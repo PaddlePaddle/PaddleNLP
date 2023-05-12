@@ -13,11 +13,14 @@
 # limitations under the License.
 import copy
 import json
+import logging
 import os
 
 import requests
 
 from pipelines.nodes.base import BaseComponent
+
+logger = logging.getLogger(__name__)
 
 
 class ErnieBot(BaseComponent):
@@ -68,7 +71,7 @@ class ErnieBot(BaseComponent):
         :param history: A list of dictionaries representing the conversation history,
         :param stream: Whether to use streaming mode when making the request. Currently not in use. Defaults to False.
         """
-
+        logger.info(query)
         payload = {"messages": []}
         if history is not None:
             if len(history) % 2 == 0:

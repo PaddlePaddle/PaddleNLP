@@ -16,14 +16,21 @@ import os
 from dataclasses import dataclass, field
 from functools import partial
 
+import numpy as np
 import paddle
-from data import convert_example, read_local_dataset
+from data import convert_example, custom_instruction_convert_example, read_local_dataset
+from sklearn.metrics import accuracy_score
 from utils import ChatGLMTrainer
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, LoRAModel
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
+from paddlenlp.prompt import PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.prompt.prefix import (
+    chatglm_pad_attention_mask,
+    chatglm_postprocess_past_key_value,
+)
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import ChatGLMForConditionalGeneration, ChatGLMTokenizer
 from paddlenlp.utils.log import logger
@@ -31,7 +38,7 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class DataArgument:
-    task_path: str = field(default="./data/", metadata={"help": "Path to data"})
+    task_name_or_path: str = field(default="./data/", metadata={"help": "Path to data"})
     src_length: int = field(default=128, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=180, metadata={"help": "The max length of target text."})
     num_beams: int = field(default=5, metadata={"help": "The number of beams."})
@@ -42,7 +49,9 @@ class ModelArgument:
     model_name_or_path: str = field(
         default="THUDM/chatglm-6b", metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
+    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix Tuning technique"})
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
+    do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
 
 
 def main():
@@ -86,14 +95,33 @@ def main():
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
     )
+    if model_args.prefix_tuning:
+        prefix_config = PrefixConfig(
+            num_prefix_tokens=64,
+            num_attention_heads=model.config.num_attention_heads,
+            num_hidden_layers=model.config.num_hidden_layers,
+            hidden_size=model.config.hidden_size,
+            prefix_projection=True,
+            prefix_projection_hidden_size=model.config.hidden_size,
+            dtype=dtype,
+        )
+        model = PrefixModelForCausalLM(
+            model=model,
+            prefix_config=prefix_config,
+            postprocess_past_key_value=chatglm_postprocess_past_key_value,
+            pad_attention_mask=chatglm_pad_attention_mask,
+        )
+        model.mark_only_prefix_as_trainable()
+        model.print_trainable_parameters()
     if model_args.lora:
         lora_config = LoRAConfig(
             target_modules=[".*query_key_value.*"],
-            r=4,
-            lora_alpha=8,
+            r=8,
+            lora_alpha=16,
             merge_weights=True,
             enable_lora_list=[[True, False, True]],
             tensor_parallel_degree=training_args.tensor_parallel_degree,
+            dtype=dtype,
         )
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()
@@ -101,17 +129,31 @@ def main():
     tokenizer = ChatGLMTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load the dataset.
-    train_ds = load_dataset(read_local_dataset, path=os.path.join(data_args.task_path, "train.json"), lazy=False)
-    dev_ds = load_dataset(read_local_dataset, path=os.path.join(data_args.task_path, "dev.json"), lazy=False)
-    trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
-    train_ds = train_ds.map(partial(trans_func, is_test=False))
-    test_ds = dev_ds.map(trans_func)
+    if os.path.exists(os.path.join(data_args.task_name_or_path, "train.json")) and os.path.exists(
+        os.path.join(data_args.task_name_or_path, "dev.json")
+    ):
+        train_ds = load_dataset(
+            read_local_dataset, path=os.path.join(data_args.task_name_or_path, "train.json"), lazy=False
+        )
+        dev_ds = load_dataset(
+            read_local_dataset, path=os.path.join(data_args.task_name_or_path, "dev.json"), lazy=False
+        )
+        trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
+    else:
+        train_ds, dev_ds = load_dataset("bellegroup", data_args.task_name_or_path, splits=["train", "dev"])
+        trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
+    if model_args.do_generation:
+        train_ds = train_ds.map(partial(trans_func, is_test=False))
+        test_ds = dev_ds.map(trans_func)
+    else:
+        train_ds = train_ds.map(partial(trans_func, is_test=False))
+        test_ds = dev_ds.map(partial(trans_func, is_test=False))
 
     collate_fn = DataCollatorWithPadding(
         tokenizer=tokenizer, max_length=data_args.src_length + data_args.tgt_length, padding=True
     )
 
-    def compute_metrics(eval_preds):
+    def compute_metrics_do_generation(eval_preds):
         rouge1 = Rouge1()
         rouge2 = Rouge2()
         rougel = RougeL()
@@ -133,16 +175,25 @@ def main():
             "bleu4": bleu4.score(),
         }
 
+    def compute_metrics(eval_preds):
+
+        predictions = [x[x != -100] for x in eval_preds.predictions]
+        references = [x[x != -100] for x in eval_preds.label_ids]
+        accuracy = accuracy_score(y_true=np.array(references).flatten(), y_pred=np.array(predictions).flatten())
+        return {
+            "accuracy": accuracy,
+        }
+
     trainer = ChatGLMTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics,
-        do_generation=True,
+        compute_metrics=compute_metrics_do_generation if model_args.do_generation else compute_metrics,
         data_collator=collate_fn,
         data_args=data_args,
+        do_generation=model_args.do_generation,
     )
     # if training_args.fp16_opt_level == "O2":
     #     trainer.disable_autocast_context_manager()

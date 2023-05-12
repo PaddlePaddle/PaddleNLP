@@ -17,6 +17,7 @@ import os
 
 import paddle
 
+from paddlenlp.layers import LoRAModel
 from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
 
 
@@ -37,6 +38,7 @@ def parse_args():
         # required=True,
         help="The output file prefix used to save the exported inference model.",
     )
+    parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     args = parser.parse_args()
     return args
 
@@ -46,6 +48,8 @@ def main():
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     model = AutoModelForConditionalGeneration.from_pretrained(args.model_name_or_path, load_state_as_np=True)
+    if args.lora_path is not None:
+        model = LoRAModel.from_pretrained(model, args.lora_path)
 
     model.eval()
     input_spec = [

@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from collections import UserDict
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle import Tensor
@@ -90,6 +90,17 @@ class GLMTrainer(Trainer):
         if self.lr_scheduler is None:
             self.lr_scheduler = LambdaDecay(self.args.learning_rate, lr_lambda, last_epoch=-1)
         return self.lr_scheduler
+
+    def log(self, logs: Dict[str, float], **kwargs) -> None:
+
+        if self.state.epoch is not None:
+            logs["epoch"] = round(self.state.epoch, 4)
+
+        if "eval_loss" in logs:
+            logs["eval_ppl"] = np.exp(logs["eval_loss"])
+        output = {**logs, **{"step": self.state.global_step}}
+        self.state.log_history.append(output)
+        self.control = self.callback_handler.on_log(self.args, self.state, self.control, logs, **kwargs)
 
 
 @paddle.no_grad()

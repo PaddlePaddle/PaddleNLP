@@ -86,7 +86,7 @@ msgstr ""
 #: ../trainer.md:32
 msgid ""
 "PdArgumentParser 可以接受多个类似TrainingArguments的参数。用户可以自定义所需要的ModelArguments, "
-"DataArguments为为 tuple 传入 PdArgumentParser即可。"
+"DataArguments为 tuple 传入 PdArgumentParser即可。"
 msgstr ""
 
 #: ../trainer.md:33

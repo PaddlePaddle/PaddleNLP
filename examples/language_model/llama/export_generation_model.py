@@ -17,6 +17,7 @@ import os
 
 import paddle
 
+from paddlenlp.layers import LoRAModel
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 
 
@@ -37,6 +38,7 @@ def parse_args():
     )
     parser.add_argument("--dtype", default="float32", type=str, help="The data type of exported model")
     parser.add_argument("--tgt_length", type=int, default=100, help="The batch size of data.")
+    parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     args = parser.parse_args()
     return args
 
@@ -57,13 +59,15 @@ def main():
         dtype=args.dtype,
     )
     model.config.fp16_opt_level = None  # For dygraph to static only
+    if args.lora_path is not None:
+        model = LoRAModel.from_pretrained(model, args.lora_path)
     model.eval()
     model = paddle.jit.to_static(
         model.generate,
         input_spec=[
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
-            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # position_ids
+            None,  # position_ids
             args.tgt_length,  # max length
             # min_length
             0,

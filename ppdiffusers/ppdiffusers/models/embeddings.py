@@ -125,6 +125,7 @@ class PatchEmbed(nn.Layer):
         layer_norm=False,
         flatten=True,
         bias=True,
+        add_pos_embed=True,
     ):
         super().__init__()
 
@@ -141,8 +142,12 @@ class PatchEmbed(nn.Layer):
         else:
             self.norm = None
 
-        pos_embed = get_2d_sincos_pos_embed(embed_dim, int(num_patches**0.5))
-        self.register_buffer("pos_embed", paddle.to_tensor(pos_embed).cast("float32").unsqueeze(0), persistable=False)
+        self.add_pos_embed = add_pos_embed
+        if add_pos_embed:
+            pos_embed = get_2d_sincos_pos_embed(embed_dim, int(num_patches**0.5))
+            self.register_buffer(
+                "pos_embed", paddle.to_tensor(pos_embed).cast("float32").unsqueeze(0), persistable=False
+            )
 
     def forward(self, latent):
         latent = self.proj(latent)
@@ -150,7 +155,10 @@ class PatchEmbed(nn.Layer):
             latent = latent.flatten(2).transpose([0, 2, 1])  # BCHW -> BNC
         if self.layer_norm:
             latent = self.norm(latent)
-        return latent + self.pos_embed
+        if self.add_pos_embed:
+            return latent + self.pos_embed
+        else:
+            return latent
 
 
 class TimestepEmbedding(nn.Layer):

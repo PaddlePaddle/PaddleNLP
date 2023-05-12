@@ -12,13 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
-
-from typing import Optional
+from typing import Optional, Union
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle import Tensor
 from paddle.common_ops_import import convert_dtype
 
 try:
@@ -52,6 +53,43 @@ from paddlenlp.generation.stopping_criteria import (
     StoppingCriteriaList,
     validate_stopping_criteria,
 )
+
+
+def get_unfinished_flag(
+    input_ids: Tensor, unfinished_flag: Tensor, eos_token_id: Union[int, list[int], list[list[int]]]
+) -> Tensor:
+    """get unfinished flag for generation step
+
+    Args:
+        input_ids (Tensor): the input_ids
+        eos_token_id (Union[int, list[int], list[list[int]]]): the end os sentence flag, which can be:
+            * single token id, eg: 10
+            * multiple token ids to stop generation, eg: [10, 10]
+            * some more tokens to stop generations, eg: [[10], [20, 20], [30, 30, 30]]
+
+    Returns:
+        Tensor: the unfinished flag tensor
+    """
+    if isinstance(eos_token_id, int):
+        unfinished_flag = paddle.logical_and(unfinished_flag, input_ids[:, -1:] != eos_token_id)
+    elif isinstance(eos_token_id[0], int):
+        eos_token_id_tensor = paddle.to_tensor([eos_token_id])
+        is_last_tokens_equal = paddle.all(
+            paddle.equal(input_ids[:, -len(eos_token_id) :], eos_token_id_tensor), axis=-1
+        ).unsqueeze(-1)
+        unfinished_flag = paddle.logical_and(unfinished_flag, ~is_last_tokens_equal)
+    else:
+        batch_unfinish_flag = None
+        for batch_eos_token_id in eos_token_id:
+            if batch_unfinish_flag is None:
+                batch_unfinish_flag = ~get_unfinished_flag(input_ids, unfinished_flag, batch_eos_token_id)
+            else:
+                batch_unfinish_flag = paddle.logical_or(
+                    batch_unfinish_flag, ~get_unfinished_flag(input_ids, unfinished_flag, batch_eos_token_id)
+                )
+
+        unfinished_flag = ~batch_unfinish_flag
+    return unfinished_flag
 
 
 class BeamHypotheses:
@@ -449,9 +487,11 @@ class GenerationMixin(object):
         # update cache
         if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
             model_kwargs["cache"] = outputs[1]
+            model_kwargs["past_key_values"] = outputs[1]
 
         if isinstance(outputs, ModelOutput) and "past_key_values" in outputs:
             model_kwargs["cache"] = outputs.past_key_values
+            model_kwargs["past_key_values"] = outputs.past_key_values
 
         # update token_type_ids with last value
         if "token_type_ids" in model_kwargs and model_kwargs["token_type_ids"] is not None:
@@ -827,7 +867,6 @@ class GenerationMixin(object):
                 print(response)
                 # ['是的', '嗯嗯']
         """
-
         assert decode_strategy in [
             "greedy_search",
             "sampling",
@@ -1176,10 +1215,11 @@ class GenerationMixin(object):
             scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
 
             cur_len += 1
+
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
 
             if eos_token_id is not None:
-                unfinished_flag = paddle.logical_and(unfinished_flag, next_tokens != eos_token_id)
+                unfinished_flag = get_unfinished_flag(input_ids, unfinished_flag, eos_token_id)
 
             # Stop when there is a </s> in all sentences
             if not paddle.any(unfinished_flag) or stopping_criteria(input_ids, scores):
@@ -1204,6 +1244,7 @@ class GenerationMixin(object):
         eos_token_id: Optional[int] = None,
         **model_kwargs
     ):
+        model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
 
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
         logits_warper = logits_warper if logits_warper is not None else LogitsProcessorList()
@@ -1284,26 +1325,35 @@ class GenerationMixin(object):
 
             top_k_probs, top_k_ids = paddle.topk(next_probs, k=top_k, axis=-1)
 
+            new_key_values = ()
             if self.config.is_encoder_decoder:
-                print(model_kwargs["cache"])
-                new_key_values = ()
-                for layer in model_kwargs["cache"]:
-                    even = 0
-                    items = ()
-                    for item in layer:
-                        if even % 2 == 0:
-                            k = item[0].repeat_interleave(top_k, axis=0)
-                            v = item[1].repeat_interleave(top_k, axis=0)
-                        if even and even % 2:
-                            static_k = item[0].repeat_interleave(top_k, axis=0)
-                            static_v = item[1].repeat_interleave(top_k, axis=0)
+                if isinstance(model_kwargs["cache"][0][0], tuple):
+                    for layer in model_kwargs["cache"]:
+                        even = 0
+                        items = ()
+                        for item in layer:
+                            if even % 2 == 0:
+                                k = item[0].repeat_interleave(top_k, axis=0)
+                                v = item[1].repeat_interleave(top_k, axis=0)
+                            if even and even % 2:
+                                static_k = item[0].repeat_interleave(top_k, axis=0)
+                                static_v = item[1].repeat_interleave(top_k, axis=0)
 
-                            items += (
-                                (MultiHeadAttention.Cache(k, v), MultiHeadAttention.StaticCache(static_k, static_v)),
-                            )
+                                items += (
+                                    (
+                                        MultiHeadAttention.Cache(k, v),
+                                        MultiHeadAttention.StaticCache(static_k, static_v),
+                                    ),
+                                )
 
-                        even += 1
-                    new_key_values += items
+                            even += 1
+                        new_key_values += items
+                else:
+                    for layer in model_kwargs["cache"]:
+                        items = ()
+                        for item in layer:
+                            items += (item.repeat_interleave(top_k, axis=0),)
+                        new_key_values += (items,)
                 model_kwargs["cache"] = new_key_values
             else:
                 new_key_values = ()
@@ -1315,19 +1365,31 @@ class GenerationMixin(object):
                             k = item.repeat_interleave(top_k, axis=0)
                         if even and even % 2:
                             v = item.repeat_interleave(top_k, axis=0)
+
                             items += (MultiHeadAttention.Cache(k, v),)
                         even += 1
                     new_key_values += items
                 model_kwargs["cache"] = new_key_values
 
+            model_kwargs["past_key_values"] = model_kwargs["cache"]
             # compute the candidate tokens by the langugae model and collects their hidden states
             tmp = paddle.reshape(top_k_ids, (-1, 1))
 
             next_model_inputs = self.prepare_inputs_for_generation(tmp, **model_kwargs)
+
             outputs = self(**next_model_inputs, return_dict=True, output_hidden_states=True)
 
-            next_past_key_values = outputs.past_key_values
-            logits = outputs.logits[:, -1, :]
+            if isinstance(outputs, tuple):
+                logits = outputs[0]
+                next_past_key_values = outputs[1]
+            elif isinstance(outputs, ModelOutput):
+                logits = outputs.logits
+                next_past_key_values = outputs.past_key_values
+            else:
+                logits = outputs
+
+            # next_past_key_values = outputs.past_key_values
+            logits = logits[:, -1, :]
 
             # name is different for encoder-decoder and decoder-only models
             if self.config.is_encoder_decoder:
@@ -1367,7 +1429,7 @@ class GenerationMixin(object):
                 next_decoder_hidden_states += (layer,)
 
             # select the past_key_value
-            if self.config.is_encoder_decoder:
+            if self.config.is_encoder_decoder and isinstance(next_past_key_values[0][0], tuple):
                 new_key_values = ()
                 for layer in next_past_key_values:
                     items = ()
@@ -1398,7 +1460,6 @@ class GenerationMixin(object):
                         even += 1
                     new_key_values += (items,)
                 next_past_key_values = new_key_values
-
             else:
                 new_key_values = ()
                 for layer in next_past_key_values:
@@ -1585,6 +1646,7 @@ class GenerationMixin(object):
 
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
+
             logits = logits_processors(input_ids, logits)
 
             # sample
@@ -1597,6 +1659,7 @@ class GenerationMixin(object):
             if paddle.get_default_dtype() not in ["float32", "float64"]:
                 probs = probs.astype("float32")
             next_tokens = paddle.multinomial(probs)
+
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
@@ -1658,6 +1721,8 @@ class GenerationMixin(object):
         eos_token_id,
         **model_kwargs
     ):
+        model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
+
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
         batch_size = len(beam_scorer._beam_hyps)

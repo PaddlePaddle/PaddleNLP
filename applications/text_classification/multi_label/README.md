@@ -1,7 +1,6 @@
 # 多标签分类指南
 
 **目录**
-**目录**
 - [1. 多标签分类简介](#多标签分类简介)
 - [2. 快速开始](#快速开始)
     - [2.1 运行环境](#运行环境)
@@ -277,7 +276,7 @@ python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 
 预测错误的样本保存在bad_case.txt文件中：
 
 ```text
-Text	Label	Prediction
+Text    Label    Prediction
 2014年，王X以其与肖X协议离婚时未分割该套楼房的首付款为由，起诉至法院，要求分得楼房的首付款15万元。    不动产分割,有夫妻共同财产    不动产分割
 但原、被告对已建立起的夫妻感情不够珍惜，因琐事即发生吵闹并最终分居，对夫妻感情造成了严重的影响，现原、被告已分居六年有余，且经人民法院判决不准离婚后仍未和好，夫妻感情确已破裂，依法应准予原、被告离婚。    二次起诉离婚,准予离婚,婚后分居,法定离婚    婚后分居,准予离婚
 婚后生有一女，取名彭某乙，已11岁，现已由被告从铁炉白族乡中心小学转入走马镇李桥小学读书。    婚后有子女    婚后有子女,限制行为能力子女抚养
@@ -296,9 +295,9 @@ text: 2015年2月23日，被告将原告赶出家门，原告居住于娘家待�
 predict label: 婚后分居
 label: 不履行家庭义务,婚后分居
 examples with positive influence
-support1 text: 2014年中秋节原告回了娘家，原、被告分居至今。	label: 婚后分居	score: 0.99942
-support2 text: 原告于2013年8月13日离开被告家，分居至今。	label: 婚后分居	score: 0.99916
-support3 text: 2014年4月，被告外出务工，双方分居至今。	label: 婚后分居	score: 0.99902
+support1 text: 2014年中秋节原告回了娘家，原、被告分居至今。    label: 婚后分居    score: 0.99942
+support2 text: 原告于2013年8月13日离开被告家，分居至今。    label: 婚后分居    score: 0.99916
+support3 text: 2014年4月，被告外出务工，双方分居至今。    label: 婚后分居    score: 0.99902
 ...
 ```
 
@@ -388,7 +387,7 @@ python prune.py \
 
 
 可支持配置的参数：
-* `output_dir`：必须，保存模型输出和和中间checkpoint的输出目录;默认为 `None` 。
+* `output_dir`：必须，保存模型输出和中间checkpoint的输出目录;默认为 `None` 。
 * `device`: 选用什么设备进行裁剪，选择cpu、gpu。如使用gpu训练，可使用参数--gpus指定GPU卡号。
 * `per_device_train_batch_size`：训练集裁剪训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `per_device_eval_batch_size`：开发集评测过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。

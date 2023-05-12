@@ -895,7 +895,7 @@ class StableDiffusionAttendAndExcitePipeline(DiffusionPipeline):
 class GaussianSmoothing(nn.Layer):
     """
     Arguments:
-    Apply gaussian smoothing on a 1d, 2d or 3d tensor. Filtering is performed seperately for each channel in the input
+    Apply gaussian smoothing on a 1d, 2d or 3d tensor. Filtering is performed separately for each channel in the input
     using a depthwise convolution.
         channels (int, sequence): Number of channels of the input tensors. Output will
             have this number of channels as well.

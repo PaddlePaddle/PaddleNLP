@@ -20,7 +20,7 @@ python -m pip install paddlepaddle-gpu==0.0.0.post112 -f https://www.paddlepaddl
 ```
 python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 --model_name_or_path THUDM/chatglm-6b \
---task_path AdvertiseGen/ \
+--task_name_or_path AdvertiseGen/ \
 --max_steps 3000 \
 --learning_rate 3e-5 \
 --warmup_steps 20 \
@@ -39,13 +39,14 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 --recompute True \
 --do_train \
 --do_eval \
---tensor_parallel_degree 4
+--tensor_parallel_degree 4 \
+--do_generation True
 ```
 
 其中参数释义如下：
 
 - `model_name_or_path`: 预训练模型内置名称或者模型所在目录，默认为`THUDM/chatglm-6b`。
-- `task_path`: 数据集存储目录。
+- `task_name_or_path`: 数据集存储目录。
 - `max_steps`: 模型训练步数。
 - `learning_rate`: 参数更新的学习率。
 - `warmup_steps`: 学习率热启的步数。
@@ -63,7 +64,36 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 - `do_train`: 是否训练模型。
 - `do_eval`: 是否评估模型。
 - `tensor_parallel_degree`: 模型并行数量。
+- `do_generation`: 在评估的时候是否调用model.generate,默认为False。
 
+## BelleGroup/school_math_0.25M
+
+```
+python -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir chatglm_log finetune_generation.py \
+--output_dir ./checkpoints/chatglm-6b \
+--per_device_train_batch_size 32 \
+--per_device_eval_batch_size 32 \
+--gradient_accumulation_steps 1 \
+--model_name_or_path THUDM/chatglm-6b \
+--task_name_or_path school_math_0.25M \
+--num_train_epochs 2 \
+--learning_rate 3e-5 \
+--warmup_ratio 0.03 \
+--logging_steps 1 \
+--eval_steps 500 \
+--save_steps 500 \
+--src_length 128 \
+--tgt_length 512 \
+--fp16 \
+--fp16_opt_level O2 \
+--recompute True \
+--do_train \
+--do_eval \
+--disable_tqdm True \
+--metric_for_best_model accuracy \
+--do_generation False \
+--tensor_parallel_degree 4
+```
 
 ## 模型预测
 
