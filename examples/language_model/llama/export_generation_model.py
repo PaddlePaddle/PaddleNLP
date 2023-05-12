@@ -17,8 +17,8 @@ import os
 
 import paddle
 
-from paddlenlp.layers import LoRAModel
-from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+from paddlenlp.layers import LoRAConfig, LoRAModel
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaConfig
 
 
 def parse_args():
@@ -36,7 +36,7 @@ def parse_args():
         type=str,
         help="The output file prefix used to save the exported inference model.",
     )
-    parser.add_argument("--dtype", default="float32", type=str, help="The data type of exported model")
+    parser.add_argument("--dtype", default=None, help="The data type of exported model")
     parser.add_argument("--tgt_length", type=int, default=100, help="The batch size of data.")
     parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     args = parser.parse_args()
@@ -47,8 +47,15 @@ def main():
     args = parse_args()
 
     paddle.seed(100)
-    paddle.set_default_dtype(args.dtype)
     tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+    if args.lora_path is not None:
+        lora_config = LoRAConfig.from_pretrained(args.lora_path)
+        dtype = lora_config.dtype
+    elif args.dtype is not None:
+        dtype = args.dtype
+    else:
+        config = LlamaConfig.from_pretrained(args.model_name_or_path)
+        dtype = "float16" if config.dtype is None else config.dtype
 
     model = AutoModelForCausalLM.from_pretrained(
         args.model_path,
@@ -56,7 +63,7 @@ def main():
         low_cpu_mem_usage=True,
         use_recompute=False,
         use_cache=True,
-        dtype=args.dtype,
+        dtype=dtype,
     )
     model.config.fp16_opt_level = None  # For dygraph to static only
     if args.lora_path is not None:

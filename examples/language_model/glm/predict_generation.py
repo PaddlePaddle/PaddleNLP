@@ -15,8 +15,12 @@
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.layers import LoRAModel
-from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
+from paddlenlp.layers import LoRAConfig, LoRAModel
+from paddlenlp.transformers import (
+    AutoConfig,
+    AutoModelForConditionalGeneration,
+    AutoTokenizer,
+)
 
 
 def parse_arguments():
@@ -33,16 +37,6 @@ def parse_arguments():
     parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
     parser.add_argument("--src_length", type=int, default=200, help="The batch size of data.")
     parser.add_argument("--tgt_length", type=int, default=20, help="The batch size of data.")
-    parser.add_argument(
-        "--fp16",
-        action="store_true",
-        help="Whether to use fp16 16-bit (mixed) precision training instead of 32-bit training.",
-    )
-    parser.add_argument(
-        "--bf16",
-        action="store_true",
-        help="Whether to use bf16 (mixed) precision instead of 32-bit. Requires Ampere or higher NVIDIA architecture or using CPU (no_cuda).",
-    )
     return parser.parse_args()
 
 
@@ -74,13 +68,14 @@ class Predictor(object):
             fleet.init(is_collective=True, strategy=strategy)
             hcg = fleet.get_hybrid_communicate_group()
             tensor_parallel_rank = hcg.get_model_parallel_rank()
-        if args.fp16:
-            dtype = "float16"
-        elif args.bf16:
-            dtype = "bfloat16"
+
+        if self.args.lora_path is not None:
+            lora_config = LoRAConfig.from_pretrained(self.args.lora_path)
+            dtype = lora_config.dtype
         else:
-            dtype = "float32"
-        paddle.set_default_dtype(dtype)
+            config = AutoConfig.from_pretrained(args.model_name_or_path)
+            dtype = config.dtype if config.dtype is not None else "float32"
+
         self.model = AutoModelForConditionalGeneration.from_pretrained(
             args.model_name_or_path,
             tensor_parallel_degree=tensor_parallel_degree,
