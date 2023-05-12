@@ -292,7 +292,7 @@ class AutoTokenizer:
                 )
                 logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
                 return tokenizer_class.from_pretrained(
-                    pretrained_model_name_or_path, from_hf_hub=from_hf_hub, *model_args, **kwargs
+                    pretrained_model_name_or_path, from_hf_hub=from_hf_hub, subfolder=subfolder, *model_args, **kwargs
                 )
         # From built-in pretrained models
         elif pretrained_model_name_or_path in all_tokenizer_names:

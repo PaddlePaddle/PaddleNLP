@@ -202,7 +202,7 @@ class Task(metaclass=abc.ABCMeta):
                 logger.info((">>> [InferBackend] INT8 inference on CPU ..."))
         elif paddle.get_device().split(":", 1)[0] == "npu":
             self._config.disable_gpu()
-            self._config.enable_npu(self.kwargs["device_id"])
+            self._config.enable_custom_device("npu", self.kwargs["device_id"])
         else:
             if self._infer_precision == "int8":
                 logger.info(

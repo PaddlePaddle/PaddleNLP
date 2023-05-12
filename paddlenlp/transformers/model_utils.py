@@ -1220,11 +1220,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 return_unused_kwargs=True,
                 force_download=force_download,
                 from_hf_hub=from_hf_hub,
+                subfolder=subfolder,
                 **kwargs,
             )
 
         if dtype is None:
             dtype = config.dtype
+        else:
+            config.dtype = dtype
 
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
             config.save_pretrained(cache_dir)

@@ -63,10 +63,10 @@ def main():
             num_classes_sym=NUM_CLASSES[args.train_dataset][1],
         )
     elif args.train_dataset == "CMeIE":
-        model = ElectraForSPO.from_pretrained(args.params_path, num_classes=NUM_CLASSES[args.train_dataset])
+        model = ElectraForSPO.from_pretrained(args.params_path, num_labels=NUM_CLASSES[args.train_dataset])
     else:
         model = ElectraForSequenceClassification.from_pretrained(
-            args.params_path, num_classes=NUM_CLASSES[args.train_dataset], activation="tanh"
+            args.params_path, num_labels=NUM_CLASSES[args.train_dataset]
         )
 
     model.eval()

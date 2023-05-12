@@ -15,8 +15,8 @@
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.layers import LoRAModel
-from paddlenlp.prompt import PrefixModelForCausalLM
+from paddlenlp.layers import LoRAConfig, LoRAModel
+from paddlenlp.prompt import PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.prompt.prefix import (
     chatglm_pad_attention_mask,
     chatglm_postprocess_past_key_value,
@@ -77,15 +77,22 @@ class Predictor(object):
             hcg = fleet.get_hybrid_communicate_group()
             tensor_parallel_rank = hcg.get_model_parallel_rank()
 
-        config = ChatGLMConfig.from_pretrained(args.model_name_or_path)
-        paddle.set_default_dtype(config.paddle_dtype)
+        if self.args.lora_path is not None:
+            lora_config = LoRAConfig.from_pretrained(self.args.lora_path)
+            dtype = lora_config.dtype
+        elif self.args.prefix_path is not None:
+            prefix_config = PrefixConfig.from_pretrained(self.args.prefix_path)
+            dtype = prefix_config.dtype
+        else:
+            config = ChatGLMConfig.from_pretrained(args.model_name_or_path)
+            dtype = config.dtype if config.dtype is not None else config.paddle_dtype
 
         self.model = ChatGLMForConditionalGeneration.from_pretrained(
             args.model_name_or_path,
             tensor_parallel_degree=tensor_parallel_degree,
             tensor_parallel_rank=tensor_parallel_rank,
             load_state_as_np=True,
-            dtype=config.paddle_dtype,
+            dtype=dtype,
         )
         if self.args.lora_path is not None:
             self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)

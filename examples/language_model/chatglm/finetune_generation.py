@@ -101,7 +101,7 @@ def main():
             num_attention_heads=model.config.num_attention_heads,
             num_hidden_layers=model.config.num_hidden_layers,
             hidden_size=model.config.hidden_size,
-            prefix_projection=True,
+            # prefix_projection=True,
             prefix_projection_hidden_size=model.config.hidden_size,
             dtype=dtype,
         )
