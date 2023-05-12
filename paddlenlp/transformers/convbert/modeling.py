@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2021 The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"
@@ -290,11 +290,12 @@ class ConvBertEmbeddings(nn.Layer):
         if input_ids is not None:
             inputs_embeds = self.word_embeddings(input_ids)
 
-        if position_ids is None:
-            ones = paddle.ones_like(input_ids, dtype="int64")
-            seq_length = paddle.cumsum(ones, axis=-1)
-            position_ids = seq_length - ones
-            position_ids.stop_gradient = True
+        input_shape = paddle.shape(inputs_embeds)[:-1]
+
+        ones = paddle.ones(input_shape, dtype="int64")
+        seq_length = paddle.cumsum(ones, axis=1)
+        position_ids = seq_length - ones
+        position_ids.stop_gradient = True
 
         if token_type_ids is None:
             token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
@@ -766,11 +767,9 @@ class ConvBertGenerator(ConvBertPretrainedModel):
             attention_mask (Tensor, optional):
                 See :class:`ConvBertModel`.
             output_hidden_states (bool, optional):
-                Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                See :class:`ConvBertModel`.
             output_attentions (bool, optional):
-                Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                See :class:`ConvBertModel`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
                 `False`, the output will be a tuple of tensors. Defaults to `False`.
@@ -902,11 +901,9 @@ class ConvBertForSequenceClassification(ConvBertPretrainedModel):
                 a regression loss is computed (Mean-Square loss), If `num_labels > 1`
                 a classification loss is computed (Cross-Entropy).
             output_hidden_states (bool, optional):
-                Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                See :class:`ConvBertModel`.
             output_attentions (bool, optional):
-                Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                See :class:`ConvBertModel`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` object. If
                 `False`, the output will be a tuple of tensors. Defaults to `False`.
@@ -1014,11 +1011,9 @@ class ConvBertForTokenClassification(ConvBertPretrainedModel):
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
                 Labels for computing the token classification loss. Indices should be in `[0, ..., num_labels - 1]`.
             output_hidden_states (bool, optional):
-                Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                See :class:`ConvBertModel`.
             output_attentions (bool, optional):
-                Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                See :class:`ConvBertModel`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` object. If
                 `False`, the output will be a tuple of tensors. Defaults to `False`.
@@ -1330,11 +1325,9 @@ class ConvBertForMultipleChoice(ConvBertPretrainedModel):
                 num_choices-1]` where `num_choices` is the size of the second dimension of the input tensors. (See
                 `input_ids` above)
             output_hidden_states (bool, optional):
-                Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                See :class:`ConvBertModel`.
             output_attentions (bool, optional):
-                Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                See :class:`ConvBertModel`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
                 `False`, the output will be a tuple of tensors. Defaults to `False`.
@@ -1455,11 +1448,9 @@ class ConvBertForQuestionAnswering(ConvBertPretrainedModel):
                 Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
                 are not taken into account for computing the loss.
             output_hidden_states (bool, optional):
-                Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                See :class:`ConvBertModel`.
             output_attentions (bool, optional):
-                Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                See :class:`ConvBertModel`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
                 `False`, the output will be a tuple of tensors. Defaults to `False`.

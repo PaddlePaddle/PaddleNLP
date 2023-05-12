@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2020 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -413,21 +413,22 @@ class ConvBertModelTester:
 
 
 @parameterized_class(
-    ("return_dict", "use_labels", "use_inputs_embeds"),
+    ("return_dict", "use_labels"),
     [
-        [False, False, True],
-        [False, False, False],
-        [False, True, False],
-        [True, False, False],
-        [True, True, False],
+        [False, False],
+        [False, False],
+        [False, True],
+        [True, False],
+        [True, True],
     ],
 )
 class ConvBertModelTest(ModelTesterMixin, unittest.TestCase):
-    test_resize_embeddings = False
+    test_resize_embeddings: bool = True
     base_model_class = ConvBertModel
     return_dict: bool = False
     use_labels: bool = False
     test_tie_weights: bool = True
+    use_test_inputs_embeds: bool = True
 
     all_model_classes = (
         ConvBertModel,

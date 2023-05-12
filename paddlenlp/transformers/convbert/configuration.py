@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -199,7 +199,7 @@ class ConvBertConfig(PretrainedConfig):
     This is the configuration class to store the configuration of a [`ConvBertModel`]. It is used to instantiate a
     ConvBERT model according to the specified arguments, defining the model architecture. Instantiating a
     configuration with the defaults will yield a similar configuration to that of the ConvBert
-    conv-bert-base architecture. Configuration objects.
+    convbert-base architecture. Configuration objects.
 
     Configuration objects inherit from [`PretrainedConfig`] and can be used to control the model outputs. Read the
     documentation from [`PretrainedConfig`] for more information.
@@ -233,28 +233,34 @@ class ConvBertConfig(PretrainedConfig):
             The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
         layer_norm_eps (`float`, *optional*, defaults to 1e-12):
             The epsilon used by the layer normalization layers.
-        position_embedding_type (`str`, *optional*, defaults to `"absolute"`):
-            Type of position embedding. Choose one of `"absolute"`, `"relative_key"`, `"relative_key_query"`. For
-            positional embeddings use `"absolute"`. For more information on `"relative_key"`, please refer to
-            [Self-Attention with Relative Position Representations (Shaw et al.)](https://arxiv.org/abs/1803.02155).
-            For more information on `"relative_key_query"`, please refer to *Method 4* in [Improve Transformer Models
-            with Better Relative Position Embeddings (Huang et al.)](https://arxiv.org/abs/2009.13658).
-        use_cache (`bool`, *optional*, defaults to `True`):
-            Whether or not the model should return the last key/values attentions (not used by all models). Only
-            relevant if `config.is_decoder=True`.
-        classifier_dropout (`float`, *optional*):
-            The dropout ratio for the classification head.
+        pad_token_id(int, optional):
+            The index of padding token in the token vocabulary.
+            Defaults to `0`.
+        pool_act (`str`, *optional*):
+            The non-linear activation function in the pooler.
+            Defaults to `"tanh"`.
+        embedding_size (int, optional):
+            Dimensionality of the embedding layer. Defaults to `768`.
+        conv_kernel_size (int, optional):
+            The size of the convolutional kernel.
+            Defaults to `9`.
+        head_ratio (int, optional):
+            Ratio gamma to reduce the number of attention heads.
+            Defaults to `2`.
+        num_groups (int, optional):
+            The number of groups for grouped linear layers for ConvBert model.
+            Defaults to `1`.
 
     Examples:
 
     ```python
-    >>> from paddlenlp.transformers import BertModel, BertConfig
+    >>> from paddlenlp.transformers import ConvBertModel, ConvBertConfig
 
-    >>> # Initializing a BERT bert-base-uncased style configuration
-    >>> configuration = BertConfig()
+    >>> # Initializing a ConvBERT configuration
+    >>> configuration = ConvBertConfig()
 
-    >>> # Initializing a model from the bert-base-uncased style configuration
-    >>> model = BertModel(configuration)
+    >>> # Initializing a model from the ConvBERT-base style configuration model
+    >>> model = ConvBertModel(configuration)
 
     >>> # Accessing the model configuration
     >>> configuration = model.config
