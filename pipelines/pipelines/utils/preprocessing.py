@@ -24,6 +24,7 @@ from pipelines.nodes.file_converter import (
     PDFToTextConverter,
     TextConverter,
     ImageToTextConverter,
+    MarkdownConverter
 )
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ def convert_files_to_dicts(
     :param encoding: character encoding to use when converting pdf documents.
     """
     file_paths = [p for p in Path(dir_path).glob("**/*")]
-    allowed_suffixes = [".pdf", ".txt", ".docx", ".png", ".jpg"]
+    allowed_suffixes = [".pdf", ".txt", ".docx", ".png", ".jpg",'.md']
     suffix2converter: Dict[str, BaseConverter] = {}
 
     suffix2paths: Dict[str, List[Path]] = {}
@@ -73,6 +74,8 @@ def convert_files_to_dicts(
             suffix2converter[file_suffix] = DocxToTextConverter()
         if file_suffix == ".png" or file_suffix == ".jpg":
             suffix2converter[file_suffix] = ImageToTextConverter()
+        if file_suffix == ".md":
+            suffix2converter[file_suffix] = MarkdownConverter()
 
     documents = []
     for suffix, paths in suffix2paths.items():

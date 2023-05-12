@@ -14,6 +14,7 @@
 
 import argparse
 import glob
+import time
 
 from pipelines.document_stores import ElasticsearchDocumentStore
 from pipelines.nodes import (
@@ -90,7 +91,7 @@ def chat_markdown_tutorial():
     indexing_pipeline.run(file_paths=files)
 
     # Query Markdowns
-    ernie_bot = ErnieBot(api_key=args.api_key, secret_key=args.secret_key)
+    # ernie_bot = ErnieBot(api_key=args.api_key, secret_key=args.secret_key)
     ernie_bot = ChatGLMBot()
     ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
     query_pipeline = Pipeline()
@@ -107,8 +108,11 @@ def chat_markdown_tutorial():
         component=TruncatedConversationHistory(max_length=256), name="TruncateHistory", inputs=["Template"]
     )
     query_pipeline.add_node(component=ernie_bot, name="ErnieBot", inputs=["TruncateHistory"])
-    query = "Aistudio 教育版有哪些特性？"
+    query = "Aistudio最火的项目是哪个?"
+    start_time = time.time()
     prediction = query_pipeline.run(query=query, params={"DenseRetriever": {"top_k": 10}, "Ranker": {"top_k": 5}})
+    end_time = time.time()
+    print("Time cost for query markdown conversion:", end_time - start_time)
     print("user: {}".format(query))
     print("assistant: {}".format(prediction["result"]))
 

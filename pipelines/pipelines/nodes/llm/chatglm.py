@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class ChatGLMBot(BaseComponent):
     def __init__(self):
-        self.chatglm = Taskflow("text2text_generation", batch_size=2, max_seq_length=2048)
+        self.chatglm = Taskflow("text2text_generation", batch_size=2, max_seq_length=2048, tgt_length=256)
 
     def run(self, query, history=None, stream=False):
 
