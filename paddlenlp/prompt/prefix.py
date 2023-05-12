@@ -160,7 +160,6 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
     ):
 
         batch_size = input_ids.shape[0]
-        kwargs["use_cache"] = True
         past_key_values = self._get_past_key_values(batch_size)
 
         if attention_mask is not None:
