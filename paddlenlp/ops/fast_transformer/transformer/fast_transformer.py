@@ -723,7 +723,7 @@ class TransformerGenerator(paddle.nn.Layer):
 
 class FasterOPT(OPTPretrainedModel):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
-        super(FasterOPT, self).__init__()
+        super(FasterOPT, self).__init__(model.config)
         self._model = model
         self.use_fp16_decoding = use_fp16_decoding
         self.decoding = InferOptDecoding(model=model, decoding_lib=decoding_lib, use_fp16_decoding=use_fp16_decoding)
@@ -1675,7 +1675,7 @@ class FasterMBART(MBartPretrainedModel):
 
 class FasterGPTJ(GPTJPretrainedModel):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
-        super(FasterGPTJ, self).__init__()
+        super(FasterGPTJ, self).__init__(model.config)
         self._model = model
         self.use_fp16_decoding = use_fp16_decoding
         self.decoding = InferGptJDecoding(model=model, decoding_lib=decoding_lib, use_fp16_decoding=use_fp16_decoding)
@@ -1807,7 +1807,7 @@ class FasterPegasus(PegasusPretrainedModel):
     enable_faster_encoder_func = enable_fast_encoder
 
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False, enable_fast_encoder=False, **kwargs):
-        super(FasterPegasus, self).__init__()
+        super(FasterPegasus, self).__init__(model.config)
         self.use_fp16_decoding = use_fp16_decoding
         self._model = model
         self.encoder = model.get_encoder()
