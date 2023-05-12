@@ -136,15 +136,14 @@ python -m paddle.distributed.launch --gpus 0,1,2,3 predict_generation.py \
 ```
 python export_generation_model.py \
    --model_name_or_path ./checkpoints/chatglm-6b \
-   --output_path ./checkpoints/infer/chatglm \
-   --dtype "float32"
+   --output_path ./checkpoints/infer/chatglm
 ```
 
 其中参数定义如下：
 
 - `model_name_or_path`: 预训练模型内置名称或者模型所在目录。
 - `output_path`: 导出模型存储地址和文件前缀。示例中导出地址为 `./checkpoints/infer`，模型前缀为 `chatglm`。
-- `dtype`: 模型参数类型，默认为`float32`，可选参数`float16`和`float32`。
+- `dtype`: 模型参数类型，可选参数`float16`和`float32`，默认为None，即为加载的动态图模型参数类型一致。
 
 ## 模型推理（c++推理）
 
