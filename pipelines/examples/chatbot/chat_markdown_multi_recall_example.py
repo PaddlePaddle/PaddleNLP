@@ -31,6 +31,10 @@ from pipelines.nodes import (
 )
 from pipelines.pipelines import Pipeline
 
+BOT_CLASSES = {
+    "chatglm": ChatGLMBot,
+}
+
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to run dense_qa system, defaults to gpu.")
@@ -46,6 +50,7 @@ parser.add_argument("--embedding_dim", default=312, type=int, help="The embeddin
 parser.add_argument("--chunk_size", default=300, type=int, help="The length of data for indexing by retriever")
 parser.add_argument('--host', type=str, default="localhost", help='host ip of ANN search engine')
 parser.add_argument('--embed_title', default=False, type=bool, help="The title to be  embedded into embedding")
+parser.add_argument('--chatbot', choices=['ernie_bot', 'chatglm'], default="chatglm", help="The chatbot models ")
 parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search'], default="ernie", help="the ernie model types")
 parser.add_argument("--api_key", default=None, type=str, help="The API Key.")
 parser.add_argument("--secret_key", default=None, type=str, help="The secret key.")
@@ -91,8 +96,10 @@ def chat_markdown_tutorial():
     indexing_pipeline.run(file_paths=files)
 
     # Query Markdowns
-    # ernie_bot = ErnieBot(api_key=args.api_key, secret_key=args.secret_key)
-    ernie_bot = ChatGLMBot()
+    if args.chatbot in ["ernie_bot"]:
+        ernie_bot = ErnieBot(api_key=args.api_key, secret_key=args.secret_key)
+    else:
+        ernie_bot = BOT_CLASSES[args.chatbot]()
     ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
     query_pipeline = Pipeline()
     query_pipeline.add_node(component=retriever, name="DenseRetriever", inputs=["Query"])
