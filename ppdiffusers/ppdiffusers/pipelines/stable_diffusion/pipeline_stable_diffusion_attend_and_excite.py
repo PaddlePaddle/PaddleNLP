@@ -32,7 +32,7 @@ from ..pipeline_utils import DiffusionPipeline
 from . import StableDiffusionPipelineOutput
 from .safety_checker import StableDiffusionSafetyChecker
 
-logger = logging.get_logger(__name__)
+logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 EXAMPLE_DOC_STRING = """
     Examples:
@@ -697,7 +697,7 @@ class StableDiffusionAttendAndExcitePipeline(DiffusionPipeline):
             cross_attention_kwargs (`dict`, *optional*):
                 A kwargs dictionary that if specified is passed along to the `AttnProcessor` as defined under
                 `self.processor` in
-                [diffusers.cross_attention](https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/cross_attention.py).
+                [ppdiffusers.cross_attention](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/cross_attention.py).
             max_iter_to_alter (`int`, *optional*, defaults to `25`):
                 Number of denoising steps to apply attend-and-excite. The first <max_iter_to_alter> denoising steps are
                 where the attend-and-excite is applied. I.e. if `max_iter_to_alter` is 25 and there are a total of `30`

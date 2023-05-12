@@ -15,6 +15,7 @@
 
 
 import os
+import re
 import sys
 import traceback
 from pathlib import Path
@@ -22,6 +23,7 @@ from typing import Dict, Optional, Union
 from uuid import uuid4
 
 from huggingface_hub import HfFolder, ModelCard, ModelCardData, whoami
+from huggingface_hub.file_download import REGEX_COMMIT_HASH
 from huggingface_hub.utils import is_jinja_available
 
 from ..version import VERSION as __version__
@@ -129,6 +131,20 @@ def create_model_card(args, model_name):
     model_card.save(card_path)
 
 
+def extract_commit_hash(resolved_file: Optional[str], commit_hash: Optional[str] = None):
+    """
+    Extracts the commit hash from a resolved filename toward a cache file.
+    """
+    if resolved_file is None or commit_hash is not None:
+        return commit_hash
+    resolved_file = str(Path(resolved_file).as_posix())
+    search = re.search(r"snapshots/([^/]+)/", resolved_file)
+    if search is None:
+        return None
+    commit_hash = search.groups()[0]
+    return commit_hash if REGEX_COMMIT_HASH.match(commit_hash) else None
+
+
 # Old default cache path, potentially to be migrated.
 # This logic was more or less taken from `transformers`, with the following differences:
 # - Diffusers doesn't use custom environment variables to specify the cache path.
@@ -167,7 +183,10 @@ if not os.path.isfile(cache_version_file):
     cache_version = 0
 else:
     with open(cache_version_file) as f:
-        cache_version = int(f.read())
+        try:
+            cache_version = int(f.read())
+        except ValueError:
+            cache_version = 0
 
 if cache_version < 1:
     old_cache_is_not_empty = os.path.isdir(old_diffusers_cache) and len(os.listdir(old_diffusers_cache)) > 0

@@ -20,7 +20,7 @@ from paddle import nn
 from paddle.distributed.fleet.utils import recompute
 
 from .attention import AdaGroupNorm, AttentionBlock
-from .cross_attention import CrossAttention, CrossAttnAddedKVProcessor
+from .attention_processor import Attention, AttnAddedKVProcessor
 from .dual_transformer_2d import DualTransformer2DModel
 from .resnet import (
     Downsample2D,
@@ -52,6 +52,9 @@ def get_down_block(
     only_cross_attention=False,
     upcast_attention=False,
     resnet_time_scale_shift="default",
+    resnet_skip_time_act=False,
+    resnet_out_scale_factor=1.0,
+    cross_attention_norm=None,
     resnet_pre_temb_non_linearity=False,
 ):
     down_block_type = down_block_type[7:] if down_block_type.startswith("UNetRes") else down_block_type
@@ -80,6 +83,8 @@ def get_down_block(
             resnet_act_fn=resnet_act_fn,
             resnet_groups=resnet_groups,
             resnet_time_scale_shift=resnet_time_scale_shift,
+            skip_time_act=resnet_skip_time_act,
+            output_scale_factor=resnet_out_scale_factor,
             resnet_pre_temb_non_linearity=resnet_pre_temb_non_linearity,
         )
     elif down_block_type == "AttnDownBlock2D":
@@ -134,6 +139,10 @@ def get_down_block(
             cross_attention_dim=cross_attention_dim,
             attn_num_head_channels=attn_num_head_channels,
             resnet_time_scale_shift=resnet_time_scale_shift,
+            skip_time_act=resnet_skip_time_act,
+            output_scale_factor=resnet_out_scale_factor,
+            only_cross_attention=only_cross_attention,
+            cross_attention_norm=cross_attention_norm,
             resnet_pre_temb_non_linearity=resnet_pre_temb_non_linearity,
         )
     elif down_block_type == "SkipDownBlock2D":
@@ -236,6 +245,9 @@ def get_up_block(
     only_cross_attention=False,
     upcast_attention=False,
     resnet_time_scale_shift="default",
+    resnet_skip_time_act=False,
+    resnet_out_scale_factor=1.0,
+    cross_attention_norm=None,
     resnet_pre_temb_non_linearity=False,
 ):
     up_block_type = up_block_type[7:] if up_block_type.startswith("UNetRes") else up_block_type
@@ -265,6 +277,8 @@ def get_up_block(
             resnet_act_fn=resnet_act_fn,
             resnet_groups=resnet_groups,
             resnet_time_scale_shift=resnet_time_scale_shift,
+            skip_time_act=resnet_skip_time_act,
+            output_scale_factor=resnet_out_scale_factor,
             resnet_pre_temb_non_linearity=resnet_pre_temb_non_linearity,
         )
     elif up_block_type == "CrossAttnUpBlock2D":
@@ -305,6 +319,10 @@ def get_up_block(
             cross_attention_dim=cross_attention_dim,
             attn_num_head_channels=attn_num_head_channels,
             resnet_time_scale_shift=resnet_time_scale_shift,
+            skip_time_act=resnet_skip_time_act,
+            output_scale_factor=resnet_out_scale_factor,
+            only_cross_attention=only_cross_attention,
+            cross_attention_norm=cross_attention_norm,
             resnet_pre_temb_non_linearity=resnet_pre_temb_non_linearity,
         )
     elif up_block_type == "AttnUpBlock2D":
@@ -602,6 +620,9 @@ class UNetMidBlock2DSimpleCrossAttn(nn.Layer):
         attn_num_head_channels: int = 1,
         output_scale_factor: float = 1.0,
         cross_attention_dim: int = 1280,
+        skip_time_act=False,
+        only_cross_attention=False,
+        cross_attention_norm=None,
         resnet_pre_temb_non_linearity: bool = False,
     ):
         super().__init__()
@@ -626,14 +647,20 @@ class UNetMidBlock2DSimpleCrossAttn(nn.Layer):
                 non_linearity=resnet_act_fn,
                 output_scale_factor=output_scale_factor,
                 pre_norm=resnet_pre_norm,
+                skip_time_act=skip_time_act,
                 pre_temb_non_linearity=resnet_pre_temb_non_linearity,
             )
         ]
         attentions = []
 
         for _ in range(num_layers):
+            # TODO use AttnAddedKVProcessor2_5
+            # processor = (
+            #     AttnAddedKVProcessor2_5() if hasattr(F, "scaled_dot_product_attention_") else AttnAddedKVProcessor()
+            # )
+            processor = AttnAddedKVProcessor()
             attentions.append(
-                CrossAttention(
+                Attention(
                     query_dim=in_channels,
                     cross_attention_dim=in_channels,
                     heads=self.num_heads,
@@ -642,7 +669,9 @@ class UNetMidBlock2DSimpleCrossAttn(nn.Layer):
                     norm_num_groups=resnet_groups,
                     bias=True,
                     upcast_softmax=True,
-                    processor=CrossAttnAddedKVProcessor(),
+                    only_cross_attention=only_cross_attention,
+                    cross_attention_norm=cross_attention_norm,
+                    processor=processor,
                 )
             )
             resnets.append(
@@ -657,6 +686,7 @@ class UNetMidBlock2DSimpleCrossAttn(nn.Layer):
                     non_linearity=resnet_act_fn,
                     output_scale_factor=output_scale_factor,
                     pre_norm=resnet_pre_norm,
+                    skip_time_act=skip_time_act,
                     pre_temb_non_linearity=resnet_pre_temb_non_linearity,
                 )
             )
@@ -1306,6 +1336,7 @@ class ResnetDownsampleBlock2D(nn.Layer):
         resnet_pre_norm: bool = True,
         output_scale_factor: float = 1.0,
         add_downsample: bool = True,
+        skip_time_act: bool = False,
         resnet_pre_temb_non_linearity: bool = False,
     ):
         super().__init__()
@@ -1325,6 +1356,7 @@ class ResnetDownsampleBlock2D(nn.Layer):
                     non_linearity=resnet_act_fn,
                     output_scale_factor=output_scale_factor,
                     pre_norm=resnet_pre_norm,
+                    skip_time_act=skip_time_act,
                     pre_temb_non_linearity=resnet_pre_temb_non_linearity,
                 )
             )
@@ -1345,6 +1377,7 @@ class ResnetDownsampleBlock2D(nn.Layer):
                         non_linearity=resnet_act_fn,
                         output_scale_factor=output_scale_factor,
                         pre_norm=resnet_pre_norm,
+                        skip_time_act=skip_time_act,
                         down=True,
                         pre_temb_non_linearity=resnet_pre_temb_non_linearity,
                     )
@@ -1399,6 +1432,9 @@ class SimpleCrossAttnDownBlock2D(nn.Layer):
         cross_attention_dim: int = 1280,
         output_scale_factor: float = 1.0,
         add_downsample: bool = True,
+        skip_time_act=False,
+        only_cross_attention=False,
+        cross_attention_norm=None,
         resnet_pre_temb_non_linearity: bool = False,
     ):
         super().__init__()
@@ -1425,11 +1461,17 @@ class SimpleCrossAttnDownBlock2D(nn.Layer):
                     non_linearity=resnet_act_fn,
                     output_scale_factor=output_scale_factor,
                     pre_norm=resnet_pre_norm,
+                    skip_time_act=skip_time_act,
                     pre_temb_non_linearity=resnet_pre_temb_non_linearity,
                 )
             )
+            # TODO use AttnAddedKVProcessor2_5
+            # processor = (
+            #     AttnAddedKVProcessor2_5() if hasattr(F, "scaled_dot_product_attention_") else AttnAddedKVProcessor()
+            # )
+            processor = AttnAddedKVProcessor()
             attentions.append(
-                CrossAttention(
+                Attention(
                     query_dim=out_channels,
                     cross_attention_dim=out_channels,
                     heads=self.num_heads,
@@ -1438,7 +1480,9 @@ class SimpleCrossAttnDownBlock2D(nn.Layer):
                     norm_num_groups=resnet_groups,
                     bias=True,
                     upcast_softmax=True,
-                    processor=CrossAttnAddedKVProcessor(),
+                    only_cross_attention=only_cross_attention,
+                    cross_attention_norm=cross_attention_norm,
+                    processor=processor,
                 )
             )
         self.attentions = nn.LayerList(attentions)
@@ -1458,6 +1502,7 @@ class SimpleCrossAttnDownBlock2D(nn.Layer):
                         non_linearity=resnet_act_fn,
                         output_scale_factor=output_scale_factor,
                         pre_norm=resnet_pre_norm,
+                        skip_time_act=skip_time_act,
                         down=True,
                         pre_temb_non_linearity=resnet_pre_temb_non_linearity,
                     )
@@ -1622,7 +1667,7 @@ class KCrossAttnDownBlock2D(nn.Layer):
                     temb_channels=temb_channels,
                     attention_bias=True,
                     add_self_attention=add_self_attention,
-                    cross_attention_norm=True,
+                    cross_attention_norm="layer_norm",
                     group_size=resnet_group_size,
                 )
             )
@@ -2322,6 +2367,7 @@ class ResnetUpsampleBlock2D(nn.Layer):
         resnet_pre_norm: bool = True,
         output_scale_factor: float = 1.0,
         add_upsample: bool = True,
+        skip_time_act=False,
         resnet_pre_temb_non_linearity: bool = False,
     ):
         super().__init__()
@@ -2343,6 +2389,7 @@ class ResnetUpsampleBlock2D(nn.Layer):
                     non_linearity=resnet_act_fn,
                     output_scale_factor=output_scale_factor,
                     pre_norm=resnet_pre_norm,
+                    skip_time_act=skip_time_act,
                     pre_temb_non_linearity=resnet_pre_temb_non_linearity,
                 )
             )
@@ -2363,6 +2410,7 @@ class ResnetUpsampleBlock2D(nn.Layer):
                         non_linearity=resnet_act_fn,
                         output_scale_factor=output_scale_factor,
                         pre_norm=resnet_pre_norm,
+                        skip_time_act=skip_time_act,
                         up=True,
                         pre_temb_non_linearity=resnet_pre_temb_non_linearity,
                     )
@@ -2417,6 +2465,9 @@ class SimpleCrossAttnUpBlock2D(nn.Layer):
         cross_attention_dim: int = 1280,
         output_scale_factor: float = 1.0,
         add_upsample: bool = True,
+        skip_time_act=False,
+        only_cross_attention=False,
+        cross_attention_norm=None,
         resnet_pre_temb_non_linearity: bool = False,
     ):
         super().__init__()
@@ -2444,11 +2495,17 @@ class SimpleCrossAttnUpBlock2D(nn.Layer):
                     non_linearity=resnet_act_fn,
                     output_scale_factor=output_scale_factor,
                     pre_norm=resnet_pre_norm,
+                    skip_time_act=skip_time_act,
                     pre_temb_non_linearity=resnet_pre_temb_non_linearity,
                 )
             )
+            # TODO support AttnAddedKVProcessor2_5
+            # processor = (
+            #     AttnAddedKVProcessor2_5() if hasattr(F, "scaled_dot_product_attention_") else AttnAddedKVProcessor()
+            # )
+            processor = AttnAddedKVProcessor()
             attentions.append(
-                CrossAttention(
+                Attention(
                     query_dim=out_channels,
                     cross_attention_dim=out_channels,
                     heads=self.num_heads,
@@ -2457,7 +2514,9 @@ class SimpleCrossAttnUpBlock2D(nn.Layer):
                     norm_num_groups=resnet_groups,
                     bias=True,
                     upcast_softmax=True,
-                    processor=CrossAttnAddedKVProcessor(),
+                    only_cross_attention=only_cross_attention,
+                    cross_attention_norm=cross_attention_norm,
+                    processor=processor,
                 )
             )
         self.attentions = nn.LayerList(attentions)
@@ -2477,6 +2536,7 @@ class SimpleCrossAttnUpBlock2D(nn.Layer):
                         non_linearity=resnet_act_fn,
                         output_scale_factor=output_scale_factor,
                         pre_norm=resnet_pre_norm,
+                        skip_time_act=skip_time_act,
                         up=True,
                         pre_temb_non_linearity=resnet_pre_temb_non_linearity,
                     )
@@ -2668,7 +2728,7 @@ class KCrossAttnUpBlock2D(nn.Layer):
                     temb_channels=temb_channels,
                     attention_bias=True,
                     add_self_attention=add_self_attention,
-                    cross_attention_norm=True,
+                    cross_attention_norm="layer_norm",
                     upcast_attention=upcast_attention,
                 )
             )
@@ -2763,7 +2823,7 @@ class KAttentionBlock(nn.Layer):
         upcast_attention: bool = False,
         temb_channels: int = 768,  # for ada_group_norm
         add_self_attention: bool = False,
-        cross_attention_norm: bool = False,
+        cross_attention_norm: Optional[str] = None,
         group_size: int = 32,
     ):
         super().__init__()
@@ -2772,7 +2832,7 @@ class KAttentionBlock(nn.Layer):
         # 1. Self-Attn
         if add_self_attention:
             self.norm1 = AdaGroupNorm(temb_channels, dim, max(1, dim // group_size))
-            self.attn1 = CrossAttention(
+            self.attn1 = Attention(
                 query_dim=dim,
                 heads=num_attention_heads,
                 dim_head=attention_head_dim,
@@ -2784,7 +2844,7 @@ class KAttentionBlock(nn.Layer):
 
         # 2. Cross-Attn
         self.norm2 = AdaGroupNorm(temb_channels, dim, max(1, dim // group_size))
-        self.attn2 = CrossAttention(
+        self.attn2 = Attention(
             query_dim=dim,
             cross_attention_dim=cross_attention_dim,
             heads=num_attention_heads,

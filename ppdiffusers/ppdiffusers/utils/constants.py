@@ -44,8 +44,12 @@ TEST_DOWNLOAD_SERVER = "https://paddlenlp.bj.bcebos.com/models/community/ppdiffu
 DOWNLOAD_SERVER = "https://bj.bcebos.com/paddlenlp/models/community"
 PPNLP_BOS_RESOLVE_ENDPOINT = os.getenv("PPNLP_ENDPOINT", "https://bj.bcebos.com/paddlenlp")
 DEPRECATED_REVISION_ARGS = ["fp16", "non-ema"]
+TEXT_ENCODER_TARGET_MODULES = ["q_proj", "v_proj", "k_proj", "out_proj"]
+LOW_CPU_MEM_USAGE_DEFAULT = os.getenv("LOW_CPU_MEM_USAGE_DEFAULT", False)
+
 NEG_INF = -1e4
 
+get_map_location_default = lambda *args, **kwargs: os.getenv("MAP_LOCATION_DEFAULT", "cpu")
 FROM_HF_HUB = os.getenv("FROM_HF_HUB", False)
 FROM_DIFFUSERS = os.getenv("FROM_DIFFUSERS", False)
 TO_DIFFUSERS = os.getenv("TO_DIFFUSERS", False)

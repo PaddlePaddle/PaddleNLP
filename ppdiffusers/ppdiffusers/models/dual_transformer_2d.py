@@ -115,7 +115,7 @@ class DualTransformer2DModel(nn.Layer):
             timestep ( `paddle.Tensor`, *optional*):
                 Optional timestep to be applied as an embedding in AdaLayerNorm's. Used to indicate denoising step.
             attention_mask (`paddle.Tensor`, *optional*):
-                Optional attention mask to be applied in CrossAttention
+                Optional attention mask to be applied in Attention
             return_dict (`bool`, *optional*, defaults to `True`):
                 Whether or not to return a [`models.unet_2d_condition.UNet2DConditionOutput`] instead of a plain tuple.
 

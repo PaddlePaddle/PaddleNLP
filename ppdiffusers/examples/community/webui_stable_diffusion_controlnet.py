@@ -657,7 +657,7 @@ class WebUIStableDiffusionControlNetPipeline(DiffusionPipeline):
             cross_attention_kwargs (`dict`, *optional*):
                 A kwargs dictionary that if specified is passed along to the `AttnProcessor` as defined under
                 `self.processor` in
-                [diffusers.cross_attention](https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/cross_attention.py).
+                [ppdiffusers.cross_attention](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/cross_attention.py).
             clip_skip (`int`, *optional*, defaults to 1):
                 CLIP_stop_at_last_layers, if clip_skip <= 1, we will use the last_hidden_state from text_encoder.
             controlnet_conditioning_scale (`float` or `List[float]`, *optional*, defaults to 1.0):

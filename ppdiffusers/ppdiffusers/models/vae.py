@@ -18,6 +18,7 @@ from typing import Optional
 import numpy as np
 import paddle
 import paddle.nn as nn
+from paddle.distributed.fleet.utils import recompute
 
 from ..utils import BaseOutput, randn_tensor
 from .unet_2d_blocks import UNetMidBlock2D, get_down_block, get_up_block
@@ -112,17 +113,34 @@ class Encoder(nn.Layer):
 
         conv_out_channels = 2 * out_channels if double_z else out_channels
         self.conv_out = nn.Conv2D(block_out_channels[-1], conv_out_channels, 3, padding=1)
+        self.gradient_checkpointing = False
 
     def forward(self, x):
         sample = x
         sample = self.conv_in(sample)
 
-        # down
-        for down_block in self.down_blocks:
-            sample = down_block(sample)
+        if self.training and self.gradient_checkpointing and not sample.stop_gradient:
 
-        # middle
-        sample = self.mid_block(sample)
+            def create_custom_forward(module):
+                def custom_forward(*inputs):
+                    return module(*inputs)
+
+                return custom_forward
+
+            # down
+            for down_block in self.down_blocks:
+                sample = recompute(create_custom_forward(down_block), sample)
+
+            # middle
+            sample = recompute(create_custom_forward(self.mid_block), sample)
+
+        else:
+            # down
+            for down_block in self.down_blocks:
+                sample = down_block(sample)
+
+            # middle
+            sample = self.mid_block(sample)
 
         # post-process
         sample = self.conv_norm_out(sample)
@@ -192,17 +210,38 @@ class Decoder(nn.Layer):
         self.conv_norm_out = nn.GroupNorm(num_channels=block_out_channels[0], num_groups=norm_num_groups, epsilon=1e-6)
         self.conv_act = nn.Silu()
         self.conv_out = nn.Conv2D(block_out_channels[0], out_channels, 3, padding=1)
+        self.gradient_checkpointing = False
 
     def forward(self, z):
         sample = z
         sample = self.conv_in(sample)
 
-        # middle
-        sample = self.mid_block(sample)
+        upscale_dtype = self.dtype
+        if self.training and self.gradient_checkpointing and not sample.stop_gradient:
 
-        # up
-        for up_block in self.up_blocks:
-            sample = up_block(sample)
+            def create_custom_forward(module):
+                def custom_forward(*inputs):
+                    return module(*inputs)
+
+                return custom_forward
+
+            # middle
+            sample = recompute(create_custom_forward(self.mid_block), sample)
+            if upscale_dtype != sample.dtype:
+                sample = sample.cast(upscale_dtype)
+
+            # up
+            for up_block in self.up_blocks:
+                sample = recompute(create_custom_forward(up_block), sample)
+        else:
+            # middle
+            sample = self.mid_block(sample)
+            if upscale_dtype != sample.dtype:
+                sample = sample.cast(upscale_dtype)
+
+            # up
+            for up_block in self.up_blocks:
+                sample = up_block(sample)
 
         # (TODO, junnyu) check nan
         # clamp inf values to enable fp16 training
