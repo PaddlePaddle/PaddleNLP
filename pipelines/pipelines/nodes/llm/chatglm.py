@@ -21,23 +21,29 @@ logger = logging.getLogger(__name__)
 
 
 class ChatGLMBot(BaseComponent):
-    def __init__(self):
-        self.chatglm = Taskflow("text2text_generation", batch_size=2, max_seq_length=2048, tgt_length=256)
+    def __init__(self, batch_size: int = 2, max_seq_length: int = 1024, tgt_length: int = 256, **kwargs):
+        """
+        Initialize the ChatGLMBot instance.
 
-    def run(self, query, history=None, stream=False):
+        :param batch_size: batch_size for chatglm prediction.
+        :param max_seq_length: max_seq_length for the processing input.
+        :param tgt_length: tgt_length for models output
+        """
+        self.kwargs = kwargs
+        self.chatglm = Taskflow(
+            "text2text_generation",
+            batch_size=batch_size,
+            max_seq_length=max_seq_length,
+            tgt_length=tgt_length,
+            **self.kwargs,
+        )
 
+    def run(self, query, stream=False):
+        """
+        Using the chatbot to generate the answers
+        :param query: The user's input/query to be sent to the chatGLM.
+        :param stream: Whether to use streaming mode when making the request. Currently not in use. Defaults to False.
+        """
         logger.info(query)
-        payload = {"messages": []}
-        if history is not None:
-            if len(history) % 2 == 0:
-                for past_msg in history:
-                    if past_msg["role"] not in ["user", "assistant"]:
-                        raise ValueError(
-                            "Invalid history: The `role` in each message in history must be `user` or `assistant`."
-                        )
-                payload["messages"].extend(history)
-            else:
-                raise ValueError("Invalid history: an even number of `messages` is expected!")
         result = self.chatglm(query)
-
         return result, "output_1"
