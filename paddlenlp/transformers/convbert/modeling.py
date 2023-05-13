@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2021 The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"
@@ -12,17 +12,34 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle import tensor
+from paddle import Tensor, tensor
 from paddle.nn import Layer
 
 from .. import PretrainedModel, register_base_model
 from ..activations import get_activation
+from ..model_outputs import (
+    BaseModelOutputWithPoolingAndCrossAttentions,
+    MaskedLMOutput,
+    MultipleChoiceModelOutput,
+    QuestionAnsweringModelOutput,
+    SequenceClassifierOutput,
+    TokenClassifierOutput,
+    tuple_output,
+)
+from .configuration import (
+    CONVBERT_PRETRAINED_INIT_CONFIGURATION,
+    CONVBERT_PRETRAINED_RESOURCE_FILES_MAP,
+    ConvBertConfig,
+)
 
 __all__ = [
     "ConvBertModel",
+    "ConvBertForMaskedLM",
     "ConvBertPretrainedModel",
     "ConvBertForTotalPretraining",
     "ConvBertDiscriminator",
@@ -114,6 +131,7 @@ class MultiHeadAttentionWithConv(Layer):
         head_ratio=None,
     ):
         super(MultiHeadAttentionWithConv, self).__init__()
+
         self.embed_dim = embed_dim
         self.kdim = kdim if kdim is not None else embed_dim
         self.vdim = vdim if vdim is not None else embed_dim
@@ -253,37 +271,39 @@ class ConvBertEmbeddings(nn.Layer):
     Include embeddings from word, position and token_type embeddings
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        embedding_size,
-        hidden_dropout_prob,
-        max_position_embeddings,
-        type_vocab_size,
-    ):
+    def __init__(self, config: ConvBertConfig):
         super(ConvBertEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(vocab_size, embedding_size)
-        self.position_embeddings = nn.Embedding(max_position_embeddings, embedding_size)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, embedding_size)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.embedding_size, padding_idx=config.pad_token_id)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.embedding_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.embedding_size)
 
-        self.layer_norm = nn.LayerNorm(embedding_size, epsilon=1e-12)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.layer_norm = nn.LayerNorm(config.embedding_size, epsilon=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None):
-        if position_ids is None:
-            ones = paddle.ones_like(input_ids, dtype="int64")
-            seq_length = paddle.cumsum(ones, axis=-1)
-            position_ids = seq_length - ones
-            position_ids.stop_gradient = True
+    def forward(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+    ):
+        if input_ids is not None:
+            inputs_embeds = self.word_embeddings(input_ids)
+
+        input_shape = paddle.shape(inputs_embeds)[:-1]
+
+        ones = paddle.ones(input_shape, dtype="int64")
+        seq_length = paddle.cumsum(ones, axis=1)
+        position_ids = seq_length - ones
+        position_ids.stop_gradient = True
 
         if token_type_ids is None:
             token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
 
-        input_embeddings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
-        embeddings = input_embeddings + position_embeddings + token_type_embeddings
+        embeddings = inputs_embeds + position_embeddings + token_type_embeddings
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
@@ -314,12 +334,12 @@ class ConvBertGeneratorPredictions(nn.Layer):
     Prediction layer for the generator.
     """
 
-    def __init__(self, embedding_size, hidden_size, hidden_act):
+    def __init__(self, config: ConvBertConfig):
         super(ConvBertGeneratorPredictions, self).__init__()
 
-        self.layer_norm = nn.LayerNorm(embedding_size)
-        self.dense = nn.Linear(hidden_size, embedding_size)
-        self.act = get_activation(hidden_act)
+        self.layer_norm = nn.LayerNorm(config.embedding_size, epsilon=config.layer_norm_eps)
+        self.dense = nn.Linear(config.hidden_size, config.embedding_size)
+        self.act = get_activation(config.hidden_act)
 
     def forward(self, generator_hidden_states):
         hidden_states = self.dense(generator_hidden_states)
@@ -348,69 +368,9 @@ class ConvBertPretrainedModel(PretrainedModel):
     use_softmax_sample = True
 
     # model init configuration
-    pretrained_init_configuration = {
-        "convbert-base": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 768,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-            "conv_kernel_size": 9,
-            "head_ratio": 2,
-            "num_groups": 1,
-        },
-        "convbert-medium-small": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 128,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 384,
-            "initializer_range": 0.02,
-            "intermediate_size": 1536,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 8,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-            "conv_kernel_size": 9,
-            "head_ratio": 2,
-            "num_groups": 2,
-        },
-        "convbert-small": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 128,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 256,
-            "initializer_range": 0.02,
-            "intermediate_size": 1024,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 4,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-            "conv_kernel_size": 9,
-            "head_ratio": 2,
-            "num_groups": 1,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "convbert-base": "http://bj.bcebos.com/paddlenlp/models/transformers/convbert/convbert-base/model_state.pdparams",
-            "convbert-medium-small": "http://bj.bcebos.com/paddlenlp/models/transformers/convbert/convbert-medium-small/model_state.pdparams",
-            "convbert-small": "http://bj.bcebos.com/paddlenlp/models/transformers/convbert/convbert-small/model_state.pdparams",
-        }
-    }
+    pretrained_init_configuration = CONVBERT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = CONVBERT_PRETRAINED_RESOURCE_FILES_MAP
+    config_class = ConvBertConfig
 
     def tie_weights(self):
         """
@@ -427,32 +387,26 @@ class ConvBertPretrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range")
-                    else self.convbert.config["initializer_range"],
+                    std=self.config.initializer_range,
                     shape=layer.weight.shape,
                 )
             )
         elif isinstance(layer, nn.LayerNorm):
             layer.bias.set_value(paddle.zeros_like(layer.bias))
             layer.weight.set_value(paddle.full_like(layer.weight, 1.0))
-            layer._epsilon = 1e-12
+            layer._epsilon = self.config.layer_norm_eps
         elif isinstance(layer, SeparableConv1D):
             layer.depthwise.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range")
-                    else self.convbert.config["initializer_range"],
+                    std=self.config.initializer_range,
                     shape=layer.depthwise.weight.shape,
                 )
             )
             layer.pointwise.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range")
-                    else self.convbert.config["initializer_range"],
+                    std=self.config.initializer_range,
                     shape=layer.pointwise.weight.shape,
                 )
             )
@@ -500,112 +454,35 @@ class ConvBertModel(ConvBertPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int):
-            Vocabulary size of `inputs_ids` in `ConvBertModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `ConvBertModel`.
-        embedding_size (int, optional):
-            Dimensionality of the embedding layer. Defaults to `768`.
-        hidden_size (int, optional):
-            Dimensionality of the encoder layer and pooler layer. Defaults to `768`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `12`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `12`.
-        intermediate_size (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
-            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
-            Defaults to `3072`.
-        hidden_act (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to `"gelu"`.
-        hidden_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to `0.1`.
-        attention_probs_dropout_prob (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence. Defaults to `512`.
-        type_vocab_size (int, optional):
-            The vocabulary size of `token_type_ids`.
-            Defaults to `2`.
-
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer.
-            Defaults to 0.02.
-
-            .. note::
-                A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`ConvBertPretrainedModel.init_weights()` for how weights are initialized in `ConvBertModel`.
-
-        pad_token_id (int, optional):
-            The index of padding token in the token vocabulary.
-            Defaults to `0`.
-
-        conv_kernel_size (int, optional):
-            The size of the convolutional kernel.
-            Defaults to `9`.
-
-        head_ratio (int, optional):
-            Ratio gamma to reduce the number of attention heads.
-            Defaults to `2`.
-
-        num_groups (int, optional):
-            The number of groups for grouped linear layers for ConvBert model.
-            Defaults to `1`.
+        config (:class:`ConvBertConfig`):
+            An instance of ConvBertConfig
 
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        embedding_size=768,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=2,
-        initializer_range=0.02,
-        pad_token_id=0,
-        conv_kernel_size=9,
-        head_ratio=2,
-        num_groups=1,
-    ):
-        super(ConvBertModel, self).__init__()
-        self.pad_token_id = pad_token_id
-        self.initializer_range = initializer_range
-        self.embeddings = ConvBertEmbeddings(
-            vocab_size,
-            embedding_size,
-            hidden_dropout_prob,
-            max_position_embeddings,
-            type_vocab_size,
-        )
+    def __init__(self, config: ConvBertConfig):
+        super(ConvBertModel, self).__init__(config)
+        self.pad_token_id = config.pad_token_id
+        self.initializer_range = config.initializer_range
+        self.embeddings = ConvBertEmbeddings(config)
 
-        if embedding_size != hidden_size:
-            self.embeddings_project = nn.Linear(embedding_size, hidden_size)
+        if config.embedding_size != config.hidden_size:
+            self.embeddings_project = nn.Linear(config.embedding_size, config.hidden_size)
 
         encoder_layer = TransformerEncoderLayerWithConv(
-            hidden_size,
-            num_attention_heads,
-            intermediate_size,
-            dropout=hidden_dropout_prob,
-            activation=hidden_act,
-            attn_dropout=attention_probs_dropout_prob,
+            config.hidden_size,
+            config.num_attention_heads,
+            config.intermediate_size,
+            dropout=config.hidden_dropout_prob,
+            activation=config.hidden_act,
+            attn_dropout=config.attention_probs_dropout_prob,
             act_dropout=0,
-            conv_kernel_size=conv_kernel_size,
-            head_ratio=head_ratio,
-            num_groups=num_groups,
+            conv_kernel_size=config.conv_kernel_size,
+            head_ratio=config.head_ratio,
+            num_groups=config.num_groups,
         )
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
+        self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
+        # self.config = config
+        self.pooler = ConvBertPooler(config)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -613,7 +490,18 @@ class ConvBertModel(ConvBertPretrainedModel):
     def set_input_embeddings(self, value):
         self.embeddings.word_embeddings = value
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
+
         r"""
         The ConvBertModel forward method, overrides the `__call__()` special method.
 
@@ -648,10 +536,26 @@ class ConvBertModel(ConvBertPretrainedModel):
 
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+                        inputs_embeds (Tensor, optional):
+                If you want to control how to convert `inputs_ids` indices into associated vectors, you can
+                pass an embedded representation directly instead of passing `inputs_ids`.
+            inputs_embeds (Tensor, optional):
+                Instead of passing input_ids you can choose to directly pass an embedded representation.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor: Returns Tensor `sequence_output`, sequence of hidden-states at the last layer of the model.
-            Shape as `[batch_size, sequence_length, hidden_size]` and dtype as float32.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions`.
 
         Example:
             .. code-block::
@@ -666,24 +570,57 @@ class ConvBertModel(ConvBertPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
         """
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        if token_type_ids is None:
+            token_type_ids = paddle.zeros_like(input_ids)
+
         if attention_mask is None:
-            attention_mask = paddle.unsqueeze((input_ids == self.pad_token_id).astype(dtype_float) * -1e4, axis=[1, 2])
+            attention_mask = paddle.unsqueeze(
+                (input_ids == self.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e4, axis=[1, 2]
+            )
         else:
-            attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2]).astype(dtype_float)
-            attention_mask = (1.0 - attention_mask) * -1e4
+            if attention_mask.ndim == 2:
+                # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
+                attention_mask = attention_mask.unsqueeze(axis=[1, 2]).astype(paddle.get_default_dtype())
+                attention_mask = (1.0 - attention_mask) * -1e4
 
         embedding_output = self.embeddings(
-            input_ids=input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids,
+            input_ids=input_ids, position_ids=position_ids, token_type_ids=token_type_ids, inputs_embeds=inputs_embeds
         )
 
         if hasattr(self, "embeddings_project"):
             embedding_output = self.embeddings_project(embedding_output)
 
-        sequence_output = self.encoder(embedding_output, attention_mask)
-
-        return sequence_output
+        encoder_outputs = self.encoder(
+            embedding_output,
+            src_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        # output_attentions may be False
+        if isinstance(encoder_outputs, type(embedding_output)):
+            sequence_output = encoder_outputs
+            pooled_output = self.pooler(sequence_output)
+            return (sequence_output, pooled_output)
+        else:
+            sequence_output = encoder_outputs[0]
+            pooled_output = self.pooler(sequence_output)
+            if not return_dict:
+                return (sequence_output, pooled_output) + encoder_outputs[1:]
+            return BaseModelOutputWithPoolingAndCrossAttentions(
+                last_hidden_state=sequence_output,
+                pooler_output=pooled_output,
+                hidden_states=encoder_outputs.hidden_states,
+                attentions=encoder_outputs.attentions,
+            )
 
 
 class ConvBertDiscriminator(ConvBertPretrainedModel):
@@ -691,19 +628,24 @@ class ConvBertDiscriminator(ConvBertPretrainedModel):
     ConvBert Model with a discriminator prediction head on top.
 
     Args:
-        convbert (:class:`ConvBertModel`):
-            An instance of ConvBertModel.
+        config (:class:`ConvBertConfig`):
+            An instance of ConvBertConfig
     """
 
-    def __init__(self, convbert):
-        super(ConvBertDiscriminator, self).__init__()
+    def __init__(self, config: ConvBertConfig):
+        super(ConvBertDiscriminator, self).__init__(config)
 
-        self.convbert = convbert
-        self.discriminator_predictions = ConvBertDiscriminatorPredictions(
-            self.convbert.config["hidden_size"], self.convbert.config["hidden_act"]
-        )
+        self.convbert = ConvBertModel(config)
+        self.discriminator_predictions = ConvBertDiscriminatorPredictions(config.hidden_size, config.hidden_act)
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+    ):
         r"""
         The ConvBertDiscriminator forward method, overrides the `__call__()` special method.
 
@@ -738,6 +680,9 @@ class ConvBertDiscriminator(ConvBertPretrainedModel):
 
                 It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            inputs_embeds (Tensor, optional):
+                Instead of passing input_ids you can choose to directly pass an embedded representation.
+
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the discriminator prediction logits.
@@ -750,14 +695,20 @@ class ConvBertDiscriminator(ConvBertPretrainedModel):
                 from paddlenlp.transformers import ConvBertDiscriminatorPredictions, ConvBertTokenizer
 
                 tokenizer = ConvBertTokenizer.from_pretrained('convbert-base')
-                model = ConvBertDiscriminatorPredictions.from_pretrained('convbert-base')
+                model = ConvBertDiscriminator.from_pretrained('convbert-base')
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
 
-        discriminator_sequence_output = self.convbert(input_ids, token_type_ids, position_ids, attention_mask)
+        discriminator_sequence_output = self.convbert(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+        )
 
         logits = self.discriminator_predictions(discriminator_sequence_output)
 
@@ -769,27 +720,21 @@ class ConvBertGenerator(ConvBertPretrainedModel):
     ConvBert Model with a generator prediction head on top.
 
     Args:
-        convbert (:class:`ConvBertModel`):
-            An instance of ConvBertModel.
+        config (:class:`ConvBertConfig`):
+            An instance of ConvBertConfig
     """
 
-    def __init__(self, convbert):
-        super(ConvBertGenerator, self).__init__()
-
-        self.convbert = convbert
-        self.generator_predictions = ConvBertGeneratorPredictions(
-            self.convbert.config["embedding_size"],
-            self.convbert.config["hidden_size"],
-            self.convbert.config["hidden_act"],
-        )
+    def __init__(self, config: ConvBertConfig):
+        super(ConvBertGenerator, self).__init__(config)
+        self.config = config
+        self.convbert = ConvBertModel(config)
+        self.generator_predictions = ConvBertGeneratorPredictions(config)
 
         if not self.tie_word_embeddings:
-            self.generator_lm_head = nn.Linear(
-                self.convbert.config["embedding_size"], self.convbert.config["vocab_size"]
-            )
+            self.generator_lm_head = nn.Linear(config.embedding_size, config.vocab_size)
         else:
             self.generator_lm_head_bias = paddle.create_parameter(
-                shape=[self.convbert.config["vocab_size"]],
+                shape=[config.vocab_size],
                 dtype=dtype_float,
                 is_bias=True,
             )
@@ -803,41 +748,31 @@ class ConvBertGenerator(ConvBertPretrainedModel):
         token_type_ids=None,
         position_ids=None,
         attention_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
     ):
         r"""
         The ConvBertGenerator forward method, overrides the `__call__()` special method.
 
         Args:
             input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input sequence.
-                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                See :class:`ConvBertModel`.
             token_type_ids (Tensor, optional):
-                Segment token indices to indicate different portions of the inputs.
-                Selected in the range ``[0, type_vocab_size - 1]``.
-                If `type_vocab_size` is 2, which means the inputs have two portions.
-                Indices can either be 0 or 1:
-
-                - 0 corresponds to a *sentence A* token,
-                - 1 corresponds to a *sentence B* token.
-
-                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
-                Defaults to `None`, which means we don't add segment embeddings.
-            position_ids(Tensor, optional):
-                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
-                max_position_embeddings - 1]``.
-                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
+                See :class:`ConvBertModel`.
+            position_ids (Tensor, optional):
+                See :class:`ConvBertModel`.
             attention_mask (Tensor, optional):
-                Mask used in multi-head attention to avoid performing attention on to some unwanted positions,
-                usually the paddings or the subsequent positions.
-                Its data type can be int, float and bool.
-                If its data type is int, the values should be either 0 or 1.
-
-                - **1** for tokens that **not masked**,
-                - **0** for tokens that **masked**.
-
-                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
-                Defaults to `None`, which means nothing needed to be prevented attention to.
+                See :class:`ConvBertModel`.
+            output_hidden_states (bool, optional):
+                See :class:`ConvBertModel`.
+            output_attentions (bool, optional):
+                See :class:`ConvBertModel`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             Tensor: Returns tensor `prediction_scores`, a tensor of the generator prediction scores.
@@ -856,40 +791,61 @@ class ConvBertGenerator(ConvBertPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 prediction_scores = model(**inputs)
         """
+        convbert_outputs = self.convbert(
+            input_ids,
+            token_type_ids,
+            position_ids,
+            attention_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
 
-        generator_sequence_output = self.convbert(input_ids, token_type_ids, position_ids, attention_mask)
-
-        prediction_scores = self.generator_predictions(generator_sequence_output)
+        prediction_scores = self.generator_predictions(convbert_outputs[0])
         if not self.tie_word_embeddings:
             prediction_scores = self.generator_lm_head(prediction_scores)
         else:
             prediction_scores = paddle.add(
-                paddle.matmul(
-                    prediction_scores,
-                    self.get_input_embeddings().weight,
-                    transpose_y=True,
-                ),
+                paddle.matmul(prediction_scores, self.get_input_embeddings().weight, transpose_y=True),
                 self.generator_lm_head_bias,
             )
+        loss = None
+        # # Masked language modeling softmax layer
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()  # -100 index = padding token
+            loss = loss_fct(prediction_scores.reshape([-1, self.config.vocab_size]), labels.reshape([-1]))
 
-        return prediction_scores
+        if not return_dict:
+            output = (prediction_scores,) + convbert_outputs[1:]
+            return tuple_output(output, loss)
+
+        return MaskedLMOutput(
+            loss=loss,
+            logits=prediction_scores,
+            hidden_states=convbert_outputs.hidden_states,
+            attentions=convbert_outputs.attentions,
+        )
 
 
 class ConvBertClassificationHead(nn.Layer):
     """
     ConvBert head for sentence-level classification tasks.
+
+    Args:
+        config (:class:`ConvBertConfig`):
+            An instance of ConvBertConfig
     """
 
-    def __init__(self, hidden_size, hidden_dropout_prob, num_classes):
+    def __init__(self, config: ConvBertConfig):
         super(ConvBertClassificationHead, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
-        self.out_proj = nn.Linear(hidden_size, num_classes)
-        self.act = get_activation("gelu")
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.out_proj = nn.Linear(config.hidden_size, config.num_labels)
+        self.act = get_activation(config.hidden_act)
 
     def forward(self, features, **kwargs):
-        x = features[:, 0, :]  # take [CLS] token
-        x = self.dropout(x)
+        x = self.dropout(features)
         x = self.dense(x)
         x = self.act(x)  # ConvBert paper used gelu here
         x = self.dropout(x)
@@ -903,32 +859,27 @@ class ConvBertForSequenceClassification(ConvBertPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        convbert (:class:`ConvBertModel`):
-            An instance of ConvBertModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of ConvBert.
-            If None, use the same value as `hidden_dropout_prob` of `ConvBertModel`
-            instance `convbert`. Defaults to None.
+        config (:class:`ConvBertConfig`):
+            An instance of ConvBertConfig
     """
 
-    def __init__(self, convbert, num_classes=2, dropout=None):
-        super(ConvBertForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
-        self.convbert = convbert
-        self.classifier = ConvBertClassificationHead(
-            hidden_size=self.convbert.config["hidden_size"],
-            hidden_dropout_prob=dropout if dropout is not None else self.convbert.config["hidden_dropout_prob"],
-            num_classes=self.num_classes,
-        )
+    def __init__(self, config: ConvBertConfig):
+        super(ConvBertForSequenceClassification, self).__init__(config)
+        self.convbert = ConvBertModel(config)
+        self.num_labels = config.num_labels
+        self.classifier = ConvBertClassificationHead(config)
 
     def forward(
         self,
-        input_ids=None,
-        token_type_ids=None,
-        position_ids=None,
-        attention_mask=None,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
         The ConvBertForSequenceClassification forward method, overrides the __call__() special method.
@@ -938,10 +889,24 @@ class ConvBertForSequenceClassification(ConvBertPretrainedModel):
                 See :class:`ConvBertModel`.
             token_type_ids (Tensor, optional):
                 See :class:`ConvBertModel`.
-            position_ids(Tensor, optional):
+            position_ids (Tensor, optional):
                 See :class:`ConvBertModel`.
-            attention_mask (list, optional):
+            attention_mask (Tensor, optional):
                 See :class:`ConvBertModel`.
+            inputs_embeds (Tensor, optional):
+                Instead of passing input_ids you can choose to directly pass an embedded representation.
+            labels (Tensor of shape `(batch_size,)`, optional):
+                Labels for computing the sequence classification/regression loss.
+                Indices should be in `[0, ..., num_labels - 1]`. If `num_labels == 1`
+                a regression loss is computed (Mean-Square loss), If `num_labels > 1`
+                a classification loss is computed (Cross-Entropy).
+            output_hidden_states (bool, optional):
+                See :class:`ConvBertModel`.
+            output_attentions (bool, optional):
+                See :class:`ConvBertModel`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
@@ -960,43 +925,74 @@ class ConvBertForSequenceClassification(ConvBertPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        sequence_output = self.convbert(input_ids, token_type_ids, position_ids, attention_mask)
+        outputs = self.convbert(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        pooled_output = outputs[1]
+        logits = self.classifier(pooled_output)
 
-        logits = self.classifier(sequence_output)
+        loss = None
+        if labels is not None:
+            if self.num_labels == 1:
+                loss_fct = paddle.nn.MSELoss()
+                loss = loss_fct(logits, labels)
+            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                loss_fct = paddle.nn.CrossEntropyLoss()
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
+            else:
+                loss_fct = paddle.nn.BCEWithLogitsLoss()
+                loss = loss_fct(logits, labels)
 
-        return logits
+        if not return_dict:
+            output = (logits,) + outputs[2:]
+            return tuple_output(output, loss)
+
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class ConvBertForTokenClassification(ConvBertPretrainedModel):
     """
     ConvBert Model with a linear layer on top of the hidden-states output layer,
     designed for token classification tasks like NER tasks.
-
     Args:
-        convbert (:class:`ConvBertModel`):
-            An instance of ConvBertModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of ConvBert.
-            If None, use the same value as `hidden_dropout_prob` of `ConvBertModel`
-            instance `convbert`. Defaults to None.
+        config (:class:`ConvBertConfig`):
+            An instance of ConvBertConfig
     """
 
-    def __init__(self, convbert, num_classes=2, dropout=None):
-        super(ConvBertForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        self.convbert = convbert
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.convbert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.convbert.config["hidden_size"], self.num_classes)
+    def __init__(self, config: ConvBertConfig):
+        super(ConvBertForTokenClassification, self).__init__(config)
+        self.convbert = ConvBertModel(config)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
 
     def forward(
         self,
-        input_ids=None,
-        token_type_ids=None,
-        position_ids=None,
-        attention_mask=None,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
         The ConvBertForTokenClassification forward method, overrides the __call__() special method.
@@ -1006,14 +1002,27 @@ class ConvBertForTokenClassification(ConvBertPretrainedModel):
                 See :class:`ConvBertModel`.
             token_type_ids (Tensor, optional):
                 See :class:`ConvBertModel`.
-            position_ids(Tensor, optional):
+            position_ids (Tensor, optional):
                 See :class:`ConvBertModel`.
-            attention_mask (list, optional):
+            attention_mask (Tensor, optional):
                 See :class:`ConvBertModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`ConvBertModel`.
+            labels (Tensor of shape `(batch_size, sequence_length)`, optional):
+                Labels for computing the token classification loss. Indices should be in `[0, ..., num_labels - 1]`.
+            output_hidden_states (bool, optional):
+                See :class:`ConvBertModel`.
+            output_attentions (bool, optional):
+                See :class:`ConvBertModel`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
-            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput`.
+
 
         Example:
             .. code-block::
@@ -1028,13 +1037,35 @@ class ConvBertForTokenClassification(ConvBertPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        sequence_output = self.convbert(input_ids, token_type_ids, position_ids, attention_mask)
-
-        sequence_output = self.dropout(sequence_output)
+        outputs = self.convbert(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        sequence_output = self.dropout(outputs[0])
         logits = self.classifier(sequence_output)
 
-        return logits
+        loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
+        if not return_dict:
+            output = (logits,) + outputs[2:]
+            return tuple_output(output, loss)
+
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class ConvBertForTotalPretraining(ConvBertPretrainedModel):
@@ -1042,123 +1073,12 @@ class ConvBertForTotalPretraining(ConvBertPretrainedModel):
     Combine generator with discriminator for Replaced Token Detection (RTD) pretraining.
     """
 
-    pretrained_init_configuration = {
-        "convbert-base-generator": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 768,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 256,
-            "initializer_range": 0.02,
-            "intermediate_size": 1024,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 4,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-            "conv_kernel_size": 9,
-            "head_ratio": 2,
-            "num_groups": 1,
-        },
-        "convbert-medium-small-generator": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 128,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 96,
-            "initializer_range": 0.02,
-            "intermediate_size": 384,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 2,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-            "conv_kernel_size": 9,
-            "head_ratio": 2,
-            "num_groups": 2,
-        },
-        "convbert-small-generator": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 128,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 64,
-            "initializer_range": 0.02,
-            "intermediate_size": 256,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 1,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-            "conv_kernel_size": 9,
-            "head_ratio": 2,
-            "num_groups": 1,
-        },
-        "convbert-base-discriminator": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 768,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-            "conv_kernel_size": 9,
-            "head_ratio": 2,
-            "num_groups": 1,
-        },
-        "convbert-medium-small-discriminator": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 128,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 384,
-            "initializer_range": 0.02,
-            "intermediate_size": 1536,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 8,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-            "conv_kernel_size": 9,
-            "head_ratio": 2,
-            "num_groups": 2,
-        },
-        "convbert-small-discriminator": {
-            "attention_probs_dropout_prob": 0.1,
-            "embedding_size": 128,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 256,
-            "initializer_range": 0.02,
-            "intermediate_size": 1024,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 4,
-            "num_hidden_layers": 12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-            "vocab_size": 30522,
-            "conv_kernel_size": 9,
-            "head_ratio": 2,
-            "num_groups": 1,
-        },
-    }
-
-    def __init__(self, generator, discriminator):
-        super(ConvBertForTotalPretraining, self).__init__()
-
-        self.generator = generator
-        self.discriminator = discriminator
-        self.initializer_range = discriminator.convbert.initializer_range
+    def __init__(self, config: ConvBertConfig):
+        super(ConvBertForTotalPretraining, self).__init__(config)
+        self.generator = ConvBertGenerator(config)
+        self.discriminator = ConvBertDiscriminator(config)
+        self.initializer_range = config.initializer_range
+        self.tie_weights()
 
     def get_input_embeddings(self):
         if not self.untied_generator_embeddings:
@@ -1172,17 +1092,17 @@ class ConvBertForTotalPretraining(ConvBertPretrainedModel):
         else:
             return None
 
-    def get_discriminator_inputs(self, inputs, raw_inputs, gen_logits, gen_labels, use_softmax_sample):
+    def get_discriminator_inputs(self, inputs, raw_inputs, generator_logits, generator_labels, use_softmax_sample):
         """Sample from the generator to create discriminator input."""
         # get generator token result
-        sampled_tokens = (self.sample_from_softmax(gen_logits, use_softmax_sample)).detach()
+        sampled_tokens = (self.sample_from_softmax(generator_logits, use_softmax_sample)).detach()
         sampled_tokids = paddle.argmax(sampled_tokens, axis=-1)
         # update token only at mask position
-        # gen_labels : [B, L], L contains -100(unmasked) or token value(masked)
+        # generator_labels : [B, L], L contains -100(unmasked) or token value(masked)
         # mask_positions : [B, L], L contains 0(unmasked) or 1(masked)
-        umask_positions = paddle.zeros_like(gen_labels)
-        mask_positions = paddle.ones_like(gen_labels)
-        mask_positions = paddle.where(gen_labels == -100, umask_positions, mask_positions)
+        umask_positions = paddle.zeros_like(generator_labels)
+        mask_positions = paddle.ones_like(generator_labels)
+        mask_positions = paddle.where(generator_labels == -100, umask_positions, mask_positions)
         updated_inputs = self.update_inputs(inputs, sampled_tokids, mask_positions)
         # use inputs and updated_input to get discriminator labels
         labels = mask_positions * (paddle.ones_like(inputs) - paddle.equal(updated_inputs, raw_inputs).astype("int32"))
@@ -1191,7 +1111,7 @@ class ConvBertForTotalPretraining(ConvBertPretrainedModel):
     def sample_from_softmax(self, logits, use_softmax_sample=True):
         if use_softmax_sample:
             # uniform_noise = paddle.uniform(logits.shape, dtype="float32", min=0, max=1)
-            uniform_noise = paddle.rand(logits.shape, dtype=dtype_float)
+            uniform_noise = paddle.rand(logits.shape, dtype=paddle.get_default_dtype())
             gumbel_noise = -paddle.log(-paddle.log(uniform_noise + 1e-9) + 1e-9)
         else:
             gumbel_noise = paddle.zeros_like(logits)
@@ -1213,12 +1133,12 @@ class ConvBertForTotalPretraining(ConvBertPretrainedModel):
 
     def forward(
         self,
-        input_ids=None,
-        token_type_ids=None,
-        position_ids=None,
-        attention_mask=None,
-        raw_input_ids=None,
-        gen_labels=None,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        raw_input_ids: Optional[Tensor] = None,
+        generator_labels: Optional[Tensor] = None,
     ):
         r"""
 
@@ -1233,15 +1153,15 @@ class ConvBertForTotalPretraining(ConvBertPretrainedModel):
                 See :class:`ConvBertModel`.
             raw_input_ids(Tensor, optional):
                 The raw input_ids. Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
-            gen_labels(Tensor, optional):
+            generator_labels(Tensor, optional):
                 The generator labels. Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
 
         Returns:
-            tuple: Returns tuple (``gen_logits``, ``disc_logits``, ``disc_labels``, ``attention_mask``).
+            tuple: Returns tuple (``generator_logits``, ``disc_logits``, ``disc_labels``, ``attention_mask``).
 
             With the fields:
 
-            - `gen_logits` (Tensor):
+            - `generator_logits` (Tensor):
                 a tensor of the generator prediction logits. Shape as `[batch_size, sequence_length, vocab_size]` and dtype as float32.
 
             - `disc_logits` (Tensor):
@@ -1254,24 +1174,24 @@ class ConvBertForTotalPretraining(ConvBertPretrainedModel):
                 See :class:`ConvBertModel`.
         """
 
-        assert gen_labels is not None, "gen_labels should not be None"
+        assert (
+            generator_labels is not None
+        ), "generator_labels should not be None, please check DataCollatorForLanguageModeling"
 
-        gen_logits = self.generator(input_ids, token_type_ids, position_ids, attention_mask)
+        generator_logits = self.generator(input_ids, token_type_ids, position_ids, attention_mask)[0]
 
-        (
-            disc_inputs,
-            disc_labels,
-            generator_predict_tokens,
-        ) = self.get_discriminator_inputs(input_ids, raw_input_ids, gen_logits, gen_labels, self.use_softmax_sample)
+        disc_inputs, disc_labels, generator_predict_tokens = self.get_discriminator_inputs(
+            input_ids, raw_input_ids, generator_logits, generator_labels, self.use_softmax_sample
+        )
 
         disc_logits = self.discriminator(disc_inputs, token_type_ids, position_ids, attention_mask)
 
         if attention_mask is None:
-            attention_mask = input_ids != self.discriminator.convbert.config["pad_token_id"]
+            attention_mask = input_ids != self.discriminator.convbert.config.pad_token_id
         else:
             attention_mask = attention_mask.astype("bool")
 
-        return gen_logits, disc_logits, disc_labels, attention_mask
+        return generator_logits, disc_logits, disc_labels, attention_mask
 
 
 class ConvBertPretrainingCriterion(nn.Layer):
@@ -1339,11 +1259,11 @@ class ConvBertPretrainingCriterion(nn.Layer):
 
 
 class ConvBertPooler(Layer):
-    def __init__(self, hidden_size, pool_act="tanh"):
+    def __init__(self, config: ConvBertConfig):
         super(ConvBertPooler, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
-        self.pool_act = pool_act
+        self.pool_act = config.pool_act
 
     def forward(self, hidden_states):
         # We "pool" the model by simply taking the hidden state corresponding
@@ -1361,37 +1281,56 @@ class ConvBertForMultipleChoice(ConvBertPretrainedModel):
     designed for multiple choice tasks like RocStories/SWAG tasks .
 
     Args:
-        convbert (:class:`ConvBertModel`):
-            An instance of ConvBertModel.
-        num_choices (int, optional):
-            The number of choices. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of ConvBert.
-            If None, use the same value as `hidden_dropout_prob` of `ConvBertModel`
-            instance `convbert`. Defaults to None.
+        config (:class:`ConvBertConfig`):
+            An instance of ConvBertConfig
     """
 
-    def __init__(self, convbert, num_choices=2, dropout=None):
-        super(ConvBertForMultipleChoice, self).__init__()
-        self.num_choices = num_choices
-        self.convbert = convbert
-        self.pooler = ConvBertPooler(self.convbert.config["hidden_size"])
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.convbert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.convbert.config["hidden_size"], 1)
+    def __init__(self, config: ConvBertConfig):
+        super(ConvBertForMultipleChoice, self).__init__(config)
+        self.num_choices = config.num_choices
+        self.convbert = ConvBertModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, 1)
 
-    def forward(self, input_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         The ConvBertForMultipleChoice forward method, overrides the __call__() special method.
 
         Args:
             input_ids (Tensor):
-                See :class:`ConvBertModel` and shape as [batch_size,num_choice, sequence_length].
+                See :class:`ConvBertModel`.
             token_type_ids (Tensor, optional):
-                See :class:`ConvBertModel` and shape as [batch_size,num_choice, sequence_length].
-            position_ids(Tensor, optional):
-                See :class:`ConvBertModel` and shape as [batch_size,num_choice, sequence_length].
-            attention_mask (list, optional):
-                See :class:`ConvBertModel` and shape as [batch_size,num_choice, sequence_length].
+                See :class:`ConvBertModel`.
+            position_ids (Tensor, optional):
+                See :class:`ConvBertModel`.
+            attention_mask (Tensor, optional):
+                See :class:`ConvBertModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`ConvBertModel`.
+            labels (Tensor of shape `(batch_size, )`, optional):
+                Labels for computing the multiple choice classification loss. Indices should be in `[0, ...,
+                num_choices-1]` where `num_choices` is the size of the second dimension of the input tensors. (See
+                `input_ids` above)
+            output_hidden_states (bool, optional):
+                See :class:`ConvBertModel`.
+            output_attentions (bool, optional):
+                See :class:`ConvBertModel`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
 
         Returns:
             Tensor: Returns tensor `reshaped_logits`, a tensor of the multiple choice classification logits.
@@ -1410,8 +1349,8 @@ class ConvBertForMultipleChoice(ConvBertPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
-        input_ids = input_ids.reshape((-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
-
+        if input_ids is not None:
+            input_ids = input_ids.reshape((-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
         if token_type_ids is not None:
             token_type_ids = token_type_ids.reshape((-1, token_type_ids.shape[-1]))
         if position_ids is not None:
@@ -1419,13 +1358,39 @@ class ConvBertForMultipleChoice(ConvBertPretrainedModel):
         if attention_mask is not None:
             attention_mask = attention_mask.reshape((-1, attention_mask.shape[-1]))
 
-        sequence_output = self.convbert(input_ids, token_type_ids, position_ids, attention_mask)
-        pooled_output = self.pooler(sequence_output)
+        if inputs_embeds is not None:
+            inputs_embeds = inputs_embeds.reshape(shape=(-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]))
+
+        outputs = self.convbert(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        pooled_output = outputs[1]
         pooled_output = self.dropout(pooled_output)
+
         logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
         reshaped_logits = logits.reshape((-1, self.num_choices))  # logits: (bs, num_choice)
 
-        return reshaped_logits
+        loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            loss = loss_fct(reshaped_logits, labels)
+        if not return_dict:
+            output = (reshaped_logits,) + outputs[2:]
+            return tuple_output(output, loss)
+
+        return MultipleChoiceModelOutput(
+            loss=loss,
+            logits=reshaped_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
 class ConvBertForQuestionAnswering(ConvBertPretrainedModel):
@@ -1434,17 +1399,32 @@ class ConvBertForQuestionAnswering(ConvBertPretrainedModel):
     and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        convbert (:class:`ConvBertModel`):
-            An instance of ConvBertModel.
+        config (:class:`ConvBertConfig`):
+            An instance of ConvBertConfig
 
     """
 
-    def __init__(self, convbert):
-        super(ConvBertForQuestionAnswering, self).__init__()
-        self.convbert = convbert
-        self.classifier = nn.Linear(self.convbert.config["hidden_size"], 2)
+    def __init__(self, config: ConvBertConfig):
+        super(ConvBertForQuestionAnswering, self).__init__(config)
+        self.convbert = ConvBertModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, 2)
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        start_positions: Optional[Tensor] = None,
+        end_positions: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         The ConvBertForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -1455,8 +1435,25 @@ class ConvBertForQuestionAnswering(ConvBertPretrainedModel):
                 See :class:`ConvBertModel`.
             position_ids(Tensor, optional):
                 See :class:`ConvBertModel`.
-            attention_mask (list, optional):
+            attention_mask (Tensor, optional):
                 See :class:`ConvBertModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`ConvBertModel`.
+            start_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the start of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
+            end_positions (Tensor of shape `(batch_size,)`, optional):
+                Labels for position (index) of the end of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
+                are not taken into account for computing the loss.
+            output_hidden_states (bool, optional):
+                See :class:`ConvBertModel`.
+            output_attentions (bool, optional):
+                See :class:`ConvBertModel`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
         Returns:
             tuple: Returns tuple (`start_logits`, `end_logits`).
 
@@ -1487,14 +1484,51 @@ class ConvBertForQuestionAnswering(ConvBertPretrainedModel):
                 end_logits  = outputs[1]
 
         """
-        sequence_output = self.convbert(
-            input_ids, token_type_ids, position_ids=position_ids, attention_mask=attention_mask
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        outputs = self.convbert(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
         )
-        logits = self.classifier(sequence_output)
+
+        logits = self.classifier(outputs[0])
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
 
-        return start_logits, end_logits
+        total_loss = None
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if start_positions.ndim > 1:
+                start_positions = start_positions.squeeze(-1)
+            if start_positions.ndim > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = paddle.shape(start_logits)[1]
+            start_positions = start_positions.clip(0, ignored_index)
+            end_positions = end_positions.clip(0, ignored_index)
+
+            loss_fct = paddle.nn.CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+        if not return_dict:
+            output = (start_logits, end_logits) + outputs[2:]
+            return tuple_output(output, total_loss)
+
+        return QuestionAnsweringModelOutput(
+            loss=total_loss,
+            start_logits=start_logits,
+            end_logits=end_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 
+# ConvBertForMaskedLM is the same as ConvBertGenerator
+ConvBertForMaskedLM = ConvBertGenerator
 ConvBertForPretraining = ConvBertForTotalPretraining
