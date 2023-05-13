@@ -52,7 +52,8 @@ def save_infer_result(trainer, dev_ds, k=100, src_length=256, tgt_length=512):
     # save results
     if trainer.args.tensor_parallel_rank == 0:
         with open(os.path.join(trainer.args.output_dir, "infer_result.json"), "w") as f:
-            f.write(json.dumps(out, ensure_ascii=False) + "\n")
+            for out in all_output:
+                f.write(json.dumps(out, ensure_ascii=False) + "\n")
 
 
 class ChatGLMTrainer(Trainer):
