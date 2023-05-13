@@ -58,48 +58,54 @@ def batchfy_text(texts, batch_size):
 
 
 class Predictor(object):
-    def __init__(self, args):
-        self.tokenizer = ChatGLMTokenizer.from_pretrained(args.model_name_or_path)
-        self.batch_size = args.batch_size
-        self.args = args
-
-        tensor_parallel_degree = paddle.distributed.get_world_size()
-        tensor_parallel_rank = 0
-        if tensor_parallel_degree > 1:
-            strategy = fleet.DistributedStrategy()
-            strategy.hybrid_configs = {
-                "dp_degree": 1,
-                "mp_degree": tensor_parallel_degree,
-                "pp_degree": 1,
-                "sharding_degree": 1,
-            }
-            fleet.init(is_collective=True, strategy=strategy)
-            hcg = fleet.get_hybrid_communicate_group()
-            tensor_parallel_rank = hcg.get_model_parallel_rank()
-
-        if self.args.lora_path is not None:
-            lora_config = LoRAConfig.from_pretrained(self.args.lora_path)
-            dtype = lora_config.dtype
-        elif self.args.prefix_path is not None:
-            prefix_config = PrefixConfig.from_pretrained(self.args.prefix_path)
-            dtype = prefix_config.dtype
+    def __init__(self, args=None, tokenizer=None, model=None, **kwargs):
+        if args is None:
+            self.tokenizer = tokenizer
+            self.model = model
+            self.src_length = kwargs["src_length"]
+            self.tgt_length = kwargs["tgt_length"]
         else:
-            config = ChatGLMConfig.from_pretrained(args.model_name_or_path)
-            dtype = config.dtype if config.dtype is not None else config.paddle_dtype
+            self.tokenizer = ChatGLMTokenizer.from_pretrained(args.model_name_or_path)
+            self.batch_size = args.batch_size
+            self.args = args
 
-        self.model = ChatGLMForConditionalGeneration.from_pretrained(
-            args.model_name_or_path,
-            tensor_parallel_degree=tensor_parallel_degree,
-            tensor_parallel_rank=tensor_parallel_rank,
-            load_state_as_np=True,
-            dtype=dtype,
-        )
-        if self.args.lora_path is not None:
-            self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
-        if self.args.prefix_path is not None:
-            self.model = PrefixModelForCausalLM.from_pretrained(
-                self.model, self.args.prefix_path, chatglm_postprocess_past_key_value, chatglm_pad_attention_mask
+            tensor_parallel_degree = paddle.distributed.get_world_size()
+            tensor_parallel_rank = 0
+            if tensor_parallel_degree > 1:
+                strategy = fleet.DistributedStrategy()
+                strategy.hybrid_configs = {
+                    "dp_degree": 1,
+                    "mp_degree": tensor_parallel_degree,
+                    "pp_degree": 1,
+                    "sharding_degree": 1,
+                }
+                fleet.init(is_collective=True, strategy=strategy)
+                hcg = fleet.get_hybrid_communicate_group()
+                tensor_parallel_rank = hcg.get_model_parallel_rank()
+
+            if self.args.lora_path is not None:
+                lora_config = LoRAConfig.from_pretrained(self.args.lora_path)
+                dtype = lora_config.dtype
+            elif self.args.prefix_path is not None:
+                prefix_config = PrefixConfig.from_pretrained(self.args.prefix_path)
+                dtype = prefix_config.dtype
+            else:
+                config = ChatGLMConfig.from_pretrained(args.model_name_or_path)
+                dtype = config.dtype if config.dtype is not None else config.paddle_dtype
+
+            self.model = ChatGLMForConditionalGeneration.from_pretrained(
+                args.model_name_or_path,
+                tensor_parallel_degree=tensor_parallel_degree,
+                tensor_parallel_rank=tensor_parallel_rank,
+                load_state_as_np=True,
+                dtype=dtype,
             )
+            if self.args.lora_path is not None:
+                self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
+            if self.args.prefix_path is not None:
+                self.model = PrefixModelForCausalLM.from_pretrained(
+                    self.model, self.args.prefix_path, chatglm_postprocess_past_key_value, chatglm_pad_attention_mask
+                )
         self.model.eval()
 
     def preprocess(self, input_text):
@@ -107,7 +113,7 @@ class Predictor(object):
             input_text,
             return_tensors="np",
             padding=True,
-            max_length=self.args.src_length,
+            max_length=self.src_length,
             truncation=True,
             truncation_side="left",
         )
@@ -121,7 +127,7 @@ class Predictor(object):
             **inputs,
             decode_strategy="sampling",
             top_k=1,
-            max_length=self.args.tgt_length,
+            max_length=self.tgt_length,
             bos_token_id=self.tokenizer.bos_token_id,
             eos_token_id=self.tokenizer.end_token_id,
             pad_token_id=self.tokenizer.pad_token_id,

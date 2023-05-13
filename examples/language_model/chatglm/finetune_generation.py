@@ -20,7 +20,7 @@ import numpy as np
 import paddle
 from data import convert_example, custom_instruction_convert_example, read_local_dataset
 from sklearn.metrics import accuracy_score
-from utils import ChatGLMTrainer
+from utils import ChatGLMTrainer, save_infer_result
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
@@ -42,6 +42,9 @@ class DataArgument:
     src_length: int = field(default=128, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=180, metadata={"help": "The max length of target text."})
     num_beams: int = field(default=5, metadata={"help": "The number of beams."})
+    generate_num: int = field(default=100, metadata={"help": "Save first k examples generation result in dev dataset"})
+    src_length: int = field(default=256, metadata={"help": "Source length for generation."})
+    tgt_length: int = field(default=512, metadata={"help": "Target length for generation."})
 
 
 @dataclass
@@ -208,6 +211,11 @@ def main():
     if training_args.do_eval:
         eval_result = trainer.evaluate(test_ds)
         trainer.log_metrics("test", eval_result)
+
+    if data_args.generate_num > 0:
+        save_infer_result(
+            trainer, dev_ds, k=data_args.generate_num, src_length=data_args.src_length, tgt_length=data_args.tgt_length
+        )
 
 
 if __name__ == "__main__":
