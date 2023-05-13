@@ -17,10 +17,11 @@ import paddle.nn as nn
 from paddle.autograd import PyLayer
 
 paddle.set_default_dtype("float64")
+# paddle.set_device("cpu")
 
 
 def print_t(x, name="x"):
-    print(f"{name}: {x.shape}, max: {x.abs().max().item()} mean: {x.abs().mean().item()}")
+    print(f"{name}: {x.shape}, max: {x.abs().max().item()} mean: {x.abs().mean().item()} min: {x.abs().min().item()}")
 
 
 class rms_norm_py(PyLayer):
@@ -44,6 +45,8 @@ class rms_norm_py(PyLayer):
         # 1/sqrt( (x^2 + x2^2 + x3^2)/3 + eps) * x * w
         # var_rsqrt - x^2 /n * var_rsqrt^3
 
+        # w( var_rsqrt -  x_in * x_in.mean() * var_rsqrt *3 )
+
         # [.., x] [.., x, h] [.., x, h]
 
         # raise ValueError()
@@ -52,25 +55,21 @@ class rms_norm_py(PyLayer):
             w,
             x_in,
         ) = ctx.saved_tensor()
-        #
-        print_t(var_rsqrt, "var_rsqrt")
-        d_x_in = var_rsqrt - var_rsqrt.pow(3) / w.shape[-1] * x_in.pow(2)
-        d_x_in = d_x_in.astype(dy.dtype) * w * dy
+        x_seq = (x_in * dy * w).mean(-1, keepdim=True) * x_in
+        # https://github.com/NVIDIA/apex/blob/85e9eddece9d4ac72b48c2407f8162f2173e1bf4/csrc/layer_norm_cuda_kernel.cu#L679
+        d_x_in = w * dy * var_rsqrt - var_rsqrt.pow(3) * x_seq
+        d_x_in = d_x_in.astype(dy.dtype)
 
         d_w = (var_rsqrt.astype(dy.dtype) * x_in * dy).sum(axis=(0, 1))
-
-        print("dw max:", d_w.abs().max().item())
-        print("dw min:", d_w.abs().min().item())
-
-        print("d_x_in max:", d_x_in.abs().max().item())
-        print("d_x_in min:", d_x_in.abs().min().item())
 
         return d_x_in, d_w
 
 
 def rms_norm(x_in, w, eps):
     var = x_in.pow(2).mean(-1, keepdim=True)
-    return paddle.rsqrt(var + eps) * x_in * w
+    x_out = paddle.rsqrt(var + eps) * x_in * w
+
+    return x_out
 
 
 class LlamaRMSNorm(nn.Layer):
@@ -123,35 +122,40 @@ class TestRmsNorm(unittest.TestCase):
         paddle.seed(1023)
         width = 4096
         eps = 1e-6
-        x_in = paddle.randn([1, 1024, width]) + 0.02
-        # self.w = paddle.randn([1, 1024, width])
+
+        x_in = paddle.randn([2, 1024, width]) + 0.02
+        # x_in = paddle.ones([1, 1, width], dtype=paddle.get_default_dtype())
+        # w = paddle.randn([1, 1024, width]) + 0.2
         w = paddle.normal(mean=0.2, std=0.02, shape=[width])
-        # w = paddle.ones(shape=[width]) * 3
+        w2 = paddle.normal(mean=0.2, std=0.02, shape=[width])
+        # w2 = paddle.ones(shape=[width], dtype=paddle.get_default_dtype())  * 1
+        # w2 = 1
 
         x_in.stop_gradient = False
         w.stop_gradient = False
-        return x_in, w, eps
+        return x_in, w, eps, w2
 
     def test_forward(self):
         ret1 = rms_norm(self.x_in, self.w, self.eps)
         ret2 = rms_norm_py.apply(self.x_in, self.w, self.eps)
-        print(ret1)
         np.testing.assert_equal(ret1.numpy(), ret2.numpy())
 
     def test_backward(self):
-        x_in, w, eps = self.create()
-        ret1 = rms_norm(x_in, w, eps)
+        x_in, w, eps, w2 = self.create()
+        ret1 = rms_norm(x_in, w, eps) * w2
         ret1.sum().backward()
         x_in_g_1 = x_in.grad.numpy()
         w_g_1 = w.grad.numpy()
 
-        x_in, w, eps = self.create()
-        ret2 = rms_norm_py.apply(x_in, w, eps)
+        x_in, w, eps, w2 = self.create()
+        ret2 = rms_norm_py.apply(x_in, w, eps) * w2
         ret2.sum().backward()
         x_in_g_2 = x_in.grad.numpy()
         w_g_2 = w.grad.numpy()
 
         np.testing.assert_equal(ret1.numpy(), ret2.numpy())
-        np.testing.assert_equal(w_g_1, w_g_2)
-        np.testing.assert_equal(x_in_g_1, x_in_g_2)
+        np.testing.assert_allclose(w_g_1, w_g_2, rtol=1e-10)
+        # np.testing.assert_equal(w_g_1, w_g_2)
+        np.testing.assert_allclose(x_in_g_1, x_in_g_2, rtol=1e-10)
+        # np.testing.assert_equal(x_in_g_1, x_in_g_2)
         np.testing.assert_equal(np.abs(x_in_g_1 * 1000).sum(), np.abs(x_in_g_2 * 1000).sum())

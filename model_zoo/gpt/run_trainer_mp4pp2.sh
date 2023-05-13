@@ -20,6 +20,7 @@ unset CUDA_VISIBLE_DEVICES
 # s1m for max steps is 1 million
 task_name="gpt_hybid"
 rm -rf output/$task_name/
+rm -rf "output/$task_name""_log"
 
 PYTHONPATH=/root/paddlejob/workspace/zhonghui03/PaddleNLP/:$PYTHONPATH  \
 python -u  -m paddle.distributed.launch \

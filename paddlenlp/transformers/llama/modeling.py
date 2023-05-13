@@ -219,63 +219,67 @@ def _expand_mask(mask, dtype, tgt_length):
 from paddle.autograd import PyLayer
 
 
-# 通过创建`PyLayer`子类的方式实现动态图 Python Op
 class rms_norm_py(PyLayer):
+    # cuda fuse
+    # https://github.com/NVIDIA/apex/blob/85e9eddece9d4ac72b48c2407f8162f2173e1bf4/csrc/layer_norm_cuda_kernel.cu#L679
+
     @staticmethod
     def forward(ctx, x_in, w, eps):
         # hidden_states_in = hidden_states
         with paddle.amp.auto_cast(False):
-            variance = x_in.astype("float32").pow(2).mean(-1, keepdim=True) + eps
+            x_in_fp32 = x_in.astype("float32")
+            variance = x_in_fp32.pow(2).mean(-1, keepdim=True) + eps
             var_rsqrt = paddle.rsqrt(variance)
-            x_out = var_rsqrt.astype(x_in.dtype) * x_in
+            x_out = var_rsqrt * x_in_fp32 * w
+            x_out = x_out.astype(x_in.dtype)
 
-        x_out = x_out * w
-
-        print("var_rsqrt", var_rsqrt.shape, var_rsqrt.abs().mean().item())
-        ctx.save_for_backward(var_rsqrt, w, x_in)
+        ctx.save_for_backward(var_rsqrt, w, x_in_fp32)
 
         return x_out
 
     @staticmethod
     def backward(ctx, dy):
         # https://www.derivative-calculator.net/
-        # 1/sqrt( (x^2 + x2^2 + x3^2)/3 + eps) * x * w
-        # var_rsqrt - x^2 /n * var_rsqrt^3
-
-        # [.., x] [.., x, h] [.., x, h]
-
-        # raise ValueError()
+        # 1/sqrt( (x1^2 + x2^2 + x3^2)/3 + eps) * x1 * w1
+        # 1/sqrt( (x1^2 + x2^2 + x3^2)/3 + eps) * x2 * w1
+        # ...
+        # A = var_rsqrt
+        # w1 * A * dy1  -  (w1 * x1 * x1)/N * A^3 * dy1
+        # - (w2 * x2 * x1 ) /N * A^3 * dy2
+        # - (w3 * x3 * x1 ) /N * A^3 * dy3
+        # - (w4 * x4 * x1 ) /N * A^3 * dy4
+        # ...
+        # finally we get
+        # W * A * dy -  (W * dy * x_in).mean() * x_in * A^3
         (
-            var_rsqrt,
-            w,
-            x_in,
+            var_rsqrt,  # fp32
+            w,  # fp16
+            x_in,  # fp32
         ) = ctx.saved_tensor()
-        #
-        d_x_in = var_rsqrt - var_rsqrt.pow(3) / w.shape[-1] * x_in.pow(2)
-        d_x_in = d_x_in.astype(dy.dtype) * dy * w
 
-        d_w = (var_rsqrt.astype(dy.dtype) * x_in * dy).sum(axis=(0, 1))
+        with paddle.amp.auto_cast(False):
+            x_seq = (x_in * dy * w).mean(-1, keepdim=True) * x_in
+            d_x_in = w * dy * var_rsqrt - var_rsqrt.pow(3) * x_seq
+            d_x_in = d_x_in.astype(dy.dtype)
 
-        # print(d_w.shape)
-
-        # print("dw:", d_w.abs().max().item())
-        # print("dw:", d_w.abs().min().item())
-
-        # print("d_x_in:", d_x_in.abs().max().item())
-        # print("d_x_in:", d_x_in.abs().min().item())
+            d_w = (var_rsqrt * x_in * dy).sum(axis=(0, 1))
+            d_w = d_w.astype(w.dtype)
 
         return d_x_in, d_w
-
-
-class fuse_silu(PyLayer):
-    pass
 
 
 def rms_norm(x_in, w, eps):
     var = x_in.pow(2).mean(-1, keepdim=True)
     var_rsqrt = paddle.rsqrt(var + eps)
-    print("var_rsqrt", var_rsqrt.shape, var_rsqrt.abs().mean().item())
     return var_rsqrt * x_in * w
+
+
+def rms_norm_fp32(x_in, w, eps):
+    with paddle.amp.auto_cast(False):
+        x_in_fp32 = x_in.astype("float32")
+        var = x_in_fp32.pow(2).mean(-1, keepdim=True)
+        var_rsqrt = paddle.rsqrt(var + eps)
+        return (var_rsqrt * x_in_fp32 * w).astype(w.dtype)
 
 
 class LlamaRMSNorm(nn.Layer):
@@ -291,11 +295,12 @@ class LlamaRMSNorm(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states):
-        return paddle.nn.functional.layer_norm(
-            hidden_states, self.hidden_size, weight=self.weight, bias=None, epsilon=self.variance_epsilon
-        )
+        # return paddle.nn.functional.layer_norm(
+        #     hidden_states, self.hidden_size, weight=self.weight, bias=None, epsilon=self.variance_epsilon
+        # )
         # return rms_norm_py.apply(hidden_states, self.weight, self.variance_epsilon)
         # return rms_norm(hidden_states, self.weight, self.variance_epsilon)
+        # return rms_norm_fp32(hidden_states, self.weight, self.variance_epsilon)
 
         if self.config.fp16_opt_level is not None:
             with paddle.amp.auto_cast(False):
@@ -768,8 +773,8 @@ class LlamaModel(LlamaPretrainedModel):
             seq_length_with_past += cache_length
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
-            print("inputs_embeds:", inputs_embeds.dtype, inputs_embeds.shape)
-            print("inputs_embedsi weight:", self.embed_tokens.weight.dtype, self.embed_tokens.weight.shape)
+            # print("inputs_embeds:", inputs_embeds.dtype, inputs_embeds.shape)
+            # print("inputs_embedsi weight:", self.embed_tokens.weight.dtype, self.embed_tokens.weight.shape)
 
         # embed positions
         if attention_mask is None:
