@@ -93,10 +93,7 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Tr
     if "input" in example["input"]:
         input = example["input"]
 
-    if "chat" in data_args.task_name_or_path:
-        prompt = instruction + input
-    else:
-        prompt = "Human: " + instruction + input + "\n Assistant: "
+    prompt = instruction + input
 
     # dataset for evaluation
     if is_test:
