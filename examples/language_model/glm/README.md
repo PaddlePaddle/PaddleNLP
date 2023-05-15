@@ -138,7 +138,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" finetune_instructio
 
 ## 模型导出
 
-使用`export_generation_model.py`脚本，传入我们需要的模型地址，和输出地址即可。如果需要导出`float16`参数的模型，请指定`paddle_dtype`参数为`float16`。
+使用`export_generation_model.py`脚本，传入我们需要的模型地址，和输出地址即可。默认导出模型参数类型与动态图模型参数类型一致，如果需要导出`float16`参数的模型，请指定`dtype`参数为`float16`。
 
 ```
 python export_generation_model.py \

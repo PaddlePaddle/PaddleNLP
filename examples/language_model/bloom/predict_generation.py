@@ -16,10 +16,10 @@ from __future__ import annotations
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.layers import LoRAModel
+from paddlenlp.layers import LoRAConfig, LoRAModel
 from paddlenlp.prompt import PrefixModelForCausalLM
 from paddlenlp.prompt.prefix import bloom_postprocess_past_key_value
-from paddlenlp.transformers import AutoTokenizer, BloomForCausalLM
+from paddlenlp.transformers import AutoConfig, AutoTokenizer, BloomForCausalLM
 
 
 def parse_arguments():
@@ -76,13 +76,14 @@ class Predictor(object):
             fleet.init(is_collective=True, strategy=strategy)
             hcg = fleet.get_hybrid_communicate_group()
             tensor_parallel_rank = hcg.get_model_parallel_rank()
-        if args.fp16:
-            dtype = "float16"
-        elif args.bf16:
-            dtype = "bfloat16"
+
+        if self.args.lora_path is not None:
+            lora_config = LoRAConfig.from_pretrained(self.args.lora_path)
+            dtype = lora_config.dtype
         else:
-            dtype = "float32"
-        paddle.set_default_dtype(dtype)
+            config = AutoConfig.from_pretrained(args.model_name_or_path)
+            dtype = config.dtype if config.dtype is not None else "float16"
+
         self.model = BloomForCausalLM.from_pretrained(
             args.model_name_or_path,
             load_state_as_np=True,

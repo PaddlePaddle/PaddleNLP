@@ -1226,6 +1226,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         if dtype is None:
             dtype = config.dtype
+        else:
+            config.dtype = dtype
 
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
             config.save_pretrained(cache_dir)

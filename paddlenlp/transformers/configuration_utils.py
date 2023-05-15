@@ -586,7 +586,6 @@ class PretrainedConfig:
         self.sep_token_id = kwargs.pop("sep_token_id", None)
 
         self.fp16_opt_level = kwargs.pop("fp16_opt_level", None)
-        self.dtype = kwargs.pop("dtype", None)
 
         self.decoder_start_token_id = kwargs.pop("decoder_start_token_id", None)
 

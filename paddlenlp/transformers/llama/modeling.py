@@ -377,7 +377,7 @@ class LlamaAttention(nn.Layer):
                 self.hidden_size,
                 bias_attr=False,
             )
-        self.rotary_emb = LlamaRotaryEmbedding(self.head_dim)
+        self.rotary_emb = LlamaRotaryEmbedding(self.head_dim, max_position_embeddings=config.max_position_embeddings)
         self.config = config
 
     def forward(

@@ -17,8 +17,12 @@ import os
 
 import paddle
 
-from paddlenlp.layers import LoRAModel
-from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
+from paddlenlp.layers import LoRAConfig, LoRAModel
+from paddlenlp.transformers import (
+    AutoConfig,
+    AutoModelForConditionalGeneration,
+    AutoTokenizer,
+)
 
 
 def parse_args():
@@ -39,6 +43,7 @@ def parse_args():
         help="The output file prefix used to save the exported inference model.",
     )
     parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
+    parser.add_argument("--dtype", default=None, help="The data type of exported model")
     args = parser.parse_args()
     return args
 
@@ -47,7 +52,18 @@ def main():
     args = parse_args()
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-    model = AutoModelForConditionalGeneration.from_pretrained(args.model_name_or_path, load_state_as_np=True)
+    if args.lora_path is not None:
+        lora_config = LoRAConfig.from_pretrained(args.lora_path)
+        dtype = lora_config.dtype
+    elif args.dtype is not None:
+        dtype = args.dtype
+    else:
+        config = AutoConfig.from_pretrained(args.model_name_or_path)
+        dtype = config.dtype if config.dtype is not None else "float32"
+
+    model = AutoModelForConditionalGeneration.from_pretrained(
+        args.model_name_or_path, load_state_as_np=True, dtype=dtype
+    )
     if args.lora_path is not None:
         model = LoRAModel.from_pretrained(model, args.lora_path)
 

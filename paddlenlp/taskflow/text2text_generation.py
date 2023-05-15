@@ -37,11 +37,12 @@ class ChatGLMTask(Task):
         self.kwargs["generation_task"] = task
         self._tgt_length = kwargs.get("tgt_length", 128)
         # Token max length
-        self._max_length = kwargs.get("max_length", 128)
+        self._max_seq_length = kwargs.get("max_seq_length", 128)
         self._top_k = kwargs.get("top_k", 1)
         self._top_p = kwargs.get("top_p", 1.0)
         self._temperature = kwargs.get("temperature", 1.0)
-        self.decode_strategy = kwargs.get("decode_strategy", "sampling")
+        self._decode_strategy = kwargs.get("decode_strategy", "sampling")
+        self._num_return_sequences = kwargs.get("num_return_sequences", 1)
 
         self._construct_tokenizer(model)
         if self._static_mode:
@@ -63,7 +64,7 @@ class ChatGLMTask(Task):
             # min_length
             0,
             # decode_strategy
-            self.decode_strategy,
+            self._decode_strategy,
             # temperature
             self._temperature,
             # top_k
@@ -95,7 +96,7 @@ class ChatGLMTask(Task):
             # no_repeat_ngram_size
             None,
             # num_return_sequences
-            1,
+            self._num_return_sequences,
             # diversity_rate
             0.0,
             # use_cache
@@ -154,7 +155,7 @@ class ChatGLMTask(Task):
                     input_text,
                     return_tensors="np",
                     padding=True,
-                    max_length=self._max_length,
+                    max_length=self._max_seq_length,
                     truncation=True,
                     truncation_side="left",
                 )
@@ -163,7 +164,7 @@ class ChatGLMTask(Task):
                     input_text,
                     return_tensors="pd",
                     padding=True,
-                    max_length=self._max_length,
+                    max_length=self._max_seq_length,
                     truncation=True,
                     truncation_side="left",
                 )
@@ -194,7 +195,7 @@ class ChatGLMTask(Task):
             for batch_inputs in inputs["data_loader"]:
                 result = self._model.generate(
                     **batch_inputs,
-                    decode_strategy=self.decode_strategy,
+                    decode_strategy=self._decode_strategy,
                     top_k=self._top_k,
                     top_p=self._top_p,
                     temperature=self._temperature,
@@ -202,6 +203,7 @@ class ChatGLMTask(Task):
                     bos_token_id=self._tokenizer.bos_token_id,
                     eos_token_id=self._tokenizer.end_token_id,
                     pad_token_id=self._tokenizer.pad_token_id,
+                    num_return_sequences=self._num_return_sequences,
                     use_cache=True,
                 )
                 result = result[0]
@@ -227,6 +229,12 @@ class ChatGLMTask(Task):
                 result.append(res)
         out_dict = {"result": result}
         return out_dict
+
+    def set_argument(self, argument: dict):
+        for k, v in argument.items():
+            if k == "input":
+                continue
+            setattr(self, f"_{k}", v)
 
     def _convert_dygraph_to_static(self):
         """

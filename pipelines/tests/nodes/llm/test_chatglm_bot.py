@@ -12,7 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .chatglm import ChatGLMBot
-from .ernie_bot import ErnieBot
-from .history import TruncatedConversationHistory
-from .prompt_template import PromptTemplate
+import unittest
+
+from pipelines.nodes.llm import ChatGLMBot
+
+
+class TestChatGLMBot(unittest.TestCase):
+    def setUp(self):
+        self.chatbot = ChatGLMBot(model="__internal_testing__/tiny-random-chatglm", dtype="float32", tgt_length=8)
+
+    def test_run(self):
+        prompt_text = "很高兴认识你"
+        result = self.chatbot.run(query=prompt_text)
+        expected_output = ({"result": ["strained睡到睡到睡到睡到睡到睡到睡到"]}, "output_1")
+        self.assertEqual(
+            result,
+            expected_output,
+        )

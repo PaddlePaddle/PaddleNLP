@@ -1356,13 +1356,21 @@ class Trainer:
         arguments, depending on the situation.
         """
         if self.enable_autocast_context_manager:
-            black_list = ["reduce_sum", "c_softmax_with_cross_entropy"]
+            custom_black_list = ["reduce_sum", "c_softmax_with_cross_entropy"]
+            custom_white_list = []
+            if self.args.fp16_opt_level == "O2":
+                # https://github.com/PaddlePaddle/Paddle/blob/eb97f4f0adca40b16a309b927e480178beb8ae96/python/paddle/amp/amp_lists.py#L85-L86
+                # the lookup_table is in black_list, but in O2, we need it return fp16
+                custom_white_list.extend(["lookup_table", "lookup_table_v2"])
+
             if self.args.bf16 and self.args.fp16_opt_level == "O2":
-                black_list.append("c_embedding")
+                # c_embedding not support bf16 yet
+                custom_black_list.append("c_embedding")
 
             ctx_manager = autocast(
                 True,
-                custom_black_list=black_list,
+                custom_black_list=custom_black_list,
+                custom_white_list=custom_white_list,
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
             )
