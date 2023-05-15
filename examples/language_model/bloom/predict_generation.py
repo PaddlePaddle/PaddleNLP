@@ -35,16 +35,6 @@ def parse_arguments():
     parser.add_argument(
         "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
     )
-    parser.add_argument(
-        "--fp16",
-        action="store_true",
-        help="Whether to use fp16 16-bit (mixed) precision training instead of 32-bit training.",
-    )
-    parser.add_argument(
-        "--bf16",
-        action="store_true",
-        help="Whether to use bf16 (mixed) precision instead of 32-bit. Requires Ampere or higher NVIDIA architecture or using CPU (no_cuda).",
-    )
     return parser.parse_args()
 
 
