@@ -121,7 +121,7 @@ def install_package(
     if mirror_source is not None:
         logger.info(f"loading <{mirror_source}> from as the final mirror source to install package.")
         arguments += ["-i", mirror_source]
-    
+
     arguments += [package_name]
     pip.main(arguments)
 
