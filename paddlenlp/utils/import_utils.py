@@ -120,8 +120,9 @@ def install_package(
     mirror_source = os.environ.get(mirror_key, None)
     if mirror_source is not None:
         logger.info(f"loading <{mirror_source}> from as the final mirror source to install package.")
-        arguments += ["-i", mirror_source, package_name]
-
+        arguments += ["-i", mirror_source]
+    
+    arguments += [package_name]
     pip.main(arguments)
 
     # 4. add site-package to the top of package
