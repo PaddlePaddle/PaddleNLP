@@ -91,6 +91,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir chatglm_log finet
 --do_eval \
 --disable_tqdm True \
 --metric_for_best_model accuracy \
+--load_best_model_at_end True \
 --do_generation False \
 --tensor_parallel_degree 4
 ```
