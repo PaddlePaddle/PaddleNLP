@@ -80,13 +80,7 @@ class MultiModalEmbedder:
         self.models = {}  # replace str with ContentTypes starting from Python3.8
         for content_type, embedding_model in embedding_models.items():
             if content_type in ["text", "image"]:
-                if "task_path" in self.kwargs:
-                    self._task_path = self.kwargs["task_path"]
-                    self.models[content_type] = Taskflow(
-                        "feature_extraction", model=embedding_model, task_path=self._task_path
-                    )
-                else:
-                    self.models[content_type] = Taskflow("feature_extraction", model=embedding_model)
+                self.models[content_type] = Taskflow("feature_extraction", model=embedding_model, **self.kwargs)
             else:
                 raise ValueError(f"{content_type} is not a supported content.")
 
