@@ -16,7 +16,6 @@ from __future__ import absolute_import, division, print_function
 
 import argparse
 import hashlib
-import json
 import os
 
 import paddle
@@ -37,14 +36,6 @@ def get_md5sum(file_path):
 
 
 def main():
-    # check and load config
-    with open(os.path.join(args.input_model_dir, "model_config.json"), "r") as f:
-        config_dict = json.load(f)
-        num_classes = config_dict["num_classes"]
-    if num_classes is None or num_classes <= 0:
-        print("%s/model_config.json may not be right, please check" % args.input_model_dir)
-        exit(1)
-
     # check and load model
     input_model_file = os.path.join(args.input_model_dir, "model_state.pdparams")
     print("load model to get static model : %s \nmodel md5sum : %s" % (input_model_file, get_md5sum(input_model_file)))
@@ -58,7 +49,7 @@ def main():
         exit(1)
     elif "classifier.dense.weight" in model_state_dict:
         print("we are load glue fine-tuning model")
-        model = ElectraForSequenceClassification.from_pretrained(args.input_model_dir, num_classes=num_classes)
+        model = ElectraForSequenceClassification.from_pretrained(args.input_model_dir)
         print("total model layers : ", len(model_state_dict))
     else:
         print("the model file : %s may not be fine-tuning model, please check" % input_model_file)

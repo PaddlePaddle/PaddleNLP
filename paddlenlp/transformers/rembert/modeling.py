@@ -45,7 +45,7 @@ class RemBertPretrainedModel(PretrainedModel):
     base_model_prefix = "rembert"
     config_class = RemBertConfig
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # only support dygraph, use truncated_normal and make it inplace
@@ -292,8 +292,6 @@ class RemBertModel(RemBertPretrainedModel):
 
         self.pooler = RemBertPooler(config)
 
-        self.apply(self.init_weights)
-
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
 
@@ -401,7 +399,6 @@ class RemBertForSequenceClassification(RemBertPretrainedModel):
         self.rembert = RemBertModel(config)
         self.dense = nn.Linear(config.hidden_size, config.num_classes)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
@@ -462,7 +459,6 @@ class RemBertForQuestionAnswering(RemBertPretrainedModel):
         super(RemBertForQuestionAnswering, self).__init__(config)
         self.rembert = RemBertModel(config)
         self.qa_outputs = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -579,8 +575,6 @@ class RemBertForMaskedLM(RemBertPretrainedModel):
             embedding_weights=self.rembert.embeddings.word_embeddings.weight,
         )
 
-        self.apply(self.init_weights)
-
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
 
@@ -637,7 +631,6 @@ class RemBertForTokenClassification(RemBertPretrainedModel):
         self.rembert = RemBertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.num_classes)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
@@ -698,7 +691,6 @@ class RemBertForMultipleChoice(RemBertPretrainedModel):
         self.rembert = RemBertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, 1)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""

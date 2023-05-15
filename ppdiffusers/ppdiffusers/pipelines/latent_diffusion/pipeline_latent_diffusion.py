@@ -755,8 +755,8 @@ class LDMBertAttention(nn.MultiHeadAttention):
         bias_attr=None,
     ):
         super().__init__(embed_dim, num_heads, dropout, kdim, vdim, need_weights, weight_attr, bias_attr)
-        assert embed_dim > 0, "Expected embed_dim to be greater than 0, " "but recieved {}".format(embed_dim)
-        assert num_heads > 0, "Expected num_heads to be greater than 0, " "but recieved {}".format(num_heads)
+        assert embed_dim > 0, "Expected embed_dim to be greater than 0, " "but received {}".format(embed_dim)
+        assert num_heads > 0, "Expected num_heads to be greater than 0, " "but received {}".format(num_heads)
 
         self.embed_dim = embed_dim
         self.kdim = kdim if kdim is not None else embed_dim

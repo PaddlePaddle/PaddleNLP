@@ -290,7 +290,7 @@ def get_cached_module_file(
             # Load from URL or cache if already cached
             resolved_module_file = hf_hub_download(
                 pretrained_model_name_or_path,
-                weights_name=module_file,
+                filename=module_file,
                 cache_dir=cache_dir,
                 force_download=force_download,
                 proxies=proxies,

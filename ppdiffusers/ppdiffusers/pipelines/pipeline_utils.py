@@ -126,6 +126,18 @@ class ImagePipelineOutput(BaseOutput):
 
 
 @dataclass
+class TextPipelineOutput(BaseOutput):
+    """
+    Output class for text pipelines.
+    Args:
+        prompt (`List[str]` or `str`)
+            List of denoised texts.
+    """
+
+    texts: Union[List[str], str]
+
+
+@dataclass
 class AudioPipelineOutput(BaseOutput):
     """
     Output class for audio pipelines.

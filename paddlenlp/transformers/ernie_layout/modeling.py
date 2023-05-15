@@ -179,7 +179,7 @@ class ErnieLayoutPretrainedModel(PretrainedModel):
     base_model_prefix = "ernie_layout"
     config_class = ErnieLayoutConfig
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             if isinstance(layer.weight, paddle.Tensor):
@@ -1000,7 +1000,6 @@ class ErnieLayoutForTokenClassification(ErnieLayoutPretrainedModel):
         )
         self.dropout = nn.Dropout(classifier_dropout)
         self.classifier = nn.Linear(config["hidden_size"], config.num_labels)
-        self.classifier.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.ernie_layout.embeddings.word_embeddings
@@ -1089,7 +1088,6 @@ class ErnieLayoutForQuestionAnswering(ErnieLayoutPretrainedModel):
         )
         self.dropout = nn.Dropout(classifier_dropout)
         self.qa_outputs = nn.Linear(config["hidden_size"], 2)
-        self.qa_outputs.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.ernie_layout.embeddings.word_embeddings
@@ -1162,7 +1160,6 @@ class UIEX(ErnieLayoutPretrainedModel):
         self.linear_start = nn.Linear(config.hidden_size, 1)
         self.linear_end = nn.Linear(config.hidden_size, 1)
         self.sigmoid = nn.Sigmoid()
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None, bbox=None, image=None):
         sequence_output, _ = self.ernie_layout(

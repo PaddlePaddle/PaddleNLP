@@ -13,9 +13,8 @@
 # limitations under the License.
 from __future__ import annotations
 
+import copy
 import inspect
-import io
-import json
 import os
 import re
 import shutil
@@ -70,6 +69,7 @@ from .utils import (
     fn_args_to_dict,
     is_paddle_support_lazy_init,
     resolve_cache_dir,
+    weight_name_suffix,
 )
 
 __all__ = [
@@ -279,7 +279,6 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
 def _find_weight_file_path(
     cache_dir: str,
     model_class: Type[PretrainedModel],
-    config: PretrainedConfig = None,
     resource_uri: Optional[str] = None,
 ) -> str | None:
     """find the target weight file under the cache dir, because there are some conflicts about weight file names.
@@ -303,12 +302,12 @@ def _find_weight_file_path(
         return weight_file_path
 
     # 3. find the target weight file name for splited tensor parallel
-    if config and config.tensor_parallel_degree > 1:
-        tensor_parallel_weight_file_path = os.path.join(
-            cache_dir, _add_variant(resource_weight_file_name, f"tp{config.tensor_parallel_rank:0>2d}")
-        )
-        if os.path.isfile(tensor_parallel_weight_file_path):
-            return tensor_parallel_weight_file_path
+    # fix for load hybrid parallel
+    hybrid_parallel_weight_file_path = os.path.join(
+        cache_dir, _add_variant(resource_weight_file_name, weight_name_suffix())
+    )
+    if os.path.isfile(hybrid_parallel_weight_file_path):
+        return hybrid_parallel_weight_file_path
 
     # 4. find the target weight file if there is only one weight file
     weight_file_names = [file for file in os.listdir(cache_dir) if file.endswith(".pdparams")]
@@ -507,7 +506,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             self.config = init_dict
 
         # only execute when it's the base method
-        if self.init_weights is PretrainedModel.init_weights:
+        if (
+            original_init.__module__ != "paddlenlp.transformers.model_utils"
+            and self.__class__.init_weights is PretrainedModel.init_weights
+        ):
             self.init_weights()
 
     def _init_weights(self, layer):
@@ -530,13 +532,38 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         If needed prunes and maybe initializes weights. If using a custom `PreTrainedModel`, you need to implement any
         initialization logic in `_init_weights`.
         """
+        # call pure
         if _init_weights:
             # Initialize weights
             self.apply(self._initialize_weights)
 
             # Tie weights should be skipped when not initializing all weights
             # since from_pretrained(...) calls tie weights anyways
-            self.tie_weights()
+
+            # TODO(wj-Mcat): enable all tie-weights later
+            # self.tie_weights()
+
+    @classmethod
+    def _from_config(cls, config, **kwargs):
+        """
+        All context managers that the model should be initialized under go here.
+
+        Args:
+            dtype (`paddle.dtype`, *optional*):
+                Override the default `paddle.dtype` and load the model under this dtype.
+        """
+        dtype = kwargs.pop("dtype", None)
+
+        if dtype is None:
+            if config.dtype is not None:
+                dtype = config.dtype
+            else:
+                dtype = paddle.get_default_dtype()
+
+        with dtype_guard(dtype):
+            model = cls(config, **kwargs)
+
+        return model
 
     @property
     def base_model(self):
@@ -660,19 +687,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
     def save_model_config(self, save_dir: str):
         """
+        Deprecated, please use `.config.save_pretrained()` instead.
         Saves model configuration to a file named "config.json" under `save_dir`.
 
         Args:
             save_dir (str): Directory to save model_config file into.
         """
-        # Save model config
-        model_config = self.get_model_config()
-        if isinstance(model_config, PretrainedConfig):
-            model_config.save_pretrained(save_dir)
-        else:
-            model_config_file = os.path.join(save_dir, self.model_config_file)
-            with io.open(model_config_file, "w", encoding="utf-8") as f:
-                f.write(json.dumps(model_config, ensure_ascii=False, indent=2))
+        logger.warning("The `save_model_config` is deprecated! Please use `.config.save_pretrained()` instead.")
+        self.config.save_pretrained(save_dir)
 
     def save_to_hf_hub(
         self,
@@ -925,7 +947,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # in-order to compatible with old style:
             # file name in pretrained_resouce_file_maps is https://path/to/bert-base-uncased.pdparams, but the registered model-state file name in `resouce_file_maps` is `model_state.pdparams`
 
-            return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls, config=config)
+            return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls)
 
         # 4. download from community or hf-hub
         else:
@@ -1083,8 +1105,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if isinstance(dtype, paddle.dtype):
                 dtype = str(dtype)[7:]
 
-            if dtype not in ["float32", "float16"]:
-                raise ValueError(f"the value of `dtype` should be one of [`float32`, `float16`], but received {dtype}")
+            if dtype not in ["float32", "float16", "bfloat16"]:
+                raise ValueError(
+                    f"the value of `dtype` should be one of [`float32`, `float16`, `bfloat16`], but received {dtype}"
+                )
             for key in state_dict.keys():
                 if isinstance(state_dict[key], np.ndarray) and issubclass(state_dict[key].dtype.type, np.floating):
                     state_dict[key] = state_dict[key].astype(dtype=dtype)
@@ -1196,11 +1220,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 return_unused_kwargs=True,
                 force_download=force_download,
                 from_hf_hub=from_hf_hub,
+                subfolder=subfolder,
                 **kwargs,
             )
 
         if dtype is None:
             dtype = config.dtype
+        else:
+            config.dtype = dtype
 
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
             config.save_pretrained(cache_dir)
@@ -1242,6 +1269,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     "don't support conversion from pytorch weight file to paddle weight file "
                     "or conversion is been disabled by `ENABLE_TORCH_CHECKPOINT` environment variable"
                 )
+
         else:
             # 4. loading the state dict
             if config.tensor_parallel_degree > 1 and model_weight_file.endswith("model_state.pdparams"):
@@ -1335,6 +1363,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         os.makedirs(save_dir, exist_ok=True)
 
         merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
+        variant = kwargs.get("variant", None)
+        is_main_process = kwargs.get("is_main_process", True)
 
         # 1. retrieve the model related config
 
@@ -1348,26 +1378,31 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
         state_dict_to_save = None
-        config_to_save = model_to_save.config
+        config_to_save = copy.deepcopy(model_to_save.config)
         if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
             state_dict_to_save = model_to_save.merge_tensor_parallel(model_to_save.state_dict(), config_to_save)
             config_to_save.tensor_parallel_degree = 1
+            # set variant to None for merge_tensor_parallel, but there should no relationship with variant setting
+            variant = None
             if config_to_save.tensor_parallel_rank != 0:
                 logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
                 return
         else:
             if config_to_save.tensor_parallel_degree > 1:
-                WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, f"tp{config_to_save.tensor_parallel_rank:0>2d}")
+                if variant is None:
+                    variant = f"tp{config_to_save.tensor_parallel_rank:0>2d}"
+                # WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, variant)
 
             state_dict_to_save = self.state_dict()
 
-        # Attach architecture to the config
-        config_to_save.architectures = [model_to_save.__class__.__name__]
-        config_to_save.save_pretrained(save_dir)
+        if is_main_process:
+            # Attach architecture to the config
+            config_to_save.architectures = [model_to_save.__class__.__name__]
+            config_to_save.save_pretrained(save_dir)
 
         # Save model
         if paddle.in_dynamic_mode():
-            file_name = os.path.join(save_dir, WEIGHTS_NAME)
+            file_name = os.path.join(save_dir, _add_variant(WEIGHTS_NAME, variant))
             paddle.save(state_dict_to_save, file_name)
             del model_to_save
         else:

@@ -95,7 +95,7 @@ msgid "Returning the average time cost after the start of training."
 msgstr ""
 
 #: of paddlenlp.utils.tools.get_env_device:1
-msgid "Return the device name of running enviroment."
+msgid "Return the device name of running environment."
 msgstr ""
 
 #: of paddlenlp.utils.tools.compare_version:1
