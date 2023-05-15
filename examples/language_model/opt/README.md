@@ -93,6 +93,6 @@ python export_generation.py \
 
 ```shell
 python infer_generation.py \
-    --model_dir "facebook/opt-125m" \
+    --model_dir inference/ \
     --model_prefix opt
 ```

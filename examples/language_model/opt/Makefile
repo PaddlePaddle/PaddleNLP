@@ -1,8 +1,6 @@
-export PYTHONPATH=/root/paddle/paddle-nlps/PaddleNLP:$PYTHONPATH
-export FLAGS_set_to_1d=False
 
 dist-finetune:
-	python -m paddle.distributed.launch --gpus "4,5,6,7" finetune_generation.py \
+	python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 		--model_name_or_path facebook/opt-125m \
 		--num_train_epochs 4 \
 		--learning_rate 3e-5 \
