@@ -233,7 +233,7 @@ class rms_norm_py(PyLayer):
             x_out = var_rsqrt * x_in_fp32 * w
             x_out = x_out.astype(x_in.dtype)
 
-        ctx.save_for_backward(var_rsqrt, w, x_in_fp32)
+        ctx.save_for_backward(var_rsqrt, w, x_in)
 
         return x_out
 
@@ -254,15 +254,16 @@ class rms_norm_py(PyLayer):
         (
             var_rsqrt,  # fp32
             w,  # fp16
-            x_in,  # fp32
+            x_in,  # fp16
         ) = ctx.saved_tensor()
 
         with paddle.amp.auto_cast(False):
-            x_seq = (x_in * dy * w).mean(-1, keepdim=True) * x_in
-            d_x_in = w * dy * var_rsqrt - var_rsqrt.pow(3) * x_seq
+            x_seq = (x_in * dy * w).astype("float32").mean(-1, keepdim=True) * x_in
+            # d_x_in = w * dy * var_rsqrt - var_rsqrt.pow(3) * x_seq
+            d_x_in = (w * dy).astype("float32") * var_rsqrt - var_rsqrt.pow(3) * x_seq
             d_x_in = d_x_in.astype(dy.dtype)
 
-            d_w = (var_rsqrt * x_in * dy).sum(axis=(0, 1))
+            d_w = (var_rsqrt * (x_in * dy)).sum(axis=(0, 1))
             d_w = d_w.astype(w.dtype)
 
         return d_x_in, d_w
@@ -298,7 +299,7 @@ class LlamaRMSNorm(nn.Layer):
         # return paddle.nn.functional.layer_norm(
         #     hidden_states, self.hidden_size, weight=self.weight, bias=None, epsilon=self.variance_epsilon
         # )
-        # return rms_norm_py.apply(hidden_states, self.weight, self.variance_epsilon)
+        return rms_norm_py.apply(hidden_states, self.weight, self.variance_epsilon)
         # return rms_norm(hidden_states, self.weight, self.variance_epsilon)
         # return rms_norm_fp32(hidden_states, self.weight, self.variance_epsilon)
 
