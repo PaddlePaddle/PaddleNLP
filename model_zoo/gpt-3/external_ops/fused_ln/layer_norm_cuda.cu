@@ -52,7 +52,7 @@ std::vector<paddle::Tensor> RMSLnFwd(const paddle::Tensor &x,
 
   auto place = x.place();
   auto y = paddle::empty(x_shape, scale.type(), place);
-  auto invvar = paddle::empty_like(mean);
+  auto invvar = paddle::empty({rows}, paddle::DataType::FLOAT32, place);
 
   cuda_rms_norm(x, scale, rows, cols, epsilon, &y, &invvar);
   return {y, invvar};
@@ -108,8 +108,9 @@ std::vector<paddle::DataType> LnFwdInferDtype(paddle::DataType x_dtype,
                                               paddle::DataType bias_dtype) {
   return {x_dtype, paddle::DataType::FLOAT32, paddle::DataType::FLOAT32};
 }
+
 std::vector<paddle::DataType> RMSLnFwdInferDtype(paddle::DataType x_dtype,
-                                              paddle::DataType scale_dtype,
+                                              paddle::DataType scale_dtype
                                               ) {
   return {x_dtype, paddle::DataType::FLOAT32};
 }
@@ -174,7 +175,7 @@ std::vector<paddle::Tensor> RMSLnBwd(const paddle::Tensor &x,
                            cols,
                            epsilon,
                            &grad_x,
-                           &grad_scale,
+                           &grad_scale
                            );
   return {grad_x, grad_scale};
 }

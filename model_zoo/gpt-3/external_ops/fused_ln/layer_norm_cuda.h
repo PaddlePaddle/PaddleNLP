@@ -416,7 +416,7 @@ struct SharedMemory<float> {
 }  // namespace
 
 template <typename T, typename U, typename V>
-__global__ void cuApplyLayerNorm_(V* __restrict__ output_vals,
+__device__ void cuApplyLayerNorm_(V* __restrict__ output_vals,
                                  U* __restrict__ mean,
                                  U* __restrict__ invvar,
                                  const T* __restrict__ vals,
@@ -952,11 +952,12 @@ void HostApplyRMSNorm(
     int n1,
     int n2,
     double epsilon,
-    const V* gamma)
+    const V* gamma, cudaStream_t stream)
 {
-    auto stream = at::cuda::getCurrentCUDAStream().stream();
+    // auto stream = at::cuda::getCurrentCUDAStream().stream();
     const dim3 threads(32,4,1);
-    const uint64_t maxGridY = at::cuda::getCurrentDeviceProperties()->maxGridSize[1];
+    // const uint64_t maxGridY = at::cuda::getCurrentDeviceProperties()->maxGridSize[1];
+    const uint64_t maxGridY = GetDeviceProp()->maxGridSize[1];
     const dim3 blocks(1, std::min((uint64_t)n1, maxGridY), 1);
     int nshared =
         threads.y > 1 ?
@@ -1110,7 +1111,7 @@ void HostRMSNormGradient(const V* dout,
         invvar,
         U(epsilon),
         part_grad_gamma.data<U>(),
-        part_grad_gammadata<U>(), /* unused */ 
+        part_grad_gamma.data<U>(), /* unused */ 
         true
         );
 
@@ -1180,16 +1181,13 @@ static void cuda_layer_norm_gradient(const paddle::Tensor& x,
 
 static void cuda_rms_norm_gradient(const paddle::Tensor& x,
                                      const paddle::Tensor& scale,
-                                     const paddle::Tensor& bias,
-                                     const paddle::Tensor& mean,
                                      const paddle::Tensor& invvar,
                                      const paddle::Tensor& dy,
                                      int rows,
                                      int cols,
                                      float epsilon,
                                      paddle::Tensor* grad_x,
-                                     paddle::Tensor* grad_scale,
-                                     paddle::Tensor* grad_bias) {
+                                     paddle::Tensor* grad_scale) {
   DISPATCH_FLOAT_HALF_AND_BFLOAT_INOUT_TYPES(
       x.type(),
       scale.type(),
