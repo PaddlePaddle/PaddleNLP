@@ -16,6 +16,8 @@ import paddle
 from paddle.distributed import fleet
 
 from paddlenlp.layers import LoRAConfig, LoRAModel
+from paddlenlp.prompt import PrefixModelForCausalLM
+from paddlenlp.prompt.prefix import llama_postprocess_past_key_value
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaConfig
 
 
@@ -31,6 +33,9 @@ def parse_arguments():
     parser.add_argument("--src_length", type=int, default=50, help="The batch size of data.")
     parser.add_argument("--tgt_length", type=int, default=100, help="The batch size of data.")
     parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
+    parser.add_argument(
+        "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
+    )
     return parser.parse_args()
 
 
@@ -80,6 +85,10 @@ class Predictor(object):
         )
         if self.args.lora_path is not None:
             self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
+        if self.args.prefix_path is not None:
+            self.model = PrefixModelForCausalLM.from_pretrained(
+                self.model, self.args.prefix_path, llama_postprocess_past_key_value
+            )
 
         self.model.eval()
 
