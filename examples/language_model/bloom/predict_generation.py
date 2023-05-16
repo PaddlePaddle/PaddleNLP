@@ -17,7 +17,7 @@ import paddle
 from paddle.distributed import fleet
 
 from paddlenlp.layers import LoRAConfig, LoRAModel
-from paddlenlp.prompt import PrefixModelForCausalLM
+from paddlenlp.prompt import PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.prompt.prefix import bloom_postprocess_past_key_value
 from paddlenlp.transformers import AutoConfig, AutoTokenizer, BloomForCausalLM
 
@@ -70,6 +70,9 @@ class Predictor(object):
         if self.args.lora_path is not None:
             lora_config = LoRAConfig.from_pretrained(self.args.lora_path)
             dtype = lora_config.dtype
+        elif self.args.prefix_path is not None:
+            prefix_config = PrefixConfig.from_pretrained(self.args.prefix_path)
+            dtype = prefix_config.dtype
         else:
             config = AutoConfig.from_pretrained(args.model_name_or_path)
             dtype = config.dtype if config.dtype is not None else "float16"
@@ -156,8 +159,11 @@ def predict():
     args = parse_arguments()
     predictor = Predictor(args)
     all_texts = [
-        "答案：年基准利率4.35%，上下文：从实际看,贷款的基本条件是: 一是中国大陆居民,年龄在60岁以下; 二是有稳定的住址和工作或经营地点; 三是有稳定的收入来源; 四是无不良信用记录,贷款用途不能作为炒股,赌博等行为; 五是具有完全民事行为能力。在已知答案的前提下，问题：</s>",
-        "答案：U系列，上下文：U系列是最好的，采用国际顶尖技术（由格力自主研发）双级变频压缩机，提高压缩机运转效率，制冷制热能力更强劲；1赫兹变频技术，使空调相当于一个15 W电灯泡，更加节能省电；送风面积广，风力大；生态风，净化空气。非常不错，现在国美在做活动，可以了解一下。在已知答案的前提下，问题：</s>",
+        "小明有5个苹果，小红有3个苹果，他们一共有多少个苹果？ ",
+        "以下是一道小学数学题：小明有三个苹果，小红有两个苹果，他们一共有多少个苹果？",
+        "题目：小明家里有5只猫，其中3只是黑猫，其他都是橘猫。小红去小明家玩，看到了其中2只橘猫。请问小明家还剩几只黑猫？",
+        "题目：小明有4个橙子，他想把橙子平均分给他的好朋友小红、小绿和小蓝。问每个人可以分到几个橙子，是否有剩余的橙子？",
+        "以下是一道小学数学题：有一个小商店正在做促销活动。如果你购买5个玩具车，可以获得2个免费的玩具车。现在小明要买23个玩具车，他需要买多少个才可以获得免费的玩具车呢？",
     ]
     batch_texts = batchfy_text(all_texts, args.batch_size)
     for bs, texts in enumerate(batch_texts):

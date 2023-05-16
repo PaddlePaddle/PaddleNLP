@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 from dataclasses import dataclass, field
 from functools import partial
@@ -32,7 +33,7 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class DataArgument:
-    task_name: str = field(default="dureader_qg", metadata={"help": "The name of task."})
+    task_name_or_path: str = field(default="./data/", metadata={"help": "Path to data"})
     src_length: int = field(default=512, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=512, metadata={"help": "The max length of target text."})
     min_tgt_length: int = field(default=0, metadata={"help": "The min length of target text."})
@@ -61,6 +62,7 @@ class ModelArgument:
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
+    do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
 
 
 def convert_example(
@@ -115,6 +117,63 @@ def convert_example(
         input_ids=input_ids,
         labels=labels,
     )
+
+
+def custom_instruction_convert_example(example, tokenizer, data_args, is_test=True):
+    instruction = ""
+    input = ""
+    response = ""
+    if "instruction" in example and "output" in example:
+        instruction = example["instruction"]
+        response = example["output"]
+    else:
+        assert False, "instruction and output are not in the input dictionary."
+    if "input" in example["input"]:
+        input = example["input"]
+
+    prompt = instruction + input
+    # dataset for evaluation
+    if is_test:
+        inputs = {
+            **tokenizer(prompt, max_length=data_args.src_length, truncation=True, padding="max_length"),
+            "labels": tokenizer(response, max_length=data_args.tgt_length, truncation=True, padding="max_length")[
+                "input_ids"
+            ],
+        }
+    # dataset for training
+    else:
+        src_ids = tokenizer(
+            prompt,
+            add_special_tokens=False,
+            max_length=data_args.src_length - 1,
+            truncation=True,
+            truncation_side="left",
+        )["input_ids"]
+        tgt_ids = tokenizer(
+            response,
+            add_special_tokens=False,
+            max_length=data_args.tgt_length - 2,
+            truncation=True,
+            truncation_side="right",
+        )["input_ids"]
+
+        input_ids = tokenizer.build_inputs_with_special_tokens(src_ids, tgt_ids)
+
+        context_length = input_ids.index(tokenizer.bos_token_id)
+        mask_position = context_length - 1
+
+        """attention_mask = np.tri(len(input_ids), len(input_ids))
+        attention_mask[:, :context_length] = 1
+        attention_mask = attention_mask[None, :, :]
+        attention_mask = (attention_mask < 0.5).astype("int64")"""
+
+        labels = [-100] * context_length + input_ids[mask_position + 1 :]
+
+        inputs = {
+            "input_ids": input_ids,
+            "labels": labels,
+        }
+    return inputs
 
 
 def main():
@@ -204,18 +263,34 @@ def main():
 
     # Load the Tokenzier
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    tokenizer.add_bos_token = True
 
-    # Load the dataset
-    trans_func = partial(
-        convert_example,
-        tokenizer=tokenizer,
-        decoder_start_token_id=tokenizer.bos_token_id,
-        max_source_length=data_args.src_length,
-        max_target_length=data_args.tgt_length,
-    )
-    train_ds, dev_ds = load_dataset("dureader_qg", splits=("train", "dev"))
-    train_ds = train_ds.map(trans_func, lazy=False)
-    dev_ds = dev_ds.map(trans_func, lazy=False)
+    # Load the dataset.
+    def read_local_dataset(path):
+        with open(path, "r", encoding="utf-8") as fp:
+            for line in fp:
+                yield json.loads(line.strip())
+
+    if os.path.exists(os.path.join(data_args.task_name_or_path, "train.json")) and os.path.exists(
+        os.path.join(data_args.task_name_or_path, "dev.json")
+    ):
+        train_ds = load_dataset(
+            read_local_dataset, path=os.path.join(data_args.task_name_or_path, "train.json"), lazy=False
+        )
+        dev_ds = load_dataset(
+            read_local_dataset, path=os.path.join(data_args.task_name_or_path, "dev.json"), lazy=False
+        )
+        trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
+    else:
+        train_ds, dev_ds = load_dataset("bellegroup", data_args.task_name_or_path, splits=["train", "dev"])
+        trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
+    if model_args.do_generation:
+        train_ds = train_ds.map(partial(trans_func, is_test=False))
+        test_ds = dev_ds.map(trans_func)
+    else:
+        train_ds = train_ds.map(partial(trans_func, is_test=False))
+        test_ds = dev_ds.map(partial(trans_func, is_test=False))
+
     collate_fn = DataCollatorForSeq2Seq(
         tokenizer=tokenizer,
         padding=True,
@@ -263,7 +338,7 @@ def main():
         trainer.save_state()
 
     if training_args.do_eval:
-        eval_result = trainer.evaluate()
+        eval_result = trainer.evaluate(test_ds)
         trainer.log_metrics("test", eval_result)
 
 

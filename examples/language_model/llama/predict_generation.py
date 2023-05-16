@@ -16,7 +16,7 @@ import paddle
 from paddle.distributed import fleet
 
 from paddlenlp.layers import LoRAConfig, LoRAModel
-from paddlenlp.prompt import PrefixModelForCausalLM
+from paddlenlp.prompt import PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.prompt.prefix import llama_postprocess_past_key_value
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaConfig
 
@@ -72,6 +72,9 @@ class Predictor(object):
         if self.args.lora_path is not None:
             lora_config = LoRAConfig.from_pretrained(self.args.lora_path)
             dtype = lora_config.dtype
+        elif self.args.prefix_path is not None:
+            prefix_config = PrefixConfig.from_pretrained(self.args.prefix_path)
+            dtype = prefix_config.dtype
         else:
             config = LlamaConfig.from_pretrained(args.model_name_or_path)
             dtype = "float16" if config.dtype is None else config.dtype
@@ -152,8 +155,11 @@ if __name__ == "__main__":
     args = parse_arguments()
     predictor = Predictor(args)
     all_texts = [
-        "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
-        "answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
+        "小明有5个苹果，小红有3个苹果，他们一共有多少个苹果？ ",
+        "以下是一道小学数学题：小明有三个苹果，小红有两个苹果，他们一共有多少个苹果？",
+        "题目：小明家里有5只猫，其中3只是黑猫，其他都是橘猫。小红去小明家玩，看到了其中2只橘猫。请问小明家还剩几只黑猫？",
+        "题目：小明有4个橙子，他想把橙子平均分给他的好朋友小红、小绿和小蓝。问每个人可以分到几个橙子，是否有剩余的橙子？",
+        "以下是一道小学数学题：有一个小商店正在做促销活动。如果你购买5个玩具车，可以获得2个免费的玩具车。现在小明要买23个玩具车，他需要买多少个才可以获得免费的玩具车呢？",
     ]
     batch_texts = batchfy_text(all_texts, args.batch_size)
     for bs, texts in enumerate(batch_texts):
