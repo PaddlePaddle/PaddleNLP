@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import argparse
 import io
 import logging
@@ -480,6 +479,11 @@ def do_train(args):
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
                     paddle.save(optimizer.state_dict(), os.path.join(output_dir, "model_state.pdopt"))
+                    if len(log_list) > 0:
+                        with open(os.path.join(output_dir, "train.log"), "w") as f:
+                            for log in log_list:
+                                if len(log.strip()) > 0:
+                                    f.write(log.strip() + "\n")
             if global_step >= num_training_steps:
                 return
 
