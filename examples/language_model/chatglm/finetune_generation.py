@@ -16,9 +16,11 @@ import os
 from dataclasses import dataclass, field
 from functools import partial
 
+import numpy as np
 import paddle
 from data import convert_example, custom_instruction_convert_example, read_local_dataset
-from utils import ChatGLMTrainer
+from sklearn.metrics import accuracy_score
+from utils import ChatGLMTrainer, save_infer_result
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
@@ -40,6 +42,9 @@ class DataArgument:
     src_length: int = field(default=128, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=180, metadata={"help": "The max length of target text."})
     num_beams: int = field(default=5, metadata={"help": "The number of beams."})
+    generate_num: int = field(default=100, metadata={"help": "Save first k examples generation result in dev dataset"})
+    src_length: int = field(default=256, metadata={"help": "Source length for generation."})
+    tgt_length: int = field(default=512, metadata={"help": "Target length for generation."})
 
 
 @dataclass
@@ -49,6 +54,7 @@ class ModelArgument:
     )
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix Tuning technique"})
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
+    do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
 
 
 def main():
@@ -98,7 +104,7 @@ def main():
             num_attention_heads=model.config.num_attention_heads,
             num_hidden_layers=model.config.num_hidden_layers,
             hidden_size=model.config.hidden_size,
-            prefix_projection=True,
+            # prefix_projection=True,
             prefix_projection_hidden_size=model.config.hidden_size,
             dtype=dtype,
         )
@@ -139,15 +145,18 @@ def main():
     else:
         train_ds, dev_ds = load_dataset("bellegroup", data_args.task_name_or_path, splits=["train", "dev"])
         trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
-
-    train_ds = train_ds.map(partial(trans_func, is_test=False))
-    test_ds = dev_ds.map(trans_func)
+    if model_args.do_generation:
+        train_ds = train_ds.map(partial(trans_func, is_test=False))
+        test_ds = dev_ds.map(trans_func)
+    else:
+        train_ds = train_ds.map(partial(trans_func, is_test=False))
+        test_ds = dev_ds.map(partial(trans_func, is_test=False))
 
     collate_fn = DataCollatorWithPadding(
         tokenizer=tokenizer, max_length=data_args.src_length + data_args.tgt_length, padding=True
     )
 
-    def compute_metrics(eval_preds):
+    def compute_metrics_do_generation(eval_preds):
         rouge1 = Rouge1()
         rouge2 = Rouge2()
         rougel = RougeL()
@@ -169,16 +178,25 @@ def main():
             "bleu4": bleu4.score(),
         }
 
+    def compute_metrics(eval_preds):
+
+        predictions = [x[x != -100] for x in eval_preds.predictions]
+        references = [x[x != -100] for x in eval_preds.label_ids]
+        accuracy = accuracy_score(y_true=np.array(references).flatten(), y_pred=np.array(predictions).flatten())
+        return {
+            "accuracy": accuracy,
+        }
+
     trainer = ChatGLMTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics,
-        do_generation=True,
+        compute_metrics=compute_metrics_do_generation if model_args.do_generation else compute_metrics,
         data_collator=collate_fn,
         data_args=data_args,
+        do_generation=model_args.do_generation,
     )
     # if training_args.fp16_opt_level == "O2":
     #     trainer.disable_autocast_context_manager()
@@ -193,6 +211,11 @@ def main():
     if training_args.do_eval:
         eval_result = trainer.evaluate(test_ds)
         trainer.log_metrics("test", eval_result)
+
+    if data_args.generate_num > 0:
+        save_infer_result(
+            trainer, dev_ds, k=data_args.generate_num, src_length=data_args.src_length, tgt_length=data_args.tgt_length
+        )
 
 
 if __name__ == "__main__":

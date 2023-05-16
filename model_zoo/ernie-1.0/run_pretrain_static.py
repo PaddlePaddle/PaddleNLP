@@ -345,6 +345,7 @@ def do_train(args):
 
     worker_num = fleet.worker_num()
     worker_index = fleet.worker_index()
+
     assert (
         args.dp_degree * args.sharding_degree * args.mp_degree * args.pp_degree == worker_num
     ), "The product of degree num should be equal to worker_num."
@@ -591,7 +592,7 @@ def do_train(args):
             if log_writer is not None:
                 for k, v in zip(fetchs_keys, ret):
                     if k in fetch_loss_vars:
-                        loss_res[k].append(v[0])
+                        loss_res[k].append(v.item())
 
             if (step + 1) % args.accumulate_steps != 0:
                 continue

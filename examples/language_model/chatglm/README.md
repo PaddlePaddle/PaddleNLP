@@ -39,7 +39,8 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 --recompute True \
 --do_train \
 --do_eval \
---tensor_parallel_degree 4
+--tensor_parallel_degree 4 \
+--do_generation True
 ```
 
 其中参数释义如下：
@@ -63,31 +64,36 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 - `do_train`: 是否训练模型。
 - `do_eval`: 是否评估模型。
 - `tensor_parallel_degree`: 模型并行数量。
+- `do_generation`: 在评估的时候是否调用model.generate,默认为False。
 
 ## BelleGroup/school_math_0.25M
 
 ```
-python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
+python -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir chatglm_log finetune_generation.py \
 --output_dir ./checkpoints/chatglm-6b \
---per_device_train_batch_size 4 \
---gradient_accumulation_steps 8 \
---save_steps 500 \
+--per_device_train_batch_size 32 \
+--per_device_eval_batch_size 32 \
+--gradient_accumulation_steps 1 \
 --model_name_or_path THUDM/chatglm-6b \
 --task_name_or_path school_math_0.25M \
 --num_train_epochs 2 \
 --learning_rate 3e-5 \
 --warmup_ratio 0.03 \
 --logging_steps 1 \
---evaluation_strategy no \
+--eval_steps 500 \
+--save_steps 500 \
 --src_length 128 \
 --tgt_length 512 \
 --fp16 \
 --fp16_opt_level O2 \
 --recompute True \
 --do_train \
+--do_eval \
 --disable_tqdm True \
---metric_for_best_model ppl \
---greater_is_better False
+--metric_for_best_model accuracy \
+--load_best_model_at_end True \
+--do_generation False \
+--tensor_parallel_degree 4
 ```
 
 ## 模型预测
@@ -131,15 +137,14 @@ python -m paddle.distributed.launch --gpus 0,1,2,3 predict_generation.py \
 ```
 python export_generation_model.py \
    --model_name_or_path ./checkpoints/chatglm-6b \
-   --output_path ./checkpoints/infer/chatglm \
-   --dtype "float32"
+   --output_path ./checkpoints/infer/chatglm
 ```
 
 其中参数定义如下：
 
 - `model_name_or_path`: 预训练模型内置名称或者模型所在目录。
 - `output_path`: 导出模型存储地址和文件前缀。示例中导出地址为 `./checkpoints/infer`，模型前缀为 `chatglm`。
-- `dtype`: 模型参数类型，默认为`float32`，可选参数`float16`和`float32`。
+- `dtype`: 模型参数类型，可选参数`float16`和`float32`，默认为None，即为加载的动态图模型参数类型一致。
 
 ## 模型推理（c++推理）
 

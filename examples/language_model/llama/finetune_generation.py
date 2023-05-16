@@ -23,6 +23,8 @@ from utils import LlamaTrainer, compute_metrics
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, LoRAModel
+from paddlenlp.prompt import PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.prompt.prefix import llama_postprocess_past_key_value
 from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
@@ -66,6 +68,7 @@ class ModelArgument:
     eval_with_do_generation: bool = field(
         default=True, metadata={"help": "Evaluate with generation, instead for calc loss."}
     )
+    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
 
 
 def main():
@@ -145,6 +148,24 @@ def main():
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
 
+    if model_args.prefix_tuning:
+        prefix_config = PrefixConfig(
+            num_prefix_tokens=10,
+            num_attention_heads=model.config.n_head,
+            num_hidden_layers=model.config.n_layer,
+            hidden_size=model.config.hidden_size,
+            prefix_projection=True,
+            prefix_projection_hidden_size=model.config.hidden_size,
+            dtype=dtype,
+        )
+        model = PrefixModelForCausalLM(
+            model=model,
+            prefix_config=prefix_config,
+            postprocess_past_key_value=llama_postprocess_past_key_value,
+        )
+        model.mark_only_prefix_as_trainable()
+        model.print_trainable_parameters()
+
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
         padding_side="left",  # Allow batch inference
@@ -159,9 +180,9 @@ def main():
     if training_args.do_train:
         train_ds = train_ds.map(partial(trans_func))
     if training_args.do_eval:
-        # pipeline_parallel eval is the some as training.
-        is_eval = model_args.eval_with_do_generation
-        dev_ds = dev_ds.map(partial(trans_func, is_eval=is_eval))
+        # pipeline_parallel eval is the same as training.
+        is_test = model_args.eval_with_do_generation
+        dev_ds = dev_ds.map(partial(trans_func, is_test=is_test))
 
     collate_fn = DataCollatorForSupervisedDataset(tokenizer)
 

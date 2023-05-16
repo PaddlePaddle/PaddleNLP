@@ -28,7 +28,7 @@ from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import ColumnParallelLinear
 
 from ..transformers.conversion_utils import ConversionMixin
-from ..transformers.model_utils import PretrainedModel, _add_variant
+from ..transformers.model_utils import PretrainedModel, _add_variant, dtype_guard
 from ..utils.distributed import distributed_gather
 from ..utils.env import LORA_CONFIG_NAME, LORA_WEIGHT_FILE_NAME
 from ..utils.log import logger
@@ -311,17 +311,7 @@ class LoRAMergedLinear(nn.Linear):
         result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
         if self.r > 0 and any(self.enable_lora) and not self.merged:
             input_a = self.lora_dropout(input) @ self.lora_A
-            if len(input_a.shape) == 2:
-                delta = (
-                    F.conv1d(
-                        input_a.T.unsqueeze(0),
-                        self.lora_B.T.unsqueeze(-1),
-                        groups=sum(self.enable_lora),
-                    )
-                    .squeeze(0)
-                    .T
-                )
-            elif len(input_a.shape) == 3:
+            if input_a.dim() == 3:
                 delta = (
                     F.conv1d(
                         input_a.transpose([0, 2, 1]),
@@ -330,7 +320,7 @@ class LoRAMergedLinear(nn.Linear):
                     )
                 ).transpose([0, 2, 1])
             else:
-                raise NotImplementedError("LoRAMergedLinear only support 2D or 3D input features")
+                raise NotImplementedError("LoRAMergedLinear only support 3D input features")
 
             result += self.zero_pad(delta * self.scaling)
         return result
@@ -457,17 +447,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
         if self.r > 0 and any(self.enable_lora) and not self.merged:
             input_a = self.lora_dropout(input_mp) @ self.lora_A
-            if len(input_a.shape) == 2:
-                delta_mp = (
-                    F.conv1d(
-                        input_a.T.unsqueeze(0),
-                        self.lora_B.T.unsqueeze(-1),
-                        groups=sum(self.enable_lora),
-                    )
-                    .squeeze(0)
-                    .T
-                )
-            elif len(input_a.shape) == 3:
+            if input_a.dim() == 3:
                 delta_mp = (
                     F.conv1d(
                         input_a.transpose([0, 2, 1]),
@@ -476,7 +456,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
                     )
                 ).transpose([0, 2, 1])
             else:
-                raise NotImplementedError("LoRAMergedLinear only support 2D or 3D input features")
+                raise NotImplementedError("LoRAMergedLinear only support 3D input features")
             # [batch_size, *, out_features_per_partition]
             result_mp += self.zero_pad(delta_mp * self.scaling)
 
@@ -619,7 +599,10 @@ class LoRAModel(nn.Layer):
     def __init__(self, model, lora_config: LoRAConfig) -> None:
         super().__init__()
         self.lora_config = lora_config
-        self.model = self.get_lora_model(model, lora_config)
+        if self.lora_config.dtype is None:
+            self.lora_config.dtype = paddle.get_default_dtype()
+        with dtype_guard(self.lora_config.dtype):
+            self.model = self.get_lora_model(model, lora_config)
         if self.lora_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
             self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
             logger.warning(
@@ -702,10 +685,6 @@ class LoRAModel(nn.Layer):
             else:
                 trainable_state_dict[key] = tensor.numpy() if is_dst else None
 
-        if self.model.config.tensor_parallel_rank != 0:
-            logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
-            return
-        self.lora_config.tensor_parallel_degree = -1
         return trainable_state_dict
 
     def _convert_tensor_parallel(self, lora_state_dict):
@@ -736,23 +715,35 @@ class LoRAModel(nn.Layer):
         return lora_state_dict
 
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
+        variant = kwargs.get("variant", None)
+        is_main_process = kwargs.get("is_main_process", paddle.distributed.get_rank() == 0)
+
         assert not os.path.isfile(
             save_directory
         ), f"Saving directory ({save_directory}) should be a directory, not a file"
         os.makedirs(save_directory, exist_ok=True)
-        lora_weight_name = LORA_WEIGHT_FILE_NAME
+
         if merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
             trainable_state_dict = self.get_trainable_state_dict()
             trainable_state_dict = self._merge_trainable_tensor_parallel(trainable_state_dict)
+            if not is_main_process:
+                logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
+                return
+            variant = None
+            self.lora_config.tensor_parallel_degree = -1
         else:
             trainable_state_dict = self.get_trainable_state_dict()
             if self.model.config.tensor_parallel_degree > 1:
-                lora_weight_name = _add_variant(
-                    LORA_WEIGHT_FILE_NAME, f"tp{self.model.config.tensor_parallel_rank:0>2d}"
-                )
+                if variant is None:
+                    variant = f"tp{self.model.config.tensor_parallel_rank:0>2d}"
+
+        # save lora weight
+        lora_weight_name = _add_variant(LORA_WEIGHT_FILE_NAME, variant)
         weight_filename = os.path.join(save_directory, lora_weight_name)
         paddle.save(trainable_state_dict, weight_filename)
-        if self.model.config.tensor_parallel_rank == 0:
+
+        # save lora config
+        if is_main_process:
             self.lora_config.save_pretrained(save_directory)
             self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
 
