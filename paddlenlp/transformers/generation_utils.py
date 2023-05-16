@@ -851,7 +851,7 @@ class GenerationMixin(object):
         if input_ids is None and "inputs_embeds" not in model_kwargs:
             # Init `input_ids` with bos_token_id
             input_ids = self.prepare_input_ids_for_generation(bos_token_id)
-        else:
+        elif "inputs_embeds" in model_kwargs:
             # Add input embeds support
             input_ids = self.prepare_input_ids_for_generation(
                 bos_token_id, encoder_output=model_kwargs["inputs_embeds"]
