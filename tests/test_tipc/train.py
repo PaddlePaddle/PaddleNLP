@@ -104,7 +104,9 @@ def do_generated_inputs(args):
 
             if args.use_amp:
                 with paddle.amp.auto_cast(
-                    custom_black_list=args.custom_black_list if args.amp_level == "O2" else {}, level=args.amp_level
+                    custom_black_list=args.custom_black_list if args.amp_level == "O2" else {},
+                    level=args.amp_level,
+                    use_promote=args.amp_use_promote,
                 ):
                     loss, sample_per_cards = benchmark_model.forward(model, args, cloned_inputs)
 

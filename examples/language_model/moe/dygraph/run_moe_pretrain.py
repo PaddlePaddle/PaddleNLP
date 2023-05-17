@@ -88,6 +88,7 @@ def run_evaluate(args, data_loader, model, criterion, iter_steps, log_writer, gl
                 "elementwise_div",
             ],
             level="O2",
+            use_promote=False,
         ):
             preds = model(tokens)
         preds = paddle.cast(preds, dtype="float32")
@@ -517,7 +518,6 @@ def do_train(args):
             # many times. and start a new random dataloader.
             valid_data_loader = valid_data_loader()
             test_data_loader = test_data_loader()
-
             for step, batch in enumerate(train_data_loader()):
                 # to remove the train data that has been studyed.
                 if step < global_step - pass_num:
@@ -542,6 +542,7 @@ def do_train(args):
                             "elementwise_div",
                         ],
                         level="O2",
+                        use_promote=False,
                     ):
                         preds = model(tokens[start_index:end_index, :])
                         loss_mbs = criterion(
