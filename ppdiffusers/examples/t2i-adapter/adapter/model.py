@@ -25,11 +25,11 @@ import paddle.nn.functional as F
 from paddlenlp.transformers import AutoTokenizer, CLIPTextModel
 from paddlenlp.utils.log import logger
 from ppdiffusers import (
-    Adapter,
     AutoencoderKL,
     DDIMScheduler,
     DDPMScheduler,
     LDMBertModel,
+    T2IAdapter,
     UNet2DConditionModel,
     is_ppxformers_available,
 )
@@ -109,9 +109,9 @@ class AdapterLDM(nn.Layer):
         logger.info("Freeze unet parameters!")
 
         if model_args.pretrained_adapter_name_or_path:
-            self.adapter = Adapter.from_pretrained(model_args.pretrained_adapter_name_or_path)
+            self.adapter = T2IAdapter.from_pretrained(model_args.pretrained_adapter_name_or_path)
         else:
-            self.adapter = Adapter(**read_json(model_args.adapter_config_file))
+            self.adapter = T2IAdapter(**read_json(model_args.adapter_config_file))
 
         self.noise_scheduler = DDPMScheduler(
             beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000

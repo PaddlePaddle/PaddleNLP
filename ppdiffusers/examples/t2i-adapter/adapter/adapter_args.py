@@ -97,6 +97,7 @@ class GenerateArguments:
     Arguments pertaining to specify the model generation settings.
     """
 
+    use_controlnet: bool = field(default=False, metadata={"help": "Whether or not use text condition"})
     adapter_model_name_or_path: str = field(default=None, metadata={"help": "adapter model name or path."})
     sd_model_name_or_path: str = field(default=None, metadata={"help": "sd model name or path."})
     file: str = field(default="data/test.openpose.filelist", metadata={"help": "eval file."})
@@ -110,9 +111,12 @@ class GenerateArguments:
     num_inference_steps: int = field(default=50, metadata={"help": "num_inference_steps"})
     save_path: str = field(default="output/adapter/", metadata={"help": "Path to the output file."})
     guidance_scales: str = field(default_factory=lambda: [5, 7, 9], metadata={"help": "guidance_scales list."})
-    height: int = field(default=256, metadata={"help": "height."})
-    width: int = field(default=256, metadata={"help": "width."})
+    height: int = field(default=512, metadata={"help": "height."})
+    width: int = field(default=512, metadata={"help": "width."})
     max_generation_limits: int = field(default=1000, metadata={"help": "max generation limits."})
     use_text_cond: bool = field(default=True, metadata={"help": "Whether or not use text condition"})
+    use_default_neg_text_cond: bool = field(
+        default=True, metadata={"help": "Whether or not use default negative text condition"}
+    )
     generate_data_format: str = field(default="img2img", metadata={"help": "Generate data format."})
     generate_control_image_processor_type: str = field(default="openpose", metadata={"help": "Generate data format."})

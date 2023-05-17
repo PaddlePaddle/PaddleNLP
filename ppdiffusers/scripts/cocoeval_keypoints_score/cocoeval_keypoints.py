@@ -14,12 +14,8 @@
 
 import argparse
 
-# import numpy as np
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
-
-# import json
-
 
 # This script references https://cocodataset.org/#keypoints-eval.
 if __name__ == "__main__":

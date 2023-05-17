@@ -626,6 +626,8 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                 if is_adapter and len(down_block_additional_residuals) > 0:
                     sample += down_block_additional_residuals.pop(0)
 
+                # westfish: add to align with torch features
+                res_samples = tuple(res_samples[:-1]) + (sample,)
             down_block_res_samples += res_samples
 
         if is_controlnet:

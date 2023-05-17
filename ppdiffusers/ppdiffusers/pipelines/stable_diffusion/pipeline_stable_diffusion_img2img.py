@@ -277,7 +277,6 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
                 attention_mask=attention_mask,
             )
             prompt_embeds = prompt_embeds[0]
-        # breakpoint()
         prompt_embeds = prompt_embeds.cast(self.text_encoder.dtype)
 
         bs_embed, seq_len, _ = prompt_embeds.shape

@@ -25,24 +25,57 @@ from tqdm import tqdm
 
 from paddlenlp.trainer import PdArgumentParser
 from ppdiffusers import (
-    Adapter,
+    ControlNetModel,
     DDIMScheduler,
     EulerAncestralDiscreteScheduler,
     LMSDiscreteScheduler,
     PNDMScheduler,
     StableDiffusionAdapterPipeline,
+    StableDiffusionControlNetPipeline,
+    T2IAdapter,
+)
+
+DEFAULT_NEGATIVE_PROMPT = (
+    "longbody, lowres, bad anatomy, bad hands, missing fingers, extra digit, "
+    "fewer digits, cropped, worst quality, low quality"
 )
 
 
-def batchify(data, batch_size=16):
-    one_batch = []
-    for example in data:
-        one_batch.append(example)
-        if len(one_batch) == batch_size:
-            yield one_batch
-            one_batch = []
-    if one_batch:
-        yield one_batch
+class CannyProcessor:
+    """
+    canny wrapper.
+    """
+
+    def __init__(self, is_output_3d=False):
+        self.is_output_3d = is_output_3d
+        self.canny_thresh = (100, 200)
+        self.apply_canny = CannyDetector()
+
+    def process_data_load(self, image):
+        """
+        Args:
+          image: PIL image.
+        Return:
+          numpy or tensor. (0 ~ 1)
+        """
+        image = np.array(image)
+        img = HWC3(image)
+        H, W, C = img.shape
+        # TODO: random thresh.
+        detected_map = self.apply_canny(img, *self.canny_thresh)
+        if self.is_output_3d:
+            detected_map = HWC3(detected_map)
+        detected_map = Image.fromarray(detected_map)
+        return detected_map
+
+    def process_model_forward(self, image):
+        """
+        Args:
+          tensor (GPU)
+        Return:
+          tensor (GPU)
+        """
+        return image
 
 
 def set_seed(seed: int):
@@ -52,26 +85,39 @@ def set_seed(seed: int):
 
 
 def generate_images(
-    adapter_model_name_or_path,
-    sd_model_name_or_path,
+    use_controlnet=False,
+    adapter_model_name_or_path=None,
+    sd_model_name_or_path=None,
     batch_size=16,
     test_dataset=None,
     save_path="output",
-    scheduler_type="ddim",
-    eta=0.0,
-    num_inference_steps=50,
     guidance_scales=[3, 4, 5, 6, 7, 8],
+    num_inference_steps=50,
+    scheduler_type="ddim",
     height=256,
     width=256,
     device="gpu",
     max_generation_limits=1000,
     use_text_cond=True,
+    use_default_neg_text_cond=True,
     generate_control_image_processor_type=None,
+    eta=0.0,
 ):
+    # set pipe
     paddle.set_device(device)
-    adapter = Adapter.from_pretrained(adapter_model_name_or_path)
-    pipe = StableDiffusionAdapterPipeline.from_pretrained(sd_model_name_or_path, adapter=adapter, safety_checker=None)
+    if use_controlnet:
+        controlnet = ControlNetModel.from_pretrained(adapter_model_name_or_path)
+        pipe = StableDiffusionControlNetPipeline.from_pretrained(
+            sd_model_name_or_path, controlnet=controlnet, safety_checker=None
+        )
+    else:
+        adapter = T2IAdapter.from_pretrained(adapter_model_name_or_path)
+        pipe = StableDiffusionAdapterPipeline.from_pretrained(
+            sd_model_name_or_path, adapter=adapter, safety_checker=None
+        )
     pipe.set_progress_bar_config(disable=True)
+
+    # set scheduler
     beta_start = pipe.scheduler.beta_start
     beta_end = pipe.scheduler.beta_end
     if scheduler_type == "pndm":
@@ -103,9 +149,13 @@ def generate_images(
     else:
         raise ValueError(f"Scheduler of type {scheduler_type} doesn't exist!")
     pipe.scheduler = scheduler
-    if generate_control_image_processor_type == "canny":
-        canny_processor = CannyProcessor()
 
+    # generate
+    if generate_control_image_processor_type == "canny":
+        if use_controlnet:
+            canny_processor = CannyProcessor(is_output_3d=True)
+        else:
+            canny_processor = CannyProcessor()
     for cfg in guidance_scales:
         set_seed(generate_args.seed)
         new_save_path = os.path.join(save_path, f"cfg_{cfg}")
@@ -117,13 +167,18 @@ def generate_images(
         write_file = open(os.path.join(save_path, "caption.txt"), "w")
         i = 0
         for data in tqdm(test_dataset):
-            if generate_control_image_processor_type == "canny":
+            if (
+                generate_control_image_processor_type == "canny"
+            ):  # Canny mode needs to manually process the control image
                 data["adapter_cond"] = canny_processor.process_data_load(data["pixel_values"])
             images = pipe(
                 data["input_ids"] if use_text_cond else "",
+                negative_prompt=DEFAULT_NEGATIVE_PROMPT if use_default_neg_text_cond else "",
                 image=data["adapter_cond"],
                 guidance_scale=float(cfg),
                 eta=eta,
+                height=height,
+                width=width,
                 num_inference_steps=num_inference_steps,
             )[0]
             data["adapter_cond"].save(os.path.join(cond_save_path, "{:05d}_000.png".format(i)))
@@ -137,52 +192,7 @@ def generate_images(
                 break
 
 
-def collate_fn(examples):
-    pixel_values = paddle.stack([paddle.to_tensor(example["pixel_values"]) for example in examples])
-    input_ids = paddle.stack([paddle.to_tensor(example["input_ids"]) for example in examples])
-    adapter_cond = paddle.stack([paddle.to_tensor(example["adapter_cond"]) for example in examples])
-
-    batch = {"input_ids": input_ids, "pixel_values": pixel_values, "adapter_cond": adapter_cond}
-    return batch
-
-
-class CannyProcessor:
-    """
-    canny wrapper.
-    """
-
-    def __init__(self):
-        self.canny_thresh = (100, 200)
-        self.apply_canny = CannyDetector()
-
-    def process_data_load(self, image):
-        """
-        Args:
-          image: PIL image.
-        Return:
-          numpy or tensor. (0 ~ 1)
-        """
-        image = np.array(image)
-        img = HWC3(image)
-        H, W, C = img.shape
-        # TODO: random thresh.
-        detected_map = self.apply_canny(img, *self.canny_thresh)
-        detected_map = Image.fromarray(detected_map)
-        return detected_map
-
-    def process_model_forward(self, image):
-        """
-        Args:
-          tensor (GPU)
-        Return:
-          tensor (GPU)
-        """
-        return image
-
-
 if __name__ == "__main__":
-    # parser = argparse.ArgumentParser()
-    # args = parser.parse_args()
     parser = PdArgumentParser((DataArguments, GenerateArguments))
     data_args, generate_args = parser.parse_args_into_dataclasses()
     print("-----------  Configuration Arguments -----------")
@@ -203,6 +213,7 @@ if __name__ == "__main__":
         do_image_processing=False,
     )
     generate_images(
+        use_controlnet=generate_args.use_controlnet,
         adapter_model_name_or_path=generate_args.adapter_model_name_or_path,
         sd_model_name_or_path=generate_args.sd_model_name_or_path,
         batch_size=generate_args.batch_size,
@@ -216,5 +227,6 @@ if __name__ == "__main__":
         device=generate_args.device,
         max_generation_limits=generate_args.max_generation_limits,
         use_text_cond=generate_args.use_text_cond,
+        use_default_neg_text_cond=generate_args.use_default_neg_text_cond,
         generate_control_image_processor_type=generate_args.generate_control_image_processor_type,
     )
