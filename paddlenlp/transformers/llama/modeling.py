@@ -275,6 +275,12 @@ def rms_norm(x_in, w, eps):
     return var_rsqrt * x_in * w
 
 
+def rms_norm_fused(x_in, w, eps):
+    from fused_ln import fused_rms_norm
+
+    return fused_rms_norm(x_in, w, eps)[0]
+
+
 def rms_norm_fp32(x_in, w, eps):
     with paddle.amp.auto_cast(False):
         x_in_fp32 = x_in.astype("float32")
@@ -299,7 +305,8 @@ class LlamaRMSNorm(nn.Layer):
         # return paddle.nn.functional.layer_norm(
         #     hidden_states, self.hidden_size, weight=self.weight, bias=None, epsilon=self.variance_epsilon
         # )
-        return rms_norm_py.apply(hidden_states, self.weight, self.variance_epsilon)
+        # return rms_norm_py.apply(hidden_states, self.weight, self.variance_epsilon)
+        return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
         # return rms_norm(hidden_states, self.weight, self.variance_epsilon)
         # return rms_norm_fp32(hidden_states, self.weight, self.variance_epsilon)
 

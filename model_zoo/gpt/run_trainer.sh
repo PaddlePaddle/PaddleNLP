@@ -22,6 +22,8 @@ task_name="gpt_hybid"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
+export PYTHONPATH=/usr/lib/python3.7/site-packages/fused_ln-0.0.0-py3.7-linux-x86_64.egg:$PYTHONPATH
+
 PYTHONPATH=/root/paddlejob/workspace/zhonghui03/PaddleNLP/:$PYTHONPATH  \
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
@@ -34,8 +36,9 @@ python -u  -m paddle.distributed.launch \
     --output_dir "output/$task_name" \
     --split 949,50,1 \
     --max_seq_length 2048 \
-    --per_device_train_batch_size 2 \
-    --per_device_eval_batch_size 2 \
+    --per_device_train_batch_size 16 \
+    --per_device_eval_batch_size 16 \
+    --use_flash_attention 1 \
     --fp16  \
     --fp16_opt_level "O2"  \
     --learning_rate 0.0001 \
@@ -50,7 +53,7 @@ python -u  -m paddle.distributed.launch \
     --eval_steps 1000 \
     --report_to "visualdl" \
     --disable_tqdm true \
-    --recompute 1 \
+    --recompute 0 \
     --do_train \
     --do_eval \
     --device "gpu"

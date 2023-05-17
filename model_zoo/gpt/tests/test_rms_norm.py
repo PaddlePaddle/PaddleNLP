@@ -16,7 +16,7 @@ import paddle
 import paddle.nn as nn
 from paddle.autograd import PyLayer
 
-paddle.set_default_dtype("float64")
+# paddle.set_default_dtype("float64")
 # paddle.set_device("cpu")
 
 
@@ -63,6 +63,12 @@ class rms_norm_py(PyLayer):
         d_w = (var_rsqrt.astype(dy.dtype) * x_in * dy).sum(axis=(0, 1))
 
         return d_x_in, d_w
+
+
+def rms_norm_fused(x_in, w, eps):
+    from fused_ln import fused_rms_norm
+
+    return fused_rms_norm(x_in, w, eps)[0]
 
 
 def rms_norm(x_in, w, eps):
@@ -137,7 +143,8 @@ class TestRmsNorm(unittest.TestCase):
 
     def test_forward(self):
         ret1 = rms_norm(self.x_in, self.w, self.eps)
-        ret2 = rms_norm_py.apply(self.x_in, self.w, self.eps)
+        # ret2 = rms_norm_py.apply(self.x_in, self.w, self.eps)
+        ret2 = rms_norm_fused(self.x_in, self.w, self.eps)
         np.testing.assert_equal(ret1.numpy(), ret2.numpy())
 
     def test_backward(self):
@@ -148,14 +155,16 @@ class TestRmsNorm(unittest.TestCase):
         w_g_1 = w.grad.numpy()
 
         x_in, w, eps, w2 = self.create()
-        ret2 = rms_norm_py.apply(x_in, w, eps) * w2
+        # ret2 = rms_norm_py.apply(x_in, w, eps) * w2
+        ret2 = rms_norm_fused(x_in, w, eps) * w2
         ret2.sum().backward()
         x_in_g_2 = x_in.grad.numpy()
         w_g_2 = w.grad.numpy()
 
-        np.testing.assert_equal(ret1.numpy(), ret2.numpy())
-        np.testing.assert_allclose(w_g_1, w_g_2, rtol=1e-10)
+        # np.testing.assert_equal(ret1.numpy(), ret2.numpy())
+        np.testing.assert_allclose(ret1.numpy(), ret2.numpy(), rtol=1e-6)
+        np.testing.assert_allclose(w_g_1, w_g_2, rtol=3e-4)
         # np.testing.assert_equal(w_g_1, w_g_2)
-        np.testing.assert_allclose(x_in_g_1, x_in_g_2, rtol=1e-10)
+        np.testing.assert_allclose(x_in_g_1, x_in_g_2, rtol=1e-6)
         # np.testing.assert_equal(x_in_g_1, x_in_g_2)
         np.testing.assert_equal(np.abs(x_in_g_1 * 1000).sum(), np.abs(x_in_g_2 * 1000).sum())
