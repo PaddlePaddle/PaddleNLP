@@ -147,19 +147,18 @@ class AdapterLDM(nn.Layer):
 
     @contextlib.contextmanager
     def ema_scope(self, context=None):
-        # if self.use_ema:
-        #     self.model_ema.store(self.adapter.parameters())
-        #     self.model_ema.copy_to(self.adapter)
-        #     if context is not None:
-        #         print(f"{context}: Switched to EMA weights")
-        # try:
-        #     yield None
-        # finally:
-        #     if self.use_ema:
-        #         self.model_ema.restore(self.adapter.parameters())
-        #         if context is not None:
-        #             print(f"{context}: Restored training weights")
-        yield None
+        if self.use_ema:
+            self.model_ema.store(self.controlnet.parameters())
+            self.model_ema.copy_to(self.controlnet)
+            if context is not None:
+                print(f"{context}: Switched to EMA weights")
+        try:
+            yield None
+        finally:
+            if self.use_ema:
+                self.model_ema.restore(self.controlnet.parameters())
+                if context is not None:
+                    print(f"{context}: Restored training weights")
 
     def on_train_batch_end(self):
         if self.use_ema:
