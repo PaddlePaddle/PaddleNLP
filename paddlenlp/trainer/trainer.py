@@ -540,7 +540,7 @@ class Trainer:
         logger.info(f"  Total optimization steps = {max_steps}")
         logger.info(f"  Total num train samples = {num_train_samples}")
         # per_device_trainable_numel = sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)
-        # Temporary fix since Tensor.numel() not supported in distributed env
+        # TODO: Temporary fix since Tensor.numel() not supported in distributed mode
         per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
         logger.info(f"  Number of trainable parameters = {per_device_trainable_numel} (per device)")
         if self.args.use_hybrid_parallel:
