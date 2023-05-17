@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import math
+import os
 from functools import partial
 from typing import Optional, Tuple
 
@@ -281,6 +282,65 @@ def rms_norm_fused(x_in, w, eps):
     return fused_rms_norm(x_in, w, eps)[0]
 
 
+def get_gencode_flags():
+    import paddle
+
+    prop = paddle.device.cuda.get_device_properties()
+    cc = prop.major * 10 + prop.minor
+    return ["-gencode", "arch=compute_{0},code=sm_{0}".format(cc)]
+
+
+def change_pwd():
+
+    path = os.path.dirname(__file__)
+    if path:
+        os.chdir(path)
+
+
+def setup_fused_ln():
+    from paddle.utils.cpp_extension import load
+
+    gencode_flags = get_gencode_flags()
+    # change_pwd()
+    ops = load(
+        name="fused_ln",
+        sources=[
+            "/root/paddlejob/workspace/zhonghui03/PaddleNLP/model_zoo/gpt-3/external_ops/fused_ln/layer_norm_cuda.cu",
+        ],
+        extra_cuda_cflags=[
+            "-O3",
+            "-U__CUDA_NO_HALF_OPERATORS__",
+            "-U__CUDA_NO_HALF_CONVERSIONS__",
+            "-U__CUDA_NO_BFLOAT16_OPERATORS__",
+            "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
+            "-U__CUDA_NO_BFLOAT162_OPERATORS__",
+            "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
+            "-I./apex/contrib/csrc/layer_norm/",
+            "--expt-relaxed-constexpr",
+            "--expt-extended-lambda",
+            "--use_fast_math",
+            "-maxrregcount=50",
+        ]
+        + gencode_flags,
+        extra_cxx_cflags=["-O3"],
+    )
+    return ops
+
+
+fused_ln_jit = None
+
+local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+if local_rank == 0:
+    fused_ln_jit = setup_fused_ln()
+
+
+def rms_norm_fused2(x_in, w, eps):
+    global fused_ln_jit
+    if fused_ln_jit is None:
+        fused_ln_jit = setup_fused_ln()
+    return fused_ln_jit.fused_rms_norm(x_in, w, eps)[0]
+
+
 def rms_norm_fp32(x_in, w, eps):
     with paddle.amp.auto_cast(False):
         x_in_fp32 = x_in.astype("float32")
@@ -306,7 +366,7 @@ class LlamaRMSNorm(nn.Layer):
         #     hidden_states, self.hidden_size, weight=self.weight, bias=None, epsilon=self.variance_epsilon
         # )
         # return rms_norm_py.apply(hidden_states, self.weight, self.variance_epsilon)
-        return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
+        return rms_norm_fused2(hidden_states, self.weight, self.variance_epsilon)
         # return rms_norm(hidden_states, self.weight, self.variance_epsilon)
         # return rms_norm_fp32(hidden_states, self.weight, self.variance_epsilon)
 
