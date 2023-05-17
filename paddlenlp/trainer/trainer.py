@@ -257,7 +257,7 @@ class Trainer:
         self._signature_columns = None
         self.optimizer_grouped_parameters = None
 
-        if (self.sharding is not None) and (self.optimizer is not None or self.lr_scheduler is not None):
+        if (self.sharding is not None) and (self.optimizer is not None):
             raise RuntimeError(
                 "Passing `optimizers` is not allowed if sharding is enabled."
                 "You should subclass `Trainer` and override the `create_optimizer_and_scheduler` method."
