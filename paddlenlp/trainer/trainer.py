@@ -51,6 +51,11 @@ from ..transformers.model_utils import PretrainedModel, _add_variant, unwrap_mod
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils import device_guard
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
+from ..utils.env import (
+    LORA_WEIGHT_FILE_NAME,
+    PADDLE_WEIGHT_FILE_NAME,
+    PREFIX_WEIGHT_FILE_NAME,
+)
 from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
@@ -100,9 +105,6 @@ TRAINER_STATE_NAME = "trainer_state.json"
 OPTIMIZER_NAME = "optimizer.pdopt"
 SCHEDULER_NAME = "scheduler.pdparams"
 SCALER_NAME = "scaler.pdparams"
-
-WEIGHTS_NAME = "model_state.pdparams"
-CONFIG_NAME = "model_config.json"
 
 
 if is_datasets_available():
@@ -402,8 +404,15 @@ class Trainer:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
         if resume_from_checkpoint is not None:
+            if isinstance(self.model, LoRAModel):
+                weight_name = LORA_WEIGHT_FILE_NAME
+            elif isinstance(self.model, PrefixModelForCausalLM):
+                weight_name = PREFIX_WEIGHT_FILE_NAME
+            else:
+                weight_name = PADDLE_WEIGHT_FILE_NAME
+
             if not os.path.isfile(
-                os.path.join(resume_from_checkpoint, _add_variant(WEIGHTS_NAME, self.args.weight_name_suffix))
+                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
             ):
                 raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
 
@@ -411,7 +420,7 @@ class Trainer:
 
             # We load the model state dict on the CPU to avoid an OOM error.
             state_dict = paddle.load(
-                os.path.join(resume_from_checkpoint, _add_variant(WEIGHTS_NAME, self.args.weight_name_suffix)),
+                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)),
                 return_numpy=True,
             )
             # If the model is on the GPU, it still works!
@@ -451,8 +460,14 @@ class Trainer:
                 raise ValueError(f"No valid checkpoint found in output directory ({args.output_dir})")
 
         if resume_from_checkpoint is not None:
+            if isinstance(self.model, LoRAModel):
+                weight_name = LORA_WEIGHT_FILE_NAME
+            elif isinstance(self.model, PrefixModelForCausalLM):
+                weight_name = PREFIX_WEIGHT_FILE_NAME
+            else:
+                weight_name = PADDLE_WEIGHT_FILE_NAME
             if not os.path.isfile(
-                os.path.join(resume_from_checkpoint, _add_variant(WEIGHTS_NAME, self.args.weight_name_suffix))
+                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
             ):
                 raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
 
@@ -460,7 +475,7 @@ class Trainer:
 
             # TODO: Need to load the model state dict on the CPU to avoid an OOM error.
             state_dict = paddle.load(
-                os.path.join(resume_from_checkpoint, _add_variant(WEIGHTS_NAME, self.args.weight_name_suffix)),
+                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)),
                 return_numpy=True,
             )
             # If the model is on the GPU, it still works!
@@ -793,9 +808,14 @@ class Trainer:
             logger.info(
                 f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
             )
-
+            if isinstance(self.model, LoRAModel):
+                weight_name = LORA_WEIGHT_FILE_NAME
+            elif isinstance(self.model, PrefixModelForCausalLM):
+                weight_name = PREFIX_WEIGHT_FILE_NAME
+            else:
+                weight_name = PADDLE_WEIGHT_FILE_NAME
             best_model_path = os.path.join(
-                self.state.best_model_checkpoint, _add_variant(WEIGHTS_NAME, self.args.weight_name_suffix)
+                self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
             )
             if os.path.exists(best_model_path):
                 # We load the model state dict on the CPU to avoid an OOM error.
@@ -1694,7 +1714,8 @@ class Trainer:
                 if state_dict is None:
                     state_dict = self.model.state_dict()
                 paddle.save(
-                    state_dict, os.path.join(output_dir, _add_variant(WEIGHTS_NAME, self.args.weight_name_suffix))
+                    state_dict,
+                    os.path.join(output_dir, _add_variant(PADDLE_WEIGHT_FILE_NAME, self.args.weight_name_suffix)),
                 )
         else:
             self.model.save_pretrained(

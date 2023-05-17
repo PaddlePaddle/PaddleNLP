@@ -644,11 +644,15 @@ class LoRAModel(nn.Layer):
                 lora_state_dict = lora_model._convert_tensor_parallel(lora_state_dict=lora_state_dict)
 
             # set lora state dict
-            lora_model.model.set_state_dict(lora_state_dict)
+            lora_model.set_state_dict(lora_state_dict)
         else:
             logger.error(f"LoRA weights not found under {lora_path}, creating LoRA weights from scratch")
 
         return lora_model
+
+    def set_state_dict(self, state_dict):
+        self.model.set_state_dict(state_dict)
+        logger.info("Load lora weight successfully")
 
     def _merge_trainable_tensor_parallel(self, trainable_state_dict):
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
