@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import os
 from dataclasses import dataclass, field
 from functools import partial
 
 import numpy as np
 import paddle
-from utils import BloomTrainer, compute_metrics
+from utils import BloomTrainer, compute_metrics, save_infer_result
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
@@ -33,7 +32,7 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class DataArgument:
-    task_name_or_path: str = field(default="./data/", metadata={"help": "Path to data"})
+    task_name: str = field(default="dureader_qg", metadata={"help": "The name of task."})
     src_length: int = field(default=512, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=512, metadata={"help": "The max length of target text."})
     min_tgt_length: int = field(default=0, metadata={"help": "The min length of target text."})
@@ -50,6 +49,7 @@ class DataArgument:
             "help": "The number of highest probability tokens to keep for top-k-filtering in the 'sampling' strategy."
         },
     )
+    generate_num: int = field(default=100, metadata={"help": "Save first k examples generation result in dev dataset"})
 
 
 @dataclass
@@ -61,8 +61,13 @@ class ModelArgument:
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
-    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
-    do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
+    r: int = field(default=4, metadata={"help": "Lora attention dimension"})
+    merge_weights: bool = field(
+        default=True, metadata={"help": "Merge weights of the original model and the Lora model"}
+    )
+    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
+    num_prefix_tokens: int = field(default=10, metadata={"help": "Number of prefix tokens"})
+    prefix_projection: bool = field(default=True, metadata={"help": "Whether to project the prefix tokens"})
 
 
 def convert_example(
@@ -232,9 +237,9 @@ def main():
         # hardcode parameters for now
         lora_config = LoRAConfig(
             target_modules=[".*query_key_value.*"],
-            r=4,
+            r=model_args.r,
             lora_alpha=8,
-            merge_weights=True,
+            merge_weights=model_args.merge_weights,
             enable_lora_list=[[True, False, True]],
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,
@@ -245,11 +250,11 @@ def main():
 
     if model_args.prefix_tuning:
         prefix_config = PrefixConfig(
-            num_prefix_tokens=10,
+            num_prefix_tokens=model_args.num_prefix_tokens,
             num_attention_heads=model.config.n_head,
             num_hidden_layers=model.config.n_layer,
             hidden_size=model.config.hidden_size,
-            prefix_projection=True,
+            prefix_projection=model_args.prefix_projection,
             prefix_projection_hidden_size=model.config.hidden_size,
             dtype=dtype,
         )
@@ -266,30 +271,10 @@ def main():
     tokenizer.add_bos_token = True
 
     # Load the dataset.
-    def read_local_dataset(path):
-        with open(path, "r", encoding="utf-8") as fp:
-            for line in fp:
-                yield json.loads(line.strip())
-
-    if os.path.exists(os.path.join(data_args.task_name_or_path, "train.json")) and os.path.exists(
-        os.path.join(data_args.task_name_or_path, "dev.json")
-    ):
-        train_ds = load_dataset(
-            read_local_dataset, path=os.path.join(data_args.task_name_or_path, "train.json"), lazy=False
-        )
-        dev_ds = load_dataset(
-            read_local_dataset, path=os.path.join(data_args.task_name_or_path, "dev.json"), lazy=False
-        )
-        trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
-    else:
-        train_ds, dev_ds = load_dataset("bellegroup", data_args.task_name_or_path, splits=["train", "dev"])
-        trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
-    if model_args.do_generation:
-        train_ds = train_ds.map(partial(trans_func, is_test=False))
-        test_ds = dev_ds.map(trans_func)
-    else:
-        train_ds = train_ds.map(partial(trans_func, is_test=False))
-        test_ds = dev_ds.map(partial(trans_func, is_test=False))
+    train_ds, dev_ds = load_dataset("bellegroup", "school_math_0.25M", splits=["train", "dev"])
+    trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
+    train_ds = train_ds.map(trans_func, lazy=False)
+    dev_ds = dev_ds.map(trans_func, lazy=False)
 
     collate_fn = DataCollatorForSeq2Seq(
         tokenizer=tokenizer,
@@ -338,8 +323,13 @@ def main():
         trainer.save_state()
 
     if training_args.do_eval:
-        eval_result = trainer.evaluate(test_ds)
+        eval_result = trainer.evaluate()
         trainer.log_metrics("test", eval_result)
+
+    if data_args.generate_num > 0:
+        save_infer_result(
+            trainer, dev_ds, k=data_args.generate_num, src_length=data_args.src_length, tgt_length=data_args.tgt_length
+        )
 
 
 if __name__ == "__main__":

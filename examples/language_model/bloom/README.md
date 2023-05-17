@@ -68,6 +68,69 @@ python -m paddle.distributed.launch --log_dir our_log --gpus "0,1,2,3" finetune_
     --recompute \
     --tensor_parallel_degree 4
 ```
+
+支持单个模型进行单卡LoRA微调，示例脚本如下所示：
+
+```shell
+python finetune_generation.py \
+    --model_name_or_path bigscience/bloom-560m \
+    --num_train_epochs 2 \
+    --learning_rate 3e-4 \
+    --warmup_ratio 0.06 \
+    --weight_decay 0.1 \
+    --label_smoothing 0.1 \
+    --save_steps 20 \
+    --logging_steps 1 \
+    --eval_steps 20 \
+    --output_dir ./checkpoints/bloom-560m \
+    --src_length 500 \
+    --tgt_length 100 \
+    --min_tgt_length 0 \
+    --per_device_eval_batch_size 8 \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 4 \
+    --max_grad_norm 1.0 \
+    --scale_loss 32768 \
+    --lr_scheduler_type linear \
+    --do_train \
+    --do_eval \
+    --fp16 \
+    --fp16_opt_level O2 \
+    --recompute \
+    --lora True
+```
+
+支持单个模型进行单卡Prefix微调，示例脚本如下所示：
+
+```shell
+python finetune_generation.py \
+    --model_name_or_path bigscience/bloom-560m \
+    --num_train_epochs 2 \
+    --learning_rate 3e-2 \
+    --warmup_ratio 0.06 \
+    --weight_decay 0.1 \
+    --label_smoothing 0.1 \
+    --save_steps 20 \
+    --logging_steps 1 \
+    --eval_steps 20 \
+    --output_dir ./checkpoints/bloom-560m \
+    --src_length 500 \
+    --tgt_length 100 \
+    --min_tgt_length 0 \
+    --per_device_eval_batch_size 8 \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 4 \
+    --max_grad_norm 1.0 \
+    --scale_loss 32768 \
+    --lr_scheduler_type linear \
+    --do_train \
+    --do_eval \
+    --fp16 \
+    --fp16_opt_level O2 \
+    --recompute \
+    --prefix True
+```
+
 ## 模型动态图预测
 
 
@@ -88,6 +151,22 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" predict_generation.py \
  python predict_generation.py --model_name_or_path ./save
 ```
 
+### LoRA微调模型预测
+对merge后的单分片模型也可以进行直接预测，脚本如下
+```shell
+ python predict_generation.py
+    --model_name_or_path bigscience/bloom-560m \
+    --lora_path ./checkpoints/bloom-560m
+```
+
+### Prefix微调模型预测
+对merge后的单分片模型也可以进行直接预测，脚本如下
+```shell
+ python predict_generation.py
+    --model_name_or_path bigscience/bloom-560m \
+    --prefix_path ./checkpoints/bloom-560m
+```
+
 ## 模型导出
 
 当在指定数据集上 finetune 过后可导出模型部署，此时将会体验到paddle内置的加速优化，针对于不同任务提供了相同的导出脚本：
@@ -97,6 +176,16 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" predict_generation.py \
 python export_generation_model.py --model_name_or_path ./save  --output_path inference/bloom
 ```
 **NOTICE**: 动转静输入的动态图参数必须要是单分片参数checkpoint
+
+当在指定数据集上进行 LoRA finetune 后的导出脚本：
+
+
+```shell
+python export_generation_model.py
+    --model_name_or_path bigscience/bloom-560m
+    --output_path inference/bloom
+    --lora_path ./checkpoints/bloom-560m
+```
 
 ## 模型部署
 对动转静的后的模型可以进行静态图部署，具体执行脚本如下：

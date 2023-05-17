@@ -34,6 +34,54 @@ python -u  -m paddle.distributed.fleet.launch \
     --warmup_steps 20
 ```
 
+### 单卡LoRA微调
+
+```shell
+python finetune_generation.py \
+    --model_name_or_path facebook/llama-7b \
+    --do_train \
+    --do_eval \
+    --num_train_epochs 2 \
+    --per_device_train_batch_size 4 \
+    --per_device_eval_batch_size 4 \
+    --overwrite_output_dir \
+    --output_dir ./checkpoints/ \
+    --logging_steps 10 \
+    --fp16 \
+    --fp16_opt_level O2 \
+    --gradient_accumulation_steps 4 \
+    --recompute \
+    --learning_rate 3e-4 \
+    --lr_scheduler_type linear \
+    --max_grad_norm 1.0 \
+    --warmup_steps 20 \
+    --lora True
+```
+
+### 单卡Prefix微调
+
+```shell
+python finetune_generation.py \
+    --model_name_or_path facebook/llama-7b \
+    --do_train \
+    --do_eval \
+    --num_train_epochs 2 \
+    --per_device_train_batch_size 4 \
+    --per_device_eval_batch_size 4 \
+    --overwrite_output_dir \
+    --output_dir ./checkpoints/ \
+    --logging_steps 10 \
+    --fp16 \
+    --fp16_opt_level O2 \
+    --gradient_accumulation_steps 4 \
+    --recompute \
+    --learning_rate 3e-2 \
+    --lr_scheduler_type linear \
+    --max_grad_norm 1.0 \
+    --warmup_steps 20 \
+    --prefix_tuning True
+```
+
 ## 流水线并行
 ```shell
 python -u  -m paddle.distributed.launch \
@@ -92,6 +140,59 @@ python -u  -m paddle.distributed.fleet.launch \
     --eval_steps 1000
 ```
 
+### 单卡LoRA微调
+
+```shell
+python finetune_instruction_generation.py \
+    --model_name_or_path facebook/llama-7b \
+    --do_train \
+    --do_eval \
+    --num_train_epochs 2 \
+    --per_device_train_batch_size 4 \
+    --per_device_eval_batch_size 4 \
+    --overwrite_output_dir \
+    --output_dir ./checkpoints/ \
+    --logging_steps 10 \
+    --fp16 \
+    --fp16_opt_level O2 \
+    --recompute \
+    --learning_rate 3e-4 \
+    --lr_scheduler_type linear \
+    --max_grad_norm 1.0 \
+    --warmup_steps 20 \
+    --gradient_accumulation_steps 4 \
+    --logging_steps 1 \
+    --eval_steps 1000 \
+    --lora True
+```
+
+### Prefix微调
+
+```shell
+python finetune_instruction_generation.py \
+    --model_name_or_path facebook/llama-7b \
+    --do_train \
+    --do_eval \
+    --num_train_epochs 2 \
+    --per_device_train_batch_size 4 \
+    --per_device_eval_batch_size 4 \
+    --overwrite_output_dir \
+    --output_dir ./checkpoints/ \
+    --logging_steps 10 \
+    --fp16 \
+    --fp16_opt_level O2 \
+    --recompute \
+    --learning_rate 3e-2 \
+    --lr_scheduler_type linear \
+    --max_grad_norm 1.0 \
+    --warmup_steps 20 \
+    --gradient_accumulation_steps 4 \
+    --logging_steps 1 \
+    --eval_steps 1000 \
+    --prefix True
+```
+
+
 <a name="2"></a>
 
 ## 模型预测
@@ -119,6 +220,22 @@ python -m paddle.distributed.launch --gpus 0,1,2,3 predict_generation.py \
     --merge_tensor_parallel_path  ./checkpoints/llama-merged
 ```
 
+### LoRA微调模型预测
+对merge后的单分片模型也可以进行直接预测，脚本如下
+```shell
+ python predict_generation.py
+    --model_name_or_path facebook/llama-7b \
+    --lora_path ./checkpoints
+```
+
+### Prefix微调模型预测
+对merge后的单分片模型也可以进行直接预测，脚本如下
+```shell
+ python predict_generation.py
+    --model_name_or_path facebook/llama-7b \
+    --prefix_path ./checkpoints
+```
+
 <a name="3"></a>
 
 ## 模型导出
@@ -127,6 +244,16 @@ python -m paddle.distributed.launch --gpus 0,1,2,3 predict_generation.py \
 python export_generation_model.py \
     --model_path checkpoints/ \
     --output_path inference/llama
+```
+
+当在指定数据集上进行 LoRA finetune 后的导出脚本：
+
+
+```shell
+python export_generation_model.py
+    --model_name_or_path facebook/llama-7b
+    --output_path inference/llama
+    --lora_path ./checkpoints
 ```
 
 <a name="4"></a>
