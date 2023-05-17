@@ -368,7 +368,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
                 prefix_state_dict = prefix_model._convert_tensor_parallel(prefix_state_dict=prefix_state_dict)
 
             # set prefix state dict
-            prefix_model.prefix_encoder.set_state_dict(prefix_state_dict)
+            prefix_model.set_state_dict(prefix_state_dict)
         else:
             logger.error(f"prefix weights not found under {prefix_path}, creating prefix weights from scratch")
 
@@ -410,6 +410,10 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             self.prefix_config.save_pretrained(save_directory)
             self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
             paddle.save({"past_key_values": past_key_values}, os.path.join(save_directory, PAST_KEY_VALUES_FILE_NAME))
+
+    def set_state_dict(self, state_dict):
+        self.prefix_encoder.set_state_dict(state_dict)
+        logger.info("Load prefix weight successfully")
 
     def _merge_trainable_tensor_parallel(self, trainable_state_dict):
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
