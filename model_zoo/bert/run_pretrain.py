@@ -291,7 +291,7 @@ def do_train(args):
     criterion = criterion_class(getattr(model, model_class.base_model_prefix).config.vocab_size)
     # decorate @to_static for benchmark, skip it by default.
     if args.to_static:
-        if args.cinn:
+        if True:
             model.bert.encoder = paddle.jit.to_static(model.bert.encoder)
             logger.info("Successfully to apply @to_static to model.bert.encoder.")
         else:
