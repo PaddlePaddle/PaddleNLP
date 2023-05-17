@@ -20,11 +20,10 @@ import paddle
 
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 
-# IGNORE_INDEX = -100
-IGNORE_INDEX = 0
+IGNORE_INDEX = -100
 
 
-def convert_example(example, tokenizer, data_args):
+def convert_example(example, tokenizer, data_args, is_test=False):
     """
     Convert an example into necessary features.
     """
@@ -62,12 +61,76 @@ def convert_example(example, tokenizer, data_args):
         input_seq + output_seq,
         return_tensors="pd",
         max_length=data_args.src_length + data_args.tgt_length,
+        padding="max_length" if data_args.always_pad_to_max_length else False,
         truncation=True,
     )
 
     input_ids = example_tokenized["input_ids"][0]
     labels = copy.deepcopy(input_ids)
     labels[:source_input_ids_len] = IGNORE_INDEX
+
+    if is_test:
+        return dict(
+            input_ids=source_tokenized["input_ids"][0],
+            labels=labels,
+        )
+
+    return dict(
+        input_ids=input_ids,
+        labels=labels,
+    )
+
+
+def custom_instruction_convert_example(example, tokenizer, data_args, is_test=False):
+    """
+    Convert an example into necessary features.
+    """
+
+    instruction = ""
+    input = ""
+    output = ""
+    if "instruction" in example and "output" in example:
+        instruction = example["instruction"]
+        output = example["output"]
+    else:
+        assert False, "instruction and output are not in the input dictionary."
+    if "input" in example["input"]:
+        input = example["input"]
+
+    if "chat" in data_args.task_name:
+        input_seq = instruction + input
+    else:
+        input_seq = "Human: " + instruction + input + "\n Assistant: "
+
+    output_seq = output
+
+    source_tokenized = tokenizer(
+        input_seq,
+        return_tensors="pd",
+        max_length=data_args.src_length,
+        truncation=True,
+    )
+
+    source_input_ids_len = (
+        source_tokenized["input_ids"].not_equal(paddle.to_tensor(tokenizer.pad_token_id)).sum().item()
+    )
+
+    example_tokenized = tokenizer(
+        input_seq + output_seq,
+        return_tensors="pd",
+        max_length=data_args.src_length + data_args.tgt_length,
+        truncation=True,
+    )
+
+    input_ids = example_tokenized["input_ids"][0]
+    labels = copy.deepcopy(input_ids)
+    labels[:source_input_ids_len] = IGNORE_INDEX
+
+    if is_test:
+        return dict(
+            input_ids=source_tokenized["input_ids"][0],
+            labels=labels,
+        )
 
     return dict(
         input_ids=input_ids,
@@ -104,9 +167,10 @@ class DataCollatorForSupervisedDataset(object):
         input_ids, labels = tuple([feature[key] for feature in features] for key in ("input_ids", "labels"))
         input_ids = left_padding(input_ids, pad_id=self.tokenizer.pad_token_id)
         labels = left_padding(labels, pad_id=IGNORE_INDEX)
+        attention_mask = paddle.cast(input_ids.not_equal(paddle.to_tensor(self.tokenizer.pad_token_id)), "int")
 
         return dict(
             input_ids=input_ids,
             labels=labels,
-            attention_mask=input_ids.not_equal(paddle.to_tensor(self.tokenizer.pad_token_id)),
+            attention_mask=attention_mask,
         )

@@ -141,8 +141,8 @@ def train():
                     with paddle.no_grad():
                         sub_CUDA_rnd_state = paddle.framework.random.get_cuda_rng_state()
                         all_CUDA_rnd_state_context.append(sub_CUDA_rnd_state)
-                        sub_context_ouput = model.get_context_pooled_embedding(sub_c_id, sub_c_segment)
-                        all_contexts.append(sub_context_ouput)
+                        sub_context_output = model.get_context_pooled_embedding(sub_c_id, sub_c_segment)
+                        all_contexts.append(sub_context_output)
 
                 model_questions = paddle.concat(all_questions, axis=0)
                 all_questions = []
@@ -189,7 +189,7 @@ def train():
                 ):
                     paddle.framework.random.set_cuda_rng_state(CUDA_state)
 
-                    sub_context_ouput = model.get_context_pooled_embedding(sub_c_id, sub_q_segment)
+                    sub_context_output = model.get_context_pooled_embedding(sub_c_id, sub_q_segment)
 
                     finally_context_res_for_backward = paddle.dot(sub_question_output, grad_for_each_context)
                     finally_context_res_for_backward = finally_context_res_for_backward * (1 / 8.0)

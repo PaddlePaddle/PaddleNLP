@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Paddle Llama model"""
+from __future__ import annotations
 
 import math
 from functools import partial
@@ -24,6 +25,18 @@ import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
+
+from paddlenlp.transformers.conversion_utils import (
+    StateDictNameMapping,
+    init_name_mappings,
+)
+
+try:
+    from paddle.nn.functional.flash_attention import flash_attention
+except:
+    flash_attention = None
+
+import warnings
 
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -43,27 +56,44 @@ __all__ = [
     "LlamaModel",
     "LlamaPretrainedModel",
     "LlamaForCausalLM",
+    "LlamaPretrainingCriterion",
 ]
 
 
-def parallel_matmul(x: Tensor, y: Tensor, parallel_output=True):
+def get_triangle_upper_mask(x, mask=None):
+    if mask is not None:
+        return mask
+    # [bsz, n_head, q_len, kv_seq_len]
+    shape = x.shape
+    #  [bsz, 1, q_len, kv_seq_len]
+    shape[1] = 1
+    mask = paddle.full(shape, -np.inf, dtype=x.dtype)
+    mask.stop_gradient = True
+    mask = paddle.triu(mask, diagonal=1)
+    mask.stop_gradient = True
+    return mask
+
+
+def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
     is_fleet_init = True
-    world_size = 1
+    tensor_parallel_degree = 1
     try:
         hcg = fleet.get_hybrid_communicate_group()
         model_parallel_group = hcg.get_model_parallel_group()
-        world_size = hcg.get_model_parallel_world_size()
+        tensor_parallel_degree = hcg.get_model_parallel_world_size()
     except:
         is_fleet_init = False
-    if is_fleet_init and world_size > 1:
+
+    if is_fleet_init and tensor_parallel_degree > 1 and y.is_distributed:
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
-        hcg = fleet.get_hybrid_communicate_group()
-        model_parallel_group = hcg.get_model_parallel_group()
         input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
         logits = paddle.matmul(input_parallel, y, transpose_y=False)
-        if parallel_output:
+
+        if tensor_parallel_output:
             return logits
+
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
+
     else:
         logits = paddle.matmul(x, y, transpose_y=False)
         return logits
@@ -87,6 +117,70 @@ def finfo(dtype: paddle.dtype = None):
         return np.finfo(np.float64)
 
 
+def scaled_dot_product_attention(
+    query_states, config, key_states, value_states, attention_mask, output_attentions, is_causal=True
+):
+
+    bsz, q_len, num_heads, head_dim = query_states.shape
+    _, kv_seq_len, _, _ = value_states.shape
+
+    if config.use_flash_attention and flash_attention:
+        # Flash Attention now ignore attention mask
+        # Current Flash Attention doesn't support attn maskt
+        # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
+        # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
+        attn_output, attn_weights = flash_attention(
+            query_states,
+            key_states,
+            value_states,
+            causal=is_causal and query_states.shape[1] != 1,
+            return_softmax=output_attentions,
+        )
+
+        attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+        return attn_output, attn_weights
+    else:
+        query_states = paddle.transpose(query_states, [0, 2, 1, 3])
+        # merge with the next tranpose
+        key_states = paddle.transpose(key_states, [0, 2, 1, 3])
+        value_states = paddle.transpose(value_states, [0, 2, 1, 3])
+
+        attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
+
+        if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
+            raise ValueError(
+                f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
+                f" {attn_weights.shape}"
+            )
+
+        # FIXME ZHUI when we use pipeline parallel, the attention_mask can be None
+        # we just make it triangle_upper_mask
+        if attention_mask is None:
+            attention_mask = get_triangle_upper_mask(attn_weights)
+
+        attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
+        if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
+            raise ValueError(
+                f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
+            )
+        attn_weights = attention_mask + attn_weights
+
+        attn_weights = paddle.maximum(
+            attn_weights, paddle.full([1], float(finfo(query_states.dtype).min), dtype=attn_weights.dtype)
+        )
+
+        if config.fp16_opt_level is not None:
+            with paddle.amp.auto_cast(False):
+                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+        else:
+            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+
+        attn_output = paddle.matmul(attn_weights, value_states)
+        attn_output = attn_output.transpose([0, 2, 1, 3])
+        attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+        return attn_output, attn_weights
+
+
 def masked_fill(x, mask, value):
     y = paddle.full(x.shape, value, x.dtype)
     return paddle.where(mask, y, x)
@@ -104,7 +198,7 @@ def _make_causal_mask(input_ids_shape, past_key_values_length, dtype):
     mask = masked_fill(mask, mask_cond < (mask_cond + 1).reshape([mask.shape[-1], 1]), 0)
 
     if past_key_values_length > 0:
-        mask = paddle.concat([paddle.zeros(target_length, past_key_values_length), mask], axis=-1)
+        mask = paddle.concat([paddle.zeros([target_length, past_key_values_length]), mask], axis=-1)
 
     return mask[None, None, :, :].expand([batch_size, 1, target_length, target_length + past_key_values_length])
 
@@ -122,7 +216,7 @@ def _expand_mask(mask, dtype, tgt_length):
     return masked_fill(inverted_mask, inverted_mask.cast("bool"), float(finfo(dtype).min))
 
 
-class RMSNorm(nn.Layer):
+class LlamaRMSNorm(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.hidden_size = config.hidden_size
@@ -135,31 +229,39 @@ class RMSNorm(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states):
-        default_type = hidden_states.dtype
-        with paddle.amp.auto_cast(False):
+        if self.config.fp16_opt_level is not None:
+            with paddle.amp.auto_cast(False):
+                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
+                hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
+        else:
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
-            hidden_states = hidden_states.astype("float32") * paddle.rsqrt(variance + self.variance_epsilon)
-            output = hidden_states * self.weight
-            output = output.astype(default_type)
-        return output
+            hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
+
+        if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
+            hidden_states = paddle.cast(hidden_states, self.weight.dtype)
+        return hidden_states * self.weight
 
 
-class RotaryEmbedding(nn.Layer):
+class LlamaRotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
-        self.inv_freq = 1.0 / (base ** (paddle.arange(0, dim, 2) / dim))
+        dtype = paddle.get_default_dtype()
+        inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, dim, 2), dtype="float32") / dim))
+        self.register_buffer("inv_freq", inv_freq.cast(dtype))
 
-        t = paddle.arange(max_position_embeddings, dtype=self.inv_freq.dtype)
-        freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
+        # higher acc using float32
+        t = paddle.arange(max_position_embeddings, dtype="float32")
+        freqs = paddle.einsum("i,j->ij", t, self.inv_freq.cast("float32"))
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         emb = paddle.concat([freqs, freqs], axis=-1)
-        self.cos_cached = emb.cos()[None, None, :, :]
-        self.sin_cached = emb.sin()[None, None, :, :]
+        # [bs, seqlen, nhead, head_dim]
+        self.cos_cached = emb.cos()[None, :, None, :]
+        self.sin_cached = emb.sin()[None, :, None, :]
 
     def forward(self, x, seq_len=None):
         return (
-            self.cos_cached[:, :, :seq_len, ...],
-            self.sin_cached[:, :, :seq_len, ...],
+            self.cos_cached[:, :seq_len, :, ...],
+            self.sin_cached[:, :seq_len, :, ...],
         )
 
 
@@ -171,8 +273,8 @@ def rotate_half(x):
 
 
 def apply_rotary_pos_emb(q, k, cos, sin, offset: int = 0):
-    cos = cos[..., offset : q.shape[-2] + offset, :]
-    sin = sin[..., offset : q.shape[-2] + offset, :]
+    cos = cos[:, offset : q.shape[1] + offset, :, :]
+    sin = sin[:, offset : q.shape[1] + offset, :, :]
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
@@ -191,6 +293,12 @@ class LlamaMLP(nn.Layer):
                 gather_output=False,
                 has_bias=False,
             )
+            self.down_proj = fleet.meta_parallel.RowParallelLinear(
+                self.intermediate_size,
+                self.hidden_size,
+                input_is_parallel=True,
+                has_bias=False,
+            )
             self.up_proj = fleet.meta_parallel.ColumnParallelLinear(
                 self.hidden_size,
                 self.intermediate_size,
@@ -199,17 +307,8 @@ class LlamaMLP(nn.Layer):
             )
         else:
             self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-
-        if config.tensor_parallel_degree > 1:
-            self.down_proj = fleet.meta_parallel.RowParallelLinear(
-                self.intermediate_size,
-                self.hidden_size,
-                input_is_parallel=True,
-                has_bias=False,
-            )
-        else:
             self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
+            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
 
     def forward(self, x):
         return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
@@ -222,11 +321,14 @@ class LlamaAttention(nn.Layer):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
-        assert self.num_heads % config.tensor_parallel_degree == 0
         self.head_dim = self.hidden_size // self.num_heads
+        if config.tensor_parallel_degree > 1:
+            assert (
+                self.num_heads % config.tensor_parallel_degree == 0
+            ), "num_heads: {self.num_heads}, tensor_parallel_degree: {config.tensor_parallel_degree}"
+            self.num_heads = self.num_heads // config.tensor_parallel_degree
 
         if config.tensor_parallel_degree > 1:
-            self.num_heads = self.num_heads // config.tensor_parallel_degree
             self.q_proj = fleet.meta_parallel.ColumnParallelLinear(
                 self.hidden_size,
                 self.hidden_size,
@@ -275,7 +377,7 @@ class LlamaAttention(nn.Layer):
                 self.hidden_size,
                 bias_attr=False,
             )
-        self.rotary_emb = RotaryEmbedding(self.head_dim)
+        self.rotary_emb = LlamaRotaryEmbedding(self.head_dim, max_position_embeddings=config.max_position_embeddings)
         self.config = config
 
     def forward(
@@ -287,29 +389,16 @@ class LlamaAttention(nn.Layer):
         use_cache: bool = False,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
-
         bsz, q_len, _ = hidden_states.shape
-        query_states = (
-            self.q_proj(hidden_states)
-            .reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
-            .transpose([0, 2, 1, 3])
-        )
-        key_states = (
-            self.k_proj(hidden_states)
-            .reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
-            .transpose([0, 2, 1, 3])
-        )
-        value_states = (
-            self.v_proj(hidden_states)
-            .reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
-            .transpose([0, 2, 1, 3])
-        )
+        query_states = self.q_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
+        key_states = self.k_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
+        value_states = self.v_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
 
-        kv_seq_len = key_states.shape[-2]
+        kv_seq_len = key_states.shape[-3]
         offset = 0
 
         if past_key_value is not None:
-            offset = past_key_value[0].shape[-2]
+            offset = past_key_value[0].shape[-3]
             kv_seq_len += offset
         cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
 
@@ -318,46 +407,19 @@ class LlamaAttention(nn.Layer):
 
         if past_key_value is not None:
             # reuse k, v, self_attention
-            key_states = paddle.concat([past_key_value[0], key_states], axis=2)
-            value_states = paddle.concat([past_key_value[1], value_states], axis=2)
+            key_states = paddle.concat([past_key_value[0], key_states], axis=1)
+            value_states = paddle.concat([past_key_value[1], value_states], axis=1)
 
         past_key_value = (key_states, value_states) if use_cache else None
 
-        attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) / math.sqrt(self.head_dim)
-
-        if attn_weights.shape != [bsz, self.num_heads, q_len, kv_seq_len]:
-            raise ValueError(
-                f"Attention weights should be of shape {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
-                f" {attn_weights.shape}"
-            )
-
-        attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len]).astype(query_states.dtype)
-
-        if attention_mask is not None:
-            if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
-                raise ValueError(
-                    f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
-                )
-            attn_weights = attention_mask + attn_weights
-            attn_weights = paddle.maximum(
-                attn_weights, paddle.to_tensor(float(finfo(query_states.dtype).min), dtype=query_states.dtype)
-            )
-
-        # Upcast attention to fp32
-        with paddle.amp.auto_cast(False):
-            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
-
-        attn_output = paddle.matmul(attn_weights, value_states)
-
-        if attn_output.shape != [bsz, self.num_heads, q_len, self.head_dim]:
-            raise ValueError(
-                f"`attn_output` should be of shape {(bsz, self.num_heads, q_len, self.head_dim)}, but is"
-                f" {attn_output.shape}"
-            )
-
-        attn_output = attn_output.transpose([0, 2, 1, 3])
-        attn_output = attn_output.reshape([bsz, q_len, self.head_dim * self.num_heads])
-
+        attn_output, attn_weights = scaled_dot_product_attention(
+            config=self.config,
+            query_states=query_states,
+            key_states=key_states,
+            value_states=value_states,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+        )
         attn_output = self.o_proj(attn_output)
 
         if not output_attentions:
@@ -372,8 +434,8 @@ class LlamaDecoderLayer(nn.Layer):
         self.hidden_size = config.hidden_size
         self.self_attn = LlamaAttention(config)
         self.mlp = LlamaMLP(config)
-        self.input_layernorm = RMSNorm(config)
-        self.post_attention_layernorm = RMSNorm(config)
+        self.input_layernorm = LlamaRMSNorm(config)
+        self.post_attention_layernorm = LlamaRMSNorm(config)
 
     def forward(
         self,
@@ -396,7 +458,6 @@ class LlamaDecoderLayer(nn.Layer):
                 (see `cache`).
             cache (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
         """
-
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
 
@@ -424,13 +485,49 @@ class LlamaDecoderLayer(nn.Layer):
         if use_cache:
             outputs += (present_key_value,)
 
+        # remove empty tuple for pipeline parallel
+        if type(outputs) is tuple and len(outputs) == 1:
+            outputs = outputs[0]
+
         return outputs
 
 
 class LlamaPretrainedModel(PretrainedModel):
-    _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
     config_class = LlamaConfig
     base_model_prefix = "llama"
+
+    @classmethod
+    def _get_name_mappings(cls, config: LlamaConfig) -> list[StateDictNameMapping]:
+        mappings: list[StateDictNameMapping] = []
+        model_mappings = [
+            ["embed_tokens.weight"],
+            ["norm.weight"],
+        ]
+        for layer_index in range(config.num_hidden_layers):
+            layer_mappings = [
+                [f"layers.{layer_index}.self_attn.q_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.k_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.v_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.o_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.rotary_emb.inv_freq"],
+                [f"layers.{layer_index}.mlp.gate_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.mlp.down_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.mlp.up_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.input_layernorm.weight"],
+                [f"layers.{layer_index}.post_attention_layernorm.weight"],
+            ]
+            model_mappings.extend(layer_mappings)
+
+        init_name_mappings(mappings=model_mappings)
+        # base-model prefix "LlamaModel"
+        if "LlamaModel" not in config.architectures:
+            for mapping in model_mappings:
+                mapping[0] = "model." + mapping[0]
+                mapping[1] = "llama." + mapping[1]
+            model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
+
+        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
+        return mappings
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):
@@ -459,6 +556,7 @@ class LlamaPretrainedModel(PretrainedModel):
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
                 "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
             }
+
             for key, action in base_actions.items():
                 if "layers.0." in key:
                     for i in range(num_layers):
@@ -477,17 +575,15 @@ class LlamaPretrainedModel(PretrainedModel):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
-                # TODO(linjieccc): enable after normal support fp16
-                if paddle.get_default_dtype() not in ["float16"]:
-                    layer.weight.set_value(
-                        paddle.tensor.normal(
-                            mean=0.0,
-                            std=self.config.initializer_range
-                            if hasattr(self.config, "initializer_range")
-                            else self.llama.config.initializer_range,
-                            shape=layer.weight.shape,
-                        )
+                layer.weight.set_value(
+                    paddle.tensor.normal(
+                        mean=0.0,
+                        std=self.config.initializer_range
+                        if hasattr(self.config, "initializer_range")
+                        else self.llama.config.initializer_range,
+                        shape=layer.weight.shape,
                     )
+                )
 
 
 @register_base_model
@@ -516,7 +612,7 @@ class LlamaModel(LlamaPretrainedModel):
             )
 
         self.layers = nn.LayerList([LlamaDecoderLayer(config) for _ in range(config.num_hidden_layers)])
-        self.norm = RMSNorm(config)
+        self.norm = LlamaRMSNorm(config)
 
         self.gradient_checkpointing = False
 
@@ -541,16 +637,21 @@ class LlamaModel(LlamaPretrainedModel):
             combined_attention_mask = (
                 expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
             )
-        combined_attention_mask = paddle.maximum(
-            combined_attention_mask.astype(dtype), paddle.to_tensor(float(finfo(dtype).min), dtype=dtype)
-        )
         return combined_attention_mask
 
     @paddle.jit.not_to_static
-    def recompute_training(self, layer_module, hidden_states, attention_mask, output_attentions):
+    def recompute_training(
+        self,
+        layer_module: nn.Layer,
+        hidden_states: Tensor,
+        attention_mask: Tensor,
+        output_attentions: Tensor,
+        use_cache: bool,
+        past_key_value: Tensor,
+    ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
-                return module(*inputs, output_attentions, None)
+                return module(*inputs, output_attentions)
 
             return custom_forward
 
@@ -558,6 +659,8 @@ class LlamaModel(LlamaPretrainedModel):
             create_custom_forward(layer_module),
             hidden_states,
             attention_mask,
+            use_cache,
+            past_key_value,
             use_reentrant=False,
         )
         return hidden_states
@@ -599,7 +702,7 @@ class LlamaModel(LlamaPretrainedModel):
         seq_length_with_past = seq_length
         cache_length = 0
         if past_key_values[0] is not None:
-            cache_length = paddle.shape(past_key_values[0][0])[2]
+            cache_length = paddle.shape(past_key_values[0][0])[1]
             seq_length_with_past += cache_length
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
@@ -621,7 +724,6 @@ class LlamaModel(LlamaPretrainedModel):
         for idx, (decoder_layer) in enumerate(self.layers):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
-
             past_key_value = past_key_values[idx] if past_key_values is not None else None
 
             has_gradient = not hidden_states.stop_gradient
@@ -631,6 +733,8 @@ class LlamaModel(LlamaPretrainedModel):
                     hidden_states,
                     attention_mask,
                     output_attentions,
+                    use_cache,
+                    past_key_value,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -640,8 +744,10 @@ class LlamaModel(LlamaPretrainedModel):
                     past_key_value,
                     use_cache,
                 )
-
-            hidden_states = layer_outputs[0]
+            if type(layer_outputs) is tuple:
+                hidden_states = layer_outputs[0]
+            else:
+                hidden_states = layer_outputs
 
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
@@ -674,52 +780,75 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
     It calculates the final loss.
     """
 
-    def __init__(self, tensor_parallel_degree=1, tensor_parallel_output=False):
-        super(LlamaPretrainingCriterion, self).__init__()
-        if tensor_parallel_degree > 1 and tensor_parallel_output:
-            self.loss_func = fleet.meta_parallel.ParallelCrossEntropy()
-        else:
-            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
+    def __init__(self, config):
 
-    def forward(self, prediction_scores, masked_lm_labels, pad_token_id):
-        masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
+        super(LlamaPretrainingCriterion, self).__init__()
+        self.ignore_index = getattr(config, "ignore_index", -100)
+        self.config = config
+        self.lm_shift_labels = config.lm_shift_labels
+        self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
+
+        if self.enable_parallel_cross_entropy:  # and False: # and lm_head is distributed
+            self.loss_func = fleet.meta_parallel.ParallelCrossEntropy(ignore_index=self.ignore_index)
+        else:
+            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
+
+    def forward(self, prediction_scores, masked_lm_labels):
+        if self.enable_parallel_cross_entropy:
+            if prediction_scores.shape[-1] == self.config.vocab_size:
+                warnings.warn(
+                    f"enable_parallel_cross_entropy, the vocab_size should be splited: {prediction_scores.shape[-1]}, {self.config.vocab_size}"
+                )
+                self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
+
+        if self.lm_shift_labels:
+            # Shift so that tokens < n predict n
+            prediction_scores = prediction_scores[..., :-1, :]
+            masked_lm_labels = masked_lm_labels[..., 1:]
+
         with paddle.amp.auto_cast(False):
-            masked_lm_loss = masked_lm_loss.astype("float32")
-            masked_lm_loss = masked_lm_loss[masked_lm_labels != pad_token_id]
+            masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
+            # skip ignore_index which loss == 0
+            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
             loss = paddle.mean(masked_lm_loss)
+
         return loss
 
 
 class LlamaLMHead(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config: LlamaConfig):
         super(LlamaLMHead, self).__init__()
-        shard_num = config.tensor_parallel_degree if config.tensor_parallel_degree > 1 else 1
+        self.config = config
+        if config.tensor_parallel_degree > 1:
+            vocab_size = config.vocab_size // config.tensor_parallel_degree
+        else:
+            vocab_size = config.vocab_size
+
         self.weight = self.create_parameter(
-            shape=[config.hidden_size, config.vocab_size // shard_num],
+            shape=[config.hidden_size, vocab_size],
             dtype=paddle.get_default_dtype(),
         )
-        self.config = config
+        # Must set distributed attr for Tensor Parallel !
+        self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
+        if self.weight.is_distributed:
+            self.weight.split_axis = 1
 
-    def forward(self, hidden_states, parallel_output=False):
-        with paddle.amp.auto_cast(False):
-            hidden_states = hidden_states.astype("float32")
-            logits = parallel_matmul(hidden_states, self.weight.astype("float32"), parallel_output=parallel_output)
+    def forward(self, hidden_states, tensor_parallel_output=None):
+        if tensor_parallel_output is None:
+            tensor_parallel_output = self.config.tensor_parallel_output
+
+        logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         return logits
 
 
 class LlamaForCausalLM(LlamaPretrainedModel):
-    _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
-
     def __init__(self, config):
         super().__init__(config)
-        self.llama = LlamaModel(config)
+        self.config = config
 
+        self.llama = LlamaModel(config)
         self.lm_head = LlamaLMHead(config)
-        self.criterion = LlamaPretrainingCriterion(
-            tensor_parallel_degree=config.tensor_parallel_degree,
-            tensor_parallel_output=True,
-        )
-        self.pad_token_id = config.pad_token_id
+        self.criterion = LlamaPretrainingCriterion(config)
 
     def get_input_embeddings(self):
         return self.llama.embed_tokens
@@ -743,7 +872,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         self, input_ids, use_cache=False, past_key_values=None, inputs_embeds=None, **kwargs
     ):
         if past_key_values:
-            input_ids = input_ids[:, -1:]
+            input_ids = input_ids[:, -1].unsqueeze(axis=-1)
 
         attention_mask = kwargs.get("attention_mask", None)
 
@@ -776,13 +905,11 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             token_type_ids = model_kwargs["token_type_ids"]
             model_kwargs["token_type_ids"] = paddle.concat([token_type_ids, token_type_ids[:, -1:]], axis=-1)
 
-        if not is_encoder_decoder:
-            # update attention mask
-            if "attention_mask" in model_kwargs:
-                attention_mask = model_kwargs["attention_mask"]
-                model_kwargs["attention_mask"] = paddle.concat(
-                    [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype="int64")], axis=-1
-                )
+        if not is_encoder_decoder and "attention_mask" in model_kwargs:
+            attention_mask = model_kwargs["attention_mask"]
+            model_kwargs["attention_mask"] = paddle.concat(
+                [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype="int64")], axis=-1
+            )
         # update role_ids
         if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
             role_ids = model_kwargs["role_ids"]
@@ -822,21 +949,18 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         )
 
         hidden_states = outputs[0]
-        parallel_output = True
-        if hidden_states.stop_gradient:
-            parallel_output = False
-        logits = self.lm_head(
-            hidden_states,
-            parallel_output=parallel_output,
+
+        # if labels is None，means we need full output, instead of tensor_parallel_output
+        # tensor_parallel_output is togather with ParallelCrossEntropy
+        tensor_parallel_output = (
+            self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         )
+
+        logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
 
         loss = None
         if labels is not None:
-            # Shift so that tokens < n predict n
-            shift_logits = logits[..., :-1, :]
-            shift_labels = labels[..., 1:]
-            # Flatten the tokens
-            loss = self.criterion(shift_logits, shift_labels, self.pad_token_id)
+            loss = self.criterion(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]

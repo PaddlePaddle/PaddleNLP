@@ -541,7 +541,7 @@ class GPTPretrainedModel(PretrainedModel):
         mappings = [StateDictNameMapping(*mapping) for mapping in model_mappings]
         return mappings
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -652,7 +652,6 @@ class GPTModel(GPTPretrainedModel):
             hidden_size=config.hidden_size,
         )
 
-        self.apply(self.init_weights)
         self.checkpoints = []
 
     def get_input_embeddings(self):
@@ -824,7 +823,6 @@ class GPTForPretraining(GPTPretrainedModel):
         super(GPTForPretraining, self).__init__(config)
         self.gpt = GPTModel(config)
         self.lm_head = GPTLMHead(config)
-        self.apply(self.init_weights)
         self.tie_weights()
 
     def get_output_embeddings(self):
@@ -878,7 +876,7 @@ class GPTForPretraining(GPTPretrainedModel):
             encoder_outputs, cached_kvs = outputs[:2]
         else:
             encoder_outputs = outputs
-        logits = self.decoder(encoder_outputs)
+        logits = self.lm_head(encoder_outputs)
 
         if use_cache:
             return logits, cached_kvs
@@ -940,7 +938,6 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         self.gpt = GPTModel(config)
         self.max_predict_len = paddle.to_tensor(max_predict_len, dtype="int32")
         self.eol_token_id = config.eol_token_id
-        self.apply(self.init_weights)
 
     def model(
         self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
@@ -1032,7 +1029,6 @@ class GPTLMHeadModel(GPTPretrainedModel):
         super(GPTLMHeadModel, self).__init__(config)
         self.gpt = GPTModel(config)
         self.lm_head = GPTLMHead(config)
-        self.apply(self.init_weights)
         self.tie_weights()
 
     def get_output_embeddings(self):
@@ -1219,8 +1215,6 @@ class GPTForTokenClassification(GPTPretrainedModel):
         self.dropout = nn.Dropout(dropout_p)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
 
-        self.apply(self.init_weights)
-
     def forward(
         self,
         input_ids=None,
@@ -1334,7 +1328,6 @@ class GPTForSequenceClassification(GPTPretrainedModel):
         self.num_labels = config.num_labels
         self.gpt = GPTModel(config)
         self.score = nn.Linear(config.hidden_size, config.num_labels, bias_attr=False)
-        self.apply(self.init_weights)
 
     def forward(
         self,

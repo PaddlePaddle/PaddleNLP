@@ -61,6 +61,7 @@ MODEL_CLASSES = {
 def set_hyrbid_parallel_seed(basic_seed, data_world_rank, mp_rank, pp_rank):
     assert args.device != "cpu"
 
+    basic_seed = basic_seed * 1000
     random.seed(basic_seed + data_world_rank)
     np.random.seed(basic_seed + data_world_rank)
     paddle.seed(basic_seed + data_world_rank)

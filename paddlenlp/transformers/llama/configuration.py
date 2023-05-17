@@ -39,6 +39,7 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "pad_token_id": 0,
         "use_cache": False,
         "use_recompute": False,
+        "use_flash_attention": False,
     },
     "facebook/llama-7b": {
         "hidden_size": 4096,
@@ -55,6 +56,7 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "pad_token_id": 0,
         "use_cache": False,
         "use_recompute": False,
+        "use_flash_attention": False,
     },
     "facebook/llama-13b": {
         "hidden_size": 5120,
@@ -71,6 +73,41 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "pad_token_id": 0,
         "use_cache": False,
         "use_recompute": False,
+        "use_flash_attention": False,
+    },
+    "facebook/llama-30b": {
+        "hidden_size": 6656,
+        "initializer_range": 0.02,
+        "intermediate_size": 17920,
+        "max_position_embeddings": 2048,
+        "model_type": "llama",
+        "num_attention_heads": 52,
+        "num_hidden_layers": 60,
+        "rms_norm_eps": 1e-06,
+        "vocab_size": 32000,
+        "bos_token_id": 1,
+        "eos_token_id": 2,
+        "pad_token_id": 0,
+        "use_cache": False,
+        "use_recompute": False,
+        "use_flash_attention": False,
+    },
+    "facebook/llama-65b": {
+        "hidden_size": 8192,
+        "initializer_range": 0.02,
+        "intermediate_size": 22016,
+        "max_position_embeddings": 2048,
+        "model_type": "llama",
+        "num_attention_heads": 64,
+        "num_hidden_layers": 80,
+        "rms_norm_eps": 1e-05,
+        "vocab_size": 32000,
+        "bos_token_id": 1,
+        "eos_token_id": 2,
+        "pad_token_id": 0,
+        "use_cache": False,
+        "use_recompute": False,
+        "use_flash_attention": False,
     },
 }
 
@@ -80,6 +117,8 @@ LLAMA_PRETRAINED_RESOURCE_FILES_MAP = {
         "facebook/tiny-random-llama": "https://bj.bcebos.com/paddlenlp/models/community/facebook/tiny-random-llama/model_state.pdparams",
         "facebook/llama-7b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-7b/model_state.pdparams",
         "facebook/llama-13b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-13b/model_state.pdparams",
+        "facebook/llama-30b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-30b/model_state.pdparams",
+        "facebook/llama-65b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-65b/model_state.pdparams",
     },
 }
 
@@ -149,8 +188,10 @@ class LlamaConfig(PretrainedConfig):
         initializer_range=0.02,
         rms_norm_eps=1e-6,
         use_cache=True,
-        use_pure_fp16=False,
         use_recompute=False,
+        use_flash_attention=False,
+        tensor_parallel_output=True,
+        lm_shift_labels=True,
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
@@ -166,8 +207,10 @@ class LlamaConfig(PretrainedConfig):
         self.initializer_range = initializer_range
         self.rms_norm_eps = rms_norm_eps
         self.use_cache = use_cache
-        self.use_pure_fp16 = use_pure_fp16
         self.use_recompute = use_recompute
+        self.use_flash_attention = use_flash_attention
+        self.tensor_parallel_output = tensor_parallel_output
+        self.lm_shift_labels = lm_shift_labels
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
@@ -177,5 +220,6 @@ class LlamaConfig(PretrainedConfig):
             bos_token_id=bos_token_id,
             eos_token_id=eos_token_id,
             tie_word_embeddings=tie_word_embeddings,
+            tensor_parallel_output=tensor_parallel_output,
             **kwargs,
         )

@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import re
@@ -21,13 +22,49 @@ from pprint import pprint as print
 
 import numpy as np
 import paddle
-from args import get_parser
+from paddle.distributed import fleet
 from paddle.io import DataLoader
-from utils import load_model
 
 from paddlenlp.data import Stack, Tuple
 from paddlenlp.transformers import AutoTokenizer, BloomForPretraining
 from paddlenlp.utils.log import logger
+
+
+def get_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_type", default=None, type=str, required=True, help="Model type selected in the list")
+    parser.add_argument(
+        "--model_name_or_path",
+        default=None,
+        type=str,
+        required=True,
+        help="Path to pre-trained model or shortcut name selected in the list: ",
+    )
+
+    # only support tensor_parallel_degree
+    parser.add_argument(
+        "--tensor_parallel_degree",
+        type=int,
+        default=1,
+        help="Model Parallelism degree. Spliting the linear layers to many cards.",
+    )
+
+    # Other config
+    parser.add_argument("--seed", type=int, default=1234, help="Random seed for initialization")
+    parser.add_argument(
+        "--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu", "npu"], help="select cpu, gpu, xpu devices."
+    )
+    parser.add_argument(
+        "--dtype",
+        type=str,
+        default="float16",
+        choices=["bfloat16", "float16", "float32"],
+        help="set the dtype of model",
+    )
+
+    # load autodist name files, eg: bloom-176b
+    parser.add_argument("--load_autodist", action="store_true", help="whether load auto-dist wieght file")
+    return parser
 
 
 def get_eval_parser():
@@ -45,9 +82,9 @@ def get_eval_parser():
     parser.add_argument("--overlapping_eval", type=int, default=32, help="Sliding window for overlapping eval.")
     parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
     parser.add_argument(
-        "--seq_length", type=int, default=1024, help="Maximum sequence length to process for evaluation."
+        "--seq_length", type=int, default=512, help="Maximum sequence length to process for evaluation."
     )
-    parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
+    parser.add_argument("--logging_steps", type=int, default=10, help="logging step for eval")
     return parser
 
 
@@ -244,14 +281,38 @@ def create_eval_dataset(args):
     return val_dataloader
 
 
-@paddle.no_grad()
 def do_generation():
     parser = get_eval_parser()
     args = parser.parse_args()
+    paddle.set_default_dtype(args.dtype)
+
+    if args.tensor_parallel_degree > 1:
+        strategy = fleet.DistributedStrategy()
+        strategy.hybrid_configs = {
+            "mp_degree": args.tensor_parallel_degree,
+        }
+        # Set control in tensor parallel
+        strategy.tensor_parallel_configs = {"tensor_init_seed": args.seed}
+        fleet.init(is_collective=True, strategy=strategy)
+
+        # add compatiblity code for bloom-176b weight files
+        if args.load_autodist:
+            BloomForPretraining.resource_files_names[
+                "model_state"
+            ] = f"auto_dist{paddle.distributed.get_rank()}.pdparams"
 
     eval_data_loader = create_eval_dataset(args)
     tic_eval = time.time()
-    model = load_model(args, model_class=BloomForPretraining)
+
+    model = BloomForPretraining.from_pretrained(
+        args.model_name_or_path,
+        load_state_as_np=True,
+        low_cpu_mem_usage=True,  # todo enable low_cpu_mem_usage=True
+        dtype=args.dtype,  # todo enable set dtype to avoid additional mem usage
+        tensor_parallel_degree=args.tensor_parallel_degree,
+        tensor_parallel_rank=paddle.distributed.get_rank(),
+    )
+
     model.eval()
     total_score = 0
     score_name = "loss" if not args.cloze_eval else "number correct"
@@ -261,14 +322,14 @@ def do_generation():
 
             tokens, loss_mask = batch[:2]
             labels = batch[-1]
+            with paddle.amp.auto_cast(args.use_pure_fp16):
+                preds = model(tokens).detach()
 
-            with paddle.amp.auto_cast(args.use_pure_fp16, level="O2", dtype=model.config.dtype):
-                preds = paddle.cast(model(tokens).detach(), dtype=paddle.float32)
+                # cast preds to float32 to keep high-precision
+                preds = preds.astype(paddle.float32)
 
                 if not args.cloze_eval:
                     masked_lm_loss = paddle.nn.functional.cross_entropy(preds, labels, reduction="none")
-                    masked_lm_loss = paddle.cast(masked_lm_loss, "float32")
-
                     loss = paddle.sum(masked_lm_loss * loss_mask)
                     total_score += loss.numpy() / (args.num_tokenized_tokens - 1)
                 else:

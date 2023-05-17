@@ -340,16 +340,26 @@ checkpoint_file = (
 
 
 class SegformerDetector:
-    def __init__(self):
-        segformer_annotator_ckpts_path = os.path.join(annotator_ckpts_path, "segformer_model")
-        modelpath = os.path.join(segformer_annotator_ckpts_path, "model.pdparams")
-        if not os.path.exists(modelpath):
-            from paddlenlp.utils.downloader import get_path_from_url_with_filelock
+    def __init__(self, mode):
+        assert mode in ["cityscapes", "ade20k"], f"mode should in {['cityscapes', 'ade20k']}!"
+        if mode == "cityscapes":
+            segformer_annotator_ckpts_path = os.path.join(annotator_ckpts_path, "segformer_model")
+            modelpath = os.path.join(segformer_annotator_ckpts_path, "model.pdparams")
+            if not os.path.exists(modelpath):
+                from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 
-            get_path_from_url_with_filelock(checkpoint_file, root_dir=segformer_annotator_ckpts_path)
-        self.model_path = modelpath
+                get_path_from_url_with_filelock(checkpoint_file, root_dir=segformer_annotator_ckpts_path)
+            self.model_path = modelpath
 
-        cfg = "annotator/segformer_paddle/segformer_b5_cityscapes_1024x1024_160k.yml"
+            cfg = "annotator/segformer_paddle/segformer_b5_cityscapes_1024x1024_160k.yml"
+        else:
+            segformer_annotator_ckpts_path = os.path.join(annotator_ckpts_path, "segformer_model")
+            modelpath = os.path.join(segformer_annotator_ckpts_path, "segformer_b5_ade20k_512x512_160k.pdparams")
+
+            self.model_path = modelpath
+
+            cfg = "annotator/segformer_paddle/segformer_b5_ade20k_512x512_160k.yml"
+
         cfg = Config(cfg)
         cfg.check_sync_info()
 

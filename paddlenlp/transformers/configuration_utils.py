@@ -28,6 +28,7 @@ import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import paddle
 from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import EntryNotFoundError
 
@@ -446,6 +447,8 @@ class PretrainedConfig:
             `float16` weights. Since the config object is stored in plain text, this attribute contains just the
             floating type string without the `paddle.` prefix. For example, for `paddle.float16` ``dtype` is the
             `"float16"` string.
+        fp16_opt_level(`str`, *optional*):
+            The `level` of the amp level.
 
             This attribute is currently not being used during model loading time, but this may change in the future
             versions. But we can already start preparing for the future by saving the dtype with save_pretrained.
@@ -508,8 +511,14 @@ class PretrainedConfig:
             "tie_word_embeddings", True
         )  # Whether input and output word embeddings should be tied for all MLM, LM and Seq2Seq models.
 
+        # parameter for model dtype
+        if "torch_dtype" in kwargs:
+            self.dtype = kwargs.pop("torch_dtype")
+        else:
+            self.dtype = kwargs.pop("dtype", paddle.get_default_dtype())
+
         # Parameters for tensor parallel
-        self.tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
+        self.tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", -1)
         self.tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
         # If set to True, this option is used with fleet.meta_parallel.ParallelCrossEntropy
         # to calculate cross-entropy loss for parallel model.
@@ -576,7 +585,7 @@ class PretrainedConfig:
         self.eos_token_id = kwargs.pop("eos_token_id", None)
         self.sep_token_id = kwargs.pop("sep_token_id", None)
 
-        self.dtype = kwargs.pop("dtype", None)
+        self.fp16_opt_level = kwargs.pop("fp16_opt_level", None)
 
         self.decoder_start_token_id = kwargs.pop("decoder_start_token_id", None)
 

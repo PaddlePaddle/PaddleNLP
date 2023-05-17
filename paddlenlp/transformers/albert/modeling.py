@@ -15,7 +15,7 @@
 """Modeling classes for ALBERT model."""
 
 import math
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import paddle
 import paddle.nn as nn
@@ -23,6 +23,7 @@ import paddle.nn.functional as F
 from paddle.nn import Layer
 
 from ...layers import Linear as TransposedLinear
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..activations import ACT2FN
@@ -358,9 +359,100 @@ class AlbertPretrainedModel(PretrainedModel):
     pretrained_init_configuration = ALBERT_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = ALBERT_PRETRAINED_RESOURCE_FILES_MAP
 
-    def init_weights(self):
-        # Initialize weights
-        self.apply(self._init_weights)
+    @classmethod
+    def _get_name_mappings(cls, config: AlbertConfig) -> List[StateDictNameMapping]:
+        model_mappings = [
+            "embeddings.word_embeddings.weight",
+            "embeddings.position_embeddings.weight",
+            "embeddings.token_type_embeddings.weight",
+            ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
+            ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
+            ["encoder.embedding_hidden_mapping_in.weight", None, "transpose"],
+            "encoder.embedding_hidden_mapping_in.bias",
+        ]
+
+        if config.add_pooling_layer:
+            model_mappings.extend(
+                [
+                    ["pooler.weight", None, "transpose"],
+                    ["pooler.bias"],
+                ]
+            )
+
+        for group_index in range(config.num_hidden_groups):
+            group_mappings = [
+                f"encoder.albert_layer_groups.{group_index}.albert_layers.0.full_layer_layer_norm.weight",
+                f"encoder.albert_layer_groups.{group_index}.albert_layers.0.full_layer_layer_norm.bias",
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.query.weight",
+                    None,
+                    "transpose",
+                ],
+                f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.query.bias",
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.key.weight",
+                    None,
+                    "transpose",
+                ],
+                f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.key.bias",
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.value.weight",
+                    None,
+                    "transpose",
+                ],
+                f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.value.bias",
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.dense.weight",
+                    None,
+                    "transpose",
+                ],
+                f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.dense.bias",
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.LayerNorm.weight",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.layer_norm.weight",
+                ],
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.LayerNorm.bias",
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.attention.layer_norm.bias",
+                ],
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn.weight",
+                    None,
+                    "transpose",
+                ],
+                f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn.bias",
+                [
+                    f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn_output.weight",
+                    None,
+                    "transpose",
+                ],
+                f"encoder.albert_layer_groups.{group_index}.albert_layers.0.ffn_output.bias",
+            ]
+            model_mappings.extend(group_mappings)
+
+        init_name_mappings(model_mappings)
+        # base-model prefix "AlbertModel"
+        if "AlbertModel" not in config.architectures:
+            for mapping in model_mappings:
+                mapping[0] = "albert." + mapping[0]
+                mapping[1] = "transformer." + mapping[1]
+
+        # downstream mappings
+        if "AlbertForQuestionAnswering" in config.architectures:
+            model_mappings.extend(
+                [["qa_outputs.weight", "qa_outputs.weight", "transpose"], ["qa_outputs.bias", "qa_outputs.bias"]]
+            )
+        if (
+            "AlbertForMultipleChoice" in config.architectures
+            or "AlbertForSequenceClassification" in config.architectures
+            or "AlbertForTokenClassification" in config.architectures
+        ):
+            model_mappings.extend(
+                [["classifier.weight", "classifier.weight", "transpose"], ["classifier.bias", "classifier.bias"]]
+            )
+
+        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
+        return mappings
 
     def _init_weights(self, layer):
         # Initialize the weights.
@@ -423,8 +515,6 @@ class AlbertModel(AlbertPretrainedModel):
         else:
             self.pooler = None
             self.pooler_activation = None
-
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -626,7 +716,6 @@ class AlbertForPretraining(AlbertPretrainedModel):
         self.predictions = AlbertMLMHead(config)
         self.sop_classifier = AlbertSOPHead(config)
         self.config = config
-        self.init_weights()
         self.vocab_size = config.vocab_size
 
     def get_output_embeddings(self):
@@ -804,7 +893,6 @@ class AlbertForMaskedLM(AlbertPretrainedModel):
         self.transformer = AlbertModel(config)
         self.predictions = AlbertMLMHead(config)
         self.config = config
-        self.init_weights()
         self.tie_weights()
 
     def get_output_embeddings(self):
@@ -934,9 +1022,6 @@ class AlbertForSequenceClassification(AlbertPretrainedModel):
         self.transformer = AlbertModel(config)
         self.dropout = nn.Dropout(config.classifier_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.config.num_labels)
-
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     def forward(
         self,
@@ -1073,8 +1158,6 @@ class AlbertForTokenClassification(AlbertPretrainedModel):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.num_labels)
 
-        self.init_weights()
-
     def forward(
         self,
         input_ids,
@@ -1197,7 +1280,6 @@ class AlbertForQuestionAnswering(AlbertPretrainedModel):
         self.config = config
         self.transformer = AlbertModel(config)
         self.qa_outputs = nn.Linear(config.hidden_size, 2)
-        self.init_weights()
 
     def forward(
         self,
@@ -1351,7 +1433,6 @@ class AlbertForMultipleChoice(AlbertPretrainedModel):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, 1)
         self.config = config
-        self.init_weights()
 
     def forward(
         self,
