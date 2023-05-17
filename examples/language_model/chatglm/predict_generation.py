@@ -108,6 +108,7 @@ class Predictor(object):
                 self.model = PrefixModelForCausalLM.from_pretrained(
                     self.model, self.args.prefix_path, chatglm_postprocess_past_key_value, chatglm_pad_attention_mask
                 )
+
         self.model.eval()
 
     def preprocess(self, input_text):

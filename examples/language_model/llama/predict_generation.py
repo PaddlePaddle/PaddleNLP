@@ -100,6 +100,7 @@ class Predictor(object):
                 self.model = PrefixModelForCausalLM.from_pretrained(
                     self.model, self.args.prefix_path, llama_postprocess_past_key_value
                 )
+
         self.model.eval()
 
     def preprocess(self, input_text):
