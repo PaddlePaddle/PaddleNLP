@@ -368,7 +368,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
                 prefix_state_dict = prefix_model._convert_tensor_parallel(prefix_state_dict=prefix_state_dict)
 
             # set prefix state dict
-            prefix_model.model.set_state_dict(prefix_state_dict)
+            prefix_model.prefix_encoder.set_state_dict(prefix_state_dict)
         else:
             logger.error(f"prefix weights not found under {prefix_path}, creating prefix weights from scratch")
 
