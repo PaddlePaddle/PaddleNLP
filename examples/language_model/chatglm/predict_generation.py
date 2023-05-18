@@ -68,6 +68,8 @@ class Predictor(object):
             self.tokenizer = ChatGLMTokenizer.from_pretrained(args.model_name_or_path)
             self.batch_size = args.batch_size
             self.args = args
+            self.src_length = args.src_length
+            self.tgt_length = args.tgt_length
 
             tensor_parallel_degree = paddle.distributed.get_world_size()
             tensor_parallel_rank = 0
