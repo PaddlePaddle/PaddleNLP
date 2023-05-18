@@ -283,7 +283,7 @@ def run_evaluate(
         ret = exe.run(program, feed=batch, fetch_list=list(eval_fetch.values()))
         if is_last:
             for k, v in zip(list(eval_fetch.keys()), ret):
-                all_ret[k].append(float(v[0]))
+                all_ret[k].append(v.item())
 
         if eval_step >= iter_steps - 1:
             if not is_last or log_writer is None:
