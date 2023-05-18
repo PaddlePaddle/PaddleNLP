@@ -848,10 +848,14 @@ class GenerationMixin(object):
                 logger.warning("FastGeneration is not available, " "and the original version would be used instead.")
 
         # params check
-        if input_ids is None:
+        if input_ids is None and "inputs_embeds" not in model_kwargs:
             # Init `input_ids` with bos_token_id
             input_ids = self.prepare_input_ids_for_generation(bos_token_id)
-
+        elif "inputs_embeds" in model_kwargs:
+            # Add input embeds support
+            input_ids = self.prepare_input_ids_for_generation(
+                bos_token_id, encoder_output=model_kwargs["inputs_embeds"]
+            )
         # Add to model_kwargs
         model_kwargs["attention_mask"] = attention_mask
         if position_ids is not None:

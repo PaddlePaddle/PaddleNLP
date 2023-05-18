@@ -501,13 +501,13 @@ class ChatGLMStack(nn.Layer):
         elif input_ids is not None:
             batch_size, seq_length = input_ids.shape[:2]
         elif inputs_embeds is not None:
-            batch_size, seq_length, _ = inputs_embeds.shape[:2]
+            batch_size, seq_length = inputs_embeds.shape[:2]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
-            inputs_embeds = inputs_embeds.transpose([1, 0, 2])
+        inputs_embeds = inputs_embeds.transpose([1, 0, 2])
 
         if cache is None:
             if self.config.pre_seq_len is not None:
@@ -690,6 +690,10 @@ class ChatGLMModel(ChatGLMPretrainedModel):
         use_cache: bool = None,
         return_dict: bool = None,
     ):
+        if input_ids is None:
+            assert position_ids is not None, "`position_ids` must be explicitly specified when input_ids is None."
+            assert attention_mask is not None, "`attention_mask` must be explicitly specified when input_ids is None."
+
         if attention_mask is None:
             attention_mask = self.get_masks(input_ids)
 
@@ -826,7 +830,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
 
     def forward(
         self,
-        input_ids,
+        input_ids=None,
         position_ids=None,
         attention_mask=None,
         cache=None,
