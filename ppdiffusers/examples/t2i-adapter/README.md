@@ -1,5 +1,5 @@
 # T2I-Adapter
-[T2I-Adapter](https://arxiv.org/abs/2302.08453) 是一种通过添加额外条件来控制扩散模型的神经网络结构。它通过将T2I（Text2Image）模型中的内部知识与外部控制信号对齐，根据不同条件训练各种适配器（Adapter），从而实现丰富的控制和编辑效果。
+[T2I-Adapter](https://arxiv.org/abs/2302.08453) 是一种通过添加额外条件来控制扩散模型的神经网络结构。它通过将T2I（Text2Image）模型的内部知识与外部控制信号进行对齐，并依据不同的条件来训练多种适配器（Adapter），可以实现丰富和精细的控制及编辑能力。
 <p align="center">
     <img src="https://github.com/TencentARC/T2I-Adapter/blob/main/assets/overview1.png?raw=true">
 </p>
@@ -17,7 +17,7 @@ pip install -r requirements.txt
 
 # 训练与推理
 ## Adapter模型训练
-下面我们将以pose2canny任务为例，介绍如何训练相应的Adapter模型。
+下面我们将以pose2image任务（即姿态控制）为例，介绍如何训练相应的Adapter模型。
 ### 数据准备
 请自行按照`adapter/data_preprocess.py`的数据处理逻辑准备好数据，并且将文件放置于`/data`目录，数据中需包含原图像、控制文本、控制图像等信息。
 
