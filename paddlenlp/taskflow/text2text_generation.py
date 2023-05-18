@@ -84,7 +84,7 @@ class ChatGLMTask(Task):
             # bos_token_id
             self._tokenizer.eos_token_id,
             # eos_token_id
-            self._tokenizer.end_token_id,
+            self._tokenizer.eop_token_id,
             # pad_token_id
             self._tokenizer.pad_token_id,
             # decoder_start_token_id
@@ -201,7 +201,7 @@ class ChatGLMTask(Task):
                     temperature=self._temperature,
                     max_length=self._tgt_length,
                     bos_token_id=self._tokenizer.bos_token_id,
-                    eos_token_id=self._tokenizer.end_token_id,
+                    eos_token_id=self._tokenizer.eop_token_id,
                     pad_token_id=self._tokenizer.pad_token_id,
                     num_return_sequences=self._num_return_sequences,
                     use_cache=True,
