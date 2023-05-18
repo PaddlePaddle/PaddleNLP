@@ -53,7 +53,7 @@ python -u -m train_t2i_adapter_trainer.py \
     --overwrite_output_dir
 ```
 `train_t2i_adapter_trainer.py`关键传入的参数解释如下：
-> * `--pretrained_model_name_or_path`: 加载预训练模型的名称或本地路径，如`runwayml/stable-diffusion-v1-5`，`pretrained_model_name_or_path`的优先级高于`vae_name_or_path`, `text_encoder_name_or_path`和`unet_name_or_path`。
+> * `--pretrained_model_name_or_path`: 加载预训练SD模型的名称或本地路径，如`runwayml/stable-diffusion-v1-5`，`pretrained_model_name_or_path`的优先级高于`vae_name_or_path`, `text_encoder_name_or_path`和`unet_name_or_path`。
 > * `--per_device_train_batch_size`: 训练时每张显卡所使用的`batch_size批量`，当我们的显存较小的时候，需要将这个值设置的小一点。
 > * `--gradient_accumulation_steps`: 梯度累积的步数，用户可以指定梯度累积的步数，以期在梯度累积的step中减少多卡之间梯度的通信量，减少更新的次数，扩大训练的batch_size。
 > * `--learning_rate`: 学习率。
@@ -80,6 +80,8 @@ python -u -m train_t2i_adapter_trainer.py \
 > * `--fp16_opt_level`: 混合精度训练模式，可为``O1``或``O2``模式，默认``O1``模式，默认O1. 只在fp16选项开启时候生效。
 > * `--is_ldmbert`: 是否使用`ldmbert`作为`text_encoder`，默认为`False`，即使用 `clip text_encoder`。
 > * `--overwrite_output_dir`: 加入该参数之后，将覆盖之前的模型保存路径，不会自动恢复训练。
+> * `--pretrained_adapter_name_or_path`: 加载预训练Adapter模型的名称或本地路径，默认为`None`，此时将随机初始化模型参数。
+
 
 ### 单机多卡训练 (多机多卡训练，仅需在 paddle.distributed.launch 后加个 --ips IP1,IP2,IP3,IP4)
 ```bash
