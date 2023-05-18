@@ -603,10 +603,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         down_block_res_samples = (sample,)
 
         # westfish: For compatibility with 0.14.0
-        if self.resnet_pre_temb_non_linearity:
-            down_nonlinear_temb = self.down_resnet_temb_nonlinearity(emb)
-        else:
-            down_nonlinear_temb = emb
+        down_nonlinear_temb = self.down_resnet_temb_nonlinearity(emb) if self.resnet_pre_temb_non_linearity else emb
 
         for downsample_block in self.down_blocks:
             if hasattr(downsample_block, "has_cross_attention") and downsample_block.has_cross_attention:

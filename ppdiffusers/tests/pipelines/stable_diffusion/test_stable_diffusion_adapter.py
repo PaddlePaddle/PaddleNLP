@@ -18,7 +18,13 @@ import unittest
 
 import numpy as np
 import paddle
+from ppdiffusers_test.pipeline_params import (
+    TEXT_GUIDED_IMAGE_VARIATION_BATCH_PARAMS,
+    TEXT_GUIDED_IMAGE_VARIATION_PARAMS,
+)
+from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
 
+from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
     AutoencoderKL,
     PNDMScheduler,
@@ -26,17 +32,8 @@ from ppdiffusers import (
     T2IAdapter,
     UNet2DConditionModel,
 )
-from ppdiffusers.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers.utils import floats_tensor, load_image, load_numpy, slow
-from ppdiffusers.utils.import_utils import (
-    is_cutlass_fused_multihead_attention_available,
-)
-
-from ...test_pipelines_common import PipelineTesterMixin
-from ..pipeline_params import (
-    TEXT_GUIDED_IMAGE_VARIATION_BATCH_PARAMS,
-    TEXT_GUIDED_IMAGE_VARIATION_PARAMS,
-)
+from ppdiffusers.utils.import_utils import is_ppxformers_available
 
 
 class StableDiffusionAdapterPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
@@ -131,7 +128,7 @@ class StableDiffusionAdapterPipelineFastTests(PipelineTesterMixin, unittest.Test
         return self._test_attention_slicing_forward_pass(expected_max_diff=0.002)
 
     @unittest.skipIf(
-        not is_cutlass_fused_multihead_attention_available(),
+        not is_ppxformers_available(),
         reason="XFormers attention is only available with CUDA and `xformers` installed",
     )
     def test_xformers_attention_forwardGenerator_pass(self):
