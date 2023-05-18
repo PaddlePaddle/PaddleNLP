@@ -195,7 +195,8 @@ def all_gather(v):
         return v.item()
     ret = []
     dist.all_gather(ret, v)
-    concat = paddle.concat(ret, axis=0)
+    output_tensors = [t if len(t.shape) > 0 else t.reshape_([-1]) for t in ret]
+    concat = paddle.concat(output_tensors, axis=0)
     return concat.mean().item()
 
 
