@@ -299,7 +299,7 @@ class Trainer:
                 else:
                     paddle.amp.decorate(models=model, level=self.args.fp16_opt_level)
 
-            if self.args.pipeline_parallel_degree > 1:
+            if self.args.pipeline_parallel_degree > 1 or self.args.tensor_parallel_degree > 1:
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
                 self.scaler = fleet.distributed_scaler(self.scaler)
             elif self.sharding is not None:
@@ -1343,6 +1343,12 @@ class Trainer:
                     **extra_kwargs,
                 )
                 self.optimizer = optimizer
+
+        # MP/TP only
+        elif self.args.pipeline_parallel_degree <= 1 and self.args.tensor_parallel_degree > 1:
+            model = fleet.distributed_model(model)
+            assert self.optimizer is not None, "Tensor parallel mode need decorate optimizer, pelease init optimizer."
+            self.optimizer = fleet.distributed_optimizer(self.optimizer)
 
         return model
 
