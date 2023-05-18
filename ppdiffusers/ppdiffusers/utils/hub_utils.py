@@ -159,6 +159,7 @@ def move_cache(old_cache_dir: Optional[str] = None, new_cache_dir: Optional[str]
                 logger.warning(
                     "Could not create symlink between old cache and new cache. If you use an older version of diffusers again, files will be re-downloaded."
                 )
+
     # At this point, old_cache_dir contains symlinks to the new cache (it can still be used).
 
 
