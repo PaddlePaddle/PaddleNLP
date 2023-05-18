@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2020 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -312,6 +312,8 @@ class ModelTesterMixin:
         pass
 
     def test_attention_outputs(self):
+        if not self.has_attentions:
+            return
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
         seq_len = getattr(self.model_tester, "seq_length", None)
         decoder_seq_length = getattr(self.model_tester, "decoder_seq_length", seq_len)
@@ -783,6 +785,13 @@ class ModelTesterPretrainedMixin:
         if self.paddlehub_remote_test_model_path is None or self.base_model_class is None:
             return
         model = self.base_model_class.from_pretrained(self.paddlehub_remote_test_model_path)
+        self.assertIsNotNone(model)
+
+    def test_model_from_config_paddle_hub(self):
+        if self.paddlehub_remote_test_model_path is None or self.base_model_class is None:
+            return
+        config = self.base_model_class.config_class.from_pretrained(self.paddlehub_remote_test_model_path)
+        model = self.base_model_class._from_config(config)
         self.assertIsNotNone(model)
 
     @slow

@@ -551,7 +551,7 @@ def do_train(args):
 
                     if args.gate != "naive" and args.balance_loss_weight:
                         aux_loss_list = [
-                            l.moe_mlp.gate.get_loss(clear=False)
+                            l.moe_mlp.gate.get_loss(clear=False).reshape([-1])
                             for l in model.gpt.decoder.layers
                             if hasattr(l.moe_mlp, "gate")
                         ]

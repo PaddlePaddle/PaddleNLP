@@ -649,7 +649,7 @@ class GPTPretrainedModel(PretrainedModel):
     }
     base_model_prefix = "gpt"
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         # no hook
         return
@@ -746,7 +746,6 @@ class GPTModel(GPTPretrainedModel):
 
         self.decoder = TransformerDecoder(decoder_layers, num_hidden_layers, norm="LayerNorm", hidden_size=hidden_size)
 
-        self.apply(self.init_weights)
         self.checkpoints = []
 
     def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None):
@@ -783,7 +782,6 @@ class GPTForPretraining(GPTPretrainedModel):
     def __init__(self, gpt):
         super(GPTForPretraining, self).__init__()
         self.gpt = gpt
-        self.apply(self.init_weights)
 
     def forward(
         self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
@@ -841,7 +839,6 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         super(GPTForGreedyGeneration, self).__init__()
         self.gpt = gpt
         self.max_predict_len = paddle.to_tensor(max_predict_len, dtype="int32")
-        self.apply(self.init_weights)
 
     def model(
         self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
@@ -898,7 +895,6 @@ class GPTLMHeadModel(GPTPretrainedModel):
         self.lm_head = GPTLMHead(
             self.gpt.config["hidden_size"], self.gpt.config["vocab_size"], self.gpt.embeddings.word_embeddings.weight
         )
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None):
         outputs = self.gpt(
