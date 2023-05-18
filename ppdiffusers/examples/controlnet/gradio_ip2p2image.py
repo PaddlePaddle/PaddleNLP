@@ -23,7 +23,7 @@ from annotator.util import HWC3, resize_image
 from paddlenlp.trainer import set_seed as seed_everything
 from ppdiffusers import ControlNetModel, StableDiffusionControlNetPipeline
 
-controlnet = ControlNetModel.from_pretrained("F:/Paddle/model/control_v11e_sd15_ip2p")
+controlnet = ControlNetModel.from_pretrained("lllyasviel/control_v11e_sd15_ip2p")
 pipe = StableDiffusionControlNetPipeline.from_pretrained(
     "runwayml/stable-diffusion-v1-5", controlnet=controlnet, safety_checker=None
 )

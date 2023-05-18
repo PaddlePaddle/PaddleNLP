@@ -25,7 +25,7 @@ from ppdiffusers import ControlNetModel, StableDiffusionControlNetPipeline
 
 apply_mlsd = MLSDdetector()
 
-controlnet = ControlNetModel.from_pretrained("F:/Paddle/model/control_v11p_sd15_mlsd")
+controlnet = ControlNetModel.from_pretrained("lllyasviel/control_v11p_sd15_mlsd")
 pipe = StableDiffusionControlNetPipeline.from_pretrained(
     "runwayml/stable-diffusion-v1-5", controlnet=controlnet, safety_checker=None
 )
