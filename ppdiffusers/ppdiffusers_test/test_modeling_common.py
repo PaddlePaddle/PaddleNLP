@@ -197,7 +197,6 @@ class ModelTesterMixin:
         output = model(**inputs_dict)
         if isinstance(output, dict):
             output = output.sample
-        # breakpoint()
         noise = paddle.randn(shape=list((inputs_dict["sample"].shape[0],) + self.output_shape))
         loss = paddle.nn.functional.mse_loss(input=output, label=noise)
         loss.backward()
