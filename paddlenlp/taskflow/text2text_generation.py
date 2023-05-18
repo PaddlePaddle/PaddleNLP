@@ -201,7 +201,7 @@ class ChatGLMTask(Task):
                     temperature=self._temperature,
                     max_length=self._tgt_length,
                     bos_token_id=self._tokenizer.bos_token_id,
-                    eos_token_id=self._tokenizer.end_token_id,
+                    eos_token_id=130005,
                     pad_token_id=self._tokenizer.pad_token_id,
                     num_return_sequences=self._num_return_sequences,
                     use_cache=True,

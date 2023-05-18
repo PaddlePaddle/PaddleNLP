@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,20 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# coding: utf8
-"""Custom Errors for pipelines stacks"""
-
-from typing import Optional
-
-
-class DuplicateDocumentError(ValueError):
-    """Exception for Duplicate document"""
-
-    pass
-
-
-class NodeError(Exception):
-    """Exception for issues that occur in a node"""
-
-    def __init__(self, message: Optional[str] = None, send_message_in_event: bool = True):
-        super().__init__(message=message, send_message_in_event=send_message_in_event)
+from pipelines.nodes.prompt.prompt_model import PromptModel
+from pipelines.nodes.prompt.prompt_node import PromptNode
+from pipelines.nodes.prompt.prompt_template import PromptTemplate
+from pipelines.nodes.prompt.shapers import AnswerParser, BaseOutputParser, Shaper
