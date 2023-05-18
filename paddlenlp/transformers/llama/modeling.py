@@ -785,10 +785,18 @@ class LlamaModel(LlamaPretrainedModel):
         return combined_attention_mask
 
     @paddle.jit.not_to_static
-    def recompute_training(self, layer_module, hidden_states, attention_mask, output_attentions):
+    def recompute_training(
+        self,
+        layer_module: nn.Layer,
+        hidden_states: Tensor,
+        attention_mask: Tensor,
+        output_attentions: Tensor,
+        use_cache: bool,
+        past_key_value: Tensor,
+    ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
-                return module(*inputs, output_attentions, None)
+                return module(*inputs, output_attentions)
 
             return custom_forward
 
@@ -796,6 +804,8 @@ class LlamaModel(LlamaPretrainedModel):
             create_custom_forward(layer_module),
             hidden_states,
             attention_mask,
+            use_cache,
+            past_key_value,
             use_reentrant=False,
         )
         return hidden_states
@@ -870,6 +880,8 @@ class LlamaModel(LlamaPretrainedModel):
                     hidden_states,
                     attention_mask,
                     output_attentions,
+                    use_cache,
+                    past_key_value,
                 )
             else:
                 layer_outputs = decoder_layer(
