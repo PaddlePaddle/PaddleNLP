@@ -142,7 +142,7 @@ def do_train():
     train_ds, dev_ds = load_dataset("cblue", args.dataset, splits=["train", "dev"])
 
     model = ElectraForSequenceClassification.from_pretrained(
-        "ernie-health-chinese", num_classes=len(train_ds.label_list), activation="tanh"
+        "ernie-health-chinese", num_labels=len(train_ds.label_list)
     )
     tokenizer = ElectraTokenizer.from_pretrained("ernie-health-chinese")
 

@@ -9,6 +9,7 @@
 |Stable Diffusion Mega|一个 Stable Diffusion 管道实现文生图、图生图、图像修复|[Stable Diffusion Mega](#stable-diffusion-mega)||
 |Long Prompt Weighting Stable Diffusion| 一个没有token数目限制的Stable Diffusion管道，支持在prompt中解析权重|[Long Prompt Weighting Stable Diffusion](#long-prompt-weighting-stable-diffusion)||
 |AUTOMATIC1111 WebUI Stable Diffusion| 与AUTOMATIC1111的WebUI基本一致的Pipeline |[AUTOMATIC1111 WebUI Stable Diffusion](#automatic1111-webui-stable-diffusion)||
+|Stable Diffusion with High Resolution Fixing| ，使用高分辨率修复功能进行文图生成|[Stable Diffusion with High Resolution Fixing](#stable-diffusion-with-high-resolution-fixing)||
 
 
 ## Example usages
@@ -324,7 +325,7 @@ with paddle.amp.auto_cast(True, level="O2"):
 images[0].save("lpw.png")
 ```
 
-上述代码生成结果如下
+上述代码生成结果如下:
 
 <center><img src="https://user-images.githubusercontent.com/40912707/221503299-24055b14-0b07-4f94-b7f9-d4f84b492540.png" style="zoom:50%"/></center>
 
@@ -343,43 +344,69 @@ import paddle
 from ppdiffusers.utils import image_grid
 from ppdiffusers import DiffusionPipeline
 from webui_stable_diffusion import WebUIStableDiffusionPipeline
+from pathlib import Path
 
 pipe = WebUIStableDiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix", paddle_dtype=paddle.float16)
 # 或者
 # pipe = DiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix", paddle_dtype=paddle.float16, custom_pipeline="webui_stable_diffusion")
 
-# 加载Moxin_10lora权重，当前仅可加载单个lora权重
-pipe.apply_lora("https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/ppdiffusers/Moxin_10.safetensors")
+# 自动下载civitai的lora及ti文件（请注意自己的网络。）
+# 介绍网页，程序将自动搜索介绍网页的下载链接
+pipe.download_civitai_lora_file('https://civitai.com/models/15365/hanfu')
+pipe.download_civitai_lora_file('https://civitai.com/models/12597/moxin')
+pipe.download_civitai_ti_file('https://civitai.com/models/1998/autumn-style')
+pipe.download_civitai_ti_file('https://civitai.com/models/21131/daisy-ridley-embedding')
+# 纯下载链接
+pipe.download_civitai_lora_file('https://civitai.com/api/download/models/21656')
 
-# 添加 textual_inversion 权重目录，程序会自动扫描该目录是否存在ti的权重
-# pipe.add_ti_embedding_dir("./")
+print("Supported Lora: " + "、 ".join([p.stem for p in Path(pipe.LORA_DIR).glob("*.safetensors")]))
 
 # 我们需要安装develop版的paddle才可以使用xformers
 # pipe.enable_xformers_memory_efficient_attention()
 scheduler_name = ["ddim", "pndm", "euler", "dpm-multi"]
-for lora_enabled in [True, False]:
-    pipe.set_lora_enabled(lora_enabled)
+for enable_lora in [True, False]:
     images = []
     for sc in scheduler_name:
         # 切换scheduler
         pipe.switch_scheduler(sc)
         # 指定clip_skip
-        clip_skip = 0
+        clip_skip = 1
         # 指定seed
         generator = paddle.Generator().manual_seed(0)
         # guidance_scale
         guidance_scale = 3.5
         prompt = "# shukezouma, negative space, , shuimobysim , portrait of a woman standing , willow branches, (masterpiece, best quality:1.2), traditional chinese ink painting, <lora:Moxin_10:1.0>, modelshoot style, peaceful, (smile), looking at viewer, wearing long hanfu, hanfu, song, willow tree in background, wuchangshuo,"
         negative_prompt = "(worst quality:2), (low quality:2), (normal quality:2), lowres, normal quality, skin spots, acnes, skin blemishes, age spot, glans, (watermark:2),"
-        img = pipe(prompt, negative_prompt=negative_prompt, num_inference_steps=50, height=768, width=512, clip_skip=clip_skip, guidance_scale=guidance_scale, generator=generator).images[0]
+        img = pipe(prompt, negative_prompt=negative_prompt, num_inference_steps=50, height=768, width=512, clip_skip=clip_skip, guidance_scale=guidance_scale, generator=generator, enable_lora=enable_lora).images[0]
         images.append(img)
-    if lora_enabled:
+    if enable_lora:
         image_grid(images, 2, 2).save(f"lora_enable.png")
     else:
         image_grid(images, 2, 2).save(f"lora_disable.png")
 ```
-生成的图片如下所示：
 
+生成的图片如下所示：
 | lora_disable.png | lora_enable.png |
 |:----------:|:--------------:|
 |<center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832029-c06a1367-1f2c-4206-9666-99854fcee240.png" width=50%></center> | <center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832028-730ce442-dd34-4e36-afd0-81d40843359a.png" width=50%></center> |
+
+### Stable Diffusion with High Resolution Fixing
+`StableDiffusionHiresFixPipeline` 基于Stable Diffusion进行文图生成，同时启动高分辨率修复功能。该自定义Pipeline生成图像期间共包含两个阶段: 初始生成图像阶段和高清修复阶段。使用方式如下所示：
+
+```python
+import paddle
+from stable_diffusion_hires_fix import StableDiffusionHiresFixPipeline
+from ppdiffusers import EulerAncestralDiscreteScheduler
+
+pipe = StableDiffusionHiresFixPipeline.from_pretrained("stabilityai/stable-diffusion-2", paddle_dtype=paddle.float16)
+pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+
+generator = paddle.Generator().manual_seed(5232132133)
+prompt = "1 real girl, long black hair, detailed face, light smile, chinese style, hanfu"
+image = pipe(prompt, guidance_scale=7.5, height=768, width=768, generator=generator, num_inference_steps=40, hires_ratio=0.5, hr_resize_width=768, hr_resize_height=1024, enable_hr=True).images[0]
+
+image.show()
+
+```
+生成的图片如下所示：
+<center><img src="https://github.com/PaddlePaddle/PaddleNLP/assets/35913314/1c96a219-0b5e-4e1a-b244-0c8cc7cb41f9" width=40%></center>

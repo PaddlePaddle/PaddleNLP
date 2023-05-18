@@ -1,4 +1,4 @@
-**简体中文**🀄 | [English🌎](.github/CODE_OF_CONDUCT_en.md)
+**简体中文**🀄 | [English🌎](.github/CONTRIBUTING_en.md)
 
 # Contributing to PaddleNLP
 
@@ -135,7 +135,7 @@ PaddleNLP 使用 [Git 分支模型](http://nvie.com/posts/a-successful-git-branc
    git push origin my-cool-stuff
    ```
 
-   git pushi之后，您可以提交Pull Request，请求[官方repo](https://github.com/PaddlePaddle/PaddleNLP) 采纳您的开发工作。请您依照[这些步骤](https://help.github.com/articles/creating-a-pull-request/)创建Pull Request。
+   git push之后，您可以提交Pull Request，请求[官方repo](https://github.com/PaddlePaddle/PaddleNLP) 采纳您的开发工作。请您依照[这些步骤](https://help.github.com/articles/creating-a-pull-request/)创建Pull Request。
 
 #### 9. 删除已经合入的本地和远程分支
 
