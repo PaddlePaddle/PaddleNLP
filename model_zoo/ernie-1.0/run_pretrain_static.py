@@ -283,7 +283,7 @@ def run_evaluate(
         ret = exe.run(program, feed=batch, fetch_list=list(eval_fetch.values()))
         if is_last:
             for k, v in zip(list(eval_fetch.keys()), ret):
-                all_ret[k].append(float(v[0]))
+                all_ret[k].append(v.item())
 
         if eval_step >= iter_steps - 1:
             if not is_last or log_writer is None:
@@ -591,7 +591,7 @@ def do_train(args):
             if log_writer is not None:
                 for k, v in zip(fetchs_keys, ret):
                     if k in fetch_loss_vars:
-                        loss_res[k].append(v[0])
+                        loss_res[k].append(v.item())
 
             if (step + 1) % args.accumulate_steps != 0:
                 continue
