@@ -18,6 +18,7 @@ from functools import partial
 
 import numpy as np
 import paddle
+from sklearn.metrics import accuracy_score
 from utils import BloomTrainer, compute_metrics, save_infer_result
 
 from paddlenlp.data import DataCollatorForSeq2Seq
@@ -49,7 +50,7 @@ class DataArgument:
             "help": "The number of highest probability tokens to keep for top-k-filtering in the 'sampling' strategy."
         },
     )
-    generate_num: int = field(default=100, metadata={"help": "Save first k examples generation result in dev dataset"})
+    generate_num: int = field(default=0, metadata={"help": "Save first k examples generation result in dev dataset"})
 
 
 @dataclass
@@ -68,6 +69,7 @@ class ModelArgument:
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
     num_prefix_tokens: int = field(default=10, metadata={"help": "Number of prefix tokens"})
     prefix_projection: bool = field(default=True, metadata={"help": "Whether to project the prefix tokens"})
+    do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
 
 
 def convert_example(
@@ -147,32 +149,31 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Tr
         }
     # dataset for training
     else:
-        src_ids = tokenizer(
-            prompt,
-            add_special_tokens=False,
-            max_length=data_args.src_length - 1,
-            truncation=True,
-            truncation_side="left",
-        )["input_ids"]
-        tgt_ids = tokenizer(
+        response = response[: data_args.tgt_length - 1]
+        target_tokenized = tokenizer(
             response,
             add_special_tokens=False,
             max_length=data_args.tgt_length - 2,
             truncation=True,
             truncation_side="right",
-        )["input_ids"]
+        )
+        target_input_ids_len = (np.array(target_tokenized["input_ids"]) != tokenizer.pad_token_id).sum()
 
-        input_ids = tokenizer.build_inputs_with_special_tokens(src_ids, tgt_ids)
+        source_tokenized = tokenizer(
+            prompt,
+            add_special_tokens=False,
+            max_length=data_args.src_length - 1,
+            truncation=True,
+            truncation_side="left",
+        )
 
-        context_length = input_ids.index(tokenizer.bos_token_id)
-        mask_position = context_length - 1
-
-        """attention_mask = np.tri(len(input_ids), len(input_ids))
-        attention_mask[:, :context_length] = 1
-        attention_mask = attention_mask[None, :, :]
-        attention_mask = (attention_mask < 0.5).astype("int64")"""
-
-        labels = [-100] * context_length + input_ids[mask_position + 1 :]
+        input_ids = (
+            [tokenizer.bos_token_id]
+            + source_tokenized["input_ids"]
+            + [tokenizer.bos_token_id]
+            + target_tokenized["input_ids"]
+        )
+        labels = (len(input_ids) - target_input_ids_len) * [tokenizer.pad_token_id] + target_tokenized["input_ids"]
 
         inputs = {
             "input_ids": input_ids,
@@ -238,7 +239,7 @@ def main():
         lora_config = LoRAConfig(
             target_modules=[".*query_key_value.*"],
             r=model_args.r,
-            lora_alpha=8,
+            lora_alpha=2 * model_args.r,
             merge_weights=model_args.merge_weights,
             enable_lora_list=[[True, False, True]],
             tensor_parallel_degree=training_args.tensor_parallel_degree,
@@ -268,13 +269,26 @@ def main():
 
     # Load the Tokenzier
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    tokenizer.add_bos_token = True
 
     # Load the dataset.
-    train_ds, dev_ds = load_dataset("bellegroup", "school_math_0.25M", splits=["train", "dev"])
-    trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
-    train_ds = train_ds.map(trans_func, lazy=False)
-    dev_ds = dev_ds.map(trans_func, lazy=False)
+    if model_args.do_generation:
+        trans_func = partial(
+            convert_example,
+            tokenizer=tokenizer,
+            decoder_start_token_id=tokenizer.bos_token_id,
+            max_source_length=data_args.src_length,
+            max_target_length=data_args.tgt_length,
+        )
+        train_ds, dev_ds = load_dataset("dureader_qg", splits=("train", "dev"))
+
+        train_ds = train_ds.map(trans_func, lazy=False)
+        dev_ds = dev_ds.map(trans_func, lazy=False)
+    else:
+        train_ds, dev_ds = load_dataset("bellegroup", "school_math_0.25M", splits=["train", "dev"])
+        trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
+
+        train_ds = train_ds.map(partial(trans_func, is_test=False))
+        dev_ds = dev_ds.map(partial(trans_func, is_test=False))
 
     collate_fn = DataCollatorForSeq2Seq(
         tokenizer=tokenizer,
@@ -300,14 +314,22 @@ def main():
         tokenizer=tokenizer,
     )
 
+    def compute_metrics_not_do_generation(eval_preds):
+        predictions = [x[x != -100] for x in eval_preds.predictions]
+        references = [x[x != -100] for x in eval_preds.label_ids]
+        accuracy = accuracy_score(y_true=np.array(references).flatten(), y_pred=np.array(predictions).flatten())
+        return {
+            "accuracy": accuracy,
+        }
+
     trainer = BloomTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics_func,
-        do_generation=True,
+        compute_metrics=compute_metrics_func if model_args.do_generation else compute_metrics_not_do_generation,
+        do_generation=model_args.do_generation,
         data_collator=collate_fn,
         data_args=data_args,
     )
@@ -323,7 +345,7 @@ def main():
         trainer.save_state()
 
     if training_args.do_eval:
-        eval_result = trainer.evaluate()
+        eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("test", eval_result)
 
     if data_args.generate_num > 0:

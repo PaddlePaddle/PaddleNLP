@@ -55,7 +55,8 @@ python finetune_generation.py \
     --lr_scheduler_type linear \
     --max_grad_norm 1.0 \
     --warmup_steps 20 \
-    --lora True
+    --lora True \
+    --r 8
 ```
 
 ### 单卡Prefix微调
@@ -79,8 +80,38 @@ python finetune_generation.py \
     --lr_scheduler_type linear \
     --max_grad_norm 1.0 \
     --warmup_steps 20 \
-    --prefix_tuning True
+    --prefix_tuning True \
+    --num_prefix_tokens 64
 ```
+
+其中参数释义如下：
+
+- `model_name_or_path`: 预训练模型内置名称或者模型所在目录，默认为`facebook/llama-7b`。
+- `num_train_epochs`: 要执行的训练 epoch 总数（如果不是整数，将在停止训练之前执行最后一个 epoch
+的小数部分百分比）。
+- `max_steps`: 模型训练步数。
+- `learning_rate`: 参数更新的学习率。
+- `warmup_steps`: 学习率热启的步数。
+- `eval_steps`: 模型评估的间隔步数。
+- `logging_steps`: 训练日志打印的间隔步数。
+- `save_steps`: 模型参数保存的间隔步数。
+- `save_total_limit`: 模型 checkpoint 保存的份数。
+- `output_dir`: 模型参数保存目录。
+- `src_length`: 上下文的最大输入长度，默认为128.
+- `tgt_length`: 生成文本的最大长度，默认为160.
+- `gradient_accumulation_steps`: 模型参数梯度累积的步数，可用于扩大 batch size。实际的 batch_size = per_device_train_batch_size * gradient_accumulation_steps。
+- `fp16`: 使用 float16 精度进行模型训练和推理。
+- `fp16_opt_level`: float16 精度训练模式，`O2`表示纯 float16 训练。
+- `recompute`: 使用重计算策略，开启后可节省训练显存。
+- `do_train`: 是否训练模型。
+- `do_eval`: 是否评估模型。
+- `tensor_parallel_degree`: 模型并行数量。
+- `do_generation`: 在评估的时候是否调用model.generate,默认为False。
+- `lora`: 是否使用LoRA技术。
+- `prefix_tuning`: 是否使用Prefix技术。
+- `merge_weights`: 是否合并原始模型和Lora模型的权重。
+- `r`: LoRA注意力部分维度。
+- `num_prefix_tokens`: 前缀令牌数量。
 
 ## 流水线并行
 ```shell
@@ -189,7 +220,7 @@ python finetune_instruction_generation.py \
     --gradient_accumulation_steps 4 \
     --logging_steps 1 \
     --eval_steps 1000 \
-    --prefix True
+    --prefix_tuning True
 ```
 
 

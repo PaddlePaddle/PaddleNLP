@@ -123,7 +123,8 @@ python finetune_generation.py \
 --metric_for_best_model accuracy \
 --load_best_model_at_end True \
 --do_generation False \
---lora True
+--lora True \
+--r 8
 ```
 
 ### 单卡Prefix微调
@@ -153,13 +154,17 @@ python finetune_generation.py \
 --metric_for_best_model accuracy \
 --load_best_model_at_end True \
 --do_generation False \
---prefix True
+--prefix_tuning True \
+--num_prefix_tokens 64
 ```
 
 其中新增参数释义如下：
 
 - `lora`: 是否使用LoRA技术。
-- `prefix`: 是否使用Prefix技术。
+- `prefix_tuning`: 是否使用Prefix技术。
+- `merge_weights`: 是否合并原始模型和Lora模型的权重。
+- `r`: LoRA注意力部分维度。
+- `num_prefix_tokens`: 前缀令牌数量。
 
 ## 模型预测
 

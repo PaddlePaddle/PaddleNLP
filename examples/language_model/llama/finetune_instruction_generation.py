@@ -16,9 +16,11 @@ import os
 from dataclasses import dataclass, field
 from functools import partial
 
+import numpy as np
 import paddle
 from data import DataCollatorForSupervisedDataset, custom_instruction_convert_example
-from utils import LlamaTrainer, save_infer_result
+from sklearn.metrics import accuracy_score
+from utils import LlamaTrainer, compute_metrics, save_infer_result
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, LoRAModel
@@ -36,6 +38,7 @@ class DataArgument:
     src_length: int = field(default=608, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=160, metadata={"help": "The max length of target text."})
     min_tgt_length: int = field(default=55, metadata={"help": "The min length of target text."})
+    generate_num: int = field(default=0, metadata={"help": "Save first k examples generation result in dev dataset"})
 
 
 @dataclass
@@ -54,6 +57,7 @@ class ModelArgument:
     num_prefix_tokens: int = field(default=10, metadata={"help": "Number of prefix tokens"})
     prefix_projection: bool = field(default=True, metadata={"help": "Whether to project the prefix tokens"})
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
+    do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
 
 
 def main():
@@ -118,7 +122,7 @@ def main():
         lora_config = LoRAConfig(
             target_modules=[".*q_proj.*", ".*v_proj.*"],
             r=model_args.r,
-            lora_alpha=8,
+            lora_alpha=2 * model_args.r,
             merge_weights=model_args.merge_weights,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,
@@ -153,13 +157,44 @@ def main():
     dev_ds = dev_ds.map(partial(trans_func))
     collate_fn = DataCollatorForSupervisedDataset(tokenizer)
 
+    def compute_metrics_trainer(eval_preds, tokenizer):
+        all_preds = []
+        all_labels = []
+        preds = eval_preds.predictions
+        preds = [x[x != -100] for x in preds]
+        all_preds.extend(tokenizer.batch_decode(preds, skip_special_tokens=True, clean_up_tokenization_spaces=False))
+        labels = [x[x != -100] for x in eval_preds.label_ids]
+        all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
+
+        all_preds = [pred.strip() for pred in all_preds]
+        all_labels = [label.strip() for label in all_labels]
+        all_preds = [pred.strip("question:") for pred in all_preds]
+        all_labels = [label.strip("question:") for label in all_labels]
+
+        eval_result = compute_metrics(all_preds, all_labels)
+        return eval_result
+
+    compute_metrics_func = partial(
+        compute_metrics_trainer,
+        tokenizer=tokenizer,
+    )
+
+    def compute_metrics_not_do_generation(eval_preds):
+        predictions = [x[x != -100] for x in eval_preds.predictions]
+        references = [x[x != -100] for x in eval_preds.label_ids]
+        accuracy = accuracy_score(y_true=np.array(references).flatten(), y_pred=np.array(predictions).flatten())
+        return {
+            "accuracy": accuracy,
+        }
+
     trainer = LlamaTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
-        do_generation=False,
+        compute_metrics=compute_metrics_func if model_args.do_generation else compute_metrics_not_do_generation,
+        do_generation=model_args.do_generation,
         data_collator=collate_fn,
     )
 

@@ -54,7 +54,7 @@ class DataArgument:
             "help": "The number of highest probability tokens to keep for top-k-filtering in the 'sampling' strategy."
         },
     )
-    generate_num: int = field(default=100, metadata={"help": "Save first k examples generation result in dev dataset"})
+    generate_num: int = field(default=0, metadata={"help": "Save first k examples generation result in dev dataset"})
 
 
 @dataclass
@@ -146,7 +146,7 @@ def main():
         lora_config = LoRAConfig(
             target_modules=[".*q_proj.*", ".*v_proj.*"],
             r=model_args.r,
-            lora_alpha=8,
+            lora_alpha=2 * model_args.r,
             merge_weights=model_args.merge_weights,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,

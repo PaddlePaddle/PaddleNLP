@@ -42,7 +42,7 @@ class DataArgument:
     src_length: int = field(default=128, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=180, metadata={"help": "The max length of target text."})
     num_beams: int = field(default=5, metadata={"help": "The number of beams."})
-    generate_num: int = field(default=100, metadata={"help": "Save first k examples generation result in dev dataset"})
+    generate_num: int = field(default=0, metadata={"help": "Save first k examples generation result in dev dataset"})
     src_length: int = field(default=256, metadata={"help": "Source length for generation."})
     tgt_length: int = field(default=512, metadata={"help": "Target length for generation."})
 
@@ -126,7 +126,7 @@ def main():
         lora_config = LoRAConfig(
             target_modules=[".*query_key_value.*"],
             r=model_args.r,
-            lora_alpha=16,
+            lora_alpha=2 * model_args.r,
             merge_weights=model_args.merge_weights,
             enable_lora_list=[[True, False, True]],
             tensor_parallel_degree=training_args.tensor_parallel_degree,
