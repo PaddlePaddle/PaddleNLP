@@ -215,6 +215,299 @@ void fusedQKV_masked_attention_dispatch_v2(
   masked_multihead_attention(params, stream);
 }
 
+template <typename T>
+void masked_attention_dispatch_v2(
+  T* key_buf, T* value_buf,
+  T* query_buf, const T* self_Q_bias, 
+  T* key_cache, const T* self_K_bias, T* value_cache, const T* self_V_bias,
+  T* context_buf, const bool* finished, int max_batch_size, int inference_batch_size,
+  int head_num, int size_per_head, const int step, const int max_seq_len, cudaStream_t stream,
+  const T* relative_attention_bias)
+{
+  if (max_seq_len < 0) {
+    const int block_sz = ATTENTION_BLOCK_SIZE;
+    T scalar = (T)(1.f / sqrtf(size_per_head * 1.0f));
+  
+    dim3 grid(inference_batch_size * head_num);
+  
+    int cond = size_per_head * ((ATTENION_OPT)? 1:0);
+    switch (cond)
+    {
+      case 32:
+        masked_attention_kernel_opt<32, block_sz, T><<<grid, block_sz, sizeof(float)*step, stream>>>(
+          key_buf, value_buf,
+          query_buf, self_Q_bias,  key_cache, self_K_bias, value_cache, self_V_bias, context_buf, finished,
+          max_batch_size, head_num, step, scalar);
+        break;
+      case 64:
+          masked_attention_kernel_opt<64, block_sz, T><<<grid, block_sz, sizeof(float)*step, stream>>>(
+            key_buf, value_buf,
+            query_buf, self_Q_bias,
+            key_cache, self_K_bias,
+            value_cache, self_V_bias,
+            context_buf, 
+            finished,
+            max_batch_size, head_num, step, scalar);
+        break;
+      case 128:
+          masked_attention_kernel_opt<128, block_sz, T><<<grid, block_sz, sizeof(float)*step, stream>>>(
+            key_buf, value_buf,
+            query_buf, self_Q_bias,  key_cache, self_K_bias, value_cache, self_V_bias, context_buf, finished,
+            max_batch_size, head_num, step, scalar);
+        break;
+      default:
+        // default path
+        int block_size = 128;
+        
+        //suppose size_per_head <= 128
+        if(step <= 64)
+          block_size = 64;
+        else if(step <= 128 && step > size_per_head)
+          block_size = 128;
+        else if(step > 128 && step <= 256)
+          block_size = 256;
+        else if(step > 256 && step <= 512)
+          block_size = 512;
+        else
+          block_size = 1024;
+        
+        if((int)block_size < size_per_head)
+          block_size = size_per_head;
+          
+        assert(block_size <= 1024);
+        dim3 block(block_size);
+        T scalar = 1 / sqrtf(size_per_head * 1.0f);
+  
+        
+        int shared_size = sizeof(T) * (size_per_head + step);
+        masked_attention_kernel<T><<<grid, block, shared_size, stream>>>(
+          key_buf, value_buf,
+          query_buf, self_Q_bias,
+          key_cache, self_K_bias,
+          value_cache, self_V_bias,
+          context_buf, finished, max_batch_size,
+          head_num, size_per_head, step, scalar);
+    }
+  } else {
+    assert(step > 0);
+    assert(size_per_head == 32 || size_per_head == 64 || size_per_head == 128);
+    using DataType = typename std::conditional<sizeof(T) == 4, float, uint16_t>::type;
+    // Prepare the parameters.
+    Masked_multihead_attention_params<DataType> params;
+    memset(&params, 0, sizeof(params));
+    params.q_bias = reinterpret_cast<const DataType *>(self_Q_bias);
+    params.k_bias = reinterpret_cast<const DataType *>(self_K_bias);
+    params.v_bias = reinterpret_cast<const DataType *>(self_V_bias);
+  
+    // Set the output buffer.
+    params.out = reinterpret_cast<DataType *>(context_buf);
+  
+    // Set the input buffers.
+    params.q = reinterpret_cast<const DataType *>(query_buf);
+    params.k = reinterpret_cast<const DataType *>(key_buf);
+    params.v = reinterpret_cast<const DataType *>(value_buf);
+    params.stride = 0;
+    params.finished = const_cast<bool*>(finished);
+  
+    params.k_cache = reinterpret_cast<DataType *>(key_cache);
+    params.v_cache = reinterpret_cast<DataType *>(value_cache);
+    params.batch_size = inference_batch_size;
+    params.seq_length = max_seq_len;
+    params.timestep = step-1;
+    params.num_heads = head_num;
+    params.hidden_size_per_head = size_per_head;
+
+    params.is_mask = false;
+    params.input_lengths = nullptr;
+    params.max_input_len = 0;
+
+    if (relative_attention_bias) {
+      params.inv_sqrt_dh = 1.F;
+
+      if (sizeof(T) == 4) {
+        params.relative_attention_bias_float = reinterpret_cast<const float*>(relative_attention_bias);
+      } else {
+        params.relative_attention_bias_half = reinterpret_cast<const half*>(relative_attention_bias);
+      }
+
+      params.relative_attention_bias_stride = max_seq_len + 1;
+    } else {
+      params.inv_sqrt_dh = 1.F / sqrtf((float) params.hidden_size_per_head);
+    }
+
+    masked_multihead_attention(params, stream);
+  }
+}
+
+template <typename T>
+void fusedQKV_masked_attention_dispatch_v3(
+  const T* qkv_buf, const T* qkv_bias,
+  T* key_cache, T* value_cache,
+  T* context_buf, const bool* finished, int max_batch_size, int inference_batch_size, 
+  int head_num, int size_per_head, const int step, const int max_seq_len, cudaStream_t stream,
+  const T* relative_attention_bias)
+{
+  if (max_seq_len < 0) {
+    const int block_sz = ATTENTION_BLOCK_SIZE;
+    T scalar = (T)(1.f / sqrtf(size_per_head * 1.0f));
+  
+    dim3 grid(inference_batch_size * head_num);
+  
+    int cond = size_per_head * ((ATTENION_OPT)? 1:0);
+    switch (cond)
+    {
+      case 32:
+        fusedQKV_masked_attention_kernel_opt<32, block_sz, T><<<grid, block_sz, sizeof(float)*step, stream>>>(
+          qkv_buf, qkv_bias,
+          key_cache, value_cache,
+          context_buf,
+          finished,
+          max_batch_size, head_num, step, scalar);
+        break;
+      case 64:
+        fusedQKV_masked_attention_kernel_opt<64, block_sz, T><<<grid, block_sz, sizeof(float)*step, stream>>>(
+          qkv_buf, qkv_bias,
+          key_cache,
+          value_cache,
+          context_buf,
+          finished,
+          max_batch_size, head_num, step, scalar);
+        break;
+      case 128:
+        fusedQKV_masked_attention_kernel_opt<128, block_sz, T><<<grid, block_sz, sizeof(float)*step, stream>>>(
+          qkv_buf, qkv_bias,
+          key_cache,
+          value_cache,
+          context_buf,
+          finished,
+          max_batch_size, head_num, step, scalar);
+        break;
+      default:
+        assert(false);
+    }
+  }
+  else {
+    using DataType = typename std::conditional<sizeof(T) == 4, float, uint16_t>::type;
+    // Prepare the parameters.
+    Masked_multihead_attention_params<DataType> params;
+    memset(&params, 0, sizeof(params));
+    int hidden_units = head_num * size_per_head;
+    params.q_bias = reinterpret_cast<const DataType *>(qkv_bias);
+    params.k_bias = reinterpret_cast<const DataType *>(qkv_bias) + hidden_units;
+    params.v_bias = reinterpret_cast<const DataType *>(qkv_bias) + 2 * hidden_units;
+  
+    // Set the output buffer.
+    params.out = reinterpret_cast<DataType *>(context_buf);
+  
+    // Set the input buffers.
+    params.q = reinterpret_cast<const DataType *>(qkv_buf);
+    params.k = reinterpret_cast<const DataType *>(qkv_buf) + hidden_units;
+    params.v = reinterpret_cast<const DataType *>(qkv_buf) + 2 * hidden_units;
+    params.stride = 3 * hidden_units;
+    params.finished = const_cast<bool*>(finished);
+  
+    params.k_cache = reinterpret_cast<DataType *>(key_cache);
+    params.v_cache = reinterpret_cast<DataType *>(value_cache);
+    params.batch_size = inference_batch_size;
+    params.seq_length = max_seq_len;
+    params.timestep = step - 1;
+    params.num_heads = head_num;
+    params.hidden_size_per_head = size_per_head;
+
+    params.is_mask = false;
+    params.input_lengths = nullptr;
+    params.max_input_len = 0;
+
+    if (relative_attention_bias) {
+      params.inv_sqrt_dh = 1.F;
+
+      if (sizeof(T) == 4) {
+        params.relative_attention_bias_float = reinterpret_cast<const float*>(relative_attention_bias);
+      } else {
+        params.relative_attention_bias_half = reinterpret_cast<const half*>(relative_attention_bias);
+      }
+
+      params.relative_attention_bias_stride = max_seq_len + 1;
+    } else {
+      params.inv_sqrt_dh = 1.F / sqrtf((float) params.hidden_size_per_head);
+    }
+
+    masked_multihead_attention(params, stream);
+  }
+}
+
+template void fusedQKV_masked_attention_dispatch_v3(
+  const float* qkv_buf, 
+  const float* qkv_bias,
+  float* key_cache, 
+  float* value_cache,
+  float* context_buf, 
+  const bool* finished, 
+  int max_batch_size, 
+  int inference_batch_size, 
+  int head_num, 
+  int size_per_head, 
+  const int step, 
+  const int max_seq_len,
+  cudaStream_t stream,
+  const float* relative_attention_bias);
+  
+template void fusedQKV_masked_attention_dispatch_v3(
+  const half* qkv_buf, 
+  const half* qkv_bias,
+  half* key_cache, 
+  half* value_cache,
+  half* context_buf, 
+  const bool* finished, 
+  int max_batch_size, 
+  int inference_batch_size, 
+  int head_num, 
+  int size_per_head,
+  const int step, 
+  const int max_seq_len,
+  cudaStream_t stream,
+  const half* relative_attention_bias);
+
+template void masked_attention_dispatch_v2(
+  float* key_buf, 
+  float* value_buf,
+  float* query_buf, 
+  const float* self_Q_bias, 
+  float* key_cache, 
+  const float* self_K_bias, 
+  float* value_cache, 
+  const float* self_V_bias,
+  float* context_buf, 
+  const bool* finished, 
+  int max_batch_size, 
+  int inference_batch_size, 
+  int head_num, 
+  int size_per_head, 
+  const int step,
+  const int max_seq_size,
+  cudaStream_t stream,
+  const float* relative_attention_bias);
+
+template void masked_attention_dispatch_v2(
+  half* key_buf, 
+  half* value_buf,
+  half* query_buf, 
+  const half* self_Q_bias, 
+  half* key_cache, 
+  const half* self_K_bias, 
+  half* value_cache, 
+  const half* self_V_bias,
+  half* context_buf, 
+  const bool* finished, 
+  int max_batch_size, 
+  int inference_batch_size, 
+  int head_num, 
+  int size_per_head, 
+  const int step,
+  const int max_seq_size,
+  cudaStream_t stream,
+  const half* relative_attention_bias);
+
 template void fusedQKV_masked_attention_dispatch_v2(
   const float* qkv_buf, 
   const float* qkv_bias,
@@ -250,5 +543,104 @@ template void fusedQKV_masked_attention_dispatch_v2(
   const int* input_lengths,
   const int rotary_embedding_dim,
   cudaStream_t stream);
+
+template <typename T>
+void cross_attention_dispatch_v2(T* query_buf, const T* Q_bias, 
+  T* key_cache, const T* K_bias, T* value_cache, const T* V_bias, const int* length,
+  T* context_buf, const bool* finished,
+  int batch_size, int head_num, int size_per_head, int step, int seq_len, cudaStream_t stream,
+  const T* relative_attention_bias)
+  {
+    const int block_sz = ATTENTION_BLOCK_SIZE;
+    float scalar = (relative_attention_bias) ? 1.0f : 1.f / sqrtf(size_per_head * 1.0f);
+
+    dim3 grid(batch_size * head_num);
+
+    int cond = size_per_head * ((ATTENION_OPT)? 1:0);
+    switch (cond)
+    {
+      case 32:
+        cross_attention_kernel_opt<T, 32, block_sz><<<grid, block_sz, sizeof(float)*seq_len, stream>>>(
+          query_buf, Q_bias, key_cache, K_bias, value_cache, V_bias, length, context_buf, finished,
+          batch_size, head_num, step, seq_len, scalar);
+        break;
+      case 64:
+        cross_attention_kernel_opt<T, 64, block_sz><<<grid, block_sz, sizeof(float)*seq_len, stream>>>(
+          query_buf, Q_bias, key_cache, K_bias, value_cache, V_bias, length, context_buf, finished,
+          batch_size, head_num, step, seq_len, scalar);
+        break;
+      case 128:
+        cross_attention_kernel_opt<T, 128, block_sz><<<grid, block_sz, sizeof(float)*seq_len, stream>>>(
+          query_buf, Q_bias, key_cache, K_bias, value_cache, V_bias, length, context_buf, finished,
+          batch_size, head_num, step, seq_len, scalar);
+        break;
+      default:
+        // default path
+
+        int block_size = 128;
+
+        if(seq_len <= 64)
+          block_size = 64;
+        else if(seq_len <= 128 && seq_len > size_per_head)
+          block_size = 128;
+        else if(seq_len > 128 && seq_len <= 256)
+          block_size = 256;
+        else if(seq_len > 256 && seq_len <= 512)
+          block_size = 512;
+        else
+          block_size = 1024;
+
+        if(block_size < size_per_head)
+          block_size = size_per_head;
+
+        assert(block_size <= 1024);
+        dim3 block(block_size);
+        
+        int shared_size = sizeof(T) * (size_per_head + seq_len);
+        cross_attention_kernel<T><<<grid, block, shared_size, stream>>>(
+          query_buf, Q_bias, 
+          key_cache, K_bias,
+          value_cache, V_bias,
+          length, context_buf, finished,
+          batch_size,
+          head_num, size_per_head, step, seq_len, scalar);
+    }
+  }
+
+template void cross_attention_dispatch_v2(
+  float* query_buf, 
+  const float* Q_bias, 
+  float* key_cache, 
+  const float* K_bias, 
+  float* value_cache, 
+  const float* V_bias, 
+  const int* length,
+  float* context_buf, 
+  const bool* finished,
+  int batch_size, 
+  int head_num, 
+  int size_per_head, 
+  int step, 
+  int seq_len, 
+  cudaStream_t stream,
+  const float* relative_attention_bias);
+
+template void cross_attention_dispatch_v2(
+  half* query_buf, 
+  const half* Q_bias, 
+  half* key_cache, 
+  const half* K_bias, 
+  half* value_cache, 
+  const half* V_bias, 
+  const int* length,
+  half* context_buf, 
+  const bool* finished,
+  int batch_size, 
+  int head_num, 
+  int size_per_head, 
+  int step, 
+  int seq_len, 
+  cudaStream_t stream,
+  const half* relative_attention_bias);
 
 }

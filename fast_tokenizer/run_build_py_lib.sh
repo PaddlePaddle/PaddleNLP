@@ -24,11 +24,11 @@ do
    then
       export LD_LIBRARY_PATH=/opt/_internal/cpython-3.${py_version}.0/lib/:${LD_LIBRARY_PATH}
       export PATH=/opt/_internal/cpython-3.${py_version}.0/bin/:${PATH}
-      core_num=${nproc}
+      core_num=`nproc`
    else
       export LD_LIBRARY_PATH=/Users/paddle/miniconda2/envs/py3${py_version}/lib/:${LD_LIBRARY_PATH}
       export PATH=/Users/paddle/miniconda2/envs/py3${py_version}/bin/:${PATH}
-      core_num=${sysctl -n hw.logicalcpu}
+      core_num=`sysctl -n hw.logicalcpu`
    fi
    echo "Compile with $core_num cores"
    cmake .. -DWITH_PYTHON=ON -DWITH_TESTING=OFF -DCMAKE_BUILD_TYPE=Release

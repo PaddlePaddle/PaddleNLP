@@ -86,10 +86,10 @@ ERNIE-Layout以文心文本大模型ERNIE为底座，融合文本、图像、布
     <img src=https://user-images.githubusercontent.com/40840292/195610820-7fb88608-b317-45fc-a6ab-97bf3b20a4ac.png height=400 width=1000 hspace='15'/>
 </div>
 
-- 中文票据多语种（中简、中繁、英、日、法语）抽取问答
+- 中文票据多语种（中简、中繁、英、日、德语）抽取问答
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195611075-9323ce9f-134b-4657-ab1c-f4892075d909.png height=350 width=1000 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/209898223-71f09f4d-a394-4a4d-91fa-33784d1cec18.jpg height=350 width=1000 hspace='15'/>
 </div>
 
 - Demo图片可在此[下载](https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/demo.zip)

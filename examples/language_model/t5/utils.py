@@ -12,17 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sklearn
-from scipy.stats import pearsonr, spearmanr
 import collections
-import numpy as np
-from sklearn.metrics import matthews_corrcoef, accuracy_score, f1_score
-
 import json
 import pickle
 import random
 
+import numpy as np
 import paddle
+import sklearn
+from scipy.stats import pearsonr, spearmanr
+from sklearn.metrics import accuracy_score, f1_score, matthews_corrcoef
 
 from paddlenlp.transformers import (
     CosineDecayWithWarmup,
@@ -35,11 +34,7 @@ def accuracy(targets, predictions):
     return {"accuracy": 100 * accuracy_score(targets, predictions)}
 
 
-def sklearn_metrics_wrapper(metric_str,
-                            metric_dict_str=None,
-                            metric_post_process_fn=None,
-                            **metric_fn_kwargs):
-
+def sklearn_metrics_wrapper(metric_str, metric_dict_str=None, metric_post_process_fn=None, **metric_fn_kwargs):
     def fn(targets, predictions):
         if metric_str == "matthews_corrcoef":
             metric_fn = matthews_corrcoef
@@ -68,24 +63,36 @@ def spearman_corrcoef(targets, predictions):
     return {"spearman_corrcoef": 100 * spearmanr(targets, predictions)[0]}
 
 
-GLUE_METRICS = collections.OrderedDict([
-    (
-        "cola",
-        [
-            sklearn_metrics_wrapper("matthews_corrcoef",
-                                    metric_post_process_fn=lambda x: 100 * x)
-        ],
-    ),
-    ("sst-2", [accuracy]),
-    ("mrpc", [f1_score_with_invalid, accuracy]),
-    ("sts-b", [pearson_corrcoef, spearman_corrcoef]),
-    ("qqp", [f1_score_with_invalid, accuracy]),
-    ("mnli", [accuracy]),
-    ("qnli", [accuracy]),
-    ("rte", [accuracy]),
-    ("wnli", [accuracy]),
-    ("ax", []),  # Only test set available.
-])
+CLUE_METRICS = collections.OrderedDict(
+    [
+        ("afqmc", [accuracy]),
+        ("tnews", [accuracy]),
+        ("iflytek", [accuracy]),
+        ("cmnli", [accuracy]),
+        ("ocnli", [accuracy]),
+        ("cluewsc2020", [accuracy]),
+        ("csl", [accuracy]),
+        ("ax", []),  # Only test set available.
+    ]
+)
+
+GLUE_METRICS = collections.OrderedDict(
+    [
+        (
+            "cola",
+            [sklearn_metrics_wrapper("matthews_corrcoef", metric_post_process_fn=lambda x: 100 * x)],
+        ),
+        ("sst-2", [accuracy]),
+        ("mrpc", [f1_score_with_invalid, accuracy]),
+        ("sts-b", [pearson_corrcoef, spearman_corrcoef]),
+        ("qqp", [f1_score_with_invalid, accuracy]),
+        ("mnli", [accuracy]),
+        ("qnli", [accuracy]),
+        ("rte", [accuracy]),
+        ("wnli", [accuracy]),
+        ("ax", []),  # Only test set available.
+    ]
+)
 
 scheduler_type2cls = {
     "linear": LinearDecayWithWarmup,
@@ -126,12 +133,10 @@ def get_scheduler(
         raise ValueError(f"scheduler_type must be choson from {data}")
 
     if num_warmup_steps is None:
-        raise ValueError(
-            f"requires `num_warmup_steps`, please provide that argument.")
+        raise ValueError("requires `num_warmup_steps`, please provide that argument.")
 
     if num_training_steps is None:
-        raise ValueError(
-            f"requires `num_training_steps`, please provide that argument.")
+        raise ValueError("requires `num_training_steps`, please provide that argument.")
 
     return scheduler_type2cls[scheduler_type](
         learning_rate=learning_rate,

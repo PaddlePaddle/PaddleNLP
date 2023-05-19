@@ -1,0 +1,8 @@
+{
+    "template": [
+        {"text": "下边两个句子说的是{'text': 'candidate_label'}的事情。“{'text': 'sentence1'}”和“{'text': 'sentence2'}”"}
+    ],
+    "verbalizer": [
+        {"0": "不同", "1": "相关"}
+    ]
+}

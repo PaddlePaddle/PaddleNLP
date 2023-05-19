@@ -62,16 +62,11 @@ _CITATION = """\
 
 _DL_URLS = {
     # pylint: disable=line-too-long
-    "cnn_stories":
-    "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/cnn_stories.tgz",
-    "dm_stories":
-    "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/dailymail_stories.tgz",
-    "test_urls":
-    "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_test.txt",
-    "train_urls":
-    "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_train.txt",
-    "val_urls":
-    "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_val.txt",
+    "cnn_stories": "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/cnn_stories.tgz",
+    "dm_stories": "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/dailymail_stories.tgz",
+    "test_urls": "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_test.txt",
+    "train_urls": "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_train.txt",
+    "val_urls": "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_val.txt",
     # pylint: enable=line-too-long
 }
 
@@ -123,7 +118,7 @@ def _get_url_hashes(path):
 def _get_hash_from_path(p):
     """Extract hash from path."""
     basename = os.path.basename(p)
-    return basename[0:basename.find(".story")]
+    return basename[0 : basename.find(".story")]
 
 
 def _find_files(dl_paths, publisher, url_dict):
@@ -163,10 +158,7 @@ def _subset_filenames(dl_paths, split):
 DM_SINGLE_CLOSE_QUOTE = "\u2019"  # unicode
 DM_DOUBLE_CLOSE_QUOTE = "\u201d"
 # acceptable ways to end a sentence
-END_TOKENS = [
-    ".", "!", "?", "...", "'", "`", '"', DM_SINGLE_CLOSE_QUOTE,
-    DM_DOUBLE_CLOSE_QUOTE, ")"
-]
+END_TOKENS = [".", "!", "?", "...", "'", "`", '"', DM_SINGLE_CLOSE_QUOTE, DM_DOUBLE_CLOSE_QUOTE, ")"]
 
 
 def _read_text_file(text_file):
@@ -231,20 +223,21 @@ class CnnDailymail(datasets.GeneratorBasedBuilder):
     """CNN/DailyMail non-anonymized summarization dataset."""
 
     BUILDER_CONFIGS = [
-        CnnDailymailConfig(name=str(version),
-                           description="Plain text",
-                           version=version) for version in _SUPPORTED_VERSIONS
+        CnnDailymailConfig(name=str(version), description="Plain text", version=version)
+        for version in _SUPPORTED_VERSIONS
     ]
 
     def _info(self):
         # Should return a datasets.DatasetInfo object
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
-            features=datasets.Features({
-                _ARTICLE: datasets.Value("string"),
-                _HIGHLIGHTS: datasets.Value("string"),
-                "id": datasets.Value("string"),
-            }),
+            features=datasets.Features(
+                {
+                    _ARTICLE: datasets.Value("string"),
+                    _HIGHLIGHTS: datasets.Value("string"),
+                    "id": datasets.Value("string"),
+                }
+            ),
             supervised_keys=None,
             homepage="https://github.com/abisee/cnn-dailymail",
             citation=_CITATION,
@@ -260,21 +253,14 @@ class CnnDailymail(datasets.GeneratorBasedBuilder):
         # Generate shared vocabulary
 
         return [
-            datasets.SplitGenerator(name=datasets.Split.TRAIN,
-                                    gen_kwargs={"files": train_files}),
+            datasets.SplitGenerator(name=datasets.Split.TRAIN, gen_kwargs={"files": train_files}),
             datasets.SplitGenerator(
                 name=datasets.Split.VALIDATION,
-                gen_kwargs={
-                    "files": _subset_filenames(dl_paths,
-                                               datasets.Split.VALIDATION)
-                },
+                gen_kwargs={"files": _subset_filenames(dl_paths, datasets.Split.VALIDATION)},
             ),
-            datasets.SplitGenerator(name=datasets.Split.TEST,
-                                    gen_kwargs={
-                                        "files":
-                                        _subset_filenames(
-                                            dl_paths, datasets.Split.TEST)
-                                    }),
+            datasets.SplitGenerator(
+                name=datasets.Split.TEST, gen_kwargs={"files": _subset_filenames(dl_paths, datasets.Split.TEST)}
+            ),
         ]
 
     def _generate_examples(self, files):

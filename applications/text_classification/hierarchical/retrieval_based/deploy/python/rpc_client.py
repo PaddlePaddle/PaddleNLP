@@ -17,12 +17,9 @@ import numpy as np
 from paddle_serving_server.pipeline import PipelineClient
 
 client = PipelineClient()
-client.connect(['127.0.0.1:8080'])
+client.connect(["127.0.0.1:8080"])
 
-list_data = [{
-    "sentence":
-    "CPU每秒执行的指令数CPU频率3.0G，执行一条指令需要1.5,频率3.0G，执行一条指令需要1.5个周期，每秒执行的指令数为？是20亿吗？"
-}]
+list_data = [{"sentence": "CPU每秒执行的指令数CPU频率3.0G，执行一条指令需要1.5,频率3.0G，执行一条指令需要1.5个周期，每秒执行的指令数为？是20亿吗？"}]
 feed = {}
 for i, item in enumerate(list_data):
     feed[str(i)] = str(item)

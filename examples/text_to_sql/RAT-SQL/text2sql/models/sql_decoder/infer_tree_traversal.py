@@ -29,6 +29,7 @@ class InferenceTreeTraversal(TreeTraversal):
     @attr.s(frozen=True)
     class SetParentField(TreeAction):
         """SetParentField"""
+
         parent_field_name = attr.ib()
         node_type = attr.ib()
         node_value = attr.ib(default=None)
@@ -36,40 +37,41 @@ class InferenceTreeTraversal(TreeTraversal):
     @attr.s(frozen=True)
     class CreateParentFieldList(TreeAction):
         """CreateParentFieldList"""
+
         parent_field_name = attr.ib()
 
     @attr.s(frozen=True)
     class AppendTerminalToken(TreeAction):
         """AppendTerminalToken"""
+
         parent_field_name = attr.ib()
         value = attr.ib()
 
     @attr.s(frozen=True)
     class FinalizeTerminal(TreeAction):
         """FinalizeTerminal"""
+
         parent_field_name = attr.ib()
         terminal_type = attr.ib()
 
     @attr.s(frozen=True)
     class NodeFinished(TreeAction):
         """NodeFinished"""
+
         pass
 
     SIMPLE_TERMINAL_TYPES = {
-        'str': str,
-        'int': int,
-        'float': float,
-        'bool': lambda n: {
-            'True': True,
-            'False': False
-        }.get(n, False),
+        "str": str,
+        "int": int,
+        "float": float,
+        "bool": lambda n: {"True": True, "False": False}.get(n, False),
     }
 
     SIMPLE_TERMINAL_TYPES_DEFAULT = {
-        'str': '',
-        'int': 0,
-        'float': 0,
-        'bool': True,
+        "str": "",
+        "int": 0,
+        "float": 0,
+        "bool": True,
     }
 
     def __init__(self, model, desc_enc, db=None, value_list=None):
@@ -104,51 +106,47 @@ class InferenceTreeTraversal(TreeTraversal):
             return pointer_logprobs
 
         pointer_logprobs = dict(pointer_logprobs)
-        return [(orig_index,
-                 paddle.logsumexp(paddle.stack(tuple(pointer_logprobs[i]
-                                                     for i in mapped_indices),
-                                               axis=0),
-                                  axis=0))
-                for orig_index, mapped_indices in pointer_map.items()]
+        return [
+            (
+                orig_index,
+                paddle.logsumexp(paddle.stack(tuple(pointer_logprobs[i] for i in mapped_indices), axis=0), axis=0),
+            )
+            for orig_index, mapped_indices in pointer_map.items()
+        ]
 
-    def update_using_last_choice(self, last_choice, extra_choice_info,
-                                 attention_offset):
+    def update_using_last_choice(self, last_choice, extra_choice_info, attention_offset):
         """update_using_last_choice"""
-        super().update_using_last_choice(last_choice, extra_choice_info,
-                                         attention_offset)
+        super().update_using_last_choice(last_choice, extra_choice_info, attention_offset)
 
         # Record actions
         # CHILDREN_INQUIRE
         if self.cur_item.state == TreeTraversal.State.CHILDREN_INQUIRE:
             self.actions = self.actions.append(
-                self.SetParentField(self.cur_item.parent_field_name,
-                                    self.cur_item.node_type))
-            type_info = self.model.ast_wrapper.singular_types[
-                self.cur_item.node_type]
+                self.SetParentField(self.cur_item.parent_field_name, self.cur_item.node_type)
+            )
+            type_info = self.model.ast_wrapper.singular_types[self.cur_item.node_type]
             if not type_info.fields:
                 self.actions = self.actions.append(self.NodeFinished())
 
         # LIST_LENGTH_APPLY
         elif self.cur_item.state == TreeTraversal.State.LIST_LENGTH_APPLY:
-            self.actions = self.actions.append(
-                self.CreateParentFieldList(self.cur_item.parent_field_name))
+            self.actions = self.actions.append(self.CreateParentFieldList(self.cur_item.parent_field_name))
 
         # GEN_TOKEN
         elif self.cur_item.state == TreeTraversal.State.GEN_TOKEN:
             if last_choice == vocab.EOS:
                 self.actions = self.actions.append(
-                    self.FinalizeTerminal(self.cur_item.parent_field_name,
-                                          self.cur_item.node_type))
+                    self.FinalizeTerminal(self.cur_item.parent_field_name, self.cur_item.node_type)
+                )
             elif last_choice is not None:
                 self.actions = self.actions.append(
-                    self.AppendTerminalToken(self.cur_item.parent_field_name,
-                                             last_choice))
+                    self.AppendTerminalToken(self.cur_item.parent_field_name, last_choice)
+                )
 
         elif self.cur_item.state == TreeTraversal.State.POINTER_APPLY:
             self.actions = self.actions.append(
-                self.SetParentField(self.cur_item.parent_field_name,
-                                    node_type=None,
-                                    node_value=last_choice))
+                self.SetParentField(self.cur_item.parent_field_name, node_type=None, node_value=last_choice)
+            )
 
         # NODE_FINISHED
         elif self.cur_item.state == TreeTraversal.State.NODE_FINISHED:
@@ -161,7 +159,7 @@ class InferenceTreeTraversal(TreeTraversal):
         for i, action in enumerate(self.actions):
             if isinstance(action, self.SetParentField):
                 if action.node_value is None:
-                    new_node = {'_type': action.node_type}
+                    new_node = {"_type": action.node_type}
                 else:
                     new_node = action.node_value
 
@@ -193,22 +191,19 @@ class InferenceTreeTraversal(TreeTraversal):
                 tokens.append('"' + action.value + '"')
 
             elif isinstance(action, self.FinalizeTerminal):
-                terminal = ''.join(current.get(action.parent_field_name, []))
-                constructor = self.SIMPLE_TERMINAL_TYPES.get(
-                    action.terminal_type)
+                terminal = "".join(current.get(action.parent_field_name, []))
+                constructor = self.SIMPLE_TERMINAL_TYPES.get(action.terminal_type)
                 if constructor:
                     try:
                         value = constructor(terminal)
                     except ValueError:
-                        value = self.SIMPLE_TERMINAL_TYPES_DEFAULT[
-                            action.terminal_type]
-                elif action.terminal_type == 'bytes':
-                    value = terminal.decode('latin1')
-                elif action.terminal_type == 'NoneType':
+                        value = self.SIMPLE_TERMINAL_TYPES_DEFAULT[action.terminal_type]
+                elif action.terminal_type == "bytes":
+                    value = terminal.decode("latin1")
+                elif action.terminal_type == "NoneType":
                     value = None
                 else:
-                    raise ValueError(
-                        f'Unknown terminal type: {action.terminal_type}')
+                    raise ValueError(f"Unknown terminal type: {action.terminal_type}")
                 current[action.parent_field_name] = value
 
             elif isinstance(action, self.NodeFinished):
@@ -218,5 +213,4 @@ class InferenceTreeTraversal(TreeTraversal):
                 raise ValueError(action)
 
         assert not stack
-        return root, self.model.preproc.grammar.unparse(root, self.db,
-                                                        self.value_list)
+        return root, self.model.preproc.grammar.unparse(root, self.db, self.value_list)

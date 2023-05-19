@@ -14,11 +14,9 @@
 # limitations under the License.
 
 import paddle
-from paddle import ParamAttr
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.nn import Conv2D, BatchNorm
-from paddle.nn import MaxPool2D
+from paddle.nn import BatchNorm, Conv2D, MaxPool2D
 
 
 class ConvBNLayer(nn.Layer):
@@ -34,23 +32,10 @@ class ConvBNLayer(nn.Layer):
             stride=stride,
             padding=(filter_size - 1) // 2,
             groups=groups,
-            weight_attr=ParamAttr(name=name + "_weights"),
             bias_attr=False,
             data_format=data_format,
         )
-        if name == "conv1":
-            bn_name = "bn_" + name
-        else:
-            bn_name = "bn" + name[3:]
-        self._batch_norm = BatchNorm(
-            num_filters,
-            act=act,
-            param_attr=ParamAttr(name=bn_name + "_scale"),
-            bias_attr=ParamAttr(bn_name + "_offset"),
-            moving_mean_name=bn_name + "_mean",
-            moving_variance_name=bn_name + "_variance",
-            data_layout=data_format,
-        )
+        self._batch_norm = BatchNorm(num_filters, act=act, data_layout=data_format)
 
     def forward(self, inputs):
         y = self._conv(inputs)
@@ -62,12 +47,7 @@ class BottleneckBlock(nn.Layer):
     def __init__(self, num_channels, num_filters, stride, shortcut=True, name=None, data_format="NCHW"):
         super(BottleneckBlock, self).__init__()
         self.conv0 = ConvBNLayer(
-            num_channels=num_channels,
-            num_filters=num_filters,
-            filter_size=1,
-            act="relu",
-            name=name + "_branch2a",
-            data_format=data_format,
+            num_channels=num_channels, num_filters=num_filters, filter_size=1, act="relu", data_format=data_format
         )
         self.conv1 = ConvBNLayer(
             num_channels=num_filters,
@@ -75,16 +55,10 @@ class BottleneckBlock(nn.Layer):
             filter_size=3,
             stride=stride,
             act="relu",
-            name=name + "_branch2b",
             data_format=data_format,
         )
         self.conv2 = ConvBNLayer(
-            num_channels=num_filters,
-            num_filters=num_filters * 4,
-            filter_size=1,
-            act=None,
-            name=name + "_branch2c",
-            data_format=data_format,
+            num_channels=num_filters, num_filters=num_filters * 4, filter_size=1, act=None, data_format=data_format
         )
 
         if not shortcut:
@@ -93,7 +67,6 @@ class BottleneckBlock(nn.Layer):
                 num_filters=num_filters * 4,
                 filter_size=1,
                 stride=stride,
-                name=name + "_branch1",
                 data_format=data_format,
             )
 
@@ -126,16 +99,10 @@ class BasicBlock(nn.Layer):
             filter_size=3,
             stride=stride,
             act="relu",
-            name=name + "_branch2a",
             data_format=data_format,
         )
         self.conv1 = ConvBNLayer(
-            num_channels=num_filters,
-            num_filters=num_filters,
-            filter_size=3,
-            act=None,
-            name=name + "_branch2b",
-            data_format=data_format,
+            num_channels=num_filters, num_filters=num_filters, filter_size=3, act=None, data_format=data_format
         )
 
         if not shortcut:
@@ -144,7 +111,6 @@ class BasicBlock(nn.Layer):
                 num_filters=num_filters,
                 filter_size=1,
                 stride=stride,
-                name=name + "_branch1",
                 data_format=data_format,
             )
 
@@ -193,7 +159,6 @@ class ResNet(nn.Layer):
             filter_size=7,
             stride=2,
             act="relu",
-            name="conv1",
             data_format=self.data_format,
         )
         self.pool2d_max = MaxPool2D(kernel_size=3, stride=2, padding=1, data_format=self.data_format)
@@ -217,7 +182,6 @@ class ResNet(nn.Layer):
                             num_filters=num_filters[block],
                             stride=2 if i == 0 and block != 0 else 1,
                             shortcut=shortcut,
-                            name=conv_name,
                             data_format=self.data_format,
                         ),
                     )
@@ -235,7 +199,6 @@ class ResNet(nn.Layer):
                             num_filters=num_filters[block],
                             stride=2 if i == 0 and block != 0 else 1,
                             shortcut=shortcut,
-                            name=conv_name,
                             data_format=self.data_format,
                         ),
                     )

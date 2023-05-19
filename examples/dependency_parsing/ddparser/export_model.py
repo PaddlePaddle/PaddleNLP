@@ -16,25 +16,23 @@ import argparse
 import os
 
 import paddle
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-
-from model.dep import BiAffineParser
 from data import load_vocab
+from model.dep import BiAffineParser
 
-# yapf: disable
+from paddlenlp.transformers import AutoModel
+
+# fmt: off
 parser = argparse.ArgumentParser()
 parser.add_argument("--encoding_model", choices=["lstm-pe", "ernie-1.0", "ernie-3.0-medium-zh", "ernie-tiny", "ernie-gram-zh"], type=str, default="ernie-3.0-medium-zh", help="Select the encoding model.")
 parser.add_argument("--params_path", type=str, required=True, default='./model_file/best.pdparams', help="The path to model parameters to be loaded.")
 parser.add_argument("--output_path", type=str, default='./output', help="The path of model parameter in static graph to be saved.")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 if __name__ == "__main__":
 
     # Load pretrained model if encoding model is ernie-3.0-medium-zh, ernie-1.0, ernie-tiny or ernie-gram-zh
-    if args.encoding_model in [
-            "ernie-3.0-medium-zh", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"
-    ]:
+    if args.encoding_model in ["ernie-3.0-medium-zh", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"]:
         pretrained_model = AutoModel.from_pretrained(args.encoding_model)
     else:
         pretrained_model = None
@@ -75,13 +73,13 @@ if __name__ == "__main__":
     model.eval()
 
     # Convert to static graph with specific input description
-    model = paddle.jit.to_static(model,
-                                 input_spec=[
-                                     paddle.static.InputSpec(shape=[None, None],
-                                                             dtype="int64"),
-                                     paddle.static.InputSpec(shape=[None, None],
-                                                             dtype="int64"),
-                                 ])
+    model = paddle.jit.to_static(
+        model,
+        input_spec=[
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+        ],
+    )
     # Save in static graph model.
     save_path = os.path.join(args.output_path, "inference")
     paddle.jit.save(model, save_path)

@@ -12,26 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
 
 import numpy as np
 
-from paddlenlp.utils.log import logger
 import time
 
-# yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--similar_text_pair", type=str,
                     default='', help="The full path of similar pair file")
 parser.add_argument("--recall_result_file", type=str,
                     default='', help="The full path of recall result file")
 parser.add_argument("--recall_num", type=int, default=10,
-                    help="Most similair number of doc recalled from corpus per query")
+                    help="Most similar number of doc recalled from corpus per query")
 
 
 args = parser.parse_args()
-# yapf: enable
 
 
 def recall(rs, N=10):
@@ -56,14 +52,14 @@ def recall(rs, N=10):
 
 if __name__ == "__main__":
     text2similar = {}
-    with open(args.similar_text_pair, 'r', encoding='utf-8') as f:
+    with open(args.similar_text_pair, "r", encoding="utf-8") as f:
         for line in f:
             text, similar_text = line.rstrip().split("\t")
             text2similar[text] = similar_text
 
     rs = []
 
-    with open(args.recall_result_file, 'r', encoding='utf-8') as f:
+    with open(args.recall_result_file, "r", encoding="utf-8") as f:
         relevance_labels = []
         for index, line in enumerate(f):
 
@@ -82,11 +78,11 @@ if __name__ == "__main__":
     for topN in recall_num:
         R = round(100 * recall(rs, N=topN), 3)
         recall_N.append(str(R))
-    result = open('result.tsv', 'a')
+    result = open("result.tsv", "a")
     res = []
-    timestamp = time.strftime('%Y%m%d-%H%M%S', time.localtime())
+    timestamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
     res.append(timestamp)
     for key, val in zip(recall_num, recall_N):
-        print('recall@{}={}'.format(key, val))
+        print("recall@{}={}".format(key, val))
         res.append(str(val))
-    result.write('\t'.join(res) + '\n')
+    result.write("\t".join(res) + "\n")

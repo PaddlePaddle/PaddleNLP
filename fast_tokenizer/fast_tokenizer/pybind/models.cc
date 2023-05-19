@@ -13,7 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include "fast_tokenizer/models/models.h"
+
 #include <Python.h>
+
 #include "fast_tokenizer/pybind/models.h"
 #include "fast_tokenizer/pybind/utils.h"
 #include "glog/logging.h"
@@ -254,18 +256,19 @@ void BindModels(pybind11::module* m) {
                   py::arg("unk_token") = "[UNK]",
                   py::arg("max_input_chars_per_word") = 100,
                   py::arg("continuing_subword_prefix") = "##")
-      .def("save",
-           [](const models::WordPiece& wordpiece,
-              const std::string& folder,
-              const py::object& py_obj) {
-             std::string prefix = "";
-             if (!py_obj.is(py::none())) {
-               prefix = py_obj.cast<std::string>();
-             }
-             return wordpiece.Save(folder, prefix);
-           },
-           py::arg("folder"),
-           py::arg("prefix") = py::none());
+      .def(
+          "save",
+          [](const models::WordPiece& wordpiece,
+             const std::string& folder,
+             const py::object& py_obj) {
+            std::string prefix = "";
+            if (!py_obj.is(py::none())) {
+              prefix = py_obj.cast<std::string>();
+            }
+            return wordpiece.Save(folder, prefix);
+          },
+          py::arg("folder"),
+          py::arg("prefix") = py::none());
   py::class_<models::FastWordPiece, PyFastWordPiece>(submodule, "FastWordPiece")
       .def(py::init<>())
       .def(py::init<const core::Vocab&,
@@ -297,23 +300,25 @@ void BindModels(pybind11::module* m) {
                   &models::FastWordPiece::GetVocabFromFile,
                   py::arg("vocab"))
       .def_static("from_file",
-                  &models::FastWordPiece::GetWordPieceFromFile,
+                  &models::FastWordPiece::GetFastWordPieceFromFile,
                   py::arg("vocab"),
                   py::arg("unk_token") = "[UNK]",
                   py::arg("max_input_chars_per_word") = 100,
-                  py::arg("continuing_subword_prefix") = "##")
-      .def("save",
-           [](const models::FastWordPiece& wordpiece,
-              const std::string& folder,
-              const py::object& py_obj) {
-             std::string prefix = "";
-             if (!py_obj.is(py::none())) {
-               prefix = py_obj.cast<std::string>();
-             }
-             return wordpiece.Save(folder, prefix);
-           },
-           py::arg("folder"),
-           py::arg("prefix") = py::none());
+                  py::arg("continuing_subword_prefix") = "##",
+                  py::arg("with_pretokenization") = false)
+      .def(
+          "save",
+          [](const models::FastWordPiece& wordpiece,
+             const std::string& folder,
+             const py::object& py_obj) {
+            std::string prefix = "";
+            if (!py_obj.is(py::none())) {
+              prefix = py_obj.cast<std::string>();
+            }
+            return wordpiece.Save(folder, prefix);
+          },
+          py::arg("folder"),
+          py::arg("prefix") = py::none());
   py::class_<models::BPE, PyBPE>(submodule, "BPE")
       .def(py::init([](const py::object& py_vocab,
                        const py::object& py_merges,
@@ -397,18 +402,19 @@ void BindModels(pybind11::module* m) {
            })
       .def("get_vocab", &models::BPE::GetVocab)
       .def("get_vocab_size", &models::BPE::GetVocabSize)
-      .def("save",
-           [](const models::BPE& bpe,
-              const std::string& folder,
-              const py::object& py_obj) {
-             std::string prefix = "";
-             if (!py_obj.is(py::none())) {
-               prefix = py_obj.cast<std::string>();
-             }
-             return bpe.Save(folder, prefix);
-           },
-           py::arg("folder"),
-           py::arg("prefix") = py::none())
+      .def(
+          "save",
+          [](const models::BPE& bpe,
+             const std::string& folder,
+             const py::object& py_obj) {
+            std::string prefix = "";
+            if (!py_obj.is(py::none())) {
+              prefix = py_obj.cast<std::string>();
+            }
+            return bpe.Save(folder, prefix);
+          },
+          py::arg("folder"),
+          py::arg("prefix") = py::none())
       .def_static(
           "read_file",
           [](const std::string& vocab_path, const std::string& merges_path) {
@@ -526,18 +532,19 @@ void BindModels(pybind11::module* m) {
       .def("set_split_rule",
            &models::Unigram::SetSplitRule,
            py::arg("split_rule") = "")
-      .def("save",
-           [](const models::Unigram& unigram,
-              const std::string& folder,
-              const py::object& py_obj) {
-             std::string prefix = "";
-             if (!py_obj.is(py::none())) {
-               prefix = py_obj.cast<std::string>();
-             }
-             return unigram.Save(folder, prefix);
-           },
-           py::arg("folder"),
-           py::arg("prefix") = py::none());
+      .def(
+          "save",
+          [](const models::Unigram& unigram,
+             const std::string& folder,
+             const py::object& py_obj) {
+            std::string prefix = "";
+            if (!py_obj.is(py::none())) {
+              prefix = py_obj.cast<std::string>();
+            }
+            return unigram.Save(folder, prefix);
+          },
+          py::arg("folder"),
+          py::arg("prefix") = py::none());
 }
 }  // namespace pybind
 }  // namespace fast_tokenizer

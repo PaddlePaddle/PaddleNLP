@@ -29,7 +29,7 @@ from paddlenlp.transformers import AutoModelForSequenceClassification, AutoToken
 from paddlenlp.trainer import Trainer, TrainingArguments, PdArgumentParser
 ```
 2. 设置好用户参数
-    - PdArgumentParser 可以接受多个类似`TrainingArguments`的参数。用户可以自定义所需要的`ModelArguments`, `DataArguments`为为 tuple 传入 PdArgumentParser即可。
+    - PdArgumentParser 可以接受多个类似`TrainingArguments`的参数。用户可以自定义所需要的`ModelArguments`, `DataArguments`为 tuple 传入 PdArgumentParser即可。
     - 这些参数都是通过`python xxx.py --dataset xx --max_seq_length xx`的方式传入。`TrainingArguments`的所有可配置参数见后文。
 ```python
 from dataclasses import dataclass
@@ -129,11 +129,15 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
         The dataset to use for training. If it is an `datasets.Dataset`, columns not accepted by the
         `model.forward()` method are automatically removed.
 
-    eval_dataset（`paddle.io.Dataset`，可选）：
+    eval_dataset（`paddle.io.Dataset` 或 `Dict[str, paddle.io.Dataset]`，可选）：
         用于评估的数据集。如果是 `datasets.Dataset`，那么
         `model.forward()` 不需要的输入字段会被自动删除。
+        如果它是一个字典，则将对字典中每个数据集进行评估，
+        并将字典中的键添加到评估指标名称前。
 
-        The dataset to use for evaluation.
+        The dataset to use for evaluation. If it is a [`~datasets.Dataset`], columns not accepted by the
+        `model.forward()` method are automatically removed. If it is a dictionary, it will evaluate on each
+        dataset prepending the dictionary key to the metric name.
 
     tokenizer（[`PretrainedTokenizer`]，可选）：
         用于数据预处理的tokenizer。如果传入，将用于自动Pad输入
@@ -180,7 +184,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
 ## TrainingArguments 参数介绍
 ```python
   --output_dir
-                        保存模型输出和和中间checkpoints的输出目录。(`str`, 必须, 默认为 `None`)
+                        保存模型输出和中间checkpoints的输出目录。(`str`, 必须, 默认为 `None`)
 
                         The output directory where the model predictions and
                         checkpoints will be written. (default: None)
@@ -244,6 +248,16 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
 
                         Number of updates steps to accumulate before
                         performing a backward/update pass. (default: 1)
+
+  --eval_accumulation_steps
+                        在将结果移动到CPU之前，累积输出张量的预测步骤数。如果如果未设置，
+                        则在移动到CPU之前，整个预测都会在GPU上累积（速度更快需要更多的显存）。
+                        （`int`，可选，默认为 None 不设置）
+
+                        Number of predictions steps to accumulate the output tensors for,
+                        before moving the results to the CPU. If left unset, the whole predictions are
+                        accumulated on GPU before being moved to the CPU (faster butrequires more memory)
+                        (default: None)
 
   --learning_rate
                         优化器的初始学习率, （`float`，可选，默认为 5e-05）
@@ -536,7 +550,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         data. (default: False)
 
   --optim
-                        优化器名称，默认为adamw，，(`str`, 可选，默认为 `adamw`)
+                        优化器名称，默认为adamw，(`str`, 可选，默认为 `adamw`)
                         The optimizer to use. (default: adamw)
 
   --report_to
@@ -548,5 +562,15 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         是否从断点重启恢复训练，(可选，默认为 None)
                         The path to a folder with a valid checkpoint for your
                         model. (default: None)
+
+  --skip_memory_metrics
+                       是否跳过内存profiler检测。（可选，默认为True，跳过）
+                       Whether or not to skip adding of memory profiler reports
+                       to metrics.(default:True)
+
+  --flatten_param_grads
+                       是否在优化器中使用flatten_param_grads策略，该策略将素有参数摊平后输入Optimizer更新。目前该策略仅在NPU设备上生效。（可选，默认为False）
+                       Whether use flatten_param_grads method in optimizer,
+                       only used on NPU devices.(default:False)
 
 ```

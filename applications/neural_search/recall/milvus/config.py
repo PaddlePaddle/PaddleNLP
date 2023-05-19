@@ -12,25 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-MILVUS_HOST = '10.21.226.175'
+MILVUS_HOST = "10.21.226.175"
 MILVUS_PORT = 8530
 data_dim = 256
 top_k = 100
-collection_name = 'literature_search'
-partition_tag = 'partition_2'
-embedding_name = 'embeddings'
+collection_name = "literature_search"
+partition_tag = "partition_2"
+embedding_name = "embeddings"
 
 index_config = {
     "index_type": "IVF_FLAT",
     "metric_type": "L2",
-    "params": {
-        "nlist": 1000
-    },
+    "params": {"nlist": 1000},
 }
 
 search_params = {
     "metric_type": "L2",
-    "params": {
-        "nprobe": top_k
-    },
+    "params": {"nprobe": top_k},
 }

@@ -13,21 +13,20 @@
 # limitations under the License.
 
 import argparse
-import os
-import time
 import copy
+import os
 from functools import partial
 
 import numpy as np
 import paddle
-from paddlenlp.transformers import AutoTokenizer, AutoModel
-from paddlenlp.datasets import load_dataset
-
-from data import create_dataloader, convert_example, load_vocab
+from data import convert_example, create_dataloader, load_vocab
 from model.dep import BiAffineParser
-from utils import decode, index_sample, flat_words
+from utils import decode, flat_words
 
-# yapf: disable
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import AutoModel
+
+# fmt: off
 parser = argparse.ArgumentParser()
 # Predict
 parser.add_argument("--params_path", type=str, default='model_file/best.pdparams', required=True, help="Directory to load model parameters.")
@@ -43,7 +42,7 @@ parser.add_argument("--tree", type=bool, default=True, help="Ensure the output c
 # Lstm
 parser.add_argument("--feat", choices=["char", "pos"], type=str, default=None, help="The feature representation to use.")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 @paddle.no_grad()
@@ -59,8 +58,7 @@ def batch_predict(
     model.eval()
     arcs, rels = [], []
     for inputs in data_loader():
-        if args.encoding_model.startswith(
-                "ernie") or args.encoding_model == "lstm-pe":
+        if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
             words = inputs[0]
             words, feats = flat_words(words)
             s_arc, s_rel, words = model(words, feats)
@@ -69,19 +67,14 @@ def batch_predict(
             s_arc, s_rel, words = model(words, feats)
 
         mask = paddle.logical_and(
-            paddle.logical_and(words != word_pad_index,
-                               words != word_bos_index),
+            paddle.logical_and(words != word_pad_index, words != word_bos_index),
             words != word_eos_index,
         )
 
         lens = paddle.sum(paddle.cast(mask, "int32"), axis=-1)
         arc_preds, rel_preds = decode(s_arc, s_rel, mask)
-        arcs.extend(
-            paddle.split(paddle.masked_select(arc_preds, mask),
-                         lens.numpy().tolist()))
-        rels.extend(
-            paddle.split(paddle.masked_select(rel_preds, mask),
-                         lens.numpy().tolist()))
+        arcs.extend(paddle.split(paddle.masked_select(arc_preds, mask), lens.numpy().tolist()))
+        rels.extend(paddle.split(paddle.masked_select(rel_preds, mask), lens.numpy().tolist()))
 
     arcs = [[str(s) for s in seq.numpy().tolist()] for seq in arcs]
     rels = [rel_vocab.to_tokens(seq.numpy().tolist()) for seq in rels]
@@ -92,12 +85,12 @@ def batch_predict(
 def do_predict(args):
     paddle.set_device(args.device)
 
-    if args.encoding_model.startswith("ernie"):
-        tokenizer = AutoTokenizer.from_pretrained(args.encoding_model)
-    elif args.encoding_model == "lstm-pe":
-        tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
-    else:
-        tokenizer = None
+    # if args.encoding_model.startswith("ernie"):
+    #     tokenizer = AutoTokenizer.from_pretrained(args.encoding_model)
+    # elif args.encoding_model == "lstm-pe":
+    #     tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
+    # else:
+    #     tokenizer = None
 
     # Load vocabs from model file path
     vocab_dir = os.path.split(args.params_path)[0]
@@ -135,9 +128,7 @@ def do_predict(args):
     )
 
     # Load pretrained model if encoding model is ernie-3.0-medium-zh, ernie-1.0, ernie-tiny or ernie-gram-zh
-    if args.encoding_model in [
-            "ernie-3.0-medium-zh", "ernie-1.0", "ernie-tiny"
-    ]:
+    if args.encoding_model in ["ernie-3.0-medium-zh", "ernie-1.0", "ernie-tiny"]:
         pretrained_model = AutoModel.from_pretrained(args.encoding_model)
     elif args.encoding_model == "ernie-gram-zh":
         pretrained_model = AutoModel.from_pretrained(args.encoding_model)
@@ -176,19 +167,17 @@ def do_predict(args):
 
     # Restore the order of sentences in the buckets
     if buckets:
-        indices = np.argsort(
-            np.array([i for bucket in buckets.values() for i in bucket]))
+        indices = np.argsort(np.array([i for bucket in buckets.values() for i in bucket]))
     else:
         indices = range(len(pred_arcs))
     pred_heads = [pred_arcs[i] for i in indices]
     pred_deprels = [pred_rels[i] for i in indices]
 
-    with open(args.infer_output_file, 'w', encoding='utf-8') as out_file:
+    with open(args.infer_output_file, "w", encoding="utf-8") as out_file:
         for res, head, rel in zip(test_ds_copy, pred_heads, pred_deprels):
             res["HEAD"] = tuple(head)
             res["DEPREL"] = tuple(rel)
-            res = '\n'.join('\t'.join(map(str, line))
-                            for line in zip(*res.values())) + '\n'
+            res = "\n".join("\t".join(map(str, line)) for line in zip(*res.values())) + "\n"
             out_file.write("{}\n".format(res))
     out_file.close()
     print("Results saved!")

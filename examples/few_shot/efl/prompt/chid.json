@@ -1,0 +1,8 @@
+{
+    "template": [
+        {"text": "成语[{'text':'idiom'}]使用{'text': 'candidate_label'}的例子：{'text':'content_pre'}({'text': 'idiom'}){'text': 'content_post'}"}
+    ],
+    "verbalizer": [
+        {"0": "错误", "1": "正确"}
+    ]
+}

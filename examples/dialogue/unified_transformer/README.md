@@ -160,7 +160,7 @@ python infer.py \
 - `top_k` 表示采用"sampling"解码策略时，token的概率按从大到小排序，生成的token只从前`top_k`个中进行采样。
 - `device` 表示使用的设备。
 
-同时，我们提供了基于 FasterTransformer 的高性能预测的选项，可以选择性开启是否需要采用高性能预测，PaddleNLP 提供了 JIT 的方式，可以自动完成对所需的自定义 op 的动态库编译：
+同时，我们提供了基于 FastGeneration 的高性能预测的选项，可以选择性开启是否需要采用高性能预测，PaddleNLP 提供了 JIT 的方式，可以自动完成对所需的自定义 op 的动态库编译：
 - `faster` 表示是否开启高性能预测。设置 `--faster` 即表示开启。
 - `use_fp16_decoding` 表示在开启高性能预测的时候，是否使用 fp16 来完成预测过程。设置 `--use_fp16_decoding` 即表示使用 fp16 进行预测，否则使用 fp32。
 

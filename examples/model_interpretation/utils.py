@@ -19,12 +19,11 @@ def convert_tokenizer_res_to_old_version(tokenized_res):
     if isinstance(tokenized_res, list):
         return tokenized_res
     if isinstance(tokenized_res, dict):
-        if len(tokenized_res['input_ids']) == 0 or not isinstance(
-                tokenized_res['input_ids'][0], list):
+        if len(tokenized_res["input_ids"]) == 0 or not isinstance(tokenized_res["input_ids"][0], list):
             return tokenized_res
         else:
             res = []
-            for idx in range(len(tokenized_res['input_ids'])):
+            for idx in range(len(tokenized_res["input_ids"])):
                 temp_dict = {}
                 key_list = list(tokenized_res.keys())
                 for key in key_list:
@@ -32,7 +31,7 @@ def convert_tokenizer_res_to_old_version(tokenized_res):
                 res.append(temp_dict)
             return res
     else:
-        raise ValueError('unsupported result type')
+        raise ValueError("unsupported result type")
 
 
 def cal_score(match_list, sorted_token):
@@ -74,8 +73,7 @@ def match(context, context_seg, sorted_token):
 
         cur_set = []
         while pointer2 < len(sorted_token):
-            while pointer2 < len(sorted_token) and sorted_token[pointer2][1][
-                    1] <= seg_start_idx:
+            while pointer2 < len(sorted_token) and sorted_token[pointer2][1][1] <= seg_start_idx:
                 pointer2 += 1
             if pointer2 >= len(sorted_token):
                 break

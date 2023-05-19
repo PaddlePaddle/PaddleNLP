@@ -18,23 +18,22 @@ from paddlenlp.datasets import MapDataset
 def load_dict(dict_path):
     vocab = {}
     i = 0
-    with open(dict_path, 'r', encoding='utf-8') as fin:
+    with open(dict_path, "r", encoding="utf-8") as fin:
         for line in fin:
-            key = line.strip('\n')
+            key = line.strip("\n")
             vocab[key] = i
             i += 1
     return vocab
 
 
 def load_dataset(datafiles):
-
     def read(data_path):
-        with open(data_path, 'r', encoding='utf-8') as fp:
+        with open(data_path, "r", encoding="utf-8") as fp:
             next(fp)  # Skip header
             for line in fp.readlines():
-                words, labels = line.strip('\n').split('\t')
-                words = words.split('\002')
-                labels = labels.split('\002')
+                words, labels = line.strip("\n").split("\t")
+                words = words.split("\002")
+                labels = labels.split("\002")
                 yield words, labels
 
     if isinstance(datafiles, str):
@@ -67,15 +66,14 @@ def parse_decodes(sentences, predictions, lengths, label_vocab):
         tags_out = []
         words = ""
         for s, t in zip(sent, tags):
-            if t.endswith('-B') or t == 'O':
+            if t.endswith("-B") or t == "O":
                 if len(words):
                     sent_out.append(words)
-                tags_out.append(t.split('-')[0])
+                tags_out.append(t.split("-")[0])
                 words = s
             else:
                 words += s
         if len(sent_out) < len(tags_out):
             sent_out.append(words)
-        outputs.append(''.join(
-            [str((s, t)) for s, t in zip(sent_out, tags_out)]))
+        outputs.append("".join([str((s, t)) for s, t in zip(sent_out, tags_out)]))
     return outputs

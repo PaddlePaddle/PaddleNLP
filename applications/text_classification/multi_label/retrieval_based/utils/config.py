@@ -14,22 +14,22 @@
 
 from milvus import MetricType, IndexType
 
-MILVUS_HOST = 'localhost'
+MILVUS_HOST = "localhost"
 MILVUS_PORT = 8530
 
 output_emb_size = 0
 
 collection_param = {
-    'dimension': output_emb_size if output_emb_size > 0 else 768,
-    'index_file_size': 256,
-    'metric_type': MetricType.IP
+    "dimension": output_emb_size if output_emb_size > 0 else 768,
+    "index_file_size": 256,
+    "metric_type": MetricType.IP,
 }
 
 index_type = IndexType.FLAT
-index_param = {'nlist': 1000}
+index_param = {"nlist": 1000}
 
 top_k = 20
-search_param = {'nprobe': 20}
+search_param = {"nprobe": 20}
 
-collection_name = 'multi_label'
-partition_tag = 'partition_2'
+collection_name = "multi_label"
+partition_tag = "partition_2"

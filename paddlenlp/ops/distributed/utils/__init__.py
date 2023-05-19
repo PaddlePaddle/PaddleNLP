@@ -16,6 +16,6 @@ from .topo import Topology
 from .random import get_rng_state_tracker
 
 __all__ = [
-    'Topology',
-    'get_rng_state_tracker',
+    "Topology",
+    "get_rng_state_tracker",
 ]

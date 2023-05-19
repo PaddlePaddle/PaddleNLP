@@ -12,17 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
-import logging
-
 
 class BaseInputEncoder(object):
-    """Docstring for BaseInputEncoder. """
+    """Docstring for BaseInputEncoder."""
 
     def __init__(self):
-        """init of class """
+        """init of class"""
         super(BaseInputEncoder, self).__init__()
 
     def encode(self, inputs):

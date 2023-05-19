@@ -17,7 +17,7 @@ SNIPPET_PREFIX = "SNIPPET_"
 
 
 def is_snippet(token):
-    """ Determines whether a token is a snippet or not.
+    """Determines whether a token is a snippet or not.
 
     Args:
         token (`str`): The token to check.
@@ -29,7 +29,7 @@ def is_snippet(token):
 
 
 def expand_snippets(sequence, snippets):
-    """ Given a sequence and a list of snippets, expand the snippets in the sequence.
+    """Given a sequence and a list of snippets, expand the snippets in the sequence.
 
     Args:
         sequence (`list`): Query containing snippet references.
@@ -54,7 +54,7 @@ def expand_snippets(sequence, snippets):
 
 
 def snippet_index(token):
-    """ Returns the index of a snippet.
+    """Returns the index of a snippet.
 
     Args:
         token (`str`): The snippet to check.
@@ -66,8 +66,8 @@ def snippet_index(token):
     return int(token.split("_")[-1])
 
 
-class Snippet():
-    """ Contains a snippet. """
+class Snippet:
+    """Contains a snippet."""
 
     def __init__(self, sequence, startpos, sql, age=0):
         self.sequence = sequence
@@ -82,29 +82,32 @@ class Snippet():
         self.embedding = None
 
         self.endpos = self.startpos + len(self.sequence)
-        assert self.endpos < len(self.sql), "End position of snippet is " + str(
-            self.endpos) + " which is greater than length of SQL (" + str(
-                len(self.sql)) + ")"
-        assert self.sequence == self.sql[self.startpos:self.endpos], \
-            "Value of snippet (" + " ".join(self.sequence) + ") " \
-            "is not the same as SQL at the same positions (" \
-            + " ".join(self.sql[self.startpos:self.endpos]) + ")"
+        assert self.endpos < len(self.sql), (
+            "End position of snippet is "
+            + str(self.endpos)
+            + " which is greater than length of SQL ("
+            + str(len(self.sql))
+            + ")"
+        )
+        assert self.sequence == self.sql[self.startpos : self.endpos], (
+            "Value of snippet (" + " ".join(self.sequence) + ") "
+            "is not the same as SQL at the same positions (" + " ".join(self.sql[self.startpos : self.endpos]) + ")"
+        )
 
     def __str__(self):
-        return self.name + "\t" + \
-            str(self.age) + "\t" + " ".join(self.sequence)
+        return self.name + "\t" + str(self.age) + "\t" + " ".join(self.sequence)
 
     def __len__(self):
         return len(self.sequence)
 
     def increase_age(self):
-        """ Ages a snippet by one. """
+        """Ages a snippet by one."""
         self.index += 1
 
     def assign_id(self, number):
-        """ Assigns the name of the snippet to be the prefix + the number. """
+        """Assigns the name of the snippet to be the prefix + the number."""
         self.name = SNIPPET_PREFIX + str(number)
 
     def set_embedding(self, embedding):
-        """ Sets the embedding of the snippet. """
+        """Sets the embedding of the snippet."""
         self.embedding = embedding

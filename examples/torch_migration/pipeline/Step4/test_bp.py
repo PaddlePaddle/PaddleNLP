@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
 import os
+import sys
 
 import numpy as np
 import paddle
@@ -21,40 +21,35 @@ from reprod_log import ReprodLogger
 from transformers import AdamW
 
 CURRENT_DIR = os.path.split(os.path.abspath(__file__))[0]  # 当前目录
-CONFIG_PATH = CURRENT_DIR.rsplit('/', 1)[0]
+CONFIG_PATH = CURRENT_DIR.rsplit("/", 1)[0]
 sys.path.append(CONFIG_PATH)
 
-from models.pd_bert import (
-    BertForSequenceClassification as PDBertForSequenceClassification, )
-from models.pd_bert import (
-    BertConfig as PDBertConfig, )
-from models.pt_bert import (
-    BertForSequenceClassification as HFBertForSequenceClassification, )
-from models.pt_bert import (
-    BertConfig as HFBertConfig, )
+# isort: off
+
+from models.pd_bert import BertConfig as PDBertConfig  # noqa: E402
+from models.pd_bert import (  # noqa: E402
+    BertForSequenceClassification as PDBertForSequenceClassification,
+)
+from models.pt_bert import BertConfig as HFBertConfig  # noqa: E402
+from models.pt_bert import (  # noqa: E402
+    BertForSequenceClassification as HFBertForSequenceClassification,
+)
+
+# isort: on
 
 
-def pd_train_some_iters(model,
-                        criterion,
-                        optimizer,
-                        fake_data,
-                        fake_label,
-                        max_iter=2):
-    paddle_dump_path = '../weights/paddle_weight.pdparams'
+def pd_train_some_iters(fake_data, fake_label, max_iter=2):
+    paddle_dump_path = "../weights/paddle_weight.pdparams"
     config = PDBertConfig()
     model = PDBertForSequenceClassification(config)
     checkpoint = paddle.load(paddle_dump_path)
     model.bert.load_dict(checkpoint)
 
-    classifier_weights = paddle.load(
-        "../classifier_weights/paddle_classifier_weights.bin")
+    classifier_weights = paddle.load("../classifier_weights/paddle_classifier_weights.bin")
     model.load_dict(classifier_weights)
     model.eval()
-    criterion = paddle.nn.CrossEntropy()
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    criterion = paddle.nn.CrossEntropyLoss()
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=3e-5,
         parameters=model.parameters(),
@@ -67,7 +62,7 @@ def pd_train_some_iters(model,
         input_ids = paddle.to_tensor(fake_data)
         labels = paddle.to_tensor(fake_label)
 
-        output = model(input_ids)
+        output = model(input_ids)[0]
         loss = criterion(output, labels)
         loss.backward()
         optimizer.step()
@@ -78,33 +73,24 @@ def pd_train_some_iters(model,
 
 def hf_train_some_iters(fake_data, fake_label, max_iter=2):
 
-    pytorch_dump_path = '../weights/torch_weight.bin'
+    pytorch_dump_path = "../weights/torch_weight.bin"
     config = HFBertConfig()
     model = HFBertForSequenceClassification(config)
     checkpoint = torch.load(pytorch_dump_path)
     model.bert.load_state_dict(checkpoint)
-    classifier_weights = torch.load(
-        "../classifier_weights/torch_classifier_weights.bin")
+    classifier_weights = torch.load("../classifier_weights/torch_classifier_weights.bin")
     model.load_state_dict(classifier_weights, strict=False)
     model.eval()
     criterion = torch.nn.CrossEntropyLoss()
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
         {
-            "params": [
-                p for n, p in model.named_parameters()
-                if not any(nd in n for nd in no_decay)
-            ],
-            "weight_decay":
-            1e-2,
+            "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
+            "weight_decay": 1e-2,
         },
         {
-            "params": [
-                p for n, p in model.named_parameters()
-                if any(nd in n for nd in no_decay)
-            ],
-            "weight_decay":
-            0.0,
+            "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
+            "weight_decay": 0.0,
         },
     ]
     optimizer = AdamW(optimizer_grouped_parameters, lr=3e-5)
@@ -135,7 +121,7 @@ if __name__ == "__main__":
     hf_reprod_logger.save("bp_align_torch.npy")
 
     pd_reprod_logger = ReprodLogger()
-    pd_loss_list = hf_train_some_iters(fake_data, fake_label, 10)
+    pd_loss_list = pd_train_some_iters(fake_data, fake_label, 10)
     for idx, loss in enumerate(pd_loss_list):
         pd_reprod_logger.add(f"loss_{idx}", loss.detach().cpu().numpy())
     pd_reprod_logger.save("bp_align_paddle.npy")

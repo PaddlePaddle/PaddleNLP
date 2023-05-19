@@ -13,98 +13,51 @@
 # limitations under the License.
 
 import argparse
-import os
 
-import paddle
-from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http
 from pipelines.document_stores import ElasticsearchDocumentStore, MilvusDocumentStore
 from pipelines.nodes import DensePassageRetriever
-from pipelines.utils import launch_es
+from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http, launch_es
 
 data_dict = {
-    'data/dureader_dev':
-    "https://paddlenlp.bj.bcebos.com/applications/dureader_dev.zip",
-    "data/baike":
-    "https://paddlenlp.bj.bcebos.com/applications/baike.zip",
-    "data/insurance":
-    "https://paddlenlp.bj.bcebos.com/applications/insurance.zip",
-    "data/file_example":
-    "https://paddlenlp.bj.bcebos.com/pipelines/file_examples.zip"
+    "data/dureader_dev": "https://paddlenlp.bj.bcebos.com/applications/dureader_dev.zip",
+    "data/baike": "https://paddlenlp.bj.bcebos.com/applications/baike.zip",
+    "data/insurance": "https://paddlenlp.bj.bcebos.com/applications/insurance.zip",
+    "data/file_example": "https://paddlenlp.bj.bcebos.com/pipelines/file_examples.zip",
 }
 
+# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--index_name",
-                    default='baike_cities',
-                    type=str,
-                    help="The index name of the ANN search engine")
-parser.add_argument("--doc_dir",
-                    default='data/baike/',
-                    type=str,
-                    help="The doc path of the corpus")
-parser.add_argument("--search_engine",
-                    choices=['elastic', 'milvus'],
-                    default="elastic",
-                    help="The type of ANN search engine.")
-parser.add_argument('--host',
-                    type=str,
-                    default="127.0.0.1",
-                    help='host ip of ANN search engine')
-
-parser.add_argument('--port',
-                    type=str,
-                    default="9200",
-                    help='port of ANN search engine')
-
-parser.add_argument("--embedding_dim",
-                    default=312,
-                    type=int,
-                    help="The embedding_dim of index")
-
-parser.add_argument('--split_answers',
-                    action='store_true',
-                    help='whether to split lines into question and answers')
-
-parser.add_argument("--query_embedding_model",
-                    default="rocketqa-zh-nano-query-encoder",
-                    type=str,
-                    help="The query_embedding_model path")
-
-parser.add_argument("--passage_embedding_model",
-                    default="rocketqa-zh-nano-para-encoder",
-                    type=str,
-                    help="The passage_embedding_model path")
-
-parser.add_argument("--params_path",
-                    default="checkpoints/model_40/model_state.pdparams",
-                    type=str,
-                    help="The checkpoint path")
-
-parser.add_argument(
-    '--delete_index',
-    action='store_true',
-    help='Whether to delete existing index while updating index')
-
-parser.add_argument(
-    '--share_parameters',
-    action='store_true',
-    help='Use to control the query and title models sharing the same parameters'
-)
-
+parser.add_argument("--index_name", default="baike_cities", type=str, help="The index name of the ANN search engine")
+parser.add_argument("--doc_dir", default="data/baike/", type=str, help="The doc path of the corpus")
+parser.add_argument("--search_engine", choices=["elastic", "milvus"], default="elastic", help="The type of ANN search engine.")
+parser.add_argument("--host", type=str, default="127.0.0.1", help="host ip of ANN search engine")
+parser.add_argument("--port", type=str, default="9200", help="port of ANN search engine")
+parser.add_argument("--embedding_dim", default=312, type=int, help="The embedding_dim of index")
+parser.add_argument("--split_answers", action="store_true", help="whether to split lines into question and answers")
+parser.add_argument("--query_embedding_model", default="rocketqa-zh-nano-query-encoder", type=str, help="The query_embedding_model path",)
+parser.add_argument("--passage_embedding_model", default="rocketqa-zh-nano-para-encoder", type=str, help="The passage_embedding_model path", )
+parser.add_argument("--params_path", default="checkpoints/model_40/model_state.pdparams", type=str, help="The checkpoint path")
+parser.add_argument("--delete_index", action="store_true", help="Whether to delete existing index while updating index")
+parser.add_argument("--share_parameters", action="store_true", help="Use to control the query and title models sharing the same parameters",)
+parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search'], default="ernie", help="the ernie model types")
+parser.add_argument('--embed_title', default=False, type=bool, help="The title to be  embedded into embedding")
+parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select devices, defaults to gpu.")
+parser.add_argument('--search_fields', default=['content', 'name'], help="multi recall BM25Retriever set search_fields")
 args = parser.parse_args()
+# yapf: enable
 
 
 def offline_ann(index_name, doc_dir):
-
-    if (args.search_engine == "milvus"):
-        document_store = MilvusDocumentStore(embedding_dim=args.embedding_dim,
-                                             host=args.host,
-                                             index=args.index_name,
-                                             port=args.port,
-                                             index_param={
-                                                 "M": 16,
-                                                 "efConstruction": 50
-                                             },
-                                             index_type="HNSW")
+    use_gpu = True if args.device == "gpu" else False
+    if args.search_engine == "milvus":
+        document_store = MilvusDocumentStore(
+            embedding_dim=args.embedding_dim,
+            host=args.host,
+            index=args.index_name,
+            port=args.port,
+            index_param={"M": 16, "efConstruction": 50},
+            index_type="HNSW",
+        )
     else:
         launch_es()
         document_store = ElasticsearchDocumentStore(
@@ -113,31 +66,32 @@ def offline_ann(index_name, doc_dir):
             username="",
             password="",
             embedding_dim=args.embedding_dim,
-            index=index_name)
+            index=index_name,
+            search_fields=args.search_fields,  # 当使用了多路召回并且搜索字段设置了除content的其他字段，构建索引时其他字段也需要设置，例如：['content', 'name']。
+        )
     # 将每篇文档按照段落进行切分
-    dicts = convert_files_to_dicts(dir_path=doc_dir,
-                                   split_paragraphs=True,
-                                   split_answers=args.split_answers,
-                                   encoding='utf-8')
+    dicts = convert_files_to_dicts(
+        dir_path=doc_dir, split_paragraphs=True, split_answers=args.split_answers, encoding="utf-8"
+    )
 
     print(dicts[:3])
 
     # 文档数据写入数据库
     document_store.write_documents(dicts)
 
-    ### 语义索引模型
+    # 语义索引模型
     retriever = DensePassageRetriever(
         document_store=document_store,
         query_embedding_model=args.query_embedding_model,
         passage_embedding_model=args.passage_embedding_model,
         params_path=args.params_path,
-        output_emb_size=args.embedding_dim,
+        output_emb_size=args.embedding_dim if args.model_type in ["ernie_search", "neural_search"] else None,
         share_parameters=args.share_parameters,
         max_seq_len_query=64,
         max_seq_len_passage=256,
         batch_size=16,
-        use_gpu=True,
-        embed_title=False,
+        use_gpu=use_gpu,
+        embed_title=args.embed_title,
     )
 
     # 建立索引库
@@ -145,16 +99,15 @@ def offline_ann(index_name, doc_dir):
 
 
 def delete_data(index_name):
-    if (args.search_engine == 'milvus'):
-        document_store = MilvusDocumentStore(embedding_dim=args.embedding_dim,
-                                             host=args.host,
-                                             index=args.index_name,
-                                             port=args.port,
-                                             index_param={
-                                                 "M": 16,
-                                                 "efConstruction": 50
-                                             },
-                                             index_type="HNSW")
+    if args.search_engine == "milvus":
+        document_store = MilvusDocumentStore(
+            embedding_dim=args.embedding_dim,
+            host=args.host,
+            index=args.index_name,
+            port=args.port,
+            index_param={"M": 16, "efConstruction": 50},
+            index_type="HNSW",
+        )
     else:
         document_store = ElasticsearchDocumentStore(
             host=args.host,
@@ -162,15 +115,15 @@ def delete_data(index_name):
             username="",
             password="",
             embedding_dim=args.embedding_dim,
-            index=index_name)
+            index=index_name,
+        )
     document_store.delete_index(index_name)
-    print('Delete an existing elasticsearch index {} Done.'.format(index_name))
+    print("Delete an existing elasticsearch index {} Done.".format(index_name))
 
 
 if __name__ == "__main__":
-    if (args.doc_dir in data_dict):
-        fetch_archive_from_http(url=data_dict[args.doc_dir],
-                                output_dir=args.doc_dir)
-    if (args.delete_index):
+    if args.doc_dir in data_dict:
+        fetch_archive_from_http(url=data_dict[args.doc_dir], output_dir=args.doc_dir)
+    if args.delete_index:
         delete_data(args.index_name)
     offline_ann(args.index_name, args.doc_dir)

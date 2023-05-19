@@ -16,8 +16,7 @@
 def reset_offset(pred_words):
     for i in range(0, len(pred_words)):
         if i > 0:
-            pred_words[i]["offset"] = pred_words[i - 1]["offset"] + len(
-                pred_words[i - 1]["item"])
+            pred_words[i]["offset"] = pred_words[i - 1]["offset"] + len(pred_words[i - 1]["item"])
         pred_words[i]["length"] = len(pred_words[i]["item"])
     return pred_words
 
@@ -36,19 +35,11 @@ def decode(texts, all_pred_tags, summary_num, idx_to_tags):
             else:
                 label = pred_label
             if pred_label.startswith("S") or pred_label.startswith("O"):
-                pred_words.append({
-                    "item": texts[i][j],
-                    "offset": 0,
-                    "wordtag_label": label
-                })
+                pred_words.append({"item": texts[i][j], "offset": 0, "wordtag_label": label})
             else:
                 pred_word.append(texts[i][j])
                 if pred_label.startswith("E"):
-                    pred_words.append({
-                        "item": "".join(pred_word),
-                        "offset": 0,
-                        "wordtag_label": label
-                    })
+                    pred_words.append({"item": "".join(pred_word), "offset": 0, "wordtag_label": label})
                     del pred_word[:]
 
         pred_words = reset_offset(pred_words)

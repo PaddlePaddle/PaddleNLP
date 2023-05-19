@@ -21,11 +21,11 @@ class Config(object):
     """
 
     def __init__(self, config_path: str):
-        with open(config_path, 'r') as f:
+        with open(config_path, "r") as f:
             self.d = yaml.load(f.read(), Loader=yaml.SafeLoader)
 
     def __getattribute__(self, key):
-        d = super(Config, self).__getattribute__('d')
+        d = super(Config, self).__getattribute__("d")
         if key in d:
             return d[key]
         else:

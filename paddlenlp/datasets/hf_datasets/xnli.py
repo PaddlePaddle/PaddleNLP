@@ -51,8 +51,7 @@ labels).
 _TRAIN_DATA_URL = "https://bj.bcebos.com/paddlenlp/datasets/XNLI-MT-1.0.zip"
 _TESTVAL_DATA_URL = "https://bj.bcebos.com/paddlenlp/datasets/XNLI-1.0.zip"
 
-_LANGUAGES = ("ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th",
-              "tr", "ur", "vi", "zh")
+_LANGUAGES = ("ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th", "tr", "ur", "vi", "zh")
 
 
 class XnliConfig(datasets.BuilderConfig):
@@ -84,7 +83,8 @@ class Xnli(datasets.GeneratorBasedBuilder):
             language=lang,
             version=datasets.Version("1.1.0", ""),
             description=f"Plain text import of XNLI for the {lang} language",
-        ) for lang in _LANGUAGES
+        )
+        for lang in _LANGUAGES
     ] + [
         XnliConfig(
             name="all_languages",
@@ -96,25 +96,25 @@ class Xnli(datasets.GeneratorBasedBuilder):
 
     def _info(self):
         if self.config.language == "all_languages":
-            features = datasets.Features({
-                "premise":
-                datasets.Translation(languages=_LANGUAGES, ),
-                "hypothesis":
-                datasets.TranslationVariableLanguages(languages=_LANGUAGES, ),
-                "label":
-                datasets.ClassLabel(
-                    names=["entailment", "neutral", "contradiction"]),
-            })
+            features = datasets.Features(
+                {
+                    "premise": datasets.Translation(
+                        languages=_LANGUAGES,
+                    ),
+                    "hypothesis": datasets.TranslationVariableLanguages(
+                        languages=_LANGUAGES,
+                    ),
+                    "label": datasets.ClassLabel(names=["entailment", "neutral", "contradiction"]),
+                }
+            )
         else:
-            features = datasets.Features({
-                "premise":
-                datasets.Value("string"),
-                "hypothesis":
-                datasets.Value("string"),
-                "label":
-                datasets.ClassLabel(
-                    names=["entailment", "neutral", "contradiction"]),
-            })
+            features = datasets.Features(
+                {
+                    "premise": datasets.Value("string"),
+                    "hypothesis": datasets.Value("string"),
+                    "label": datasets.ClassLabel(names=["entailment", "neutral", "contradiction"]),
+                }
+            )
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
             features=features,
@@ -126,40 +126,31 @@ class Xnli(datasets.GeneratorBasedBuilder):
         )
 
     def _split_generators(self, dl_manager):
-        dl_dirs = dl_manager.download_and_extract({
-            "train_data":
-            _TRAIN_DATA_URL,
-            "testval_data":
-            _TESTVAL_DATA_URL,
-        })
-        train_dir = os.path.join(dl_dirs["train_data"], "XNLI-MT-1.0",
-                                 "multinli")
+        dl_dirs = dl_manager.download_and_extract(
+            {
+                "train_data": _TRAIN_DATA_URL,
+                "testval_data": _TESTVAL_DATA_URL,
+            }
+        )
+        train_dir = os.path.join(dl_dirs["train_data"], "XNLI-MT-1.0", "multinli")
         testval_dir = os.path.join(dl_dirs["testval_data"], "XNLI-1.0")
         return [
             datasets.SplitGenerator(
                 name=datasets.Split.TRAIN,
                 gen_kwargs={
                     "filepaths": [
-                        os.path.join(train_dir, f"multinli.train.{lang}.tsv")
-                        for lang in self.config.languages
+                        os.path.join(train_dir, f"multinli.train.{lang}.tsv") for lang in self.config.languages
                     ],
-                    "data_format":
-                    "XNLI-MT",
+                    "data_format": "XNLI-MT",
                 },
             ),
             datasets.SplitGenerator(
                 name=datasets.Split.TEST,
-                gen_kwargs={
-                    "filepaths": [os.path.join(testval_dir, "xnli.test.tsv")],
-                    "data_format": "XNLI"
-                },
+                gen_kwargs={"filepaths": [os.path.join(testval_dir, "xnli.test.tsv")], "data_format": "XNLI"},
             ),
             datasets.SplitGenerator(
                 name=datasets.Split.VALIDATION,
-                gen_kwargs={
-                    "filepaths": [os.path.join(testval_dir, "xnli.dev.tsv")],
-                    "data_format": "XNLI"
-                },
+                gen_kwargs={"filepaths": [os.path.join(testval_dir, "xnli.dev.tsv")], "data_format": "XNLI"},
             ),
         ]
 
@@ -169,50 +160,25 @@ class Xnli(datasets.GeneratorBasedBuilder):
         if self.config.language == "all_languages":
             if data_format == "XNLI-MT":
                 with ExitStack() as stack:
-                    files = [
-                        stack.enter_context(open(filepath, encoding="utf-8"))
-                        for filepath in filepaths
-                    ]
-                    readers = [
-                        csv.DictReader(file,
-                                       delimiter="\t",
-                                       quoting=csv.QUOTE_NONE) for file in files
-                    ]
+                    files = [stack.enter_context(open(filepath, encoding="utf-8")) for filepath in filepaths]
+                    readers = [csv.DictReader(file, delimiter="\t", quoting=csv.QUOTE_NONE) for file in files]
                     for row_idx, rows in enumerate(zip(*readers)):
                         yield row_idx, {
-                            "premise": {
-                                lang: row["premise"]
-                                for lang, row in zip(self.config.languages,
-                                                     rows)
-                            },
-                            "hypothesis": {
-                                lang: row["hypo"]
-                                for lang, row in zip(self.config.languages,
-                                                     rows)
-                            },
-                            "label":
-                            rows[0]["label"].replace("contradictory",
-                                                     "contradiction"),
+                            "premise": {lang: row["premise"] for lang, row in zip(self.config.languages, rows)},
+                            "hypothesis": {lang: row["hypo"] for lang, row in zip(self.config.languages, rows)},
+                            "label": rows[0]["label"].replace("contradictory", "contradiction"),
                         }
             else:
                 rows_per_pair_id = collections.defaultdict(list)
                 for filepath in filepaths:
                     with open(filepath, encoding="utf-8") as f:
-                        reader = csv.DictReader(f,
-                                                delimiter="\t",
-                                                quoting=csv.QUOTE_NONE)
+                        reader = csv.DictReader(f, delimiter="\t", quoting=csv.QUOTE_NONE)
                         for row in reader:
                             rows_per_pair_id[row["pairID"]].append(row)
 
                 for rows in rows_per_pair_id.values():
-                    premise = {
-                        row["language"]: row["sentence1"]
-                        for row in rows
-                    }
-                    hypothesis = {
-                        row["language"]: row["sentence2"]
-                        for row in rows
-                    }
+                    premise = {row["language"]: row["sentence1"] for row in rows}
+                    hypothesis = {row["language"]: row["sentence2"] for row in rows}
                     yield rows[0]["pairID"], {
                         "premise": premise,
                         "hypothesis": hypothesis,
@@ -222,26 +188,18 @@ class Xnli(datasets.GeneratorBasedBuilder):
             if data_format == "XNLI-MT":
                 for file_idx, filepath in enumerate(filepaths):
                     with open(filepath, encoding="utf-8") as file:
-                        reader = csv.DictReader(file,
-                                                delimiter="\t",
-                                                quoting=csv.QUOTE_NONE)
+                        reader = csv.DictReader(file, delimiter="\t", quoting=csv.QUOTE_NONE)
                         for row_idx, row in enumerate(reader):
                             key = str(file_idx) + "_" + str(row_idx)
                             yield key, {
-                                "premise":
-                                row["premise"],
-                                "hypothesis":
-                                row["hypo"],
-                                "label":
-                                row["label"].replace("contradictory",
-                                                     "contradiction"),
+                                "premise": row["premise"],
+                                "hypothesis": row["hypo"],
+                                "label": row["label"].replace("contradictory", "contradiction"),
                             }
             else:
                 for filepath in filepaths:
                     with open(filepath, encoding="utf-8") as f:
-                        reader = csv.DictReader(f,
-                                                delimiter="\t",
-                                                quoting=csv.QUOTE_NONE)
+                        reader = csv.DictReader(f, delimiter="\t", quoting=csv.QUOTE_NONE)
                         for row in reader:
                             if row["language"] == self.config.language:
                                 yield row["pairID"], {

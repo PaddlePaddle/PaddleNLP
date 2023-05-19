@@ -21,7 +21,6 @@ ENTITY_TOKEN = "[ENTITY]"
 
 
 class InputExample(object):
-
     def __init__(self, id_, text, span, labels):
         self.id = id_
         self.text = text
@@ -30,7 +29,6 @@ class InputExample(object):
 
 
 class InputFeatures(object):
-
     def __init__(
         self,
         word_ids,
@@ -53,7 +51,6 @@ class InputFeatures(object):
 
 
 class DatasetProcessor(object):
-
     def get_train_examples(self, data_dir):
         return self._create_examples(data_dir, "train")
 
@@ -73,13 +70,11 @@ class DatasetProcessor(object):
         with open(os.path.join(data_dir, set_type + ".json"), "r") as f:
             data = json.load(f)
         return [
-            InputExample(i, item["sent"], (item["start"], item["end"]),
-                         item["labels"]) for i, item in enumerate(data)
+            InputExample(i, item["sent"], (item["start"], item["end"]), item["labels"]) for i, item in enumerate(data)
         ]
 
 
-def convert_examples_to_features(examples, label_list, tokenizer,
-                                 max_mention_length):
+def convert_examples_to_features(examples, label_list, tokenizer, max_mention_length):
     label_map = {label: i for i, label in enumerate(label_list)}
 
     conv_tables = (
@@ -104,8 +99,7 @@ def convert_examples_to_features(examples, label_list, tokenizer,
         tokens += preprocess_and_tokenize(example.text, 0, example.span[0])
         mention_start = len(tokens)
         tokens.append(ENTITY_TOKEN)
-        tokens += preprocess_and_tokenize(example.text, example.span[0],
-                                          example.span[1])
+        tokens += preprocess_and_tokenize(example.text, example.span[0], example.span[1])
         tokens.append(ENTITY_TOKEN)
         mention_end = len(tokens)
 
@@ -119,10 +113,8 @@ def convert_examples_to_features(examples, label_list, tokenizer,
         entity_ids = [2, 0]
         entity_attention_mask = [1, 0]
         entity_segment_ids = [0, 0]
-        entity_position_ids = list(range(mention_start,
-                                         mention_end))[:max_mention_length]
-        entity_position_ids += [-1] * (max_mention_length - mention_end +
-                                       mention_start)
+        entity_position_ids = list(range(mention_start, mention_end))[:max_mention_length]
+        entity_position_ids += [-1] * (max_mention_length - mention_end + mention_start)
         entity_position_ids = [entity_position_ids, [-1] * max_mention_length]
 
         labels = [0] * len(label_map)
@@ -140,6 +132,7 @@ def convert_examples_to_features(examples, label_list, tokenizer,
                 entity_segment_ids=entity_segment_ids,
                 entity_attention_mask=entity_attention_mask,
                 labels=labels,
-            ))
+            )
+        )
 
     return features

@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import sys
+
+import numpy as np
 import paddle
 import torch
-import numpy as np
 
 paddle.set_device("cpu")
 
-model = torch.load(sys.argv[1], map_location='cpu')
+model = torch.load(sys.argv[1], map_location="cpu")
 
 print("The origin model keys:")
 for x in sorted(list(model.keys())):

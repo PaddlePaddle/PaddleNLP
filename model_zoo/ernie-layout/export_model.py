@@ -16,7 +16,11 @@ import argparse
 import os
 
 import paddle
-from paddlenlp.transformers import AutoModelForSequenceClassification, AutoModelForQuestionAnswering, AutoModelForTokenClassification
+from paddlenlp.transformers import (
+    AutoModelForSequenceClassification,
+    AutoModelForQuestionAnswering,
+    AutoModelForTokenClassification,
+)
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -32,8 +36,7 @@ if __name__ == "__main__":
     elif args.task_type == "mrc":
         model = AutoModelForQuestionAnswering.from_pretrained(args.model_path)
     elif args.task_type == "cls":
-        model = AutoModelForSequenceClassification.from_pretrained(
-            args.model_path)
+        model = AutoModelForSequenceClassification.from_pretrained(args.model_path)
     else:
         raise ValueError("Unsppoorted task type!")
     model.eval()
@@ -42,25 +45,14 @@ if __name__ == "__main__":
     model = paddle.jit.to_static(
         model,
         input_spec=[
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='input_ids'),
-            paddle.static.InputSpec(shape=[None, None, None],
-                                    dtype="int64",
-                                    name='bbox'),
-            paddle.static.InputSpec(shape=[None, None, None, None],
-                                    dtype="int64",
-                                    name='image'),
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='attention_mask'),
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='token_type_ids'),
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='position_ids'),
-        ])
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+            paddle.static.InputSpec(shape=[None, None, None], dtype="int64", name="bbox"),
+            paddle.static.InputSpec(shape=[None, None, None, None], dtype="int64", name="image"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="attention_mask"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
+        ],
+    )
     # Save in static graph model.
     save_path = os.path.join(args.output_path, "inference")
     paddle.jit.save(model, save_path)

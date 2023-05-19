@@ -61,7 +61,7 @@ class Perplexity(paddle.metric.Metric):
             # 48263.528820122105
     """
 
-    def __init__(self, name='Perplexity', *args, **kwargs):
+    def __init__(self, name="Perplexity", *args, **kwargs):
         super(Perplexity, self).__init__(*args, **kwargs)
         self._name = name
         self.total_ce = 0
@@ -90,10 +90,7 @@ class Perplexity(paddle.metric.Metric):
         """
         if label.dim() == 2:
             label = paddle.unsqueeze(label, axis=2)
-        ce = F.cross_entropy(input=pred,
-                             label=label,
-                             reduction='none',
-                             soft_label=False)
+        ce = F.cross_entropy(input=pred, label=label, reduction="none", soft_label=False)
         ce = paddle.squeeze(ce, axis=[2])
         if seq_mask is not None:
             ce = ce * seq_mask

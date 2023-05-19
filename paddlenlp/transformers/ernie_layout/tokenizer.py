@@ -15,16 +15,13 @@
 """ Tokenization classes for ErnieLayout model."""
 
 import os
-import itertools
 import unicodedata
-from dataclasses import dataclass, field
-from collections import OrderedDict
 from typing import List, Optional
 
 import sentencepiece as spm
 
-from .. import PretrainedTokenizer, AddedToken
-from ..tokenizer_utils import _is_punctuation, _is_control, _is_whitespace
+from .. import AddedToken, PretrainedTokenizer
+from ..tokenizer_utils import _is_control, _is_punctuation, _is_whitespace
 
 SPIECE_UNDERLINE = "▁"
 
@@ -49,19 +46,21 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             "ernie-layoutx-base-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/vocab.txt",
+            "uie-x-base": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/vocab.txt",
         },
         "sentencepiece_model_file": {
             "ernie-layoutx-base-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/sentencepiece.bpe.model",
+            "uie-x-base": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/sentencepiece.bpe.model",
         },
     }
     pretrained_init_configuration = {
         "ernie-layoutx-base-uncased": {"do_lower_case": True, "do_tokenize_postprocess": False},
+        "uie-x-base": {"do_lower_case": True, "do_tokenize_postprocess": True},
     }
-    pretrained_positional_embedding_sizes = {
-        "ernie-layoutx-base-uncased": 512,
-    }
+    pretrained_positional_embedding_sizes = {"ernie-layoutx-base-uncased": 514, "uie-x-base": 514}
     max_model_input_sizes = pretrained_positional_embedding_sizes
-    model_input_names = ["input_ids", "attention_mask"]
+    # Ernie-M model doesn't have token_type embedding.
+    model_input_names: List[str] = ["input_ids"]
 
     SPECIAL_TOKENS_ATTRIBUTES = [
         "unk_token",
@@ -105,7 +104,6 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
 
         self.tokens_to_ids["[MASK]"] = len(self.sp_model) + self.offset
         self.ids_to_tokens = {v: k for k, v in self.tokens_to_ids.items()}
-
         self.SP_CHAR_MAPPING = {}
 
         for ch in range(65281, 65375):
@@ -171,7 +169,7 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         return len(cls + token_ids_0 + sep + sep + token_ids_1 + sep) * [0]
 
     def get_offset_mapping(self, text):
-        split_tokens = self._tokenize(text)
+        split_tokens = self.tokenize(text)
         normalized_text, char_mapping = "", []
 
         for i, ch in enumerate(text):

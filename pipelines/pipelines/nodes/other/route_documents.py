@@ -28,9 +28,7 @@ class RouteDocuments(BaseComponent):
     # By default (split_by == "content_type"), the node has two outgoing edges.
     outgoing_edges = 2
 
-    def __init__(self,
-                 split_by: str = "content_type",
-                 metadata_values: Optional[List[str]] = None):
+    def __init__(self, split_by: str = "content_type", metadata_values: Optional[List[str]] = None):
         """
         :param split_by: Field to split the documents by, either `"content_type"` or a metadata field name.
             If this parameter is set to `"content_type"`, the list of `Document`s will be split into a list containing
@@ -46,7 +44,8 @@ class RouteDocuments(BaseComponent):
 
         assert split_by == "content_type" or metadata_values is not None, (
             "If split_by is set to the name of a metadata field, you must provide metadata_values "
-            "to group the documents to.")
+            "to group the documents to."
+        )
 
         # Save init parameters to enable export of component config as YAML
         self.set_config(split_by=split_by, metadata_values=metadata_values)
@@ -58,13 +57,9 @@ class RouteDocuments(BaseComponent):
         if split_by != "content_type" and metadata_values is not None:
             self.outgoing_edges = len(metadata_values)
 
-    def run(self,
-            documents: List[Document]) -> Tuple[Dict, str]:  # type: ignore
+    def run(self, documents: List[Document]) -> Tuple[Dict, str]:  # type: ignore
         if self.split_by == "content_type":
-            split_documents: Dict[str, List[Document]] = {
-                "output_1": [],
-                "output_2": []
-            }
+            split_documents: Dict[str, List[Document]] = {"output_1": [], "output_2": []}
 
             for doc in documents:
                 if doc.content_type == "text":
@@ -74,19 +69,15 @@ class RouteDocuments(BaseComponent):
 
         else:
             assert isinstance(self.metadata_values, list), (
-                "You need to provide metadata_values if you want to split"
-                " a list of Documents by a metadata field.")
-            split_documents = {
-                f"output_{i+1}": []
-                for i in range(len(self.metadata_values))
-            }
+                "You need to provide metadata_values if you want to split" " a list of Documents by a metadata field."
+            )
+            split_documents = {f"output_{i+1}": [] for i in range(len(self.metadata_values))}
             for doc in documents:
                 current_metadata_value = doc.meta.get(self.split_by, None)
                 # Disregard current document if it does not contain the provided metadata field
                 if current_metadata_value is not None:
                     try:
-                        index = self.metadata_values.index(
-                            current_metadata_value)
+                        index = self.metadata_values.index(current_metadata_value)
                     except ValueError:
                         # Disregard current document if current_metadata_value is not in the provided metadata_values
                         continue

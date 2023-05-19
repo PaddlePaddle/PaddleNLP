@@ -20,7 +20,7 @@ print("Generate vocabulary file for corpus:  ", input_path)
 
 spm.SentencePieceTrainer.train(
     input=input_path,
-    model_prefix='eng',
+    model_prefix="eng",
     vocab_size=17000,
     model_type="BPE",
 )

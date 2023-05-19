@@ -22,7 +22,7 @@ ERNIE-ViLG是一个知识增强跨模态图文生成大模型，将文生成图�
 本实验采用了以下的运行环境进行，详细说明如下，用户也可以在自己的环境进行：
 
 a. 软件环境：
-- python >= 3.7.0
+- python >= 3.7.3
 - paddlenlp >= 2.4.0
 - paddlepaddle-gpu >=2.3
 - CUDA Version: 10.2
@@ -44,6 +44,13 @@ cd ${HOME}/PaddleNLP/pipelines/
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 python setup.py install
 ```
+
+```
+# 下载pipelines源代码
+git clone https://github.com/PaddlePaddle/PaddleNLP.git
+cd PaddleNLP/pipelines
+```
+
 【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录；另外，文生图系统需要联网，用户需要在有网的环境下进行。
 
 
@@ -82,7 +89,7 @@ export PIPELINE_YAML_PATH=rest_api/pipeline/text_to_image.yaml
 # 使用端口号 8891 启动模型服务
 python rest_api/application.py 8891
 ```
-Linux 用户推荐采用 Shell 脚本来启动服务：：
+Linux 用户推荐采用 Shell 脚本来启动服务：
 
 ```bash
 sh examples/text_to_image/run_text_to_image.sh
@@ -101,7 +108,7 @@ export API_ENDPOINT=http://127.0.0.1:8891
 # 在指定端口 8502 启动 WebUI
 python ui/webapp_text_to_image.py --serving_port 8502
 ```
-Linux 用户推荐采用 Shell 脚本来启动服务：：
+Linux 用户推荐采用 Shell 脚本来启动服务：
 
 ```bash
 sh examples/text_to_image/run_text_to_image_web.sh

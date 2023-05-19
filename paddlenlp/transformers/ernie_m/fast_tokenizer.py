@@ -14,15 +14,13 @@
 # limitations under the License.
 
 import os
-import json
-from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 from shutil import copyfile
+from typing import List, Optional, Tuple, Union
 
-from fast_tokenizer import normalizers
-from ..tokenizer_utils_faster import PretrainedFastTokenizer
-from ..tokenizer_utils_base import TensorType, PaddingStrategy, TruncationStrategy
-from .tokenizer import ErnieMTokenizer
 from ...utils.log import logger
+from ..tokenizer_utils_base import PaddingStrategy, TensorType, TruncationStrategy
+from ..tokenizer_utils_fast import PretrainedFastTokenizer
+from .tokenizer import ErnieMTokenizer
 
 VOCAB_FILES_NAMES = {
     "sentencepiece_model_file": "sentencepiece.bpe.model",

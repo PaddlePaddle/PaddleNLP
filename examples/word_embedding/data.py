@@ -11,9 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import numpy as np
-from paddlenlp.data import JiebaTokenizer, Vocab
 import jieba
+import numpy as np
+
+from paddlenlp.data import JiebaTokenizer
 
 tokenizer = jieba
 
@@ -36,12 +37,12 @@ def load_vocab(vocab_file):
 
 
 def convert_tokens_to_ids(tokens, vocab):
-    """ Converts a token id (or a sequence of id) in a token string
-        (or a sequence of tokens), using the vocabulary.
+    """Converts a token id (or a sequence of id) in a token string
+    (or a sequence of tokens), using the vocabulary.
     """
 
     ids = []
-    unk_id = vocab.get('[UNK]', None)
+    unk_id = vocab.get("[UNK]", None)
     for token in tokens:
         wid = vocab.get(token, unk_id)
         if wid:
@@ -51,7 +52,7 @@ def convert_tokens_to_ids(tokens, vocab):
 
 def convert_example(example, vocab, unk_token_id=1, is_test=False):
     """
-    Builds model inputs from a sequence for sequence classification tasks. 
+    Builds model inputs from a sequence for sequence classification tasks.
     It use `jieba.cut` to tokenize text.
     Args:
         example(obj:`list[str]`): List of input data, containing text and label if it have label.
@@ -65,7 +66,7 @@ def convert_example(example, vocab, unk_token_id=1, is_test=False):
     """
 
     input_ids = []
-    for token in tokenizer.cut(example['text']):
+    for token in tokenizer.cut(example["text"]):
         token_id = vocab.get(token, unk_token_id)
         input_ids.append(token_id)
     valid_length = np.array([len(input_ids)])
@@ -82,9 +83,9 @@ def pad_texts_to_max_seq_len(texts, max_seq_len, pad_token_id=0):
     Padded the texts to the max sequence length if the length of text is lower than it.
     Unless it truncates the text.
     Args:
-        texts(obj:`list`): Texts which contrains a sequence of word ids.
+        texts(obj:`list`): Texts which contains a sequence of word ids.
         max_seq_len(obj:`int`): Max sequence length.
-        pad_token_id(obj:`int`, optinal, defaults to 0) : The pad token index.
+        pad_token_id(obj:`int`, optional, defaults to 0) : The pad token index.
     """
     for index, text in enumerate(texts):
         seq_len = len(text)
@@ -108,7 +109,7 @@ def preprocess_prediction_data(data, vocab):
     """
     examples = []
     for text in data:
-        tokens = " ".join(tokenizer.cut(text)).split(' ')
+        tokens = " ".join(tokenizer.cut(text)).split(" ")
         ids = convert_tokens_to_ids(tokens, vocab)
         examples.append([ids, len(ids)])
     return examples

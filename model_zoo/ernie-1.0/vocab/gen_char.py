@@ -36,7 +36,7 @@ s = time.time()
 data_len = 0
 for file_name in file_paths:
     print(f" > reading file {file_name}")
-    with open(file_name, 'r') as f:
+    with open(file_name, "r") as f:
         line = f.readline()
         while line:
             count += 1

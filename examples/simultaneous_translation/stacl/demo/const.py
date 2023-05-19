@@ -22,4 +22,4 @@ APPKEY = None
 DEV_PID = 15372
 
 # Do not modify: wss link
-URI = 'wss://vop.baidu.com/realtime_asr'
+URI = "wss://vop.baidu.com/realtime_asr"

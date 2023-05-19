@@ -12,39 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import traceback
 import logging
+import traceback
+
 import nvgpu
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(levelname)s: %(asctime)s %(filename)s'
-                    ' [%(funcName)s:%(lineno)d][%(process)d] %(message)s',
-                    datefmt='%m-%d %H:%M:%S',
-                    filename=None,
-                    filemode='a')
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(levelname)s: %(asctime)s %(filename)s" " [%(funcName)s:%(lineno)d][%(process)d] %(message)s",
+    datefmt="%m-%d %H:%M:%S",
+    filename=None,
+    filemode="a",
+)
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
+
     try:
-        arg_parser = ArgumentParser(
-            description="print available_gpu id, using nvgpu")
-        arg_parser.add_argument("-b",
-                                "--best",
-                                default=None,
-                                type=int,
-                                help="output best N")
+        arg_parser = ArgumentParser(description="print available_gpu id, using nvgpu")
+        arg_parser.add_argument("-b", "--best", default=None, type=int, help="output best N")
         args = arg_parser.parse_args()
 
         if args.best is not None:
-            gpus = sorted(nvgpu.gpu_info(),
-                          key=lambda x: (x['mem_used'], x['index']))
-            ids = [x['index'] for x in gpus]
-            print(','.join(ids[:args.best]))
+            gpus = sorted(nvgpu.gpu_info(), key=lambda x: (x["mem_used"], x["index"]))
+            ids = [x["index"] for x in gpus]
+            print(",".join(ids[: args.best]))
         else:
-            print(','.join(nvgpu.available_gpus()))
+            print(",".join(nvgpu.available_gpus()))
 
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         exit(-1)

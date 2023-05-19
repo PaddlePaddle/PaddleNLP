@@ -29,18 +29,17 @@ headers = {"Content-Type": "application/json"}
 
 if __name__ == "__main__":
     texts = [
-        '请问木竭胶囊能同高血压药、氨糖同时服吗？', '低压100*高压140*头涨，想吃点降压药。谢谢！', '脑穿通畸形易发人群有哪些',
-        '幼儿乱吃丙硫氧嘧啶片怎么办，我也不知道她吃了几片', '如果是可以降血糖的话,血糖值7点多的大概需要吃几个疗程?'
+        "请问木竭胶囊能同高血压药、氨糖同时服吗？",
+        "低压100*高压140*头涨，想吃点降压药。谢谢！",
+        "脑穿通畸形易发人群有哪些",
+        "幼儿乱吃丙硫氧嘧啶片怎么办，我也不知道她吃了几片",
+        "如果是可以降血糖的话,血糖值7点多的大概需要吃几个疗程?",
     ]
     data = {
-        'data': {
-            'text': texts,
+        "data": {
+            "text": texts,
         },
-        'parameters': {
-            'max_seq_len': args.max_seq_len,
-            'batch_size': args.batch_size,
-            'prob_limit': args.prob_limit
-        }
+        "parameters": {"max_seq_len": args.max_seq_len, "batch_size": args.batch_size, "prob_limit": args.prob_limit},
     }
     r = requests.post(url=url, headers=headers, data=json.dumps(data))
     print(r.text)

@@ -12,34 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import os
 import sys
-import argparse
 
-import numpy as np
 import paddle
+
 from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.transformers import ErnieCtmTokenizer
 
-sys.path.append('./')
+sys.path.append("./")
 
-from data import convert_example, create_dataloader, read_custom_data
-from utils import construct_dict_map, decode, search, find_topk
+from data import convert_example  # noqa: E402
+from utils import construct_dict_map, decode, find_topk, search  # noqa: E402
 
-# yapf: disable
+# fmt: off
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True, default="./export/", help="The directory to static model.")
 parser.add_argument("--data_dir", type=str, default="./data", help="The input data dir, should contain name_category_map.json.")
-parser.add_argument("--max_seq_len", type=int, default=64, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--max_seq_len", type=int, default=64, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", type=int, default=3, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 class Predictor(object):
-
     def __init__(self, model_dir, device):
         model_file = model_dir + "/inference.pdmodel"
         params_file = model_dir + "/inference.pdiparams"
@@ -65,37 +63,30 @@ class Predictor(object):
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
 
-        self.input_handles = [
-            self.predictor.get_input_handle(name)
-            for name in self.predictor.get_input_names()
-        ]
+        self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
 
-        self.output_handle = self.predictor.get_output_handle(
-            self.predictor.get_output_names()[0])
+        self.output_handle = self.predictor.get_output_handle(self.predictor.get_output_names()[0])
 
     def predict(self, data, tokenizer):
         examples = []
         for text in data:
             example = {"text": text}
             input_ids, token_type_ids, label_indices = convert_example(
-                example, tokenizer, max_seq_len=args.max_seq_len, is_test=True)
+                example, tokenizer, max_seq_len=args.max_seq_len, is_test=True
+            )
             examples.append((input_ids, token_type_ids, label_indices))
 
-        batches = [
-            examples[idx:idx + args.batch_size]
-            for idx in range(0, len(examples), args.batch_size)
-        ]
+        batches = [examples[idx : idx + args.batch_size] for idx in range(0, len(examples), args.batch_size)]
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
-                ),  # input_ids
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
-                ),  # token_type_ids
-            Stack(dtype='int64'),  # label_indices
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
+            Stack(dtype="int64"),  # label_indices
         ): fn(samples)
 
         name_dict, bk_tree, id_vocabs, vocab_ids = construct_dict_map(
-            tokenizer, os.path.join(args.data_dir, "name_category_map.json"))
+            tokenizer, os.path.join(args.data_dir, "name_category_map.json")
+        )
 
         all_scores_can = []
         all_preds_can = []
@@ -109,7 +100,7 @@ class Predictor(object):
             logits = self.output_handle.copy_to_cpu()
 
             for i, l in zip(label_indices, logits):
-                score = l[i[0]:i[-1] + 1, vocab_ids]
+                score = l[i[0] : i[-1] + 1, vocab_ids]
                 # Find topk candidates of scores and predicted indices.
                 score_can, pred_id_can = find_topk(score, k=4, axis=-1)
 
@@ -121,8 +112,8 @@ class Predictor(object):
         for i, d in enumerate(data):
             label = decode(pred_ids[i], id_vocabs)
             result = {
-                'text': d,
-                'label': label,
+                "text": d,
+                "label": label,
             }
             if label not in name_dict:
                 scores_can = all_scores_can[i]
@@ -132,13 +123,13 @@ class Predictor(object):
                 for labels in labels_can:
                     cls_label_can = decode(labels[0], id_vocabs)
                     if cls_label_can in name_dict:
-                        result['label'] = cls_label_can
+                        result["label"] = cls_label_can
                         break
                     else:
                         labels_can = bk_tree.search_similar_word(label)
-                        result['label'] = labels_can[0][0]
+                        result["label"] = labels_can[0][0]
 
-            result['category'] = name_dict[result['label']]
+            result["category"] = name_dict[result["label"]]
             results.append(result)
         return results
 
@@ -150,9 +141,9 @@ if __name__ == "__main__":
     tokenizer = ErnieCtmTokenizer.from_pretrained("nptag")
 
     data = [
-        '刘德华',
-        '快乐薯片',
-        '自适应共振理论映射',
+        "刘德华",
+        "快乐薯片",
+        "自适应共振理论映射",
     ]
 
     results = predictor.predict(data, tokenizer)

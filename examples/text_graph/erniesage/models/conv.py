@@ -18,7 +18,7 @@ import paddle.nn.functional as F
 
 
 class GraphSageConv(nn.Layer):
-    """ GraphSAGE is a general inductive framework that leverages node feature
+    """GraphSAGE is a general inductive framework that leverages node feature
     information (e.g., text attributes) to efficiently generate node embeddings
     for previously unseen data.
 
@@ -30,21 +30,22 @@ class GraphSageConv(nn.Layer):
 
     def __init__(self, input_size, hidden_size, learning_rate, aggr_func="sum"):
         super(GraphSageConv, self).__init__()
-        assert aggr_func in ["sum", "mean", "max", "min"], \
-            "Only support 'sum', 'mean', 'max', 'min' built-in receive function."
+        assert aggr_func in [
+            "sum",
+            "mean",
+            "max",
+            "min",
+        ], "Only support 'sum', 'mean', 'max', 'min' built-in receive function."
         self.aggr_func = "reduce_%s" % aggr_func
 
         self.self_linear = nn.Linear(
-            input_size,
-            hidden_size,
-            weight_attr=paddle.ParamAttr(learning_rate=learning_rate))
+            input_size, hidden_size, weight_attr=paddle.ParamAttr(learning_rate=learning_rate)
+        )
         self.neigh_linear = nn.Linear(
-            input_size,
-            hidden_size,
-            weight_attr=paddle.ParamAttr(learning_rate=learning_rate))
+            input_size, hidden_size, weight_attr=paddle.ParamAttr(learning_rate=learning_rate)
+        )
 
     def forward(self, graph, feature, act=None):
-
         def _send_func(src_feat, dst_feat, edge_feat):
             return {"msg": src_feat["h"]}
 
@@ -65,17 +66,11 @@ class GraphSageConv(nn.Layer):
 
 
 class ErnieSageV2Conv(nn.Layer):
-    """ ErnieSage (abbreviation of ERNIE SAmple aggreGatE), a model proposed by the PGL team.
+    """ErnieSage (abbreviation of ERNIE SAmple aggreGatE), a model proposed by the PGL team.
     ErnieSageV2: Ernie is applied to the EDGE of the text graph.
     """
 
-    def __init__(self,
-                 ernie,
-                 input_size,
-                 hidden_size,
-                 learning_rate,
-                 cls_token_id=1,
-                 aggr_func='sum'):
+    def __init__(self, ernie, input_size, hidden_size, learning_rate, cls_token_id=1, aggr_func="sum"):
         """ErnieSageV2: Ernie is applied to the EDGE of the text graph.
 
         Args:
@@ -86,23 +81,25 @@ class ErnieSageV2Conv(nn.Layer):
             aggr_func (str): aggregate function. 'sum', 'mean', 'max' avaliable.
         """
         super(ErnieSageV2Conv, self).__init__()
-        assert aggr_func in ["sum", "mean", "max", "min"], \
-            "Only support 'sum', 'mean', 'max', 'min' built-in receive function."
+        assert aggr_func in [
+            "sum",
+            "mean",
+            "max",
+            "min",
+        ], "Only support 'sum', 'mean', 'max', 'min' built-in receive function."
         self.aggr_func = "reduce_%s" % aggr_func
         self.cls_token_id = cls_token_id
         self.self_linear = nn.Linear(
-            input_size,
-            hidden_size,
-            weight_attr=paddle.ParamAttr(learning_rate=learning_rate))
+            input_size, hidden_size, weight_attr=paddle.ParamAttr(learning_rate=learning_rate)
+        )
         self.neigh_linear = nn.Linear(
-            input_size,
-            hidden_size,
-            weight_attr=paddle.ParamAttr(learning_rate=learning_rate))
+            input_size, hidden_size, weight_attr=paddle.ParamAttr(learning_rate=learning_rate)
+        )
 
         self.ernie = ernie
 
     def ernie_send(self, src_feat, dst_feat, edge_feat):
-        """ Apply ernie model on the edge.
+        """Apply ernie model on the edge.
 
         Args:
             src_feat (Tensor Dict): src feature tensor dict.
@@ -113,17 +110,13 @@ class ErnieSageV2Conv(nn.Layer):
             Tensor Dict: tensor dict which use 'msg' as the key.
         """
         # input_ids
-        cls = paddle.full(shape=[src_feat["term_ids"].shape[0], 1],
-                          dtype="int64",
-                          fill_value=self.cls_token_id)
+        cls = paddle.full(shape=[src_feat["term_ids"].shape[0], 1], dtype="int64", fill_value=self.cls_token_id)
         src_ids = paddle.concat([cls, src_feat["term_ids"]], 1)
 
         dst_ids = dst_feat["term_ids"]
 
         # sent_ids
-        sent_ids = paddle.concat(
-            [paddle.zeros_like(src_ids),
-             paddle.ones_like(dst_ids)], 1)
+        sent_ids = paddle.concat([paddle.zeros_like(src_ids), paddle.ones_like(dst_ids)], 1)
         term_ids = paddle.concat([src_ids, dst_ids], 1)
 
         # build position_ids
@@ -151,9 +144,7 @@ class ErnieSageV2Conv(nn.Layer):
         msg = graph.send(self.ernie_send, node_feat={"term_ids": term_ids})
         neigh_feature = graph.recv(reduce_func=_recv_func, msg=msg)
 
-        cls = paddle.full(shape=[term_ids.shape[0], 1],
-                          dtype="int64",
-                          fill_value=self.cls_token_id)
+        cls = paddle.full(shape=[term_ids.shape[0], 1], dtype="int64", fill_value=self.cls_token_id)
         term_ids = paddle.concat([cls, term_ids], 1)
         term_ids.stop_gradient = True
         outputs = self.ernie(term_ids, paddle.zeros_like(term_ids))
@@ -161,7 +152,7 @@ class ErnieSageV2Conv(nn.Layer):
 
         return self_feature, neigh_feature
 
-    def forward(self, graph, term_ids, act='relu'):
+    def forward(self, graph, term_ids, act="relu"):
         """Forward funciton of Conv layer.
 
         Args:

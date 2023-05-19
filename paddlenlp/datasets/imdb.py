@@ -13,18 +13,14 @@
 # limitations under the License.
 
 import collections
-import json
 import io
 import os
 
-import numpy as np
+from ..utils.downloader import get_path_from_url
+from ..utils.env import DATA_HOME
+from .dataset import DatasetBuilder
 
-from paddle.dataset.common import md5file
-from paddlenlp.utils.downloader import get_path_from_url
-from paddlenlp.utils.env import DATA_HOME
-from . import DatasetBuilder
-
-__all__ = ['Imdb']
+__all__ = ["Imdb"]
 
 
 class Imdb(DatasetBuilder):
@@ -35,12 +31,13 @@ class Imdb(DatasetBuilder):
     Implementation of `IMDB <https://www.imdb.com/interfaces/>`_ dataset.
 
     """
-    URL = 'https://bj.bcebos.com/dataset/imdb%2FaclImdb_v1.tar.gz'
-    MD5 = '7c2ac02c03563afcf9b574c7e56c153a'
-    META_INFO = collections.namedtuple('META_INFO', ('data_dir', 'md5'))
+
+    URL = "https://bj.bcebos.com/dataset/imdb%2FaclImdb_v1.tar.gz"
+    MD5 = "7c2ac02c03563afcf9b574c7e56c153a"
+    META_INFO = collections.namedtuple("META_INFO", ("data_dir", "md5"))
     SPLITS = {
-        'train': META_INFO(os.path.join('aclImdb', 'train'), None),
-        'test': META_INFO(os.path.join('aclImdb', 'test'), None),
+        "train": META_INFO(os.path.join("aclImdb", "train"), None),
+        "test": META_INFO(os.path.join("aclImdb", "test"), None),
     }
 
     def _get_data(self, mode, **kwargs):
@@ -49,7 +46,7 @@ class Imdb(DatasetBuilder):
         filename, _ = self.SPLITS[mode]
         data_dir = os.path.join(default_root, filename)
         if not os.path.exists(data_dir):
-            path = get_path_from_url(self.URL, default_root, self.MD5)
+            get_path_from_url(self.URL, default_root, self.MD5)
         return data_dir
 
     def _read(self, data_dir, *args):
@@ -64,7 +61,7 @@ class Imdb(DatasetBuilder):
                 label_id = "0"
             for f in data_files:
                 f = os.path.join(root, f)
-                with io.open(f, 'r', encoding='utf8') as fr:
+                with io.open(f, "r", encoding="utf8") as fr:
                     data = fr.readlines()
                     data = data[0]
                     yield {"text": data, "label": label_id}

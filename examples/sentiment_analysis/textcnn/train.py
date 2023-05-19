@@ -52,49 +52,38 @@ if __name__ == "__main__":
 
     # Load vocab.
     if not os.path.exists(args.vocab_path):
-        raise RuntimeError('The vocab_path  can not be found in the path %s' %
-                           args.vocab_path)
+        raise RuntimeError("The vocab_path  can not be found in the path %s" % args.vocab_path)
 
-    vocab = Vocab.load_vocabulary(args.vocab_path,
-                                  unk_token='[UNK]',
-                                  pad_token='[PAD]')
+    vocab = Vocab.load_vocabulary(args.vocab_path, unk_token="[UNK]", pad_token="[PAD]")
 
     # Load datasets.
-    dataset_names = ['train.tsv', 'dev.tsv', 'test.tsv']
-    train_ds, dev_ds, test_ds = [load_dataset(read_custom_data, \
-        filename=os.path.join(args.data_path, dataset_name), lazy=False) for dataset_name in dataset_names]
+    dataset_names = ["train.tsv", "dev.tsv", "test.tsv"]
+    train_ds, dev_ds, test_ds = [
+        load_dataset(read_custom_data, filename=os.path.join(args.data_path, dataset_name), lazy=False)
+        for dataset_name in dataset_names
+    ]
 
     tokenizer = JiebaTokenizer(vocab)
     trans_fn = partial(convert_example, tokenizer=tokenizer)
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=vocab.token_to_idx.get('[PAD]', 0)),
-        Stack(dtype='int64')  # label
+        Pad(axis=0, pad_val=vocab.token_to_idx.get("[PAD]", 0)), Stack(dtype="int64")  # label
     ): [data for data in fn(samples)]
-    train_loader = create_dataloader(train_ds,
-                                     batch_size=args.batch_size,
-                                     mode='train',
-                                     batchify_fn=batchify_fn,
-                                     trans_fn=trans_fn)
-    dev_loader = create_dataloader(dev_ds,
-                                   batch_size=args.batch_size,
-                                   mode='validation',
-                                   batchify_fn=batchify_fn,
-                                   trans_fn=trans_fn)
-    test_loader = create_dataloader(test_ds,
-                                    batch_size=args.batch_size,
-                                    mode='test',
-                                    batchify_fn=batchify_fn,
-                                    trans_fn=trans_fn)
+    train_loader = create_dataloader(
+        train_ds, batch_size=args.batch_size, mode="train", batchify_fn=batchify_fn, trans_fn=trans_fn
+    )
+    dev_loader = create_dataloader(
+        dev_ds, batch_size=args.batch_size, mode="validation", batchify_fn=batchify_fn, trans_fn=trans_fn
+    )
+    test_loader = create_dataloader(
+        test_ds, batch_size=args.batch_size, mode="test", batchify_fn=batchify_fn, trans_fn=trans_fn
+    )
 
-    label_map = {0: 'negative', 1: 'neutral', 2: 'positive'}
+    label_map = {0: "negative", 1: "neutral", 2: "positive"}
     vocab_size = len(vocab)
     num_classes = len(label_map)
-    pad_token_id = vocab.to_indices('[PAD]')
+    pad_token_id = vocab.to_indices("[PAD]")
 
-    model = TextCNNModel(vocab_size,
-                         num_classes,
-                         padding_idx=pad_token_id,
-                         ngram_filter_sizes=(1, 2, 3))
+    model = TextCNNModel(vocab_size, num_classes, padding_idx=pad_token_id, ngram_filter_sizes=(1, 2, 3))
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -102,8 +91,7 @@ if __name__ == "__main__":
 
     model = paddle.Model(model)
 
-    optimizer = paddle.optimizer.Adam(parameters=model.parameters(),
-                                      learning_rate=args.lr)
+    optimizer = paddle.optimizer.Adam(parameters=model.parameters(), learning_rate=args.lr)
 
     # Define loss and metric.
     criterion = paddle.nn.CrossEntropyLoss()
@@ -113,12 +101,8 @@ if __name__ == "__main__":
 
     # Start training and evaluating.
     callback = paddle.callbacks.ProgBarLogger(log_freq=10, verbose=3)
-    model.fit(train_loader,
-              dev_loader,
-              epochs=args.epochs,
-              save_dir=args.save_dir,
-              callbacks=callback)
+    model.fit(train_loader, dev_loader, epochs=args.epochs, save_dir=args.save_dir, callbacks=callback)
 
     # Evaluate on test dataset
-    print('Start to evaluate on test dataset...')
+    print("Start to evaluate on test dataset...")
     model.evaluate(test_loader, log_freq=len(test_loader))

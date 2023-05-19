@@ -26,7 +26,7 @@ class ParserEvaluator(Metric):
     LAS = number of words assigned correct head and relation / total words
     """
 
-    def __init__(self, name='ParserEvaluator', eps=1e-8):
+    def __init__(self, name="ParserEvaluator", eps=1e-8):
         super(ParserEvaluator, self).__init__()
 
         self.eps = eps
@@ -44,8 +44,7 @@ class ParserEvaluator(Metric):
     def update(self, arc_preds, rel_preds, arcs, rels, mask):
         select = paddle.nonzero(mask)
         arc_mask = paddle.gather_nd(arc_preds == arcs, select)
-        rel_mask = paddle.logical_and(
-            paddle.gather_nd(rel_preds == rels, select), arc_mask)
+        rel_mask = paddle.logical_and(paddle.gather_nd(rel_preds == rels, select), arc_mask)
 
         self.total += len(arc_mask)
         self.correct_arcs += np.sum(arc_mask.numpy()).item()

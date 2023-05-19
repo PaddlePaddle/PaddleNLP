@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 URLS = {
     "docprompt": [
         "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/docprompt/docprompt_params.tar",
-        "8eae8148981731f230b328076c5a08bf"
+        "8eae8148981731f230b328076c5a08bf",
     ],
 }
 
@@ -39,20 +39,23 @@ class DocPrompter(BaseComponent):
     """
     DocPrompter: extract prompt's answers from the document input.
     """
+
     return_no_answers: bool
     outgoing_edges = 1
     query_count = 0
     query_time = 0
 
-    def __init__(self,
-                 topn: int = 1,
-                 use_gpu: bool = True,
-                 task_path: str = None,
-                 model: str = "docprompt",
-                 device_id: int = 0,
-                 num_threads: int = None,
-                 lang: str = "ch",
-                 batch_size: int = 1):
+    def __init__(
+        self,
+        topn: int = 1,
+        use_gpu: bool = True,
+        task_path: str = None,
+        model: str = "docprompt",
+        device_id: int = 0,
+        num_threads: int = None,
+        lang: str = "ch",
+        batch_size: int = 1,
+    ):
         """
         Init Document Prompter.
         :param topn: return top n answers.
@@ -66,42 +69,35 @@ class DocPrompter(BaseComponent):
                            Memory consumption is much lower in inference mode. Recommendation: Increase the batch size
                            to a value so only a single batch is used.
         """
-        self._use_gpu = False if paddle.get_device() == 'cpu' else use_gpu
+        self._use_gpu = False if paddle.get_device() == "cpu" else use_gpu
         self.model = model
         self._device_id = device_id
-        self._num_threads = num_threads if num_threads else math.ceil(
-            cpu_count() / 2)
+        self._num_threads = num_threads if num_threads else math.ceil(cpu_count() / 2)
         self._topn = topn
         self._lang = lang
         self._batch_size = batch_size
         if task_path is None:
-            self._task_path = os.path.join(PPNLP_HOME, "pipelines",
-                                           "document_intelligence", self.model)
+            self._task_path = os.path.join(PPNLP_HOME, "pipelines", "document_intelligence", self.model)
         else:
             self._task_path = task_path
 
-        download_file(self._task_path, "docprompt_params.tar",
-                      URLS[self.model][0], URLS[self.model][1])
+        download_file(self._task_path, "docprompt_params.tar", URLS[self.model][0], URLS[self.model][1])
         self._get_inference_model()
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            "ernie-layoutx-base-uncased")
-        self._reader = ImageReader(super_rel_pos=False,
-                                   tokenizer=self._tokenizer)
+        self._tokenizer = AutoTokenizer.from_pretrained("ernie-layoutx-base-uncased")
+        self._reader = ImageReader(super_rel_pos=False, tokenizer=self._tokenizer)
 
     def _get_inference_model(self):
-        inference_model_path = os.path.join(self._task_path, "static",
-                                            "inference")
+        inference_model_path = os.path.join(self._task_path, "static", "inference")
         self._static_model_file = inference_model_path + ".pdmodel"
         self._static_params_file = inference_model_path + ".pdiparams"
-        self._config = paddle.inference.Config(self._static_model_file,
-                                               self._static_params_file)
+        self._config = paddle.inference.Config(self._static_model_file, self._static_params_file)
         self._prepare_static_mode()
 
     def _prepare_static_mode(self):
         """
-        Construct the input data and predictor in the PaddlePaddele static mode. 
+        Construct the input data and predictor in the PaddlePaddele static mode.
         """
-        if paddle.get_device() == 'cpu':
+        if paddle.get_device() == "cpu":
             self._config.disable_gpu()
             self._config.enable_mkldnn()
         else:
@@ -114,18 +110,12 @@ class DocPrompter(BaseComponent):
         self._config.switch_ir_optim(False)
         self.predictor = paddle.inference.create_predictor(self._config)
         self.input_names = [name for name in self.predictor.get_input_names()]
-        self.input_handles = [
-            self.predictor.get_input_handle(name)
-            for name in self.predictor.get_input_names()
-        ]
-        self.output_handle = [
-            self.predictor.get_output_handle(name)
-            for name in self.predictor.get_output_names()
-        ]
+        self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
+        self.output_handle = [self.predictor.get_output_handle(name) for name in self.predictor.get_output_names()]
 
     def _run_model(self, inputs: List[dict]):
         """
-        Run docprompt model. 
+        Run docprompt model.
         """
         all_predictions_list = []
         for example in inputs:
@@ -135,33 +125,21 @@ class DocPrompter(BaseComponent):
             ocr_type = example["ocr_type"]
 
             if not ocr_result:
-                all_predictions = [{
-                    "prompt":
-                    p,
-                    "result": [{
-                        'value': '',
-                        'prob': 0.0,
-                        'start': -1,
-                        'end': -1
-                    }]
-                } for p in prompt]
+                all_predictions = [
+                    {"prompt": p, "result": [{"value": "", "prob": 0.0, "start": -1, "end": -1}]} for p in prompt
+                ]
                 all_boxes = {}
             else:
-                data_loader = self._reader.data_generator(
-                    ocr_result, doc_path, prompt, self._batch_size, ocr_type)
+                data_loader = self._reader.data_generator(ocr_result, doc_path, prompt, self._batch_size, ocr_type)
 
-                RawResult = collections.namedtuple("RawResult",
-                                                   ["unique_id", "seq_logits"])
+                RawResult = collections.namedtuple("RawResult", ["unique_id", "seq_logits"])
 
                 all_results = []
                 for data in data_loader:
                     for idx in range(len(self.input_names)):
                         self.input_handles[idx].copy_from_cpu(data[idx])
                     self.predictor.run()
-                    outputs = [
-                        output_handle.copy_to_cpu()
-                        for output_handle in self.output_handle
-                    ]
+                    outputs = [output_handle.copy_to_cpu() for output_handle in self.output_handle]
                     unique_ids, seq_logits = outputs
 
                     for idx in range(len(unique_ids)):
@@ -169,7 +147,8 @@ class DocPrompter(BaseComponent):
                             RawResult(
                                 unique_id=int(unique_ids[idx]),
                                 seq_logits=seq_logits[idx],
-                            ))
+                            )
+                        )
 
                 all_examples = self._reader.examples["infer"]
                 all_features = self._reader.features["infer"]
@@ -205,25 +184,18 @@ class DocPrompter(BaseComponent):
                         # find preds
                         ans_pos = find_answer_pos(result.seq_logits, feature)
                         preds.extend(
-                            get_doc_pred(result, ans_pos, example,
-                                         self._tokenizer, feature, True,
-                                         all_key_probs, example_index))
+                            get_doc_pred(
+                                result, ans_pos, example, self._tokenizer, feature, True, all_key_probs, example_index
+                            )
+                        )
 
                     if not preds:
-                        preds.append({
-                            'value': '',
-                            'prob': 0.,
-                            'start': -1,
-                            'end': -1
-                        })
+                        preds.append({"value": "", "prob": 0.0, "start": -1, "end": -1})
                     else:
-                        preds = sort_res(example_query, preds,
-                                         example_doc_tokens, all_boxes[page_id],
-                                         self._lang)[:self._topn]
-                    all_predictions.append({
-                        "prompt": example_query,
-                        "result": preds
-                    })
+                        preds = sort_res(example_query, preds, example_doc_tokens, all_boxes[page_id], self._lang)[
+                            : self._topn
+                        ]
+                    all_predictions.append({"prompt": example_query, "result": preds})
             all_predictions_list.append(all_predictions)
         return all_predictions_list
 

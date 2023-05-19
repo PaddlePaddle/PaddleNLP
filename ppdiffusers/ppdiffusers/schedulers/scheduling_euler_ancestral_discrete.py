@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 Katherine Crowson and The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,20 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import BaseOutput, logging
-from .scheduling_utils import SchedulerMixin
+from ..utils import BaseOutput, logging, randn_tensor
+from .scheduling_utils import KarrasDiffusionSchedulers, SchedulerMixin
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 
 @dataclass
+# Copied from ppdiffusers.schedulers.scheduling_ddpm.DDPMSchedulerOutput with DDPM->EulerAncestralDiscrete
 class EulerAncestralDiscreteSchedulerOutput(BaseOutput):
     """
     Output class for the scheduler's step function output.
@@ -44,6 +46,36 @@ class EulerAncestralDiscreteSchedulerOutput(BaseOutput):
     pred_original_sample: Optional[paddle.Tensor] = None
 
 
+# Copied from ppdiffusers.schedulers.scheduling_ddpm.betas_for_alpha_bar
+def betas_for_alpha_bar(num_diffusion_timesteps, max_beta=0.999) -> paddle.Tensor:
+    """
+    Create a beta schedule that discretizes the given alpha_t_bar function, which defines the cumulative product of
+    (1-beta) over time from t = [0,1].
+
+    Contains a function alpha_bar that takes an argument t and transforms it to the cumulative product of (1-beta) up
+    to that part of the diffusion process.
+
+
+    Args:
+        num_diffusion_timesteps (`int`): the number of betas to produce.
+        max_beta (`float`): the maximum beta to use; use values lower than 1 to
+                     prevent singularities.
+
+    Returns:
+        betas (`np.ndarray`): the betas used by the scheduler to step the model outputs
+    """
+
+    def alpha_bar(time_step):
+        return math.cos((time_step + 0.008) / 1.008 * math.pi / 2) ** 2
+
+    betas = []
+    for i in range(num_diffusion_timesteps):
+        t1 = i / num_diffusion_timesteps
+        t2 = (i + 1) / num_diffusion_timesteps
+        betas.append(min(1 - alpha_bar(t2) / alpha_bar(t1), max_beta))
+    return paddle.to_tensor(betas, dtype=paddle.float32)
+
+
 class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
     """
     Ancestral sampling with Euler method steps. Based on the original k-diffusion implementation by Katherine Crowson:
@@ -51,8 +83,8 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
     [`~ConfigMixin`] takes care of storing all config attributes that are passed in the scheduler's `__init__`
     function, such as `num_train_timesteps`. They can be accessed via `scheduler.config.num_train_timesteps`.
-    [`~ConfigMixin`] also provides general loading and saving functionality via the [`~ConfigMixin.save_config`] and
-    [`~ConfigMixin.from_config`] functions.
+    [`SchedulerMixin`] provides general loading and saving functionality via the [`SchedulerMixin.save_pretrained`] and
+    [`~SchedulerMixin.from_pretrained`] functions.
 
     Args:
         num_train_timesteps (`int`): number of diffusion steps used to train the model.
@@ -63,17 +95,15 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
             `linear` or `scaled_linear`.
         trained_betas (`np.ndarray`, optional):
             option to pass an array of betas directly to the constructor to bypass `beta_start`, `beta_end` etc.
+        prediction_type (`str`, default `epsilon`, optional):
+            prediction type of the scheduler function, one of `epsilon` (predicting the noise of the diffusion
+            process), `sample` (directly predicting the noisy sample`) or `v_prediction` (see section 2.4
+            https://imagen.research.google/video/paper.pdf)
 
     """
 
-    _compatible_classes = [
-        "DDIMScheduler",
-        "DDPMScheduler",
-        "LMSDiscreteScheduler",
-        "PNDMScheduler",
-        "EulerDiscreteScheduler",
-        "DPMSolverMultistepScheduler",
-    ]
+    _compatibles = [e.name for e in KarrasDiffusionSchedulers]
+    order = 1
 
     @register_to_config
     def __init__(
@@ -82,15 +112,21 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         beta_start: float = 0.0001,
         beta_end: float = 0.02,
         beta_schedule: str = "linear",
-        trained_betas: Optional[np.ndarray] = None,
+        trained_betas: Optional[Union[np.ndarray, List[float]]] = None,
+        prediction_type: str = "epsilon",
     ):
         if trained_betas is not None:
-            self.betas = paddle.to_tensor(trained_betas)
+            self.betas = paddle.to_tensor(trained_betas, dtype=paddle.float32)
         elif beta_schedule == "linear":
-            self.betas = paddle.linspace(beta_start, beta_end, num_train_timesteps, dtype="float32")
+            self.betas = paddle.linspace(beta_start, beta_end, num_train_timesteps, dtype=paddle.float32)
         elif beta_schedule == "scaled_linear":
             # this schedule is very specific to the latent diffusion model.
-            self.betas = paddle.linspace(beta_start**0.5, beta_end**0.5, num_train_timesteps, dtype="float32") ** 2
+            self.betas = (
+                paddle.linspace(beta_start**0.5, beta_end**0.5, num_train_timesteps, dtype=paddle.float32) ** 2
+            )
+        elif beta_schedule == "squaredcos_cap_v2":
+            # Glide cosine schedule
+            self.betas = betas_for_alpha_bar(num_train_timesteps)
         else:
             raise NotImplementedError(f"{beta_schedule} does is not implemented for {self.__class__}")
 
@@ -107,7 +143,7 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         # setable values
         self.num_inference_steps = None
         timesteps = np.linspace(0, num_train_timesteps - 1, num_train_timesteps, dtype=float)[::-1].copy()
-        self.timesteps = paddle.to_tensor(timesteps)
+        self.timesteps = paddle.to_tensor(timesteps, dtype=paddle.float32)
         self.is_scale_input_called = False
 
     def scale_model_input(self, sample: paddle.Tensor, timestep: Union[float, paddle.Tensor]) -> paddle.Tensor:
@@ -142,13 +178,14 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         sigmas = np.interp(timesteps, np.arange(0, len(sigmas)), sigmas)
         sigmas = np.concatenate([sigmas, [0.0]]).astype(np.float32)
         self.sigmas = paddle.to_tensor(sigmas)
-        self.timesteps = paddle.to_tensor(timesteps)
+        self.timesteps = paddle.to_tensor(timesteps, dtype=paddle.float32)
 
     def step(
         self,
         model_output: paddle.Tensor,
         timestep: Union[float, paddle.Tensor],
         sample: paddle.Tensor,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         return_dict: bool = True,
     ) -> Union[EulerAncestralDiscreteSchedulerOutput, Tuple]:
         """
@@ -160,6 +197,7 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
             timestep (`float`): current timestep in the diffusion chain.
             sample (`paddle.Tensor`):
                 current instance of sample being created by diffusion process.
+            generator (`paddle.Generator`, optional): Random number generator.
             return_dict (`bool`): option for returning tuple rather than EulerAncestralDiscreteSchedulerOutput class
 
         Returns:
@@ -169,7 +207,7 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
         """
         if not self.is_scale_input_called:
-            logger.warn(
+            logger.warning(
                 "The `scale_model_input` function should be called before `step` to ensure correct denoising. "
                 "See `StableDiffusionPipeline` for a usage example."
             )
@@ -177,7 +215,18 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         sigma = self.sigmas[step_index]
 
         # 1. compute predicted original sample (x_0) from sigma-scaled predicted noise
-        pred_original_sample = sample - sigma * model_output
+        if self.config.prediction_type == "epsilon":
+            pred_original_sample = sample - sigma * model_output
+        elif self.config.prediction_type == "v_prediction":
+            # * c_out + input * c_skip
+            pred_original_sample = model_output * (-sigma / (sigma**2 + 1) ** 0.5) + (sample / (sigma**2 + 1))
+        elif self.config.prediction_type == "sample":
+            raise NotImplementedError("prediction_type not implemented yet: sample")
+        else:
+            raise ValueError(
+                f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, or `v_prediction`"
+            )
+
         sigma_from = self.sigmas[step_index]
         sigma_to = self.sigmas[step_index + 1]
         sigma_up = (sigma_to**2 * (sigma_from**2 - sigma_to**2) / sigma_from**2) ** 0.5
@@ -190,7 +239,7 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
         prev_sample = sample + derivative * dt
 
-        noise = paddle.randn(model_output.shape, dtype=model_output.dtype)
+        noise = randn_tensor(model_output.shape, dtype=model_output.dtype, generator=generator)
 
         prev_sample = prev_sample + noise * sigma_up
 
@@ -207,8 +256,8 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         noise: paddle.Tensor,
         timesteps: paddle.Tensor,
     ) -> paddle.Tensor:
-        # Make sure sigmas and timesteps have the same device and dtype as original_samples
-        self.sigmas = self.sigmas.astype(original_samples.dtype)
+        # Make sure sigmas and timesteps have the same dtype as original_samples
+        self.sigmas = self.sigmas.cast(original_samples.dtype)
 
         schedule_timesteps = self.timesteps
         step_indices = [(schedule_timesteps == t).nonzero().item() for t in timesteps]

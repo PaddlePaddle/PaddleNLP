@@ -16,8 +16,7 @@ import argparse
 import os
 
 import paddle
-
-from run_glue import MODEL_CLASSES
+from run_glue_trainer import MODEL_CLASSES
 
 
 def parse_args():
@@ -29,8 +28,7 @@ def parse_args():
         default=None,
         type=str,
         required=True,
-        help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()),
+        help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
     )
     parser.add_argument(
         "--model_path",
@@ -64,11 +62,10 @@ def main():
     model = paddle.jit.to_static(
         model,
         input_spec=[
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64")  # segment_ids
-        ])
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # segment_ids
+        ],
+    )
     # save converted static graph model
     paddle.jit.save(model, args.output_path)
     # also save tokenizer for inference usage

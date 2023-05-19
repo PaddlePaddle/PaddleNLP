@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import copy
 import math
+from functools import partial
 from typing import Optional, Tuple
 
 import numpy as np
@@ -23,9 +24,17 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
+from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
+try:
+    from paddle.amp.auto_cast import amp_state
+except ImportError:
+    from paddle.fluid.dygraph.amp.auto_cast import amp_state
+
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from ...utils.log import logger
+from ..activations import ACT2FN
 from ..model_outputs import (
     BaseModelOutput,
     BaseModelOutputWithPastAndCrossAttentions,
@@ -34,7 +43,6 @@ from ..model_outputs import (
     convert_encoder_output,
 )
 from ..model_utils import PretrainedModel, register_base_model
-from ..nezha.modeling import ACT2FN
 from .configuration import (
     T5_PRETRAINED_INIT_CONFIGURATION,
     T5_PRETRAINED_RESOURCE_FILES_MAP,
@@ -50,6 +58,18 @@ T5_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "t5-3b",
     "t5-11b",
 ]
+
+DATA_TYPE_MAP = {
+    paddle.int64: "int64",
+    paddle.int32: "int32",
+    paddle.float32: "float32",
+    paddle.float64: "float64",
+    paddle.float16: "float16",
+}
+
+
+def data_type_converter(tensor):
+    return DATA_TYPE_MAP[tensor.dtype]
 
 
 def finfo(dtype):
@@ -77,7 +97,7 @@ class T5LayerNorm(nn.Layer):
         hidden_states = hidden_states * paddle.rsqrt(variance + self.variance_epsilon)
 
         # convert into float16 if necessary
-        if self.weight.dtype == paddle.float16:
+        if amp_state() or self.weight.dtype == paddle.float16:
             hidden_states = hidden_states.astype(paddle.float16)
         return self.weight * hidden_states
 
@@ -89,8 +109,16 @@ class T5DenseReluDense(nn.Layer):
 
     def __init__(self, config: T5Config):
         super().__init__()
-        self.wi = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
-        self.wo = nn.Linear(config.d_ff, config.d_model, bias_attr=False)
+        if config.tensor_parallel_degree > 1:
+            self.wi = fleet.meta_parallel.ColumnParallelLinear(
+                config.d_model, config.d_ff, has_bias=False, gather_output=False
+            )
+            self.wo = fleet.meta_parallel.RowParallelLinear(
+                config.d_ff, config.d_model, input_is_parallel=True, has_bias=False
+            )
+        else:
+            self.wi = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
+            self.wo = nn.Linear(config.d_ff, config.d_model, bias_attr=False)
         self.dropout = nn.Dropout(config.dropout_rate)
 
     def forward(self, hidden_states):
@@ -108,9 +136,20 @@ class T5DenseGatedGeluDense(nn.Layer):
 
     def __init__(self, config: T5Config):
         super().__init__()
-        self.wi_0 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
-        self.wi_1 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
-        self.wo = nn.Linear(config.d_ff, config.d_model, bias_attr=False)
+        if config.tensor_parallel_degree > 1:
+            self.wi_0 = fleet.meta_parallel.ColumnParallelLinear(
+                config.d_model, config.d_ff, has_bias=False, gather_output=False
+            )
+            self.wi_1 = fleet.meta_parallel.ColumnParallelLinear(
+                config.d_model, config.d_ff, has_bias=False, gather_output=False
+            )
+            self.wo = fleet.meta_parallel.RowParallelLinear(
+                config.d_ff, config.d_model, input_is_parallel=True, has_bias=False
+            )
+        else:
+            self.wi_0 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
+            self.wi_1 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
+            self.wo = nn.Linear(config.d_ff, config.d_model, bias_attr=False)
         self.dropout = nn.Dropout(config.dropout_rate)
         self.gelu_act = ACT2FN["gelu_new"]
 
@@ -130,9 +169,20 @@ class T5DenseGatedSiluDense(nn.Layer):
 
     def __init__(self, config: T5Config):
         super().__init__()
-        self.wi_0 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
-        self.wi_1 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
-        self.wo = nn.Linear(config.d_ff, config.d_model, bias_attr=False)
+        if config.tensor_parallel_degree > 1:
+            self.wi_0 = fleet.meta_parallel.ColumnParallelLinear(
+                config.d_model, config.d_ff, has_bias=False, gather_output=False
+            )
+            self.wi_1 = fleet.meta_parallel.ColumnParallelLinear(
+                config.d_model, config.d_ff, has_bias=False, gather_output=False
+            )
+            self.wo = fleet.meta_parallel.RowParallelLinear(
+                config.d_ff, config.d_model, input_is_parallel=True, has_bias=False
+            )
+        else:
+            self.wi_0 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
+            self.wi_1 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
+            self.wo = nn.Linear(config.d_ff, config.d_model, bias_attr=False)
         self.dropout = nn.Dropout(config.dropout_rate)
 
     def forward(self, hidden_states):
@@ -181,10 +231,27 @@ class T5Attention(nn.Layer):
         self.enable_recompute = False
 
         # Mesh TensorFlow initialization to avoid scaling before softmax
-        self.q = nn.Linear(self.d_model, self.inner_dim, bias_attr=False)
-        self.k = nn.Linear(self.d_model, self.inner_dim, bias_attr=False)
-        self.v = nn.Linear(self.d_model, self.inner_dim, bias_attr=False)
-        self.o = nn.Linear(self.inner_dim, self.d_model, bias_attr=False)
+        if config.tensor_parallel_degree > 1:
+            assert self.n_heads % config.tensor_parallel_degree == 0
+            self.q = fleet.meta_parallel.ColumnParallelLinear(
+                self.d_model, self.inner_dim, has_bias=False, gather_output=False
+            )
+            self.k = fleet.meta_parallel.ColumnParallelLinear(
+                self.d_model, self.inner_dim, has_bias=False, gather_output=False
+            )
+            self.v = fleet.meta_parallel.ColumnParallelLinear(
+                self.d_model, self.inner_dim, has_bias=False, gather_output=False
+            )
+            self.o = fleet.meta_parallel.RowParallelLinear(
+                self.inner_dim, self.d_model, has_bias=False, input_is_parallel=True
+            )
+            self.n_heads = self.n_heads // config.tensor_parallel_degree
+            self.inner_dim = self.inner_dim // config.tensor_parallel_degree
+        else:
+            self.q = nn.Linear(self.d_model, self.inner_dim, bias_attr=False)
+            self.k = nn.Linear(self.d_model, self.inner_dim, bias_attr=False)
+            self.v = nn.Linear(self.d_model, self.inner_dim, bias_attr=False)
+            self.o = nn.Linear(self.inner_dim, self.d_model, bias_attr=False)
 
         if self.has_relative_attention_bias:
             self.relative_attention_bias = nn.Embedding(self.relative_attention_num_buckets, self.n_heads)
@@ -270,15 +337,15 @@ class T5Attention(nn.Layer):
         # Input is (batch_size, seq_length, dim)
         # Mask is (batch_size, key_length) (non-causal) or (batch_size, key_length, key_length)
         # cache[0] is (batch_size, n_heads, q_len - 1, dim_per_head)
-        batch_size, seq_length = hidden_states.shape[:2]
+        batch_size, seq_length = paddle.shape(hidden_states)[:2]
 
         real_seq_length = seq_length
 
         if cache is not None:
             assert len(cache) == 2, f"cache should have 2 past states: keys and values. Got { len(cache)} past states"
-            real_seq_length += cache[0].shape[2] if query_length is None else query_length
+            real_seq_length += paddle.shape(cache[0])[2] if query_length is None else query_length
 
-        key_length = real_seq_length if key_value_states is None else key_value_states.shape[1]
+        key_length = real_seq_length if key_value_states is None else paddle.shape(key_value_states)[1]
 
         def shape(states):
             """projection"""
@@ -345,7 +412,7 @@ class T5Attention(nn.Layer):
             # if key and values are already calculated
             # we want only the last query position bias
             if cache is not None:
-                position_bias = position_bias[:, :, -hidden_states.shape[1] :, :]
+                position_bias = position_bias[:, :, -paddle.shape(hidden_states)[1] :, :]
 
             if mask is not None:
                 position_bias = position_bias + mask  # (batch_size, n_heads, seq_length, key_length)
@@ -359,6 +426,7 @@ class T5Attention(nn.Layer):
         )  # (batch_size, n_heads, seq_length, key_length)
 
         attn_output = unshape(paddle.matmul(attn_weights, value_states))  # (batch_size, seq_length, dim)
+
         attn_output = self.o(attn_output)
 
         present_key_value_state = (key_states, value_states) if (self.is_decoder and use_cache) else None
@@ -386,6 +454,7 @@ class T5LayerSelfAttention(nn.Layer):
         output_attentions=False,
     ):
         normed_hidden_states = self.layer_norm(hidden_states)
+
         attention_output = self.SelfAttention(
             normed_hidden_states,
             mask=attention_mask,
@@ -418,6 +487,7 @@ class T5LayerCrossAttention(nn.Layer):
         output_attentions=False,
     ):
         normed_hidden_states = self.layer_norm(hidden_states)
+
         attention_output = self.EncDecAttention(
             normed_hidden_states,
             mask=attention_mask,
@@ -486,7 +556,7 @@ class T5Block(nn.Layer):
         attention_outputs = self_attention_outputs[2:]  # Keep self-attention outputs and relative position weights
 
         # clamp inf values to enable fp16 training
-        if hidden_states.dtype == paddle.float16 and paddle.isinf(hidden_states).any():
+        if (amp_state() or hidden_states.dtype == paddle.float16) and paddle.isinf(hidden_states).any():
             # TODO finfo
             clamp_value = finfo(hidden_states.dtype).max - 1000
             hidden_states = paddle.clip(hidden_states, min=-clamp_value, max=clamp_value)
@@ -496,7 +566,7 @@ class T5Block(nn.Layer):
             # the actual query length is unknown for cross attention
             # if using past key value states. Need to inject it here
             if present_key_value_state is not None:
-                query_length = present_key_value_state[0].shape[2]
+                query_length = paddle.shape(present_key_value_state[0])[2]
             else:
                 query_length = None
 
@@ -513,7 +583,7 @@ class T5Block(nn.Layer):
             hidden_states = cross_attention_outputs[0]
 
             # clamp inf values to enable fp16 training
-            if hidden_states.dtype == paddle.float16 and paddle.isinf(hidden_states).any():
+            if (amp_state() or hidden_states.dtype == paddle.float16) and paddle.isinf(hidden_states).any():
                 clamp_value = finfo(hidden_states.dtype).max - 1000
                 hidden_states = paddle.clip(hidden_states, min=-clamp_value, max=clamp_value)
 
@@ -528,7 +598,7 @@ class T5Block(nn.Layer):
         hidden_states = self.layer[-1](hidden_states)
 
         # clamp inf values to enable fp16 training
-        if hidden_states.dtype == paddle.float16 and paddle.isinf(hidden_states).any():
+        if (amp_state() or hidden_states.dtype == paddle.float16) and paddle.isinf(hidden_states).any():
             clamp_value = finfo(hidden_states.dtype).max - 1000
             hidden_states = paddle.clip(hidden_states, min=-clamp_value, max=clamp_value)
 
@@ -556,12 +626,173 @@ class T5PretrainedModel(PretrainedModel):
     pretrained_init_configuration = T5_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = T5_PRETRAINED_RESOURCE_FILES_MAP
 
+    @classmethod
+    def _get_tensor_parallel_mappings(cls, config, is_split=True):
+        # paddle tensor parallel
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+
+        fn = split_or_merge_func(
+            is_split=is_split,
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_rank=config.tensor_parallel_rank,
+            num_attention_heads=config.num_heads,
+        )
+
+        def get_tensor_parallel_split_mappings(num_layers):
+            final_actions = {}
+            base_actions = {
+                # Column Linear
+                "encoder.block.0.layer.0.SelfAttention.q.weight": partial(fn, is_column=True),
+                "encoder.block.0.layer.0.SelfAttention.k.weight": partial(fn, is_column=True),
+                "encoder.block.0.layer.0.SelfAttention.v.weight": partial(fn, is_column=True),
+                "decoder.block.0.layer.0.SelfAttention.q.weight": partial(fn, is_column=True),
+                "decoder.block.0.layer.0.SelfAttention.k.weight": partial(fn, is_column=True),
+                "decoder.block.0.layer.0.SelfAttention.v.weight": partial(fn, is_column=True),
+                # Row Linear
+                "encoder.block.0.layer.0.SelfAttention.o.weight": partial(fn, is_column=False),
+                "decoder.block.0.layer.0.SelfAttention.o.weight": partial(fn, is_column=False),
+                "encoder.block.0.layer.1.DenseReluDense.wo.weight": partial(fn, is_column=False),
+                "decoder.block.0.layer.2.DenseReluDense.wo.weight": partial(fn, is_column=False),
+                "shared.weight": partial(fn, is_column=False),
+            }
+            # mv T5LayerCrossAttention here
+            base_actions["decoder.block.0.layer.1.EncDecAttention.q.weight"] = partial(fn, is_column=True)
+            base_actions["decoder.block.0.layer.1.EncDecAttention.k.weight"] = partial(fn, is_column=True)
+            base_actions["decoder.block.0.layer.1.EncDecAttention.v.weight"] = partial(fn, is_column=True)
+            base_actions["decoder.block.0.layer.1.EncDecAttention.o.weight"] = partial(fn, is_column=False)
+
+            if config.feed_forward_proj == "relu":
+                base_actions["encoder.block.0.layer.1.DenseReluDense.wi.weight"] = partial(fn, is_column=True)
+                base_actions["decoder.block.0.layer.2.DenseReluDense.wi.weight"] = partial(fn, is_column=True)
+            elif config.feed_forward_proj == "gated-gelu":
+                for i in range(2):
+                    base_actions[f"encoder.block.0.layer.1.DenseReluDense.wi_{i}.weight"] = partial(fn, is_column=True)
+                    base_actions[f"decoder.block.0.layer.2.DenseReluDense.wi_{i}.weight"] = partial(fn, is_column=True)
+
+            final_actions["encoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight"] = partial(
+                fn, is_column=True
+            )
+            final_actions["decoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight"] = partial(
+                fn, is_column=True
+            )
+
+            for key, action in base_actions.items():
+                if "block.0." in key:
+                    for i in range(num_layers):
+                        final_actions[key.replace("block.0.", f"block.{i}.")] = action
+                final_actions[key] = action
+
+            return final_actions
+
+        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+
+        return mappings
+
+    @classmethod
+    def _get_name_mappings(cls, config: T5Config) -> list[StateDictNameMapping]:
+        # from pytorch to paddle
+        mappings: list[StateDictNameMapping] = []
+        model_mappings = [
+            "shared.weight",
+            "encoder.embed_tokens.weight",
+            "encoder.final_layer_norm.weight",
+            "decoder.embed_tokens.weight",
+            "decoder.final_layer_norm.weight",
+            "encoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight",
+            "decoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight",
+        ]
+        for layer_index in range(config.num_hidden_layers):
+            for att_head in ["q", "k", "v", "o"]:
+                model_mappings.extend(
+                    [
+                        [
+                            f"encoder.block.{layer_index}.layer.0.SelfAttention.{att_head}.weight",
+                            None,
+                            "transpose",
+                        ],
+                        [
+                            f"decoder.block.{layer_index}.layer.0.SelfAttention.{att_head}.weight",
+                            None,
+                            "transpose",
+                        ],
+                        [
+                            f"decoder.block.{layer_index}.layer.1.EncDecAttention.{att_head}.weight",
+                            None,
+                            "transpose",
+                        ],
+                    ]
+                )
+
+            layer_mappings = [
+                [
+                    f"encoder.block.{layer_index}.layer.1.DenseReluDense.wo.weight",
+                    None,
+                    "transpose",
+                ],
+                [
+                    f"decoder.block.{layer_index}.layer.2.DenseReluDense.wo.weight",
+                    None,
+                    "transpose",
+                ],
+                f"encoder.block.{layer_index}.layer.0.layer_norm.weight",
+                f"encoder.block.{layer_index}.layer.1.layer_norm.weight",
+                f"decoder.block.{layer_index}.layer.0.layer_norm.weight",
+                f"decoder.block.{layer_index}.layer.1.layer_norm.weight",
+                f"decoder.block.{layer_index}.layer.2.layer_norm.weight",
+            ]
+
+            if config.feed_forward_proj == "relu":
+                layer_mappings.extend(
+                    [
+                        [
+                            f"encoder.block.{layer_index}.layer.1.DenseReluDense.wi.weight",
+                            None,
+                            "transpose",
+                        ],
+                        [
+                            f"decoder.block.{layer_index}.layer.2.DenseReluDense.wi.weight",
+                            None,
+                            "transpose",
+                        ],
+                    ]
+                )
+            elif config.feed_forward_proj == "gated-gelu":
+                for i in range(2):
+                    layer_mappings.extend(
+                        [
+                            [
+                                f"encoder.block.{layer_index}.layer.1.DenseReluDense.wi_{i}.weight",
+                                None,
+                                "transpose",
+                            ],
+                            [
+                                f"decoder.block.{layer_index}.layer.2.DenseReluDense.wi_{i}.weight",
+                                None,
+                                "transpose",
+                            ],
+                        ]
+                    )
+
+            model_mappings.extend(layer_mappings)
+
+        init_name_mappings(model_mappings)
+
+        if cls.__name__ != "T5Model":
+            for mapping in model_mappings:
+                mapping[1] = "t5." + mapping[1]
+
+        if config.architectures is not None and "T5ForConditionalGeneration" in config.architectures:
+            model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
+
+        mappings = [StateDictNameMapping(*mapping) for mapping in model_mappings]
+        return mappings
+
     @property
     def dummy_inputs(self):
         DUMMY_INPUTS = [[7, 6, 0, 0, 1], [1, 2, 3, 0, 0], [0, 0, 0, 4, 5]]
         DUMMY_MASK = [[1, 1, 1, 1, 1], [1, 1, 1, 0, 0], [0, 0, 0, 1, 1]]
-        input_ids = paddle.to_tensor(DUMMY_INPUTS, dtype=paddle.int64)
-        input_mask = paddle.to_tensor(DUMMY_MASK, dtype=paddle.int64)
+        input_ids = paddle.assign(np.asarray(DUMMY_INPUTS, dtype="int64"))
+        input_mask = paddle.assign(np.asarray(DUMMY_MASK, dtype="int64"))
         dummy_inputs = {
             "decoder_input_ids": input_ids,
             "input_ids": input_ids,
@@ -569,22 +800,14 @@ class T5PretrainedModel(PretrainedModel):
         }
         return dummy_inputs
 
-    def init_weights(self):
-        """
-        Initializes and tie weights if needed.
-        """
-        # Initialize weights
-        self.apply(self._init_weights)
-
     def _init_weights(self, layer):
         """Initialize the weights"""
-        factor = (
-            self.initializer_factor if hasattr(self, "initializer_factor") else self.t5.config["initializer_factor"]
-        )  # Used for testing weights initialization
-        d_model = self.d_model if hasattr(self, "d_model") else self.t5.config["d_model"]
-        d_ff = self.d_ff if hasattr(self, "d_ff") else self.t5.config["d_ff"]
-        n_heads = self.num_heads if hasattr(self, "num_heads") else self.t5.config["num_heads"]
-        key_value_proj_dim = self.d_kv if hasattr(self, "d_kv") else self.t5.config["d_kv"]
+        # Used for testing weights initialization
+        factor = self.config.initializer_factor
+        d_model = self.config.d_model
+        d_ff = self.config.d_ff
+        n_heads = self.config.num_heads
+        key_value_proj_dim = self.config.d_kv
 
         if isinstance(layer, T5LayerNorm):
             layer.weight.set_value(paddle.ones_like(layer.weight) * factor)
@@ -666,8 +889,8 @@ class T5PretrainedModel(PretrainedModel):
                 )
 
     def _shift_right(self, input_ids):
-        bos_token_id = self.bos_token_id if hasattr(self, "bos_token_id") else self.t5.config["bos_token_id"]
-        pad_token_id = self.pad_token_id if hasattr(self, "pad_token_id") else self.t5.config["pad_token_id"]
+        bos_token_id = self.config.bos_token_id
+        pad_token_id = self.config.pad_token_id
 
         assert (
             bos_token_id is not None
@@ -681,7 +904,9 @@ class T5PretrainedModel(PretrainedModel):
         assert pad_token_id is not None, "pad_token_id has to be defined."
         # replace possible -100 values in labels by `pad_token_id`
         shifted_input_ids = paddle.where(
-            shifted_input_ids == -100, paddle.to_tensor(pad_token_id, dtype=shifted_input_ids.dtype), shifted_input_ids
+            shifted_input_ids == -100,
+            paddle.assign(np.asarray(pad_token_id, dtype=data_type_converter(shifted_input_ids)).reshape([1])),
+            shifted_input_ids,
         )
 
         assert paddle.all(shifted_input_ids >= 0), "Verify that `shifted_input_ids` has only positive values"
@@ -689,9 +914,9 @@ class T5PretrainedModel(PretrainedModel):
         return shifted_input_ids
 
 
-class T5Stack(nn.Layer):
+class T5Stack(T5PretrainedModel):
     def __init__(self, config: T5Config, embed_tokens: Optional[nn.Embedding] = None):
-        super().__init__()
+        super().__init__(config)
         self.is_decoder = config.is_decoder
         self.embed_tokens = embed_tokens
         self.block = nn.LayerList(
@@ -711,6 +936,38 @@ class T5Stack(nn.Layer):
     def dtype(self):
         return self.embed_tokens.weight.dtype
 
+    @paddle.jit.not_to_static
+    def recompute_training(
+        self,
+        layer_module,
+        hidden_states,
+        extended_attention_mask,
+        position_bias,
+        encoder_hidden_states,
+        encoder_extended_attention_mask,
+        encoder_decoder_position_bias,
+        use_cache,
+        output_attentions,
+    ):
+        def create_custom_forward(module):
+            def custom_forward(*inputs):
+                return tuple(module(*inputs, use_cache, output_attentions))
+
+            return custom_forward
+
+        layer_outputs = recompute(
+            create_custom_forward(layer_module),
+            hidden_states,
+            extended_attention_mask,
+            position_bias,
+            encoder_hidden_states,
+            encoder_extended_attention_mask,
+            encoder_decoder_position_bias,
+            None,
+        )
+
+        return layer_outputs
+
     def forward(
         self,
         input_ids=None,
@@ -723,6 +980,7 @@ class T5Stack(nn.Layer):
         output_attentions=False,
         output_hidden_states=False,
         return_dict=False,
+        **model_kwargs
     ):
 
         if input_ids is not None and inputs_embeds is not None:
@@ -731,10 +989,10 @@ class T5Stack(nn.Layer):
                 f"You cannot specify both {err_msg_prefix}input_ids and {err_msg_prefix}inputs_embeds at the same time"
             )
         elif input_ids is not None:
-            input_shape = input_ids.shape
-            input_ids = input_ids.reshape(shape=[-1, input_shape[-1]])
+            input_shape = paddle.shape(input_ids)
+            # input_ids = input_ids.reshape(shape=[-1, input_shape[-1]])
         elif inputs_embeds is not None:
-            input_shape = inputs_embeds.shape[:-1]
+            input_shape = paddle.shape(inputs_embeds)[:-1]
         else:
             err_msg_prefix = "decoder_" if self.is_decoder else ""
             raise ValueError(f"You have to specify either {err_msg_prefix}input_ids or {err_msg_prefix}inputs_embeds")
@@ -746,15 +1004,15 @@ class T5Stack(nn.Layer):
         batch_size, seq_length = input_shape
 
         # required mask seq length can be calculated via length of past
-        mask_seq_length = cache[0][0].shape[2] + seq_length if cache is not None else seq_length
+        mask_seq_length = paddle.shape(cache[0][0])[2] + seq_length if cache is not None else seq_length
 
         if use_cache is True:
-            assert self.is_decoder, f"`use_cache` can only be set to `True` if {self} is used as a decoder"
+            assert self.is_decoder, f"`use_cache` can only be set to `True` if {self.__class__} is used as a decoder"
 
         if attention_mask is None:
             attention_mask = paddle.ones(shape=[batch_size, mask_seq_length])
         if self.is_decoder and encoder_attention_mask is None and encoder_hidden_states is not None:
-            encoder_seq_length = encoder_hidden_states.shape[1]
+            encoder_seq_length = paddle.shape(encoder_hidden_states)[1]
             encoder_attention_mask = paddle.ones([batch_size, encoder_seq_length], dtype=paddle.int64)
 
         # initialize caches with `None` if past does not exist
@@ -768,7 +1026,7 @@ class T5Stack(nn.Layer):
         # If a 2D or 3D attention mask is provided for the cross-attention
         # we need to make broadcastable to [batch_size, num_heads, seq_length, seq_length]
         if self.is_decoder and encoder_hidden_states is not None:
-            encoder_batch_size, encoder_sequence_length, _ = encoder_hidden_states.shape
+            encoder_batch_size, encoder_sequence_length, _ = paddle.shape(encoder_hidden_states)
             encoder_hidden_shape = (encoder_batch_size, encoder_sequence_length)
             if encoder_attention_mask is None:
                 encoder_attention_mask = paddle.ones(shape=encoder_hidden_shape)
@@ -798,21 +1056,16 @@ class T5Stack(nn.Layer):
                     )
                     use_cache = False
 
-                def create_custom_forward(module):
-                    def custom_forward(*inputs):
-                        return tuple(module(*inputs, use_cache, output_attentions))
-
-                    return custom_forward
-
-                layer_outputs = recompute(
-                    create_custom_forward(layer_module),
+                layer_outputs = self.recompute_training(
+                    layer_module,
                     hidden_states,
                     extended_attention_mask,
                     position_bias,
                     encoder_hidden_states,
                     encoder_extended_attention_mask,
                     encoder_decoder_position_bias,
-                    None,
+                    use_cache,
+                    output_attentions,
                 )
             else:
                 layer_outputs = layer_module(
@@ -953,7 +1206,7 @@ class T5Stack(nn.Layer):
             encoder_extended_attention_mask = encoder_attention_mask.unsqueeze([1, 2])
         encoder_extended_attention_mask = encoder_extended_attention_mask.astype(self.dtype)  # fp16 compatibility
 
-        if self.dtype == paddle.float16:
+        if amp_state() or self.dtype == paddle.float16:
             encoder_extended_attention_mask = (1.0 - encoder_extended_attention_mask) * -1e4
         elif self.dtype == paddle.float32:
             encoder_extended_attention_mask = (1.0 - encoder_extended_attention_mask) * -1e4
@@ -996,7 +1249,14 @@ class T5Model(T5PretrainedModel):
         self.d_kv = config.d_kv
         self.d_ff = config.d_ff
         self.tie_word_embeddings = config.tie_word_embeddings
-        self.shared = nn.Embedding(config.vocab_size, config.d_model)
+        if config.tensor_parallel_degree > 1:
+            self.shared = fleet.meta_parallel.VocabParallelEmbedding(
+                config.vocab_size,
+                config.d_model,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+            )
+        else:
+            self.shared = nn.Embedding(config.vocab_size, config.d_model)
         encoder_config = copy.deepcopy(config)
         encoder_config.is_decoder = False
         encoder_config.use_cache = False
@@ -1008,8 +1268,6 @@ class T5Model(T5PretrainedModel):
         decoder_config.is_encoder_decoder = False
         decoder_config.num_layers = config.num_decoder_layers
         self.decoder = T5Stack(decoder_config, self.shared)
-
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.shared
@@ -1238,10 +1496,14 @@ class T5ForConditionalGeneration(T5PretrainedModel):
     def __init__(self, config: T5Config):
         super().__init__(config)
         self.t5 = T5Model(config)
-        if not self.t5.config["tie_word_embeddings"]:
-            self.lm_head = nn.Linear(self.t5.config["d_model"], self.t5.config["vocab_size"], bias_attr=False)
 
-        self.init_weights()
+        if not config.tie_word_embeddings:
+            if config.tensor_parallel_degree > 1:
+                self.lm_head = nn.Linear(
+                    config.d_model, config.vocab_size // config.tensor_parallel_degree, bias_attr=False
+                )
+            else:
+                self.lm_head = nn.Linear(config.d_model, config.vocab_size, bias_attr=False)
 
     def get_input_embeddings(self):
         return self.t5.shared
@@ -1385,6 +1647,8 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 logits = output[1]
 
         """
+
+        input_type = type(decoder_input_ids) if decoder_input_ids is not None else type(decoder_inputs_embeds)
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         # Encode if needed (training, first prediction pass)
@@ -1399,7 +1663,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 return_dict=return_dict,
             )
         else:
-            if isinstance(encoder_output, type(decoder_input_ids)):
+            if isinstance(encoder_output, input_type):
                 encoder_output = (encoder_output,)
             if return_dict and not isinstance(encoder_output, BaseModelOutput):
                 encoder_output = convert_encoder_output(encoder_output)
@@ -1417,6 +1681,17 @@ class T5ForConditionalGeneration(T5PretrainedModel):
             if decoder_input_ids is not None:
                 decoder_input_ids = decoder_input_ids[:, -1:]
 
+        encoder_attention_mask = attention_mask
+        if attention_mask is not None:
+            if attention_mask.ndim == 4:
+                encoder_attention_mask = attention_mask[:, :, -1:, :]
+            elif attention_mask.ndim == 3:
+                encoder_attention_mask = attention_mask[:, -1:, :].unsqueeze([1])
+            elif attention_mask.ndim == 2:
+                encoder_attention_mask = attention_mask.unsqueeze([1, 2])
+            else:
+                raise ValueError("Invalid attention mask shape. ")
+
         # Decode
         decoder_outputs = self.t5.decoder(
             input_ids=decoder_input_ids,
@@ -1424,7 +1699,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
             inputs_embeds=decoder_inputs_embeds,
             cache=cache,
             encoder_hidden_states=hidden_states,
-            encoder_attention_mask=attention_mask,
+            encoder_attention_mask=encoder_attention_mask,
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
@@ -1462,6 +1737,25 @@ class T5ForConditionalGeneration(T5PretrainedModel):
             encoder_attentions=encoder_output.attentions,
         )
 
+    def prepare_fast_entry(self, kwargs):
+        from paddlenlp.ops import FasterT5
+
+        use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
+        decode_strategy = kwargs.get("decode_strategy")
+        if decode_strategy == "sampling" and kwargs.get("top_k") != 0 and kwargs.get("top_p") != 1:
+            raise AttributeError(
+                "Only topk sampling or topp sampling are supported. "
+                "Topk sampling and topp sampling cannot be both applied in the fast version."
+            )
+        if kwargs["repetition_penalty"] != 1.0:
+            # not support for repetition_penalty yet in the fast version
+            raise AttributeError("'repetition_penalty != 1' is not supported yet in the fast version")
+        if kwargs["forced_bos_token_id"] is not None:
+            # not support for min_length yet in the fast version
+            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the fast version")
+        self._fast_entry = FasterT5(self, use_fp16_decoding=use_fp16_decoding).forward
+        return self._fast_entry
+
     @staticmethod
     def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
         batch_size = 1
@@ -1480,6 +1774,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
         # cut decoder_input_ids if past is used
         if cache is not None:
             input_ids = input_ids[:, -1:]
+
         return {
             "decoder_input_ids": input_ids,
             "cache": cache,
@@ -1487,6 +1782,9 @@ class T5ForConditionalGeneration(T5PretrainedModel):
             "attention_mask": attention_mask,
             "use_cache": use_cache,
         }
+
+    def prepare_decoder_input_ids_from_labels(self, labels: paddle.Tensor):
+        return self._shift_right(labels)
 
     @staticmethod
     def expand_inputs_for_generation(input_ids, expand_size, attention_mask=None, **model_kwargs):
@@ -1533,14 +1831,8 @@ class T5ForConditionalGeneration(T5PretrainedModel):
     def __getattr__(self, name):
         try:
             return super().__getattr__(name)
-        except AttributeError as e:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                try:
-                    return getattr(self, self.base_model_prefix).config[name]
-                except KeyError:
-                    raise e
+        except AttributeError:
+            return getattr(getattr(self, self.base_model_prefix), name)
 
 
 class T5EncoderModel(T5PretrainedModel):
@@ -1554,9 +1846,6 @@ class T5EncoderModel(T5PretrainedModel):
         encoder_config.is_encoder_decoder = False
         self.shared = nn.Embedding(encoder_config.vocab_size, encoder_config.d_model)
         self.encoder = T5Stack(encoder_config, embed_tokens=self.shared)
-
-        # Initialize weights and apply final processing
-        self.init_weights()
 
     @property
     def t5(self):
@@ -1585,6 +1874,7 @@ class T5EncoderModel(T5PretrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ):
+
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         encoder_outputs = self.encoder(
             input_ids=input_ids,

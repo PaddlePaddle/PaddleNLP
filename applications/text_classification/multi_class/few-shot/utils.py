@@ -20,10 +20,10 @@ from paddlenlp.datasets import load_dataset
 def load_local_dataset(data_path, splits, label_list):
     """
     Read datasets from files.
-    
+
     Args:
         data_path (str):
-            Path to the dataset directory, including label.txt, train.txt, 
+            Path to the dataset directory, including label.txt, train.txt,
             dev.txt, test.txt (and data.txt).
         splits (list):
             Which file(s) to load, such as ['train', 'dev', 'test'].
@@ -49,9 +49,5 @@ def load_local_dataset(data_path, splits, label_list):
     dataset = []
     for split in splits:
         data_file = os.path.join(data_path, split_map[split])
-        dataset.append(
-            load_dataset(_reader,
-                         data_file=data_file,
-                         label_list=label_list,
-                         lazy=False))
+        dataset.append(load_dataset(_reader, data_file=data_file, label_list=label_list, lazy=False))
     return dataset

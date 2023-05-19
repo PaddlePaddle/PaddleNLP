@@ -17,18 +17,18 @@ from pipelines.nodes.file_converter.base import BaseConverter
 
 from pipelines.utils.import_utils import safe_import
 
-MarkdownConverter = safe_import("pipelines.nodes.file_converter.markdown",
-                                "MarkdownConverter",
-                                "preprocessing")  # Has optional dependencies
-ImageToTextConverter = safe_import("pipelines.nodes.file_converter.image",
-                                   "ImageToTextConverter",
-                                   "ocr")  # Has optional dependencies
-PDFToTextConverter = safe_import("pipelines.nodes.file_converter.pdf",
-                                 "PDFToTextConverter",
-                                 "ocr")  # Has optional dependencies
-PDFToTextOCRConverter = safe_import("pipelines.nodes.file_converter.pdf",
-                                    "PDFToTextOCRConverter",
-                                    "ocr")  # Has optional dependencies
+MarkdownConverter = safe_import(
+    "pipelines.nodes.file_converter.markdown", "MarkdownConverter", "preprocessing"
+)  # Has optional dependencies
+ImageToTextConverter = safe_import(
+    "pipelines.nodes.file_converter.image", "ImageToTextConverter", "ocr"
+)  # Has optional dependencies
+PDFToTextConverter = safe_import(
+    "pipelines.nodes.file_converter.pdf", "PDFToTextConverter", "ocr"
+)  # Has optional dependencies
+PDFToTextOCRConverter = safe_import(
+    "pipelines.nodes.file_converter.pdf", "PDFToTextOCRConverter", "ocr"
+)  # Has optional dependencies
 
 from pipelines.nodes.file_converter.docx import DocxToTextConverter
 from pipelines.nodes.file_converter.txt import TextConverter

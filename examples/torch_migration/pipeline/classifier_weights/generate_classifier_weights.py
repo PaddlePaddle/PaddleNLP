@@ -20,7 +20,7 @@ import torch
 def generate(seed):
     np.random.seed(seed)
     weight = np.random.normal(0, 0.02, (768, 2)).astype("float32")
-    bias = np.zeros((2, )).astype("float32")
+    bias = np.zeros((2,)).astype("float32")
     paddle_weights = {
         "classifier.weight": weight,
         "classifier.bias": bias,

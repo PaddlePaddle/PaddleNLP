@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,473 +12,375 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 import unittest
 
-import numpy as np
 import paddle
+from parameterized import parameterized_class
 
-from common_test import CommonTest
-from util import softmax_with_cross_entropy, slow
-from paddlenlp.transformers import BigBirdForSequenceClassification, \
-    BigBirdPretrainingCriterion, BigBirdForPretraining, BigBirdModel, \
-    BigBirdForQuestionAnswering, BigBirdForTokenClassification, BigBirdForMultipleChoice, \
-    BigBirdForMaskedLM, BigBirdForCausalLM
-from paddlenlp.transformers import create_bigbird_rand_mask_idx_list
+from paddlenlp.transformers import (
+    BigBirdForMultipleChoice,
+    BigBirdForPretraining,
+    BigBirdForQuestionAnswering,
+    BigBirdForSequenceClassification,
+    BigBirdForTokenClassification,
+    BigBirdModel,
+    BigBirdPretrainedModel,
+)
+from paddlenlp.transformers.bigbird.configuration import BigBirdConfig
 
-
-def create_input_data(config, seed=None):
-    if seed is not None:
-        np.random.seed(seed)
-    rand_mask_idx_list = create_bigbird_rand_mask_idx_list(
-        config["num_layers"], config["seq_len"], config["seq_len"],
-        config["nhead"], config["block_size"], config["window_size"],
-        config["num_global_blocks"], config["num_rand_blocks"], config["seed"])
-    input_ids = np.random.randint(low=0,
-                                  high=config['vocab_size'],
-                                  size=(config["batch_size"],
-                                        config["seq_len"]))
-    num_to_predict = int(config["seq_len"] * 0.15)
-    masked_lm_positions = np.random.choice(
-        config["seq_len"], (config["batch_size"], num_to_predict),
-        replace=False)
-    masked_lm_positions = np.sort(masked_lm_positions)
-    pred_padding_len = config["seq_len"] - num_to_predict
-    temp_masked_lm_positions = np.full(masked_lm_positions.size,
-                                       0,
-                                       dtype=np.int32)
-    mask_token_num = 0
-    for i, x in enumerate(masked_lm_positions):
-        for j, pos in enumerate(x):
-            temp_masked_lm_positions[
-                mask_token_num] = i * config["seq_len"] + pos
-            mask_token_num += 1
-    masked_lm_positions = temp_masked_lm_positions
-    return rand_mask_idx_list, input_ids, masked_lm_positions
+from ...testing_utils import slow
+from ..test_modeling_common import (
+    ModelTesterMixin,
+    ModelTesterPretrainedMixin,
+    ids_tensor,
+    random_attention_mask,
+)
 
 
-class NpBigBirdPretrainingCriterion(object):
-
-    def __init__(self, vocab_size, use_nsp=False, ignore_index=0):
+class BigBirdModelTester:
+    def __init__(
+        self,
+        parent,
+        batch_size=13,
+        seq_length=7,
+        is_training=True,
+        use_input_mask=True,
+        use_token_type_ids=True,
+        vocab_size=99,
+        hidden_size=32,
+        num_hidden_layers=5,
+        num_attention_heads=4,
+        intermediate_size=37,
+        hidden_act="gelu",
+        hidden_dropout_prob=0.1,
+        attention_probs_dropout_prob=0.1,
+        max_position_embeddings=512,
+        type_vocab_size=2,
+        initializer_range=0.02,
+        pad_token_id=0,
+        type_sequence_label_size=2,
+        use_relative_position=True,
+        num_labels=3,
+        num_choices=4,
+        num_classes=3,
+        scope=None,
+    ):
+        self.parent = parent
+        self.batch_size = batch_size
+        self.seq_length = seq_length
+        self.is_training = is_training
+        self.use_input_mask = use_input_mask
+        self.use_token_type_ids = use_token_type_ids
         self.vocab_size = vocab_size
-        self.use_nsp = use_nsp
-        self.ignore_index = ignore_index
+        self.hidden_size = hidden_size
+        self.num_hidden_layers = num_hidden_layers
+        self.num_attention_heads = num_attention_heads
+        self.intermediate_size = intermediate_size
+        self.hidden_act = hidden_act
+        self.hidden_dropout_prob = hidden_dropout_prob
+        self.attention_probs_dropout_prob = attention_probs_dropout_prob
+        self.max_position_embeddings = max_position_embeddings
+        self.type_vocab_size = type_vocab_size
+        self.initializer_range = initializer_range
+        self.pad_token_id = pad_token_id
+        self.type_sequence_label_size = type_sequence_label_size
+        self.use_relative_position = use_relative_position
+        self.num_classes = num_classes
+        self.num_labels = num_labels
+        self.num_choices = num_choices
+        self.scope = scope
+        self.key_length = self.hidden_size // self.num_attention_heads
 
-    def __call__(self, prediction_scores, seq_relationship_score,
-                 masked_lm_labels, next_sentence_labels, masked_lm_scale,
-                 masked_lm_weights):
-        masked_lm_loss = softmax_with_cross_entropy(
-            prediction_scores, masked_lm_labels, ignore_index=self.ignore_index)
-        masked_lm_loss = np.transpose(masked_lm_loss, [1, 0])
-        masked_lm_loss = np.sum(masked_lm_loss * masked_lm_weights) / (
-            np.sum(masked_lm_weights) + 1e-5)
-        scale = 1.0
-        if not self.use_nsp:
-            scale = 0.0
-        next_sentence_loss = softmax_with_cross_entropy(seq_relationship_score,
-                                                        next_sentence_labels)
-        return masked_lm_loss + np.mean(next_sentence_loss) * scale
+    def prepare_config_and_inputs(self):
+        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
 
+        input_mask = None
+        if self.use_input_mask:
+            input_mask = random_attention_mask([self.batch_size, self.seq_length])
 
-class TestBigBirdForSequenceClassification(CommonTest):
+        token_type_ids = None
+        if self.use_token_type_ids:
+            token_type_ids = ids_tensor([self.batch_size, self.seq_length], self.type_vocab_size)
 
-    def set_input(self):
-        self.config = copy.deepcopy(
-            BigBirdModel.pretrained_init_configuration['bigbird-base-uncased'])
-        self.config['num_layers'] = 2
-        self.config['vocab_size'] = 1024
-        self.config['attn_dropout'] = 0.0
-        self.config['hidden_dropout_prob'] = 0.0
-        self.config['dim_feedforward'] = 1024
-        self.config['seq_len'] = 1024
-        self.config['batch_size'] = 2
-        self.config['max_position_embeddings'] = 2048
-        self.rand_mask_idx_list, self.input_ids, self.masked_lm_positions = create_input_data(
-            self.config)
+        sequence_labels = None
+        token_labels = None
+        choice_labels = None
 
-    def set_output(self):
-        self.expected_shape = (self.config['batch_size'], 2)
+        if self.parent.use_labels:
+            sequence_labels = ids_tensor([self.batch_size], self.type_sequence_label_size)
+            token_labels = ids_tensor([self.batch_size, self.seq_length], self.num_labels)
+            choice_labels = ids_tensor([self.batch_size], self.num_choices)
 
-    def setUp(self):
-        self.set_model_class()
-        self.set_input()
-        self.set_output()
+        config = self.get_config()
+        return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
 
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = BigBirdForSequenceClassification
+    def get_config(self):
+        return BigBirdConfig(
+            vocab_size=self.vocab_size,
+            hidden_size=self.hidden_size,
+            num_hidden_layers=self.num_hidden_layers,
+            num_attention_heads=self.num_attention_heads,
+            intermediate_size=self.intermediate_size,
+            hidden_act=self.hidden_act,
+            hidden_dropout_prob=self.hidden_dropout_prob,
+            attention_probs_dropout_prob=self.attention_probs_dropout_prob,
+            max_position_embeddings=self.max_position_embeddings,
+            type_vocab_size=self.type_vocab_size,
+            initializer_range=self.initializer_range,
+            pad_token_id=self.pad_token_id,
+            use_relative_position=self.use_relative_position,
+            num_class=self.num_classes,
+            num_labels=self.num_labels,
+            num_choices=self.num_choices,
+        )
 
-    def test_forward(self):
-        bigbird = BigBirdModel(**self.config)
-        model = self.TEST_MODEL_CLASS(bigbird)
-        input_ids = paddle.to_tensor(self.input_ids)
-        rand_mask_idx_list = paddle.to_tensor(self.rand_mask_idx_list)
-        output = model(input_ids, rand_mask_idx_list=rand_mask_idx_list)
-        self.check_output_equal(self.expected_shape, output.numpy().shape)
+    def create_and_check_model(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
+        model = BigBirdModel(config)
+        model.eval()
+        result = model(
+            input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, return_dict=self.parent.return_dict
+        )
+        result = model(input_ids, token_type_ids=token_type_ids, return_dict=self.parent.return_dict)
+        result = model(input_ids, return_dict=self.parent.return_dict)
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
+        self.parent.assertEqual(result[1].shape, [self.batch_size, self.hidden_size])
 
+    def create_and_check_for_multiple_choice(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
+        model = BigBirdForMultipleChoice(config)
+        model.eval()
+        multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand([-1, self.num_choices, -1])
+        multiple_choice_input_mask = input_mask.unsqueeze(1).expand([-1, self.num_choices, -1])
+        result = model(
+            multiple_choice_inputs_ids,
+            attention_mask=multiple_choice_input_mask,
+            rand_mask_idx_list=None,
+            labels=choice_labels,
+            return_dict=self.parent.return_dict,
+        )
+        if choice_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
 
-class TestBigBirdForQuestionAnswering(CommonTest):
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.num_choices])
 
-    def set_input(self):
-        self.config = copy.deepcopy(
-            BigBirdModel.pretrained_init_configuration['bigbird-base-uncased'])
-        self.config['num_layers'] = 2
-        self.config['vocab_size'] = 1024
-        self.config['attn_dropout'] = 0.0
-        self.config['hidden_dropout_prob'] = 0.0
-        self.config['dim_feedforward'] = 1024
-        self.config['seq_len'] = 1024
-        self.config['batch_size'] = 2
-        self.config['max_position_embeddings'] = 2048
-        self.rand_mask_idx_list, self.input_ids, self.masked_lm_positions = create_input_data(
-            self.config)
+    def create_and_check_for_question_answering(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
+        model = BigBirdForQuestionAnswering(config)
+        model.eval()
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+            start_positions=sequence_labels,
+            end_positions=sequence_labels,
+            return_dict=self.parent.return_dict,
+        )
+        if sequence_labels is not None:
+            start_logits, end_logits = result[1], result[2]
+        else:
+            start_logits, end_logits = result[0], result[1]
 
-    def set_output(self):
-        self.expected_shape1 = (self.config['batch_size'],
-                                self.config['seq_len'])
-        self.expected_shape2 = (self.config['batch_size'],
-                                self.config['seq_len'])
+        self.parent.assertEqual(start_logits.shape, [self.batch_size, self.seq_length])
+        self.parent.assertEqual(end_logits.shape, [self.batch_size, self.seq_length])
 
-    def setUp(self):
-        self.set_model_class()
-        self.set_input()
-        self.set_output()
+    def create_and_check_for_sequence_classification(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
+        model = BigBirdForSequenceClassification(config)
+        model.eval()
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+            rand_mask_idx_list=None,
+            labels=sequence_labels,
+            return_dict=self.parent.return_dict,
+        )
+        if sequence_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
 
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = BigBirdForQuestionAnswering
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.num_classes])
 
-    def test_forward(self):
-        bigbird = BigBirdModel(**self.config)
-        model = self.TEST_MODEL_CLASS(bigbird)
-        input_ids = paddle.to_tensor(self.input_ids)
-        rand_mask_idx_list = paddle.to_tensor(self.rand_mask_idx_list)
-        start_logits, end_logits = model(input_ids,
-                                         rand_mask_idx_list=rand_mask_idx_list)
-        self.check_output_equal(self.expected_shape1,
-                                start_logits.numpy().shape)
-        self.check_output_equal(self.expected_shape2, end_logits.numpy().shape)
+    def create_and_check_for_token_classification(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
+        model = BigBirdForTokenClassification(config)
+        model.eval()
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+            labels=token_labels,
+            return_dict=self.parent.return_dict,
+        )
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
 
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.num_classes])
 
-class TestBigBirdForTokenClassification(CommonTest):
-
-    def set_input(self):
-        self.config = copy.deepcopy(
-            BigBirdModel.pretrained_init_configuration['bigbird-base-uncased'])
-        self.config['num_layers'] = 2
-        self.config['vocab_size'] = 1024
-        self.config['attn_dropout'] = 0.0
-        self.config['hidden_dropout_prob'] = 0.0
-        self.config['dim_feedforward'] = 1024
-        self.config['seq_len'] = 1024
-        self.config['batch_size'] = 2
-        self.config['max_position_embeddings'] = 2048
-        self.rand_mask_idx_list, self.input_ids, self.masked_lm_positions = create_input_data(
-            self.config)
-        self.num_classes = 2
-
-    def set_output(self):
-        self.expected_shape = (self.config['batch_size'],
-                               self.config['seq_len'], self.num_classes)
-
-    def setUp(self):
-        self.set_model_class()
-        self.set_input()
-        self.set_output()
-
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = BigBirdForTokenClassification
-
-    def test_forward(self):
-        bigbird = BigBirdModel(**self.config)
-        model = self.TEST_MODEL_CLASS(bigbird, num_classes=self.num_classes)
-        input_ids = paddle.to_tensor(self.input_ids)
-        rand_mask_idx_list = paddle.to_tensor(self.rand_mask_idx_list)
-        output = model(input_ids, rand_mask_idx_list=rand_mask_idx_list)
-        self.check_output_equal(self.expected_shape, output.numpy().shape)
-
-
-class TestBigBirdForMultipleChoice(CommonTest):
-
-    def set_input(self):
-        self.config = copy.deepcopy(
-            BigBirdModel.pretrained_init_configuration['bigbird-base-uncased'])
-        self.config['num_layers'] = 2
-        self.config['vocab_size'] = 1024
-        self.config['attn_dropout'] = 0.0
-        self.config['hidden_dropout_prob'] = 0.0
-        self.config['dim_feedforward'] = 1024
-        self.config['seq_len'] = 1024
-        self.config['batch_size'] = 2
-        self.config['max_position_embeddings'] = 2048
-        self.rand_mask_idx_list, self.input_ids, self.masked_lm_positions = [], [], []
-        self.num_choices = 2
-        for i in range(self.num_choices):
-            rand_mask_idx_list, input_ids, masked_lm_positions = create_input_data(
-                self.config)
-            self.rand_mask_idx_list.append(rand_mask_idx_list)
-            self.input_ids.append(input_ids)
-            self.masked_lm_positions.append(masked_lm_positions)
-        self.rand_mask_idx_list = np.array(self.rand_mask_idx_list).swapaxes(
-            0, 1)
-        self.input_ids = np.array(self.input_ids).swapaxes(0, 1)
-        self.masked_lm_positions = np.array(self.masked_lm_positions).swapaxes(
-            0, 1)
-
-    def set_output(self):
-        self.expected_shape = (self.config['batch_size'], self.num_choices)
-
-    def setUp(self):
-        self.set_model_class()
-        self.set_input()
-        self.set_output()
-
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = BigBirdForMultipleChoice
-
-    def test_forward(self):
-        bigbird = BigBirdModel(**self.config)
-        model = self.TEST_MODEL_CLASS(bigbird, num_choices=self.num_choices)
-        input_ids = paddle.to_tensor(self.input_ids)
-        rand_mask_idx_list = paddle.to_tensor(self.rand_mask_idx_list)
-        output = model(input_ids, rand_mask_idx_list=rand_mask_idx_list)
-        self.check_output_equal(self.expected_shape, output.numpy().shape)
-
-
-class TestBigBirdForMaskedLM(CommonTest):
-
-    def set_input(self):
-        self.config = copy.deepcopy(
-            BigBirdModel.pretrained_init_configuration['bigbird-base-uncased'])
-        self.config['num_layers'] = 2
-        self.config['vocab_size'] = 1024
-        self.config['attn_dropout'] = 0.0
-        self.config['hidden_dropout_prob'] = 0.0
-        self.config['dim_feedforward'] = 1024
-        self.config['seq_len'] = 1024
-        self.config['batch_size'] = 2
-        self.config['max_position_embeddings'] = 2048
-        self.rand_mask_idx_list, self.input_ids, self.masked_lm_positions = create_input_data(
-            self.config)
-        self.labels = np.random.randint(low=0,
-                                        high=self.config['vocab_size'],
-                                        size=(self.config["batch_size"],
-                                              self.config["seq_len"]))
-
-    def set_output(self):
-        self.expected_shape1 = (1, )
-        self.expected_shape2 = (self.config['batch_size'],
-                                self.config['seq_len'],
-                                self.config['vocab_size'])
-        self.expected_shape3 = (self.config['batch_size'],
-                                self.config['seq_len'],
-                                self.config['hidden_size'])
-
-    def setUp(self):
-        self.set_model_class()
-        self.set_input()
-        self.set_output()
-
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = BigBirdForMaskedLM
-
-    def test_forward(self):
-        bigbird = BigBirdModel(**self.config)
-        model = self.TEST_MODEL_CLASS(bigbird)
-        input_ids = paddle.to_tensor(self.input_ids)
-        rand_mask_idx_list = paddle.to_tensor(self.rand_mask_idx_list)
-        labels = paddle.to_tensor(self.labels)
-        masked_lm_loss, prediction_scores, sequence_output = model(
-            input_ids, rand_mask_idx_list=rand_mask_idx_list, labels=labels)
-        self.check_output_equal(self.expected_shape1,
-                                masked_lm_loss.numpy().shape)
-        self.check_output_equal(self.expected_shape2,
-                                prediction_scores.numpy().shape)
-        self.check_output_equal(self.expected_shape3,
-                                sequence_output.numpy().shape)
+    def prepare_config_and_inputs_for_common(self):
+        config_and_inputs = self.prepare_config_and_inputs()
+        (
+            config,
+            input_ids,
+            token_type_ids,
+            input_mask,
+            sequence_labels,
+            token_labels,
+            choice_labels,
+        ) = config_and_inputs
+        inputs_dict = {"input_ids": input_ids, "token_type_ids": token_type_ids, "attention_mask": input_mask}
+        return config, inputs_dict
 
 
-class TestBigBirdForCausalLM(CommonTest):
+@parameterized_class(
+    ("return_dict", "use_labels"),
+    [
+        [False, False],
+        [False, True],
+        [True, False],
+        [True, True],
+    ],
+)
+class BigBirdModelTest(ModelTesterMixin, unittest.TestCase):
+    base_model_class = BigBirdModel
+    return_dict: bool = False
+    use_labels: bool = False
+    use_test_inputs_embeds: bool = True
+    test_tie_weights = True
 
-    def set_input(self):
-        self.config = copy.deepcopy(
-            BigBirdModel.pretrained_init_configuration['bigbird-base-uncased'])
-        self.config['num_layers'] = 2
-        self.config['vocab_size'] = 1024
-        self.config['attn_dropout'] = 0.0
-        self.config['hidden_dropout_prob'] = 0.0
-        self.config['dim_feedforward'] = 1024
-        self.config['seq_len'] = 1024
-        self.config['batch_size'] = 2
-        self.config['max_position_embeddings'] = 2048
-        self.rand_mask_idx_list, self.input_ids, self.masked_lm_positions = create_input_data(
-            self.config)
-        self.labels = np.random.randint(low=0,
-                                        high=self.config['vocab_size'],
-                                        size=(self.config["batch_size"],
-                                              self.config["seq_len"]))
-
-    def set_output(self):
-        self.expected_shape1 = (1, )
-        self.expected_shape2 = (self.config['batch_size'],
-                                self.config['seq_len'],
-                                self.config['vocab_size'])
-        self.expected_shape3 = (self.config['batch_size'],
-                                self.config['seq_len'],
-                                self.config['hidden_size'])
+    all_model_classes = (
+        BigBirdModel,
+        BigBirdForMultipleChoice,
+        BigBirdForPretraining,
+        BigBirdForQuestionAnswering,
+        BigBirdForSequenceClassification,
+        BigBirdForTokenClassification,
+    )
 
     def setUp(self):
-        self.set_model_class()
-        self.set_input()
-        self.set_output()
+        self.model_tester = BigBirdModelTester(self)
 
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = BigBirdForCausalLM
+    def test_model(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_model(*config_and_inputs)
 
-    def test_forward(self):
-        bigbird = BigBirdModel(**self.config)
-        model = self.TEST_MODEL_CLASS(bigbird)
-        input_ids = paddle.to_tensor(self.input_ids)
-        rand_mask_idx_list = paddle.to_tensor(self.rand_mask_idx_list)
-        labels = paddle.to_tensor(self.labels)
-        masked_lm_loss, prediction_scores, sequence_output = model(
-            input_ids, rand_mask_idx_list=rand_mask_idx_list, labels=labels)
-        self.check_output_equal(self.expected_shape1,
-                                masked_lm_loss.numpy().shape)
-        self.check_output_equal(self.expected_shape2,
-                                prediction_scores.numpy().shape)
-        self.check_output_equal(self.expected_shape3,
-                                sequence_output.numpy().shape)
+    def test_for_multiple_choice(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_multiple_choice(*config_and_inputs)
 
+    def test_for_question_answering(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_question_answering(*config_and_inputs)
 
-class TestBigBirdForPretraining(TestBigBirdForSequenceClassification):
+    def test_for_sequence_classification(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_sequence_classification(*config_and_inputs)
 
-    def set_input(self):
-        self.config = copy.deepcopy(
-            BigBirdModel.pretrained_init_configuration['bigbird-base-uncased'])
-        self.config['num_layers'] = 2
-        self.config['vocab_size'] = 512
-        self.config['attn_dropout'] = 0.0
-        self.config['hidden_dropout_prob'] = 0.0
-        self.config['dim_feedforward'] = 1024
-        self.config['seq_len'] = 1024
-        self.config['batch_size'] = 2
-        self.config['max_position_embeddings'] = 2048
-        self.rand_mask_idx_list, self.input_ids, self.masked_lm_positions = create_input_data(
-            self.config)
-
-    def set_model_class(self):
-        self.TEST_MODEL_CLASS = BigBirdForPretraining
-
-    def set_output(self):
-        self.expected_pred_shape = (self.masked_lm_positions.shape[0],
-                                    self.config['vocab_size'])
-        self.expected_seq_shape = (self.config['batch_size'], 2)
-
-    def test_forward(self):
-        bigbird = BigBirdModel(**self.config)
-        model = self.TEST_MODEL_CLASS(bigbird)
-        input_ids = paddle.to_tensor(self.input_ids)
-        rand_mask_idx_list = paddle.to_tensor(self.rand_mask_idx_list)
-        masked_positions = paddle.to_tensor(self.masked_lm_positions)
-        output = model(input_ids,
-                       rand_mask_idx_list=rand_mask_idx_list,
-                       masked_positions=masked_positions)
-        self.check_output_equal(output[0].numpy().shape,
-                                self.expected_pred_shape)
-        self.check_output_equal(output[1].numpy().shape,
-                                self.expected_seq_shape)
-
-
-class TestBigBirdPretrainingCriterionUseNSP(CommonTest):
-
-    def setUp(self):
-        self.config['vocab_size'] = 1024
-        self.criterion = BigBirdPretrainingCriterion(**self.config)
-        self.np_criterion = NpBigBirdPretrainingCriterion(**self.config)
-
-    def _construct_input_data(self, mask_num, vocab_size, batch_size):
-        prediction_scores = np.random.rand(mask_num, vocab_size).astype(
-            paddle.get_default_dtype())
-        seq_relationship_score = np.random.rand(batch_size, 2).astype(
-            paddle.get_default_dtype())
-        masked_lm_labels = np.random.randint(0, vocab_size, (mask_num, 1))
-        next_sentence_labels = np.random.randint(0, 2, (batch_size, 1))
-        masked_lm_scale = 1.0
-        masked_lm_weights = np.random.randint(0, 2, (mask_num)).astype(
-            paddle.get_default_dtype())
-        return prediction_scores, seq_relationship_score, masked_lm_labels, \
-            next_sentence_labels, masked_lm_scale, masked_lm_weights
-
-    def test_forward(self):
-        np_prediction_score, np_seq_relationship_score, np_masked_lm_labels, \
-            np_next_sentence_labels, masked_lm_scale, np_masked_lm_weights \
-            = self._construct_input_data(20, self.config['vocab_size'], 4)
-
-        prediction_score = paddle.to_tensor(np_prediction_score)
-        seq_relationship_score = paddle.to_tensor(np_seq_relationship_score)
-        masked_lm_labels = paddle.to_tensor(np_masked_lm_labels)
-        next_sentence_labels = paddle.to_tensor(np_next_sentence_labels)
-        masked_lm_weights = paddle.to_tensor(np_masked_lm_weights)
-
-        np_loss = self.np_criterion(np_prediction_score,
-                                    np_seq_relationship_score,
-                                    np_masked_lm_labels,
-                                    np_next_sentence_labels, masked_lm_scale,
-                                    np_masked_lm_weights)
-        loss = self.criterion(prediction_score, seq_relationship_score,
-                              masked_lm_labels, next_sentence_labels,
-                              masked_lm_scale, masked_lm_weights)
-
-        self.check_output_equal(np_loss, loss.numpy()[0])
-
-
-class TestBigBirdPretrainingCriterionNotUseNSP(
-        TestBigBirdPretrainingCriterionUseNSP):
-
-    def setUp(self):
-        self.config['vocab_size'] = 1024
-        self.config['use_nsp'] = False
-        self.criterion = BigBirdPretrainingCriterion(**self.config)
-        self.np_criterion = NpBigBirdPretrainingCriterion(**self.config)
-
-
-class TestBigBirdFromPretrain(CommonTest):
+    def test_for_token_classification(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_token_classification(*config_and_inputs)
 
     @slow
-    def test_bigbird_base_uncased(self):
-        model = BigBirdModel.from_pretrained('bigbird-base-uncased',
-                                             attn_dropout=0.0,
-                                             hidden_dropout_prob=0.0)
-        self.config = copy.deepcopy(model.config)
-        self.config['seq_len'] = 512
-        self.config['batch_size'] = 3
+    def test_model_from_pretrained(self):
+        for model_name in list(BigBirdPretrainedModel.pretrained_init_configuration)[:1]:
+            model = BigBirdModel.from_pretrained(model_name)
+            self.assertIsNotNone(model)
 
-        rand_mask_idx_list, input_ids, _ = create_input_data(self.config, 102)
-        input_ids = paddle.to_tensor(input_ids)
-        rand_mask_idx_list = paddle.to_tensor(rand_mask_idx_list)
-        output = model(input_ids, rand_mask_idx_list=rand_mask_idx_list)
 
-        expected_seq_shape = (self.config['batch_size'], self.config['seq_len'],
-                              self.config['hidden_size'])
-        expected_pooled_shape = (self.config['batch_size'],
-                                 self.config['hidden_size'])
-        self.check_output_equal(output[0].numpy().shape, expected_seq_shape)
-        self.check_output_equal(output[1].numpy().shape, expected_pooled_shape)
+class BigBirdModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
+    base_model_class = BigBirdModel
+    hf_remote_test_model_path = "PaddleCI/tiny-random-bigbird"
+    paddlehub_remote_test_model_path = "__internal_testing__/tiny-random-bigbird"
 
-        expected_seq_slice = np.array([[0.06685783, 0.01576832, -0.14448889],
-                                       [0.16531630, 0.00974050, -0.15113291],
-                                       [0.08514148, -0.01252885, -0.12458798]])
-        # There's output diff about 1e-4 between cpu and gpu
-        self.check_output_equal(output[0].numpy()[0, 0:3, 0:3],
-                                expected_seq_slice,
-                                atol=1e-4)
+    @slow
+    def test_inference_no_attention(self):
+        model = BigBirdModel.from_pretrained("bigbird-base-uncased")
+        model.eval()
+        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids, attention_mask=attention_mask)[0]
+        expected_shape = [1, 11, 768]
+        self.assertEqual(output.shape, expected_shape)
 
-        expected_pooled_slice = np.array([[0.78695089, 0.87273526, -0.88046724],
-                                          [0.66016346, 0.74889791, -0.76608104],
-                                          [0.15944470, 0.25242448,
-                                           -0.34336662]])
-        self.check_output_equal(output[1].numpy()[0:3, 0:3],
-                                expected_pooled_slice,
-                                atol=1e-4)
+        expected_slice = paddle.to_tensor(
+            [
+                [
+                    [-0.07543463, -0.12640929, 0.04644738],
+                    [0.13448411, -0.08428665, -0.04799746],
+                    [0.00980866, -0.08991019, 0.17119916],
+                ]
+            ]
+        )
+        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+    @slow
+    def test_inference_with_attention(self):
+        model = BigBirdModel.from_pretrained("bigbird-base-uncased")
+        model.eval()
+        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids, attention_mask=attention_mask)[0]
+        expected_shape = [1, 11, 768]
+        self.assertEqual(output.shape, expected_shape)
+
+        expected_slice = paddle.to_tensor(
+            [
+                [
+                    [-0.00835392, -0.06217613, -0.17532486],
+                    [0.07107036, -0.04628750, 0.47526565],
+                    [-0.03114043, -0.15154681, 0.92528886],
+                ]
+            ]
+        )
+        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
 if __name__ == "__main__":

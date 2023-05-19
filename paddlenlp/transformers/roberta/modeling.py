@@ -13,22 +13,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
+
+from typing import Optional, Tuple
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle import Tensor
 
-from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
+from ...layers import Linear as TransposedLinear
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
+    CausalLMOutputWithCrossAttentions,
+    MaskedLMOutput,
+    MultipleChoiceModelOutput,
+    QuestionAnsweringModelOutput,
     SequenceClassifierOutput,
     TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
-    MaskedLMOutput,
-    CausalLMOutputWithCrossAttentions,
 )
 from .configuration import PRETRAINED_INIT_CONFIGURATION, RobertaConfig
 
@@ -42,6 +46,22 @@ __all__ = [
     "RobertaForMultipleChoice",
     "RobertaForCausalLM",
 ]
+
+
+def create_position_ids_from_input_ids(input_ids, padding_idx, past_key_values_length):
+    """
+    Replace non-padding symbols with their position numbers. Position numbers begin at padding_idx+1. Padding symbols
+    are ignored. This is modified from fairseq's `utils.make_positions`.
+    Args:
+        x: paddle.Tensor x:
+    Returns: paddle.Tensor
+    """
+    if past_key_values_length is None:
+        past_key_values_length = 0
+    # The series of casts and type-conversions here are carefully balanced to both work with ONNX export and XLA.
+    mask = (input_ids != padding_idx).cast("int64")
+    incremental_indices = (paddle.cumsum(mask, axis=1) + past_key_values_length) * mask
+    return incremental_indices + padding_idx
 
 
 class RobertaEmbeddings(nn.Layer):
@@ -59,29 +79,51 @@ class RobertaEmbeddings(nn.Layer):
         self.padding_idx = config.pad_token_id
         self.cls_token_id = config.cls_token_id
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None, past_key_values_length=None):
-        if position_ids is None:
-            # maybe need use shape op to unify static graph and dynamic graph
-            ones = paddle.ones_like(input_ids, dtype="int64")
-            seq_length = paddle.cumsum(ones, axis=-1)
-            if self.cls_token_id == 0 or input_ids[0][0] == 0:  # postion_ids for RobertaBPETokenizer
-                position_ids = seq_length + self.padding_idx + 1 - ones
-            else:  # postion_ids for RobertaTokenizer
-                position_ids = seq_length - ones
-            if past_key_values_length is not None:
-                position_ids += past_key_values_length
-            position_ids.stop_gradient = True
-        if token_type_ids is None:
-            token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        past_key_values_length: Optional[int] = None,
+    ):
 
-        input_embedings = self.word_embeddings(input_ids)
+        if input_ids is not None:
+            inputs_embeds = self.word_embeddings(input_ids)
+
+        if position_ids is None:
+            if input_ids is not None:
+                position_ids = create_position_ids_from_input_ids(
+                    input_ids, padding_idx=self.padding_idx, past_key_values_length=past_key_values_length
+                )
+            else:
+                position_ids = self.create_position_ids_from_inputs_embeds(inputs_embeds)
+            position_ids.stop_gradient = True
+
+        if token_type_ids is None:
+            input_shape = paddle.shape(inputs_embeds)[:-1]
+            token_type_ids = paddle.zeros(input_shape, dtype="int64")
+
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
-        embeddings = input_embedings + position_embeddings + token_type_embeddings
+        embeddings = inputs_embeds + position_embeddings + token_type_embeddings
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
+
+    def create_position_ids_from_inputs_embeds(self, inputs_embeds):
+        """
+        We are provided embeddings directly. We cannot infer which are padded so just generate sequential position ids.
+        Args:
+            input_shape: paddle.Tensor
+        Returns: paddle.Tensor
+        """
+        input_shape = paddle.shape(inputs_embeds)[:-1]
+        sequence_length = input_shape[1]
+
+        position_ids = paddle.arange(self.padding_idx + 1, sequence_length + self.padding_idx + 1, dtype="int64")
+        return position_ids.unsqueeze(0).expand(input_shape)
 
 
 class RobertaPooler(nn.Layer):
@@ -124,7 +166,137 @@ class RobertaPretrainedModel(PretrainedModel):
     }
     base_model_prefix = "roberta"
 
-    def init_weights(self, layer):
+    @classmethod
+    def _get_name_mappings(cls, config: RobertaConfig) -> list[StateDictNameMapping]:
+        mappings = [
+            "embeddings.word_embeddings.weight",
+            "embeddings.position_embeddings.weight",
+            "embeddings.token_type_embeddings.weight",
+            ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
+            ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
+        ]
+
+        for layer_index in range(config.num_hidden_layers):
+            layer_mappings = [
+                [
+                    f"encoder.layer.{layer_index}.attention.self.query.weight",
+                    f"encoder.layers.{layer_index}.self_attn.q_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.query.bias",
+                    f"encoder.layers.{layer_index}.self_attn.q_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.key.weight",
+                    f"encoder.layers.{layer_index}.self_attn.k_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.key.bias",
+                    f"encoder.layers.{layer_index}.self_attn.k_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.value.weight",
+                    f"encoder.layers.{layer_index}.self_attn.v_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.value.bias",
+                    f"encoder.layers.{layer_index}.self_attn.v_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.dense.weight",
+                    f"encoder.layers.{layer_index}.self_attn.out_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.dense.bias",
+                    f"encoder.layers.{layer_index}.self_attn.out_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.weight",
+                    f"encoder.layers.{layer_index}.norm1.weight",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.bias",
+                    f"encoder.layers.{layer_index}.norm1.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.intermediate.dense.weight",
+                    f"encoder.layers.{layer_index}.linear1.weight",
+                    "transpose",
+                ],
+                [f"encoder.layer.{layer_index}.intermediate.dense.bias", f"encoder.layers.{layer_index}.linear1.bias"],
+                [
+                    f"encoder.layer.{layer_index}.output.dense.weight",
+                    f"encoder.layers.{layer_index}.linear2.weight",
+                    "transpose",
+                ],
+                [f"encoder.layer.{layer_index}.output.dense.bias", f"encoder.layers.{layer_index}.linear2.bias"],
+                [f"encoder.layer.{layer_index}.output.LayerNorm.weight", f"encoder.layers.{layer_index}.norm2.weight"],
+                [f"encoder.layer.{layer_index}.output.LayerNorm.bias", f"encoder.layers.{layer_index}.norm2.bias"],
+            ]
+            mappings.extend(layer_mappings)
+
+        init_name_mappings(mappings)
+        # Other than RobertaModel, other architectures will prepend model prefix
+        if config.architectures is not None and "RobertaModel" not in config.architectures:
+            for mapping in mappings:
+                mapping[0] = "roberta." + mapping[0]
+
+        if cls.__name__ != "RobertaModel":
+            for mapping in mappings:
+                mapping[1] = "roberta." + mapping[1]
+
+        mappings.extend(
+            [
+                ["pooler.dense.weight", "roberta.pooler.dense.weight", "transpose"],
+                ["pooler.dense.bias", "roberta.pooler.dense.bias"],
+            ]
+        )
+
+        if config.architectures is not None:
+            if "RobertaForSequenceClassification" in config.architectures:
+                mappings.extend(
+                    [
+                        ["classifier.out_proj.weight", None, "transpose"],
+                        "classifier.out_proj.bias",
+                        ["classifier.dense.weight", None, "transpose"],
+                        "classifier.dense.bias",
+                    ]
+                )
+            if "RobertaForMaskedLM" in config.architectures:
+                mappings.extend(
+                    [
+                        "lm_head.bias",
+                        "lm_head.dense.weight",
+                        "lm_head.dense.bias",
+                        "lm_head.layer_norm.weight",
+                        "lm_head.layer_norm.bias",
+                    ]
+                )
+            if (
+                "RobertaForTokenClassification" in config.architectures
+                or "RobertaForMultipleChoice" in config.architectures
+            ):
+                mappings.extend(
+                    [
+                        ["classifier.weight", None, "transpose"],
+                        "classifier.bias",
+                    ]
+                )
+            if "RobertaForQuestionAnswering" in config.architectures:
+                mappings.extend(
+                    [
+                        ["qa_outputs.weight", "classifier.weight", "transpose"],
+                        ["qa_outputs.bias", "classifier.bias"],
+                    ]
+                )
+        init_name_mappings(mappings)
+        return [StateDictNameMapping(*mapping) for mapping in mappings]
+
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # only support dygraph, use truncated_normal and make it inplace
@@ -132,16 +304,12 @@ class RobertaPretrainedModel(PretrainedModel):
             layer.weight.set_value(
                 paddle.tensor.normal(
                     mean=0.0,
-                    std=self.initializer_range
-                    if hasattr(self, "initializer_range")
-                    else self.roberta.config["initializer_range"],
+                    std=self.config.initializer_range,
                     shape=layer.weight.shape,
                 )
             )
         elif isinstance(layer, nn.LayerNorm):
-            layer._epsilon = (
-                self.layer_norm_eps if hasattr(self, "layer_norm_eps") else self.roberta.config["layer_norm_eps"]
-            )
+            layer._epsilon = self.config.layer_norm_eps
 
 
 @register_base_model
@@ -203,7 +371,7 @@ class RobertaModel(RobertaPretrainedModel):
             Defaults to `101`.
     """
 
-    def __init__(self, config: RobertaConfig):
+    def __init__(self, config: RobertaConfig, add_pooling_layer=True):
         super(RobertaModel, self).__init__(config)
 
         self.pad_token_id = config.pad_token_id
@@ -220,8 +388,7 @@ class RobertaModel(RobertaPretrainedModel):
             act_dropout=0,
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
-        self.pooler = RobertaPooler(config.hidden_size)
-        self.apply(self.init_weights)
+        self.pooler = RobertaPooler(config.hidden_size) if add_pooling_layer else None
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -231,15 +398,16 @@ class RobertaModel(RobertaPretrainedModel):
 
     def forward(
         self,
-        input_ids,
-        token_type_ids=None,
-        position_ids=None,
-        attention_mask=None,
-        past_key_values=None,
-        use_cache=None,
-        output_hidden_states=False,
-        output_attentions=False,
-        return_dict=False,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        use_cache: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
         Args:
@@ -279,6 +447,9 @@ class RobertaModel(RobertaPretrainedModel):
                 If `past_key_values` are used, the user can optionally input only the last `input_ids` (those that
                 don't have their past key value states given to this model) of shape `(batch_size, 1)` instead of all
                 `input_ids` of shape `(batch_size, sequence_length)`.
+            inputs_embeds (Tensor, optional):
+                If you want to control how to convert `inputs_ids` indices into associated vectors, you can
+                pass an embedded representation directly instead of passing `inputs_ids`.
             use_cache (`bool`, optional):
                 If set to `True`, `past_key_values` key value states are returned.
                 Defaults to `None`.
@@ -312,12 +483,16 @@ class RobertaModel(RobertaPretrainedModel):
                 sequence_output, pooled_output = model(**inputs)
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time.")
+
         past_key_values_length = None
         if past_key_values is not None:
             past_key_values_length = past_key_values[0][0].shape[2]
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e4, axis=[1, 2]
+                (input_ids == self.pad_token_id).astype(paddle.get_default_dtype()) * -1e4, axis=[1, 2]
             )
             if past_key_values is not None:
                 batch_size = past_key_values[0][0].shape[0]
@@ -331,6 +506,7 @@ class RobertaModel(RobertaPretrainedModel):
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids,
+            inputs_embeds=inputs_embeds,
             past_key_values_length=past_key_values_length,
         )
 
@@ -346,11 +522,11 @@ class RobertaModel(RobertaPretrainedModel):
         )
         if isinstance(encoder_outputs, type(embedding_output)):
             sequence_output = encoder_outputs
-            pooled_output = self.pooler(sequence_output)
+            pooled_output = self.pooler(sequence_output) if self.pooler is not None else None
             return (sequence_output, pooled_output)
         else:
             sequence_output = encoder_outputs[0]
-            pooled_output = self.pooler(sequence_output)
+            pooled_output = self.pooler(sequence_output) if self.pooler is not None else None
             if not return_dict:
                 return (sequence_output, pooled_output) + encoder_outputs[1:]
 
@@ -376,21 +552,21 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
     def __init__(self, config: RobertaConfig):
         super(RobertaForQuestionAnswering, self).__init__(config)
 
-        self.roberta = RobertaModel(config)
+        self.roberta = RobertaModel(config, add_pooling_layer=False)
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,
-        input_ids,
-        token_type_ids=None,
-        position_ids=None,
-        attention_mask=None,
-        start_positions=None,
-        end_positions=None,
-        output_hidden_states=False,
-        output_attentions=False,
-        return_dict=False,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        start_positions: Optional[Tensor] = None,
+        end_positions: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
         Args:
@@ -401,6 +577,8 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`RobertaModel`.
             attention_mask (Tensor, optional):
+                See :class:`RobertaModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`RobertaModel`.
             start_positions (Tensor of shape `(batch_size,)`, optional):
                 Labels for position (index) of the start of the labelled span for computing the token classification loss.
@@ -439,11 +617,13 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.roberta(
             input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -484,6 +664,28 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
         )
 
 
+class RobertaClassificationHead(nn.Layer):
+    """Head for sentence-level classification tasks."""
+
+    def __init__(self, config):
+        super().__init__()
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        classifier_dropout = (
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.dropout = nn.Dropout(classifier_dropout)
+        self.out_proj = nn.Linear(config.hidden_size, config.num_labels)
+
+    def forward(self, features, **kwargs):
+        x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
+        x = self.dropout(x)
+        x = self.dense(x)
+        x = paddle.tanh(x)
+        x = self.dropout(x)
+        x = self.out_proj(x)
+        return x
+
+
 class RobertaForSequenceClassification(RobertaPretrainedModel):
     r"""
     Roberta Model with a linear layer on top of the output layer,
@@ -502,24 +704,24 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
 
     def __init__(self, config: RobertaConfig):
         super(RobertaForSequenceClassification, self).__init__(config)
-        self.roberta = RobertaModel(config)
+        self.roberta = RobertaModel(config, add_pooling_layer=False)
 
         self.dropout = nn.Dropout(
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
-        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
+        self.classifier = RobertaClassificationHead(config)
 
     def forward(
         self,
-        input_ids,
-        token_type_ids=None,
-        position_ids=None,
-        attention_mask=None,
-        labels=None,
-        output_hidden_states=False,
-        output_attentions=False,
-        return_dict=False,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
         Args:
@@ -530,6 +732,8 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`RobertaModel`.
             attention_mask (Tensor, optional):
+                See :class:`RobertaModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`RobertaModel`.
             labels (Tensor of shape `(batch_size,)`, optional):
                 Labels for computing the sequence classification/regression loss.
@@ -565,19 +769,21 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.roberta(
             input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        pooled_output = outputs[1]
+        sequence_output = outputs[0]
 
-        pooled_output = self.dropout(pooled_output)
-        logits = self.classifier(pooled_output)
+        sequence_output = self.dropout(sequence_output)
+        logits = self.classifier(sequence_output)
 
         loss = None
         if labels is not None:
@@ -621,23 +827,23 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
     def __init__(self, config: RobertaConfig):
         super(RobertaForTokenClassification, self).__init__(config)
 
-        self.roberta = RobertaModel(config)
+        self.roberta = RobertaModel(config, add_pooling_layer=False)
         self.dropout = nn.Dropout(
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
-        input_ids,
-        token_type_ids=None,
-        position_ids=None,
-        attention_mask=None,
-        labels=None,
-        output_hidden_states=False,
-        output_attentions=False,
-        return_dict=False,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
         Args:
@@ -648,6 +854,8 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`RobertaModel`.
             attention_mask (Tensor, optional):
+                See :class:`RobertaModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`RobertaModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
                 Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
@@ -680,11 +888,13 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.roberta(
             input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -739,18 +949,18 @@ class RobertaForMultipleChoice(RobertaPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 1)
-        self.apply(self.init_weights)
 
     def forward(
         self,
-        input_ids=None,
-        token_type_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        labels=None,
-        output_hidden_states=False,
-        output_attentions=False,
-        return_dict=False,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
         The RobertaForMultipleChoice forward method, overrides the __call__() special method.
@@ -763,6 +973,8 @@ class RobertaForMultipleChoice(RobertaPretrainedModel):
             position_ids(Tensor, optional):
                 See :class:`RobertaModel` and shape as [batch_size, num_choice, sequence_length].
             attention_mask (list, optional):
+                See :class:`RobertaModel` and shape as [batch_size, num_choice, sequence_length].
+            inputs_embeds (list, optional):
                 See :class:`RobertaModel` and shape as [batch_size, num_choice, sequence_length].
             labels (Tensor of shape `(batch_size, )`, optional):
                 Labels for computing the multiple choice classification loss. Indices should be in `[0, ...,
@@ -835,10 +1047,18 @@ class RobertaForMultipleChoice(RobertaPretrainedModel):
                 # [2, 2]
 
         """
-
-        num_choices = input_ids.shape[1]
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        if input_ids is not None:
+            num_choices = paddle.shape(input_ids)[1]
+        elif inputs_embeds is not None:
+            num_choices = paddle.shape(inputs_embeds)[1]
 
         input_ids = input_ids.reshape((-1, input_ids.shape[-1])) if input_ids is not None else None
+        inputs_embeds = (
+            inputs_embeds.reshape((-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]))
+            if inputs_embeds is not None
+            else None
+        )
         position_ids = position_ids.reshape((-1, position_ids.shape[-1])) if position_ids is not None else None
         token_type_ids = token_type_ids.reshape((-1, token_type_ids.shape[-1])) if token_type_ids is not None else None
         attention_mask = attention_mask.reshape((-1, attention_mask.shape[-1])) if attention_mask is not None else None
@@ -848,6 +1068,7 @@ class RobertaForMultipleChoice(RobertaPretrainedModel):
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -887,10 +1108,9 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
     def __init__(self, config: RobertaConfig):
         super(RobertaForMaskedLM, self).__init__(config)
 
-        self.roberta = RobertaModel(config)
+        self.roberta = RobertaModel(config, add_pooling_layer=False)
         self.lm_head = RobertaLMHead(config)
-
-        self.apply(self.init_weights)
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.lm_head.decoder
@@ -900,14 +1120,15 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
 
     def forward(
         self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        labels=None,
-        output_hidden_states=False,
-        output_attentions=False,
-        return_dict=False,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
 
@@ -919,6 +1140,8 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
             position_ids (Tensor, optional):
                 See :class:`RobertaModel`.
             attention_mask (Tensor, optional):
+                See :class:`RobertaModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`RobertaModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
                 Labels for computing the masked language modeling loss. Indices should be in `[-100, 0, ...,
@@ -955,12 +1178,13 @@ class RobertaForMaskedLM(RobertaPretrainedModel):
                 print(logits.shape)
                 # [1, 13, 30522]
         """
-
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.roberta(
             input_ids,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -999,7 +1223,9 @@ class RobertaLMHead(nn.Layer):
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
 
-        self.decoder = nn.Linear(config.hidden_size, config.vocab_size)
+        self.decoder = TransposedLinear(config.hidden_size, config.vocab_size)
+        # link bias to load pretrained weights
+        self.bias = self.decoder.bias
 
     def forward(self, features, **kwargs):
         x = self.dense(features)
@@ -1024,9 +1250,10 @@ class RobertaForCausalLM(RobertaPretrainedModel):
 
     def __init__(self, config: RobertaConfig):
         super().__init__(config)
-        self.roberta = RobertaModel(config)
+        self.roberta = RobertaModel(config, add_pooling_layer=False)
         self.lm_head = RobertaLMHead(config)
-        self.apply(self.init_weights)
+
+        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.lm_head.decoder
@@ -1036,16 +1263,17 @@ class RobertaForCausalLM(RobertaPretrainedModel):
 
     def forward(
         self,
-        input_ids=None,
-        attention_mask=None,
-        token_type_ids=None,
-        position_ids=None,
-        labels=None,
-        past_key_values=None,
-        use_cache=None,
-        output_attentions=False,
-        output_hidden_states=False,
-        return_dict=False,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
+        use_cache: Optional[bool] = None,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
         Args:
@@ -1057,7 +1285,9 @@ class RobertaForCausalLM(RobertaPretrainedModel):
                 See :class:`RobertaModel`.
             attention_mask (Tensor, optional):
                 See :class:`RobertaModel`.
-            past_key_values (Tensor, optional):
+            inputs_embeds (Tensor, optional):
+                See :class:`RobertaModel`.
+            past_key_values (tuple(tuple(Tensor)), optional):
                 See :class:`RobertaModel`.
             use_cache (Tensor, optional):
                 See :class:`RobertaModel`.
@@ -1098,14 +1328,15 @@ class RobertaForCausalLM(RobertaPretrainedModel):
                 print(logits.shape)
                 # [1, 13, 30522]
         """
-
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         if labels is not None:
             use_cache = False
         outputs = self.roberta(
-            input_ids,
+            input_ids=input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
             position_ids=position_ids,
+            inputs_embeds=inputs_embeds,
             past_key_values=past_key_values,
             use_cache=use_cache,
             output_attentions=output_attentions,

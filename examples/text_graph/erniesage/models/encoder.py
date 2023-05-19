@@ -15,13 +15,11 @@
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import numpy as np
-
-from models.conv import GraphSageConv, ErnieSageV2Conv
+from models.conv import ErnieSageV2Conv, GraphSageConv
 
 
 class Encoder(nn.Layer):
-    """ Base class 
+    """Base class
     Chose different type ErnieSage class.
     """
 
@@ -61,9 +59,8 @@ class Encoder(nn.Layer):
 
 
 class ErnieSageV2Encoder(Encoder):
-
     def __init__(self, config, ernie):
-        """ Ernie sage v2 encoder
+        """Ernie sage v2 encoder
 
         Args:
             config (Dict): all config.
@@ -73,27 +70,26 @@ class ErnieSageV2Encoder(Encoder):
         # Don't add ernie to self, oterwise, there will be more copies of ernie weights
         # self.ernie = ernie
         self.convs = nn.LayerList()
-        initializer = None
         fc_lr = self.config.lr / 0.001
-        erniesage_conv = ErnieSageV2Conv(ernie,
-                                         ernie.config["hidden_size"],
-                                         self.config.hidden_size,
-                                         learning_rate=fc_lr,
-                                         cls_token_id=self.config.cls_token_id,
-                                         aggr_func="sum")
+        erniesage_conv = ErnieSageV2Conv(
+            ernie,
+            ernie.config["hidden_size"],
+            self.config.hidden_size,
+            learning_rate=fc_lr,
+            cls_token_id=self.config.cls_token_id,
+            aggr_func="sum",
+        )
         self.convs.append(erniesage_conv)
         for i in range(1, self.config.num_layers):
-            layer = GraphSageConv(self.config.hidden_size,
-                                  self.config.hidden_size,
-                                  learning_rate=fc_lr,
-                                  aggr_func="sum")
+            layer = GraphSageConv(
+                self.config.hidden_size, self.config.hidden_size, learning_rate=fc_lr, aggr_func="sum"
+            )
             self.convs.append(layer)
 
         if self.config.final_fc:
             self.linear = nn.Linear(
-                self.config.hidden_size,
-                self.config.hidden_size,
-                weight_attr=paddle.ParamAttr(learning_rate=fc_lr))
+                self.config.hidden_size, self.config.hidden_size, weight_attr=paddle.ParamAttr(learning_rate=fc_lr)
+            )
 
     def take_final_feature(self, feature, index):
         """Gather the final feature.
@@ -113,7 +109,7 @@ class ErnieSageV2Encoder(Encoder):
         return feat
 
     def forward(self, graphs, term_ids, inputs):
-        """ forward train function of the model.
+        """forward train function of the model.
 
         Args:
             graphs (Graph List): list of graph tensors.

@@ -35,8 +35,6 @@ class TaskflowManager:
         t = time.time()
         t = int(round(t * 1000))
         task_index = t % len(self._task)
-        logger.info(
-            "The predictor id: {} is selected by running the taskflow.".format(
-                task_index))
+        logger.info("The predictor id: {} is selected by running the taskflow.".format(task_index))
         with lock_predictor(self._task[task_index]._lock):
             return self._handler_func(self._task[task_index], data, parameters)

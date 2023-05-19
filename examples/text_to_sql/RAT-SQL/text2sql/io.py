@@ -12,34 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
+import json
+import logging
 import os
 import traceback
-import logging
-import json
 
 import paddle
 
 
 def init_ernie_model(model_class, model_dir):
-    """init ernie model from static graph checkpoint
-    """
-    with open(os.path.join(model_dir, 'ernie_config.json')) as ifs:
+    """init ernie model from static graph checkpoint"""
+    with open(os.path.join(model_dir, "ernie_config.json")) as ifs:
         config = json.load(ifs)
 
-    state = paddle.static.load_program_state(os.path.join(model_dir, 'params'))
-    ernie = model_class(config, name='')
+    state = paddle.static.load_program_state(os.path.join(model_dir, "params"))
+    ernie = model_class(config, name="")
     ernie.set_dict(state, use_structured_name=False)
-    return ernie, config['hidden_size']
+    return ernie, config["hidden_size"]
 
 
-def save(model, optimzer, save_path):
+def save(model, optimizer, save_path):
     try:
-        paddle.save(model.state_dict(), save_path + '.pdparams')
-        paddle.save(optimzer.state_dict(), save_path + '.pdopt')
-    except Exception as e:
-        logging.error('save model and optimzer failed. save path: %s',
-                      save_path)
+        paddle.save(model.state_dict(), save_path + ".pdparams")
+        paddle.save(optimizer.state_dict(), save_path + ".pdopt")
+    except Exception:
+        logging.error("save model and optimizer failed. save path: %s", save_path)
         logging.error(traceback.format_exc())
 
 

@@ -26,7 +26,6 @@ def subsequence(first_sequence, second_sequence):
         `bool`: Whether first_sequence is a subsequence of second_sequence.
     """
     for startidx in range(len(second_sequence) - len(first_sequence) + 1):
-        if second_sequence[startidx:startidx +
-                           len(first_sequence)] == first_sequence:
+        if second_sequence[startidx : startidx + len(first_sequence)] == first_sequence:
             return True
     return False

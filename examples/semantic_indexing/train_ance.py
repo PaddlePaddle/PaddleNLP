@@ -13,51 +13,47 @@
 # limitations under the License.
 
 import argparse
-import sys
 import os
 import random
 import time
-import logging
 from functools import partial
 
 import numpy as np
 import paddle
-import paddle.nn.functional as F
+from ance.model import SemanticIndexANCE
+from data import (
+    convert_example,
+    create_dataloader,
+    get_latest_ann_data,
+    get_latest_checkpoint,
+    read_text_triplet,
+)
 
-from paddlenlp.transformers import AutoModel, AutoTokenizer
-from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddlenlp.transformers import AutoModel, AutoTokenizer, LinearDecayWithWarmup
 from paddlenlp.utils.log import logger
 
-from ance.model import SemanticIndexANCE
-from data import read_text_pair, read_text_triplet
-from data import convert_example, create_dataloader
-from data import get_latest_checkpoint, get_latest_ann_data
-
-# yapf: disable
+# fmt: off
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_dir", default='./checkpoints', type=str, help="The output directory where the model checkpoints will be written.")
 parser.add_argument("--ann_data_dir", default='./ann_data', type=str, help="The output directory where the ann generated training data will be saved.")
-parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--max_training_steps", default=1000000, type=int, help="The maximum total steps for training")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--output_emb_size", default=None, type=int, help="output_embedding_size")
 parser.add_argument("--learning_rate", default=1e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
-parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
+parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 parser.add_argument('--save_steps', type=int, default=10000, help="Inteval steps to save checkpoint")
 parser.add_argument("--train_set_file", type=str, required=True, help="The full path of train_set_file")
 parser.add_argument("--margin", default=0.3, type=float, help="Margin for pair-wise margin_rank_loss")
-
-
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 def set_seed(seed):
@@ -75,14 +71,12 @@ def do_train():
 
     set_seed(args.seed)
 
-    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
 
     latest_checkpoint, latest_global_step = get_latest_checkpoint(args)
     logger.info("get latest_checkpoint:{}".format(latest_checkpoint))
 
-    model = SemanticIndexANCE(pretrained_model,
-                              margin=args.margin,
-                              output_emb_size=args.output_emb_size)
+    model = SemanticIndexANCE(pretrained_model, margin=args.margin, output_emb_size=args.output_emb_size)
 
     if latest_checkpoint:
         state_dict = paddle.load(latest_checkpoint)
@@ -91,11 +85,9 @@ def do_train():
 
     model = paddle.DataParallel(model)
 
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # text_input
@@ -109,41 +101,29 @@ def do_train():
     global_step = 0
 
     while global_step < args.max_training_steps:
-        latest_ann_data, latest_ann_data_step = get_latest_ann_data(
-            args.ann_data_dir)
+        latest_ann_data, latest_ann_data_step = get_latest_ann_data(args.ann_data_dir)
 
         if latest_ann_data_step == -1:
             # No ann_data generated yet
             latest_ann_data = args.train_set_file
-            logger.info("No ann_data generated yet, Use training_set:{}".format(
-                args.train_set_file))
+            logger.info("No ann_data generated yet, Use training_set:{}".format(args.train_set_file))
         else:
             # Using ann_data to training model
-            logger.info("Latest ann_data is ready for training: [{}]".format(
-                latest_ann_data))
+            logger.info("Latest ann_data is ready for training: [{}]".format(latest_ann_data))
 
-        train_ds = load_dataset(read_text_triplet,
-                                data_path=latest_ann_data,
-                                lazy=False)
+        train_ds = load_dataset(read_text_triplet, data_path=latest_ann_data, lazy=False)
 
-        train_data_loader = create_dataloader(train_ds,
-                                              mode='train',
-                                              batch_size=args.batch_size,
-                                              batchify_fn=batchify_fn,
-                                              trans_fn=trans_func)
+        train_data_loader = create_dataloader(
+            train_ds, mode="train", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+        )
 
         num_training_steps = len(train_data_loader) * args.epochs
 
-        lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
-                                             num_training_steps,
-                                             args.warmup_proportion)
+        lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
 
         # Generate parameter names needed to perform weight decay.
         # All bias and LayerNorm parameters are excluded.
-        decay_params = [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ]
+        decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
 
         clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=1.0)
 
@@ -152,12 +132,20 @@ def do_train():
             parameters=model.parameters(),
             weight_decay=args.weight_decay,
             apply_decay_param_fun=lambda x: x in decay_params,
-            grad_clip=clip)
+            grad_clip=clip,
+        )
 
         tic_train = time.time()
         for epoch in range(1, args.epochs + 1):
             for step, batch in enumerate(train_data_loader, start=1):
-                text_input_ids, text_token_type_ids, pos_sample_input_ids, pos_sample_token_type_ids, neg_sample_input_ids, neg_sample_token_type_ids, = batch
+                (
+                    text_input_ids,
+                    text_token_type_ids,
+                    pos_sample_input_ids,
+                    pos_sample_token_type_ids,
+                    neg_sample_input_ids,
+                    neg_sample_token_type_ids,
+                ) = batch
 
                 loss = model(
                     text_input_ids=text_input_ids,
@@ -165,14 +153,15 @@ def do_train():
                     neg_sample_input_ids=neg_sample_input_ids,
                     text_token_type_ids=text_token_type_ids,
                     pos_sample_token_type_ids=pos_sample_token_type_ids,
-                    neg_sample_token_type_ids=neg_sample_token_type_ids)
+                    neg_sample_token_type_ids=neg_sample_token_type_ids,
+                )
 
                 global_step += 1
                 if global_step % 10 == 0 and rank == 0:
                     print(
                         "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s, trainning_file: %s"
-                        % (global_step, epoch, step, loss, 10 /
-                           (time.time() - tic_train), latest_ann_data))
+                        % (global_step, epoch, step, loss, 10 / (time.time() - tic_train), latest_ann_data)
+                    )
                     tic_train = time.time()
                 loss.backward()
                 optimizer.step()
@@ -182,15 +171,13 @@ def do_train():
                     save_dir = os.path.join(args.save_dir, str(global_step))
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir,
-                                                   'model_state.pdparams')
+                    save_param_path = os.path.join(save_dir, "model_state.pdparams")
                     paddle.save(model.state_dict(), save_param_path)
                     tokenizer.save_pretrained(save_dir)
 
                     # Flag to indicate succeefully save model
-                    succeed_flag_file = os.path.join(save_dir,
-                                                     "succeed_flag_file")
-                    open(succeed_flag_file, 'a').close()
+                    succeed_flag_file = os.path.join(save_dir, "succeed_flag_file")
+                    open(succeed_flag_file, "a").close()
 
 
 if __name__ == "__main__":

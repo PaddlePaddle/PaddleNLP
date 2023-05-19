@@ -139,7 +139,7 @@ emb.set_state_dict(load_layer_state_dict) # 加载模型参数
 
 ##### Q1.5 如何提升模型的性能，提升QPS？
 
-**A:** 从工程角度，对于服务器端部署可以使用[Paddle Inference](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/05_inference_deployment/inference/inference_cn.html)高性能预测引擎进行预测部署。对于Transformer类模型的GPU预测还可以使用PaddleNLP中提供的[FasterTransformer](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/ops)功能来进行快速预测，其集成了[NV FasterTransformer](https://github.com/NVIDIA/FasterTransformer)并进行了功能增强。
+**A:** 从工程角度，对于服务器端部署可以使用[Paddle Inference](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/05_inference_deployment/inference/inference_cn.html)高性能预测引擎进行预测部署。对于Transformer类模型的GPU预测还可以使用PaddleNLP中提供的[FastGeneration](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/ops)功能来进行快速预测，其集成了[NV FasterTransformer](https://github.com/NVIDIA/FasterTransformer)并进行了功能增强。
 
 从模型策略角度，可以使用一些模型小型化技术来进行模型压缩，如模型蒸馏和裁剪，通过小模型来实现加速。PaddleNLP中集成了ERNIE-Tiny这样一些通用小模型供下游任务微调使用。另外PaddleNLP提供了[模型压缩示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/model_compression)，实现了DynaBERT、TinyBERT、MiniLM等方法策略，可以参考对自己的模型进行蒸馏压缩。
 

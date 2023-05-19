@@ -35,8 +35,7 @@ _DATA_URL = "https://paddlenlp.bj.bcebos.com/datasets/iwslt15.en-vi/{}.{}"
 # Tuple that describes a single pair of files with matching translations.
 # language_to_file is the map from language (2 letter string: example 'en')
 # to the file path in the extracted directory.
-TranslateData = collections.namedtuple("TranslateData",
-                                       ["url", "language_to_file"])
+TranslateData = collections.namedtuple("TranslateData", ["url", "language_to_file"])
 
 
 class MT_Eng_ViConfig(datasets.BuilderConfig):
@@ -52,8 +51,7 @@ class MT_Eng_ViConfig(datasets.BuilderConfig):
           **kwargs: keyword arguments forwarded to super.
         """
 
-        description = ("Translation dataset from %s to %s") % (language_pair[0],
-                                                               language_pair[1])
+        description = ("Translation dataset from %s to %s") % (language_pair[0], language_pair[1])
         super(MT_Eng_ViConfig, self).__init__(
             description=description,
             version=datasets.Version("1.0.0"),
@@ -81,11 +79,9 @@ class MTEngVietnamese(datasets.GeneratorBasedBuilder):
         source, target = self.config.language_pair
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
-            features=datasets.Features({
-                "translation":
-                datasets.features.Translation(
-                    languages=self.config.language_pair)
-            }),
+            features=datasets.Features(
+                {"translation": datasets.features.Translation(languages=self.config.language_pair)}
+            ),
             supervised_keys=(source, target),
             homepage="https://nlp.stanford.edu/projects/nmt/data/iwslt15.en-vi/",
             citation=_CITATION,
@@ -97,33 +93,21 @@ class MTEngVietnamese(datasets.GeneratorBasedBuilder):
         files = {}
         for split in ("train", "dev", "test"):
             if split == "dev":
-                dl_dir_src = dl_manager.download_and_extract(
-                    _DATA_URL.format("tst2012", source))
-                dl_dir_tar = dl_manager.download_and_extract(
-                    _DATA_URL.format("tst2012", target))
+                dl_dir_src = dl_manager.download_and_extract(_DATA_URL.format("tst2012", source))
+                dl_dir_tar = dl_manager.download_and_extract(_DATA_URL.format("tst2012", target))
             if split == "dev":
-                dl_dir_src = dl_manager.download_and_extract(
-                    _DATA_URL.format("tst2013", source))
-                dl_dir_tar = dl_manager.download_and_extract(
-                    _DATA_URL.format("tst2013", target))
+                dl_dir_src = dl_manager.download_and_extract(_DATA_URL.format("tst2013", source))
+                dl_dir_tar = dl_manager.download_and_extract(_DATA_URL.format("tst2013", target))
             if split == "train":
-                dl_dir_src = dl_manager.download_and_extract(
-                    _DATA_URL.format(split, source))
-                dl_dir_tar = dl_manager.download_and_extract(
-                    _DATA_URL.format(split, target))
+                dl_dir_src = dl_manager.download_and_extract(_DATA_URL.format(split, source))
+                dl_dir_tar = dl_manager.download_and_extract(_DATA_URL.format(split, target))
 
-            files[split] = {
-                "source_file": dl_dir_src,
-                "target_file": dl_dir_tar
-            }
+            files[split] = {"source_file": dl_dir_src, "target_file": dl_dir_tar}
 
         return [
-            datasets.SplitGenerator(name=datasets.Split.TRAIN,
-                                    gen_kwargs=files["train"]),
-            datasets.SplitGenerator(name=datasets.Split.VALIDATION,
-                                    gen_kwargs=files["dev"]),
-            datasets.SplitGenerator(name=datasets.Split.TEST,
-                                    gen_kwargs=files["test"]),
+            datasets.SplitGenerator(name=datasets.Split.TRAIN, gen_kwargs=files["train"]),
+            datasets.SplitGenerator(name=datasets.Split.VALIDATION, gen_kwargs=files["dev"]),
+            datasets.SplitGenerator(name=datasets.Split.TEST, gen_kwargs=files["test"]),
         ]
 
     def _generate_examples(self, source_file, target_file):

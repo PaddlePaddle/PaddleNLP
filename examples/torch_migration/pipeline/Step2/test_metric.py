@@ -26,10 +26,9 @@ def generate():
     hf_metric = load_metric("accuracy.py")
     for i in range(4):
         logits = np.random.normal(0, 1, size=(64, 2)).astype("float32")
-        labels = np.random.randint(0, 2, size=(64, )).astype("int64")
+        labels = np.random.randint(0, 2, size=(64,)).astype("int64")
         # paddle metric
-        correct = pd_metric.compute(paddle.to_tensor(logits),
-                                    paddle.to_tensor(labels))
+        correct = pd_metric.compute(paddle.to_tensor(logits), paddle.to_tensor(labels))
         pd_metric.update(correct)
         # hf metric
         hf_metric.add_batch(

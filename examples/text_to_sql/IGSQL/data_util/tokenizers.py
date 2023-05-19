@@ -24,13 +24,13 @@ def nl_tokenize(string):
     Args:
        string(`str`): the string to tokenize.
     Outputs:
-        `list`: a list of tokens. 
+        `list`: a list of tokens.
     """
     return nltk.word_tokenize(string)
 
 
 def sql_tokenize(string):
-    """ Tokenizes a SQL statement into tokens.
+    """Tokenizes a SQL statement into tokens.
 
     Args:
        string(`str`): string to tokenize.
@@ -66,7 +66,7 @@ def sql_tokenize(string):
 
 
 def lambda_tokenize(string):
-    """ Tokenizes a lambda-calculus statement into tokens.
+    """Tokenizes a lambda-calculus statement into tokens.
 
     Args:
        string(`str`): a lambda-calculus string

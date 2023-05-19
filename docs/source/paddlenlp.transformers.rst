@@ -79,5 +79,5 @@ paddlenlp.transformers
    paddlenlp.transformers.sentencepiece_model_pb2
    paddlenlp.transformers.tokenizer_utils
    paddlenlp.transformers.tokenizer_utils_base
-   paddlenlp.transformers.tokenizer_utils_faster
+   paddlenlp.transformers.tokenizer_utils_fast
    paddlenlp.transformers.utils

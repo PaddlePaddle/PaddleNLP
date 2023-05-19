@@ -24,6 +24,5 @@ from pipelines.nodes.base import BaseComponent
 
 
 class SampleComponent(BaseComponent):
-
     def run(self, **kwargs):
         raise NotImplementedError

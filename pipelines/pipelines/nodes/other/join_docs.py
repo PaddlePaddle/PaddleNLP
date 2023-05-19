@@ -33,10 +33,9 @@ class JoinDocuments(BaseComponent):
 
     outgoing_edges = 1
 
-    def __init__(self,
-                 join_mode: str = "concatenate",
-                 weights: Optional[List[float]] = None,
-                 top_k_join: Optional[int] = None):
+    def __init__(
+        self, join_mode: str = "concatenate", weights: Optional[List[float]] = None, top_k_join: Optional[int] = None
+    ):
         """
         :param join_mode: `concatenate` to combine documents from multiple retrievers `merge` to aggregate scores of
                           individual documents, `reciprocal_rank_fusion` to apply rank based scoring.
@@ -56,18 +55,13 @@ class JoinDocuments(BaseComponent):
         ), "Weights are not compatible with 'concatenate' join_mode."
 
         # save init parameters to enable export of component config as YAML
-        self.set_config(join_mode=join_mode,
-                        weights=weights,
-                        top_k_join=top_k_join)
+        self.set_config(join_mode=join_mode, weights=weights, top_k_join=top_k_join)
 
         self.join_mode = join_mode
-        self.weights = [float(i) / sum(weights)
-                        for i in weights] if weights else None
+        self.weights = [float(i) / sum(weights) for i in weights] if weights else None
         self.top_k_join = top_k_join
 
-    def run(self,
-            inputs: List[dict],
-            top_k_join: Optional[int] = None):  # type: ignore
+    def run(self, inputs: List[dict], top_k_join: Optional[int] = None):  # type: ignore
         results = [inp["documents"] for inp in inputs]
         document_map = {doc.id: doc for result in results for doc in result}
 
@@ -80,9 +74,7 @@ class JoinDocuments(BaseComponent):
         else:
             raise ValueError(f"Invalid join_mode: {self.join_mode}")
 
-        sorted_docs = sorted(scores_map.items(),
-                             key=lambda d: d[1],
-                             reverse=True)
+        sorted_docs = sorted(scores_map.items(), key=lambda d: d[1], reverse=True)
 
         if not top_k_join:
             top_k_join = self.top_k_join
@@ -110,8 +102,7 @@ class JoinDocuments(BaseComponent):
         Calculates a combination sum by multiplying each score by its weight.
         """
         scores_map = defaultdict(int)
-        weights = self.weights if self.weights else [1 / len(results)
-                                                     ] * len(results)
+        weights = self.weights if self.weights else [1 / len(results)] * len(results)
 
         for result, weight in zip(results, weights):
             for doc in result:

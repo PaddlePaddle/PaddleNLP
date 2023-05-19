@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 
 
 class MarkdownConverter(BaseConverter):
-
     def convert(
         self,
         file_path: Path,

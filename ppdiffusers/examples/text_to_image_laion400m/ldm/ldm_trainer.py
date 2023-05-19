@@ -11,31 +11,39 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import contextlib
 import sys
-from paddlenlp.trainer import Trainer
+
 import paddle.amp.auto_cast as autocast
 from paddle.io import DataLoader
-import contextlib
-from .text_image_pair_dataset import worker_init_fn, TextImagePair
-from paddlenlp.trainer.integrations import VisualDLCallback, INTEGRATION_TO_CALLBACK, rewrite_logs
+
+from paddlenlp.trainer import Trainer
+from paddlenlp.trainer.integrations import (
+    INTEGRATION_TO_CALLBACK,
+    VisualDLCallback,
+    rewrite_logs,
+)
 from paddlenlp.utils.log import logger
+
+from .text_image_pair_dataset import TextImagePair, worker_init_fn
 
 
 class VisualDLWithImageCallback(VisualDLCallback):
-
     def autocast_smart_context_manager(self, args):
         if args.fp16 or args.bf16:
             amp_dtype = "float16" if args.fp16 else "bfloat16"
-            ctx_manager = autocast(True,
-                                   custom_black_list=[
-                                       "reduce_sum",
-                                       "c_softmax_with_cross_entropy",
-                                   ],
-                                   level=args.fp16_opt_level,
-                                   dtype=amp_dtype)
+            ctx_manager = autocast(
+                True,
+                custom_black_list=[
+                    "reduce_sum",
+                    "c_softmax_with_cross_entropy",
+                ],
+                level=args.fp16_opt_level,
+                dtype=amp_dtype,
+            )
         else:
-            ctx_manager = contextlib.nullcontext() if sys.version_info >= (
-                3, 7) else contextlib.suppress()
+            ctx_manager = contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
 
         return ctx_manager
 
@@ -50,14 +58,20 @@ class VisualDLWithImageCallback(VisualDLCallback):
         inputs = kwargs.get("inputs", None)
         model = kwargs.get("model", None)
         image_logs = {}
-        if inputs is not None and model is not None and args.image_logging_steps > 0 and state.global_step % args.image_logging_steps == 0:
+        if (
+            inputs is not None
+            and model is not None
+            and args.image_logging_steps > 0
+            and state.global_step % args.image_logging_steps == 0
+        ):
             with self.autocast_smart_context_manager(args):
-                image_logs["reconstruction"] = model.decode_image(
-                    pixel_values=inputs["pixel_values"])
+                image_logs["reconstruction"] = model.decode_image(pixel_values=inputs["pixel_values"])
                 image_logs["ddim-samples-1.0"] = model.log_image(
-                    input_ids=inputs["input_ids"], guidance_scale=1.0)
+                    input_ids=inputs["input_ids"], guidance_scale=1.0, height=args.resolution, width=args.resolution
+                )
                 image_logs["ddim-samples-7.5"] = model.log_image(
-                    input_ids=inputs["input_ids"], guidance_scale=7.5)
+                    input_ids=inputs["input_ids"], guidance_scale=7.5, height=args.resolution, width=args.resolution
+                )
 
         if not state.is_world_process_zero:
             return
@@ -75,13 +89,11 @@ class VisualDLWithImageCallback(VisualDLCallback):
                         "Trainer is attempting to log a value of "
                         f'"{v}" of type {type(v)} for key "{k}" as a scalar. '
                         "This invocation of VisualDL's writer.add_scalar() "
-                        "is incorrect so we dropped this attribute.")
+                        "is incorrect so we dropped this attribute."
+                    )
             # log images
             for k, v in image_logs.items():
-                self.vdl_writer.add_image(k,
-                                          v,
-                                          state.global_step,
-                                          dataformats="NHWC")
+                self.vdl_writer.add_image(k, v, state.global_step, dataformats="NHWC")
             self.vdl_writer.flush()
 
 
@@ -90,7 +102,6 @@ INTEGRATION_TO_CALLBACK.update({"custom_visualdl": VisualDLWithImageCallback})
 
 
 class LatentDiffusionTrainer(Trainer):
-
     def compute_loss(self, model, inputs, return_outputs=False):
         loss = model(**inputs)
         return loss

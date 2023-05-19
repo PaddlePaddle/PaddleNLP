@@ -21,14 +21,14 @@ from paddle.metric import Metric
 
 class RecallAtK(Metric):
     """
-    Recall@K is the fraction of relevant results among the retrieved Top K 
-    results, using to evaluate the performance of Dialogue Response Selection. 
+    Recall@K is the fraction of relevant results among the retrieved Top K
+    results, using to evaluate the performance of Dialogue Response Selection.
 
     Noted that this class manages the Recall@K score only for binary
     classification task.
     """
 
-    def __init__(self, name='Recall@K', *args, **kwargs):
+    def __init__(self, name="Recall@K", *args, **kwargs):
         super(RecallAtK, self).__init__(*args, **kwargs)
         self._name = name
         self.softmax = nn.Softmax()
@@ -48,7 +48,7 @@ class RecallAtK(Metric):
         calculate precision in recall n
         """
         pos_score = data[idx][0]
-        curr = data[idx:idx + m]
+        curr = data[idx : idx + m]
         curr = sorted(curr, key=lambda x: x[0], reverse=True)
         if curr[n - 1][0] <= pos_score:
             return 1
@@ -59,9 +59,9 @@ class RecallAtK(Metric):
         Update the states based on the current mini-batch prediction results.
 
         Args:
-            logits (Tensor): The predicted value is a Tensor with 
+            logits (Tensor): The predicted value is a Tensor with
                 shape [batch_size, 2] and type float32 or float64.
-            labels (Tensor): The ground truth value is a 2D Tensor, 
+            labels (Tensor): The ground truth value is a 2D Tensor,
                 its shape is [batch_size, 1] and type is int64.
         """
         probs = self.softmax(logits)
@@ -92,7 +92,7 @@ class RecallAtK(Metric):
         metrics_out = [
             self.p_at_1_in_10 / self.num_sampls,
             self.p_at_2_in_10 / self.num_sampls,
-            self.p_at_5_in_10 / self.num_sampls
+            self.p_at_5_in_10 / self.num_sampls,
         ]
         return metrics_out
 
@@ -106,13 +106,13 @@ class RecallAtK(Metric):
 class JointAccuracy(Metric):
     """
     The joint accuracy rate is used to evaluate the performance of multi-turn
-    Dialogue State Tracking. For each turn, if and only if all state in 
-    state_list are correctly predicted, the dialog state prediction is 
-    considered correct. And the joint accuracy rate is equal to 1, otherwise 
+    Dialogue State Tracking. For each turn, if and only if all state in
+    state_list are correctly predicted, the dialog state prediction is
+    considered correct. And the joint accuracy rate is equal to 1, otherwise
     it is equal to 0.
     """
 
-    def __init__(self, name='JointAccuracy', *args, **kwargs):
+    def __init__(self, name="JointAccuracy", *args, **kwargs):
         super(JointAccuracy, self).__init__(*args, **kwargs)
         self._name = name
         self.sigmoid = nn.Sigmoid()
@@ -130,9 +130,9 @@ class JointAccuracy(Metric):
         Update the states based on the current mini-batch prediction results.
 
         Args:
-            logits (Tensor): The predicted value is a Tensor with 
+            logits (Tensor): The predicted value is a Tensor with
                 shape [batch_size,  num_classes] and type float32 or float64.
-            labels (Tensor): The ground truth value is a 2D Tensor, 
+            labels (Tensor): The ground truth value is a 2D Tensor,
                 its shape is [batch_size, num_classes] and type is int64.
         """
         probs = self.sigmoid(logits)
@@ -172,13 +172,13 @@ class JointAccuracy(Metric):
 
 class F1Score(Metric):
     """
-    F1-score is the harmonic mean of precision and recall. Micro-averaging is 
-    to create a global confusion matrix for all examples, and then calculate 
-    the F1-score. This class is using to evaluate the performance of Dialogue 
+    F1-score is the harmonic mean of precision and recall. Micro-averaging is
+    to create a global confusion matrix for all examples, and then calculate
+    the F1-score. This class is using to evaluate the performance of Dialogue
     Slot Filling.
     """
 
-    def __init__(self, name='F1Score', *args, **kwargs):
+    def __init__(self, name="F1Score", *args, **kwargs):
         super(F1Score, self).__init__(*args, **kwargs)
         self._name = name
         self.reset()
@@ -196,10 +196,10 @@ class F1Score(Metric):
         Update the states based on the current mini-batch prediction results.
 
         Args:
-            logits (Tensor): The predicted value is a Tensor with 
-                shape [batch_size, seq_len, num_classes] and type float32 or 
+            logits (Tensor): The predicted value is a Tensor with
+                shape [batch_size, seq_len, num_classes] and type float32 or
                 float64.
-            labels (Tensor): The ground truth value is a 2D Tensor, 
+            labels (Tensor): The ground truth value is a 2D Tensor,
                 its shape is [batch_size, seq_len] and type is int64.
         """
         probs = paddle.argmax(logits, axis=-1)

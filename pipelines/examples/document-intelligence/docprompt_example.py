@@ -13,12 +13,9 @@
 # limitations under the License.
 
 import argparse
-import logging
-import os
 
-import paddle
-from pipelines.nodes import DocOCRProcessor, DocPrompter
 from pipelines import DocPipeline
+from pipelines.nodes import DocOCRProcessor, DocPrompter
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -30,16 +27,15 @@ args = parser.parse_args()
 
 def docprompt_pipeline():
 
-    use_gpu = True if args.device == 'gpu' else False
+    use_gpu = True if args.device == "gpu" else False
 
     preprocessor = DocOCRProcessor(use_gpu=use_gpu)
     docprompter = DocPrompter(use_gpu=use_gpu, batch_size=args.batch_size)
     pipe = DocPipeline(preprocessor=preprocessor, docreader=docprompter)
     # image link input
     meta = {
-        "doc":
-        "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg",
-        "prompt": ["发票号码是多少?", "校验码是多少?"]
+        "doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg",
+        "prompt": ["发票号码是多少?", "校验码是多少?"],
     }
     # image local path input
     # meta = {"doc": "./invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}

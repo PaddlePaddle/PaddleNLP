@@ -13,26 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import glob
-import json
-import math
 import os
-import copy
-import itertools
 
-import numpy as np
 import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
-from ..datasets import load_dataset, MapDataset
-from ..data import Stack, Pad, Tuple, Vocab, JiebaTokenizer
-from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
-from .utils import Customization
-from .task import Task
+
+from ..data import Pad, Stack, Tuple
+from ..datasets import load_dataset
 from .models import BiGruCrf
+from .task import Task
+from .utils import Customization
 
 usage = r"""
-           from paddlenlp import Taskflow 
+           from paddlenlp import Taskflow
 
            lac = Taskflow("lexical_analysis")
            lac("LAC是个优秀的分词工具")
@@ -42,7 +34,7 @@ usage = r"""
 
            lac(["LAC是个优秀的分词工具", "三亚是一个美丽的城市"])
            '''
-           [{'text': 'LAC是个优秀的分词工具', 'segs': ['LAC', '是', '个', '优秀', '的', '分词', '工具'], 'tags': ['nz', 'v', 'q', 'a', 'u', 'n', 'n']}, 
+           [{'text': 'LAC是个优秀的分词工具', 'segs': ['LAC', '是', '个', '优秀', '的', '分词', '工具'], 'tags': ['nz', 'v', 'q', 'a', 'u', 'n', 'n']},
             {'text': '三亚是一个美丽的城市', 'segs': ['三亚', '是', '一个', '美丽', '的', '城市'], 'tags': ['LOC', 'v', 'm', 'a', 'u', 'n']}
            ]
            '''
@@ -60,7 +52,7 @@ def load_vocab(dict_path):
         for i, line in enumerate(fin):
             terms = line.strip("\n").split("\t")
             if len(terms) == 2:
-                if reverse == None:
+                if reverse is None:
                     reverse = True if terms[0].isdigit() else False
                 if reverse:
                     value, key = terms
@@ -174,7 +166,6 @@ class LacTask(Task):
         batch_size = self.kwargs["batch_size"] if "batch_size" in self.kwargs else 1
         num_workers = self.kwargs["num_workers"] if "num_workers" in self.kwargs else 0
         self._split_sentence = self.kwargs["split_sentence"] if "split_sentence" in self.kwargs else False
-        infer_data = []
         oov_token_id = self._word_vocab.get("OOV")
 
         filter_inputs = []
@@ -238,7 +229,6 @@ class LacTask(Task):
         """
         The model output is the tag ids, this function will convert the model output to raw text.
         """
-        batch_out = []
         lengths = inputs["lens"]
         preds = inputs["result"]
         sents = inputs["text"]

@@ -1,10 +1,11 @@
-paddlenlp>=2.4.3
+paddlenlp>=2.5.2
 paddleocr
+pdf2image>1.14
 requests
 pydantic
 mmh3
 more_itertools
-elasticsearch>=7.7,<=7.10
+elasticsearch>=7.7,<=7.11
 sqlalchemy>=1.4.2,<2
 sqlalchemy_utils
 langdetect
@@ -17,9 +18,10 @@ opencv-contrib-python-headless
 python-multipart
 st-annotated-text
 click==8.0
-streamlit==1.9.0
+streamlit==1.11.1
 fastapi
 uvicorn
 markdown
 numba
 pymilvus>=2.1
+wordcloud==1.8.2.2

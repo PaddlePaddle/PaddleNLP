@@ -12,16 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .faster_transformer.transformer.decoding import *
-from .faster_transformer.transformer.faster_transformer import *
-from .faster_transformer.transformer.decoder import *
-from .faster_transformer.transformer.encoder import *
-from .einsum import *
-from .distributed import *
-from . import optimizer
+import paddle
 
-paddle.nn.TransformerEncoderLayer._ft_forward = encoder_layer_forward
-paddle.nn.TransformerEncoder._ft_forward = encoder_forward
+from . import optimizer
+from .distributed import *
+from .einsum import *
+
+# isort: split
+from .fast_transformer.transformer.decoding import *
+
+# isort: split
+from .fast_transformer.transformer.decoder import *
+from .fast_transformer.transformer.encoder import *
+from .fast_transformer.transformer.fast_transformer import *
+
+paddle.nn.TransformerEncoderLayer._ft_forward = encoder_layer_forward  # noqa F405
+paddle.nn.TransformerEncoder._ft_forward = encoder_forward  # noqa F405
 
 paddle.nn.TransformerEncoderLayer._ori_forward = paddle.nn.TransformerEncoderLayer.forward
 paddle.nn.TransformerEncoder._ori_forward = paddle.nn.TransformerEncoder.forward

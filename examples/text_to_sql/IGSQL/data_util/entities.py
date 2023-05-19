@@ -31,9 +31,7 @@ class NLtoSQLDict:
     def __init__(self, entity_dict_filename):
         self.entity_dict = {}
 
-        pairs = [
-            json.loads(line) for line in open(entity_dict_filename).readlines()
-        ]
+        pairs = [json.loads(line) for line in open(entity_dict_filename).readlines()]
         for pair in pairs:
             input_seq = pair["input"]
             output_seq = pair["output"]
@@ -62,12 +60,10 @@ class NLtoSQLDict:
             in_middle = " " + entry + " " in flat_input_string
 
             leftspace = " " + entry
-            at_end = leftspace in flat_input_string and flat_input_string.endswith(
-                leftspace)
+            at_end = leftspace in flat_input_string and flat_input_string.endswith(leftspace)
 
             rightspace = entry + " "
-            at_beginning = rightspace in flat_input_string and flat_input_string.startswith(
-                rightspace)
+            at_beginning = rightspace in flat_input_string and flat_input_string.startswith(rightspace)
             if in_middle or at_end or at_beginning:
                 for out_string in values:
                     entities.append(out_string)

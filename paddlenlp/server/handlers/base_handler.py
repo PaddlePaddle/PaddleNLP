@@ -13,12 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import abc
 from abc import ABCMeta, abstractmethod
 
 
 class BaseModelHandler(metaclass=ABCMeta):
-
     def __init__(self):
         super().__init__()
 
@@ -29,7 +27,6 @@ class BaseModelHandler(metaclass=ABCMeta):
 
 
 class BasePostHandler(metaclass=ABCMeta):
-
     def __init__(self):
         super().__init__()
 
@@ -40,7 +37,6 @@ class BasePostHandler(metaclass=ABCMeta):
 
 
 class BaseTaskflowHandler(metaclass=ABCMeta):
-
     def __init__(self):
         super().__init__()
 

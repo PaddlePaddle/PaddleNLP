@@ -45,14 +45,14 @@ _URL = "https://bj.bcebos.com/paddlenlp/datasets/rvl_cdip_sampled.tar.gz"
 
 
 def _get_md5(string):
-    """ Get md5 value for string """
+    """Get md5 value for string"""
     hl = hashlib.md5()
     hl.update(string.encode(encoding="utf-8"))
     return hl.hexdigest()
 
 
 class RVLCDIPSampledConfig(datasets.BuilderConfig):
-    """ funsd dataset config """
+    """funsd dataset config"""
 
     target_size: int = 1000
     max_size: int = 1000
@@ -63,7 +63,7 @@ class RVLCDIPSampledConfig(datasets.BuilderConfig):
 
 
 class RVLCDIPSampled(datasets.GeneratorBasedBuilder):
-    """ funsd dataset builder """
+    """funsd dataset builder"""
 
     BUILDER_CONFIGS = [
         RVLCDIPSampledConfig(
@@ -76,46 +76,33 @@ class RVLCDIPSampled(datasets.GeneratorBasedBuilder):
     def _info(self):
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
-            features=datasets.Features({
-                "name":
-                datasets.Value("string"),
-                "page_no":
-                datasets.Value("int32"),
-                "text":
-                datasets.features.Sequence(datasets.Value("string")),
-                "bbox":
-                datasets.features.Sequence(
-                    datasets.features.Sequence(datasets.Value("int32"))),
-                "segment_bbox":
-                datasets.features.Sequence(
-                    datasets.features.Sequence(datasets.Value("int32"))),
-                "segment_id":
-                datasets.features.Sequence(datasets.Value("int32")),
-                "image":
-                datasets.Value("string"),
-                "width":
-                datasets.Value("int32"),
-                "height":
-                datasets.Value("int32"),
-                "md5sum":
-                datasets.Value("string"),
-                "qas":
-                datasets.features.Sequence({
-                    "question_id":
-                    datasets.Value("int32"),
-                    "question":
-                    datasets.Value("string"),
-                    "answers":
-                    datasets.features.Sequence({
-                        "text":
-                        datasets.Value("string"),
-                        "answer_start":
-                        datasets.Value("int32"),
-                        "answer_end":
-                        datasets.Value("int32"),
-                    }),
-                }),
-            }),
+            features=datasets.Features(
+                {
+                    "name": datasets.Value("string"),
+                    "page_no": datasets.Value("int32"),
+                    "text": datasets.features.Sequence(datasets.Value("string")),
+                    "bbox": datasets.features.Sequence(datasets.features.Sequence(datasets.Value("int32"))),
+                    "segment_bbox": datasets.features.Sequence(datasets.features.Sequence(datasets.Value("int32"))),
+                    "segment_id": datasets.features.Sequence(datasets.Value("int32")),
+                    "image": datasets.Value("string"),
+                    "width": datasets.Value("int32"),
+                    "height": datasets.Value("int32"),
+                    "md5sum": datasets.Value("string"),
+                    "qas": datasets.features.Sequence(
+                        {
+                            "question_id": datasets.Value("int32"),
+                            "question": datasets.Value("string"),
+                            "answers": datasets.features.Sequence(
+                                {
+                                    "text": datasets.Value("string"),
+                                    "answer_start": datasets.Value("int32"),
+                                    "answer_end": datasets.Value("int32"),
+                                }
+                            ),
+                        }
+                    ),
+                }
+            ),
             supervised_keys=None,
             homepage="https://adamharley.com/rvl-cdip/",
             license=_LICENSE,
@@ -128,24 +115,15 @@ class RVLCDIPSampled(datasets.GeneratorBasedBuilder):
         return [
             datasets.SplitGenerator(
                 name=datasets.Split.TRAIN,
-                gen_kwargs={
-                    "filepath":
-                    os.path.join(dl_dir, 'rvl_cdip_sampled', 'train.json')
-                },
+                gen_kwargs={"filepath": os.path.join(dl_dir, "rvl_cdip_sampled", "train.json")},
             ),
             datasets.SplitGenerator(
                 name=datasets.Split.VALIDATION,
-                gen_kwargs={
-                    "filepath": os.path.join(dl_dir, 'rvl_cdip_sampled',
-                                             'dev.json')
-                },
+                gen_kwargs={"filepath": os.path.join(dl_dir, "rvl_cdip_sampled", "dev.json")},
             ),
             datasets.SplitGenerator(
                 name=datasets.Split.TEST,
-                gen_kwargs={
-                    "filepath":
-                    os.path.join(dl_dir, 'rvl_cdip_sampled', 'test.json')
-                },
+                gen_kwargs={"filepath": os.path.join(dl_dir, "rvl_cdip_sampled", "test.json")},
             ),
         ]
 

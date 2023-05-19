@@ -42,7 +42,7 @@
 本实验采用了以下的运行环境进行，详细说明如下，用户也可以在自己 GPU 硬件环境进行：
 
 a. 软件环境：
-- python >= 3.7.0
+- python >= 3.7.3
 - paddlenlp >= 2.2.1
 - paddlepaddle-gpu >=2.3
 - CUDA Version: 10.2
@@ -63,6 +63,12 @@ pip install --upgrade paddle-pipelines -i https://pypi.tuna.tsinghua.edu.cn/simp
 cd ${HOME}/PaddleNLP/pipelines/
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 python setup.py install
+```
+
+```
+# 下载pipelines源代码
+git clone https://github.com/PaddlePaddle/PaddleNLP.git
+cd PaddleNLP/pipelines
 ```
 【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
 
@@ -115,6 +121,7 @@ curl http://localhost:9200/_aliases?pretty=true
 python utils/offline_ann.py --index_name dureader_robust_query_encoder \
                             --doc_dir data/dureader_dev \
                             --search_engine elastic \
+                            --embed_title True \
                             --delete_index
 ```
 可以使用下面的命令来查看数据：
@@ -131,6 +138,7 @@ curl http://localhost:9200/dureader_robust_query_encoder/_search
 * `port`: ANN索引引擎的端口号
 * `search_engine`: 选择的近似索引引擎elastic，milvus，默认elastic
 * `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
+* `embed_title`: 是否需要对标题建索引，默认为false，标题默认为文件名
 
 删除索引也可以使用下面的命令：
 
@@ -145,7 +153,7 @@ export PIPELINE_YAML_PATH=rest_api/pipeline/semantic_search.yaml
 # 使用端口号 8891 启动模型服务
 python rest_api/application.py 8891
 ```
-Linux 用户推荐采用 Shell 脚本来启动服务：：
+Linux 用户推荐采用 Shell 脚本来启动服务：
 
 ```bash
 sh examples/semantic-search/run_search_server.sh
@@ -165,7 +173,7 @@ export API_ENDPOINT=http://127.0.0.1:8891
 # 在指定端口 8502 启动 WebUI
 python -m streamlit run ui/webapp_semantic_search.py --server.port 8502
 ```
-Linux 用户推荐采用 Shell 脚本来启动服务：：
+Linux 用户推荐采用 Shell 脚本来启动服务：
 
 ```bash
 sh examples/semantic-search/run_search_web.sh

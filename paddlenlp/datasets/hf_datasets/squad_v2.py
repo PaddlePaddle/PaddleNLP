@@ -63,9 +63,7 @@ class SquadV2(datasets.GeneratorBasedBuilder):
 
     # TODO(squad_v2): Set up version.
     BUILDER_CONFIGS = [
-        SquadV2Config(name="squad_v2",
-                      version=datasets.Version("2.0.0"),
-                      description="SQuAD plaint text version 2"),
+        SquadV2Config(name="squad_v2", version=datasets.Version("2.0.0"), description="SQuAD plaint text version 2"),
     ]
 
     def _info(self):
@@ -74,24 +72,21 @@ class SquadV2(datasets.GeneratorBasedBuilder):
             # This is the description that will appear on the datasets page.
             description=_DESCRIPTION,
             # datasets.features.FeatureConnectors
-            features=datasets.Features({
-                "id":
-                datasets.Value("string"),
-                "title":
-                datasets.Value("string"),
-                "context":
-                datasets.Value("string"),
-                "question":
-                datasets.Value("string"),
-                "answers":
-                datasets.features.Sequence({
-                    "text":
-                    datasets.Value("string"),
-                    "answer_start":
-                    datasets.Value("int32"),
-                }),
-                # These are the features of your dataset like images, labels ...
-            }),
+            features=datasets.Features(
+                {
+                    "id": datasets.Value("string"),
+                    "title": datasets.Value("string"),
+                    "context": datasets.Value("string"),
+                    "question": datasets.Value("string"),
+                    "answers": datasets.features.Sequence(
+                        {
+                            "text": datasets.Value("string"),
+                            "answer_start": datasets.Value("int32"),
+                        }
+                    ),
+                    # These are the features of your dataset like images, labels ...
+                }
+            ),
             # If there's a common (input, target) tuple from the features,
             # specify them here. They'll be used if as_supervised=True in
             # builder.as_dataset.
@@ -100,9 +95,9 @@ class SquadV2(datasets.GeneratorBasedBuilder):
             homepage="https://rajpurkar.github.io/SQuAD-explorer/",
             citation=_CITATION,
             task_templates=[
-                QuestionAnsweringExtractive(question_column="question",
-                                            context_column="context",
-                                            answers_column="answers")
+                QuestionAnsweringExtractive(
+                    question_column="question", context_column="context", answers_column="answers"
+                )
             ],
         )
 
@@ -115,12 +110,8 @@ class SquadV2(datasets.GeneratorBasedBuilder):
         downloaded_files = dl_manager.download_and_extract(urls_to_download)
 
         return [
-            datasets.SplitGenerator(
-                name=datasets.Split.TRAIN,
-                gen_kwargs={"filepath": downloaded_files["train"]}),
-            datasets.SplitGenerator(
-                name=datasets.Split.VALIDATION,
-                gen_kwargs={"filepath": downloaded_files["dev"]}),
+            datasets.SplitGenerator(name=datasets.Split.TRAIN, gen_kwargs={"filepath": downloaded_files["train"]}),
+            datasets.SplitGenerator(name=datasets.Split.VALIDATION, gen_kwargs={"filepath": downloaded_files["dev"]}),
         ]
 
     def _generate_examples(self, filepath):
@@ -131,15 +122,12 @@ class SquadV2(datasets.GeneratorBasedBuilder):
             for example in squad["data"]:
                 title = example.get("title", "")
                 for paragraph in example["paragraphs"]:
-                    context = paragraph[
-                        "context"]  # do not strip leading blank spaces GH-2585
+                    context = paragraph["context"]  # do not strip leading blank spaces GH-2585
                     for qa in paragraph["qas"]:
                         question = qa["question"]
                         id_ = qa["id"]
 
-                        answer_starts = [
-                            answer["answer_start"] for answer in qa["answers"]
-                        ]
+                        answer_starts = [answer["answer_start"] for answer in qa["answers"]]
                         answers = [answer["text"] for answer in qa["answers"]]
 
                         # Features currently used are "context", "question", and "answers".

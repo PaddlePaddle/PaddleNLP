@@ -1,5 +1,6 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+#!/usr/bin/env python
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,10 +20,8 @@ from .env import EnvironmentCommand
 
 
 def main():
-    parser = ArgumentParser("PPDiffusers CLI tool",
-                            usage="ppdiffusers-cli <command> [<args>]")
-    commands_parser = parser.add_subparsers(
-        help="ppdiffusers-cli command helpers")
+    parser = ArgumentParser("PPDiffusers CLI tool", usage="ppdiffusers-cli <command> [<args>]")
+    commands_parser = parser.add_subparsers(help="ppdiffusers-cli command helpers")
 
     # Register commands
     EnvironmentCommand.register_subcommand(commands_parser)

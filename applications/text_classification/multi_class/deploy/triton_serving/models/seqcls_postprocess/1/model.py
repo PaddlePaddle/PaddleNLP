@@ -13,9 +13,7 @@
 # limitations under the License.
 
 import json
-import time
 
-import paddle
 import numpy as np
 
 # triton_python_backend_utils is available in every Triton Python model. You
@@ -33,7 +31,7 @@ class TritonPythonModel(object):
     def initialize(self, args):
         """`initialize` is called only once when the model is being loaded.
         Implementing `initialize` function is optional. This function allows
-        the model to intialize any state associated with this model.
+        the model to initialize any state associated with this model.
         Parameters
         ----------
         args : dict
@@ -45,7 +43,7 @@ class TritonPythonModel(object):
           * model_version: Model version
           * model_name: Model name
         """
-        self.model_config = model_config = json.loads(args['model_config'])
+        self.model_config = json.loads(args["model_config"])
         print("model_config:", self.model_config)
 
         self.input_names = []
@@ -83,18 +81,15 @@ class TritonPythonModel(object):
         responses = []
         # print("num:", len(requests), flush=True)
         for request in requests:
-            data = pb_utils.get_input_tensor_by_name(request,
-                                                     self.input_names[0])
+            data = pb_utils.get_input_tensor_by_name(request, self.input_names[0])
             data = data.as_numpy()
             max_value = np.max(data, axis=1, keepdims=True)
             exp_data = np.exp(data - max_value)
             probs = exp_data / np.sum(exp_data, axis=1, keepdims=True)
             probs = probs.max(axis=-1)
-            out_tensor1 = pb_utils.Tensor(self.output_names[0],
-                                          data.argmax(axis=-1))
+            out_tensor1 = pb_utils.Tensor(self.output_names[0], data.argmax(axis=-1))
             out_tensor2 = pb_utils.Tensor(self.output_names[1], probs)
-            inference_response = pb_utils.InferenceResponse(
-                output_tensors=[out_tensor1, out_tensor2])
+            inference_response = pb_utils.InferenceResponse(output_tensors=[out_tensor1, out_tensor2])
             responses.append(inference_response)
         return responses
 
@@ -103,4 +98,4 @@ class TritonPythonModel(object):
         Implementing `finalize` function is optional. This function allows
         the model to perform any necessary clean ups before exit.
         """
-        print('Cleaning up...')
+        print("Cleaning up...")

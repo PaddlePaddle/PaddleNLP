@@ -1,64 +1,140 @@
-# ERNIE 3.0 Python部署指南
-本文介绍 ERNIE 3.0 Python 端的部署，包括部署环境的准备，序列标注和分类两大场景下的使用示例。
-- [ERNIE 3.0 Python 部署指南](#ERNIE3.0Python部署指南)
-  - [1. 环境准备](#1-环境准备)
-    - [1.1 CPU 端](#11-CPU端)
-    - [1.2 GPU 端](#12-GPU端)
-  - [2. 序列标注模型推理](#2-序列标注模型推理)
-    - [2.1 模型获取](#21-模型获取)
-    - [2.2 CPU 端推理样例](#22-CPU端推理样例)
-    - [2.3 GPU 端推理样例](#23-GPU端推理样例)
-  - [3. 分类模型推理](#3-分类模型推理)
-    - [3.1 模型获取](#31-模型获取)
-    - [3.2 CPU 端推理样例](#32-CPU端推理样例)
-    - [3.3 GPU 端推理样例](#33-GPU端推理样例)
-## 1. 环境准备
-ERNIE 3.0 的部署分为 CPU 和 GPU 两种情况，请根据你的部署环境安装对应的依赖。
-### 1.1 CPU端
-CPU 端的部署请使用如下命令安装所需依赖
+# FastDeploy ERNIE 3.0 模型 Python 部署示例
+
+在部署前，参考 [FastDeploy SDK 安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md)安装 FastDeploy Python SDK。
+
+本目录下分别提供 `seq_cls_infer.py` 以及 `token_cls_infer.py` 快速完成在 CPU/GPU 的文本分类任务以及序列标注任务的 Python 部署示例。
+
+## 依赖安装
+
+直接执行以下命令安装部署示例的依赖。
+
+```bash
+
+# 安装fast_tokenizer以及GPU版本fastdeploy
+pip install fast-tokenizer-python fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdeploy.html
+
 ```
-pip install -r requirements_cpu.txt
+
+## 文本分类任务
+
+### 快速开始
+
+以下示例展示如何基于 FastDeploy 库完成 ERNIE 3.0 Medium 模型在 CLUE Benchmark 的 [AFQMC 数据集](https://github.com/CLUEbenchmark/CLUE)上进行文本分类任务的 Python 预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型，具体参数设置可查看下面[参数说明](#参数说明)。示例中的模型是按照 [ERNIE 3.0 训练文档](../../README.md)导出得到的部署模型，其模型目录为`model_zoo/ernie-3.0/best_models/afqmc/export`（用户可按实际情况设置）。
+
+```bash
+
+# CPU 推理
+python seq_cls_infer.py --model_dir ../../best_models/afqmc/export --device cpu --backend paddle
+
+# GPU 推理
+python seq_cls_infer.py --model_dir ../../best_models/afqmc/export --device gpu --backend paddle
+
 ```
-### 1.2 GPU端
-为了在 GPU 上获得最佳的推理性能和稳定性，请先确保机器已正确安装 NVIDIA 相关驱动和基础软件，确保 CUDA >= 11.2，CuDNN >= 8.2，并使用以下命令安装所需依赖
+
+运行完成后返回的结果如下：
+
+```bash
+
+[INFO] fastdeploy/runtime.cc(596)::Init    Runtime initialized with Backend::PDINFER in Device::CPU.
+Batch id:0, example id:0, sentence1:花呗收款额度限制, sentence2:收钱码，对花呗支付的金额有限制吗, label:0, similarity:0.5099
+Batch id:1, example id:0, sentence1:花呗支持高铁票支付吗, sentence2:为什么友付宝不支持花呗付款, label:0, similarity:0.9862
+
 ```
-pip install -r requirements_gpu.txt
+
+### 量化模型部署
+
+该示例支持部署 Paddle INT8 新格式量化模型，仅需在`--model_dir`参数传入量化模型路径，并且在对应硬件上选择可用的推理引擎后端，即可完成量化模型部署。在 GPU 上部署量化模型时，可选后端为`paddle_tensorrt`、`tensorrt`；在CPU上部署量化模型时，可选后端为`paddle`、`onnx_runtime`。下面将展示如何使用该示例完成量化模型部署，示例中的模型是按照 [ERNIE 3.0 训练文档](../../README.md) 压缩量化后导出得到的量化模型。
+
+```bash
+
+# 在GPU上使用 tensorrt 后端，模型目录可按照实际模型路径设置
+python seq_cls_infer.py --model_dir ../../best_models/afqmc/width_mult_0.75/mse16_1/ --device gpu --backend tensorrt --model_prefix int8
+
+# 在CPU上使用paddle_inference后端，模型目录可按照实际模型路径设置
+python seq_cls_infer.py --model_dir ../../best_models/afqmc/width_mult_0.75/mse16_1/ --device cpu --backend paddle --model_prefix int8
+
 ```
-如需使用半精度（FP16）或量化（INT8）部署，请确保GPU设备的 CUDA 计算能力 (CUDA Compute Capability) 大于 7.0，典型的设备包括 V100、T4、A10、A100、GTX 20 系列和 30 系列显卡等。同时 INT8 推理需要安装 TensorRT 以及包含 TensorRT 预测库的 PaddlePaddle。
-更多关于 CUDA Compute Capability 和精度支持情况请参考 NVIDIA 文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)
 
-1. TensorRT 安装请参考：[TensorRT安装说明](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/install-guide/index.html#overview)，Linux 端简要步骤如下：
+运行完成后返回的结果如下：
 
-    (1)下载 TensorRT8.2 版本，文件名 TensorRT-XXX.tar.gz，[下载链接](https://developer.nvidia.com/tensorrt)
-
-    (2)解压得到 TensorRT-XXX 文件夹
-
-    (3)通过 export LD_LIBRARY_PATH=TensorRT-XXX/lib:$LD_LIBRARY_PATH 将 lib 路径加入到 LD_LIBRARY_PATH 中
-
-    (4)使用 pip install 安装 TensorRT-XXX/python 中对应的 TensorRT 安装包
-
-2. PaddlePaddle 预测库的安装请参考 [PaddlePaddle 预测库安装文档](https://www.paddlepaddle.org.cn/inference/v2.3/user_guides/source_compile.html)，Linux 端简要步骤如下：
-
-    (1)根据 CUDA 环境和 Python 版本下载对应的 PaddlePaddle 预测库，注意须下载支持 TensorRT 的预测包，如 linux-cuda11.2-cudnn8.2-trt8-gcc8.2。[PaddlePaddle 预测库下载路径](https://www.paddlepaddle.org.cn/inference/v2.3/user_guides/download_lib.html#python)
-
-    (2)使用 pip install 安装下载好的 PaddlePaddle 预测库
-
-
-## 2. 序列标注模型推理
-### 2.1 模型获取
-用户可使用自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#微调)，也可以使用我们提供的 msra_ner 数据集训练的 ERNIE 3.0 模型，请执行如下命令获取模型：
+```bash
+[INFO] fastdeploy/runtime/runtime.cc(101)::Init    Runtime initialized with Backend::PDINFER in Device::GPU.
+Batch id:0, example id:0, sentence1:花呗收款额度限制, sentence2:收钱码，对花呗支付的金额有限制吗, label:0, similarity:0.5224
+Batch id:1, example id:0, sentence1:花呗支持高铁票支付吗, sentence2:为什么友付宝不支持花呗付款, label:0, similarity:0.9856
 ```
-# 获取序列标注FP32模型
-wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_pruned_infer_model.zip
-unzip msra_ner_pruned_infer_model.zip
+
+
+### 参数说明
+
+`seq_cls_infer.py` 除了以上示例的命令行参数，还支持更多命令行参数的设置。以下为各命令行参数的说明。
+
+| 参数 |参数说明 |
+|----------|--------------|
+|--model_dir | 指定部署模型的目录， |
+|--batch_size |输入的batch size，默认为 1|
+|--max_length |最大序列长度，默认为 128|
+|--device | 运行的设备，可选范围: ['cpu', 'gpu']，默认为'cpu' |
+|--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
+|--use_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
+|--use_fast| 是否使用FastTokenizer加速分词阶段。默认为True|
+
+## 序列标注任务
+
+### 快速开始
+
+以下示例展示如何基于 FastDeploy 库完成 ERNIE 3.0 Medium 模型在 CLUE Benchmark 的[ MSRA_NER 数据集](https://github.com/lemonhu/NER-BERT-pytorch/tree/master/data/msra)上进行序列标注任务的Python预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型，具体参数设置可查看下面[参数说明](#参数说明)。示例中的模型是按照 [ERNIE 3.0 训练文档](../../README.md)导出得到的部署模型，其模型目录为`model_zoo/ernie-3.0/best_models/msra_ner/export`（用户可按实际情况设置）。
+
+
+```bash
+
+# CPU 推理
+python token_cls_infer.py --model_dir ../../best_models/msra_ner/export/ --device cpu --backend paddle
+
+# GPU 推理
+python token_cls_infer.py --model_dir ../../best_models/msra_ner/export/ --device gpu --backend paddle
+
 ```
-### 2.2 CPU端推理样例
-在 CPU 端，请使用如下命令进行部署
+
+运行完成后返回的结果如下：
+
+```bash
+
+[INFO] fastdeploy/runtime.cc(500)::Init    Runtime initialized with Backend::PDINFER in Device::CPU.
+input data: 北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。
+The model detects all entities:
+entity: 北京   label: LOC   pos: [0, 1]
+entity: 重庆   label: LOC   pos: [6, 7]
+entity: 成都   label: LOC   pos: [12, 13]
+-----------------------------
+input data: 乔丹、科比、詹姆斯和姚明都是篮球界的标志性人物。
+The model detects all entities:
+entity: 乔丹   label: PER   pos: [0, 1]
+entity: 科比   label: PER   pos: [3, 4]
+entity: 詹姆斯   label: PER   pos: [6, 8]
+entity: 姚明   label: PER   pos: [10, 11]
+-----------------------------
+
 ```
-python infer_cpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32
+
+### 量化模型部署
+
+该示例支持部署 Paddle INT8 新格式量化模型，仅需在`--model_dir`参数传入量化模型路径，并且在对应硬件上选择可用的推理引擎后端，即可完成量化模型部署。在 GPU 上部署量化模型时，可选后端为`paddle_tensorrt`、`tensorrt`；在CPU上部署量化模型时，可选后端为`paddle`、`onnx_runtime`。下面将展示如何使用该示例完成量化模型部署，示例中的模型是按照 [ERNIE 3.0 训练文档](../../README.md) 压缩量化后导出得到的量化模型。
+
+```bash
+
+# 在GPU上使用 tensorrt 后端，模型目录可按照实际模型路径设置
+python token_cls_infer.py --model_dir ../../best_models/msra_ner/width_mult_0.75/mse16_1/ --device gpu --backend tensorrt --model_prefix int8
+
+# 在CPU上使用paddle_inference后端，模型目录可按照实际模型路径设置
+python token_cls_infer.py --model_dir ../../best_models/msra_ner/width_mult_0.75/mse16_1/ --device cpu --backend paddle --model_prefix int8
+
 ```
-输出打印如下:
-```
+
+运行完成后返回的结果如下：
+
+```bash
+
+[INFO] fastdeploy/runtime.cc(500)::Init    Runtime initialized with Backend::PDINFER in Device::CPU.
 input data: 北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。
 The model detects all entities:
 entity: 北京   label: LOC   pos: [0, 1]
@@ -73,166 +149,112 @@ entity: 詹姆斯   label: PER   pos: [6, 8]
 entity: 姚明   label: PER   pos: [10, 11]
 -----------------------------
 ```
-infer_cpu.py 脚本中的参数说明：
+
+### 参数说明
+
+`token_cls_infer.py` 除了以上示例的命令行参数，还支持更多命令行参数的设置。以下为各命令行参数的说明。
+
 | 参数 |参数说明 |
 |----------|--------------|
-|--task_name | 配置任务名称，可选 seq_cls 或 token_cls，默认为 seq_cls|
-|--model_name_or_path | 模型的路径或者名字，默认为 ernie-3.0-medium-zh|
-|--model_path | 用于推理的 Paddle 模型的路径|
-|--max_seq_length |最大序列长度，默认为 128|
-|--precision_mode | 推理精度，可选 fp32，fp16 或者 int8，当输入非量化模型并设置 int8 时使用动态量化进行加速，默认 fp32 |
-|--num_threads | 配置 cpu 的线程数，默认为 cpu 的最大线程数 |
+|--model_dir | 指定部署模型的目录， |
+|--batch_size |输入的batch size，默认为 1|
+|--max_length |最大序列长度，默认为 128|
+|--device | 运行的设备，可选范围: ['cpu', 'gpu']，默认为'cpu' |
+|--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
+|--use_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
+|--use_fast| 是否使用FastTokenizer加速分词阶段。默认为True|
+|--model_prefix| 模型文件前缀。前缀会分别与'.pdmodel'和'.pdiparams'拼接得到模型文件名和参数文件名。默认为 'model'|
 
-**Note**：在支持 avx512_vnni 指令集或 Intel® DL Boost 的 CPU 设备上，可设置 precision_mode 为 int8 对 FP32 模型进行动态量化以获得更高的推理性能，具体性能提升情况请查阅[量化性能提升情况](../../README.md#压缩效果)。
-CPU 端，开启动态量化的命令如下：
-```
-python infer_cpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32 --precision_mode int8
-```
-INT8 的输出打印和 FP32 的输出打印一致。
 
-### 2.3 GPU端推理样例
-在 GPU 端，请使用如下命令进行部署
-```
-python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32
-```
-输出打印如下:
-```
-input data: 北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。
-The model detects all entities:
-entity: 北京   label: LOC   pos: [0, 1]
-entity: 重庆   label: LOC   pos: [6, 7]
-entity: 成都   label: LOC   pos: [12, 13]
------------------------------
-input data: 乔丹、科比、詹姆斯和姚明都是篮球界的标志性人物。
-The model detects all entities:
-entity: 乔丹   label: PER   pos: [0, 1]
-entity: 科比   label: PER   pos: [3, 4]
-entity: 詹姆斯   label: PER   pos: [6, 8]
-entity: 姚明   label: PER   pos: [10, 11]
------------------------------
-```
-如果需要 FP16 进行加速，可以设置 precision_mode 为 fp16，具体命令为
-```
-python infer_gpu.py --task_name token_cls --model_path ./msra_ner_pruned_infer_model/float32 --precision_mode fp16
-```
-如果需要进行 INT8 量化加速，还需要使用量化脚本对训练好的 FP32 模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，也可下载我们量化后的 INT8 模型进行部署，请执行如下命令获取模型：
-```
-# 获取序列标注 INT8 量化模型
-wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/msra_ner_quant_infer_model.zip
-unzip msra_ner_quant_infer_model.zip
-```
-量化模型的部署命令为：
-```
-# 第一步，打开 set_dynamic_shape 开关，自动配置动态shape，在当前目录下生成 dynamic_shape_info.txt 文件
-python infer_gpu.py --task_name token_cls --model_path ./msra_ner_quant_infer_model/int8 --shape_info_file dynamic_shape_info.txt --set_dynamic_shape
-# 第二步，读取上一步中生成的 dynamic_shape_info.txt 文件，开启预测
-python infer_gpu.py --task_name token_cls --model_path ./msra_ner_quant_infer_model/int8 --shape_info_file dynamic_shape_info.txt
-```
-FP16 和 INT8 推理的运行结果和FP32的运行结果一致。
+## FastDeploy 高阶用法
 
-infer_gpu.py 脚本中的参数说明：
-| 参数 |参数说明 |
-|----------|--------------|
-|--task_name | 配置任务名称，可选 seq_cls 或 token_cls，默认为 seq_cls|
-|--model_name_or_path | 模型的路径或者名字，默认为ernie-3.0-medium-zh|
-|--model_path | 用于推理的 Paddle 模型的路径|
-|--batch_size |最大可测的 batch size，默认为 32|
-|--max_seq_length |最大序列长度，默认为 128|
-|--shape_info_file | 指定 dynamic shape info 的存储文件名，默认为 shape_info.txt |
-|--set_dynamic_shape | 配置是否自动配置 TensorRT 的 dynamic shape，在GPU上INT8量化推理时需要先开启此选项进行 dynamic shape 配置，生成 shape_info.txt 后再关闭，默认关闭 |
-|--precision_mode | 推理精度，可选 fp32，fp16 或者 int8，默认 fp32 |
+FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以及 `fastdeploy.RuntimeOption.use_xxx_backend()` 接口支持开发者选择不同的硬件、不同的推理引擎进行部署。在不同的硬件上部署 ERNIE 3.0 模型，需要选择硬件所支持的推理引擎进行部署，下表展示如何在不同的硬件上选择可用的推理引擎部署 ERNIE 3.0 模型。
 
-## 3. 分类模型推理
-### 3.1 模型获取
-用户可使用自己训练的模型进行推理，具体训练调优方法可参考[模型训练调优](./../../README.md#微调)，也可以使用我们提供的 tnews 数据集训练的 ERNIE 3.0 模型，请执行如下命令获取模型：
-```
-# 分类模型模型：
-wget  https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/tnews_pruned_infer_model.zip
-unzip tnews_pruned_infer_model.zip
-```
-### 3.2 CPU端推理样例
-在 CPU 端，请使用如下命令进行部署
-```
-python infer_cpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32
-```
-输出打印如下:
-```
-input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
-seq cls result:
-label: news_car   confidence: 0.5543532371520996
------------------------------
-input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
-seq cls result:
-label: news_entertainment   confidence: 0.9495906829833984
------------------------------
-```
-和序列标注模型推理类似，使用动态量化进行加速的命令如下：
-```
-python infer_cpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32 --precision_mode int8
-```
-输出打印如下:
-```
-input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
-seq cls result:
-label: news_car   confidence: 0.5778735876083374
------------------------------
-input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
-seq cls result:
-label: news_entertainment   confidence: 0.9206441044807434
------------------------------
-```
-### 3.3 GPU端推理样例
-在 GPU 端，请使用如下命令进行部署
-```
-python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32
-```
-输出打印如下:
-```
-input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
-seq cls result:
-label: news_car   confidence: 0.5543532371520996
------------------------------
-input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
-seq cls result:
-label: news_entertainment   confidence: 0.9495906829833984
------------------------------
-```
-如果需要 FP16 进行加速，可以设置 precision_mode 为 fp16，具体命令为
-```
-python infer_gpu.py --task_name seq_cls --model_path ./tnews_pruned_infer_model/float32 --precision_mode fp16
-```
-输出打印如下:
-```
-input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
-seq cls result:
-label: news_car   confidence: 0.5536671876907349
------------------------------
-input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
-seq cls result:
-label: news_entertainment   confidence: 0.9494127035140991
------------------------------
-```
-如果需要进行 INT8 量化加速，还需要使用量化脚本对训练好的 FP32 模型进行量化，然后使用量化后的模型进行部署，模型的量化请参考：[模型量化脚本使用说明](./../../README.md#模型压缩)，也可下载我们量化后的 INT8 模型进行部署，请执行如下命令获取模型：
-```
-# 获取序列标注 INT8 量化模型
-wget https://paddlenlp.bj.bcebos.com/models/transformers/ernie_3.0/tnews_quant_infer_model.zip
-unzip tnews_quant_infer_model.zip
-```
-量化模型的部署命令为：
-```
-# 第一步，打开 set_dynamic_shape 开关，自动配置动态shape，在当前目录下生成 dynamic_shape_info.txt 文件
-python infer_gpu.py --task_name seq_cls --model_path ./tnews_quant_infer_model/int8 --shape_info_file dynamic_shape_info.txt --set_dynamic_shape
-# 第二步，读取上一步中生成的 dynamic_shape_info.txt 文件，开启预测
-python infer_gpu.py --task_name seq_cls --model_path ./tnews_quant_infer_model/int8 --shape_info_file dynamic_shape_info.txt
-```
-输出打印如下:
-```
-input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
-seq cls result:
-label: news_car   confidence: 0.5510320067405701
------------------------------
-input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
-seq cls result:
-label: news_entertainment   confidence: 0.9432708024978638
------------------------------
-```
+符号说明: (1) ✅: 已经支持; (2) ❔: 正在进行中; (3) N/A: 暂不支持;
+
+<table>
+    <tr>
+        <td align=center> 硬件</td>
+        <td align=center> 硬件对应的接口</td>
+        <td align=center> 可用的推理引擎  </td>
+        <td align=center> 推理引擎对应的接口 </td>
+        <td align=center> 是否支持 Paddle 新格式量化模型 </td>
+        <td align=center> 是否支持 FP16 模式 </td>
+    </tr>
+    <tr>
+        <td rowspan=3 align=center> CPU </td>
+        <td rowspan=3 align=center> use_cpu() </td>
+        <td align=center> Paddle Inference </td>
+        <td align=center> use_paddle_infer_backend() </td>
+        <td align=center>  ✅ </td>
+        <td align=center>  N/A </td>
+    </tr>
+    <tr>
+      <td align=center> ONNX Runtime </td>
+      <td align=center> use_ort_backend() </td>
+      <td align=center>  ✅ </td>
+      <td align=center>  N/A </td>
+    </tr>
+    <tr>
+      <td align=center> OpenVINO </td>
+      <td align=center> use_openvino_backend() </td>
+      <td align=center> ❔ </td>
+      <td align=center>  N/A </td>
+    </tr>
+    <tr>
+        <td rowspan=4 align=center> GPU </td>
+        <td rowspan=4 align=center> use_gpu() </td>
+        <td align=center> Paddle Inference </td>
+        <td align=center> use_paddle_infer_backend() </td>
+        <td align=center>  ✅ </td>
+        <td align=center>  N/A </td>
+    </tr>
+    <tr>
+      <td align=center> ONNX Runtime </td>
+      <td align=center> use_ort_backend() </td>
+      <td align=center>  ✅ </td>
+      <td align=center>  ❔ </td>
+    </tr>
+    <tr>
+      <td align=center> Paddle TensorRT </td>
+      <td align=center> use_trt_backend() + enable_paddle_to_trt() </td>
+      <td align=center> ✅ </td>
+      <td align=center> ✅ </td>
+    </tr>
+    <tr>
+      <td align=center> TensorRT </td>
+      <td align=center> use_trt_backend() </td>
+      <td align=center> ✅ </td>
+      <td align=center> ✅ </td>
+    </tr>
+    <tr>
+        <td align=center> 昆仑芯 XPU </td>
+        <td align=center> use_kunlunxin() </td>
+        <td align=center> Paddle Lite </td>
+        <td align=center> use_paddle_lite_backend() </td>
+        <td align=center>  N/A </td>
+        <td align=center>  ✅  </td>
+    </tr>
+    <tr>
+        <td align=center> 华为 昇腾 </td>
+        <td align=center> use_ascend() </td>
+        <td align=center> Paddle Lite </td>
+        <td align=center> use_paddle_lite_backend() </td>
+        <td align=center> ❔ </td>
+        <td align=center> ✅ </td>
+    </tr>
+    <tr>
+        <td align=center> Graphcore IPU </td>
+        <td align=center> use_ipu() </td>
+        <td align=center> Paddle Inference </td>
+        <td align=center> use_paddle_infer_backend() </td>
+        <td align=center> ❔ </td>
+        <td align=center> N/A </td>
+    </tr>
+</table>
+
+## 相关文档
+
+[ERNIE 3.0模型详细介绍](../../README.md)
+
+[ERNIE 3.0模型C++部署方法](../cpp/README.md)

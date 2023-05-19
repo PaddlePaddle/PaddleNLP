@@ -1,0 +1,12 @@
+{
+    "template": [
+        {"text": "“{'text': 'sentence1'}”和“{'text': 'sentence2'}”之间的逻辑关系是{'mask'}{'mask'}"},
+        {"text": "“{'text': 'sentence1'}”和“{'text': 'sentence2'}”说的是{'mask'}{'mask'}的东西。"},
+        {"text": "下边两句话之间有什么逻辑关系？{'mask'}{'mask'}“{'text': 'sentence1'}”{'sep'}“{'text': 'sentence2'}”"}
+    ],
+    "verbalizer": [
+        {"contradiction": "矛盾", "entailment": "蕴含", "neutral": "中立"},
+        {"contradiction": "矛盾", "entailment": "蕴含", "neutral": "中立"},
+        {"contradiction": "不同", "entailment": "类似", "neutral": "无关"}
+    ]
+}

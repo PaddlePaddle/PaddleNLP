@@ -56,20 +56,19 @@ class TextDomainMapper(explanation.DomainMapper):
             examples: ('bad', 1) or ('bad_3-6-12', 1)
         """
         if positions:
-            exp = [('%s_%s' % (self.indexed_string.word(x[0]), '-'.join(
-                map(str, self.indexed_string.string_position(x[0])))), x[1])
-                   for x in exp]
+            exp = [
+                (
+                    "%s_%s"
+                    % (self.indexed_string.word(x[0]), "-".join(map(str, self.indexed_string.string_position(x[0])))),
+                    x[1],
+                )
+                for x in exp
+            ]
         else:
             exp = [(self.indexed_string.word(x[0]), x[1]) for x in exp]
         return exp
 
-    def visualize_instance_html(self,
-                                exp,
-                                label,
-                                div_name,
-                                exp_object_name,
-                                text=True,
-                                opacity=True):
+    def visualize_instance_html(self, exp, label, div_name, exp_object_name, text=True, opacity=True):
         """Adds text with highlighted words to visualization.
 
         Args:
@@ -81,32 +80,29 @@ class TextDomainMapper(explanation.DomainMapper):
              opacity: if True, fade colors according to weight
         """
         if not text:
-            return u''
-        text = (self.indexed_string.raw_string().encode(
-            'utf-8', 'xmlcharrefreplace').decode('utf-8'))
-        text = re.sub(r'[<>&]', '|', text)
-        exp = [(self.indexed_string.word(x[0]),
-                self.indexed_string.string_position(x[0]), x[1]) for x in exp]
-        all_occurrences = list(
-            itertools.chain.from_iterable(
-                [itertools.product([x[0]], x[1], [x[2]]) for x in exp]))
+            return ""
+        text = self.indexed_string.raw_string().encode("utf-8", "xmlcharrefreplace").decode("utf-8")
+        text = re.sub(r"[<>&]", "|", text)
+        exp = [(self.indexed_string.word(x[0]), self.indexed_string.string_position(x[0]), x[1]) for x in exp]
+        all_occurrences = list(itertools.chain.from_iterable([itertools.product([x[0]], x[1], [x[2]]) for x in exp]))
         all_occurrences = [(x[0], int(x[1]), x[2]) for x in all_occurrences]
-        ret = '''
+        ret = """
             %s.show_raw_text(%s, %d, %s, %s, %s);
-            ''' % (exp_object_name, json.dumps(all_occurrences), label,
-                   json.dumps(text), div_name, json.dumps(opacity))
+            """ % (
+            exp_object_name,
+            json.dumps(all_occurrences),
+            label,
+            json.dumps(text),
+            div_name,
+            json.dumps(opacity),
+        )
         return ret
 
 
 class IndexedString(object):
     """String with various indexes."""
 
-    def __init__(self,
-                 raw_string,
-                 split_expression=r'\W+',
-                 bow=True,
-                 mask_string=None,
-                 language='en'):
+    def __init__(self, raw_string, split_expression=r"\W+", bow=True, mask_string=None, language="en"):
         """Initializer.
 
         Args:
@@ -121,7 +117,7 @@ class IndexedString(object):
                 if None, default value is UNKWORDZ
         """
         self.raw = raw_string
-        self.mask_string = 'UNKWORDZ' if mask_string is None else mask_string
+        self.mask_string = "UNKWORDZ" if mask_string is None else mask_string
         self.language = language
 
         if callable(split_expression):
@@ -138,20 +134,15 @@ class IndexedString(object):
             # splitter = re.compile(r'(%s)|$' % split_expression)
             # self.as_list = [s for s in splitter.split(self.raw) if s]
             if self.language == "ch":
-                splitter = re.compile(r'([\u4e00-\u9fa5])')
-                self.as_list = [
-                    w for w in splitter.split(self.raw) if len(w.strip()) > 0
-                ]
+                splitter = re.compile(r"([\u4e00-\u9fa5])")
+                self.as_list = [w for w in splitter.split(self.raw) if len(w.strip()) > 0]
             else:
                 splitter = re.compile(split_expression)
-                self.as_list = [
-                    w for w in self.raw.strip().split() if len(w.strip()) > 0
-                ]
+                self.as_list = [w for w in self.raw.strip().split() if len(w.strip()) > 0]
             valid_word = splitter.match
 
         self.as_np = np.array(self.as_list)
-        self.string_start = np.hstack(
-            ([0], np.cumsum([len(x) for x in self.as_np[:-1]])))
+        self.string_start = np.hstack(([0], np.cumsum([len(x) for x in self.as_np[:-1]])))
         vocab = {}
         self.inverse_vocab = []
         self.positions = []
@@ -160,9 +151,7 @@ class IndexedString(object):
         for i, word in enumerate(self.as_np):
             if word in non_vocab:
                 continue
-            if (valid_word(word)
-                    and self.language == 'en') or (not valid_word(word)
-                                                   and self.language == 'ch'):
+            if (valid_word(word) and self.language == "en") or (not valid_word(word) and self.language == "ch"):
                 non_vocab.add(word)
                 continue
             if bow:
@@ -208,22 +197,16 @@ class IndexedString(object):
         Returns:
             original raw string with appropriate words removed.
         """
-        mask = np.ones(self.as_np.shape[0], dtype='bool')
+        mask = np.ones(self.as_np.shape[0], dtype="bool")
         mask[self.__get_idxs(words_to_remove)] = False
         if self.language == "ch":
             if not self.bow:
-                return ''.join([
-                    self.as_list[i] if mask[i] else self.mask_string
-                    for i in range(mask.shape[0])
-                ])
-            return ''.join([self.as_list[v] for v in mask.nonzero()[0]])
+                return "".join([self.as_list[i] if mask[i] else self.mask_string for i in range(mask.shape[0])])
+            return "".join([self.as_list[v] for v in mask.nonzero()[0]])
         else:
             if not self.bow:
-                return ' '.join([
-                    self.as_list[i] if mask[i] else self.mask_string
-                    for i in range(mask.shape[0])
-                ])
-            return ' '.join([self.as_list[v] for v in mask.nonzero()[0]])
+                return " ".join([self.as_list[i] if mask[i] else self.mask_string for i in range(mask.shape[0])])
+            return " ".join([self.as_list[v] for v in mask.nonzero()[0]])
 
     @staticmethod
     def _segment_with_tokens(text, tokens):
@@ -236,12 +219,10 @@ class IndexedString(object):
                 inter_token_string.append(text[text_ptr])
                 text_ptr += 1
                 if text_ptr >= len(text):
-                    raise ValueError(
-                        "Tokenization produced tokens that do not belong in string!"
-                    )
+                    raise ValueError("Tokenization produced tokens that do not belong in string!")
             text_ptr += len(token)
             if inter_token_string:
-                list_form.append(''.join(inter_token_string))
+                list_form.append("".join(inter_token_string))
             list_form.append(token)
         if text_ptr < len(text):
             list_form.append(text[text_ptr:])
@@ -250,9 +231,7 @@ class IndexedString(object):
     def __get_idxs(self, words):
         """Returns indexes to appropriate words."""
         if self.bow:
-            return list(
-                itertools.chain.from_iterable(
-                    [self.positions[z] for z in words]))
+            return list(itertools.chain.from_iterable([self.positions[z] for z in words]))
         else:
             return self.positions[words]
 
@@ -329,42 +308,39 @@ class IndexedCharacters(object):
         Returns:
             original raw string with appropriate words removed.
         """
-        mask = np.ones(self.as_np.shape[0], dtype='bool')
+        mask = np.ones(self.as_np.shape[0], dtype="bool")
         mask[self.__get_idxs(words_to_remove)] = False
         if not self.bow:
-            return ''.join([
-                self.as_list[i] if mask[i] else self.mask_string
-                for i in range(mask.shape[0])
-            ])
-        return ''.join([self.as_list[v] for v in mask.nonzero()[0]])
+            return "".join([self.as_list[i] if mask[i] else self.mask_string for i in range(mask.shape[0])])
+        return "".join([self.as_list[v] for v in mask.nonzero()[0]])
 
     def __get_idxs(self, words):
         """Returns indexes to appropriate words."""
         if self.bow:
-            return list(
-                itertools.chain.from_iterable(
-                    [self.positions[z] for z in words]))
+            return list(itertools.chain.from_iterable([self.positions[z] for z in words]))
         else:
             return self.positions[words]
 
 
 class LimeTextExplainer(object):
     """Explains text classifiers.
-       Currently, we are using an exponential kernel on cosine distance, and
-       restricting explanations to words that are present in documents."""
+    Currently, we are using an exponential kernel on cosine distance, and
+    restricting explanations to words that are present in documents."""
 
-    def __init__(self,
-                 kernel_width=25,
-                 kernel=None,
-                 verbose=False,
-                 class_names=None,
-                 feature_selection='auto',
-                 split_expression=r'\W+',
-                 bow=True,
-                 mask_string=None,
-                 random_state=None,
-                 char_level=False,
-                 language='en'):
+    def __init__(
+        self,
+        kernel_width=25,
+        kernel=None,
+        verbose=False,
+        class_names=None,
+        feature_selection="auto",
+        split_expression=r"\W+",
+        bow=True,
+        mask_string=None,
+        random_state=None,
+        char_level=False,
+        language="en",
+    ):
         """Init function.
 
         Args:
@@ -407,9 +383,7 @@ class LimeTextExplainer(object):
         kernel_fn = partial(kernel, kernel_width=kernel_width)
 
         self.random_state = check_random_state(random_state)
-        self.base = lime_base.LimeBase(kernel_fn,
-                                       verbose,
-                                       random_state=self.random_state)
+        self.base = lime_base.LimeBase(kernel_fn, verbose, random_state=self.random_state)
         self.class_names = class_names
         self.vocabulary = None
         self.feature_selection = feature_selection
@@ -419,18 +393,20 @@ class LimeTextExplainer(object):
         self.char_level = char_level
         self.language = language
 
-    def explain_instance(self,
-                         text_instance: str,
-                         tokenizer,
-                         pred_label: int,
-                         classifier_fn,
-                         labels=(0, 1),
-                         top_labels=None,
-                         num_features=10,
-                         num_samples=5000,
-                         distance_metric='cosine',
-                         model_regressor=None,
-                         if_lstm=False):
+    def explain_instance(
+        self,
+        text_instance: str,
+        tokenizer,
+        pred_label: int,
+        classifier_fn,
+        labels=(0, 1),
+        top_labels=None,
+        num_features=10,
+        num_samples=5000,
+        distance_metric="cosine",
+        model_regressor=None,
+        if_lstm=False,
+    ):
         """Generates explanations for a prediction.
 
         First, we generate neighborhood data by randomly hiding features from
@@ -459,14 +435,17 @@ class LimeTextExplainer(object):
             An Explanation object (see explanation.py) with the corresponding
             explanations.
         """
-        indexed_string = (IndexedCharacters(
-            text_instance, bow=self.bow, mask_string=self.mask_string)
-                          if self.char_level else IndexedString(
-                              text_instance,
-                              bow=self.bow,
-                              split_expression=self.split_expression,
-                              mask_string=self.mask_string,
-                              language=self.language))
+        indexed_string = (
+            IndexedCharacters(text_instance, bow=self.bow, mask_string=self.mask_string)
+            if self.char_level
+            else IndexedString(
+                text_instance,
+                bow=self.bow,
+                split_expression=self.split_expression,
+                mask_string=self.mask_string,
+                language=self.language,
+            )
+        )
         domain_mapper = TextDomainMapper(indexed_string, self.language)
 
         # 产生扰动数据集    第一条是原始数据
@@ -474,18 +453,14 @@ class LimeTextExplainer(object):
         # yss:  解释器训练标签  list (num_samples, class_num(2))
         # distances: 扰动样本到原始样本的距离 np.array(float) (num_samples, )
         data, yss, distances = self.__data_labels_distances(
-            indexed_string,
-            tokenizer,
-            classifier_fn,
-            num_samples,
-            distance_metric=distance_metric,
-            if_lstm=if_lstm)
+            indexed_string, tokenizer, classifier_fn, num_samples, distance_metric=distance_metric, if_lstm=if_lstm
+        )
 
         if self.class_names is None:
             self.class_names = [str(x) for x in range(yss[0].shape[0])]
-        ret_exp = explanation.Explanation(domain_mapper=domain_mapper,
-                                          class_names=self.class_names,
-                                          random_state=self.random_state)
+        ret_exp = explanation.Explanation(
+            domain_mapper=domain_mapper, class_names=self.class_names, random_state=self.random_state
+        )
         ret_exp.predict_proba = yss[0]
         if top_labels:
             labels = np.argsort(yss[0])[-top_labels:]
@@ -494,26 +469,28 @@ class LimeTextExplainer(object):
 
         num_features = indexed_string.num_words()  # 特征数量跟word_num相同
 
-        (ret_exp.intercept[pred_label], ret_exp.local_exp[pred_label],
-         ret_exp.score[pred_label], ret_exp.local_pred[pred_label],
-         relative_err, err) = self.base.explain_instance_with_data(
-             data,
-             yss,
-             distances,
-             pred_label,
-             num_features,
-             model_regressor=model_regressor,
-             feature_selection=self.feature_selection)
+        (
+            ret_exp.intercept[pred_label],
+            ret_exp.local_exp[pred_label],
+            ret_exp.score[pred_label],
+            ret_exp.local_pred[pred_label],
+            relative_err,
+            err,
+        ) = self.base.explain_instance_with_data(
+            data,
+            yss,
+            distances,
+            pred_label,
+            num_features,
+            model_regressor=model_regressor,
+            feature_selection=self.feature_selection,
+        )
 
         return ret_exp, indexed_string, relative_err, err
 
-    def __data_labels_distances(self,
-                                indexed_string,
-                                tokenizer,
-                                classifier_fn,
-                                num_samples,
-                                distance_metric='cosine',
-                                if_lstm=False):
+    def __data_labels_distances(
+        self, indexed_string, tokenizer, classifier_fn, num_samples, distance_metric="cosine", if_lstm=False
+    ):
         """Generates a neighborhood around a prediction.
 
         Generates neighborhood data by randomly removing words from
@@ -541,15 +518,14 @@ class LimeTextExplainer(object):
         """
 
         def distance_fn(x):
-            return sklearn.metrics.pairwise.pairwise_distances(
-                x, x[0], metric=distance_metric).ravel() * 100
+            return sklearn.metrics.pairwise.pairwise_distances(x, x[0], metric=distance_metric).ravel() * 100
 
         doc_size = indexed_string.num_words()
 
         if doc_size > 1:
             sample = self.random_state.randint(
-                1, doc_size, num_samples -
-                1)  # sample: [int(1 ~ doc_size-1) * num_samples-1]
+                1, doc_size, num_samples - 1
+            )  # sample: [int(1 ~ doc_size-1) * num_samples-1]
         else:
             sample = [0 for i in range(num_samples - 1)]
         data = np.ones((num_samples, doc_size))
@@ -560,12 +536,10 @@ class LimeTextExplainer(object):
         for i, size in enumerate(sample, start=1):
             # inactive: 从range（0， doc_size）中随机取出的size个数组成的list, 要去掉的字的id
             inactive = self.random_state.choice(
-                features_range,  # [0, doc_size)
-                size,  # int: 该扰动样本中remove token的数量
-                replace=False)
+                features_range, size, replace=False  # [0, doc_size)  # int: 该扰动样本中remove token的数量
+            )
 
-            text = indexed_string.inverse_removing(
-                inactive)  # 原文本去掉了inactive中的字后的文本
+            text = indexed_string.inverse_removing(inactive)  # 原文本去掉了inactive中的字后的文本
 
             data[i, inactive] = 0
             perturb_text.append(text)
@@ -579,9 +553,9 @@ class LimeTextExplainer(object):
         valid_idxs = []
 
         for idx, text in enumerate(perturb_text):
-            if self.language == 'en':
+            if self.language == "en":
                 if if_lstm:
-                    pad_id = [tokenizer.vocab.token_to_idx.get('[PAD]', 0)]
+                    pad_id = [tokenizer.vocab.token_to_idx.get("[PAD]", 0)]
 
                     token_ids = tokenizer.encode(text)
                     token_ids_max_len = max(token_ids_max_len, len(token_ids))
@@ -591,15 +565,18 @@ class LimeTextExplainer(object):
                     else:
                         valid_idxs.append(idx)
                     seq_len_list.append(seq_len)
-                    pad_id = [tokenizer.vocab.token_to_idx.get('[PAD]', 0)]
+                    pad_id = [tokenizer.vocab.token_to_idx.get("[PAD]", 0)]
 
                 else:
-                    pad_id = tokenizer.convert_tokens_to_ids(['[PAD]'])
+                    pad_id = tokenizer.convert_tokens_to_ids(["[PAD]"])
 
                     tokens = tokenizer.tokenize(text)
                     token_ids = tokenizer.convert_tokens_to_ids(tokens)
-                    token_ids = tokenizer.convert_tokens_to_ids(['[CLS]']) \
-                        + token_ids + tokenizer.convert_tokens_to_ids(['[SEP]'])
+                    token_ids = (
+                        tokenizer.convert_tokens_to_ids(["[CLS]"])
+                        + token_ids
+                        + tokenizer.convert_tokens_to_ids(["[SEP]"])
+                    )
                     token_ids_max_len = max(token_ids_max_len, len(token_ids))
 
                 token_ids_list.append(token_ids)
@@ -617,17 +594,21 @@ class LimeTextExplainer(object):
                         valid_idxs.append(idx)
                     seq_len_list.append(seq_len)
                 else:
-                    token_ids = tokenizer.convert_tokens_to_ids(['[CLS]']) \
-                        + token_ids + tokenizer.convert_tokens_to_ids(['[SEP]'])
+                    token_ids = (
+                        tokenizer.convert_tokens_to_ids(["[CLS]"])
+                        + token_ids
+                        + tokenizer.convert_tokens_to_ids(["[SEP]"])
+                    )
 
                 # padding
-                token_ids = token_ids + tokenizer.convert_tokens_to_ids(
-                    ['[PAD]']) * (len(perturb_text[0]) + 2 - len(token_ids))
+                token_ids = token_ids + tokenizer.convert_tokens_to_ids(["[PAD]"]) * (
+                    len(perturb_text[0]) + 2 - len(token_ids)
+                )
                 token_ids_list.append(token_ids)
                 s_ids = [0 for _ in range(len(token_ids))]
                 s_ids_list.append(s_ids)
 
-        if self.language == 'en':
+        if self.language == "en":
             for token_ids in token_ids_list:
                 while len(token_ids) < token_ids_max_len:
                     token_ids += pad_id
@@ -655,31 +636,28 @@ class LimeTextExplainer(object):
         epoch_num = math.ceil(len(token_ids_np) / batch)
         for idx in range(epoch_num):
             token_ids_tensor = paddle.Tensor(
-                value=token_ids_np[idx * batch:(idx + 1) * batch],
-                place=paddle.CUDAPlace(0),
-                stop_gradient=True)
+                value=token_ids_np[idx * batch : (idx + 1) * batch], place=paddle.CUDAPlace(0), stop_gradient=True
+            )
             if if_lstm:
                 seq_len_tensor = paddle.Tensor(
-                    value=seq_len_np[idx * batch:(idx + 1) * batch],
+                    value=seq_len_np[idx * batch : (idx + 1) * batch],
                     place=token_ids_tensor.place,
-                    stop_gradient=token_ids_tensor.stop_gradient)
-                label = classifier_fn(
-                    token_ids_tensor,
-                    seq_len_tensor)[0]  # label: Tensor[num_samples, 2]
+                    stop_gradient=token_ids_tensor.stop_gradient,
+                )
+                label = classifier_fn(token_ids_tensor, seq_len_tensor)[0]  # label: Tensor[num_samples, 2]
             else:
                 s_ids_tensor = paddle.Tensor(
-                    value=s_ids_np[idx * batch:(idx + 1) * batch],
+                    value=s_ids_np[idx * batch : (idx + 1) * batch],
                     place=token_ids_tensor.place,
-                    stop_gradient=token_ids_tensor.stop_gradient)
-                label = classifier_fn(
-                    token_ids_tensor,
-                    s_ids_tensor)[0]  # label: Tensor[num_samples, 2]
+                    stop_gradient=token_ids_tensor.stop_gradient,
+                )
+                label = classifier_fn(token_ids_tensor, s_ids_tensor)[0]  # label: Tensor[num_samples, 2]
 
             labels.extend(label.numpy().tolist())
 
         labels = np.array(labels)  # labels: nsp.array(num_samples, 2)
 
-        print('mode forward time: %.5f' % (time.time() - prev_time))
+        print("mode forward time: %.5f" % (time.time() - prev_time))
 
         distances = distance_fn(sp.sparse.csr_matrix(data))
 

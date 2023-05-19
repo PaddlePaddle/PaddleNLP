@@ -12,7 +12,7 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 ├── dataset.py              # 数据处理
 ├── deploy/                 # 模型部署的inference脚本
 ├── export_model.py         # 导出预测部署的模型脚本
-├── faster_gpt/             # 使用 FasterGPT 高性能预测 sample
+├── fast_gpt/               # 使用 FasterGPT 高性能预测 sample
 ├── lr.py                   # 学习率控制
 ├── predict.py              # 生成文本示例demo
 ├── README.md               # 文档
@@ -153,6 +153,7 @@ python run_eval.py --model_name gpt2-en \
 
 2. LAMBADA数据集评估
 ```bash
+# 覆盖default.yaml中的eval_path配置字段
 python run_eval.py --model_name gpt2-en \
     --eval_path ./lambada_test.jsonl \
     --cloze_eval \
@@ -160,19 +161,19 @@ python run_eval.py --model_name gpt2-en \
     --batch_size 8 \
     --device gpu
 ```
+
 其中参数释义如下：
 `model_name` 使用的模型名称，如gpt2-en、gpt2-medium-en等。
 `eval_path` 数据集地址。
 `init_checkpoint_path` 模型参数地址。
 `batch_size` batch size大小。
-`device` 运行设备，cpu，gpu，xpu可选。
+`device` 运行设备，cpu，gpu，xpu, npu可选。
 `overlapping_eval` wikitext数据集参数。
 `cloze_eval` lambada数据参数，作为完型填空任务。
 
 其中数据集WikiText采用的是PPL(perplexity)评估指标，LAMBADA采用的是ACC(accuracy)指标。
 
 注：不设置`init_checkpoint_path` 参数时，可以评估默认预训练好的模型参数。
-
 
 ### 文本生成
 
@@ -268,21 +269,21 @@ qa(["中国国土面积有多大？", "中国的首都在哪里？"])
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" run_glue.py \
-    --model_type gpt \
-    --model_name_or_path gpt2-medium-en \
-    --task_name SST-2 \
-    --max_seq_length 128 \
-    --batch_size 32   \
-    --learning_rate 2e-5 \
-    --num_train_epochs 3 \
-    --logging_steps 1 \
-    --save_steps 500 \
-    --output_dir ./tmp/ \
-    --device gpu \
-    --use_amp False
+  --model_name_or_path gpt2-medium-en \
+  --task_name SST-2 \
+  --max_seq_length 128 \
+  --per_device_train_batch_size 32   \
+  --learning_rate 2e-5 \
+  --num_train_epochs 3 \
+  --logging_steps 1 \
+  --save_steps 500 \
+  --output_dir ./output_dir/glue \
+  --eval_steps 1 \
+  --device gpu \
+  --do_train true
 ```
 
-其中参数释义如下：
+配置文件中的参数释义如下：
 - `model_type` 指示了模型类型。
 - `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
 - `task_name` 表示Fine-tuning的任务。
@@ -293,7 +294,7 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
-- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+- `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU, 'npu'表示使用华为昇腾卡。
 - `use_amp` 指示是否启用自动混合精度训练。
 
 基于`gpt2-medium-en`在SST-2任务上Fine-tuning后，在验证集上有如下结果：
@@ -310,18 +311,19 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" run_msra_ner.py \
-    --model_name_or_path gpt-cpm-small-cn-distill \
-    --max_seq_length 128 \
-    --batch_size 32 \
-    --learning_rate 2e-5 \
-    --num_train_epochs 3 \
-    --logging_steps 25 \
-    --save_steps 250 \
-    --output_dir ./tmp/msra_ner/ \
-    --device gpu
+  --model_name_or_path gpt-cpm-small-cn-distill \
+  --max_seq_length 128 \
+  --per_device_eval_batch_size 32 \
+  --learning_rate 2e-5 \
+  --num_train_epochs 3 \
+  --logging_steps 25 \
+  --save_steps 250 \
+  --output_dir ./tmp/msra_ner/ \
+  --device gpu  \
+  --do_train true
 ```
 
-其中参数释义如下：
+配置文件中参数释义如下：
 - `model_name_or_path`: 指示了某种特定配置的模型。
 - `max_seq_length`: 表示最大句子长度，超过该长度将被截断。
 - `batch_size`: 表示每次迭代**每张卡**上的样本数目。
@@ -330,7 +332,7 @@ python -m paddle.distributed.launch --gpus "0" run_msra_ner.py \
 - `logging_steps`: 表示日志打印间隔。
 - `save_steps`: 表示模型保存及评估间隔。
 - `output_dir`: 表示模型保存路径。
-- `device`: 训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
+- `device`: 训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU, 'npu'表示使用华为昇腾卡。
 
 基于`gpt-cpm-small-cn-distill`在MSRA的NER任务上Fine-tuning后，在验证集上有如下结果：
 

@@ -71,6 +71,18 @@ __inline__ __device__ T blockReduceSum(T val) {
   return val;
 }
 
+template<typename T>
+__device__ __forceinline__ T clamp_inf_for_half(const float input)
+{
+    if (std::is_same<T, half>::value == true) {
+        // clamp inf values to enable fp16 training
+        return (float)input > 0.0f ? min(input, HALF_FLT_MAX - 1000) : max(input, -HALF_FLT_MAX + 1000);
+    }
+    else {
+        return input;
+    }
+}
+
 template <typename T>
 __global__ void add_bias_gelu(T* out, const T* __restrict bias, int m, int n) {
   for (int id = blockIdx.x * blockDim.x + threadIdx.x; id < m * n;
@@ -344,6 +356,151 @@ void add_bias_act_kernelLauncher(T* out,
 }
 
 template <typename T>
+__global__ void gated_add_bias_relu(
+    T* out0,
+    T* out1,
+    const T* __restrict bias0,
+    const T* __restrict bias1,
+    int m,
+    int n) {
+  for (int id = blockIdx.x * blockDim.x + threadIdx.x; id < m * n;
+       id += blockDim.x * gridDim.x) {
+    T reg_bias0 = (bias0) ? __ldg(&bias0[id % n]) : (T)0.0f;
+    T reg_bias1 = (bias1) ? __ldg(&bias1[id % n]) : (T)0.0f;
+
+    float val = (float)(out0[id] + reg_bias0);
+    val = (val > 0.0f) ? val : 0.0f;
+
+    out0[id] = (T)val * (out1[id] + reg_bias1);
+  }
+}
+
+template <>
+__global__ void gated_add_bias_relu(half* out0,
+                                    half* out1,
+                                    const half* __restrict bias0,
+                                    const half* __restrict bias1,
+                                    int m,
+                                    int n) {
+  half2* out0_ptr = (half2*)out0;
+  half2* out1_ptr = (half2*)out1;
+
+  const half2* bias0_ptr = (bias0) ? (half2*)bias0 : nullptr;
+  const half2* bias1_ptr = (bias1) ? (half2*)bias1 : nullptr;
+
+  for (int id = blockIdx.x * blockDim.x + threadIdx.x; id < m * n;
+       id += blockDim.x * gridDim.x) {
+    half2 reg_bias0;
+    if (bias0) {
+      reg_bias0 = __ldg(&bias0_ptr[id % n]);
+    } else {
+      reg_bias0.x = (half)0.0f;
+      reg_bias0.y = (half)0.0f;
+    }
+
+    half2 reg_bias1;
+    if (bias1) {
+      reg_bias1 = __ldg(&bias1_ptr[id % n]);
+    } else {
+      reg_bias1.x = (half)0.0f;
+      reg_bias1.y = (half)0.0f;
+    }
+
+    half2 val0 = out0_ptr[id] + reg_bias0;
+    val0.x = val0.x > (half)0.0f ? val0.x : (half)0.0f;
+    val0.y = val0.y > (half)0.0f ? val0.y : (half)0.0f;
+
+    half2 val1 = out1_ptr[id] + reg_bias1;
+
+    out0_ptr[id] = val0 * val1;
+  }
+}
+
+template <typename T>
+__global__ void gated_add_bias_gelu(
+    T* out0,
+    T* out1,
+    const T* __restrict bias0,
+    const T* __restrict bias1,
+    int m,
+    int n) {
+  for (int id = blockIdx.x * blockDim.x + threadIdx.x; id < m * n;
+       id += blockDim.x * gridDim.x) {
+    T reg_bias0 = (bias0) ? __ldg(&bias0[id % n]) : (T)0.0f;
+    T reg_bias1 = (bias1) ? __ldg(&bias1[id % n]) : (T)0.0f;
+
+    T val = (T)(gelu(out0[id] + reg_bias0)) * (out1[id] + reg_bias1);
+
+    out0[id] = (T)(val);
+  }
+}
+
+template <>
+__global__ void gated_add_bias_gelu(
+    half* out0,
+    half* out1,
+    const half* __restrict bias0,
+    const half* __restrict bias1,
+    int m,
+    int n) {
+  half2* out0_ptr = (half2*)out0;
+  half2* out1_ptr = (half2*)out1;
+
+  const half2* bias0_ptr = (half2*)bias0;
+  const half2* bias1_ptr = (half2*)bias1;
+
+  for (int id = blockIdx.x * blockDim.x + threadIdx.x; id < m * n;
+       id += blockDim.x * gridDim.x) {
+    half2 reg_bias0;
+    if (bias0) {
+      reg_bias0 = __ldg(&bias0_ptr[id % n]);
+    } else {
+      reg_bias0.x = (half)0.0f;
+      reg_bias0.y = (half)0.0f;
+    }
+
+    half2 reg_bias1;
+    if (bias0) {
+      reg_bias1 = __ldg(&bias1_ptr[id % n]);
+    } else {
+      reg_bias1.x = (half)0.0f;
+      reg_bias1.y = (half)0.0f;
+    }
+
+    half2 val0 = out0_ptr[id] + reg_bias0;
+    val0 = gelu(val0);
+
+    out0_ptr[id] = val0 * (out1_ptr[id] + reg_bias1);
+  }
+}
+
+template <typename T>
+void gated_add_bias_act_kernelLauncher(T* out,
+                                       const T* bias0,
+                                       const T* bias1,
+                                       int m,
+                                       int n,
+                                       ActivationType activation_type,
+                                       cudaStream_t stream) {
+  const int data_type_factor = 4 / sizeof(T);  // 1 for fp32, 2 for fp16
+  dim3 block, grid;
+  if (n / 4 / data_type_factor <= 1024) {
+    block.x = n / 4 / data_type_factor;
+    grid.x = m;
+  } else {
+    block.x = 1024;
+    grid.x = ceil(m * n / 1024.);
+  }
+
+  if (activation_type == ActivationType::RELU)
+    gated_add_bias_relu<T><<<grid, block, 0, stream>>>(
+        out, out + m * n, bias0, bias1, m, n / data_type_factor);
+  else if (activation_type == ActivationType::GELU)
+    gated_add_bias_gelu<T><<<grid, block, 0, stream>>>(
+        out, out + m * n, bias0, bias1, m, n / data_type_factor);
+}
+
+template <typename T>
 void add_bias_input_layernorm_kernelLauncher(T* out,
                                              const T* input,
                                              const T* bias,
@@ -466,6 +623,76 @@ void add_bias_input_layernorm_2_kernelLauncher(const T* input,
 }
 
 template <typename T>
+__global__ void add_bias_input_t5_layernorm_2(const T* __restrict input,
+                                           const T* __restrict gamma,
+                                           const T* __restrict bias,
+                                           T* output,
+                                           T* norm_output,
+                                           int m,
+                                           int n) {
+  int tid = threadIdx.x;
+
+  __shared__ float s_variance;
+  float variance = 0.0f;
+
+  for (int i = tid; i < n; i += blockDim.x) {
+    float local_out = (float)(__ldg(&input[blockIdx.x * n + i]));
+    local_out += (float)(output[blockIdx.x * n + i]);
+    if(bias != nullptr){
+        local_out += (float)(__ldg(&bias[i]));
+    }
+    output[blockIdx.x * n + i] = (T)local_out;
+  }
+
+  if (gamma == nullptr){
+    return;
+  }
+
+  float local_var_sum = 0.0f;
+  for (int i = tid; i < n; i += blockDim.x) {
+    float diff = (float)(__ldg(&output[blockIdx.x * n + i]));
+    local_var_sum += diff * diff;
+  }
+  variance = blockReduceSum<float>(local_var_sum);
+
+  if (threadIdx.x == 0) s_variance = rsqrtf(variance / n + 1e-6);
+  __syncthreads();
+
+  for (int i = tid; i < n; i += blockDim.x) {
+    norm_output[blockIdx.x * n + i] =
+        clamp_inf_for_half<T>((((float)output[blockIdx.x * n + i]) * s_variance) *
+                (float)(__ldg(&gamma[i])));
+  }
+}
+
+template <typename T>
+void add_bias_input_t5_layernorm_2_kernelLauncher(const T* input,
+                                               const T* gamma,
+                                               const T* beta,
+                                               const T* bias,
+                                               T* output,
+                                               T* norm_output,
+                                               int m,
+                                               int n,
+                                               cudaStream_t stream) {
+  dim3 grid(m);
+  dim3 block(min(n, 1024));
+
+  if (n % 32 != 0) block.x = 1024;
+
+  block.x =
+      block.x / (4 / sizeof(T));
+
+  if (beta != nullptr) {
+    add_bias_input_layernorm_2<T><<<grid, block, 0, stream>>>(
+        input, gamma, beta, bias, output, norm_output, m, n);
+  } else {
+    add_bias_input_t5_layernorm_2<T><<<grid, block, 0, stream>>>(
+        input, gamma, bias, output, norm_output, m, n);
+  }
+}
+
+template <typename T>
 __global__ void add_bias_input(
     T* output, const T* input, const T* bias, const int m, const int n) {
   // This kernel can run with any block size and grid size
@@ -562,6 +789,59 @@ void layer_norm(const T* input,
       input, gamma, beta, output, m, n);  // For gpt-3
 }
 
+template <typename T>
+__global__ void t5_layer_norm_kernel_generalize(const T* __restrict input,
+                                             const T* __restrict gamma,
+                                             T* output,
+                                             int m,
+                                             int n) {
+    const int tid = threadIdx.x;
+
+    __shared__ float s_variance;
+    float variance = 0.0f;
+
+    float local_var_sum = 0.0f;
+    for (int i = tid; i < n; i += blockDim.x) {
+        float diff = (float)(__ldg(&input[blockIdx.x * n + i]));
+        local_var_sum += diff * diff;
+    }
+    variance = blockReduceSum(local_var_sum);
+
+    if (threadIdx.x == 0) {
+        s_variance = rsqrtf(variance / n + 1e-6f);
+    }
+    __syncthreads();
+
+    for (int i = tid; i < n; i += blockDim.x) {
+        output[blockIdx.x * n + i] =
+            clamp_inf_for_half<T>((((float)input[blockIdx.x * n + i]) * s_variance) * (float)(__ldg(&gamma[i])));
+    }
+}
+
+template <typename T>
+void t5_layer_norm(const T* input,
+                const T* gamma,
+                const T* beta,
+                T* output,
+                int m,
+                int n,
+                cudaStream_t stream) {
+  dim3 grid(m);
+  dim3 block(min(n, 1024));
+
+  if (n % 32 != 0) block.x = 1024;
+
+  block.x =
+      block.x / (4 / sizeof(T));
+  if (beta != nullptr) {
+    layer_norm_kernel_generalize<T><<<grid, block, 0, stream>>>(
+        input, gamma, beta, output, m, n);
+  } else {
+    t5_layer_norm_kernel_generalize<T><<<grid, block, 0, stream>>>(
+        input, gamma, output, m, n);
+  }
+}
+
 template void add_bias_act_kernelLauncher<float>(float* out,
                                                  const float* bias,
                                                  int m,
@@ -585,6 +865,22 @@ template void add_bias_act_kernelLauncher<half>(half* out,
                                                 int n,
                                                 ActivationType activation_type,
                                                 cudaStream_t stream);
+
+template void gated_add_bias_act_kernelLauncher<float>(float* out,
+                                                       const float* bias0,
+                                                       const float* bias1,
+                                                       int m,
+                                                       int n,
+                                                       ActivationType activation_type,
+                                                       cudaStream_t stream);
+
+template void gated_add_bias_act_kernelLauncher<half>(half* out,
+                                                      const half* bias0,
+                                                      const half* bias1,
+                                                      int m,
+                                                      int n,
+                                                      ActivationType activation_type,
+                                                      cudaStream_t stream);
 
 template void add_bias_input_layernorm_kernelLauncher<half>(
     half* out,
@@ -618,6 +914,28 @@ template void add_bias_input_layernorm_2_kernelLauncher<half>(
     int n,
     cudaStream_t stream);
 
+template void add_bias_input_t5_layernorm_2_kernelLauncher<float>(
+    const float* input,
+    const float* gamma,
+    const float* beta,
+    const float* bias,
+    float* output,
+    float* norm_output,
+    int m,
+    int n,
+    cudaStream_t stream);
+
+template void add_bias_input_t5_layernorm_2_kernelLauncher<half>(
+    const half* input,
+    const half* gamma,
+    const half* beta,
+    const half* bias,
+    half* output,
+    half* norm_output,
+    int m,
+    int n,
+    cudaStream_t stream);
+
 template void add_bias_input_kernelLauncher<float>(float* output,
                                                    const float* bias,
                                                    const float* input,
@@ -641,6 +959,22 @@ template void layer_norm<float>(const float* input,
                                 cudaStream_t stream);
 
 template void layer_norm<half>(const half* input,
+                               const half* gamma,
+                               const half* beta,
+                               half* output,
+                               int m,
+                               int n,
+                               cudaStream_t stream);
+
+template void t5_layer_norm<float>(const float* input,
+                                const float* gamma,
+                                const float* beta,
+                                float* output,
+                                int m,
+                                int n,
+                                cudaStream_t stream);
+
+template void t5_layer_norm<half>(const half* input,
                                const half* gamma,
                                const half* beta,
                                half* output,

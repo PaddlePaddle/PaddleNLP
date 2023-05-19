@@ -1,0 +1,18 @@
+{
+    "template": [
+        {"text": "{'text':'sentence'}我{'mask'}喜欢。"},
+        {"text": "我{'mask'}喜欢。{'text':'sentence'}"},
+        {"text": "{'mask'}{'mask'}推荐这件商品！{'text':'sentence'}"},
+        {"text": "我对这个东西{'mask'}满意。{'text':'sentence'}"},
+        {"text": "{'mask'}理想。{'text':'sentence'}"},
+        {"text": "{'text':'sentence'}这句话表示我{'mask'}满意。"}
+    ],
+    "verbalizer": [
+        {"Negative": "不", "Positive": "很"},
+        {"Negative": "不", "Positive": "很"},
+        {"Negative": "很不", "Positive": "非常"},
+        {"Negative": "不", "Positive": "很"},
+        {"Negative": "不", "Positive": "很"},
+        {"Negative": "不", "Positive": "很"}
+    ]
+}

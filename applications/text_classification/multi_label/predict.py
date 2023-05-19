@@ -12,20 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
 import functools
-import numpy as np
+import os
 
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.utils.log import logger
-from paddle.io import DataLoader, BatchSampler
+from paddle.io import BatchSampler, DataLoader
+from utils import preprocess_function, read_local_dataset
+
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
-
-from utils import preprocess_function, read_local_dataset
+from paddlenlp.utils.log import logger
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -52,32 +51,29 @@ def predict():
 
     label_list = []
     label_path = os.path.join(args.dataset_dir, args.label_file)
-    with open(label_path, 'r', encoding='utf-8') as f:
+    with open(label_path, "r", encoding="utf-8") as f:
         for i, line in enumerate(f):
             label_list.append(line.strip())
 
-    data_ds = load_dataset(read_local_dataset,
-                           path=os.path.join(args.dataset_dir, args.data_file),
-                           is_test=True,
-                           lazy=False)
+    data_ds = load_dataset(
+        read_local_dataset, path=os.path.join(args.dataset_dir, args.data_file), is_test=True, lazy=False
+    )
 
-    trans_func = functools.partial(preprocess_function,
-                                   tokenizer=tokenizer,
-                                   max_seq_length=args.max_seq_length,
-                                   label_nums=len(label_list),
-                                   is_test=True)
+    trans_func = functools.partial(
+        preprocess_function,
+        tokenizer=tokenizer,
+        max_seq_length=args.max_seq_length,
+        label_nums=len(label_list),
+        is_test=True,
+    )
 
     data_ds = data_ds.map(trans_func)
 
     # batchify dataset
     collate_fn = DataCollatorWithPadding(tokenizer)
-    data_batch_sampler = BatchSampler(data_ds,
-                                      batch_size=args.batch_size,
-                                      shuffle=False)
+    data_batch_sampler = BatchSampler(data_ds, batch_size=args.batch_size, shuffle=False)
 
-    data_data_loader = DataLoader(dataset=data_ds,
-                                  batch_sampler=data_batch_sampler,
-                                  collate_fn=collate_fn)
+    data_data_loader = DataLoader(dataset=data_ds, batch_sampler=data_batch_sampler, collate_fn=collate_fn)
 
     results = []
     model.eval()
@@ -91,11 +87,11 @@ def predict():
                     labels.append(i)
             results.append(labels)
 
-    with open(args.output_file, 'w', encoding='utf-8') as f:
-        f.write('text' + '\t' + 'label' + '\n')
+    with open(args.output_file, "w", encoding="utf-8") as f:
+        f.write("text" + "\t" + "label" + "\n")
         for d, result in zip(data_ds.data, results):
             label = [label_list[r] for r in result]
-            f.write(d["sentence"] + '\t' + ', '.join(label) + '\n')
+            f.write(d["sentence"] + "\t" + ", ".join(label) + "\n")
     logger.info("Prediction results save in {}.".format(args.output_file))
 
     return

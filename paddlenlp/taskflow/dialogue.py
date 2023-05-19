@@ -12,19 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import contextlib
 from collections import deque
 
 import numpy as np
 import paddle
 
-from ..transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
 from ..data import Pad
+from ..transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
 from .task import Task
 
 usage = r"""
-           from paddlenlp import Taskflow 
+           from paddlenlp import Taskflow
 
            # 非交互模式
            dialogue = Taskflow("dialogue")
@@ -48,7 +47,7 @@ usage = r"""
            [Bot]:那你喜欢什么运动啊?
            [Human]:篮球,你喜欢篮球吗
            [Bot]:当然了,我很喜欢打篮球的。
-           '''           
+           '''
          """
 
 
@@ -75,23 +74,33 @@ class DialogueTask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/dialogue/plato-mini/model_config.json",
                 "5e853fda9a9b573815ad112e494a65af",
             ],
-        }
+        },
+        "__internal_testing__/tiny-random-plato": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-plato/model_state.pdparams",
+                "fda5d068908505cf0c3a46125eb4d39e",
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-plato/config.json",
+                "3664e658d5273a132f2e7345a8cafa53",
+            ],
+        },
     }
 
     def __init__(self, task, model, batch_size=1, max_seq_len=512, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._static_mode = False
         self._usage = usage
-        if not self.from_hf_hub:
+        if not self._custom_model:
             self._check_task_files()
-        self._construct_tokenizer(self._task_path if self.from_hf_hub else model)
+        self._construct_tokenizer(self._task_path if self._custom_model else model)
         self._batch_size = batch_size
         self._max_seq_len = max_seq_len
         self._interactive_mode = False
         if self._static_mode:
             self._get_inference_model()
         else:
-            self._construct_model(self._task_path if self.from_hf_hub else model)
+            self._construct_model(self._task_path if self._custom_model else model)
 
     def _construct_input_spec(self):
         """
@@ -189,7 +198,7 @@ class DialogueTask(Task):
         for texts in data:
             examples.append(self._convert_text_to_input(texts, max_seq_len))
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         one_batch = []
         for example in examples:
             one_batch.append(example)
@@ -215,8 +224,8 @@ class DialogueTask(Task):
         """
         inputs = self._check_input_text(inputs)
         # Get the config from the kwargs
-        num_workers = self.kwargs["num_workers"] if "num_workers" in self.kwargs else 0
-        lazy_load = self.kwargs["lazy_load"] if "lazy_load" in self.kwargs else False
+        num_workers = self.kwargs["num_workers"] if "num_workers" in self.kwargs else 0  # noqa: F841
+        lazy_load = self.kwargs["lazy_load"] if "lazy_load" in self.kwargs else False  # noqa: F841
 
         batches = self._batchify(inputs, self._max_seq_len, self._batch_size)
 
@@ -248,7 +257,7 @@ class DialogueTask(Task):
                 num_beams=0,
                 length_penalty=1.0,
                 early_stopping=False,
-                use_faster=False,
+                use_fast=False,
                 num_return_sequences=1,
             )
             all_ids.extend([ids])

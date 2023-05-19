@@ -16,15 +16,19 @@ from .base_handler import BaseTaskflowHandler
 
 
 class TaskflowHandler(BaseTaskflowHandler):
-
     def __init__(self):
-        self._name = 'taskflow_handler'
+        self._name = "taskflow_handler"
 
     @classmethod
     def process(cls, predictor, data, parameters):
-        text = None
-        if 'text' in data:
-            text = data['text']
-        if text is None:
+        if data is None:
             return {}
+        text = None
+        if "text" in data:
+            text = data["text"]
+        else:
+            return {}
+        if "schema" in parameters:
+            schema = parameters["schema"]
+            predictor.set_schema(schema)
         return predictor(text)

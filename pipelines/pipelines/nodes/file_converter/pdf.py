@@ -13,14 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional, Dict, Any
-
-import os
 import logging
+import os
 import tempfile
-import subprocess
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import pdfplumber
+
+try:
+    from pdf2image import convert_from_path
+except (ImportError, ModuleNotFoundError) as ie:
+    from pipelines.utils.import_utils import _optional_component_not_installed
+
+    _optional_component_not_installed(__name__, "ocr", ie)
 
 from pipelines.nodes.file_converter import BaseConverter, ImageToTextConverter
 
@@ -28,10 +34,10 @@ logger = logging.getLogger(__name__)
 
 
 class PDFToTextConverter(BaseConverter):
-
     def __init__(
         self,
         remove_numeric_tables: bool = False,
+        language: str = "en",
         valid_languages: Optional[List[str]] = None,
     ):
         """
@@ -47,11 +53,10 @@ class PDFToTextConverter(BaseConverter):
                                 in garbled text.
         """
         # save init parameters to enable export of component config as YAML
-        self.set_config(remove_numeric_tables=remove_numeric_tables,
-                        valid_languages=valid_languages)
+        self.set_config(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
 
-        super().__init__(remove_numeric_tables=remove_numeric_tables,
-                         valid_languages=valid_languages)
+        super().__init__(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
+        self.language = language
 
     def convert(
         self,
@@ -59,7 +64,7 @@ class PDFToTextConverter(BaseConverter):
         meta: Optional[Dict[str, str]] = None,
         remove_numeric_tables: Optional[bool] = None,
         valid_languages: Optional[List[str]] = None,
-        encoding: Optional[str] = "Latin1",
+        language: Optional[str] = "en",
     ) -> List[Dict[str, Any]]:
         """
         Extract text from a .pdf file using the pdftotext library (https://www.xpdfreader.com/pdftotext-man.html)
@@ -77,20 +82,15 @@ class PDFToTextConverter(BaseConverter):
                                 This option can be used to add test for encoding errors. If the extracted text is
                                 not one of the valid languages, then it might likely be encoding error resulting
                                 in garbled text.
-        :param encoding: Encoding that will be passed as -enc parameter to pdftotext. "Latin 1" is the default encoding
-                         of pdftotext. While this works well on many PDFs, it might be needed to switch to "UTF-8" or
-                         others if your doc contains special characters (e.g. German Umlauts, Cyrillic characters ...).
-                         Note: With "UTF-8" we experienced cases, where a simple "fi" gets wrongly parsed as
-                         "xef\xac\x81c" (see test cases). That's why we keep "Latin 1" as default here.
-                         (See list of available encodings by running `pdftotext -listenc` in the terminal)
         """
 
-        pages = self._read_pdf(file_path, layout=False, encoding=encoding)
+        pages = self._read_pdf(file_path, layout=False)
         if remove_numeric_tables is None:
             remove_numeric_tables = self.remove_numeric_tables
         if valid_languages is None:
             valid_languages = self.valid_languages
-
+        if language is None:
+            language = self.language
         cleaned_pages = []
         for page in pages:
             # pdftotext tool provides an option to retain the original physical layout of a PDF page. This behaviour
@@ -104,39 +104,38 @@ class PDFToTextConverter(BaseConverter):
             #
             #  Here, as a "safe" default, layout is turned off.
             lines = page.splitlines()
+
             cleaned_lines = []
             for line in lines:
-                words = line.split()
-                digits = [
-                    word for word in words if any(i.isdigit() for i in word)
-                ]
+                if self.language == "chinese":
+                    words = list(line)
+                else:
+                    words = line.split()
+                digits = [word for word in words if any(i.isdigit() for i in word)]
 
                 # remove lines having > 40% of words as digits AND not ending with a period(.)
                 if remove_numeric_tables:
-                    if words and len(digits) / len(
-                            words) > 0.4 and not line.strip().endswith("."):
+                    if words and len(digits) / len(words) > 0.4 and not line.strip().endswith("."):
                         logger.debug(f"Removing line '{line}' from {file_path}")
                         continue
                 cleaned_lines.append(line)
-            cleaned_pages.extend(cleaned_lines)
+
+            page = "\n".join(cleaned_lines)
+            cleaned_pages.append(page)
 
         if valid_languages:
             document_text = "".join(cleaned_pages)
             if not self.validate_language(document_text, valid_languages):
                 logger.warning(
                     f"The language for {file_path} is not one of {valid_languages}. The file may not have "
-                    f"been decoded in the correct text format.")
+                    f"been decoded in the correct text format."
+                )
 
-        documents = []
-        for page in cleaned_pages:
-            document = {"content": page, "content_type": "text", "meta": meta}
-            documents.append(document)
-        return documents
+        text = "\f".join(cleaned_pages)
+        document = {"content": text, "content_type": "text", "meta": meta}
+        return [document]
 
-    def _read_pdf(self,
-                  file_path: Path,
-                  layout: bool,
-                  encoding: Optional[str] = "Latin1") -> List[str]:
+    def _read_pdf(self, file_path: Path, layout: bool) -> List[str]:
         """
         Extract pages from the pdf file at file_path.
 
@@ -153,7 +152,6 @@ class PDFToTextConverter(BaseConverter):
 
 
 class PDFToTextOCRConverter(BaseConverter):
-
     def __init__(
         self,
         remove_numeric_tables: bool = False,
@@ -174,14 +172,11 @@ class PDFToTextOCRConverter(BaseConverter):
                                 in garbled text.
         """
         # init image to text instance
-        self.image_2_text = ImageToTextConverter(remove_numeric_tables,
-                                                 valid_languages)
+        self.image_2_text = ImageToTextConverter(remove_numeric_tables, valid_languages)
 
         # save init parameters to enable export of component config as YAML
-        self.set_config(remove_numeric_tables=remove_numeric_tables,
-                        valid_languages=valid_languages)
-        super().__init__(remove_numeric_tables=remove_numeric_tables,
-                         valid_languages=valid_languages)
+        self.set_config(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
+        super().__init__(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
 
     def convert(
         self,
@@ -215,12 +210,13 @@ class PDFToTextOCRConverter(BaseConverter):
         try:
             images = convert_from_path(file_path)
             for image in images:
-                temp_img = tempfile.NamedTemporaryFile(dir=os.path.dirname(
-                    os.path.realpath(__file__)),
-                                                       suffix=".jpeg")
+                temp_img = tempfile.NamedTemporaryFile(
+                    dir=os.path.dirname(os.path.realpath(__file__)), suffix=".jpeg", delete=False
+                )
                 image.save(temp_img.name)
-                pages.append(
-                    self.image_2_text.convert(temp_img.name)[0]["content"])
+                pages.append(self.image_2_text.convert(temp_img.name)[0]["content"])
+                temp_img.close()
+                os.remove(temp_img.name)
         except Exception as exception:
             logger.error(f"File {file_path} has an error \n {exception}")
 

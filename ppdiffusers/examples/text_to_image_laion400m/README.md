@@ -9,16 +9,10 @@ ___官方32层`CompVis/ldm-text2im-large-256`的Latent Diffusion Model使用的�
 ### 1.1 安装依赖
 
 在运行这个训练代码前，我们需要安装下面的训练依赖。
-
-___注意___:
-___当前这部分的代码需要使用develop分支的paddlenlp以及develop分支的ppdiffusers才可以正常运行！！！！___
-
 ```bash
-# 安装cuda11.2, python 3.7, develop版本的paddle, commit号为b96a21df4e7a42b2445104426e2be407534705e6.
-wget https://paddlenlp.bj.bcebos.com/models/community/CompVis/paddlepaddle_gpu-0.0.0.post112-cp37-cp37m-linux_x86_64.whl
-pip install paddlepaddle_gpu-0.0.0.post112-cp37-cp37m-linux_x86_64.whl
-# 注意当前该部分的训练需要使用develop分支的paddlenlp和develop分支的ppdiffusers。
-pip install -U paddlenlp ppdiffusers visualdl fastcore Pillow
+# paddlepaddle-gpu>=2.4.1
+python -m pip install paddlepaddle-gpu==2.4.1.post112 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
+pip install -r requirements.txt
 ```
 
 ### 1.2 准备数据
@@ -44,11 +38,14 @@ pip install -U paddlenlp ppdiffusers visualdl fastcore Pillow
 ```
 ./data/filelist/laion400m_en.filelist
 ```
+Tips: 我们可以选择下载demo数据
+- 删除当前目录下的`data`;
+- 下载demo数据`wget https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/laion400m_demo_data.tar.gz`；
+- 解压demo数据`tar -zxvf laion400m_demo_data.tar.gz`
 
 ### 1.3 使用trainner开启训练
 #### 1.3.1 硬件要求
 Tips：
-- FP16 O2 在 32GB 的显卡上可正常训练。
 - FP32 在 40GB 的显卡上可正常训练。
 
 #### 1.3.2 单机单卡训练
@@ -105,10 +102,13 @@ python -u train_txt2img_laion400m_trainer.py \
 > * `--tokenizer_name`: 我们需要使用的`tokenizer_name`，我们可以使用英文的分词器`bert-base-uncased`，也可以使用中文的分词器`ernie-1.0`。
 > * `--use_ema`: 是否对`unet`使用`ema`，默认为`False`。
 > * `--max_grad_norm`: 梯度剪裁的最大norm值，`-1`表示不使用梯度裁剪策略。
+> * `--recompute`: 是否开启重计算，(`bool`, 可选, 默认为 `False`)，在开启后我们可以增大batch_size，注意在小batch_size的条件下，开启recompute后显存变化不明显，只有当开大batch_size后才能明显感受到区别。
 > * `--fp16`: 是否使用 fp16 混合精度训练而不是 fp32 训练。(`bool`, 可选, 默认为 `False`)
 > * `--fp16_opt_level`: 混合精度训练模式，可为``O1``或``O2``模式，默认``O1``模式，默认O1. 只在fp16选项开启时候生效。
+> * `--enable_xformers_memory_efficient_attention`: 是否开启`xformers`，开启后训练速度会变慢，但是能够节省显存。注意我们需要安装develop版本的paddlepaddle！
 
-#### 1.3.3 单机多卡训练
+
+#### 1.3.3 单机多卡训练 (多机多卡训练，仅需在 paddle.distributed.launch 后加个 --ips IP1,IP2,IP3,IP4)
 ```bash
 python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train_txt2img_laion400m_trainer.py \
     --do_train \
@@ -188,8 +188,10 @@ python -u train_txt2img_laion400m_no_trainer.py \
 > * `--tokenizer_name`: 我们需要使用的`tokenizer_name`。
 > * `--use_ema`: 是否对`unet`使用`ema`，默认为`False`。
 > * `--max_grad_norm`: 梯度剪裁的最大norm值，`-1`表示不使用梯度裁剪策略。
+> * `--recompute`: 是否开启重计算，(`bool`, 可选, 默认为 `False`)，在开启后我们可以增大batch_size，注意在小batch_size的条件下，开启recompute后显存变化不明显，只有当开大batch_size后才能明显感受到区别。
 > * `--fp16`: 是否使用 fp16 混合精度训练而不是 fp32 训练。(`bool`, 可选, 默认为 `False`)
 > * `--fp16_opt_level`: 混合精度训练模式，可为``O1``或``O2``模式，默认``O1``模式，默认O1. 只在fp16选项开启时候生效。
+> * `--enable_xformers_memory_efficient_attention`: 是否开启`xformers`，开启后训练速度会变慢，但是能够节省显存。注意我们需要安装develop版本的paddlepaddle！
 
 #### 1.4.2 单机多卡训练
 ```bash

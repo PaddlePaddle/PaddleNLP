@@ -22,9 +22,14 @@ import paddle
 
 def cast_model_to_fp16_block(program, amp_lists=None, use_fp16_guard=True):
     from paddle.static.amp import AutoMixedPrecisionLists
-    from paddle.fluid.contrib.mixed_precision.fp16_utils import \
-        _valid_types, _dtype_to_str, \
-        _need_keep_fp32, _insert_cast_op, _keep_fp32_input, _keep_fp32_output
+    from paddle.fluid.contrib.mixed_precision.fp16_utils import (
+        _valid_types,
+        _dtype_to_str,
+        _need_keep_fp32,
+        _insert_cast_op,
+        _keep_fp32_input,
+        _keep_fp32_output,
+    )
 
     if amp_lists is None:
         amp_lists = AutoMixedPrecisionLists()
@@ -39,8 +44,7 @@ def cast_model_to_fp16_block(program, amp_lists=None, use_fp16_guard=True):
             print("-- {}, try to get it in the global block --".format(e))
             var = global_block.var(var_name)
             if var is not None:
-                print(
-                    "-- var {} is got in the global block --".format(var_name))
+                print("-- var {} is got in the global block --".format(var_name))
         return var
 
     def get_input_output_info(block):
@@ -63,26 +67,23 @@ def cast_model_to_fp16_block(program, amp_lists=None, use_fp16_guard=True):
         if var.type not in _valid_types or var.dtype == dest_dtype:
             return num_cast_ops
 
-        assert var.dtype == src_dtype, \
-            "The real dtype({}) is not equal to the src dtype({})".format(
-                _dtype_to_str(var.dtype), _dtype_to_str(src_dtype))
+        assert var.dtype == src_dtype, "The real dtype({}) is not equal to the src dtype({})".format(
+            _dtype_to_str(var.dtype), _dtype_to_str(src_dtype)
+        )
 
-        cast_name = var_name + '.cast_' + _dtype_to_str(dest_dtype)
+        cast_name = var_name + ".cast_" + _dtype_to_str(dest_dtype)
         cast_var = block.vars.get(cast_name)
         if cast_var is None or cast_var.dtype != dest_dtype:
-            cast_var = block.create_var(name=cast_name,
-                                        dtype=dest_dtype,
-                                        persistable=False,
-                                        stop_gradient=var.stop_gradient)
-            block._insert_op_without_sync(idx,
-                                          type='cast',
-                                          inputs={'X': var},
-                                          outputs={'Out': cast_var},
-                                          attrs={
-                                              'in_dtype': var.dtype,
-                                              'out_dtype': cast_var.dtype,
-                                              'op_device': op.attr('op_device')
-                                          })
+            cast_var = block.create_var(
+                name=cast_name, dtype=dest_dtype, persistable=False, stop_gradient=var.stop_gradient
+            )
+            block._insert_op_without_sync(
+                idx,
+                type="cast",
+                inputs={"X": var},
+                outputs={"Out": cast_var},
+                attrs={"in_dtype": var.dtype, "out_dtype": cast_var.dtype, "op_device": op.attr("op_device")},
+            )
             num_cast_ops += 1
         return num_cast_ops, cast_name
 
@@ -94,17 +95,16 @@ def cast_model_to_fp16_block(program, amp_lists=None, use_fp16_guard=True):
             fp32_var2op.update(parent_fp32var2op)
         num_cast_ops = 0
         for idx, op in enumerate(list(block.ops)):
-            #if op.type == 'create_py_reader' or op.type == 'read':
-            if op.type == 'create_py_reader':
+            # if op.type == 'create_py_reader' or op.type == 'read':
+            if op.type == "create_py_reader":
                 continue
-            if op.has_attr('sub_block'):
-                sub_block_id = op.attr('sub_block').id
+            if op.has_attr("sub_block"):
+                sub_block_id = op.attr("sub_block").id
                 cast_block(program.block(sub_block_id), fp32_var2op)
                 continue
 
             if _need_keep_fp32(op, amp_lists.unsupported_list, use_fp16_guard):
-                pre_cast_num = _insert_cast_op(block, op, idx + num_cast_ops,
-                                               paddle.float16, paddle.float32)
+                pre_cast_num = _insert_cast_op(block, op, idx + num_cast_ops, paddle.float16, paddle.float32)
                 num_cast_ops += pre_cast_num
 
                 for out_var_name in op.output_arg_names:
@@ -128,9 +128,13 @@ def cast_model_to_fp16_block(program, amp_lists=None, use_fp16_guard=True):
                         if in_var.dtype == paddle.float32 and in_var_name in fp32_var2op:
                             # cast fp32->fp16, rename op input
                             pre_cast_num, cast_name = cast_var(
-                                block, fp32_var2op[in_var_name],
-                                idx + num_cast_ops, paddle.float32,
-                                paddle.float16, in_var_name)
+                                block,
+                                fp32_var2op[in_var_name],
+                                idx + num_cast_ops,
+                                paddle.float32,
+                                paddle.float16,
+                                in_var_name,
+                            )
                             op._rename_input(in_var_name, cast_name)
                             num_cast_ops += pre_cast_num
                         elif in_var.dtype == paddle.float32:
@@ -138,8 +142,10 @@ def cast_model_to_fp16_block(program, amp_lists=None, use_fp16_guard=True):
                             to_fp16_var_names.add(in_var_name)
 
                         print(
-                            "-- op type: {}, in var name: {}, in var dtype: {} --"
-                            .format(op.type, in_var_name, in_var.dtype))
+                            "-- op type: {}, in var name: {}, in var dtype: {} --".format(
+                                op.type, in_var_name, in_var.dtype
+                            )
+                        )
 
                     for out_name in op.output_names:
                         # FIXME(wangxi): can be float16?
@@ -154,18 +160,17 @@ def cast_model_to_fp16_block(program, amp_lists=None, use_fp16_guard=True):
                                 out_var.desc.set_dtype(paddle.float16)
 
                             print(
-                                "-- op type: {}, out var name: {}, out var dtype: {} --"
-                                .format(op.type, out_var_name, out_var.dtype))
+                                "-- op type: {}, out var name: {}, out var dtype: {} --".format(
+                                    op.type, out_var_name, out_var.dtype
+                                )
+                            )
 
-                    if op.has_attr('in_dtype') and op.attr(
-                            'in_dtype') == paddle.float32:
-                        op._set_attr('in_dtype', paddle.float16)
-                    if op.has_attr('out_dtype') and op.attr(
-                            'out_dtype') == paddle.float32:
-                        op._set_attr('out_dtype', paddle.float16)
-                    if op.has_attr('dtype') and op.attr(
-                            'dtype') == paddle.float32:
-                        op._set_attr('dtype', paddle.float16)
+                    if op.has_attr("in_dtype") and op.attr("in_dtype") == paddle.float32:
+                        op._set_attr("in_dtype", paddle.float16)
+                    if op.has_attr("out_dtype") and op.attr("out_dtype") == paddle.float32:
+                        op._set_attr("out_dtype", paddle.float16)
+                    if op.has_attr("dtype") and op.attr("dtype") == paddle.float32:
+                        op._set_attr("dtype", paddle.float16)
 
             # record fp32_var to op
             for in_var_name in op.input_arg_names:

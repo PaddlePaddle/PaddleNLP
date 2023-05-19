@@ -14,15 +14,11 @@
 
 import argparse
 import os
-from functools import partial
 
-import numpy as np
 import paddle
-import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import AutoModel, AutoTokenizer
+from base_model import SemanticIndexBaseStatic
 
-from base_model import SemanticIndexBase, SemanticIndexBaseStatic
+from paddlenlp.transformers import AutoModel, AutoTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -38,26 +34,23 @@ if __name__ == "__main__":
     output_emb_size = 256
     pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-    model = SemanticIndexBaseStatic(pretrained_model,
-                                    output_emb_size=output_emb_size)
+    model = SemanticIndexBaseStatic(pretrained_model, output_emb_size=output_emb_size)
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
     else:
-        raise ValueError(
-            "Please set --params_path with correct pretrained model file")
+        raise ValueError("Please set --params_path with correct pretrained model file")
 
     model.eval()
     # Convert to static graph with specific input description
     model = paddle.jit.to_static(
         model,
         input_spec=[
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64")  # segment_ids
-        ])
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # segment_ids
+        ],
+    )
     # Save in static graph model.
     save_path = os.path.join(args.output_path, "inference")
     paddle.jit.save(model, save_path)

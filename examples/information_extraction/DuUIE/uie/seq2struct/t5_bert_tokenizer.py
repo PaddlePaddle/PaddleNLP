@@ -28,20 +28,22 @@ class T5BertTokenizer(BertTokenizer):
 
     model_input_names = ["input_ids", "attention_mask"]
 
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=False,
-                 do_basic_tokenize=True,
-                 never_split=None,
-                 unk_token="<unk>",
-                 sep_token=None,
-                 pad_token="<pad>",
-                 cls_token=None,
-                 mask_token=None,
-                 space_token="<space>",
-                 tokenize_chinese_chars=True,
-                 strip_accents=None,
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        do_lower_case=False,
+        do_basic_tokenize=True,
+        never_split=None,
+        unk_token="<unk>",
+        sep_token=None,
+        pad_token="<pad>",
+        cls_token=None,
+        mask_token=None,
+        space_token="<space>",
+        tokenize_chinese_chars=True,
+        strip_accents=None,
+        **kwargs
+    ):
         super().__init__(
             vocab_file=vocab_file,
             do_lower_case=do_lower_case,
@@ -62,26 +64,22 @@ class T5BertTokenizer(BertTokenizer):
         self._space_token = space_token
 
     def get_vocab(self):
-        vocab = {
-            self.convert_ids_to_tokens(i): i
-            for i in range(self.vocab_size)
-        }
+        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
         vocab.update(self.added_tokens_encoder)
         return vocab
 
     def tokenize(self, text, **kwargs):
         import re
+
         # Remove space between <extra_id_*> <spot> <asoc>
-        split_bracket = re.compile(
-            r"\s*<extra_id_\d>\s*|\s*<spot>\s*|\s*<asoc>\s*")
+        split_bracket = re.compile(r"\s*<extra_id_\d>\s*|\s*<spot>\s*|\s*<asoc>\s*")
 
         if len(split_bracket.split(text)) > 1:
             new_text_list = [split_bracket.split(text)[0]]
-            for item in zip(split_bracket.findall(text),
-                            split_bracket.split(text)[1:]):
+            for item in zip(split_bracket.findall(text), split_bracket.split(text)[1:]):
                 new_text_list += [item[0].strip(), item[1]]
             text = "".join(new_text_list)
-        text = text.replace(' ', self._space_token)
+        text = text.replace(" ", self._space_token)
         return super().tokenize(text, **kwargs)
 
     def _add_eos_if_not_present(self, token_ids: List[int]) -> List[int]:
@@ -95,9 +93,8 @@ class T5BertTokenizer(BertTokenizer):
             return token_ids + [self.eos_token_id]
 
     def build_inputs_with_special_tokens(
-            self,
-            token_ids_0: List[int],
-            token_ids_1: Optional[List[int]] = None) -> List[int]:
+        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
+    ) -> List[int]:
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens. A sequence has the following format:
@@ -121,35 +118,24 @@ class T5BertTokenizer(BertTokenizer):
             token_ids_1 = self._add_eos_if_not_present(token_ids_1)
             return token_ids_0 + token_ids_1
 
-    def _decode(self,
-                token_ids: Union[List[int], Tensor],
-                skip_special_tokens: bool = False,
-                **kwargs) -> str:
+    def _decode(self, token_ids: Union[List[int], Tensor], skip_special_tokens: bool = False, **kwargs) -> str:
         if isinstance(token_ids, Tensor):
-            tokens = self.convert_ids_to_tokens(
-                token_ids.tolist(), skip_special_tokens=skip_special_tokens)
+            tokens = self.convert_ids_to_tokens(token_ids.tolist(), skip_special_tokens=skip_special_tokens)
         else:
-            tokens = self.convert_ids_to_tokens(
-                token_ids, skip_special_tokens=skip_special_tokens)
+            tokens = self.convert_ids_to_tokens(token_ids, skip_special_tokens=skip_special_tokens)
 
         # Fix '##' subtoken
-        tokens = [x.lstrip('#') if x.startswith("##") else x for x in tokens]
+        tokens = [x.lstrip("#") if x.startswith("##") else x for x in tokens]
 
         x_str = "".join(tokens)
-        x_str = x_str.replace(' ', '')
-        x_str = x_str.replace(self._space_token, ' ')
+        x_str = x_str.replace(" ", "")
+        x_str = x_str.replace(self._space_token, " ")
         return x_str
 
-    def decode(self,
-               token_ids: Union[List[int], Tensor],
-               skip_special_tokens: bool = False,
-               **kwargs) -> str:
+    def decode(self, token_ids: Union[List[int], Tensor], skip_special_tokens: bool = False, **kwargs) -> str:
         return self._decode(token_ids, skip_special_tokens)
 
-    def batch_decode(self,
-                     sequences,
-                     skip_special_tokens=False,
-                     clean_up_tokenization_spaces=True):
+    def batch_decode(self, sequences, skip_special_tokens=False, clean_up_tokenization_spaces=True):
         """
         Convert a list of lists of token ids into a list of strings by calling decode.
         Args:
@@ -164,8 +150,7 @@ class T5BertTokenizer(BertTokenizer):
         """
         return [
             self._decode(
-                seq,
-                skip_special_tokens=skip_special_tokens,
-                clean_up_tokenization_spaces=clean_up_tokenization_spaces)
+                seq, skip_special_tokens=skip_special_tokens, clean_up_tokenization_spaces=clean_up_tokenization_spaces
+            )
             for seq in sequences
         ]

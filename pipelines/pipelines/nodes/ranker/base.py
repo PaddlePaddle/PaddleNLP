@@ -32,23 +32,14 @@ class BaseRanker(BaseComponent):
     query_time = 0
 
     @abstractmethod
-    def predict(self,
-                query: str,
-                documents: List[Document],
-                top_k: Optional[int] = None):
+    def predict(self, query: str, documents: List[Document], top_k: Optional[int] = None):
         pass
 
     @abstractmethod
-    def predict_batch(self,
-                      query_doc_list: List[dict],
-                      top_k: Optional[int] = None,
-                      batch_size: Optional[int] = None):
+    def predict_batch(self, query_doc_list: List[dict], top_k: Optional[int] = None, batch_size: Optional[int] = None):
         pass
 
-    def run(self,
-            query: str,
-            documents: List[Document],
-            top_k: Optional[int] = None):
+    def run(self, query: str, documents: List[Document], top_k: Optional[int] = None):
         self.query_count += 1
         if documents:
             predict = self.timing(self.predict, "query_time")
@@ -71,10 +62,7 @@ class BaseRanker(BaseComponent):
     ):
         self.query_count += len(queries)
         predict_batch = self.timing(self.predict_batch, "query_time")
-        results = predict_batch(queries=queries,
-                                documents=documents,
-                                top_k=top_k,
-                                batch_size=batch_size)
+        results = predict_batch(queries=queries, documents=documents, top_k=top_k, batch_size=batch_size)
 
         for doc_list in results:
             document_ids = [doc.id for doc in doc_list]

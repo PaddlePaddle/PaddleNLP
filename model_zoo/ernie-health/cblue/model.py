@@ -14,7 +14,8 @@
 
 import paddle
 import paddle.nn as nn
-from paddlenlp.transformers import ElectraPretrainedModel
+
+from paddlenlp.transformers import ElectraConfig, ElectraModel, ElectraPretrainedModel
 
 
 class ElectraForBinaryTokenClassification(ElectraPretrainedModel):
@@ -22,7 +23,7 @@ class ElectraForBinaryTokenClassification(ElectraPretrainedModel):
     Electra Model with two linear layers on top of the hidden-states output layers,
     designed for token classification tasks with nesting.
 
-    Args: 
+    Args:
         electra (:class:`ElectraModel`):
             An instance of ElectraModel.
         num_classes (list):
@@ -33,27 +34,17 @@ class ElectraForBinaryTokenClassification(ElectraPretrainedModel):
             instance `electra`. Defaults to None.
     """
 
-    def __init__(self, electra, num_classes, dropout=None):
-        super(ElectraForBinaryTokenClassification, self).__init__()
-        assert (len(num_classes) == 2)
-        self.num_classes_oth = num_classes[0]
-        self.num_classes_sym = num_classes[1]
-        self.electra = electra
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.
-                                  electra.config['hidden_dropout_prob'])
-        self.classifier_oth = nn.Linear(self.electra.config['hidden_size'],
-                                        self.num_classes_oth)
-        self.classifier_sym = nn.Linear(self.electra.config['hidden_size'],
-                                        self.num_classes_sym)
-        self.init_weights()
+    def __init__(self, config: ElectraConfig, num_classes_oth, num_classes_sym):
+        super(ElectraForBinaryTokenClassification, self).__init__(config)
+        self.num_classes_oth = num_classes_oth
+        self.num_classes_sym = num_classes_sym
+        self.electra = ElectraModel(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.classifier_oth = nn.Linear(config.hidden_size, self.num_classes_oth)
+        self.classifier_sym = nn.Linear(config.hidden_size, self.num_classes_sym)
 
-    def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
-        sequence_output = self.electra(input_ids, token_type_ids, position_ids,
-                                       attention_mask)
+    def forward(self, input_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
+        sequence_output = self.electra(input_ids, token_type_ids, position_ids, attention_mask)
         sequence_output = self.dropout(sequence_output)
 
         logits_sym = self.classifier_sym(sequence_output)
@@ -93,7 +84,7 @@ class ElectraForSPO(ElectraPretrainedModel):
     layers for entity recognition, and a multi-head attention layer for
     relation classification.
 
-    Args: 
+    Args:
         electra (:class:`ElectraModel`):
             An instance of ElectraModel.
         num_classes (int):
@@ -104,28 +95,18 @@ class ElectraForSPO(ElectraPretrainedModel):
             instance `electra`. Defaults to None.
     """
 
-    def __init__(self, electra, num_classes, dropout=None):
-        super(ElectraForSPO, self).__init__()
-        self.num_classes = num_classes
-        self.electra = electra
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.
-                                  electra.config['hidden_dropout_prob'])
-        self.classifier = nn.Linear(self.electra.config['hidden_size'], 2)
-        self.span_attention = MultiHeadAttentionForSPO(
-            self.electra.config['hidden_size'], num_classes)
-        self.init_weights()
+    def __init__(self, config: ElectraConfig):
+        super(ElectraForSPO, self).__init__(config)
+        self.num_classes = config.num_labels
+        self.electra = ElectraModel(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, 2)
+        self.span_attention = MultiHeadAttentionForSPO(config.hidden_size, config.num_labels)
 
-    def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
-        outputs = self.electra(input_ids,
-                               token_type_ids,
-                               position_ids,
-                               attention_mask,
-                               output_hidden_states=True,
-                               return_dict=True)
+    def forward(self, input_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
+        outputs = self.electra(
+            input_ids, token_type_ids, position_ids, attention_mask, output_hidden_states=True, return_dict=True
+        )
         sequence_outputs = outputs.last_hidden_state
         all_hidden_states = outputs.hidden_states
         sequence_outputs = self.dropout(sequence_outputs)
@@ -135,7 +116,7 @@ class ElectraForSPO(ElectraPretrainedModel):
         cls_output = paddle.unsqueeze(sequence_outputs[:, 0, :], axis=1)
         subject_output = subject_output + cls_output
 
-        output_size = self.num_classes + self.electra.config['hidden_size']
+        output_size = self.num_classes + self.electra.config["hidden_size"]  # noqa:F841
         rel_logits = self.span_attention(sequence_outputs, subject_output)
 
         return ent_logits, rel_logits

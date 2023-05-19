@@ -11,20 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
 import os
+import sys
 
 import numpy as np
-import paddle
 import torch
 import torch.nn as nn
 from reprod_log import ReprodLogger
 
 CURRENT_DIR = os.path.split(os.path.abspath(__file__))[0]  # 当前目录
-CONFIG_PATH = CURRENT_DIR.rsplit('/', 1)[0]
+CONFIG_PATH = CURRENT_DIR.rsplit("/", 1)[0]
 sys.path.append(CONFIG_PATH)
 
-from models.pt_bert import BertConfig, BertForSequenceClassification
+from models.pt_bert import BertConfig, BertForSequenceClassification  # noqa: E402
 
 if __name__ == "__main__":
 
@@ -33,14 +32,13 @@ if __name__ == "__main__":
 
     criterion = nn.CrossEntropyLoss()
 
-    pytorch_dump_path = '../weights/torch_weight.bin'
+    pytorch_dump_path = "../weights/torch_weight.bin"
     config = BertConfig()
     model = BertForSequenceClassification(config)
     checkpoint = torch.load(pytorch_dump_path)
     model.bert.load_state_dict(checkpoint)
 
-    classifier_weights = torch.load(
-        "../classifier_weights/torch_classifier_weights.bin")
+    classifier_weights = torch.load("../classifier_weights/torch_classifier_weights.bin")
     model.load_state_dict(classifier_weights, strict=False)
     model.eval()
     # read or gen fake data

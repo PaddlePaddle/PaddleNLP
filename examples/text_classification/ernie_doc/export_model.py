@@ -48,9 +48,11 @@ if __name__ == "__main__":
         logger.info("will remove the old model")
         shutil.rmtree(args.static_path)
 
-    predictor = LongDocClassifier(model_name_or_path=args.model_name_or_path,
-                                  batch_size=args.batch_size,
-                                  max_seq_length=args.max_seq_length,
-                                  memory_len=args.memory_length,
-                                  static_mode=True,
-                                  static_path=args.static_path)
+    predictor = LongDocClassifier(
+        model_name_or_path=args.model_name_or_path,
+        batch_size=args.batch_size,
+        max_seq_length=args.max_seq_length,
+        memory_len=args.memory_length,
+        static_mode=True,
+        static_path=args.static_path,
+    )

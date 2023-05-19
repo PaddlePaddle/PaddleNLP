@@ -12,15 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-### 城市百科知识智能问答系统
+# 城市百科知识智能问答系统
 import argparse
-import logging
 import os
 
-import paddle
 from pipelines.document_stores import FAISSDocumentStore
-from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http, print_documents
-from pipelines.nodes import ErnieRanker, DensePassageRetriever
+from pipelines.nodes import DensePassageRetriever, ErnieRanker
+from pipelines.utils import (
+    convert_files_to_dicts,
+    fetch_archive_from_http,
+    print_documents,
+)
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -35,7 +37,7 @@ args = parser.parse_args()
 
 def dense_faq_pipeline():
 
-    use_gpu = True if args.device == 'gpu' else False
+    use_gpu = True if args.device == "gpu" else False
 
     faiss_document_store = "faiss_document_store.db"
     if os.path.exists(args.index_name) and os.path.exists(faiss_document_store):
@@ -55,18 +57,14 @@ def dense_faq_pipeline():
         doc_dir = "data/insurance"
         city_data = "https://paddlenlp.bj.bcebos.com/applications/insurance.zip"
         fetch_archive_from_http(url=city_data, output_dir=doc_dir)
-        dicts = convert_files_to_dicts(dir_path=doc_dir,
-                                       split_paragraphs=True,
-                                       split_answers=True,
-                                       encoding='utf-8')
+        dicts = convert_files_to_dicts(dir_path=doc_dir, split_paragraphs=True, split_answers=True, encoding="utf-8")
 
         if os.path.exists(args.index_name):
             os.remove(args.index_name)
         if os.path.exists(faiss_document_store):
             os.remove(faiss_document_store)
 
-        document_store = FAISSDocumentStore(embedding_dim=768,
-                                            faiss_index_factory_str="Flat")
+        document_store = FAISSDocumentStore(embedding_dim=768, faiss_index_factory_str="Flat")
         document_store.write_documents(dicts)
 
         retriever = DensePassageRetriever(
@@ -86,12 +84,10 @@ def dense_faq_pipeline():
         # save index
         document_store.save(args.index_name)
 
-    ### Ranker
-    ranker = ErnieRanker(
-        model_name_or_path="rocketqa-zh-dureader-cross-encoder",
-        use_gpu=use_gpu)
+    # Ranker
+    ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
 
-    # ### Pipeline
+    # Pipeline
     from pipelines import SemanticSearchPipeline
 
     pipe = SemanticSearchPipeline(retriever, ranker)

@@ -15,11 +15,10 @@
 
 import logging
 import numbers
-from typing import Iterable, List
 
 import numpy as np
-from paddlenlp.datasets import IterDataset, MapDataset
 
+from paddlenlp.datasets import MapDataset
 from pipelines.utils.common_utils import flatten_list
 
 logger = logging.getLogger(__name__)
@@ -56,9 +55,10 @@ def convert_features_to_dataset(features):
                     f"A non-integer value for feature '{t_name}' with a value of: "
                     f"'{base}' will be converted to a Paddle tensor of dtype long."
                 )
-        except:
-            logger.debug(f"Could not determine type for feature '{t_name}'. "
-                         "Converting now to a tensor of default type long.")
+        except Exception:
+            logger.debug(
+                f"Could not determine type for feature '{t_name}'. " "Converting now to a tensor of default type long."
+            )
 
         # Convert all remaining python objects to Paddle long tensors
         cur_tensor = [sample[t_name] for sample in features]

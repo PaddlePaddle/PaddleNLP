@@ -12,21 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple, Union, Tuple, List, Dict
-
 from abc import ABC
+from typing import Dict, List, Tuple, Union
 
-from .. import C
+from .. import C, OffsetType, Token
 from ..normalizers import NormalizedString
-from .. import Token, OffsetType
 
 
 class StringSplit:
-
     def __init__(self, nomalized_text: NormalizedString, tokens: List[Token]):
         tokens = [token._token for token in tokens]
-        self._string_split = C.pretokenizers.StringSplit(
-            nomalized_text._normalized, tokens)
+        self._string_split = C.pretokenizers.StringSplit(nomalized_text._normalized, tokens)
 
     @property
     def normalized(self):
@@ -46,7 +42,6 @@ class StringSplit:
 
 
 class PreTokenizedString:
-
     def __init__(self, text: str):
         self._pretokenized = C.pretokenizers.PreTokenizedString(text)
 
@@ -59,10 +54,10 @@ class PreTokenizedString:
     def get_original_text(self):
         return self._pretokenized.get_original_text()
 
-    def get_splits(self, offset_referential: bool, offset_type: str):
+    def get_splits(self, offset_referential: str = "original", offset_type: str = "char"):
         """
         param offset_referential: "original" or "normalized"
-        param offset_type
+        param offset_type: "char" or "byte"
         """
         return self._pretokenized.get_splits(offset_referential, offset_type)
 
@@ -71,48 +66,48 @@ class PreTokenizedString:
 
 
 class PreTokenizer(ABC):
-
     def __call__(self, pretokenized: PreTokenizedString):
         return self._pretokenizer(pretokenized._pretokenized)
 
+    def pretokenize_str(self, pretokenized_str: str):
+        pretokenized = PreTokenizedString(pretokenized_str)
+        self(pretokenized)
+        splits = pretokenized.get_splits()
+        result = [(s, offset) for s, offset, tokens in splits]
+        return result
+
 
 class WhitespacePreTokenizer(PreTokenizer):
-
     def __init__(self):
         self._pretokenizer = C.pretokenizers.WhitespacePreTokenizer()
 
 
-class BertPreTokenizer(PreTokenizer):
+class WhitespaceAndPunctuationPreTokenizer(PreTokenizer):
+    def __init__(self):
+        self._pretokenizer = C.pretokenizers.WhitespaceAndPunctuationPreTokenizer()
 
+
+class BertPreTokenizer(PreTokenizer):
     def __init__(self):
         self._pretokenizer = C.pretokenizers.BertPreTokenizer()
 
 
 class MetaSpacePreTokenizer(PreTokenizer):
-
     def __init__(self, replacement: str = "_", add_prefix_space: bool = True):
-        self._pretokenizer = C.pretokenizers.MetaSpacePreTokenizer(
-            replacement, add_prefix_space)
+        self._pretokenizer = C.pretokenizers.MetaSpacePreTokenizer(replacement, add_prefix_space)
 
 
 class SequencePreTokenizer(PreTokenizer):
-
     def __init__(self, pretokenizers: List):
-        pretokenizers = [
-            pretokenizer._pretokenizer for pretokenizer in pretokenizers
-        ]
+        pretokenizers = [pretokenizer._pretokenizer for pretokenizer in pretokenizers]
         self._pretokenizer = C.pretokenizers.SequencePreTokenizer(pretokenizers)
 
 
 class ByteLevelPreTokenizer(PreTokenizer):
-
     def __init__(self, add_prefix_space: bool = True, use_regex: bool = True):
-        self._pretokenizer = C.pretokenizers.ByteLevelPreTokenizer(
-            add_prefix_space, use_regex)
+        self._pretokenizer = C.pretokenizers.ByteLevelPreTokenizer(add_prefix_space, use_regex)
 
 
 class SplitPreTokenizer(PreTokenizer):
-
     def __init__(self, pattern: str, split_mode: int, invert: bool = True):
-        self._pretokenizer = C.pretokenizers.SplitPreTokenizer(
-            pattern, C.SplitMode(split_mode), invert)
+        self._pretokenizer = C.pretokenizers.SplitPreTokenizer(pattern, C.SplitMode(split_mode), invert)

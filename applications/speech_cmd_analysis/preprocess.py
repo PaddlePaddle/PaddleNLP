@@ -35,9 +35,7 @@ def do_convert():
         raise ValueError("Only []/ len(splits)==3 accepted for splits.")
 
     if args.splits and sum(args.splits) != 1:
-        raise ValueError(
-            "Please set correct splits, sum of elements in splits should be equal to 1."
-        )
+        raise ValueError("Please set correct splits, sum of elements in splits should be equal to 1.")
 
     with open(args.input_file, "r", encoding="utf-8") as f:
         raw_examples = f.readlines()
@@ -61,8 +59,7 @@ def do_convert():
         print("\nSave %d examples to %s." % (count, save_path))
 
     if len(args.splits) == 0:
-        examples = _create_ext_examples(raw_examples, args.negative_ratio,
-                                        args.is_shuffle)
+        examples = _create_ext_examples(raw_examples, args.negative_ratio, args.is_shuffle)
         _save_examples(args.save_dir, "train.txt", examples)
     else:
         if args.is_shuffle:
@@ -73,9 +70,7 @@ def do_convert():
         p1 = int(len(raw_examples) * i1)
         p2 = int(len(raw_examples) * (i1 + i2))
 
-        train_examples = _create_ext_examples(raw_examples[:p1],
-                                              args.negative_ratio,
-                                              args.is_shuffle)
+        train_examples = _create_ext_examples(raw_examples[:p1], args.negative_ratio, args.is_shuffle)
         dev_examples = _create_ext_examples(raw_examples[p1:p2])
         test_examples = _create_ext_examples(raw_examples[p2:])
 
@@ -83,7 +78,7 @@ def do_convert():
         _save_examples(args.save_dir, "dev.txt", dev_examples)
         _save_examples(args.save_dir, "test.txt", test_examples)
 
-    print('Finished! It takes %.2f seconds' % (time.time() - tic_time))
+    print("Finished! It takes %.2f seconds" % (time.time() - tic_time))
 
 
 if __name__ == "__main__":

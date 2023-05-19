@@ -13,13 +13,11 @@
 # limitations under the License.
 
 import logging
-# import
-from requests.exceptions import ConnectionError
 
 logger = logging.getLogger(__name__)
 
 
-class StdoutLogger():
+class StdoutLogger:
     """Minimal logger printing metrics and params to stdout.
     Useful for services like AWS SageMaker, where you parse metrics from the actual logs"""
 
@@ -29,9 +27,7 @@ class StdoutLogger():
         self.tracking_uri = tracking_uri
 
     def init_experiment(self, experiment_name, run_name=None, nested=True):
-        logger.info(
-            f"\n **** Starting experiment '{experiment_name}' (Run: {run_name})  ****"
-        )
+        logger.info(f"\n **** Starting experiment '{experiment_name}' (Run: {run_name})  ****")
 
     @classmethod
     def log_metrics(cls, metrics, step):
@@ -47,4 +43,4 @@ class StdoutLogger():
 
     @classmethod
     def end_run(cls):
-        logger.info(f"**** End of Experiment **** ")
+        logger.info("**** End of Experiment **** ")

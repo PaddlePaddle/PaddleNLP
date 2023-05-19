@@ -19,6 +19,7 @@ limitations under the License. */
 #include <tuple>
 #include <unordered_map>
 #include <vector>
+
 #include "fast_tokenizer/core/base.h"
 #include "fast_tokenizer/core/encoding.h"
 #include "fast_tokenizer/normalizers/normalizer.h"
@@ -65,8 +66,9 @@ public:
   void Normalize(
       std::function<void(normalizers::NormalizedString*)> normalize_fn);
   // For wordpiece, bpe ......
-  void Tokenize(std::function<std::vector<core::Token>(
-                    normalizers::NormalizedString*)> tokenize_fn);
+  void Tokenize(
+      std::function<std::vector<core::Token>(normalizers::NormalizedString*)>
+          tokenize_fn);
   bool TransformToEncoding(const std::vector<uint32_t>& word_idx,
                            uint32_t type_id,
                            core::OffsetType offset_type,
@@ -98,15 +100,13 @@ struct FASTTOKENIZER_DECL OffsetConverter {
   }
 };
 
-struct FASTTOKENIZER_DECL BytesToCharOffsetConverter
-    : public OffsetConverter {
+struct FASTTOKENIZER_DECL BytesToCharOffsetConverter : public OffsetConverter {
   std::vector<size_t> offset_map_;
   BytesToCharOffsetConverter(const std::string&);
   virtual bool convert(const core::Offset&, core::Offset*) const;
 };
 
-struct FASTTOKENIZER_DECL CharToBytesOffsetConverter
-    : public OffsetConverter {
+struct FASTTOKENIZER_DECL CharToBytesOffsetConverter : public OffsetConverter {
   std::vector<size_t> offset_map_;
   CharToBytesOffsetConverter(const std::string&);
   virtual bool convert(const core::Offset&, core::Offset*) const;

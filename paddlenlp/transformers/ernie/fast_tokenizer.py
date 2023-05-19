@@ -14,10 +14,11 @@
 # limitations under the License.
 
 import json
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 from fast_tokenizer import normalizers
-from ..tokenizer_utils_faster import PretrainedFastTokenizer
+
+from ..tokenizer_utils_fast import PretrainedFastTokenizer
 from .tokenizer import ErnieTokenizer
 
 VOCAB_FILES_NAMES = {"vocab_file": "vocab.txt", "tokenizer_file": "tokenizer.json"}

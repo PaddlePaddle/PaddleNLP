@@ -51,9 +51,9 @@ def search(scores_can, pred_ids_can, depth, path, score):
         return [(path, score)]
     res = []
     for i in range(len(pred_ids_can[0])):
-        tmp_res = search(scores_can, pred_ids_can, depth + 1,
-                         path + [pred_ids_can[depth][i]],
-                         score + scores_can[depth][i])
+        tmp_res = search(
+            scores_can, pred_ids_can, depth + 1, path + [pred_ids_can[depth][i]], score + scores_can[depth][i]
+        )
         res.extend(tmp_res)
     return res
 
@@ -77,12 +77,8 @@ def find_topk(a, k, axis=-1, largest=True, sorted=True):
         sorted_indices_in_topk = np.argsort(topk_values, axis=axis)
         if largest:
             sorted_indices_in_topk = np.flip(sorted_indices_in_topk, axis=axis)
-        sorted_topk_values = np.take_along_axis(topk_values,
-                                                sorted_indices_in_topk,
-                                                axis=axis)
-        sorted_topk_indices = np.take_along_axis(topk_indices,
-                                                 sorted_indices_in_topk,
-                                                 axis=axis)
+        sorted_topk_values = np.take_along_axis(topk_values, sorted_indices_in_topk, axis=axis)
+        sorted_topk_indices = np.take_along_axis(topk_indices, sorted_indices_in_topk, axis=axis)
         return sorted_topk_values, sorted_topk_indices
     return topk_values, topk_indices
 
@@ -129,8 +125,7 @@ class BurkhardKellerNode(object):
 
 
 class BurkhardKellerTree(object):
-    """Implementataion of BK-Tree
-    """
+    """Implementataion of BK-Tree"""
 
     def __init__(self):
         self.root = None
@@ -161,10 +156,7 @@ class BurkhardKellerTree(object):
         """
         return self.__add(self.root, word)
 
-    def __search_similar_word(self,
-                              cur_node: BurkhardKellerNode,
-                              s: str,
-                              threshold: int = 2) -> List[str]:
+    def __search_similar_word(self, cur_node: BurkhardKellerNode, s: str, threshold: int = 2) -> List[str]:
         res = []
         if cur_node is None:
             return res
@@ -173,8 +165,7 @@ class BurkhardKellerTree(object):
             res.append((cur_node.word, dist))
         start = max(dist - threshold, 1)
         while start < dist + threshold:
-            tmp_res = self.__search_similar_word(cur_node.next.get(start, None),
-                                                 s)[:]
+            tmp_res = self.__search_similar_word(cur_node.next.get(start, None), s)[:]
             res.extend(tmp_res)
             start += 1
         return res

@@ -17,7 +17,7 @@ import numpy as np
 from paddle_serving_server.pipeline import PipelineClient
 
 client = PipelineClient()
-client.connect(['127.0.0.1:8089'])
+client.connect(["127.0.0.1:8089"])
 
 list_data = [{"query": "中西方语言与文化的差异", "title": "第二语言习得的一大障碍就是文化差异。"}]
 feed = {}

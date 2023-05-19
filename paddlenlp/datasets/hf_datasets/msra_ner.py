@@ -72,34 +72,33 @@ class MsraNer(datasets.GeneratorBasedBuilder):
     """MSRA NER dataset."""
 
     BUILDER_CONFIGS = [
-        MsraNerConfig(name="msra_ner",
-                      version=datasets.Version("1.0.0"),
-                      description="MSRA NER dataset"),
+        MsraNerConfig(name="msra_ner", version=datasets.Version("1.0.0"), description="MSRA NER dataset"),
     ]
 
     def _info(self):
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
-            features=datasets.Features({
-                "id":
-                datasets.Value("string"),
-                "tokens":
-                datasets.Sequence(datasets.Value("string")),
-                "ner_tags":
-                datasets.Sequence(
-                    datasets.features.ClassLabel(names=[
-                        "O",
-                        "B-PER",
-                        "I-PER",
-                        "B-ORG",
-                        "I-ORG",
-                        "B-LOC",
-                        "I-LOC",
-                    ])),
-            }),
+            features=datasets.Features(
+                {
+                    "id": datasets.Value("string"),
+                    "tokens": datasets.Sequence(datasets.Value("string")),
+                    "ner_tags": datasets.Sequence(
+                        datasets.features.ClassLabel(
+                            names=[
+                                "O",
+                                "B-PER",
+                                "I-PER",
+                                "B-ORG",
+                                "I-ORG",
+                                "B-LOC",
+                                "I-LOC",
+                            ]
+                        )
+                    ),
+                }
+            ),
             supervised_keys=None,
-            homepage=
-            "https://www.microsoft.com/en-us/download/details.aspx?id=52531",
+            homepage="https://www.microsoft.com/en-us/download/details.aspx?id=52531",
             citation=_CITATION,
         )
 
@@ -112,12 +111,8 @@ class MsraNer(datasets.GeneratorBasedBuilder):
         downloaded_files = dl_manager.download_and_extract(urls_to_download)
 
         return [
-            datasets.SplitGenerator(
-                name=datasets.Split.TRAIN,
-                gen_kwargs={"filepath": downloaded_files["train"]}),
-            datasets.SplitGenerator(
-                name=datasets.Split.TEST,
-                gen_kwargs={"filepath": downloaded_files["test"]}),
+            datasets.SplitGenerator(name=datasets.Split.TRAIN, gen_kwargs={"filepath": downloaded_files["train"]}),
+            datasets.SplitGenerator(name=datasets.Split.TEST, gen_kwargs={"filepath": downloaded_files["test"]}),
         ]
 
     def _generate_examples(self, filepath):

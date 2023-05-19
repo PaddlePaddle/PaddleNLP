@@ -12,22 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
-import time
+import os
 import random
+import time
 from functools import partial
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import ErnieCtmNptagModel, ErnieCtmTokenizer, LinearDecayWithWarmup
-from paddlenlp.data import Pad, Stack, Tuple
-from paddlenlp.datasets import load_dataset
-
 from data import convert_example, create_dataloader, read_custom_data
 from metric import NPTagAccuracy
+
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import (
+    ErnieCtmNptagModel,
+    ErnieCtmTokenizer,
+    LinearDecayWithWarmup,
+)
+from paddlenlp.utils.log import logger
 
 
 def parse_args():
@@ -68,7 +72,8 @@ def evaluate(model, metric, criterion, data_loader, vocab_size):
     losses = []
     for batch in data_loader():
         input_ids, token_type_ids, labels = batch
-        logits = model(input_ids, token_type_ids)
+        outputs = model(input_ids, token_type_ids)
+        logits = outputs[0]
         loss = criterion(logits.reshape([-1, vocab_size]), labels.reshape([-1]))
         losses.append(loss.numpy())
         probs = F.softmax(logits, axis=-1)
@@ -89,41 +94,30 @@ def do_train(args):
 
     set_seed(args.seed)
 
-    train_ds = load_dataset(read_custom_data,
-                            filename=os.path.join(args.data_dir, "train.txt"),
-                            is_test=False,
-                            lazy=False)
-    dev_ds = load_dataset(read_custom_data,
-                          filename=os.path.join(args.data_dir, "dev.txt"),
-                          is_test=False,
-                          lazy=False)
+    train_ds = load_dataset(
+        read_custom_data, filename=os.path.join(args.data_dir, "train.txt"), is_test=False, lazy=False
+    )
+    dev_ds = load_dataset(read_custom_data, filename=os.path.join(args.data_dir, "dev.txt"), is_test=False, lazy=False)
 
     tokenizer = ErnieCtmTokenizer.from_pretrained("nptag")
     model = ErnieCtmNptagModel.from_pretrained("nptag")
     vocab_size = model.ernie_ctm.config["vocab_size"]
 
-    trans_func = partial(convert_example,
-                         tokenzier=tokenizer,
-                         max_seq_len=args.max_seq_len)
+    trans_func = partial(convert_example, tokenzier=tokenizer, max_seq_len=args.max_seq_len)
 
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
-            ),  # token_type_ids
-        Pad(axis=0, pad_val=-100, dtype='int64'),  # labels
+    batchify_fn = lambda samples, fn=Tuple(  # noqa: E731
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
+        Pad(axis=0, pad_val=-100, dtype="int64"),  # labels
     ): fn(samples)
 
-    train_data_loader = create_dataloader(train_ds,
-                                          mode="train",
-                                          batch_size=args.batch_size,
-                                          batchify_fn=batchify_fn,
-                                          trans_fn=trans_func)
+    train_data_loader = create_dataloader(
+        train_ds, mode="train", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
-    dev_data_loader = create_dataloader(dev_ds,
-                                        mode="dev",
-                                        batch_size=args.batch_size,
-                                        batchify_fn=batchify_fn,
-                                        trans_fn=trans_func)
+    dev_data_loader = create_dataloader(
+        dev_ds, mode="dev", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -131,19 +125,16 @@ def do_train(args):
     model = paddle.DataParallel(model)
     num_training_steps = len(train_data_loader) * args.num_train_epochs
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_proportion)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
 
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+    )
 
     logger.info("Total steps: %s" % num_training_steps)
 
@@ -158,9 +149,9 @@ def do_train(args):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
             input_ids, token_type_ids, labels = batch
-            logits = model(input_ids, token_type_ids)
-            loss = criterion(logits.reshape([-1, vocab_size]),
-                             labels.reshape([-1]))
+            outputs = model(input_ids, token_type_ids)
+            logits = outputs[0]
+            loss = criterion(logits.reshape([-1, vocab_size]), labels.reshape([-1]))
 
             loss.backward()
             optimizer.step()
@@ -172,13 +163,12 @@ def do_train(args):
                 speed = float(args.logging_steps) / (end_time - start_time)
                 logger.info(
                     "global step %d, epoch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, loss.numpy().item(), speed))
+                    % (global_step, epoch, loss.numpy().item(), speed)
+                )
                 start_time = time.time()
 
-            if (global_step % args.save_steps == 0
-                    or global_step == num_training_steps) and rank == 0:
-                output_dir = os.path.join(args.output_dir,
-                                          "model_%d" % (global_step))
+            if (global_step % args.save_steps == 0 or global_step == num_training_steps) and rank == 0:
+                output_dir = os.path.join(args.output_dir, "model_%d" % (global_step))
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)
                 model._layers.save_pretrained(output_dir)
@@ -189,10 +179,10 @@ def do_train(args):
 
 def print_arguments(args):
     """print arguments"""
-    print('-----------  Configuration Arguments -----------')
+    print("-----------  Configuration Arguments -----------")
     for arg, value in sorted(vars(args).items()):
-        print('%s: %s' % (arg, value))
-    print('------------------------------------------------')
+        print("%s: %s" % (arg, value))
+    print("------------------------------------------------")
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@
 
 ## 2. 产品功能介绍
 
-本项目提供了低成本搭建端到端FAQ智能问答的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的检索系统模型(召回模型、排序模型)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。以下是使用预置模型的教程，如果用户想训练并接入自己训练的模型，模型训练可以参考[FAQ Finance](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/question_answering/faq_finance)，模型的接入流程参考Pipelines语义检索中Neural Search模型接入流程即可。
+本项目提供了低成本搭建端到端FAQ智能问答的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的检索系统模型(召回模型、排序模型)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。以下是使用预置模型的教程，如果用户想训练并接入自己训练的模型，模型训练可以参考[FAQ Finance](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/question_answering/supervised_qa/faq_finance)，模型的接入流程参考Pipelines语义检索中Neural Search模型接入流程即可。
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/12107462/190307449-38135678-f259-4483-ac0f-2fa3ae4be97f.gif" width="500px">
@@ -30,8 +30,8 @@
 本实验采用了以下的运行环境进行，详细说明如下，用户也可以在自己 GPU 硬件环境进行：
 
 a. 软件环境：
-- python >= 3.7.0
-- paddlenlp >= 2.3.5
+- python >= 3.7.3
+- paddlenlp >= 2.4.0
 - paddlepaddle-gpu >=2.3
 - CUDA Version: 10.2
 - NVIDIA Driver Version: 440.64.00
@@ -52,6 +52,13 @@ cd ${HOME}/PaddleNLP/pipelines/
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 python setup.py install
 ```
+
+```
+# 下载pipelines源代码
+git clone https://github.com/PaddlePaddle/PaddleNLP.git
+cd PaddleNLP/pipelines
+```
+
 【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
 
 ### 3.2 数据说明
@@ -133,7 +140,7 @@ export PIPELINE_YAML_PATH=rest_api/pipeline/dense_faq.yaml
 # 使用端口号 8891 启动模型服务
 python rest_api/application.py 8891
 ```
-Linux 用户推荐采用 Shell 脚本来启动服务：：
+Linux 用户推荐采用 Shell 脚本来启动服务：
 
 ```bash
 sh examples/FAQ/run_faq_server.sh
@@ -154,7 +161,7 @@ export API_ENDPOINT=http://127.0.0.1:8891
 # 在指定端口 8502 启动 WebUI
 python -m streamlit run ui/webapp_faq.py --server.port 8502
 ```
-Linux 用户推荐采用 Shell 脚本来启动服务：：
+Linux 用户推荐采用 Shell 脚本来启动服务：
 
 ```bash
 sh examples/FAQ/run_faq_web.sh

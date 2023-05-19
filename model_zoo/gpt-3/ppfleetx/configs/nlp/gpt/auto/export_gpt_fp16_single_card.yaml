@@ -1,0 +1,32 @@
+Global:
+  device: gpu
+  seed: 1024
+  global_batch_size: 
+  local_batch_size: 1
+  micro_batch_size: 1
+
+Engine:
+  max_steps: -1
+  num_train_epochs: -1
+  eval_freq: -1
+  eval_iters: -1
+  test_iters: -1
+  mix_precision:
+    enable: True
+    dtype: "float16"
+    level: "o2"
+    scale_loss: 32768.0
+    custom_black_list: ["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div", "where"]
+    custom_white_list: ["lookup_table", "lookup_table_v2"]
+    use_fp16_guard: False
+  save_load:
+    output_dir:
+    ckpt_dir:
+
+Distributed:
+  dp_degree: 1
+  mp_degree: 1
+  pp_degree: 1
+  sharding:
+    sharding_degree: 1
+    sharding_stage: 1

@@ -12,10 +12,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
+import unittest
+
+import numpy as np
 import paddle
 
-from paddlenlp.transformers import BartForConditionalGeneration, BartTokenizer
+from paddlenlp.transformers import (  # import gpt model
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BartForConditionalGeneration,
+    BartTokenizer,
+    GPTLMHeadModel,
+    PretrainedConfig,
+    PretrainedTokenizer,
+)
 from paddlenlp.transformers.generation_utils import (
     BeamSearchScorer,
     ForcedBOSTokenLogitsProcessor,
@@ -26,6 +38,7 @@ from paddlenlp.transformers.generation_utils import (
     RepetitionPenaltyLogitsProcessor,
     TopKProcess,
     TopPProcess,
+    get_unfinished_flag,
 )
 from tests.testing_utils import slow
 
@@ -64,12 +77,19 @@ class GenerationTesterMixin:
         input_ids = input_ids[:max_batch_size, :sequence_length]
         attention_mask = attention_mask[:max_batch_size, :sequence_length].unsqueeze([1, 2])
 
+        attention_mask = attention_mask * attention_mask.transpose([0, 1, 3, 2])
+
         # generate max 3 tokens
         max_length = 3
 
-        if config.get("eos_token_id", None) is not None and config.get("pad_token_id", None) is None:
+        if config.eos_token_id or config.pad_token_id:
             # hack to allow generate for models such as GPT2 as is done in `generate()`
             config["pad_token_id"] = config["eos_token_id"]
+        # if config.get(
+        #         "eos_token_id",
+        #         None) is not None and config.get("pad_token_id", None) is None:
+        #     # hack to allow generate for models such as GPT2 as is done in `generate()`
+        #     config["pad_token_id"] = config["eos_token_id"]
 
         return config, input_ids, attention_mask, max_length
 
@@ -80,6 +100,7 @@ class GenerationTesterMixin:
         forced_eos_token_id=None,
         max_length=None,
         diversity_rate=None,
+        plus_length=0,
     ):
         process_kwargs = {
             "min_length": 1 if max_length is None else max_length - 1,
@@ -98,7 +119,7 @@ class GenerationTesterMixin:
             )
             + (
                 [
-                    MinLengthLogitsProcessor(process_kwargs["min_length"], eos_token_id),
+                    MinLengthLogitsProcessor(process_kwargs["min_length"] + plus_length, eos_token_id),
                 ]
                 if eos_token_id is not None
                 else []
@@ -111,7 +132,7 @@ class GenerationTesterMixin:
                 else []
             )
             + (
-                [ForcedEOSTokenLogitsProcessor(max_length, forced_eos_token_id)]
+                [ForcedEOSTokenLogitsProcessor(max_length + plus_length, forced_eos_token_id)]
                 if forced_eos_token_id is not None
                 else []
             )
@@ -203,6 +224,7 @@ class GenerationTesterMixin:
             forced_bos_token_id=getattr(getattr(model, model.base_model_prefix).config, "forced_bos_token_id", None),
             forced_eos_token_id=getattr(getattr(model, model.base_model_prefix).config, "forced_eos_token_id", None),
             max_length=max_length,
+            plus_length=1 if self.is_encoder_decoder else input_ids.shape[-1],
         )
 
         kwargs = {}
@@ -298,6 +320,7 @@ class GenerationTesterMixin:
         logits_processor,
         logits_process_kwargs,
     ):
+
         with paddle.no_grad():
             output_generate = model.generate(
                 input_ids,
@@ -338,6 +361,7 @@ class GenerationTesterMixin:
                 eos_token_id=getattr(model, model.base_model_prefix).config["eos_token_id"],
                 **kwargs,
             )
+
         return output_generate, output_beam_search
 
     def _group_beam_search_generate(
@@ -398,8 +422,7 @@ class GenerationTesterMixin:
         # check `generate()` and `greedy_search()` are equal
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
-
-            paddle.seed(128)
+            paddle.seed(124)
             model = self._make_model_instance(config, model_class)
             model.eval()
 
@@ -413,8 +436,7 @@ class GenerationTesterMixin:
 
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
-
-            paddle.seed(128)
+            paddle.seed(124)
             model = self._make_model_instance(config, model_class)
             model.eval()
 
@@ -430,6 +452,7 @@ class GenerationTesterMixin:
                     getattr(model, model.base_model_prefix).config, "forced_eos_token_id", None
                 ),
                 max_length=max_length,
+                plus_length=1 if self.is_encoder_decoder else input_ids.shape[-1],
             )
             logits_warper = self._get_warper_and_kwargs()
 
@@ -460,13 +483,11 @@ class GenerationTesterMixin:
             self.assertListEqual(output_sample[0].tolist(), output_generate[0].tolist())
 
     def test_beam_search_generate(self):
-        paddle.seed(100)
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
-
+            paddle.seed(128)
             model = self._make_model_instance(config, model_class)
             model.eval()
-
             if self.is_encoder_decoder:
                 max_length = 4
 
@@ -475,6 +496,7 @@ class GenerationTesterMixin:
                 getattr(config, "forced_bos_token_id", None),
                 getattr(config, "forced_eos_token_id", None),
                 max_length,
+                plus_length=1 if self.is_encoder_decoder else input_ids.shape[-1],
             )
             beam_kwargs, beam_scorer = self._get_beam_scorer_and_kwargs(
                 input_ids.shape[0], max_length + 1 if self.is_encoder_decoder else max_length + input_ids.shape[-1]
@@ -520,13 +542,16 @@ class GenerationTesterMixin:
         config, _, _, max_length = self._get_input_ids_and_config()
 
         # if no bos token id => cannot generate from None
-        if config.get("bos_token_id", None) is None:
+        if config.bos_token_id is None:
             return
 
         for model_class in self.all_generative_model_classes.keys():
-            model = self._make_model_instance(config, model_class)
+            if isinstance(config, PretrainedConfig):
+                model = model_class(config)
+            else:
+                pretrained_model = self.all_generative_model_classes[model_class][0](**config)
+                model = model_class(pretrained_model)
             model.eval()
-
             output_ids_generate = model.generate(
                 decode_strategy="greedy_search",
                 max_length=max_length,
@@ -537,9 +562,7 @@ class GenerationTesterMixin:
     def test_group_beam_search_generate(self):
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
-
             model = self._make_model_instance(config, model_class)
-
             model.eval()
 
             if self.is_encoder_decoder:
@@ -551,6 +574,7 @@ class GenerationTesterMixin:
                 getattr(config, "forced_eos_token_id", None),
                 max_length,
                 diversity_rate=2.0,
+                plus_length=1 if self.is_encoder_decoder else input_ids.shape[-1],
             )
 
             # check `generate()` and `group_beam_search()` are equal
@@ -993,3 +1017,105 @@ class GenerationIntegrationTests:
         diff = (batched_out - out).abs()
 
         self.assertTrue(diff.numpy() < 1e-6)
+
+
+class GenerationUtilsTestCase(unittest.TestCase):
+    def test_get_unfinished_flag(self):
+        input_ids = paddle.to_tensor([[1, 2, 3, 4, 5, 6, 7], [5, 6, 7, 8, 9, 10, 11]], dtype=paddle.int64)
+
+        # 1. test single eos_token_id
+        eos_token_id = 6
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [True, True])
+
+        eos_token_id = 7
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, True])
+
+        # 2. get tokens
+        eos_token_id = [6, 7]
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, True])
+
+        eos_token_id = [10, 11]
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [True, False])
+
+        # 3. get multi tokens
+        eos_token_id = [[6, 7], [9, 10]]
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, True])
+
+        eos_token_id = [[6, 7], [10, 11]]
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, False])
+
+        eos_token_id = [[7], [11]]
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, False])
+
+        eos_token_id = [[7], [10, 11]]
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, False])
+
+        eos_token_id = [[7], [10, 12]]
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, True])
+
+    @slow
+    def test_gpt_multi_stop_tokens(self):
+        tokenizer: PretrainedTokenizer = AutoTokenizer.from_pretrained("gpt-cpm-small-cn-distill")
+
+        input_ids = tokenizer("中国的首都是")["input_ids"]
+        model = AutoModelForCausalLM.from_pretrained("gpt-cpm-small-cn-distill")
+        model.eval()
+
+        # 1. generate with no special eos_token_id
+        # [520, 8, 9, 59, 124, 635, 8, 12, 8, 10, 8, 10, 8, 10, 8, 10, 8, 10, 8, 10]
+        decoded_ids = model.generate(paddle.to_tensor([input_ids]), max_length=20)[0].tolist()[0]
+        self.assertEqual(len(decoded_ids), 20)
+
+        # 2. generate with single special eos_token_id (12)
+        decoded_ids = model.generate(paddle.to_tensor([input_ids]), max_length=20, eos_token_id=12)[0].tolist()[0]
+        self.assertEqual(decoded_ids, [520, 8, 9, 59, 124, 635, 8, 12])
+
+        decoded_ids = model.generate(paddle.to_tensor([input_ids]), max_length=20, eos_token_id=635)[0].tolist()[0]
+        self.assertEqual(decoded_ids, [520, 8, 9, 59, 124, 635])
+
+        # 3. generate with single tokens
+        decoded_ids = model.generate(paddle.to_tensor([input_ids]), max_length=20, eos_token_id=[124, 635])[
+            0
+        ].tolist()[0]
+        self.assertEqual(decoded_ids, [520, 8, 9, 59, 124, 635])
+
+        # 4. generate with multi tokens
+        decoded_ids = model.generate(
+            paddle.to_tensor([input_ids]), max_length=20, eos_token_id=[[59, 124], [124, 635]]
+        )[0].tolist()[0]
+        self.assertEqual(decoded_ids, [520, 8, 9, 59, 124])
+
+    def test_gpt_generation(self):
+        # init the tiny-random-gpt
+        model = GPTLMHeadModel.from_pretrained("__internal_testing__/tiny-random-gpt")
+        model.eval()
+
+        input_ids = np.array([list(range(200, 300)), list(range(100, 200))])
+
+        # 1. get the dygraph decoded_ids
+        expected_output_ids = [[15426, 15426, 15426, 15426, 15426, 15426], [18966, 18000, 23410, 23410, 23410, 23410]]
+
+        decoded_ids = model.generate(paddle.to_tensor(input_ids), max_length=6)[0].tolist()
+
+        self.assertEqual(expected_output_ids, decoded_ids)
+
+        decoded_ids = model.generate(paddle.to_tensor(input_ids), max_length=6, eos_token_id=[1800, 23410])[0].tolist()
+        self.assertEqual(expected_output_ids, decoded_ids)

@@ -18,33 +18,28 @@ from fast_tokenizer.normalizers import NFKCNormalizer
 from fast_tokenizer import Tokenizer
 from fast_tokenizer.pretokenizers import MetaSpacePreTokenizer
 
-__all__ = ['SentencePieceBPEFastTokenizer']
+__all__ = ["SentencePieceBPEFastTokenizer"]
 
 
 class SentencePieceBPEFastTokenizer(BaseFastTokenizer):
-
-    def __init__(self,
-                 vocab=None,
-                 merges=None,
-                 unk_token="<unk>",
-                 replacement="▁",
-                 add_prefix_space=True,
-                 dropout=None,
-                 fuse_unk=False):
+    def __init__(
+        self,
+        vocab=None,
+        merges=None,
+        unk_token="<unk>",
+        replacement="▁",
+        add_prefix_space=True,
+        dropout=None,
+        fuse_unk=False,
+    ):
         if vocab is not None and merges is not None:
-            tokenizer = Tokenizer(
-                BPE(vocab,
-                    merges,
-                    dropout=dropout,
-                    unk_token=unk_token,
-                    fuse_unk=fuse_unk))
+            tokenizer = Tokenizer(BPE(vocab, merges, dropout=dropout, unk_token=unk_token, fuse_unk=fuse_unk))
         else:
             tokenizer = Tokenizer(BPE())
         if tokenizer.token_to_id(str(unk_token)) is not None:
             tokenizer.add_special_tokens([str(unk_token)])
         tokenizer.normalizer = NFKCNormalizer()
-        tokenizer.pretokenizer = MetaSpacePreTokenizer(
-            replacement=replacement, add_prefix_space=add_prefix_space)
+        tokenizer.pretokenizer = MetaSpacePreTokenizer(replacement=replacement, add_prefix_space=add_prefix_space)
         parameters = {
             "model": "SentencePieceBPE",
             "unk_token": unk_token,

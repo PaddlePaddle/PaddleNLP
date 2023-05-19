@@ -13,25 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import division
-from __future__ import absolute_import
-from __future__ import print_function
-from __future__ import unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals
 
-import sys
-import argparse
-import logging
 import paddle
 
 
 class UnpackDataLoader(paddle.io.DataLoader):
-
     def __init__(self, *args, **kwargs):
         super(UnpackDataLoader, self).__init__(*args, batch_size=1, **kwargs)
 
     def __iter__(self):
-        return ([yy[0] for yy in y]
-                for y in super(UnpackDataLoader, self).__iter__())
+        return ([yy[0] for yy in y] for y in super(UnpackDataLoader, self).__iter__())
 
 
 def create_if_not_exists(dir):
@@ -43,6 +35,4 @@ def create_if_not_exists(dir):
 
 
 def get_warmup_and_linear_decay(max_steps, warmup_steps):
-    return lambda step: min(
-        step / warmup_steps, 1. - (step - warmup_steps) /
-        (max_steps - warmup_steps))
+    return lambda step: min(step / warmup_steps, 1.0 - (step - warmup_steps) / (max_steps - warmup_steps))

@@ -14,11 +14,10 @@
 
 from fast_tokenizer import Tokenizer
 
-__all__ = ['BaseFastTokenizer']
+__all__ = ["BaseFastTokenizer"]
 
 
 class BaseFastTokenizer:
-
     def __init__(self, tokenizer_impl, parma_dict=None):
         self._tokenizer = tokenizer_impl
         self._parma_dict = parma_dict if parma_dict is not None else {}
@@ -36,8 +35,7 @@ class BaseFastTokenizer:
         return self._tokenizer.get_vocab(with_added_tokens=with_added_tokens)
 
     def get_vocab_size(self, with_added_tokens=True):
-        return self._tokenizer.get_vocab_size(
-            with_added_tokens=with_added_tokens)
+        return self._tokenizer.get_vocab_size(with_added_tokens=with_added_tokens)
 
     def enable_padding(
         self,
@@ -64,13 +62,8 @@ class BaseFastTokenizer:
     def padding(self):
         return self._tokenizer.padding
 
-    def enable_truncation(self,
-                          max_length,
-                          stride=0,
-                          strategy="longest_first",
-                          direction="right"):
-        self._tokenizer.enable_truncation(max_length, stride, strategy,
-                                          direction)
+    def enable_truncation(self, max_length, stride=0, strategy="longest_first", direction="right"):
+        self._tokenizer.enable_truncation(max_length, stride, strategy, direction)
 
     def disable_truncation(self):
         self._tokenizer.disable_truncation()
@@ -93,33 +86,24 @@ class BaseFastTokenizer:
     ):
         if sequence is None:
             raise ValueError("encode: `sequence` can't be `None`")
-        return self._tokenizer.encode(sequence, pair, is_pretokenized,
-                                      add_special_tokens)
+        return self._tokenizer.encode(sequence, pair, is_pretokenized, add_special_tokens)
 
-    def encode_batch(self,
-                     inputs,
-                     add_special_tokens=True,
-                     is_pretokenized=False):
+    def encode_batch(self, inputs, add_special_tokens=True, is_pretokenized=False):
         if inputs is None:
             raise ValueError("encode_batch: `inputs` can't be `None`")
-        return self._tokenizer.encode_batch(inputs, add_special_tokens,
-                                            is_pretokenized)
+        return self._tokenizer.encode_batch(inputs, add_special_tokens, is_pretokenized)
 
     def decode(self, ids, skip_special_tokens=True) -> str:
         if ids is None:
-            raise ValueError(
-                "None input is not valid. Should be a list of integers.")
+            raise ValueError("None input is not valid. Should be a list of integers.")
 
-        return self._tokenizer.decode(ids,
-                                      skip_special_tokens=skip_special_tokens)
+        return self._tokenizer.decode(ids, skip_special_tokens=skip_special_tokens)
 
     def decode_batch(self, sequences, skip_special_tokens=True) -> str:
         if sequences is None:
-            raise ValueError(
-                "None input is not valid. Should be list of list of integers.")
+            raise ValueError("None input is not valid. Should be list of list of integers.")
 
-        return self._tokenizer.decode_batch(
-            sequences, skip_special_tokens=skip_special_tokens)
+        return self._tokenizer.decode_batch(sequences, skip_special_tokens=skip_special_tokens)
 
     def token_to_id(self, token):
         return self._tokenizer.token_to_id(token)

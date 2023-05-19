@@ -110,22 +110,21 @@ class ChunkEvaluator(paddle.metric.Metric):
             dummy, lengths, predictions, labels = lengths, predictions, labels, dummy
             if not getattr(self, "has_warn", False):
                 logger.warning(
-                    'Compatibility Warning: The params of ChunkEvaluator.compute has been modified. The old version is `inputs`, `lengths`, `predictions`, `labels` while the current version is `lengths`, `predictions`, `labels`.  Please update the usage.'
+                    "Compatibility Warning: The params of ChunkEvaluator.compute has been modified. The old version is `inputs`, `lengths`, `predictions`, `labels` while the current version is `lengths`, `predictions`, `labels`.  Please update the usage."
                 )
                 self.has_warn = True
         labels = labels.numpy()
         predictions = predictions.numpy()
-        unpad_labels = [[
-            self.id2label_dict[index]
-            for index in labels[sent_index][:lengths[sent_index]]
-        ] for sent_index in range(len(lengths))]
-        unpad_predictions = [[
-            self.id2label_dict.get(index, "O")
-            for index in predictions[sent_index][:lengths[sent_index]]
-        ] for sent_index in range(len(lengths))]
+        unpad_labels = [
+            [self.id2label_dict[index] for index in labels[sent_index][: lengths[sent_index]]]
+            for sent_index in range(len(lengths))
+        ]
+        unpad_predictions = [
+            [self.id2label_dict.get(index, "O") for index in predictions[sent_index][: lengths[sent_index]]]
+            for sent_index in range(len(lengths))
+        ]
 
-        pred_sum, tp_sum, true_sum = extract_tp_actual_correct(
-            unpad_labels, unpad_predictions, self.suffix)
+        pred_sum, tp_sum, true_sum = extract_tp_actual_correct(unpad_labels, unpad_predictions, self.suffix)
         num_correct_chunks = paddle.to_tensor([tp_sum.sum()])
         num_infer_chunks = paddle.to_tensor([pred_sum.sum()])
         num_label_chunks = paddle.to_tensor([true_sum.sum()])
@@ -133,12 +132,13 @@ class ChunkEvaluator(paddle.metric.Metric):
         return num_infer_chunks, num_label_chunks, num_correct_chunks
 
     def _is_number_or_matrix(self, var):
-
         def _is_number_(var):
-            return isinstance(var,
-                              int) or isinstance(var, np.int64) or isinstance(
-                                  var, float) or (isinstance(var, np.ndarray)
-                                                  and var.shape == (1, ))
+            return (
+                isinstance(var, int)
+                or isinstance(var, np.int64)
+                or isinstance(var, float)
+                or (isinstance(var, np.ndarray) and var.shape == (1,))
+            )
 
         return _is_number_(var) or isinstance(var, np.ndarray)
 
@@ -159,17 +159,11 @@ class ChunkEvaluator(paddle.metric.Metric):
                 The number of chunks both in Inference and Label on the given mini-batch.
         """
         if not self._is_number_or_matrix(num_infer_chunks):
-            raise ValueError(
-                "The 'num_infer_chunks' must be a number(int) or a numpy ndarray."
-            )
+            raise ValueError("The 'num_infer_chunks' must be a number(int) or a numpy ndarray.")
         if not self._is_number_or_matrix(num_label_chunks):
-            raise ValueError(
-                "The 'num_label_chunks' must be a number(int, float) or a numpy ndarray."
-            )
+            raise ValueError("The 'num_label_chunks' must be a number(int, float) or a numpy ndarray.")
         if not self._is_number_or_matrix(num_correct_chunks):
-            raise ValueError(
-                "The 'num_correct_chunks' must be a number(int, float) or a numpy ndarray."
-            )
+            raise ValueError("The 'num_correct_chunks' must be a number(int, float) or a numpy ndarray.")
         self.num_infer_chunks += num_infer_chunks
         self.num_label_chunks += num_label_chunks
         self.num_correct_chunks += num_correct_chunks
@@ -181,14 +175,9 @@ class ChunkEvaluator(paddle.metric.Metric):
         Returns:
             tuple: Returns tuple (`precision, recall, f1 score`).
         """
-        precision = float(
-            self.num_correct_chunks /
-            self.num_infer_chunks) if self.num_infer_chunks else 0.
-        recall = float(self.num_correct_chunks /
-                       self.num_label_chunks) if self.num_label_chunks else 0.
-        f1_score = float(
-            2 * precision * recall /
-            (precision + recall)) if self.num_correct_chunks else 0.
+        precision = float(self.num_correct_chunks / self.num_infer_chunks) if self.num_infer_chunks else 0.0
+        recall = float(self.num_correct_chunks / self.num_label_chunks) if self.num_label_chunks else 0.0
+        f1_score = float(2 * precision * recall / (precision + recall)) if self.num_correct_chunks else 0.0
         return precision, recall, f1_score
 
     def reset(self):

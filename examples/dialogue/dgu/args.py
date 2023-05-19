@@ -47,7 +47,7 @@ def parse_args():
 
 def set_default_args(args):
     args.task_name = args.task_name.lower()
-    if args.task_name == 'udc':
+    if args.task_name == "udc":
         if not args.save_steps:
             args.save_steps = 1000
         if not args.logging_steps:
@@ -58,7 +58,7 @@ def set_default_args(args):
             args.max_seq_len = 210
         if not args.test_batch_size:
             args.test_batch_size = 100
-    elif args.task_name == 'dstc2':
+    elif args.task_name == "dstc2":
         if not args.save_steps:
             args.save_steps = 400
         if not args.logging_steps:
@@ -71,28 +71,28 @@ def set_default_args(args):
             args.max_seq_len = 256
         if not args.test_max_seq_len:
             args.test_max_seq_len = 512
-    elif args.task_name == 'atis_slot':
+    elif args.task_name == "atis_slot":
         if not args.save_steps:
             args.save_steps = 100
         if not args.logging_steps:
             args.logging_steps = 10
         if not args.epochs:
             args.epochs = 50
-    elif args.task_name == 'atis_intent':
+    elif args.task_name == "atis_intent":
         if not args.save_steps:
             args.save_steps = 100
         if not args.logging_steps:
             args.logging_steps = 10
         if not args.epochs:
             args.epochs = 20
-    elif args.task_name == 'mrda':
+    elif args.task_name == "mrda":
         if not args.save_steps:
             args.save_steps = 500
         if not args.logging_steps:
             args.logging_steps = 200
         if not args.epochs:
             args.epochs = 7
-    elif args.task_name == 'swda':
+    elif args.task_name == "swda":
         if not args.save_steps:
             args.save_steps = 500
         if not args.logging_steps:
@@ -100,12 +100,12 @@ def set_default_args(args):
         if not args.epochs:
             args.epochs = 3
     else:
-        raise ValueError('Not support task: %s.' % args.task_name)
+        raise ValueError("Not support task: %s." % args.task_name)
 
     if not args.data_dir:
-        args.data_dir = './DGU_datasets/' + args.task_name
+        args.data_dir = "./DGU_datasets/" + args.task_name
     if not args.output_dir:
-        args.output_dir = './checkpoints/' + args.task_name
+        args.output_dir = "./checkpoints/" + args.task_name
     if not args.learning_rate:
         args.learning_rate = 2e-5
     if not args.batch_size:

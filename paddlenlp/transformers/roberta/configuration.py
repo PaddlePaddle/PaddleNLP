@@ -14,8 +14,7 @@
 """Albert model configuration"""
 from __future__ import annotations
 
-from typing import Dict
-from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 __all__ = ["PRETRAINED_INIT_CONFIGURATION", "RobertaConfig"]
 
@@ -178,7 +177,7 @@ class RobertaConfig(PretrainedConfig):
     >>> # Accessing the model configuration
     >>> configuration = model.config
     ```"""
-    model_type = "albert"
+    model_type = "roberta"
     pretrained_init_configuration = PRETRAINED_INIT_CONFIGURATION
 
     def __init__(

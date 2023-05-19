@@ -25,16 +25,10 @@ from paddlenlp.transformers import PPMiniLMForSequenceClassification
 from paddlenlp.transformers import TinyBertForPretraining
 from paddlenlp.transformers import BertForSequenceClassification
 
-__all__ = ['to_distill', 'calc_minilm_loss', 'calc_multi_relation_loss']
+__all__ = ["to_distill", "calc_minilm_loss", "calc_multi_relation_loss"]
 
 
-def calc_multi_relation_loss(loss_fct,
-                             s,
-                             t,
-                             attn_mask,
-                             num_relation_heads=0,
-                             alpha=0.0,
-                             beta=0.0):
+def calc_multi_relation_loss(loss_fct, s, t, attn_mask, num_relation_heads=0, alpha=0.0, beta=0.0):
     """
     Calculates loss for multiple Q-Q, K-K and V-V relation. It supports
     head-head relation, sample-sample relation and origin token-token relation.
@@ -82,56 +76,44 @@ def calc_multi_relation_loss(loss_fct,
     if alpha + beta == 1.0:
         loss_token_token = 0.0
     else:
-        scaled_dot_product_s1 = tensor.matmul(
-            x=s1, y=s1, transpose_y=True) / math.sqrt(s_head_dim)
+        scaled_dot_product_s1 = tensor.matmul(x=s1, y=s1, transpose_y=True) / math.sqrt(s_head_dim)
         del s1
         scaled_dot_product_s1 += attn_mask
-        scaled_dot_product_t1 = tensor.matmul(
-            x=t1, y=t1, transpose_y=True) / math.sqrt(t_head_dim)
+        scaled_dot_product_t1 = tensor.matmul(x=t1, y=t1, transpose_y=True) / math.sqrt(t_head_dim)
         del t1
         scaled_dot_product_t1 += attn_mask
-        loss_token_token = loss_fct(F.log_softmax(scaled_dot_product_s1),
-                                    F.softmax(scaled_dot_product_t1))
+        loss_token_token = loss_fct(F.log_softmax(scaled_dot_product_s1), F.softmax(scaled_dot_product_t1))
 
     if alpha == 0.0:
         loss_head_head = 0.0
     else:
-        scaled_dot_product_s = tensor.matmul(
-            x=s, y=s, transpose_y=True) / math.sqrt(s_head_dim)
+        scaled_dot_product_s = tensor.matmul(x=s, y=s, transpose_y=True) / math.sqrt(s_head_dim)
         attn_mask_head_head = tensor.transpose(x=attn_mask, perm=[0, 3, 1, 2])
 
         scaled_dot_product_s += attn_mask_head_head
-        scaled_dot_product_t = tensor.matmul(
-            x=t, y=t, transpose_y=True) / math.sqrt(t_head_dim)
+        scaled_dot_product_t = tensor.matmul(x=t, y=t, transpose_y=True) / math.sqrt(t_head_dim)
         scaled_dot_product_t += attn_mask_head_head
-        loss_head_head = loss_fct(F.log_softmax(scaled_dot_product_s),
-                                  F.softmax(scaled_dot_product_t))
+        loss_head_head = loss_fct(F.log_softmax(scaled_dot_product_s), F.softmax(scaled_dot_product_t))
     if beta == 0.0:
         loss_sample_sample = 0.0
     else:
         s2 = tensor.transpose(x=s, perm=[1, 2, 0, 3])
-        scaled_dot_product_s2 = tensor.matmul(
-            x=s2, y=s2, transpose_y=True) / math.sqrt(s_head_dim)
+        scaled_dot_product_s2 = tensor.matmul(x=s2, y=s2, transpose_y=True) / math.sqrt(s_head_dim)
 
         del s, s2
         # Shape: [seq_len, 1, batch_size, 1]
-        attn_mask_sample_sample = tensor.transpose(x=attn_mask,
-                                                   perm=[3, 1, 0, 2])
+        attn_mask_sample_sample = tensor.transpose(x=attn_mask, perm=[3, 1, 0, 2])
 
         # Shape: [seq_len, head_num, batch_size, batch_size]
         scaled_dot_product_s2 += attn_mask_sample_sample
         t2 = tensor.transpose(x=t, perm=[1, 2, 0, 3])
-        scaled_dot_product_t2 = tensor.matmul(
-            x=t2, y=t2, transpose_y=True) / math.sqrt(t_head_dim)
+        scaled_dot_product_t2 = tensor.matmul(x=t2, y=t2, transpose_y=True) / math.sqrt(t_head_dim)
 
         del t, t2
         scaled_dot_product_t2 += attn_mask_sample_sample
-        loss_sample_sample = loss_fct(F.log_softmax(scaled_dot_product_s2),
-                                      F.softmax(scaled_dot_product_t2))
+        loss_sample_sample = loss_fct(F.log_softmax(scaled_dot_product_s2), F.softmax(scaled_dot_product_t2))
 
-    return (
-        1 - alpha - beta
-    ) * loss_token_token + alpha * loss_head_head + beta * loss_sample_sample
+    return (1 - alpha - beta) * loss_token_token + alpha * loss_head_head + beta * loss_sample_sample
 
 
 def calc_minilm_loss(loss_fct, s, t, attn_mask, num_relation_heads=0):
@@ -169,25 +151,18 @@ def calc_minilm_loss(loss_fct, s, t, attn_mask, num_relation_heads=0):
         t = tensor.transpose(x=t, perm=[0, 2, 1, 3])
 
     s_head_dim, t_head_dim = s.shape[3], t.shape[3]
-    scaled_dot_product_s = tensor.matmul(
-        x=s, y=s, transpose_y=True) / math.sqrt(s_head_dim)
+    scaled_dot_product_s = tensor.matmul(x=s, y=s, transpose_y=True) / math.sqrt(s_head_dim)
     del s
     scaled_dot_product_s += attn_mask
 
-    scaled_dot_product_t = tensor.matmul(
-        x=t, y=t, transpose_y=True) / math.sqrt(t_head_dim)
+    scaled_dot_product_t = tensor.matmul(x=t, y=t, transpose_y=True) / math.sqrt(t_head_dim)
     del t
     scaled_dot_product_t += attn_mask
-    loss = loss_fct(F.log_softmax(scaled_dot_product_s),
-                    F.softmax(scaled_dot_product_t))
+    loss = loss_fct(F.log_softmax(scaled_dot_product_s), F.softmax(scaled_dot_product_t))
     return loss
 
 
-def to_distill(self,
-               return_qkv=False,
-               return_attentions=False,
-               return_layer_outputs=False,
-               layer_index=-1):
+def to_distill(self, return_qkv=False, return_attentions=False, return_layer_outputs=False, layer_index=-1):
     """
     Can be bound to object with transformer encoder layers, and make model
     expose attributes `outputs.q`, `outputs.k`, `outputs.v`,
@@ -211,10 +186,16 @@ def to_distill(self,
 
     def init_func(layer):
         if isinstance(
-                layer,
-            (MultiHeadAttention, TransformerEncoderLayer, TransformerEncoder,
-             TinyBertForPretraining, BertForSequenceClassification,
-             PPMiniLMForSequenceClassification)):
+            layer,
+            (
+                MultiHeadAttention,
+                TransformerEncoderLayer,
+                TransformerEncoder,
+                TinyBertForPretraining,
+                BertForSequenceClassification,
+                PPMiniLMForSequenceClassification,
+            ),
+        ):
             layer.forward = layer._forward
             if isinstance(layer, TransformerEncoder):
                 layer.return_layer_outputs = return_layer_outputs
@@ -226,8 +207,9 @@ def to_distill(self,
     for layer in self.children():
         layer.apply(init_func)
 
-    base_model_prefix = self._layers.base_model_prefix if isinstance(
-        self, paddle.DataParallel) else self.base_model_prefix
+    base_model_prefix = (
+        self._layers.base_model_prefix if isinstance(self, paddle.DataParallel) else self.base_model_prefix
+    )
 
     # For distribute training
     if isinstance(self, paddle.DataParallel):
@@ -246,19 +228,14 @@ def to_distill(self,
 def _convert_attention_mask(attn_mask, dtype):
     if attn_mask is not None and attn_mask.dtype != dtype:
         attn_mask_dtype = convert_dtype(attn_mask.dtype)
-        if attn_mask_dtype == 'bool' or 'int' in attn_mask_dtype:
+        if attn_mask_dtype == "bool" or "int" in attn_mask_dtype:
             attn_mask = (paddle.cast(attn_mask, dtype) - 1.0) * 1e9
         else:
             attn_mask = paddle.cast(attn_mask, dtype)
     return attn_mask
 
 
-def attention_forward(self,
-                      query,
-                      key=None,
-                      value=None,
-                      attn_mask=None,
-                      cache=None):
+def attention_forward(self, query, key=None, value=None, attn_mask=None, cache=None):
     """
     Redefines the `forward` function of `paddle.nn.MultiHeadAttention`.
     """
@@ -282,10 +259,7 @@ def attention_forward(self,
     self.attention_matrix = product if self.return_attentions else None
     weights = F.softmax(product)
     if self.dropout:
-        weights = F.dropout(weights,
-                            self.dropout,
-                            training=self.training,
-                            mode="upscale_in_train")
+        weights = F.dropout(weights, self.dropout, training=self.training, mode="upscale_in_train")
 
     out = tensor.matmul(weights, v)
     if self.return_qkv:
@@ -333,9 +307,9 @@ def transformer_encoder_layer_forward(self, src, src_mask=None, cache=None):
     src = residual + self.dropout2(src)
     if not self.normalize_before:
         src = self.norm2(src)
-    if hasattr(self.self_attn, 'attention_matrix'):
+    if hasattr(self.self_attn, "attention_matrix"):
         self.attention_matrix = self.self_attn.attention_matrix
-    if hasattr(self.self_attn, 'q'):
+    if hasattr(self.self_attn, "q"):
         self.q = self.self_attn.q
         self.k = self.self_attn.k
         self.v = self.self_attn.v
@@ -362,9 +336,9 @@ def transformer_encoder_forward(self, src, src_mask=None, cache=None):
         else:
             output, new_cache = mod(output, src_mask=src_mask, cache=cache[i])
             new_caches.append(new_cache)
-        if hasattr(mod, 'attention_matrix'):
+        if hasattr(mod, "attention_matrix"):
             self.attentions.append(mod.attention_matrix)
-        if i == self.layer_index and hasattr(mod, 'q'):
+        if i == self.layer_index and hasattr(mod, "q"):
             self.q = mod.q
             self.k = mod.k
             self.v = mod.v
@@ -376,10 +350,7 @@ def transformer_encoder_forward(self, src, src_mask=None, cache=None):
     return output if cache is None else (output, new_caches)
 
 
-def minilm_pretraining_forward(self,
-                               input_ids,
-                               token_type_ids=None,
-                               attention_mask=None):
+def minilm_pretraining_forward(self, input_ids, token_type_ids=None, attention_mask=None):
     """
     Replaces `forward` function while using multi gpus to train. If training on
     single GPU, this `forward` could not be replaced.
@@ -387,13 +358,11 @@ def minilm_pretraining_forward(self,
     `TinyBertForPretraining`.
     Strategy MINILM only needs q, k and v of transformers.
     """
-    assert hasattr(self, self.base_model_prefix), \
-        "Student class should inherit from %s" % (self.base_model_class)
+    assert hasattr(self, self.base_model_prefix), "Student class should inherit from %s" % (self.base_model_class)
     model = getattr(self, self.base_model_prefix)
     encoder = model.encoder
 
-    sequence_output, pooled_output = model(input_ids, token_type_ids,
-                                           attention_mask)
+    sequence_output, pooled_output = model(input_ids, token_type_ids, attention_mask)
     return encoder.q, encoder.k, encoder.v
 
 
@@ -401,20 +370,17 @@ def tinybert_forward(self, input_ids, token_type_ids=None, attention_mask=None):
     """
     Replaces `forward` function while using multi gpus to train.
     """
-    assert hasattr(self, self.base_model_prefix), \
-        "Student class should inherit from %s" % (self.base_model_class)
+    assert hasattr(self, self.base_model_prefix), "Student class should inherit from %s" % (self.base_model_class)
     model = getattr(self, self.base_model_prefix)
     encoder = model.encoder
 
-    sequence_output, pooled_output = model(input_ids, token_type_ids,
-                                           attention_mask)
+    sequence_output, pooled_output = model(input_ids, token_type_ids, attention_mask)
     for i in range(len(encoder.hidden_states)):
         # While using tinybert-4l-312d, tinybert-6l-768d, tinybert-4l-312d-zh,
         # tinybert-6l-768d-zh
         # While using tinybert-4l-312d-v2, tinybert-6l-768d-v2
         # encoder.hidden_states[i] = self.tinybert.fit_dense(encoder.hidden_states[i])
-        encoder.hidden_states[i] = self.tinybert.fit_denses[i](
-            encoder.hidden_states[i])
+        encoder.hidden_states[i] = self.tinybert.fit_denses[i](encoder.hidden_states[i])
 
     return encoder.attentions, encoder.hidden_states
 
@@ -423,11 +389,9 @@ def bert_forward(self, input_ids, token_type_ids=None, attention_mask=None):
     """
     Replaces `forward` function while using multi gpus to train.
     """
-    assert hasattr(self, self.base_model_prefix), \
-        "Student class should inherit from %s" % (self.base_model_class)
+    assert hasattr(self, self.base_model_prefix), "Student class should inherit from %s" % (self.base_model_class)
     model = getattr(self, self.base_model_prefix)
     encoder = model.encoder
 
-    sequence_output, pooled_output = model(input_ids, token_type_ids,
-                                           attention_mask)
+    sequence_output, pooled_output = model(input_ids, token_type_ids, attention_mask)
     return encoder.attentions, encoder.hidden_states

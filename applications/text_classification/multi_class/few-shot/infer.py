@@ -12,19 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import six
-import json
-import psutil
 import argparse
+import json
+import os
 
 import numpy as np
-
-from paddlenlp.utils.log import logger
-from paddlenlp.prompt import AutoTemplate, PromptDataCollatorWithPadding
-from paddlenlp.transformers import AutoTokenizer, AutoModelForMaskedLM
-import paddle2onnx
 import onnxruntime as ort
+import paddle2onnx
+import psutil
+import six
+
+from paddlenlp.prompt import AutoTemplate, PromptDataCollatorWithPadding
+from paddlenlp.transformers import AutoModelForMaskedLM, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -42,23 +42,15 @@ args = parser.parse_args()
 
 
 class InferBackend(object):
-
-    def __init__(self,
-                 model_path_prefix,
-                 device="cpu",
-                 device_id=0,
-                 use_fp16=False,
-                 num_threads=10):
+    def __init__(self, model_path_prefix, device="cpu", device_id=0, use_fp16=False, num_threads=10):
 
         if not isinstance(device, six.string_types):
             logger.error(
-                ">>> [InferBackend] The type of device must be string, but the type you set is: ",
-                type(device))
+                ">>> [InferBackend] The type of device must be string, but the type you set is: ", type(device)
+            )
             exit(0)
-        if device not in ['cpu', 'gpu']:
-            logger.error(
-                ">>> [InferBackend] The device must be cpu or gpu, but your device is set to:",
-                type(device))
+        if device not in ["cpu", "gpu"]:
+            logger.error(">>> [InferBackend] The device must be cpu or gpu, but your device is set to:", type(device))
             exit(0)
 
         logger.info(">>> [InferBackend] Creating Engine ...")
@@ -67,50 +59,46 @@ class InferBackend(object):
             model_file=model_path_prefix + ".pdmodel",
             params_file=model_path_prefix + ".pdiparams",
             opset_version=13,
-            enable_onnx_checker=True)
+            enable_onnx_checker=True,
+        )
         infer_model_dir = model_path_prefix.rsplit("/", 1)[0]
         float_onnx_file = os.path.join(infer_model_dir, "model.onnx")
-        with open(float_onnx_file, "wb") as f:
+        with open(float_onnx_file, "wb", encoding="utf-8") as f:
             f.write(onnx_model)
 
         if device == "gpu":
             logger.info(">>> [InferBackend] Use GPU to inference ...")
-            providers = ['CUDAExecutionProvider']
+            providers = ["CUDAExecutionProvider"]
             if use_fp16:
                 logger.info(">>> [InferBackend] Use FP16 to inference ...")
-                from onnxconverter_common import float16
                 import onnx
-                fp16_model_file = os.path.join(infer_model_dir,
-                                               "fp16_model.onnx")
+                from onnxconverter_common import float16
+
+                fp16_model_file = os.path.join(infer_model_dir, "fp16_model.onnx")
                 onnx_model = onnx.load_model(float_onnx_file)
-                trans_model = float16.convert_float_to_float16(
-                    onnx_model, keep_io_types=True)
+                trans_model = float16.convert_float_to_float16(onnx_model, keep_io_types=True)
                 onnx.save_model(trans_model, fp16_model_file)
                 onnx_model = fp16_model_file
         else:
             logger.info(">>> [InferBackend] Use CPU to inference ...")
-            providers = ['CPUExecutionProvider']
+            providers = ["CPUExecutionProvider"]
             if use_fp16:
                 logger.warning(
-                    ">>> [InferBackend] Ignore use_fp16 as it only " +
-                    "takes effect when deploying on gpu...")
+                    ">>> [InferBackend] Ignore use_fp16 as it only " + "takes effect when deploying on gpu..."
+                )
 
         sess_options = ort.SessionOptions()
         sess_options.intra_op_num_threads = num_threads
-        self.predictor = ort.InferenceSession(onnx_model,
-                                              sess_options=sess_options,
-                                              providers=providers,
-                                              provider_options=[{
-                                                  'device_id':
-                                                  device_id
-                                              }])
+        self.predictor = ort.InferenceSession(
+            onnx_model, sess_options=sess_options, providers=providers, provider_options=[{"device_id": device_id}]
+        )
 
         if device == "gpu":
             try:
-                assert 'CUDAExecutionProvider' in self.predictor.get_providers()
+                assert "CUDAExecutionProvider" in self.predictor.get_providers()
             except AssertionError:
                 raise AssertionError(
-                    f"The environment for GPU inference is not set properly. "
+                    "The environment for GPU inference is not set properly. "
                     "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. "
                     "Please run the following commands to reinstall: \n "
                     "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
@@ -123,36 +111,31 @@ class InferBackend(object):
 
 
 class MultiClassPredictor(object):
-
     def __init__(self, args):
         self.args = args
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
         self.model = AutoModelForMaskedLM.from_pretrained(args.model_name)
         self.template, self.labels, self.input_handles = self.post_init()
         self.collate_fn = PromptDataCollatorWithPadding(
-            self.tokenizer,
-            padding=True,
-            return_tensors="np",
-            return_attention_mask=True)
+            self.tokenizer, padding=True, return_tensors="np", return_attention_mask=True
+        )
 
-        self.inference_backend = InferBackend(self.args.model_path_prefix,
-                                              self.args.device,
-                                              self.args.device_id,
-                                              self.args.use_fp16,
-                                              self.args.num_threads)
+        self.inference_backend = InferBackend(
+            self.args.model_path_prefix,
+            self.args.device,
+            self.args.device_id,
+            self.args.use_fp16,
+            self.args.num_threads,
+        )
 
     def post_init(self):
         export_path = os.path.dirname(self.args.model_path_prefix)
         template_path = os.path.join(export_path, "template_config.json")
-        with open(template_path, "r") as fp:
+        with open(template_path, "r", encoding="utf-8") as fp:
             prompt = json.load(fp)
-            template = AutoTemplate.create_from(prompt, self.tokenizer,
-                                                self.args.max_length,
-                                                self.model)
+            template = AutoTemplate.create_from(prompt, self.tokenizer, self.args.max_length, self.model)
         keywords = template.extract_template_keywords(template.prompt)
-        inputs = [
-            "input_ids", "token_type_ids", "position_ids", "attention_mask"
-        ]
+        inputs = ["input_ids", "token_type_ids", "position_ids", "attention_mask"]
         if "mask" in keywords:
             inputs.append("masked_positions")
         if "soft" in keywords:
@@ -160,7 +143,7 @@ class MultiClassPredictor(object):
         if "encoder" in keywords:
             inputs.append("encoder_ids")
         verbalizer_path = os.path.join(export_path, "verbalizer_config.json")
-        with open(verbalizer_path, "r") as fp:
+        with open(verbalizer_path, "r", encoding="utf-8") as fp:
             label_words = json.load(fp)
             labels = sorted(list(label_words.keys()))
 
@@ -191,9 +174,7 @@ class MultiClassPredictor(object):
                     if value.ndim == 2:
                         value = (1 - value[:, np.newaxis, np.newaxis, :]) * -1e4
                     elif value.ndim != 4:
-                        raise ValueError(
-                            "Expect attention mask with ndim=2 or 4, but get ndim={}"
-                            .format(value.ndim))
+                        raise ValueError("Expect attention mask with ndim=2 or 4, but get ndim={}".format(value.ndim))
                     value = value.astype("float32")
                 else:
                     value = value.astype("int64")

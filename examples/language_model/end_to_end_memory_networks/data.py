@@ -19,13 +19,13 @@ def read_data(fname, word2idx):
     """
     Data is processed into a one-dimensional vector, and each value is the code corresponding to a word.
     The two sentences are separated by special characters < EOS >.
-    
+
     Args:
         fname (str):
             data filename
         word2idx (dict):
             word dict
-    
+
     Returns:
         list: return word vectors
     """
@@ -46,7 +46,7 @@ def read_data(fname, word2idx):
         for word in line.split():
             index = word2idx[word]
             data.append(index)
-        data.append(word2idx['<eos>'])
+        data.append(word2idx["<eos>"])
     return data
 
 
@@ -56,7 +56,7 @@ def load_vocab(fname):
 
     Args:
         fname (str): filename of the vocav file
-    
+
     Returns:
         dict: word dict
     """
@@ -71,25 +71,18 @@ def load_vocab(fname):
 def load_data(config):
     """
     load data
-    
+
     Args:
         config: config
-    
+
     Returns:
         word dict, and train, valid, test data
     """
-    vocab_path = os.path.join(config.data_dir,
-                              "%s.vocab.txt" % config.data_name)
+    vocab_path = os.path.join(config.data_dir, "%s.vocab.txt" % config.data_name)
     word2idx = load_vocab(vocab_path)
 
-    train_data = read_data(
-        os.path.join(config.data_dir, "%s.train.txt" % config.data_name),
-        word2idx)
-    valid_data = read_data(
-        os.path.join(config.data_dir, "%s.valid.txt" % config.data_name),
-        word2idx)
-    test_data = read_data(
-        os.path.join(config.data_dir, "%s.test.txt" % config.data_name),
-        word2idx)
+    train_data = read_data(os.path.join(config.data_dir, "%s.train.txt" % config.data_name), word2idx)
+    valid_data = read_data(os.path.join(config.data_dir, "%s.valid.txt" % config.data_name), word2idx)
+    test_data = read_data(os.path.join(config.data_dir, "%s.test.txt" % config.data_name), word2idx)
 
     return word2idx, train_data, valid_data, test_data

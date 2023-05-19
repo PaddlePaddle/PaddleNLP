@@ -12,23 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
-import time
+import os
 import random
+import time
 from functools import partial
 
 import numpy as np
 import paddle
-from paddle.io import DataLoader
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer, LinearDecayWithWarmup
-from paddlenlp.data import Stack, Pad, Tuple
-from paddlenlp.datasets import load_dataset
-from paddlenlp.layers.crf import LinearChainCrf, LinearChainCrfLoss
-
-from data import load_dict, convert_example, read_custom_data, create_dataloader
+from data_process import convert_example, create_dataloader, load_dict, read_custom_data
 from metric import SequenceAccuracy
+
+from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import (
+    ErnieCtmTokenizer,
+    ErnieCtmWordtagModel,
+    LinearDecayWithWarmup,
+)
+from paddlenlp.utils.log import logger
 
 
 def parse_args():
@@ -49,7 +51,7 @@ def parse_args():
     parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over total steps.")
     parser.add_argument("--adam_epsilon", default=1e-6, type=float, help="Epsilon for Adam optimizer.")
     parser.add_argument("--seed", default=1000, type=int, help="random seed for initialization")
-    parser.add_argument("--device", default="gpu",type=str, help="The device to select to train the model, is must be cpu/gpu/xpu.")
+    parser.add_argument("--device", default="gpu", type=str, help="The device to select to train the model, is must be cpu/gpu/xpu.")
     # yapf: enable
 
     args = parser.parse_args()
@@ -70,17 +72,13 @@ def evaluate(model, metric, data_loader, tags, tags_to_idx):
     losses = []
     for batch in data_loader():
         input_ids, token_type_ids, seq_len, tags = batch
-        loss, seq_logits = model(input_ids,
-                                 token_type_ids,
-                                 lengths=seq_len,
-                                 tag_labels=tags)
+        loss, seq_logits = model(input_ids, token_type_ids, lengths=seq_len, tag_labels=tags)[:2]
         loss = loss.mean()
         losses.append(loss.numpy())
 
-        correct = metric.compute(pred=seq_logits.reshape([-1,
-                                                          len(tags_to_idx)]),
-                                 label=tags.reshape([-1]),
-                                 ignore_index=tags_to_idx["O"])
+        correct = metric.compute(
+            pred=seq_logits.reshape([-1, len(tags_to_idx)]), label=tags.reshape([-1]), ignore_index=tags_to_idx["O"]
+        )
         metric.update(correct)
     acc = metric.accumulate()
     logger.info("eval loss: %.5f, acc: %.5f" % (np.mean(losses), acc))
@@ -96,46 +94,33 @@ def do_train(args):
 
     set_seed(args.seed)
 
-    train_ds = load_dataset(read_custom_data,
-                            filename=os.path.join(args.data_dir, "train.txt"),
-                            is_test=False,
-                            lazy=False)
-    dev_ds = load_dataset(read_custom_data,
-                          filename=os.path.join(args.data_dir, "dev.txt"),
-                          is_test=False,
-                          lazy=False)
+    train_ds = load_dataset(
+        read_custom_data, filename=os.path.join(args.data_dir, "train.txt"), is_test=False, lazy=False
+    )
+    dev_ds = load_dataset(read_custom_data, filename=os.path.join(args.data_dir, "dev.txt"), is_test=False, lazy=False)
     tags_to_idx = load_dict(os.path.join(args.data_dir, "tags.txt"))
 
     tokenizer = ErnieCtmTokenizer.from_pretrained("wordtag")
-    model = ErnieCtmWordtagModel.from_pretrained("wordtag",
-                                                 num_tag=len(tags_to_idx))
-    model.crf_loss = LinearChainCrfLoss(
-        LinearChainCrf(len(tags_to_idx), 0.1, with_start_stop_tag=False))
+    model = ErnieCtmWordtagModel.from_pretrained("wordtag", num_labels=len(tags_to_idx))
 
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         max_seq_len=args.max_seq_len,
-                         tags_to_idx=tags_to_idx)
+    trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_len=args.max_seq_len, tags_to_idx=tags_to_idx)
 
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
-            ),  # token_type_ids
-        Stack(dtype='int64'),  # seq_len
-        Pad(axis=0, pad_val=tags_to_idx["O"], dtype='int64'),  # tags
-    ): fn(samples)
+    def batchify_fn(samples):
+        fn = Tuple(  # noqa: E731
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
+            Stack(dtype="int64"),  # seq_len
+            Pad(axis=0, pad_val=tags_to_idx["O"], dtype="int64"),  # tags
+        )
+        return fn(samples)
 
-    train_data_loader = create_dataloader(train_ds,
-                                          mode="train",
-                                          batch_size=args.batch_size,
-                                          batchify_fn=batchify_fn,
-                                          trans_fn=trans_func)
+    train_data_loader = create_dataloader(
+        train_ds, mode="train", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
-    dev_data_loader = create_dataloader(dev_ds,
-                                        mode="dev",
-                                        batch_size=args.batch_size,
-                                        batchify_fn=batchify_fn,
-                                        trans_fn=trans_func)
+    dev_data_loader = create_dataloader(
+        dev_ds, mode="dev", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -146,22 +131,16 @@ def do_train(args):
 
     num_training_steps = len(train_data_loader) * args.num_train_epochs
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         warmup)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, warmup)
 
-    num_train_optimization_steps = len(
-        train_ds) / args.batch_size * args.num_train_epochs
-
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+    )
 
     logger.info("Total steps: %s" % num_training_steps)
     logger.info("WarmUp steps: %s" % warmup)
@@ -179,10 +158,8 @@ def do_train(args):
             global_step += 1
             input_ids, token_type_ids, seq_len, tags = batch
 
-            loss, _ = model(input_ids,
-                            token_type_ids,
-                            lengths=seq_len,
-                            tag_labels=tags)
+            loss = model(input_ids, token_type_ids, lengths=seq_len, tag_labels=tags)[0]
+
             loss = loss.mean()
             total_loss += loss
             loss.backward()
@@ -196,19 +173,16 @@ def do_train(args):
                 speed = float(args.logging_steps) / (end_time - start_time)
                 logger.info(
                     "global step %d, epoch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, total_loss / args.logging_steps,
-                       speed))
+                    % (global_step, epoch, total_loss / args.logging_steps, speed)
+                )
                 start_time = time.time()
                 total_loss = 0
 
-            if (global_step % args.save_steps == 0
-                    or global_step == num_training_steps) and rank == 0:
-                output_dir = os.path.join(args.output_dir,
-                                          "model_%d" % (global_step))
+            if (global_step % args.save_steps == 0 or global_step == num_training_steps) and rank == 0:
+                output_dir = os.path.join(args.output_dir, "model_%d" % (global_step))
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)
-                model_to_save = model._layers if isinstance(
-                    model, paddle.DataParallel) else model
+                model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
                 model_to_save.save_pretrained(output_dir)
                 tokenizer.save_pretrained(output_dir)
 
@@ -217,10 +191,10 @@ def do_train(args):
 
 def print_arguments(args):
     """print arguments"""
-    print('-----------  Configuration Arguments -----------')
+    print("-----------  Configuration Arguments -----------")
     for arg, value in sorted(vars(args).items()):
-        print('%s: %s' % (arg, value))
-    print('------------------------------------------------')
+        print("%s: %s" % (arg, value))
+    print("------------------------------------------------")
 
 
 if __name__ == "__main__":

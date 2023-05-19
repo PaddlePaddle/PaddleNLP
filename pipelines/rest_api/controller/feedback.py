@@ -64,9 +64,7 @@ def delete_feedback():
     `POST /feedback` endpoint
     """
     all_labels = DOCUMENT_STORE.get_all_labels()
-    user_label_ids = [
-        label.id for label in all_labels if label.origin == "user-feedback"
-    ]
+    user_label_ids = [label.id for label in all_labels if label.origin == "user-feedback"]
     DOCUMENT_STORE.delete_labels(ids=user_label_ids)
 
 
@@ -100,24 +98,16 @@ def get_feedback_metrics(filters: FilterRequest = None):
         answer_accuracy = sum(answer_feedback) / len(answer_feedback)
         doc_accuracy = sum(doc_feedback) / len(doc_feedback)
 
-        res = {
-            "answer_accuracy": answer_accuracy,
-            "document_accuracy": doc_accuracy,
-            "n_feedback": len(labels)
-        }
+        res = {"answer_accuracy": answer_accuracy, "document_accuracy": doc_accuracy, "n_feedback": len(labels)}
     else:
-        res = {
-            "answer_accuracy": None,
-            "document_accuracy": None,
-            "n_feedback": 0
-        }
+        res = {"answer_accuracy": None, "document_accuracy": None, "n_feedback": 0}
     return res
 
 
 @router.get("/export-feedback")
-def export_feedback(context_size: int = 100_000,
-                    full_document_context: bool = True,
-                    only_positive_labels: bool = False):
+def export_feedback(
+    context_size: int = 100_000, full_document_context: bool = True, only_positive_labels: bool = False
+):
     """
     This endpoint returns JSON output in the SQuAD format for question/answer pairs
     that were marked as "relevant" by user feedback through the `POST /feedback` endpoint.
@@ -125,19 +115,12 @@ def export_feedback(context_size: int = 100_000,
     The context_size param can be used to limit response size for large documents.
     """
     if only_positive_labels:
-        labels = DOCUMENT_STORE.get_all_labels(filters={
-            "is_correct_answer": [True],
-            "origin": ["user-feedback"]
-        })
+        labels = DOCUMENT_STORE.get_all_labels(filters={"is_correct_answer": [True], "origin": ["user-feedback"]})
     else:
-        labels = DOCUMENT_STORE.get_all_labels(
-            filters={"origin": ["user-feedback"]})
+        labels = DOCUMENT_STORE.get_all_labels(filters={"origin": ["user-feedback"]})
         # Filter out the labels where the passage is correct but answer is wrong (in SQuAD this matches
         # neither a "positive example" nor a negative "is_impossible" one)
-        labels = [
-            l for l in labels if not (
-                l.is_correct_document is True and l.is_correct_answer is False)
-        ]
+        labels = [l for l in labels if not (l.is_correct_document is True and l.is_correct_answer is False)]
 
     export_data = []
 
@@ -153,17 +136,14 @@ def export_feedback(context_size: int = 100_000,
             # if either beginning or end of text is reached, we correspondingly
             # append more context characters at the other end of answer string.
             context_to_add = int((context_size - len(label.answer.answer)) / 2)
-            start_pos = max(
-                label.answer.offsets_in_document[0].start - context_to_add, 0)
-            additional_context_at_end = max(
-                context_to_add - label.answer.offsets_in_document[0].start, 0)
+            start_pos = max(label.answer.offsets_in_document[0].start - context_to_add, 0)
+            additional_context_at_end = max(context_to_add - label.answer.offsets_in_document[0].start, 0)
             end_pos = min(
-                label.answer.offsets_in_document[0].start +
-                len(label.answer.answer) + context_to_add,
-                len(text) - 1)
+                label.answer.offsets_in_document[0].start + len(label.answer.answer) + context_to_add, len(text) - 1
+            )
             additional_context_at_start = max(
-                label.answer.offsets_in_document[0].start +
-                len(label.answer.answer) + context_to_add - len(text), 0)
+                label.answer.offsets_in_document[0].start + len(label.answer.answer) + context_to_add - len(text), 0
+            )
             start_pos = max(0, start_pos - additional_context_at_start)
             end_pos = min(len(text) - 1, end_pos + additional_context_at_end)
             context = text[start_pos:end_pos]
@@ -171,48 +151,37 @@ def export_feedback(context_size: int = 100_000,
 
         if label.is_correct_answer is False and label.is_correct_document is False:  # No answer
             squad_label = {
-                "paragraphs": [{
-                    "context":
-                    context,
-                    "id":
-                    label.document.id,
-                    "qas": [{
-                        "question": label.query,
-                        "id": label.id,
-                        "is_impossible": True,
-                        "answers": []
-                    }],
-                }]
+                "paragraphs": [
+                    {
+                        "context": context,
+                        "id": label.document.id,
+                        "qas": [{"question": label.query, "id": label.id, "is_impossible": True, "answers": []}],
+                    }
+                ]
             }
         else:
             squad_label = {
-                "paragraphs": [{
-                    "context":
-                    context,
-                    "id":
-                    label.document.id,
-                    "qas": [{
-                        "question":
-                        label.query,
-                        "id":
-                        label.id,
-                        "is_impossible":
-                        False,
-                        "answers": [{
-                            "text": label.answer.answer,
-                            "answer_start": answer_start
-                        }],
-                    }],
-                }]
+                "paragraphs": [
+                    {
+                        "context": context,
+                        "id": label.document.id,
+                        "qas": [
+                            {
+                                "question": label.query,
+                                "id": label.id,
+                                "is_impossible": False,
+                                "answers": [{"text": label.answer.answer, "answer_start": answer_start}],
+                            }
+                        ],
+                    }
+                ]
             }
 
             # quality check
-            start = squad_label["paragraphs"][0]["qas"][0]["answers"][0][
-                "answer_start"]
-            answer = squad_label["paragraphs"][0]["qas"][0]["answers"][0][
-                "text"]
+            start = squad_label["paragraphs"][0]["qas"][0]["answers"][0]["answer_start"]
+            answer = squad_label["paragraphs"][0]["qas"][0]["answers"][0]["text"]
             context = squad_label["paragraphs"][0]["context"]
-            if not context[start:start + len(answer)] == answer:
+            if not context[start : start + len(answer)] == answer:
                 logger.error(
                     f"Skipping invalid squad label as string via offsets "
                     f"('{context[start:start + len(answer)]}') does not match answer string ('{answer}') "

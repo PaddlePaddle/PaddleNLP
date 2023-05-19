@@ -19,25 +19,36 @@ import copy
 import io
 import json
 import os
+import shutil
+import tempfile
 import warnings
 from collections import OrderedDict, UserDict
 from dataclasses import dataclass, field
 from enum import Enum
-from shutil import copyfile
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import paddle
-from huggingface_hub import hf_hub_download
+from huggingface_hub import (
+    create_repo,
+    get_hf_file_metadata,
+    hf_hub_download,
+    hf_hub_url,
+    repo_type_and_id_from_hf_id,
+    upload_folder,
+)
+from huggingface_hub.utils import EntryNotFoundError
+from paddle import __version__
 
-from paddlenlp import __version__
 from paddlenlp.utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     get_path_from_url_with_filelock,
     url_file_exists,
 )
-from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.env import TOKENIZER_CONFIG_NAME
 from paddlenlp.utils.log import logger
+
+from .utils import resolve_cache_dir
 
 
 @dataclass(frozen=True, eq=True)
@@ -1281,7 +1292,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
     pretrained_init_configuration: Dict[str, Dict[str, Any]] = {}
     max_model_input_sizes: Dict[str, Optional[int]] = {}
     _auto_class: Optional[str] = None
-    tokenizer_config_file = "tokenizer_config.json"
+    tokenizer_config_file = TOKENIZER_CONFIG_NAME
 
     # first name has to correspond to main model input name
     # to make sure `tokenizer.pad(...)` works correctly
@@ -1390,7 +1401,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         raise NotImplementedError()
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, from_hf_hub=False, **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, from_hf_hub=False, subfolder=None, **kwargs):
         """
         Creates an instance of `PretrainedTokenizer`. Related resources are loaded
         by specifying name of a built-in pretrained model, or a community-contributed
@@ -1404,6 +1415,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 - Name of a community-contributed pretrained model.
                 - Local directory path which contains tokenizer related resources
                   and tokenizer config file ("tokenizer_config.json").
+            from_hf_hub (bool, optional): whether to load from Huggingface Hub
+            subfolder (str, optional) An optional value corresponding to a folder inside the repo.
+                Only works when loading from Huggingface Hub.
             *args (tuple): position arguments for model `__init__`. If provided,
                 use these as position argument values for tokenizer initialization.
             **kwargs (dict): keyword arguments for model `__init__`. If provided,
@@ -1429,6 +1443,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         """
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+        cache_dir = kwargs.pop("cache_dir", None)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
         vocab_files = {}
         init_configuration = {}
 
@@ -1467,7 +1483,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
             )
 
-        default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_vocab_files = {}
         for file_id, file_path in vocab_files.items():
             if file_path is None or os.path.isfile(file_path):
@@ -1477,26 +1492,25 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 resolved_vocab_files[file_id] = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=file_path,
-                    cache_dir=MODEL_HOME,
+                    subfolder=subfolder,
+                    cache_dir=cache_dir,
                     library_name="PaddleNLP",
                     library_version=__version__,
                 )
             else:
-                path = os.path.join(default_root, file_path.split("/")[-1])
+                path = os.path.join(cache_dir, file_path.split("/")[-1])
                 if os.path.exists(path):
                     logger.info("Already cached %s" % path)
                     resolved_vocab_files[file_id] = path
 
                 else:
-                    logger.info("Downloading %s and saved to %s" % (file_path, default_root))
+                    logger.info("Downloading %s and saved to %s" % (file_path, cache_dir))
                     try:
-
                         if not url_file_exists(file_path):
                             logger.warning(f"file<{file_path}> not exist")
                             resolved_vocab_files[file_id] = None
                             continue
-
-                        resolved_vocab_files[file_id] = get_path_from_url_with_filelock(file_path, default_root)
+                        resolved_vocab_files[file_id] = get_path_from_url_with_filelock(file_path, cache_dir)
                     except RuntimeError as err:
                         if file_id not in cls.resource_files_names:
                             resolved_vocab_files[file_id] = None
@@ -1555,7 +1569,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             # use pretrained_init_configuration as `init_kwargs` to init which
             # does not include the vocab file in it, thus add vocab file into
             # args.
-
             if args_name not in init_kwargs:
                 init_kwargs[args_name] = file_path
             # when `pretrained_model_name_or_path` is a pretrained model dir,
@@ -1565,6 +1578,11 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             # it still work, use the vocab file under this dir.
             elif not os.path.isfile(init_kwargs[args_name] or "") and os.path.isfile(file_path):
                 init_kwargs[args_name] = file_path
+
+        # TODO(zhoushunjie): It's not supportted to load tokenizer.json of hf so far.
+        if from_hf_hub and "tokenizer_file" in init_kwargs:
+            init_kwargs.pop("tokenizer_file")
+
         # TODO(guosheng): avoid reduplication of position args and key word args
         tokenizer = cls(*init_args, **init_kwargs)
         special_tokens_map_file = resolved_vocab_files.pop("special_tokens_map_file", None)
@@ -1615,7 +1633,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             )
         # save all of related things into default root dir
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
-            tokenizer.save_pretrained(default_root)
+            tokenizer.save_pretrained(cache_dir)
 
         return tokenizer
 
@@ -1738,7 +1756,67 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             src_path = self.init_kwargs[name]
             dst_path = os.path.join(save_directory, file_name)
             if os.path.abspath(src_path) != os.path.abspath(dst_path):
-                copyfile(src_path, dst_path)
+                shutil.copyfile(src_path, dst_path)
+
+    def save_to_hf_hub(
+        self,
+        repo_id: str,
+        private: Optional[bool] = None,
+        subfolder: Optional[str] = None,
+        commit_message: Optional[str] = None,
+        revision: Optional[str] = None,
+        create_pr: bool = False,
+    ):
+        """
+        Uploads all elements of this tokenizer to a new HuggingFace Hub repository.
+        Args:
+            repo_id (str): Repository name for your model/tokenizer in the Hub.
+            private (bool, optional): Whether the model/tokenizer is set to private
+            subfolder (str, optional): Push to a subfolder of the repo instead of the root
+            commit_message (str, optional) — The summary / title / first line of the generated commit. Defaults to: f"Upload {path_in_repo} with huggingface_hub"
+            revision (str, optional) — The git revision to commit from. Defaults to the head of the "main" branch.
+            create_pr (boolean, optional) — Whether or not to create a Pull Request with that commit. Defaults to False.
+                If revision is not set, PR is opened against the "main" branch. If revision is set and is a branch, PR is opened against this branch.
+                If revision is set and is not a branch name (example: a commit oid), an RevisionNotFoundError is returned by the server.
+
+        Returns: The url of the commit of your model in the given repository.
+        """
+        repo_url = create_repo(repo_id, private=private, exist_ok=True)
+
+        # Infer complete repo_id from repo_url
+        # Can be different from the input `repo_id` if repo_owner was implicit
+        _, repo_owner, repo_name = repo_type_and_id_from_hf_id(repo_url)
+        repo_id = f"{repo_owner}/{repo_name}"
+
+        # Check if README file already exist in repo
+        try:
+            get_hf_file_metadata(hf_hub_url(repo_id=repo_id, filename="README.md", revision=revision))
+            has_readme = True
+        except EntryNotFoundError:
+            has_readme = False
+
+        with tempfile.TemporaryDirectory() as root_dir:
+            if subfolder is not None:
+                save_dir = os.path.join(root_dir, subfolder)
+            else:
+                save_dir = root_dir
+            # save model
+            self.save_pretrained(save_dir)
+            # Add readme if does not exist
+            logger.info("README.md not found, adding the default README.md")
+            if not has_readme:
+                with open(os.path.join(root_dir, "README.md"), "w") as f:
+                    f.write(f"---\nlibrary_name: paddlenlp\n---\n# {repo_id}")
+            # Upload model and return
+            logger.info(f"Pushing to the {repo_id}. This might take a while")
+            return upload_folder(
+                repo_id=repo_id,
+                repo_type="model",
+                folder_path=root_dir,
+                commit_message=commit_message,
+                revision=revision,
+                create_pr=create_pr,
+            )
 
     def tokenize(self, text: str, pair: Optional[str] = None, add_special_tokens: bool = False, **kwargs) -> List[str]:
         """
@@ -2937,6 +3015,11 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     encoded_inputs["offset_mapping"] = encoded_inputs["offset_mapping"] + [(0, 0)] * difference
                 if "position_ids" in encoded_inputs:
                     encoded_inputs["position_ids"] = encoded_inputs["position_ids"] + [0] * difference
+                # NOTE: In ernie3.0-qa, the type of `*_positions` is int.
+                if "start_positions" in encoded_inputs and isinstance(encoded_inputs["start_positions"], list):
+                    encoded_inputs["start_positions"] = encoded_inputs["start_positions"] + [0] * difference
+                if "end_positions" in encoded_inputs and isinstance(encoded_inputs["end_positions"], list):
+                    encoded_inputs["end_positions"] = encoded_inputs["end_positions"] + [0] * difference
                 encoded_inputs[self.model_input_names[0]] = required_input + [self.pad_token_id] * difference
             elif self.padding_side == "left":
                 if return_attention_mask:
@@ -2951,6 +3034,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     encoded_inputs["offset_mapping"] = [(0, 0)] * difference + encoded_inputs["offset_mapping"]
                 if "position_ids" in encoded_inputs:
                     encoded_inputs["position_ids"] = [0] * difference + encoded_inputs["position_ids"]
+                if "start_positions" in encoded_inputs and isinstance(encoded_inputs["start_positions"], list):
+                    encoded_inputs["start_positions"] = [0] * difference + encoded_inputs["start_positions"]
+                if "end_positions" in encoded_inputs and isinstance(encoded_inputs["end_positions"], list):
+                    encoded_inputs["end_positions"] = [0] * difference + encoded_inputs["end_positions"]
                 encoded_inputs[self.model_input_names[0]] = [self.pad_token_id] * difference + required_input
             else:
                 raise ValueError("Invalid padding strategy:" + str(self.padding_side))

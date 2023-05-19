@@ -1,0 +1,14 @@
+_base_: ./pretrain_gpt_345M_single_card.yaml
+
+
+Model:
+  module: GPTEvalModule
+
+
+Offline_Eval:
+  eval_path: ./wikitext-103/wiki.valid.tokens
+  cloze_eval: False
+  overlapping_eval: 32
+  batch_size: 8
+  max_seq_len: 1024
+  logging_freq: 10

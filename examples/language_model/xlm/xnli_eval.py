@@ -23,21 +23,16 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 from paddle.metric import Accuracy
 
-all_languages = [
-    "ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th", "tr",
-    "ur", "vi", "zh"
-]
+all_languages = ["ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th", "tr", "ur", "vi", "zh"]
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
     # Required parameters
-    parser.add_argument("--model_name_or_path",
-                        default=None,
-                        type=str,
-                        required=True,
-                        help="Path to pre-trained model.")
+    parser.add_argument(
+        "--model_name_or_path", default=None, type=str, required=True, help="Path to pre-trained model."
+    )
     parser.add_argument(
         "--batch_size",
         default=8,
@@ -48,8 +43,7 @@ def parse_args():
         "--max_seq_length",
         default=256,
         type=int,
-        help=
-        "The maximum total input sequence length after tokenization. Sequences longer "
+        help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.",
     )
     parser.add_argument(
@@ -57,7 +51,8 @@ def parse_args():
         default="gpu",
         type=str,
         choices=["cpu", "gpu", "xpu"],
-        help="The device to select to train the model, is must be cpu/gpu/xpu.")
+        help="The device to select to train the model, is must be cpu/gpu/xpu.",
+    )
     args = parser.parse_args()
     return args
 
@@ -84,12 +79,14 @@ def convert_example(example, tokenizer, max_seq_length=256, language="en"):
     premise = example["premise"]
     hypothesis = example["hypothesis"]
     # Convert raw text to feature
-    example = tokenizer(premise,
-                        text_pair=hypothesis,
-                        max_length=max_seq_length,
-                        return_attention_mask=True,
-                        return_token_type_ids=False,
-                        lang=language)
+    example = tokenizer(
+        premise,
+        text_pair=hypothesis,
+        max_length=max_seq_length,
+        return_attention_mask=True,
+        return_token_type_ids=False,
+        lang=language,
+    )
     return example["input_ids"], example["attention_mask"], label
 
 
@@ -97,31 +94,23 @@ def get_test_dataloader(args, language, tokenizer):
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
         Pad(axis=0, pad_val=0, dtype="int64"),  # attention_mask
-        Stack(dtype="int64")  # labels
+        Stack(dtype="int64"),  # labels
     ): fn(samples)
     # make sure language is `language``
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length,
-                         language=language)
+    trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length, language=language)
     test_ds = load_dataset("xnli", language, splits="test")
     test_ds = test_ds.map(trans_func, lazy=True)
-    test_batch_sampler = BatchSampler(test_ds,
-                                      batch_size=args.batch_size * 4,
-                                      shuffle=False)
-    test_data_loader = DataLoader(dataset=test_ds,
-                                  batch_sampler=test_batch_sampler,
-                                  collate_fn=batchify_fn,
-                                  num_workers=0,
-                                  return_list=True)
+    test_batch_sampler = BatchSampler(test_ds, batch_size=args.batch_size * 4, shuffle=False)
+    test_data_loader = DataLoader(
+        dataset=test_ds, batch_sampler=test_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
+    )
     return test_data_loader
 
 
 def do_eval(args):
     paddle.set_device(args.device)
     tokenizer = XLMTokenizer.from_pretrained(args.model_name_or_path)
-    model = XLMForSequenceClassification.from_pretrained(
-        args.model_name_or_path)
+    model = XLMForSequenceClassification.from_pretrained(args.model_name_or_path)
     model.eval()
     metric = Accuracy()
     all_languages_acc = []

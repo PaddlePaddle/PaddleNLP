@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+unset http_proxy && unset https_proxy
 # 指定语义检索系统的Yaml配置文件
 export CUDA_VISIBLE_DEVICES=0
 export PIPELINE_YAML_PATH=rest_api/pipeline/semantic_search.yaml

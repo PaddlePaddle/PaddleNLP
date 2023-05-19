@@ -55,19 +55,17 @@ class DataCollator:
     def __call__(self, features):
         has_labels = "labels" in features[0]
         for feat in features:
-            feat['input_ids'] = feat['input_ids'] + [
+            feat["input_ids"] = feat["input_ids"] + [1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]] * (
+                self.max_length - len(feat["input_ids"])
+            )
+            feat["attention_mask"] = feat["attention_mask"] + [
                 1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]
-            ] * (self.max_length - len(feat['input_ids']))
-            feat['attention_mask'] = feat['attention_mask'] + [
-                1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]
-            ] * (self.max_length - len(feat['attention_mask']))
-            feat['bbox'] = feat['bbox'] + [[0, 0, 0, 0]
-                                           for _ in range(self.max_length -
-                                                          len(feat['bbox']))]
-            if has_labels and not isinstance(feat['labels'], int):
-                feat['labels'] = feat['labels'] + [
-                    1 * self.label_pad_token_id
-                ] * (self.max_length - len(feat['labels']))
+            ] * (self.max_length - len(feat["attention_mask"]))
+            feat["bbox"] = feat["bbox"] + [[0, 0, 0, 0] for _ in range(self.max_length - len(feat["bbox"]))]
+            if has_labels and not isinstance(feat["labels"], int):
+                feat["labels"] = feat["labels"] + [1 * self.label_pad_token_id] * (
+                    self.max_length - len(feat["labels"])
+                )
 
         batch = self.tokenizer.pad(
             features,
@@ -75,5 +73,6 @@ class DataCollator:
             max_length=self.max_length,
             pad_to_multiple_of=self.pad_to_multiple_of,
             # Conversion to tensors will fail if we have labels as they are not of the same length yet.
-            return_tensors=self.return_tensors)
+            return_tensors=self.return_tensors,
+        )
         return batch

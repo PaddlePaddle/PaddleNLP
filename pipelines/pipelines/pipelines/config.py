@@ -26,9 +26,7 @@ logger = logging.getLogger(__name__)
 VALID_CODE_GEN_INPUT_REGEX = re.compile(r"^[-a-zA-Z0-9_/.:]+$")
 
 
-def get_pipeline_definition(
-        pipeline_config: Dict[str, Any],
-        pipeline_name: Optional[str] = None) -> Dict[str, Any]:
+def get_pipeline_definition(pipeline_config: Dict[str, Any], pipeline_name: Optional[str] = None) -> Dict[str, Any]:
     """
     Get the definition of Pipeline from a given pipeline config. If the config contains more than one Pipeline,
     then the pipeline_name must be supplied.
@@ -40,25 +38,17 @@ def get_pipeline_definition(
         if len(pipeline_config["pipelines"]) == 1:
             pipeline_definition = pipeline_config["pipelines"][0]
         else:
-            raise Exception(
-                "The YAML contains multiple pipelines. Please specify the pipeline name to load."
-            )
+            raise Exception("The YAML contains multiple pipelines. Please specify the pipeline name to load.")
     else:
-        pipelines_in_definitions = list(
-            filter(lambda p: p["name"] == pipeline_name,
-                   pipeline_config["pipelines"]))
+        pipelines_in_definitions = list(filter(lambda p: p["name"] == pipeline_name, pipeline_config["pipelines"]))
         if not pipelines_in_definitions:
-            raise KeyError(
-                f"Cannot find any pipeline with name '{pipeline_name}' declared in the YAML file."
-            )
+            raise KeyError(f"Cannot find any pipeline with name '{pipeline_name}' declared in the YAML file.")
         pipeline_definition = pipelines_in_definitions[0]
 
     return pipeline_definition
 
 
-def get_component_definitions(
-        pipeline_config: Dict[str, Any],
-        overwrite_with_env_variables: bool) -> Dict[str, Any]:
+def get_component_definitions(pipeline_config: Dict[str, Any], overwrite_with_env_variables: bool) -> Dict[str, Any]:
     """
     Returns the definitions of all components from a given pipeline config.
 
@@ -101,8 +91,8 @@ def validate_config(pipeline_config: Dict[str, Any]):
 
 
 def build_component_dependency_graph(
-        pipeline_definition: Dict[str, Any],
-        component_definitions: Dict[str, Any]) -> DiGraph:
+    pipeline_definition: Dict[str, Any], component_definitions: Dict[str, Any]
+) -> DiGraph:
     """
     Builds a dependency graph between components. Dependencies are:
     - referenced components during component build time (e.g. init params)
@@ -134,9 +124,7 @@ def build_component_dependency_graph(
 
 def _validate_user_input(input: str):
     if isinstance(input, str) and not VALID_CODE_GEN_INPUT_REGEX.match(input):
-        raise ValueError(
-            f"'{input}' is not a valid config variable name. Use word characters only."
-        )
+        raise ValueError(f"'{input}' is not a valid config variable name. Use word characters only.")
 
 
 def _overwrite_with_env_variables(component_definition: Dict[str, Any]):

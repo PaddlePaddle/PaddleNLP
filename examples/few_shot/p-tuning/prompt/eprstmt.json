@@ -1,0 +1,8 @@
+{
+    "template": [
+        {"text": "{'mask'}{'soft'}{'text':'sentence'}"}
+    ],
+    "verbalizer": [
+        {"Negative": "不", "Positive": "很"}
+    ]
+}

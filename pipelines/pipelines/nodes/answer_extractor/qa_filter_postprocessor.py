@@ -19,7 +19,7 @@ import paddle
 
 class QAFilterPostprocessor(BaseComponent):
     """
-    QA Filter Postprocessor used to postprocess the result of qa filter. 
+    QA Filter Postprocessor used to postprocess the result of qa filter.
     """
 
     return_no_answers: bool
@@ -32,13 +32,13 @@ class QAFilterPostprocessor(BaseComponent):
 
     def run(self, filtered_cqa_triples):
         results = {
-            "documents": [{
-                'content': triple['synthetic_question'],
-                'content_type': 'text',
-                'meta': {
-                    'answer': triple['synthetic_answer'],
-                    '_split_id': 0
+            "documents": [
+                {
+                    "content": triple["synthetic_question"],
+                    "content_type": "text",
+                    "meta": {"answer": triple["synthetic_answer"], "_split_id": 0},
                 }
-            } for triple in filtered_cqa_triples]
+                for triple in filtered_cqa_triples
+            ]
         }
         return results, "output_1"

@@ -13,12 +13,12 @@
 # limitations under the License.
 from __future__ import annotations
 
+import argparse
+import os
 import subprocess
 import sys
-import os
-import argparse
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from pkg_resources import parse_version
 
 
 def read_version_of_remote_package(name: str) -> str:
@@ -34,13 +34,12 @@ def read_version_of_remote_package(name: str) -> str:
     """
     latest_version = str(
         subprocess.run(
-            [sys.executable, '-m', 'pip', 'install', '{}==random'.format(name)],
-            capture_output=True,
-            text=True))
-    latest_version = latest_version[latest_version.find('(from versions:') +
-                                    15:]
-    latest_version = latest_version[:latest_version.find(')')]
-    latest_version = latest_version.replace(' ', '').split(',')[-1]
+            [sys.executable, "-m", "pip", "install", "{}==random".format(name)], capture_output=True, text=True
+        )
+    )
+    latest_version = latest_version[latest_version.find("(from versions:") + 15 :]
+    latest_version = latest_version[: latest_version.find(")")]
+    latest_version = latest_version.replace(" ", "").split(",")[-1]
     return latest_version
 
 
@@ -53,28 +52,31 @@ def read_version_of_local_package(version_file_path: str) -> str:
     Returns:
         str: the version of local package
     """
-    with open(version_file_path, 'r', encoding='utf-8') as f:
+    with open(version_file_path, "r", encoding="utf-8") as f:
         version = f.read().strip()
     return version
 
 
-def should_ppdiffusers_deploy():
-    """print the result to terminal"""
-    local_version_file = os.path.join(PROJECT_ROOT, 'ppdiffusers/VERSION')
-    remote_version = read_version_of_remote_package("ppdiffusers")
-    local_version = read_version_of_local_package(local_version_file)
-
-    should_deploy = str(remote_version != local_version).lower()
-    print(f"should_deploy={should_deploy}")
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--name', required=True)
+    parser.add_argument("--name", required=True)
 
     args = parser.parse_args()
 
-    if args.name == 'ppdiffusers':
-        should_ppdiffusers_deploy()
+    version_file_map = {
+        "ppdiffusers": "ppdiffusers/VERSION",
+        "paddle-pipelines": "pipelines/VERSION",
+    }
+    remote_version = read_version_of_remote_package(args.name)
+
+    if args.name == "paddlenlp":
+        local_version = str(subprocess.check_output(["python", "setup.py", "--version"], text=True))
+    elif args.name in version_file_map:
+        PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        local_version_file = os.path.join(PROJECT_ROOT, version_file_map[args.name])
+        local_version = read_version_of_local_package(local_version_file)
     else:
         raise ValueError(f"package<{args.name}> not supported")
+
+    should_deploy = str(parse_version(remote_version) < parse_version(local_version)).lower()
+    print(f"should_deploy={should_deploy}")

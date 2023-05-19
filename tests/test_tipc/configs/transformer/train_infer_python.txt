@@ -2,7 +2,7 @@
 model_name:transformer_base
 python:python3.7
 gpu_list:0|0,1
-null:null
+--device:gpu
 null:null
 --max_iter:lite_train_lite_infer=100|lite_train_whole_infer=100
 null:null
@@ -27,7 +27,7 @@ null:null
 ===========================infer_params===========================
 null:null
 null:null
-norm_export:../examples/machine_translation/transformer/export_model.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --vocab_file ../examples/machine_translation/transformer/vocab_all.bpe.33708 --unk_token "<unk>" --bos_token "<s>" --eos_token "<e>"
+norm_export:../examples/machine_translation/transformer/export_model.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --vocab_file ../examples/machine_translation/transformer/vocab_all.bpe.33708 --bos_token "<s>" --eos_token "<e>"
 quant_export:null
 fpgm_export:null
 distill_export:null

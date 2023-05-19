@@ -58,31 +58,28 @@ class DureaderRobust(datasets.GeneratorBasedBuilder):
     def _info(self):
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
-            features=datasets.Features({
-                "id":
-                datasets.Value("string"),
-                "title":
-                datasets.Value("string"),
-                "context":
-                datasets.Value("string"),
-                "question":
-                datasets.Value("string"),
-                "answers":
-                datasets.features.Sequence({
-                    "text":
-                    datasets.Value("string"),
-                    "answer_start":
-                    datasets.Value("int32"),
-                }),
-            }),
+            features=datasets.Features(
+                {
+                    "id": datasets.Value("string"),
+                    "title": datasets.Value("string"),
+                    "context": datasets.Value("string"),
+                    "question": datasets.Value("string"),
+                    "answers": datasets.features.Sequence(
+                        {
+                            "text": datasets.Value("string"),
+                            "answer_start": datasets.Value("int32"),
+                        }
+                    ),
+                }
+            ),
             # No default supervised_keys (as we have to pass both question
             # and context as input).
             supervised_keys=None,
             homepage="https://arxiv.org/abs/2004.11142",
             task_templates=[
-                QuestionAnsweringExtractive(question_column="question",
-                                            context_column="context",
-                                            answers_column="answers")
+                QuestionAnsweringExtractive(
+                    question_column="question", context_column="context", answers_column="answers"
+                )
             ],
         )
 
@@ -90,27 +87,18 @@ class DureaderRobust(datasets.GeneratorBasedBuilder):
         dl_dir = dl_manager.download_and_extract(_URL)
 
         return [
-            datasets.SplitGenerator(name=datasets.Split.TRAIN,
-                                    gen_kwargs={
-                                        "filepath":
-                                        os.path.join(dl_dir,
-                                                     'dureader_robust-data',
-                                                     'train.json')
-                                    }),
-            datasets.SplitGenerator(name=datasets.Split.VALIDATION,
-                                    gen_kwargs={
-                                        "filepath":
-                                        os.path.join(dl_dir,
-                                                     'dureader_robust-data',
-                                                     'dev.json')
-                                    }),
-            datasets.SplitGenerator(name=datasets.Split.TEST,
-                                    gen_kwargs={
-                                        "filepath":
-                                        os.path.join(dl_dir,
-                                                     'dureader_robust-data',
-                                                     'test.json')
-                                    }),
+            datasets.SplitGenerator(
+                name=datasets.Split.TRAIN,
+                gen_kwargs={"filepath": os.path.join(dl_dir, "dureader_robust-data", "train.json")},
+            ),
+            datasets.SplitGenerator(
+                name=datasets.Split.VALIDATION,
+                gen_kwargs={"filepath": os.path.join(dl_dir, "dureader_robust-data", "dev.json")},
+            ),
+            datasets.SplitGenerator(
+                name=datasets.Split.TEST,
+                gen_kwargs={"filepath": os.path.join(dl_dir, "dureader_robust-data", "test.json")},
+            ),
         ]
 
     def _generate_examples(self, filepath):
@@ -122,16 +110,10 @@ class DureaderRobust(datasets.GeneratorBasedBuilder):
             for article in durobust["data"]:
                 title = article.get("title", "")
                 for paragraph in article["paragraphs"]:
-                    context = paragraph[
-                        "context"]  # do not strip leading blank spaces GH-2585
+                    context = paragraph["context"]  # do not strip leading blank spaces GH-2585
                     for qa in paragraph["qas"]:
-                        answer_starts = [
-                            answer["answer_start"]
-                            for answer in qa.get("answers", '')
-                        ]
-                        answers = [
-                            answer["text"] for answer in qa.get("answers", '')
-                        ]
+                        answer_starts = [answer["answer_start"] for answer in qa.get("answers", "")]
+                        answers = [answer["text"] for answer in qa.get("answers", "")]
                         # Features currently used are "context", "question", and "answers".
                         # Others are extracted here for the ease of future expansions.
                         yield key, {

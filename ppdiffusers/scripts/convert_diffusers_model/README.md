@@ -191,7 +191,6 @@ python convert_diffusers_stable_diffusion_to_ppdiffusers.py --pretrained_model_n
 import torch
 from diffusers import StableDiffusionPipeline as DiffusersStableDiffusionPipeline
 pipe = DiffusersStableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
-pipe = pipe.to("cuda")
 seed = 1024
 generator = torch.Generator("cuda").manual_seed(seed)
 prompt = "a photo of an astronaut riding a horse on mars"
@@ -222,18 +221,17 @@ from io import BytesIO
 from diffusers import StableDiffusionImg2ImgPipeline as DiffusersStableDiffusionImg2ImgPipeline
 
 pipe = DiffusersStableDiffusionImg2ImgPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
-pipe = pipe.to("cuda")
 
 url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
 
 response = requests.get(url)
-init_image = Image.open(BytesIO(response.content)).convert("RGB")
-init_image = init_image.resize((768, 512))
+image = Image.open(BytesIO(response.content)).convert("RGB")
+image = image.resize((768, 512))
 
 prompt = "A fantasy landscape, trending on artstation"
 seed = 1024
 generator = torch.Generator("cuda").manual_seed(seed)
-image = pipe(prompt=prompt, init_image=init_image, strength=0.75, guidance_scale=7.5, generator=generator).images[0]
+image = pipe(prompt=prompt, image=image, strength=0.75, guidance_scale=7.5, generator=generator).images[0]
 
 image.save("diffusers_fantasy_landscape.png")
 ```
@@ -252,13 +250,13 @@ pipe = PPDiffusersStableDiffusionImg2ImgPipeline.from_pretrained("runwayml/stabl
 url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
 
 response = requests.get(url)
-init_image = Image.open(BytesIO(response.content)).convert("RGB")
-init_image = init_image.resize((768, 512))
+image = Image.open(BytesIO(response.content)).convert("RGB")
+image = image.resize((768, 512))
 
 prompt = "A fantasy landscape, trending on artstation"
 seed = 1024
 paddle.seed(seed)
-image = pipe(prompt=prompt, init_image=init_image, strength=0.75, guidance_scale=7.5).images[0]
+image = pipe(prompt=prompt, image=image, strength=0.75, guidance_scale=7.5).images[0]
 
 image.save("ppdiffusers_fantasy_landscape.png")
 ```
@@ -280,16 +278,15 @@ def download_image(url):
 img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
 mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
 
-init_image = download_image(img_url).resize((512, 512))
+image = download_image(img_url).resize((512, 512))
 mask_image = download_image(mask_url).resize((512, 512))
 scheduler = DiffusersEulerAncestralDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
 pipe = DiffusersStableDiffusionInpaintPipeline.from_pretrained("runwayml/stable-diffusion-inpainting", scheduler=scheduler)
-pipe.to("cuda")
 
 prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
 seed = 1024
 generator = torch.Generator("cuda").manual_seed(seed)
-image = pipe(prompt=prompt, image=init_image, mask_image=mask_image, generator=generator).images[0]
+image = pipe(prompt=prompt, image=image, mask_image=mask_image, generator=generator).images[0]
 
 image.save("diffusers_cat_on_bench.png")
 ```
@@ -311,7 +308,7 @@ def download_image(url):
 img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
 mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
 
-init_image = download_image(img_url).resize((512, 512))
+image = download_image(img_url).resize((512, 512))
 mask_image = download_image(mask_url).resize((512, 512))
 scheduler = PPDiffusersEulerAncestralDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
 pipe = PPDiffusersStableDiffusionInpaintPipeline.from_pretrained("runwayml/stable-diffusion-inpainting", scheduler=scheduler)
@@ -319,7 +316,7 @@ pipe = PPDiffusersStableDiffusionInpaintPipeline.from_pretrained("runwayml/stabl
 prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
 seed = 1024
 paddle.seed(seed)
-image = pipe(prompt=prompt, image=init_image, mask_image=mask_image).images[0]
+image = pipe(prompt=prompt, image=image, mask_image=mask_image).images[0]
 
 image.save("ppdiffusers_cat_on_bench.png")
 ```

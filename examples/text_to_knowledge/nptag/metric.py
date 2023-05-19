@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import paddle
 
 
@@ -39,8 +38,7 @@ class NPTagAccuracy(paddle.metric.Metric):
                 real_pred.append(pred[i])
                 real_label.append(label[i])
 
-            if all(real_pred[i] == real_label[i]
-                   for i in range(len(real_label))):
+            if all(real_pred[i] == real_label[i] for i in range(len(real_label))):
                 correct.append(1)
             else:
                 correct.append(0)

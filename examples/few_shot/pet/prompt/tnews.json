@@ -1,0 +1,30 @@
+{
+    "template": [
+        {"text": "阅读下边一则{'mask'}{'mask'}新闻：{'text':'sentence'}"},
+        {"text": "阅读这篇标题为「{'text':'sentence'}」的文章，它讲的是{'mask'}{'mask'}。"},
+        {"text": "下边这则新闻属于{'mask'}{'mask'}话题{'text':'sentence'}"},
+        {"text": "下边这则新闻属于什么话题呢？{'mask'}{'mask'}{'text':'sentence'}"}
+    ],
+    "verbalizer": [
+        {
+            "news_story":  "八卦",
+            "news_entertainment": "明星",
+            "news_finance": "财经",
+            "news_sports": "体育",
+            "news_edu": "校园",
+            "news_game": "游戏",
+            "news_culture": "文化",
+            "news_tech": "科技",
+            "news_car": "汽车",
+            "news_travel": "旅行",
+            "news_world": "国际",
+            "news_agriculture": "农业",
+            "news_military": "军事",
+            "news_house": "房子",
+            "news_stock": "股票"
+        },
+        {},
+        {},
+        {}
+    ]
+}

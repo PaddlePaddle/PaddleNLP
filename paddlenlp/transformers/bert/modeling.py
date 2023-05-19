@@ -12,32 +12,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import annotations
-import warnings
 
+import warnings
 from typing import Optional, Tuple
+
 import paddle
-from paddle import Tensor
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle import Tensor
 from paddle.nn import Layer
 
 try:
     from paddle.incubate.nn import FusedTransformerEncoderLayer
 except ImportError:
     FusedTransformerEncoderLayer = None
-from dataclasses import dataclass, fields
-from typing import List, Optional, Tuple, Union
+from dataclasses import dataclass
+
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
+
+from ...layers import Linear as TransposedLinear
+from ...utils.converter import StateDictNameMapping, init_name_mappings
+from ...utils.env import CONFIG_NAME
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
-    SequenceClassifierOutput,
-    TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
     MaskedLMOutput,
     ModelOutput,
+    MultipleChoiceModelOutput,
+    QuestionAnsweringModelOutput,
+    SequenceClassifierOutput,
+    TokenClassifierOutput,
 )
-from .configuration import BERT_PRETRAINED_RESOURCE_FILES_MAP, BertConfig, BERT_PRETRAINED_INIT_CONFIGURATION
+from .configuration import (
+    BERT_PRETRAINED_INIT_CONFIGURATION,
+    BERT_PRETRAINED_RESOURCE_FILES_MAP,
+    BertConfig,
+)
 
 __all__ = [
     "BertModel",
@@ -132,7 +141,7 @@ class BertPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
+    model_config_file = CONFIG_NAME
     config_class = BertConfig
     resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "bert"
@@ -140,7 +149,106 @@ class BertPretrainedModel(PretrainedModel):
     pretrained_init_configuration = BERT_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = BERT_PRETRAINED_RESOURCE_FILES_MAP
 
-    def init_weights(self, layer):
+    @classmethod
+    def _get_name_mappings(cls, config: BertConfig) -> list[StateDictNameMapping]:
+        mappings: list[StateDictNameMapping] = []
+        model_mappings = [
+            "embeddings.word_embeddings.weight",
+            "embeddings.position_embeddings.weight",
+            "embeddings.token_type_embeddings.weight",
+            ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
+            ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
+            ["pooler.dense.weight", None, "transpose"],
+            "pooler.dense.bias",
+            # for TokenClassification
+        ]
+        for layer_index in range(config.num_hidden_layers):
+            layer_mappings = [
+                [
+                    f"encoder.layer.{layer_index}.attention.self.query.weight",
+                    f"encoder.layers.{layer_index}.self_attn.q_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.query.bias",
+                    f"encoder.layers.{layer_index}.self_attn.q_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.key.weight",
+                    f"encoder.layers.{layer_index}.self_attn.k_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.key.bias",
+                    f"encoder.layers.{layer_index}.self_attn.k_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.value.weight",
+                    f"encoder.layers.{layer_index}.self_attn.v_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.value.bias",
+                    f"encoder.layers.{layer_index}.self_attn.v_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.dense.weight",
+                    f"encoder.layers.{layer_index}.self_attn.out_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.dense.bias",
+                    f"encoder.layers.{layer_index}.self_attn.out_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.intermediate.dense.weight",
+                    f"encoder.layers.{layer_index}.linear1.weight",
+                    "transpose",
+                ],
+                [f"encoder.layer.{layer_index}.intermediate.dense.bias", f"encoder.layers.{layer_index}.linear1.bias"],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.weight",
+                    f"encoder.layers.{layer_index}.norm1.weight",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.bias",
+                    f"encoder.layers.{layer_index}.norm1.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.output.dense.weight",
+                    f"encoder.layers.{layer_index}.linear2.weight",
+                    "transpose",
+                ],
+                [f"encoder.layer.{layer_index}.output.dense.bias", f"encoder.layers.{layer_index}.linear2.bias"],
+                [f"encoder.layer.{layer_index}.output.LayerNorm.weight", f"encoder.layers.{layer_index}.norm2.weight"],
+                [f"encoder.layer.{layer_index}.output.LayerNorm.bias", f"encoder.layers.{layer_index}.norm2.bias"],
+            ]
+            model_mappings.extend(layer_mappings)
+
+        init_name_mappings(model_mappings)
+
+        # base-model prefix "BertModel"
+        if "BertModel" not in config.architectures:
+            for mapping in model_mappings:
+                mapping[0] = "bert." + mapping[0]
+                mapping[1] = "bert." + mapping[1]
+
+        # downstream mappings
+        if "BertForQuestionAnswering" in config.architectures:
+            model_mappings.extend(
+                [["qa_outputs.weight", "classifier.weight", "transpose"], ["qa_outputs.bias", "classifier.bias"]]
+            )
+        if (
+            "BertForMultipleChoice" in config.architectures
+            or "BertForSequenceClassification" in config.architectures
+            or "BertForTokenClassification" in config.architectures
+        ):
+            model_mappings.extend([["classifier.weight", "classifier.weight", "transpose"]])
+
+        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
+        return mappings
+
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -149,9 +257,7 @@ class BertPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.config.initializer_range,
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -173,54 +279,8 @@ class BertModel(BertPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int, optional):
-            Vocabulary size of `inputs_ids` in `BertModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `BertModel`.
-            Defaults to `30522`.
-        hidden_size (int, optional):
-            Dimensionality of the embedding layer, encoder layer and pooler layer. Defaults to `768`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `12`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `12`.
-        intermediate_size (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
-            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
-            Defaults to `3072`.
-        hidden_act (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to `"gelu"`.
-        hidden_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to `0.1`.
-        attention_probs_dropout_prob (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence. Defaults to `512`.
-        type_vocab_size (int, optional):
-            The vocabulary size of `token_type_ids`.
-            Defaults to `16`.
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer.
-            Defaults to 0.02.
-
-            .. note::
-                A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `BertModel`.
-
-        pad_token_id (int, optional):
-            The index of padding token in the token vocabulary.
-            Defaults to `0`.
-
-        pooled_act (str, optional):
-            The non-linear activation function in the pooling layer.
-            Defaults to `"tanh"`.
-
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertModel.
     """
 
     def __init__(self, config: BertConfig):
@@ -262,7 +322,6 @@ class BertModel(BertPretrainedModel):
             )
             self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
         self.pooler = BertPooler(config)
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -371,7 +430,6 @@ class BertModel(BertPretrainedModel):
                 batch_size = past_key_values[0][0].shape[0]
                 past_mask = paddle.zeros([batch_size, 1, 1, past_key_values_length], dtype=attention_mask.dtype)
                 attention_mask = paddle.concat([past_mask, attention_mask], axis=-1)
-
         else:
             if attention_mask.ndim == 2:
                 # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
@@ -450,7 +508,6 @@ class BertForQuestionAnswering(BertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -582,7 +639,6 @@ class BertForSequenceClassification(BertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -704,7 +760,6 @@ class BertForTokenClassification(BertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -801,23 +856,15 @@ class BertLMPredictionHead(Layer):
     Bert Model with a `language modeling` head on top for CLM fine-tuning.
     """
 
-    def __init__(self, config: BertConfig, embedding_weights=None):
+    def __init__(self, config: BertConfig):
         super(BertLMPredictionHead, self).__init__()
 
         self.transform = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = getattr(nn.functional, config.hidden_act)
         self.layer_norm = nn.LayerNorm(config.hidden_size)
-        self.decoder_weight = (
-            self.create_parameter(
-                shape=[config.vocab_size, config.hidden_size], dtype=self.transform.weight.dtype, is_bias=False
-            )
-            if embedding_weights is None
-            else embedding_weights
-        )
-
-        self.decoder_bias = self.create_parameter(
-            shape=[config.vocab_size], dtype=self.decoder_weight.dtype, is_bias=True
-        )
+        self.decoder = TransposedLinear(config.hidden_size, config.vocab_size)
+        # link bias to load pretrained weights
+        self.decoder_bias = self.decoder.bias
 
     def forward(self, hidden_states, masked_positions=None):
         if masked_positions is not None:
@@ -827,7 +874,7 @@ class BertLMPredictionHead(Layer):
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        hidden_states = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True) + self.decoder_bias
+        hidden_states = self.decoder(hidden_states)
         return hidden_states
 
 
@@ -836,22 +883,14 @@ class BertPretrainingHeads(Layer):
     Perform language modeling task and next sentence classification task.
 
     Args:
-        hidden_size (int):
-            See :class:`BertModel`.
-        vocab_size (int):
-            See :class:`BertModel`.
-        activation (str):
-            Activation function used in the language modeling task.
-        embedding_weights (Tensor, optional):
-            Decoding weights used to map hidden_states to logits of the masked token prediction.
-            Its data type should be float32 and its shape is [vocab_size, hidden_size].
-            Defaults to `None`, which means use the same weights of the embedding layer.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForPretraining.
 
     """
 
-    def __init__(self, config: BertConfig, embedding_weights=None):
+    def __init__(self, config: BertConfig):
         super(BertPretrainingHeads, self).__init__()
-        self.predictions = BertLMPredictionHead(config, embedding_weights)
+        self.predictions = BertLMPredictionHead(config)
         self.seq_relationship = nn.Linear(config.hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output, masked_positions=None):
@@ -937,9 +976,11 @@ class BertForPretraining(BertPretrainedModel):
     def __init__(self, config: BertConfig):
         super(BertForPretraining, self).__init__(config)
         self.bert = BertModel(config)
-        self.cls = BertPretrainingHeads(config, embedding_weights=self.bert.embeddings.word_embeddings.weight)
+        self.cls = BertPretrainingHeads(config)
+        self.tie_weights()
 
-        self.apply(self.init_weights)
+    def get_output_embeddings(self):
+        return self.cls.predictions.decoder
 
     def forward(
         self,
@@ -1107,7 +1148,6 @@ class BertForMultipleChoice(BertPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 1)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1247,9 +1287,9 @@ class BertForMultipleChoice(BertPretrainedModel):
 
 
 class BertOnlyMLMHead(nn.Layer):
-    def __init__(self, config: BertConfig, embedding_weights=None):
+    def __init__(self, config: BertConfig):
         super().__init__()
-        self.predictions = BertLMPredictionHead(config=config, embedding_weights=embedding_weights)
+        self.predictions = BertLMPredictionHead(config=config)
 
     def forward(self, sequence_output, masked_positions=None):
         prediction_scores = self.predictions(sequence_output, masked_positions)
@@ -1270,9 +1310,11 @@ class BertForMaskedLM(BertPretrainedModel):
         super(BertForMaskedLM, self).__init__(config)
         self.bert = BertModel(config)
 
-        self.cls = BertOnlyMLMHead(config=config, embedding_weights=self.bert.embeddings.word_embeddings.weight)
+        self.cls = BertOnlyMLMHead(config=config)
+        self.tie_weights()
 
-        self.apply(self.init_weights)
+    def get_output_embeddings(self):
+        return self.cls.predictions.decoder
 
     def forward(
         self,
@@ -1280,6 +1322,7 @@ class BertForMaskedLM(BertPretrainedModel):
         token_type_ids: Optional[Tensor] = None,
         position_ids: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
+        masked_positions: Optional[Tensor] = None,
         labels: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
@@ -1343,7 +1386,7 @@ class BertForMaskedLM(BertPretrainedModel):
             return_dict=return_dict,
         )
         sequence_output = outputs[0]
-        prediction_scores = self.cls(sequence_output, masked_positions=None)
+        prediction_scores = self.cls(sequence_output, masked_positions=masked_positions)
 
         masked_lm_loss = None
         if labels is not None:

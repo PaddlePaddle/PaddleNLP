@@ -35,7 +35,7 @@ class SequenceAccuracy(paddle.metric.Metric):
         return correct
 
     def update(self, correct):
-        self.correct_k += correct.cast('float32').sum(0)
+        self.correct_k += correct.cast("float32").sum(0)
         self.total += correct.shape[0]
 
     def reset(self):
@@ -49,8 +49,7 @@ class SequenceAccuracy(paddle.metric.Metric):
         return "Masked Language Model Accuracy"
 
 
-def wordseg_hard_acc(list_a: List[Tuple[str, str]],
-                     list_b: List[Tuple[str, str]]) -> float:
+def wordseg_hard_acc(list_a: List[Tuple[str, str]], list_b: List[Tuple[str, str]]) -> float:
     """
     Calculate extra metrics of word-seg
 
@@ -86,8 +85,7 @@ def wordseg_hard_acc(list_a: List[Tuple[str, str]],
     return acc
 
 
-def wordtag_hard_acc(list_a: List[Tuple[str, str]],
-                     list_b: List[Tuple[str, str]]) -> float:
+def wordtag_hard_acc(list_a: List[Tuple[str, str]], list_b: List[Tuple[str, str]]) -> float:
     """
     Calculate extra metrics of word-tag
 
@@ -123,8 +121,7 @@ def wordtag_hard_acc(list_a: List[Tuple[str, str]],
     return acc
 
 
-def wordtag_soft_acc(list_a: List[Tuple[str, str]],
-                     list_b: List[Tuple[str, str]]) -> float:
+def wordtag_soft_acc(list_a: List[Tuple[str, str]], list_b: List[Tuple[str, str]]) -> float:
     """
     Calculate extra metrics of word-tag
 
@@ -164,8 +161,7 @@ def wordtag_soft_acc(list_a: List[Tuple[str, str]],
     return acc
 
 
-def wordseg_soft_acc(list_a: List[Tuple[str, str]],
-                     list_b: List[Tuple[str, str]]) -> float:
+def wordseg_soft_acc(list_a: List[Tuple[str, str]], list_b: List[Tuple[str, str]]) -> float:
     """
     Calculate extra metrics of word-seg
 

@@ -232,7 +232,7 @@ python -u -m paddle.distributed.launch --gpus "0" \
 0.9800204038619995
 ```
 
-## 使用 FasterTransformer 加速预测
+## 使用 FastGeneration 加速预测
 
 我们基于 Paddle 自定义算子功能集成了[NVIDIA FasterTransformer](https://github.com/NVIDIA/FasterTransformer) 的高性能加速能力，通过简单易用的 Python API 即可得到 GPU 上更高性能预测能力。
 - FT FP32 相比 Paddle 前向加速比为 1.13 ~ 4.36

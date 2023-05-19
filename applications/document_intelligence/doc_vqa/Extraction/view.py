@@ -30,12 +30,12 @@ def _highlight_bbox(img, bbox):
     w = bbox[1] - x
     y = bbox[2]
     h = bbox[3] - y
-    sub_img = img[y:y + h, x:x + w]
+    sub_img = img[y : y + h, x : x + w]
     colored_rect = np.zeros(sub_img.shape, dtype=np.uint8)
     colored_rect[:, :, 2] = 255
     colored_rect[:, :, 1] = 255
     res = cv2.addWeighted(sub_img, 0.5, colored_rect, 0.5, 1.0)
-    img[y:y + h, x:x + w] = res
+    img[y : y + h, x : x + w] = res
 
 
 def highlight_ans(source_img_path, output_img_path, ans_bbox):
@@ -54,14 +54,14 @@ def highlight_img(source_img_path, output_img_path):
     cv2.imwrite(output_img_path, image)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     res_path = "./data/decode_res.json"
     result = {}
     with open(res_path, "r", encoding="utf-8") as f:
         line = f.readline()
         result = json.loads(line.strip())
 
-    img_path = '../OCR_process/demo_pics/demo_{}.png'.format(result["img_id"])
+    img_path = "../OCR_process/demo_pics/demo_{}.png".format(result["img_id"])
     img_save_path = "../answer.png"
-    highlight_ans(img_path, img_save_path, result['predict_bboxes'])
+    highlight_ans(img_path, img_save_path, result["predict_bboxes"])
     print("extraction result has been saved to answer.png")

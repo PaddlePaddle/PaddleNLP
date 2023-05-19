@@ -12,21 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import random
 import argparse
 
-from tqdm import tqdm
 import numpy as np
-
 from milvus_util import VecToMilvus
+from tqdm import tqdm
 
-# yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--vector_path", type=str, required=True,
-    help="feature file path.")
-
+parser.add_argument("--vector_path", type=str, required=True, help="feature file path.")
 args = parser.parse_args()
-# yapf: enable
 
 
 def vector_insert(file_path):
@@ -36,21 +30,23 @@ def vector_insert(file_path):
     print(len(embedding_ids))
     client = VecToMilvus()
 
-    collection_name = 'text'
-    partition_tag = 'partition_2'
-    if (client.has_partition(collection_name, partition_tag)):
+    collection_name = "text"
+    partition_tag = "partition_2"
+    if client.has_partition(collection_name, partition_tag):
         client.delete_partition(collection_name, partition_tag)
     data_size = len(embedding_ids)
     batch_size = 50000
     for i in tqdm(range(0, data_size, batch_size)):
         cur_end = i + batch_size
-        if (cur_end > data_size):
+        if cur_end > data_size:
             cur_end = data_size
         batch_emb = embeddings[np.arange(i, cur_end)]
-        status, ids = client.insert(collection_name=collection_name,
-                                    vectors=batch_emb.tolist(),
-                                    ids=embedding_ids[i:i + batch_size],
-                                    partition_tag=partition_tag)
+        status, ids = client.insert(
+            collection_name=collection_name,
+            vectors=batch_emb.tolist(),
+            ids=embedding_ids[i : i + batch_size],
+            partition_tag=partition_tag,
+        )
 
 
 if __name__ == "__main__":

@@ -13,20 +13,17 @@
 # limitations under the License.
 
 import argparse
-import os
-import time
 import copy
-from functools import partial
+import os
 
 import numpy as np
 import paddle
-from paddlenlp.data import Pad
+from data import convert_example, load_vocab
+from utils import eisner, flat_words, istree, pad_sequence
+
 from paddlenlp.datasets import load_dataset
 
-from data import create_dataloader, convert_example, load_vocab
-from utils import flat_words, pad_sequence, istree, eisner
-
-# yapf: disable
+# fmt: off
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True, help="The path to static model.")
 parser.add_argument("--task_name", choices=["nlpcc13_evsam05_thu", "nlpcc13_evsam05_hit"], type=str, default="nlpcc13_evsam05_thu", help="Select the task.")
@@ -35,7 +32,7 @@ parser.add_argument("--batch_size", type=int, default=64, help="Numbers of examp
 parser.add_argument("--infer_output_file", type=str, default='infer_output.conll', help="The path to save infer results.")
 parser.add_argument("--tree", type=bool, default=True, help="Ensure the output conforms to the tree structure.")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 def batchify_fn(batch):
@@ -44,46 +41,21 @@ def batchify_fn(batch):
     return batch
 
 
-def flat_words(words, pad_index=0):
-    mask = words != pad_index
-    lens = np.sum(mask.astype(int), axis=-1)
-    position = np.cumsum(lens + (lens == 0).astype(int), axis=1) - 1
-    lens = np.sum(lens, -1)
-    words = words.ravel()[np.flatnonzero(words)]
-
-    sequences = []
-    idx = 0
-    for l in lens:
-        sequences.append(words[idx:idx + l])
-        idx += l
-    words = Pad(pad_val=pad_index)(sequences)
-
-    max_len = words.shape[1]
-
-    mask = (position >= max_len).astype(int)
-    position = position * np.logical_not(mask) + mask * (max_len - 1)
-    return words, position
-
-
 def decode(s_arc, s_rel, mask, tree=True):
 
     lens = np.sum(mask.astype(int), axis=-1)
     arc_preds = np.argmax(s_arc, axis=-1)
 
-    bad = [not istree(seq[:i + 1]) for i, seq in zip(lens, arc_preds)]
+    bad = [not istree(seq[: i + 1]) for i, seq in zip(lens, arc_preds)]
     if tree and any(bad):
         arc_preds[bad] = eisner(s_arc[bad], mask[bad])
 
     rel_preds = np.argmax(s_rel, axis=-1)
-    rel_preds = [
-        rel_pred[np.arange(len(arc_pred)), arc_pred]
-        for arc_pred, rel_pred in zip(arc_preds, rel_preds)
-    ]
+    rel_preds = [rel_pred[np.arange(len(arc_pred)), arc_pred] for arc_pred, rel_pred in zip(arc_preds, rel_preds)]
     return arc_preds, rel_preds
 
 
 class Predictor(object):
-
     def __init__(self, model_dir, device):
         model_file = model_dir + "/inference.pdmodel"
         params_file = model_dir + "/inference.pdiparams"
@@ -106,15 +78,9 @@ class Predictor(object):
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
 
-        self.input_handles = [
-            self.predictor.get_input_handle(name)
-            for name in self.predictor.get_input_names()
-        ]
+        self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
 
-        self.output_handle = [
-            self.predictor.get_output_handle(name)
-            for name in self.predictor.get_output_names()
-        ]
+        self.output_handle = [self.predictor.get_output_handle(name) for name in self.predictor.get_output_names()]
 
     def predict(self, data, vocabs):
         word_vocab, _, rel_vocab = vocabs
@@ -134,10 +100,7 @@ class Predictor(object):
             )
             examples.append(example)
 
-        batches = [
-            examples[idx:idx + args.batch_size]
-            for idx in range(0, len(examples), args.batch_size)
-        ]
+        batches = [examples[idx : idx + args.batch_size] for idx in range(0, len(examples), args.batch_size)]
 
         arcs, rels = [], []
         for batch in batches:
@@ -151,8 +114,7 @@ class Predictor(object):
             words = self.output_handle[2].copy_to_cpu()
 
             mask = np.logical_and(
-                np.logical_and(words != word_pad_index,
-                               words != word_bos_index),
+                np.logical_and(words != word_pad_index, words != word_bos_index),
                 words != word_eos_index,
             )
 
@@ -178,12 +140,11 @@ if __name__ == "__main__":
 
     pred_arcs, pred_rels = predictor.predict(test_ds, vocabs)
 
-    with open(args.infer_output_file, 'w', encoding='utf-8') as out_file:
+    with open(args.infer_output_file, "w", encoding="utf-8") as out_file:
         for res, head, rel in zip(test_ds_copy, pred_arcs, pred_rels):
             res["HEAD"] = tuple(head)
             res["DEPREL"] = tuple(rel)
-            res = '\n'.join('\t'.join(map(str, line))
-                            for line in zip(*res.values())) + '\n'
+            res = "\n".join("\t".join(map(str, line)) for line in zip(*res.values())) + "\n"
             out_file.write("{}\n".format(res))
     out_file.close()
     print("Results saved!")

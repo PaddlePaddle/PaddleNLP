@@ -67,22 +67,20 @@ class Cmrc2018(datasets.GeneratorBasedBuilder):
             # This is the description that will appear on the datasets page.
             description=_DESCRIPTION,
             # datasets.features.FeatureConnectors
-            features=datasets.Features({
-                "id":
-                datasets.Value("string"),
-                "context":
-                datasets.Value("string"),
-                "question":
-                datasets.Value("string"),
-                "answers":
-                datasets.features.Sequence({
-                    "text":
-                    datasets.Value("string"),
-                    "answer_start":
-                    datasets.Value("int32"),
-                }),
-                # These are the features of your dataset like images, labels ...
-            }),
+            features=datasets.Features(
+                {
+                    "id": datasets.Value("string"),
+                    "context": datasets.Value("string"),
+                    "question": datasets.Value("string"),
+                    "answers": datasets.features.Sequence(
+                        {
+                            "text": datasets.Value("string"),
+                            "answer_start": datasets.Value("int32"),
+                        }
+                    ),
+                    # These are the features of your dataset like images, labels ...
+                }
+            ),
             # If there's a common (input, target) tuple from the features,
             # specify them here. They'll be used if as_supervised=True in
             # builder.as_dataset.
@@ -91,9 +89,9 @@ class Cmrc2018(datasets.GeneratorBasedBuilder):
             homepage=_URL,
             citation=_CITATION,
             task_templates=[
-                QuestionAnsweringExtractive(question_column="question",
-                                            context_column="context",
-                                            answers_column="answers")
+                QuestionAnsweringExtractive(
+                    question_column="question", context_column="context", answers_column="answers"
+                )
             ],
         )
 
@@ -102,23 +100,13 @@ class Cmrc2018(datasets.GeneratorBasedBuilder):
         # TODO(cmrc2018): Downloads the data and defines the splits
         # dl_manager is a datasets.download.DownloadManager that can be used to
         # download and extract URLs
-        urls_to_download = {
-            "train": _TRAIN_FILE,
-            "dev": _DEV_FILE,
-            "test": _TEST_FILE
-        }
+        urls_to_download = {"train": _TRAIN_FILE, "dev": _DEV_FILE, "test": _TEST_FILE}
         downloaded_files = dl_manager.download_and_extract(urls_to_download)
 
         return [
-            datasets.SplitGenerator(
-                name=datasets.Split.TRAIN,
-                gen_kwargs={"filepath": downloaded_files["train"]}),
-            datasets.SplitGenerator(
-                name=datasets.Split.VALIDATION,
-                gen_kwargs={"filepath": downloaded_files["dev"]}),
-            datasets.SplitGenerator(
-                name=datasets.Split.TEST,
-                gen_kwargs={"filepath": downloaded_files["test"]}),
+            datasets.SplitGenerator(name=datasets.Split.TRAIN, gen_kwargs={"filepath": downloaded_files["train"]}),
+            datasets.SplitGenerator(name=datasets.Split.VALIDATION, gen_kwargs={"filepath": downloaded_files["dev"]}),
+            datasets.SplitGenerator(name=datasets.Split.TEST, gen_kwargs={"filepath": downloaded_files["test"]}),
         ]
 
     def _generate_examples(self, filepath):
@@ -133,12 +121,8 @@ class Cmrc2018(datasets.GeneratorBasedBuilder):
                         question = qa["question"].strip()
                         id_ = qa["id"]
 
-                        answer_starts = [
-                            answer["answer_start"] for answer in qa["answers"]
-                        ]
-                        answers = [
-                            answer["text"].strip() for answer in qa["answers"]
-                        ]
+                        answer_starts = [answer["answer_start"] for answer in qa["answers"]]
+                        answers = [answer["text"].strip() for answer in qa["answers"]]
 
                         yield id_, {
                             "context": context,

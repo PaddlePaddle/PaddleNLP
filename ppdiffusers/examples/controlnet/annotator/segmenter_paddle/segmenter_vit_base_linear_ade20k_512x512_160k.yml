@@ -1,0 +1,38 @@
+_base_: '../_base_/ade20k.yml'
+
+batch_size: 2
+iters: 160000
+
+model:
+  type: LinearSegmenter
+  backbone:
+    type: VisionTransformer
+    img_size: 512
+    patch_size: 16
+    embed_dim: 768
+    depth: 12
+    num_heads: 12
+    mlp_ratio: 4
+    qkv_bias: True
+    drop_rate: 0.0
+    drop_path_rate: 0.1
+    final_norm: True
+    pretrained: https://bj.bcebos.com/paddleseg/dygraph/pretrained_models/vit_base_patch16_384_augreg.tar.gz
+
+val_dataset:
+  transforms:
+    - type: ResizeByShort
+      short_size: 512
+    - type: Normalize
+
+optimizer:
+  weight_decay: 0.0
+
+lr_scheduler:
+  learning_rate: 0.001
+  end_lr: 1.0e-05
+
+test_config:
+  is_slide: True
+  crop_size: [512, 512]
+  stride: [512, 512]

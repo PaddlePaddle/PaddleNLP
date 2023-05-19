@@ -15,8 +15,7 @@
  * limitations under the License.
  */
  
-namespace fastertransformer
-{
+namespace fastertransformer {
 
 template <typename T>
 void add_fusedQKV_bias_transpose_kernelLauncher(
@@ -31,6 +30,5 @@ void add_fusedQKV_bias_transpose_kernelLauncher(
   const int size_per_head,
   const int rotary_embedding_dim,
   cudaStream_t stream);
-
 
 } // namespace fastertransformer

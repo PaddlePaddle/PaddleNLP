@@ -20,31 +20,35 @@ from fast_tokenizer.models import BPE
 from fast_tokenizer.postprocessors import RobertaPostProcessor
 from fast_tokenizer import Tokenizer, SplitMode
 
-__all__ = ['ClipFastTokenizer']
+__all__ = ["ClipFastTokenizer"]
 
 
 class ClipFastTokenizer(BaseFastTokenizer):
-
-    def __init__(self,
-                 vocab=None,
-                 merges=None,
-                 max_length=None,
-                 unk_token="<|endoftext|>",
-                 pad_token="<|endoftext|>",
-                 bos_token="<|startoftext|>",
-                 eos_token="<|endoftext|>",
-                 add_prefix_space=False,
-                 continuing_subword_prefix="",
-                 end_of_word_suffix="</w>",
-                 trim_offsets=False):
+    def __init__(
+        self,
+        vocab=None,
+        merges=None,
+        max_length=None,
+        unk_token="<|endoftext|>",
+        pad_token="<|endoftext|>",
+        bos_token="<|startoftext|>",
+        eos_token="<|endoftext|>",
+        add_prefix_space=False,
+        continuing_subword_prefix="",
+        end_of_word_suffix="</w>",
+        trim_offsets=False,
+    ):
         # Init Tokenizer instance using tokenization model
         tokenizer = Tokenizer(
-            BPE(vocab,
+            BPE(
+                vocab,
                 merges,
                 unk_token=unk_token,
                 continuing_subword_prefix=continuing_subword_prefix,
                 end_of_word_suffix=end_of_word_suffix,
-                fuse_unk=False))
+                fuse_unk=False,
+            )
+        )
 
         # Add special tokens
         bos_token_id = 0
@@ -61,28 +65,26 @@ class ClipFastTokenizer(BaseFastTokenizer):
             tokenizer.add_special_tokens([str(eos_token)])
 
         # Set the normalizer
-        tokenizer.normalizer = SequenceNormalizer([
-            NFCNormalizer(),
-            ReplaceNormalizer(r"\s+", " "),
-            LowercaseNormalizer()
-        ])
+        tokenizer.normalizer = SequenceNormalizer(
+            [NFCNormalizer(), ReplaceNormalizer(r"\s+", " "), LowercaseNormalizer()]
+        )
 
         # Set the pretokenizer
-        tokenizer.pretokenizer = SequencePreTokenizer([
-            SplitPreTokenizer(
-                r"""'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]+""",
-                split_mode=SplitMode.REMOVED,
-                invert=True),
-            ByteLevelPreTokenizer(add_prefix_space=False)
-        ])
+        tokenizer.pretokenizer = SequencePreTokenizer(
+            [
+                SplitPreTokenizer(
+                    r"""'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]+""",
+                    split_mode=SplitMode.REMOVED,
+                    invert=True,
+                ),
+                ByteLevelPreTokenizer(add_prefix_space=False),
+            ]
+        )
 
         # Set the postprocessor
-        tokenizer.postprocessor = RobertaPostProcessor(sep=(eos_token,
-                                                            eos_token_id),
-                                                       cls=(bos_token,
-                                                            bos_token_id),
-                                                       trim_offsets=False,
-                                                       add_prefix_space=False)
+        tokenizer.postprocessor = RobertaPostProcessor(
+            sep=(eos_token, eos_token_id), cls=(bos_token, bos_token_id), trim_offsets=False, add_prefix_space=False
+        )
 
         parameters = {
             "model": "BPE",
@@ -94,6 +96,6 @@ class ClipFastTokenizer(BaseFastTokenizer):
             "max_length": max_length,
             "continuing_subword_prefix": continuing_subword_prefix,
             "end_of_word_suffix": end_of_word_suffix,
-            "trim_offsets": trim_offsets
+            "trim_offsets": trim_offsets,
         }
         super().__init__(tokenizer, parameters)

@@ -13,15 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import time
 import argparse
 import json
+import os
+import time
 from decimal import Decimal
-import numpy as np
-from paddlenlp.utils.log import logger
 
-from utils import set_seed, convert_ext_examples, convert_cls_examples
+import numpy as np
+from utils import convert_cls_examples, convert_ext_examples, set_seed
+
+from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.utils.log import logger
 
 
 def do_convert():
@@ -38,28 +40,27 @@ def do_convert():
         raise ValueError("Only []/ len(splits)==3 accepted for splits.")
 
     def _check_sum(splits):
-        return Decimal(str(splits[0])) + Decimal(str(splits[1])) + Decimal(
-            str(splits[2])) == Decimal("1")
+        return Decimal(str(splits[0])) + Decimal(str(splits[1])) + Decimal(str(splits[2])) == Decimal("1")
 
     if len(args.splits) == 3 and not _check_sum(args.splits):
-        raise ValueError(
-            "Please set correct splits, sum of elements in splits should be equal to 1."
-        )
+        raise ValueError("Please set correct splits, sum of elements in splits should be equal to 1.")
 
     with open(args.doccano_file, "r", encoding="utf-8") as f:
         raw_examples = f.readlines()
 
-    def _create_ext_examples(examples,
-                             negative_ratio,
-                             prompt_prefix="情感倾向",
-                             options=["正向", "负向"],
-                             separator="##",
-                             shuffle=False,
-                             is_train=True,
-                             schema_lang="ch"):
+    def _create_ext_examples(
+        examples,
+        negative_ratio,
+        prompt_prefix="情感倾向",
+        options=["正向", "负向"],
+        separator="##",
+        shuffle=False,
+        is_train=True,
+        schema_lang="ch",
+    ):
         entities, relations, aspects = convert_ext_examples(
-            examples, negative_ratio, prompt_prefix, options, separator,
-            is_train, schema_lang)
+            examples, negative_ratio, prompt_prefix, options, separator, is_train, schema_lang
+        )
         examples = entities + relations + aspects
         if shuffle:
             indexes = np.random.permutation(len(examples))
@@ -84,22 +85,25 @@ def do_convert():
 
     if len(args.splits) == 0:
         if args.task_type == "ext":
-            examples = _create_ext_examples(raw_examples,
-                                            args.negative_ratio,
-                                            args.prompt_prefix,
-                                            args.options,
-                                            args.separator,
-                                            args.is_shuffle,
-                                            schema_lang=args.schema_lang)
+            examples = _create_ext_examples(
+                raw_examples,
+                args.negative_ratio,
+                args.prompt_prefix,
+                args.options,
+                args.separator,
+                args.is_shuffle,
+                schema_lang=args.schema_lang,
+            )
         else:
-            examples = _create_cls_examples(raw_examples, args.prompt_prefix,
-                                            args.options, args.is_shuffle)
+            examples = _create_cls_examples(raw_examples, args.prompt_prefix, args.options, args.is_shuffle)
         _save_examples(args.save_dir, "train.txt", examples)
     else:
         if args.is_shuffle:
             indexes = np.random.permutation(len(raw_examples))
             index_list = indexes.tolist()
             raw_examples = [raw_examples[i] for i in indexes]
+        else:
+            index_list = list(range(len(raw_examples)))
 
         i1, i2, _ = args.splits
         p1 = int(len(raw_examples) * i1)
@@ -110,51 +114,47 @@ def do_convert():
         test_ids = index_list[p2:]
 
         with open(os.path.join(args.save_dir, "sample_index.json"), "w") as fp:
-            maps = {
-                "train_ids": train_ids,
-                "dev_ids": dev_ids,
-                "test_ids": test_ids
-            }
+            maps = {"train_ids": train_ids, "dev_ids": dev_ids, "test_ids": test_ids}
             fp.write(json.dumps(maps))
 
         if args.task_type == "ext":
-            train_examples = _create_ext_examples(raw_examples[:p1],
-                                                  args.negative_ratio,
-                                                  args.prompt_prefix,
-                                                  args.options,
-                                                  args.separator,
-                                                  args.is_shuffle,
-                                                  schema_lang=args.schema_lang)
-            dev_examples = _create_ext_examples(raw_examples[p1:p2],
-                                                -1,
-                                                args.prompt_prefix,
-                                                args.options,
-                                                args.separator,
-                                                is_train=False,
-                                                schema_lang=args.schema_lang)
-            test_examples = _create_ext_examples(raw_examples[p2:],
-                                                 -1,
-                                                 args.prompt_prefix,
-                                                 args.options,
-                                                 args.separator,
-                                                 is_train=False,
-                                                 schema_lang=args.schema_lang)
+            train_examples = _create_ext_examples(
+                raw_examples[:p1],
+                args.negative_ratio,
+                args.prompt_prefix,
+                args.options,
+                args.separator,
+                args.is_shuffle,
+                schema_lang=args.schema_lang,
+            )
+            dev_examples = _create_ext_examples(
+                raw_examples[p1:p2],
+                -1,
+                args.prompt_prefix,
+                args.options,
+                args.separator,
+                is_train=False,
+                schema_lang=args.schema_lang,
+            )
+            test_examples = _create_ext_examples(
+                raw_examples[p2:],
+                -1,
+                args.prompt_prefix,
+                args.options,
+                args.separator,
+                is_train=False,
+                schema_lang=args.schema_lang,
+            )
         else:
-            train_examples = _create_cls_examples(raw_examples[:p1],
-                                                  args.prompt_prefix,
-                                                  args.options)
-            dev_examples = _create_cls_examples(raw_examples[p1:p2],
-                                                args.prompt_prefix,
-                                                args.options)
-            test_examples = _create_cls_examples(raw_examples[p2:],
-                                                 args.prompt_prefix,
-                                                 args.options)
+            train_examples = _create_cls_examples(raw_examples[:p1], args.prompt_prefix, args.options)
+            dev_examples = _create_cls_examples(raw_examples[p1:p2], args.prompt_prefix, args.options)
+            test_examples = _create_cls_examples(raw_examples[p2:], args.prompt_prefix, args.options)
 
         _save_examples(args.save_dir, "train.txt", train_examples)
         _save_examples(args.save_dir, "dev.txt", dev_examples)
         _save_examples(args.save_dir, "test.txt", test_examples)
 
-    logger.info('Finished! It takes %.2f seconds' % (time.time() - tic_time))
+    logger.info("Finished! It takes %.2f seconds" % (time.time() - tic_time))
 
 
 if __name__ == "__main__":
@@ -168,7 +168,7 @@ if __name__ == "__main__":
     parser.add_argument("--task_type", choices=['ext', 'cls'], default="ext", type=str, help="Select task type, ext for the extraction task and cls for the classification task, defaults to ext.")
     parser.add_argument("--options", default=["正向", "负向"], type=str, nargs="+", help="Used only for the classification task, the options for classification")
     parser.add_argument("--prompt_prefix", default="情感倾向", type=str, help="Used only for the classification task, the prompt prefix for classification")
-    parser.add_argument("--is_shuffle", default=True, type=bool, help="Whether to shuffle the labeled dataset, defaults to True.")
+    parser.add_argument("--is_shuffle", default="True", type=strtobool, help="Whether to shuffle the labeled dataset, defaults to True.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization")
     parser.add_argument("--separator", type=str, default='##', help="Used only for entity/aspect-level classification task, separator for entity label and classification label")
     parser.add_argument("--schema_lang", choices=["ch", "en"], default="ch", help="Select the language type for schema.")

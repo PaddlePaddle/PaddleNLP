@@ -15,7 +15,11 @@
 
 import os
 
-from paddlenlp.transformers import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
+from paddlenlp.transformers import (
+    BasicTokenizer,
+    PretrainedTokenizer,
+    WordpieceTokenizer,
+)
 
 __all__ = [
     "SqueezeBertTokenizer",
@@ -93,6 +97,9 @@ class SqueezeBertTokenizer(PretrainedTokenizer):
             int: the size of vocabulary.
         """
         return len(self.vocab)
+
+    def get_vocab(self):
+        return dict(self.vocab.token_to_idx, **self.added_tokens_encoder)
 
     def _tokenize(self, text):
         """
@@ -207,7 +214,7 @@ class SqueezeBertTokenizer(PretrainedTokenizer):
         special tokens using the tokenizer ``encode`` methods.
         Args:
             token_ids_0 (List[int]): List of ids of the first sequence.
-            token_ids_1 (List[int], optinal): List of ids of the second sequence.
+            token_ids_1 (List[int], optional): List of ids of the second sequence.
             already_has_special_tokens (bool, optional): Whether or not the token list is already
                 formatted with special tokens for the model. Defaults to None.
         Returns:

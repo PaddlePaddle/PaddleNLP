@@ -16,7 +16,7 @@ import numpy as np
 
 def convert_example(example, tokenizer, is_test=False):
     """
-    Builds model inputs from a sequence for sequence classification tasks. 
+    Builds model inputs from a sequence for sequence classification tasks.
     It use `jieba.cut` to tokenize text.
 
     Args:
@@ -50,14 +50,14 @@ def preprocess_prediction_data(data, tokenizer):
     It process the prediction data as the format used as training.
 
     Args:
-        data (obj:`List[List[str, str]]`): 
-            The prediction data whose each element is a text pair. 
+        data (obj:`List[List[str, str]]`):
+            The prediction data whose each element is a text pair.
             Each text will be tokenized by jieba.lcut() function.
         tokenizer(obj: paddlenlp.data.JiebaTokenizer): It use jieba to cut the chinese string.
 
     Returns:
-        examples (obj:`list`): The processed data whose each element 
-            is a `list` object, which contains 
+        examples (obj:`list`): The processed data whose each element
+            is a `list` object, which contains
 
             - query_ids(obj:`list[int]`): The list of query ids.
             - title_ids(obj:`list[int]`): The list of title ids.

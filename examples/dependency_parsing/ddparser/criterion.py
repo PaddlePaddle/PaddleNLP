@@ -12,16 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-
 from utils import index_sample
 
 
 class ParserCriterion(nn.Layer):
-
     def __init__(self, *args, **kwargs):
         super(ParserCriterion, self).__init__(*args, **kwargs)
 

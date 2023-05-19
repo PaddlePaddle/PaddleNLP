@@ -1,0 +1,12 @@
+{
+    "template": [
+        {"text": "{'text': 'text'}{'text': 'pronoun'}指的{'mask'}是{'text': 'entity'}"},
+        {"text": "{'text': 'text'}{'text': 'pronoun'}指的是{'text': 'entity'}。这里{'text': 'pronoun'}理解得对吗？{'mask'}"},
+        {"text": "{'text': 'text'}{'text': 'pronoun'}{'mask'}{'mask'}地代表了{'text': 'entity'}"}
+    ],
+    "verbalizer": [
+        {"false": "不", "true": "就"},
+        {"false": "错", "true": "对"},
+        {"false": "错误", "true": "正确"}
+    ]
+}

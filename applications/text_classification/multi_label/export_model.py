@@ -31,19 +31,11 @@ if __name__ == "__main__":
     model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
     model.eval()
     if args.multilingual:
-        input_spec = [
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='input_ids')
-        ]
+        input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids")]
     else:
         input_spec = [
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='input_ids'),
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='token_type_ids')
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
         ]
     # Convert to static graph with specific input description
     model = paddle.jit.to_static(model, input_spec=input_spec)

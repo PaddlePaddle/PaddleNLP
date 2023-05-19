@@ -43,11 +43,13 @@ def convert_pytorch_checkpoint_to_paddle(
     }
     do_not_transpose = []
     if version == "old":
-        hf_to_paddle.update({
-            "predictions.bias": "predictions.decoder_bias",
-            ".gamma": ".weight",
-            ".beta": ".bias",
-        })
+        hf_to_paddle.update(
+            {
+                "predictions.bias": "predictions.decoder_bias",
+                ".gamma": ".weight",
+                ".beta": ".bias",
+            }
+        )
         do_not_transpose = do_not_transpose + ["predictions.decoder.weight"]
 
     pytorch_state_dict = torch.load(pytorch_checkpoint_path, map_location="cpu")
@@ -59,7 +61,7 @@ def convert_pytorch_checkpoint_to_paddle(
             if all(d not in k for d in do_not_transpose):
                 if ".embeddings." not in k and ".LayerNorm." not in k:
                     if v.ndim == 2:
-                        if 'embeddings' not in k:
+                        if "embeddings" not in k:
                             v = v.transpose(0, 1)
                             is_transpose = True
                         is_transpose = False
@@ -97,9 +99,7 @@ def test_forward():
     model_torch.eval()
     model_paddle.eval()
     np.random.seed(42)
-    x = np.random.randint(1,
-                          model_paddle.bert.config["vocab_size"],
-                          size=(4, 64))
+    x = np.random.randint(1, model_paddle.bert.config["vocab_size"], size=(4, 64))
     input_torch = torch.tensor(x, dtype=torch.int64)
     out_torch = model_torch(input_torch)[0]
 
@@ -112,5 +112,4 @@ def test_forward():
 
 
 if __name__ == "__main__":
-    convert_pytorch_checkpoint_to_paddle("./torch_weight.bin",
-                                         "./paddle_weight.pdparams")
+    convert_pytorch_checkpoint_to_paddle("./torch_weight.bin", "./paddle_weight.pdparams")

@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from enum import Enum
-import os.path as osp
-
 URL_ROOT = "https://bj.bcebos.com/paddlenlp"
 EMBEDDING_URL_ROOT = URL_ROOT + "/models/embeddings"
 
-PAD_TOKEN = '[PAD]'
-UNK_TOKEN = '[UNK]'
+PAD_TOKEN = "[PAD]"
+UNK_TOKEN = "[UNK]"
 
 EMBEDDING_NAME_LIST = [
     # Word2Vec
@@ -97,5 +94,5 @@ EMBEDDING_NAME_LIST = [
     "glove.twitter.target.word-word.dim200.en",
     # FastText
     "fasttext.wiki-news.target.word-word.dim300.en",
-    "fasttext.crawl.target.word-word.dim300.en"
+    "fasttext.crawl.target.word-word.dim300.en",
 ]

@@ -13,13 +13,8 @@
 # limitations under the License.
 
 import os
-import re
-import subprocess
-import sys
-import multiprocessing
 
-import setuptools
-from setuptools import setup, Distribution, Extension
+from setuptools import Distribution, setup
 from setuptools.command.install import install
 
 
@@ -31,23 +26,19 @@ class BinaryDistribution(Distribution):
 
 
 class InstallPlatlib(install):
-
     def finalize_options(self):
         install.finalize_options(self)
         if self.distribution.has_ext_modules():
             self.install_lib = self.install_platlib
 
 
-if os.name != 'nt':
+if os.name != "nt":
     package_data = {"fast_tokenizer": ["core_tokenizers.so", "commit.log"]}
-    package_data['fast_tokenizer.libs'] = []
+    package_data["fast_tokenizer.libs"] = []
 else:
-    package_data = {
-        "fast_tokenizer":
-        ["core_tokenizers.pyd", "core_tokenizers.lib", "commit.log"]
-    }
+    package_data = {"fast_tokenizer": ["core_tokenizers.pyd", "core_tokenizers.lib", "commit.log"]}
     # Add icu dll
-    package_data['fast_tokenizer.libs'] = ["icuuc70.dll", "icudt70.dll"]
+    package_data["fast_tokenizer.libs"] = ["icuuc70.dll", "icudt70.dll"]
 
 
 def get_version():
@@ -57,7 +48,7 @@ def get_version():
     for line in lines:
         if line.startswith("__version__"):
             version = line.split("=")[1]
-            version = version.strip().replace("\"", "")
+            version = version.strip().replace('"', "")
             break
     return version
 
@@ -74,29 +65,33 @@ setup(
     url="https://github.com/PaddlePaddle/PaddleNLP/fast_tokenizer",
     package_dir={"": "python"},
     packages=[
-        "fast_tokenizer", "fast_tokenizer.tokenizers_impl",
-        "fast_tokenizer.normalizers", "fast_tokenizer.pretokenizers",
-        "fast_tokenizer.models", "fast_tokenizer.postprocessors",
-        "fast_tokenizer.libs", "fast_tokenizer.decoders"
+        "fast_tokenizer",
+        "fast_tokenizer.tokenizers_impl",
+        "fast_tokenizer.normalizers",
+        "fast_tokenizer.pretokenizers",
+        "fast_tokenizer.models",
+        "fast_tokenizer.postprocessors",
+        "fast_tokenizer.libs",
+        "fast_tokenizer.decoders",
     ],
     package_data=package_data,
     extras_require={"test": ["pytest>=6.0"]},
     python_requires=">=3.6",
-    cmdclass={'install': InstallPlatlib},
-    license='Apache 2.0',
+    cmdclass={"install": InstallPlatlib},
+    license="Apache 2.0",
     distclass=BinaryDistribution,
     classifiers=[
-        'Development Status :: 5 - Production/Stable',
-        'Operating System :: OS Independent',
-        'Intended Audience :: Developers',
-        'Intended Audience :: Education',
-        'Intended Audience :: Science/Research',
-        'License :: OSI Approved :: Apache Software License',
-        'Programming Language :: C++',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
-        'Programming Language :: Python :: 3.10',
+        "Development Status :: 5 - Production/Stable",
+        "Operating System :: OS Independent",
+        "Intended Audience :: Developers",
+        "Intended Audience :: Education",
+        "Intended Audience :: Science/Research",
+        "License :: OSI Approved :: Apache Software License",
+        "Programming Language :: C++",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
     ],
 )
