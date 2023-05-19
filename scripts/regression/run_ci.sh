@@ -88,6 +88,10 @@ nlp_build (){
     rm -rf dist/
 
     python -m pip install -r requirements.txt
+    python -m pip uninstall protobuf -y
+    python -m pip uninstall protobuf -y
+    python -m pip install protobuf==3.20.2
+
     python setup.py bdist_wheel
     # python -m pip install --ignore-installed  dist/p****.whl
 }

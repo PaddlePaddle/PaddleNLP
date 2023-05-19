@@ -2,12 +2,29 @@
 
 [OPT: Open Pre-trained Transformer Language Models](https://arxiv.org/abs/2205.01068) 是以自回归填空作为训练目标的通用语言模型，可用于各类理解和生成任务。
 
-本示例提供了 OPT 模型的生成任务微调流程。
+本示例提供了 OPT 模型的训练、导出、推理全流程的示例脚本。
 
+**目录**
+- [1. 模型下载及权重转换](#1)
+- [2. 微调](#2)
+- [3. 模型预测](#3)
+- [4. 动转静](#4)
+- [5. 模型推理](#5)
 
-## 快速开始
+<a name="1"></a>
 
-### SQuAD 知识问答微调
+## 模型加载：
+
+```python
+from paddlenlp.transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained("facebook/opt-125m")
+model = AutoModel.from_pretrained("facebook/opt-125m", load_state_as_np=True)
+```
+
+<a name="2"></a>
+
+### 微调
 
 本示例中以SQuAD 数据集为示例，通过融合context、question来生成answer，从而让模型能够文本中生成指定的答案，执行脚本如下所示：
 
@@ -50,3 +67,32 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 - `num_beams`: 搜索方向数量，默认为5。
 - `label_smoothing`: 标签平滑因子，默认为0.1.
 - `lr_decay_ratio`: 学习率衰减因子，默认为0.1.
+
+<a name="3"></a>
+
+## 模型预测
+
+```shell
+python predict_generation.py \
+    --model_name_or_path ./checkpoints/
+```
+
+<a name="4"></a>
+
+## 动转静导出
+
+```shell
+python export_generation.py \
+    --model_path checkpoints/ \
+    --output_path inference/opt
+```
+
+<a name="5"></a>
+
+## 模型推理
+
+```shell
+python infer_generation.py \
+    --model_dir inference/ \
+    --model_prefix opt
+```
