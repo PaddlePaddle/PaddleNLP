@@ -35,9 +35,9 @@ class ChatGLMTask(Task):
         self._static_mode = False
         self._dtype = kwargs.get("dtype", "float16")
         self.kwargs["generation_task"] = task
-        self._tgt_length = kwargs.get("tgt_length", 128)
+        self._tgt_length = kwargs.get("tgt_length", 2048)
         # Token max length
-        self._max_seq_length = kwargs.get("max_seq_length", 128)
+        self._max_seq_length = kwargs.get("max_seq_length", 2048)
         self._top_k = kwargs.get("top_k", 1)
         self._top_p = kwargs.get("top_p", 1.0)
         self._temperature = kwargs.get("temperature", 1.0)
