@@ -75,12 +75,12 @@ python gradio_ip2p2image.py
 ```
 ![image](https://github.com/Submerge-Gu/Images/raw/main/4.png)
 
-## MLSD to Image
-(ControlNet V1.1) 在原基础上进行升级，采用HoughLine检测图片作为控制条件
+## Shuffle to Image
+(ControlNet V1.1) Shuffle打乱图像进行重构。
 ```
-python gradio_mlsd2image.py
+python gradio_shuffle2image.py
 ```
-![image](https://github.com/Submerge-Gu/Images/raw/main/8.png)
+![image](https://github.com/Submerge-Gu/Images/raw/main/control.png)
 
 # ControlNet模型训练
 

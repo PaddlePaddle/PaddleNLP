@@ -17,15 +17,15 @@ import random
 
 import gradio as gr
 import paddle
-from annotator.mlsd import MLSDdetector
+from annotator.shuffle import ContentShuffleDetector
 from annotator.util import HWC3, resize_image
 
 from paddlenlp.trainer import set_seed as seed_everything
 from ppdiffusers import ControlNetModel, StableDiffusionControlNetPipeline
 
-apply_mlsd = MLSDdetector()
+apply_shuffle = ContentShuffleDetector()
 
-controlnet = ControlNetModel.from_pretrained("lllyasviel/control_v11p_sd15_mlsd")
+controlnet = ControlNetModel.from_pretrained("lllyasviel/control_v11e_sd15_shuffle")
 pipe = StableDiffusionControlNetPipeline.from_pretrained(
     "runwayml/stable-diffusion-v1-5", controlnet=controlnet, safety_checker=None
 )
@@ -44,21 +44,16 @@ def process(
     scale,
     seed,
     eta,
-    value_threshold,
-    distance_threshold,
 ):
     with paddle.no_grad():
         img = resize_image(HWC3(input_image), image_resolution)
         H, W, C = img.shape
-        detected_map = apply_mlsd(img, value_threshold, distance_threshold)
-        detected_map = HWC3(detected_map)
+        detected_map = apply_shuffle(img, w=W, h=H, f=256)
 
         control = paddle.to_tensor(detected_map.copy(), dtype=paddle.float32) / 255.0
         control = control.unsqueeze(0).transpose([0, 3, 1, 2])
 
-        control_scales = (
-            [strength * (0.825 ** float(12 - i)) for i in range(13)] if guess_mode else ([strength] * 13)
-        )  # Magic number. IDK why. Perhaps because 0.825**12<0.01 but 0.826**12>0.01
+        control_scales = [strength] * 13
         if seed == -1:
             seed = random.randint(0, 65535)
         seed_everything(seed)
@@ -83,7 +78,7 @@ def process(
 block = gr.Blocks().queue()
 with block:
     with gr.Row():
-        gr.Markdown("## Control Stable Diffusion with MLSD Lines")
+        gr.Markdown("## Control Stable Diffusion with Content Shuffle")
     with gr.Row():
         with gr.Column():
             input_image = gr.Image(source="upload", type="numpy")
@@ -94,12 +89,6 @@ with block:
                 image_resolution = gr.Slider(label="Image Resolution", minimum=256, maximum=768, value=512, step=64)
                 strength = gr.Slider(label="Control Strength", minimum=0.0, maximum=2.0, value=1.0, step=0.01)
                 guess_mode = gr.Checkbox(label="Guess Mode", value=False)
-                value_threshold = gr.Slider(
-                    label="Hough value threshold (MLSD)", minimum=0.01, maximum=2.0, value=0.1, step=0.01
-                )
-                distance_threshold = gr.Slider(
-                    label="Hough ditance threshold (MLSD)", minimum=0.01, maximum=20.0, value=0.1, step=0.01
-                )
                 ddim_steps = gr.Slider(label="Steps", minimum=1, maximum=100, value=20, step=1)
                 scale = gr.Slider(label="Guidance Scale", minimum=0.1, maximum=30.0, value=9.0, step=0.1)
                 seed = gr.Slider(label="Seed", minimum=-1, maximum=2147483647, step=1, randomize=True)
@@ -126,9 +115,8 @@ with block:
         scale,
         seed,
         eta,
-        value_threshold,
-        distance_threshold,
     ]
     run_button.click(fn=process, inputs=ips, outputs=[result_gallery])
+
 
 block.launch(server_name="0.0.0.0", server_port=8513)
