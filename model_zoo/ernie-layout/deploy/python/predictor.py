@@ -754,21 +754,12 @@ class Predictor(object):
 
     def predict(self, docs):
         input_data = []
-        invalid_idx, input_idx, idx_map = set(), [], {}
-        for idx, doc in enumerate(docs):
+        for doc in docs:
             ocr_result = self.ocr.ocr(doc, cls=True)
             # Compatible with paddleocr>=2.6.0.2
             ocr_result = ocr_result[0] if len(ocr_result) == 1 else ocr_result
-            if ocr_result:
-                # Only process images with ocr results
-                example = ppocr2example(ocr_result, doc)
-                input_data.append(example)
-                input_idx.append(idx)
-            else:
-                invalid_idx.add(idx)
-
-        # Save maping between original index in docs and new index(index in valid inputs)
-        idx_map = {j: i for i, j in enumerate(input_idx)}
+            example = ppocr2example(ocr_result, doc)
+            input_data.append(example)
 
         inputs = collections.defaultdict(list)
         for data in input_data:
@@ -789,20 +780,8 @@ class Predictor(object):
                 preds[0].extend(output[0].tolist())
                 preds[1].extend(output[1].tolist())
         results = self.postprocess(preds)
-
-        # Merge results of invalid docs & valid docs input
-        merged_results = []
-        for i in range(len(docs)):
-            if i in invalid_idx:
-                # Set empty result for invalid doc
-                result = ""
-            else:
-                result = results[idx_map[i]]
-            merged_results.append(result)
-
         formatted_results = []
-        # for doc, res in zip(docs, results):
-        for doc, res in zip(docs, merged_results):
+        for doc, res in zip(docs, results):
             formatted_result = {"doc": doc, "result": res}
             formatted_results.append(formatted_result)
         return formatted_results
