@@ -20,7 +20,13 @@ from paddle.nn import Layer
 
 from paddlenlp.utils.log import logger
 
+from ...layers import Linear as TransposedLinear
 from .. import PretrainedModel, register_base_model
+from .configuration import (
+    LAYOUTLM_PRETRAINED_INIT_CONFIGURATION,
+    LAYOUTLM_PRETRAINED_RESOURCE_FILES_MAP,
+    LayoutLMConfig,
+)
 
 __all__ = [
     "LayoutLMModel",
@@ -32,11 +38,11 @@ __all__ = [
 
 
 class LayoutLMPooler(Layer):
-    def __init__(self, hidden_size, pool_act="tanh"):
+    def __init__(self, config: LayoutLMConfig):
         super(LayoutLMPooler, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
-        self.pool_act = pool_act
+        self.pool_act = config.pool_act
 
     def forward(self, hidden_states):
         # We "pool" the model by simply taking the hidden state corresponding
@@ -53,32 +59,22 @@ class LayoutLMEmbeddings(Layer):
     Include embeddings from word, position and token_type embeddings
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        hidden_size=768,
-        hidden_dropout_prob=0.1,
-        max_position_embeddings=512,
-        max_2d_position_embeddings=1024,
-        layer_norm_eps=1e-12,
-        pad_token_id=0,
-        type_vocab_size=16,
-    ):
+    def __init__(self, config: LayoutLMConfig):
         super(LayoutLMEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(vocab_size, hidden_size, padding_idx=pad_token_id)
-        self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
         # gry add for layoutlm
-        self.x_position_embeddings = nn.Embedding(max_2d_position_embeddings, hidden_size)
-        self.y_position_embeddings = nn.Embedding(max_2d_position_embeddings, hidden_size)
-        self.h_position_embeddings = nn.Embedding(max_2d_position_embeddings, hidden_size)
-        self.w_position_embeddings = nn.Embedding(max_2d_position_embeddings, hidden_size)
+        self.x_position_embeddings = nn.Embedding(config.max_2d_position_embeddings, config.hidden_size)
+        self.y_position_embeddings = nn.Embedding(config.max_2d_position_embeddings, config.hidden_size)
+        self.h_position_embeddings = nn.Embedding(config.max_2d_position_embeddings, config.hidden_size)
+        self.w_position_embeddings = nn.Embedding(config.max_2d_position_embeddings, config.hidden_size)
         # end of gry add for layoutlm
         # self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size, padding_idx=pad_token_id)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        self.register_buffer("position_ids", paddle.arange(max_position_embeddings).expand((1, -1)))
+        self.register_buffer("position_ids", paddle.arange(config.max_position_embeddings).expand((1, -1)))
 
     def forward(self, input_ids, bbox=None, token_type_ids=None, position_ids=None):
         # input_shape = input_ids.size()
@@ -127,46 +123,9 @@ class LayoutLMEmbeddings(Layer):
 
 
 class LayoutLMPretrainedModel(PretrainedModel):
-    pretrained_init_configuration = {
-        "layoutlm-base-uncased": {
-            "vocab_size": 30522,
-            "hidden_size": 768,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "max_2d_position_embeddings": 1024,
-            "initializer_range": 0.02,
-            "layer_norm_eps": 1e-12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-        },
-        "layoutlm-large-uncased": {
-            "vocab_size": 30522,
-            "hidden_size": 1024,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 24,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_2d_position_embeddings": 1024,
-            "max_position_embeddings": 512,
-            "initializer_range": 0.02,
-            "layer_norm_eps": 1e-12,
-            "pad_token_id": 0,
-            "type_vocab_size": 2,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "layoutlm-base-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlm/layoutlm-base-uncased/model_state.pdparams",
-            "layoutlm-large-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlm/layoutlm-large-uncased/model_state.pdparams",
-        },
-    }
+    config_class = LayoutLMConfig
+    pretrained_init_configuration = LAYOUTLM_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = LAYOUTLM_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "layoutlm"
 
     def _init_weights(self, layer):
@@ -178,9 +137,7 @@ class LayoutLMPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.pretrained_init_configuration["initializer_range"]
-                        if "initializer_range" in self.pretrained_init_configuration
-                        else 0.02,
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -235,56 +192,36 @@ class LayoutLMModel(LayoutLMPretrainedModel):
         pad_token_id (int, optional):
             The index of padding token in the token vocabulary.
             Defaults to `0`.
-        pooled_act (str, optional):
+        pool_act (str, optional):
             The non-linear activation function in the pooling layer.
             Defaults to `"tanh"`.
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        layer_norm_eps=1e-12,
-        max_position_embeddings=512,
-        max_2d_position_embeddings=1024,
-        type_vocab_size=16,
-        initializer_range=0.02,
-        pad_token_id=0,
-        pool_act="tanh",
-    ):
-        super(LayoutLMModel, self).__init__()
+    def __init__(self, config: LayoutLMConfig):
+        super(LayoutLMModel, self).__init__(config)
         # self.config = kwargs
-        self.num_hidden_layers = num_hidden_layers
-        self.pad_token_id = pad_token_id
-        self.initializer_range = initializer_range
-        self.embeddings = LayoutLMEmbeddings(
-            vocab_size,
-            hidden_size,
-            hidden_dropout_prob,
-            max_position_embeddings,
-            max_2d_position_embeddings,
-            layer_norm_eps,
-            pad_token_id,
-            type_vocab_size,
-        )
+        self.num_hidden_layers = config.num_hidden_layers
+        self.pad_token_id = config.pad_token_id
+        self.initializer_range = config.initializer_range
+        self.embeddings = LayoutLMEmbeddings(config)
 
         encoder_layer = nn.TransformerEncoderLayer(
-            hidden_size,
-            num_attention_heads,
-            intermediate_size,
-            dropout=hidden_dropout_prob,
-            activation=hidden_act,
-            attn_dropout=attention_probs_dropout_prob,
+            config.hidden_size,
+            config.num_attention_heads,
+            config.intermediate_size,
+            dropout=config.hidden_dropout_prob,
+            activation=config.hidden_act,
+            attn_dropout=config.attention_probs_dropout_prob,
             act_dropout=0,
         )
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = LayoutLMPooler(hidden_size, pool_act)
+        self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
+        self.pooler = LayoutLMPooler(config)
+
+    def get_input_embeddings(self):
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.embeddings.word_embeddings = value
 
     def resize_position_embeddings(self, new_num_position_embeddings):
         """
@@ -303,12 +240,12 @@ class LayoutLMModel(LayoutLMPretrainedModel):
             return
 
         logger.info(f"Setting `config.max_position_embeddings={new_num_position_embeddings}`...")
-        self.config["max_position_embeddings"] = new_num_position_embeddings
+        self.config.max_position_embeddings = new_num_position_embeddings
 
         old_position_embeddings_weight = self.embeddings.position_embeddings.weight
 
         self.embeddings.position_embeddings = nn.Embedding(
-            self.config["max_position_embeddings"], self.config["hidden_size"]
+            self.config.max_position_embeddings, self.config.hidden_size
         )
 
         with paddle.no_grad():
@@ -420,22 +357,18 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        layoutlm (:class:`LayoutLMModel`):
-            An instance of LayoutLMModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of LayoutLM.
-            If None, use the same value as `hidden_dropout_prob` of `LayoutLMModel`
-            instance `layoutlm`. Defaults to None.
+        config (:class:`LayoutLMConfig`):
+            An instance of LayoutLMConfig used to construct LayoutLMForTokenClassification.
     """
 
-    def __init__(self, layoutlm, num_classes=2, dropout=None):
-        super(LayoutLMForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        self.layoutlm = layoutlm
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.layoutlm.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.layoutlm.config["hidden_size"], num_classes)
+    def __init__(self, config: LayoutLMConfig):
+        super(LayoutLMForTokenClassification, self).__init__(config)
+        self.num_classes = config.num_classes
+        self.layoutlm = LayoutLMModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, self.num_classes)
         self.classifier.apply(self._init_weights)
 
     def get_input_embeddings(self):
@@ -494,8 +427,7 @@ class LayoutLMForTokenClassification(LayoutLMPretrainedModel):
                 tokenizer = LayoutLMFTokenizer.from_pretrained('layoutlm-base-uncased')
                 model = LayoutLMFForTokenClassification.from_pretrained('layoutlm-base-uncased', num_classes=2)
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors="pd")
 
                 logits = model(**inputs)
                 print(logits.shape)
@@ -524,18 +456,18 @@ class LayoutLMForSequenceClassification(LayoutLMPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        layoutlm (:class:`LayoutLMModel`):
-            An instance of LayoutLMModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
+        config (:class:`LayoutLMConfig`):
+            An instance of LayoutLMConfig used to construct LayoutLMForSequenceClassification.
     """
 
-    def __init__(self, layoutlm, num_classes=2):
-        super(LayoutLMForSequenceClassification, self).__init__()
-        self.layoutlm = layoutlm
-        self.num_classes = num_classes
-        self.dropout = nn.Dropout(self.layoutlm.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.layoutlm.config["hidden_size"], num_classes)
+    def __init__(self, config: LayoutLMConfig):
+        super(LayoutLMForSequenceClassification, self).__init__(config)
+        self.layoutlm = LayoutLMModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.num_classes = config.num_classes
+        self.classifier = nn.Linear(config.hidden_size, self.num_classes)
 
     def get_input_embeddings(self):
         return self.layoutlm.embeddings.word_embeddings
@@ -592,8 +524,7 @@ class LayoutLMForSequenceClassification(LayoutLMPretrainedModel):
                 tokenizer = LayoutLMTokenizer.from_pretrained('layoutlm-base-uncased')
                 model = LayoutLMForSequenceClassification.from_pretrained('layoutlm-base-uncased', num_classes=2)
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors="pd")
 
                 logits = model(**inputs)
                 print(logits.shape)
@@ -619,17 +550,20 @@ class LayoutLMLMPredictionHead(Layer):
     LayoutLM Model with a `language modeling` head on top for CLM fine-tuning.
     """
 
-    def __init__(self, hidden_size, vocab_size, activation, embedding_weights=None):
+    def __init__(self, config: LayoutLMConfig, weight_attr=None):
         super(LayoutLMLMPredictionHead, self).__init__()
-        self.transform = nn.Linear(hidden_size, hidden_size)
-        self.activation = getattr(nn.functional, activation)
-        self.layer_norm = nn.LayerNorm(hidden_size)
-        self.decoder_weight = (
-            self.create_parameter(shape=[vocab_size, hidden_size], dtype=self.transform.weight.dtype, is_bias=False)
-            if embedding_weights is None
-            else embedding_weights
-        )
-        self.decoder_bias = self.create_parameter(shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
+        self.transform = nn.Linear(config.hidden_size, config.hidden_size, weight_attr=weight_attr)
+        self.activation = getattr(nn.functional, config.hidden_act)
+        self.layer_norm = nn.LayerNorm(config.hidden_size)
+        self.decoder = TransposedLinear(config.hidden_size, config.vocab_size)
+        # link bias to load pretrained weights
+        self.decoder_bias = self.decoder.bias
+        # self.decoder_weight = (
+        #     self.create_parameter(shape=[vocab_size, hidden_size], dtype=self.transform.weight.dtype, is_bias=False)
+        #     if embedding_weights is None
+        #     else embedding_weights
+        # )
+        # self.decoder_bias = self.create_parameter(shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
 
     def forward(self, hidden_states, masked_positions=None):
         if masked_positions is not None:
@@ -639,16 +573,14 @@ class LayoutLMLMPredictionHead(Layer):
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        hidden_states = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True) + self.decoder_bias
+        hidden_states = self.decoder(hidden_states)
         return hidden_states
 
 
 class LayoutLMOnlyMLMHead(nn.Layer):
-    def __init__(self, hidden_size, vocab_size, activation, embedding_weights):
+    def __init__(self, config: LayoutLMConfig, weight_attr=None):
         super().__init__()
-        self.predictions = LayoutLMLMPredictionHead(
-            hidden_size=hidden_size, vocab_size=vocab_size, activation=activation, embedding_weights=embedding_weights
-        )
+        self.predictions = LayoutLMLMPredictionHead(config, weight_attr=weight_attr)
 
     def forward(self, sequence_output, masked_positions=None):
         prediction_scores = self.predictions(sequence_output, masked_positions)
@@ -660,20 +592,15 @@ class LayoutLMForMaskedLM(LayoutLMPretrainedModel):
     LayoutLM Model with a `masked language modeling` head on top.
 
     Args:
-        layoutlm (:class:`LayoutLMModel`):
-            An instance of :class:`LayoutLMModel`.
+        config (:class:`LayoutLMConfig`):
+            An instance of LayoutLMConfig used to construct LayoutLMForMaskedLM.
 
     """
 
-    def __init__(self, layoutlm):
-        super(LayoutLMForMaskedLM, self).__init__()
-        self.layoutlm = layoutlm
-        self.cls = LayoutLMOnlyMLMHead(
-            self.layoutlm.config["hidden_size"],
-            self.layoutlm.config["vocab_size"],
-            self.layoutlm.config["hidden_act"],
-            embedding_weights=self.layoutlm.embeddings.word_embeddings.weight,
-        )
+    def __init__(self, config: LayoutLMConfig):
+        super(LayoutLMForMaskedLM, self).__init__(config)
+        self.layoutlm = LayoutLMModel(config)
+        self.cls = LayoutLMOnlyMLMHead(config)
 
     def resize_position_embeddings(self, new_num_position_embeddings):
         """
@@ -714,8 +641,7 @@ class LayoutLMForMaskedLM(LayoutLMPretrainedModel):
                 tokenizer = LayoutLMTokenizer.from_pretrained('layoutlm-base-uncased')
                 model = LayoutLMForMaskedLM.from_pretrained('layoutlm-base-uncased')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_tensors="pd")
 
                 logits = model(**inputs)
                 print(logits.shape)

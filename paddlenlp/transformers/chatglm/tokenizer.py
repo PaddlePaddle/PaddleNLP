@@ -165,11 +165,12 @@ class ChatGLMTokenizer(PretrainedTokenizer):
     """
 
     resource_files_names = {"vocab_file": "ice_text.model"}
-    max_model_input_sizes = {"THUDM/chatglm-6b": 2048}
+    max_model_input_sizes = {"THUDM/chatglm-6b": 2048, "THUDM/chatglm-6b-v1.1": 2048}
     model_input_names = ["input_ids", "attention_mask", "position_ids"]
     pretrained_resource_files_map = {
         "model_file": {
-            "THUDM/chatglm-6b": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/chatglm-6b/ice_text.model"
+            "THUDM/chatglm-6b": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/chatglm-6b/ice_text.model",
+            "THUDM/chatglm-6b-v1.1": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/chatglm-6b-v1.1/ice_text.model",
         }
     }
 

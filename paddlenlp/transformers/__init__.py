@@ -113,6 +113,7 @@ from .funnel.configuration import *
 from .llama.configuration import *
 from .llama.modeling import *
 from .llama.tokenizer import *
+from .layoutlm.configuration import *
 from .layoutlm.modeling import *
 from .layoutlm.tokenizer import *
 from .layoutlmv2.modeling import *
