@@ -42,9 +42,7 @@ from ..model_utils import (
     prune_linear_layer,
 )
 
-MiniGPT4_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "",
-]
+MiniGPT4_PRETRAINED_MODEL_ARCHIVE_LIST = []
 
 from .configuration import MiniGPT4Config, MiniGPT4QFormerConfig, MiniGPT4VisionConfig
 
@@ -190,9 +188,18 @@ class MiniGPT4PretrainedModel(PretrainedModel):
         )
 
         logger.info("Trying to convert dtype for MiniGPT4 model, it may take a while.")
-        convert_weights_to_dtype(model.vision_model, dtype=vit_dtype)
-        convert_weights_to_dtype(model.qformer, dtype=qformer_dtype)
-        convert_weights_to_dtype(model.language_model, dtype=llama_dtype)
+        if isinstance(model, (MiniGPT4Model, MiniGPT4ForConditionalGeneration)):
+            convert_weights_to_dtype(model.vision_model, dtype=vit_dtype)
+            convert_weights_to_dtype(model.qformer, dtype=qformer_dtype)
+            convert_weights_to_dtype(model.language_model, dtype=llama_dtype)
+        elif isinstance(model, MiniGPT4VisionModel):
+            convert_weights_to_dtype(model, dtype=vit_dtype)
+        elif isinstance(model, MiniGPT4QFormerModel):
+            convert_weights_to_dtype(model, dtype=qformer_dtype)
+        elif isinstance(model, LlamaForCausalLM):
+            convert_weights_to_dtype(model, dtype=llama_dtype)
+        else:
+            raise TypeError("Not supported model type: {}.".format(type(model)))
 
         return model
 

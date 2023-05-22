@@ -255,7 +255,7 @@ class ModelTesterMixin:
 
             with tempfile.TemporaryDirectory() as tmpdirname:
                 model.save_pretrained(tmpdirname)
-                model = model_class.from_pretrained(tmpdirname)
+                model = model_class.from_pretrained(tmpdirname, llama_dtype="float32")
                 model.eval()
                 with paddle.no_grad():
                     second = model(**self._prepare_for_class(inputs_dict, model_class))[0]
