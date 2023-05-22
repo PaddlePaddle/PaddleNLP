@@ -56,6 +56,7 @@ except OptionalDependencyNotAvailable:
 else:
     from .pipeline_cycle_diffusion import CycleDiffusionPipeline
     from .pipeline_stable_diffusion import StableDiffusionPipeline
+    from .pipeline_stable_diffusion_adapter import StableDiffusionAdapterPipeline
     from .pipeline_stable_diffusion_all_in_one import StableDiffusionPipelineAllinOne
     from .pipeline_stable_diffusion_attend_and_excite import (
         StableDiffusionAttendAndExcitePipeline,

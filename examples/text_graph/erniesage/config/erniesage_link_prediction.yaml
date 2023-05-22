@@ -1,4 +1,4 @@
-# Global Enviroment Settings 
+# Global Environment Settings 
 
 # trainer config ------
 device: "gpu" # use cpu or gpu devices to train.

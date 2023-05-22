@@ -15,6 +15,9 @@
 import paddle
 from paddle.distributed import fleet
 
+from paddlenlp.layers import LoRAConfig, LoRAModel
+from paddlenlp.prompt import PrefixModelForCausalLM
+from paddlenlp.prompt.prefix import llama_postprocess_past_key_value
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaConfig
 
 
@@ -29,6 +32,10 @@ def parse_arguments():
     parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
     parser.add_argument("--src_length", type=int, default=50, help="The batch size of data.")
     parser.add_argument("--tgt_length", type=int, default=100, help="The batch size of data.")
+    parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
+    parser.add_argument(
+        "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
+    )
     return parser.parse_args()
 
 
@@ -62,9 +69,13 @@ class Predictor(object):
             hcg = fleet.get_hybrid_communicate_group()
             tensor_parallel_rank = hcg.get_model_parallel_rank()
 
-        config = LlamaConfig.from_pretrained(args.model_name_or_path)
-        dtype = "float16" if config.dtype is None else config.dtype
-        paddle.set_default_dtype(dtype)
+        if self.args.lora_path is not None:
+            lora_config = LoRAConfig.from_pretrained(self.args.lora_path)
+            dtype = lora_config.dtype
+        else:
+            config = LlamaConfig.from_pretrained(args.model_name_or_path)
+            dtype = "float16" if config.dtype is None else config.dtype
+
         self.model = AutoModelForCausalLM.from_pretrained(
             args.model_name_or_path,
             tensor_parallel_degree=tensor_parallel_degree,
@@ -72,6 +83,12 @@ class Predictor(object):
             load_state_as_np=True,
             dtype=dtype,
         )
+        if self.args.lora_path is not None:
+            self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
+        if self.args.prefix_path is not None:
+            self.model = PrefixModelForCausalLM.from_pretrained(
+                self.model, self.args.prefix_path, llama_postprocess_past_key_value
+            )
 
         self.model.eval()
 

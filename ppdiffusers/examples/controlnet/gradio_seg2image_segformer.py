@@ -24,7 +24,7 @@ from annotator.util import HWC3, resize_image
 from paddlenlp.trainer import set_seed as seed_everything
 from ppdiffusers import ControlNetModel, StableDiffusionControlNetPipeline
 
-apply_uniformer = SegformerDetector()
+apply_uniformer = SegformerDetector(mode="ade20k")
 
 controlnet = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-seg")
 pipe = StableDiffusionControlNetPipeline.from_pretrained(

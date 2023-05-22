@@ -473,7 +473,7 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
                 instead.
             image (`paddle.Tensor`, `PIL.Image.Image`, `List[paddle.Tensor]` or `List[PIL.Image.Image]`):
                 The ControlNet input condition. ControlNet uses this input condition to generate guidance to Unet. If
-                the type is is specified as `paddle.Tensor`, it is passed to ControlNet as is. PIL.Image.Image` can
+                the type is specified as `paddle.Tensor`, it is passed to ControlNet as is. PIL.Image.Image` can
                 also be accepted as an image. The control image is automatically resized to fit the output image.
             height (`int`, *optional*, defaults to 512):
                 The height in pixels of the generated image.
