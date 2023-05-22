@@ -112,7 +112,6 @@ class PromptModel(BaseComponent):
                 return invocation_layer(
                     model_name_or_path=self.model_name_or_path, max_length=self.max_length, **all_kwargs
                 )
-        # breakpoint()
         raise ValueError(
             f"Model {self.model_name_or_path} is not supported - no matching invocation layer found."
             f" Currently supported invocation layers are: {PromptModelInvocationLayer.invocation_layer_providers}"

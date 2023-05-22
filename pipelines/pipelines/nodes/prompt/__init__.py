@@ -15,4 +15,9 @@
 from pipelines.nodes.prompt.prompt_model import PromptModel
 from pipelines.nodes.prompt.prompt_node import PromptNode
 from pipelines.nodes.prompt.prompt_template import PromptTemplate
-from pipelines.nodes.prompt.shapers import AnswerParser, BaseOutputParser, Shaper
+from pipelines.nodes.prompt.shapers import (
+    AnswerParser,
+    BaseOutputParser,
+    Shaper,
+    to_strings,
+)

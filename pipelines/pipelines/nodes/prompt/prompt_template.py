@@ -24,6 +24,8 @@ from pipelines.nodes.base import BaseComponent
 from pipelines.nodes.prompt.shapers import AnswerParser, BaseOutputParser
 from pipelines.schema import Document, MultiLabel
 
+from .shapers import to_strings  # # noqa F401
+
 logger = logging.getLogger(__name__)
 
 PROMPT_TEMPLATE_ALLOWED_FUNCTIONS = json.loads('["join", "to_strings", "replace", "enumerate", "str"]')

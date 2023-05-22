@@ -15,12 +15,136 @@
 import inspect
 import logging
 import re
+from functools import reduce
+from string import Template
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
 from pipelines.nodes.base import BaseComponent
 from pipelines.schema import Answer, Document, MultiLabel
 
 logger = logging.getLogger(__name__)
+
+
+def to_strings(items: List[Union[str, Document, Answer]], pattern=None, str_replace=None) -> List[str]:
+    results = []
+    for idx, item in enumerate(items, start=1):
+        if isinstance(item, str):
+            results.append(format_string(item, str_replace=str_replace))
+        elif isinstance(item, Document):
+            results.append(format_document(document=item, pattern=pattern, str_replace=str_replace, idx=idx))
+        elif isinstance(item, Answer):
+            results.append(format_answer(answer=item, pattern=pattern, str_replace=str_replace, idx=idx))
+        else:
+            raise ValueError(f"Unsupported item type: {type(item)}")
+    return results
+
+
+def format_document(
+    document: Document,
+    pattern: Optional[str] = None,
+    str_replace: Optional[Dict[str, str]] = None,
+    idx: Optional[int] = None,
+) -> str:
+    """
+    Transforms a document into a single string.
+    Use regex in the `pattern` parameter to control how the document is represented.
+    You can use the following placeholders:
+    - $content: The content of the document.
+    - $idx: The index of the document in the list.
+    - $id: The ID of the document.
+    - $META_FIELD: The value of the metadata field called 'META_FIELD'.
+
+    Example:
+
+    ```python
+    assert format_document(
+        document=Document(content="first"),
+        pattern="prefix [$idx] $content",
+        str_replace={"r": "R"},
+        idx=1,
+    ) == "prefix [1] fiRst"
+    ```
+    """
+    str_replace = str_replace or {}
+    pattern = pattern or "$content"
+
+    template = Template(pattern)
+    pattern_params = [
+        match.groupdict().get("named", match.groupdict().get("braced"))
+        for match in template.pattern.finditer(template.template)
+    ]
+    meta_params = [param for param in pattern_params if param and param not in ["content", "idx", "id"]]
+    content = template.substitute(
+        {
+            "idx": idx,
+            "content": reduce(lambda content, kv: content.replace(*kv), str_replace.items(), document.content),
+            "id": reduce(lambda id, kv: id.replace(*kv), str_replace.items(), document.id),
+            **{
+                k: reduce(lambda val, kv: val.replace(*kv), str_replace.items(), document.meta.get(k, ""))
+                for k in meta_params
+            },
+        }
+    )
+    return content
+
+
+def format_answer(
+    answer: Answer,
+    pattern: Optional[str] = None,
+    str_replace: Optional[Dict[str, str]] = None,
+    idx: Optional[int] = None,
+) -> str:
+    """
+    Transforms an answer into a single string.
+    Use regex in the `pattern` parameter to control how the answer is represented.
+    You can use the following placeholders:
+    - $answer: The answer text.
+    - $idx: The index of the answer in the list.
+    - $META_FIELD: The value of the metadata field called 'META_FIELD'.
+
+    Example:
+
+    ```python
+    assert format_answer(
+        answer=Answer(answer="first"),
+        pattern="prefix [$idx] $answer",
+        str_replace={"r": "R"},
+        idx=1,
+    ) == "prefix [1] fiRst"
+    ```
+    """
+    str_replace = str_replace or {}
+    pattern = pattern or "$answer"
+
+    template = Template(pattern)
+    pattern_params = [
+        match.groupdict().get("named", match.groupdict().get("braced"))
+        for match in template.pattern.finditer(template.template)
+    ]
+    meta_params = [param for param in pattern_params if param and param not in ["answer", "idx"]]
+    meta = answer.meta or {}
+    content = template.substitute(
+        {
+            "idx": idx,
+            "answer": reduce(lambda content, kv: content.replace(*kv), str_replace.items(), answer.answer),
+            **{k: reduce(lambda val, kv: val.replace(*kv), str_replace.items(), meta.get(k, "")) for k in meta_params},
+        }
+    )
+    return content
+
+
+def format_string(string: str, str_replace: Optional[Dict[str, str]] = None) -> str:
+    """
+    Replaces strings.
+
+    Example:
+
+    ```python
+    assert format_string(string="first", str_replace={"r": "R"}) == "fiRst"
+    ```
+    """
+    str_replace = str_replace or {}
+    return reduce(lambda s, kv: s.replace(*kv), str_replace.items(), string)
 
 
 def rename(value: Any) -> Any:
@@ -241,17 +365,220 @@ def join_documents_and_scores(documents: List[Document]) -> Tuple[List[Document]
     return ([Document(content=content)],)
 
 
+def answers_to_strings(
+    answers: List[Answer], pattern: Optional[str] = None, str_replace: Optional[Dict[str, str]] = None
+) -> List[str]:
+    """
+    Extracts the content field of answers and returns a list of strings.
+
+    Example:
+
+    ```python
+    assert answers_to_strings(
+            answers=[
+                Answer(answer="first"),
+                Answer(answer="second"),
+                Answer(answer="third")
+            ],
+            pattern="[$idx] $answer",
+            str_replace={"r": "R"}
+        ) == ["[1] fiRst", "[2] second", "[3] thiRd"]
+    ```
+    """
+    return [format_answer(answer, pattern, str_replace, idx) for idx, answer in enumerate(answers, start=1)]
+
+
+def documents_to_strings(
+    documents: List[Document], pattern: Optional[str] = None, str_replace: Optional[Dict[str, str]] = None
+) -> List[str]:
+    """
+    Extracts the content field of documents and returns a list of strings. Use regext in the `pattern` parameter to control how the documents are represented.
+
+    Example:
+
+    ```python
+    assert documents_to_strings(
+            documents=[
+                Document(content="first"),
+                Document(content="second"),
+                Document(content="third")
+            ],
+            pattern="[$idx] $content",
+            str_replace={"r": "R"}
+        ) == ["[1] fiRst", "[2] second", "[3] thiRd"]
+    ```
+    """
+    return [format_document(doc, pattern, str_replace, idx) for idx, doc in enumerate(documents, start=1)]
+
+
+def strings_to_documents(
+    strings: List[str],
+    meta: Union[List[Optional[Dict[str, Any]]], Optional[Dict[str, Any]]] = None,
+    id_hash_keys: Optional[List[str]] = None,
+) -> List[Document]:
+    """
+    Transforms a list of strings into a list of documents. If you pass the metadata in a single
+    dictionary, all documents get the same metadata. If you pass the metadata as a list, the length of this list
+    must be the same as the length of the list of strings, and each document gets its own metadata.
+    You can specify `id_hash_keys` only once and it gets assigned to all documents.
+
+    Example:
+
+    ```python
+    assert strings_to_documents(
+            strings=["first", "second", "third"],
+            meta=[{"position": i} for i in range(3)],
+            id_hash_keys=['content', 'meta]
+        ) == [
+            Document(content="first", metadata={"position": 1}, id_hash_keys=['content', 'meta])]),
+            Document(content="second", metadata={"position": 2}, id_hash_keys=['content', 'meta]),
+            Document(content="third", metadata={"position": 3}, id_hash_keys=['content', 'meta])
+        ]
+    ```
+    """
+    all_metadata: List[Optional[Dict[str, Any]]]
+    if isinstance(meta, dict):
+        all_metadata = [meta] * len(strings)
+    elif isinstance(meta, list):
+        if len(meta) != len(strings):
+            raise ValueError(
+                f"Not enough metadata dictionaries. strings_to_documents received {len(strings)} and {len(meta)} metadata dictionaries."
+            )
+        all_metadata = meta
+    else:
+        all_metadata = [None] * len(strings)
+
+    return [Document(content=string, meta=m, id_hash_keys=id_hash_keys) for string, m in zip(strings, all_metadata)]
+
+
+def join_documents_to_string(
+    documents: List[Document],
+    delimiter: str = " ",
+    pattern: Optional[str] = None,
+    str_replace: Optional[Dict[str, str]] = None,
+) -> str:
+    """
+    Transforms a list of documents into a single string. The content of this string
+    is the joined result of all original documents separated by the delimiter you specify.
+    Use regex in the `pattern` parameter to control how the documents are represented.
+    You can use the following placeholders:
+    - $content: The content of the document.
+    - $idx: The index of the document in the list.
+    - $id: The ID of the document.
+    - $META_FIELD: The value of the metadata field called 'META_FIELD'.
+
+    Example:
+
+    ```python
+    assert join_documents_to_string(
+        documents=[
+            Document(content="first"),
+            Document(content="second"),
+            Document(content="third")
+        ],
+        delimiter=" - ",
+        pattern="[$idx] $content",
+        str_replace={"r": "R"}
+    ) == "[1] fiRst - [2] second - [3] thiRd"
+    ```
+    """
+    content = delimiter.join(
+        format_document(doc, pattern, str_replace, idx=idx) for idx, doc in enumerate(documents, start=1)
+    )
+    return content
+
+
+def join_documents(
+    documents: List[Document],
+    delimiter: str = " ",
+    pattern: Optional[str] = None,
+    str_replace: Optional[Dict[str, str]] = None,
+) -> List[Document]:
+    """
+    Transforms a list of documents into a list containing a single document. The content of this document
+    is the joined result of all original documents, separated by the delimiter you specify.
+    Use regex in the `pattern` parameter to control how each document is represented.
+    You can use the following placeholders:
+    - $content: The content of the document.
+    - $idx: The index of the document in the list.
+    - $id: The ID of the document.
+    - $META_FIELD: The value of the metadata field called 'META_FIELD'.
+
+    All metadata is dropped.
+
+    Example:
+
+    ```python
+    assert join_documents(
+        documents=[
+            Document(content="first"),
+            Document(content="second"),
+            Document(content="third")
+        ],
+        delimiter=" - ",
+        pattern="[$idx] $content",
+        str_replace={"r": "R"}
+    ) == [Document(content="[1] fiRst - [2] second - [3] thiRd")]
+    ```
+    """
+    return [Document(content=join_documents_to_string(documents, delimiter, pattern, str_replace))]
+
+
+def join_strings(strings: List[str], delimiter: str = " ", str_replace: Optional[Dict[str, str]] = None) -> str:
+    """
+    Transforms a list of strings into a single string. The content of this string
+    is the content of all of the original strings separated by the delimiter you specify.
+
+    Example:
+
+    ```python
+    assert join_strings(strings=["first", "second", "third"], delimiter=" - ", str_replace={"r": "R"}) == "fiRst - second - thiRd"
+    ```
+    """
+    str_replace = str_replace or {}
+    return delimiter.join([format_string(string, str_replace) for string in strings])
+
+
+def join_lists(lists: List[List[Any]]) -> List[Any]:
+    """
+    Joins the lists you pass to it into a single list.
+
+    Example:
+
+    ```python
+    assert join_lists(lists=[[1, 2, 3], [4, 5]]) == [1, 2, 3, 4, 5]
+    ```
+    """
+    merged_list = []
+    for inner_list in lists:
+        merged_list += inner_list
+    return merged_list
+
+
+def value_to_list(value: Any, target_list: List[Any]) -> List[Any]:
+    """
+    Transforms a value into a list containing this value as many times as the length of the target list.
+
+    Example:
+
+    ```python
+    assert value_to_list(value=1, target_list=list(range(5))) == [1, 1, 1, 1, 1]
+    ```
+    """
+    return [value] * len(target_list)
+
+
 REGISTERED_FUNCTIONS: Dict[str, Callable[..., Any]] = {
     "rename": rename,
-    # "value_to_list": value_to_list,
-    # "join_lists": join_lists,
-    # "join_strings": join_strings,
-    # "join_documents": join_documents,
+    "value_to_list": value_to_list,
+    "join_lists": join_lists,
+    "join_strings": join_strings,
+    "join_documents": join_documents,
     "join_documents_and_scores": join_documents_and_scores,
     "strings_to_answers": strings_to_answers,
-    # "answers_to_strings": answers_to_strings,
-    # "strings_to_documents": strings_to_documents,
-    # "documents_to_strings": documents_to_strings,
+    "answers_to_strings": answers_to_strings,
+    "strings_to_documents": strings_to_documents,
+    "documents_to_strings": documents_to_strings,
 }
 
 
