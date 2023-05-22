@@ -45,7 +45,7 @@ class PromptModel(BaseComponent):
 
     def __init__(
         self,
-        model_name_or_path: str = "google/flan-t5-base",
+        model_name_or_path: str = "gpt-3.5-turbo",
         max_length: Optional[int] = 100,
         api_key: Optional[str] = None,
         use_auth_token: Optional[Union[str, bool]] = None,
