@@ -267,11 +267,13 @@ class GenerationMixin(object):
     """
 
     @staticmethod
-    def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
+    def prepare_input_ids_for_generation(bos_token_id, inputs_embeds=None, encoder_output=None):
         batch_size = 1
         if bos_token_id is None:
             raise ValueError("`bos_token_id` should be defined when no " "`input_ids` are provided.")
-        if encoder_output is not None:
+        if inputs_embeds is not None:
+            batch_size = inputs_embeds.shape[0]
+        elif encoder_output is not None:
             batch_size = encoder_output.shape[0]
         return paddle.ones([batch_size, 1], dtype="int64") * bos_token_id
 
@@ -810,8 +812,9 @@ class GenerationMixin(object):
 
         # params check
         if input_ids is None:
+            inputs_embeds = model_kwargs.get("inputs_embeds", None)
             # Init `input_ids` with bos_token_id
-            input_ids = self.prepare_input_ids_for_generation(bos_token_id)
+            input_ids = self.prepare_input_ids_for_generation(bos_token_id, inputs_embeds=inputs_embeds)
 
         # Add to model_kwargs
         model_kwargs["attention_mask"] = attention_mask
@@ -877,7 +880,6 @@ class GenerationMixin(object):
                     "`num_return_sequences` has to be 1, but is {} "
                     "when doing greedy search.".format(num_return_sequences)
                 )
-
             return self.greedy_search(
                 input_ids, logits_processors, max_len, pad_token_id, eos_token_id, **model_kwargs
             )
@@ -979,7 +981,6 @@ class GenerationMixin(object):
 
     def greedy_search(self, input_ids, logits_processors, max_length, pad_token_id, eos_token_id, **model_kwargs):
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
-
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")

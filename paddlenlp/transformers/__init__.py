@@ -244,6 +244,10 @@ from .blip_2.processing import *
 from .chatglm.configuration import *
 from .chatglm.modeling import *
 from .chatglm.tokenizer import *
+from .minigpt4.modeling import *
+from .minigpt4.configuration import *
+from .minigpt4.processing import *
+from .minigpt4.image_processing import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available
