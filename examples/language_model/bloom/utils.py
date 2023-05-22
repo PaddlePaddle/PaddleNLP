@@ -79,13 +79,9 @@ class BloomTrainer(Trainer):
             return super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
         elif not self.do_generation:
             loss, logits, labels = super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
-            lm_logits = logits[0]
-            all_preds = []
-            all_labels = []
-            for p, l in zip(lm_logits[..., :-1, :].argmax(axis=-1), labels[..., 1:]):
-                all_preds.append(p[l != 3])
-                all_labels.append(l[l != 3])
-            return (loss, all_preds, all_labels)
+            # argmax here to avoid gather all logits, which is too memory-consuming.
+            # keepdim in order to maintain the same shape as logits
+            return (loss, logits[0][..., :-1, :].argmax(axis=-1, keepdim=True), labels[..., 1:])
 
         model.eval()
         with paddle.no_grad():
