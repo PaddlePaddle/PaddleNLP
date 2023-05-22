@@ -112,8 +112,14 @@ class LatentDiffusionModel(nn.Layer):
             )
             self.unet_is_pretrained = True
 
+        assert model_args.prediction_type in ["epsilon", "v_prediction"]
+        self.prediction_type = model_args.prediction_type
         self.noise_scheduler = DDPMScheduler(
-            beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000
+            beta_start=0.00085,
+            beta_end=0.012,
+            beta_schedule="scaled_linear",
+            num_train_timesteps=1000,
+            prediction_type=self.prediction_type,
         )
         self.register_buffer("alphas_cumprod", self.noise_scheduler.alphas_cumprod)
 
@@ -122,9 +128,11 @@ class LatentDiffusionModel(nn.Layer):
                 beta_start=0.00085,
                 beta_end=0.012,
                 beta_schedule="scaled_linear",
+                num_train_timesteps=1000,
                 clip_sample=False,
                 set_alpha_to_one=False,
                 steps_offset=1,
+                prediction_type=self.prediction_type,
             )
             self.eval_scheduler.set_timesteps(model_args.num_inference_steps)
         self.init_weights()
@@ -164,6 +172,20 @@ class LatentDiffusionModel(nn.Layer):
 
         noisy_samples = sqrt_alpha_prod * original_samples + sqrt_one_minus_alpha_prod * noise
         return noisy_samples
+
+    def get_velocity(self, sample: paddle.Tensor, noise: paddle.Tensor, timesteps: paddle.Tensor) -> paddle.Tensor:
+        sqrt_alpha_prod = self.alphas_cumprod[timesteps] ** 0.5
+        sqrt_alpha_prod = sqrt_alpha_prod.flatten()
+        while len(sqrt_alpha_prod.shape) < len(sample.shape):
+            sqrt_alpha_prod = sqrt_alpha_prod.unsqueeze(-1)
+
+        sqrt_one_minus_alpha_prod = (1 - self.alphas_cumprod[timesteps]) ** 0.5
+        sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten()
+        while len(sqrt_one_minus_alpha_prod.shape) < len(sample.shape):
+            sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)
+
+        velocity = sqrt_alpha_prod * noise - sqrt_one_minus_alpha_prod * sample
+        return velocity
 
     def init_weights(self):
         # init text_encoder
@@ -221,7 +243,17 @@ class LatentDiffusionModel(nn.Layer):
 
         encoder_hidden_states = self.text_encoder(input_ids)[0]
         noise_pred = self.unet(noisy_latents, timesteps, encoder_hidden_states).sample
-        loss = F.mse_loss(noise_pred, noise, reduction="none").mean([1, 2, 3]).mean()
+
+        # Get the target for loss depending on the prediction type
+        if self.prediction_type == "epsilon":
+            target = noise
+        elif self.prediction_type == "v_prediction":
+            target = self.get_velocity(latents, noise, timesteps)
+        else:
+            raise ValueError(f"Unknown prediction type {self.prediction_type}")
+
+        loss = F.mse_loss(noise_pred, target, reduction="none").mean([1, 2, 3]).mean()
+
         return loss
 
     @paddle.no_grad()
