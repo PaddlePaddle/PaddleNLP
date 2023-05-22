@@ -307,13 +307,11 @@ class GenerationMixin(object):
     """
 
     @staticmethod
-    def prepare_input_ids_for_generation(bos_token_id, inputs_embeds=None, encoder_output=None):
+    def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
         batch_size = 1
         if bos_token_id is None:
             raise ValueError("`bos_token_id` should be defined when no " "`input_ids` are provided.")
-        if inputs_embeds is not None:
-            batch_size = inputs_embeds.shape[0]
-        elif encoder_output is not None:
+        if encoder_output is not None:
             batch_size = encoder_output.shape[0]
         return paddle.ones([batch_size, 1], dtype="int64") * bos_token_id
 
