@@ -13,4 +13,5 @@
 # limitations under the License.
 
 from pipelines.agents.memory.base import Memory
+from pipelines.agents.memory.conversation_memory import ConversationMemory
 from pipelines.agents.memory.no_memory import NoMemory
