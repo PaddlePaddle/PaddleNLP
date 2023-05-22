@@ -288,7 +288,7 @@ class MiniGPT4TextModelTester:
         hidden_act="gelu",
         hidden_dropout_prob=0.1,
         attention_probs_dropout_prob=0.1,
-        max_position_embeddings=20,
+        max_position_embeddings=200,
         eos_token_id=2,
         pad_token_id=1,
         bos_token_id=0,
@@ -349,7 +349,6 @@ class MiniGPT4TextModelTester:
         )
 
 
-# this model tester uses a decoder-only language model (OPT)
 class MiniGPT4ForConditionalGenerationModelTester:
     def __init__(
         self, parent, vision_kwargs=None, qformer_kwargs=None, text_kwargs=None, is_training=True, num_query_tokens=10
@@ -470,13 +469,44 @@ class MiniGPT4ForConditionalGenerationTest(ModelTesterMixin, unittest.TestCase):
         config, _ = self.model_tester.prepare_config_and_inputs_for_common()
 
         for model_class in self.all_model_classes:
-            model = model_class(config)
+            model = self._make_model_instance(config, model_class)
             signature = inspect.signature(model.forward)
             # signature.parameters is an OrderedDict => so arg_names order is deterministic
             arg_names = [*signature.parameters.keys()]
+            expected_arg_names = ["pixel_values", "first_input_ids", "second_input_ids"]
+            self.assertListEqual(arg_names[:3], expected_arg_names)
 
-            expected_arg_names = ["pixel_values"]
-            self.assertListEqual(arg_names[:1], expected_arg_names)
+    def test_save_load(self):
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+
+        def check_save_load(out1, out2):
+            # make sure we don't have nans
+            out_2 = out2.numpy()
+            out_2[np.isnan(out_2)] = 0
+
+            out_1 = out1.numpy()
+            out_1[np.isnan(out_1)] = 0
+            max_diff = np.amax(np.abs(out_1 - out_2))
+            self.assertLessEqual(max_diff, 1e-5)
+
+        for model_class in self.all_model_classes:
+            model = self._make_model_instance(config, model_class)
+            model.eval()
+            with paddle.no_grad():
+                first = model(**self._prepare_for_class(inputs_dict, model_class))[0]
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                model.save_pretrained(tmpdirname)
+                model = model_class.from_pretrained(tmpdirname, llama_dtype="float32")
+                model.eval()
+                with paddle.no_grad():
+                    second = model(**self._prepare_for_class(inputs_dict, model_class))[0]
+
+            # support tuple of tensor
+            if isinstance(first, tuple) and isinstance(second, tuple):
+                for tensor1, tensor2 in zip(first, second):
+                    check_save_load(tensor1, tensor2)
+            else:
+                check_save_load(first, second)
 
     def test_load_vision_qformer_text_config(self):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
