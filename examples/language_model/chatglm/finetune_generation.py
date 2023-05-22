@@ -179,10 +179,11 @@ def main():
         }
 
     def compute_metrics(eval_preds):
-
-        predictions = [x[x != -100] for x in eval_preds.predictions]
-        references = [x[x != -100] for x in eval_preds.label_ids]
-        accuracy = accuracy_score(y_true=np.array(references).flatten(), y_pred=np.array(predictions).flatten())
+        flattened_preds = np.array(eval_preds.predictions).flatten()
+        flattened_labels = np.array(eval_preds.label_ids).flatten()
+        filtered_preds = flattened_preds[flattened_labels != -100]
+        filtered_labels = flattened_labels[flattened_labels != -100]
+        accuracy = accuracy_score(y_true=filtered_labels, y_pred=filtered_preds)
         return {
             "accuracy": accuracy,
         }
