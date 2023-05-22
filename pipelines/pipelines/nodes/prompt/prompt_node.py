@@ -111,6 +111,7 @@ class PromptNode(BaseComponent):
         #     },
         # )
         super().__init__()
+
         self.prompt_templates: Dict[str, PromptTemplate] = {pt.name: pt for pt in get_predefined_prompt_templates()}  # type: ignore
         self.default_prompt_template: Union[str, PromptTemplate, None] = default_prompt_template
         self.output_variable: Optional[str] = output_variable
@@ -119,6 +120,10 @@ class PromptNode(BaseComponent):
         self.stop_words: Optional[List[str]] = stop_words
         self.top_k: int = top_k
         self.debug = debug
+
+        self.set_config(
+            default_prompt_template=self.default_prompt_template, top_k=self.top_k, stop_words=self.stop_words
+        )
 
         if isinstance(self.default_prompt_template, str) and not self.is_supported_template(
             self.default_prompt_template
