@@ -2,7 +2,7 @@
 model_name:t5_for_conditional_generation
 python:python3.7
 gpu_list:0|0,1
-null:null
+--device:gpu
 --use_amp:null
 --max_steps:null
 null:null

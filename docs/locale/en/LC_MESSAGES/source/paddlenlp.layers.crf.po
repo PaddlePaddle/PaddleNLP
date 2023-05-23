@@ -191,7 +191,7 @@ msgstr ""
 #: of paddlenlp.layers.crf.ViterbiDecoder:5
 msgid ""
 "If set to True, the last row and the last column of transitions will be "
-"considered as start tag, the the penultimate row and the penultimate "
+"considered as start tag, the penultimate row and the penultimate "
 "column of transitions will be considered as stop tag. Else, all the rows "
 "and columns will be considered as the real tag. Defaults to ``None``."
 msgstr ""

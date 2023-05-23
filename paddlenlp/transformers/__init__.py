@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -73,6 +73,7 @@ from .blip.image_processing import *
 from .chinesebert.configuration import *
 from .chinesebert.modeling import *
 from .chinesebert.tokenizer import *
+from .convbert.configuration import *
 from .convbert.modeling import *
 from .convbert.tokenizer import *
 from .ctrl.modeling import *
@@ -105,11 +106,14 @@ from .ernie_m.modeling import *
 from .ernie_m.tokenizer import *
 from .fnet.modeling import *
 from .fnet.tokenizer import *
+from .fnet.configuration import *
 from .funnel.modeling import *
 from .funnel.tokenizer import *
+from .funnel.configuration import *
 from .llama.configuration import *
 from .llama.modeling import *
 from .llama.tokenizer import *
+from .layoutlm.configuration import *
 from .layoutlm.modeling import *
 from .layoutlm.tokenizer import *
 from .layoutlmv2.modeling import *

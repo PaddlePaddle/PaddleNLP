@@ -243,7 +243,7 @@ class T5ModelTester:
         self.parent.assertEqual(len(outputs), 4 if self.parent.use_labels else 3)
         if self.parent.use_labels:
             self.parent.assertEqual(outputs[1].shape, [self.batch_size, self.decoder_seq_length, self.vocab_size])
-            self.parent.assertEqual(outputs[0].shape, [1])
+            self.parent.assertIsInstance(outputs[0].item(), float)
         else:
             self.parent.assertEqual(outputs[0].shape, [self.batch_size, self.decoder_seq_length, self.vocab_size])
 
@@ -1202,7 +1202,7 @@ class TestAsymmetricT5(unittest.TestCase):
 
         if self.use_labels:
             assert outputs[1].shape == [tester.batch_size, tester.decoder_seq_length, tester.vocab_size]
-            assert outputs[0].shape == [1]
+            assert isinstance(outputs[0].item(), float)
         else:
             assert outputs[0].shape == [tester.batch_size, tester.decoder_seq_length, tester.vocab_size]
         return model

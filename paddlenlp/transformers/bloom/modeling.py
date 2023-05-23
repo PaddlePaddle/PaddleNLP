@@ -479,7 +479,7 @@ class BloomAttention(nn.Layer):
         attention_probs_reshaped = attention_probs.reshape([batch_size * self.num_heads, q_length, kv_length])
 
         # matmul: [batch_size * num_heads, q_length, head_dim]
-        context_layer = paddle.bmm(attention_probs_reshaped, value_layer)
+        context_layer = paddle.matmul(attention_probs_reshaped, value_layer)
 
         # change view [batch_size, num_heads, q_length, head_dim]
         context_layer = self._merge_heads(context_layer)

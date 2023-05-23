@@ -20,7 +20,7 @@ import paddle
 
 from paddlenlp.transformers import GLMModel
 
-GLMModel.init_weights = lambda *_: None
+GLMModel._init_weights = lambda *_: None
 
 
 def main():

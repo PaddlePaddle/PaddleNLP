@@ -449,7 +449,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
             return_length (bool, optional): Whether to return the length of the
                 encoded sequence. Defaults to False.
             add_start_token_as_response (bool, optional): Whether to add the
-                special token "[CLS]" at the end of sequence as the begining of
+                special token "[CLS]" at the end of sequence as the beginning of
                 the response when running inference to force the model to start
                 generating response sequence. Defaults to False.
             pad_to_max_seq_len (bool, optional): Whether to pad the returned
