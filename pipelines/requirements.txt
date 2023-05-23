@@ -28,3 +28,4 @@ wordcloud==1.8.2.2
 boilerpy3
 events
 sseclient-py==1.7.2
+pydantic==1.10.7
