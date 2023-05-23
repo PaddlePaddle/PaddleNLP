@@ -96,6 +96,76 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir chatglm_log finet
 --tensor_parallel_degree 4
 ```
 
+### 单卡LoRA微调
+
+```
+python finetune_generation.py \
+--output_dir ./checkpoints/chatglm-6b \
+--per_device_train_batch_size 32 \
+--per_device_eval_batch_size 32 \
+--gradient_accumulation_steps 1 \
+--model_name_or_path THUDM/chatglm-6b \
+--task_name_or_path school_math_0.25M \
+--num_train_epochs 2 \
+--learning_rate 3e-4 \
+--warmup_ratio 0.03 \
+--logging_steps 1 \
+--eval_steps 500 \
+--save_steps 500 \
+--src_length 128 \
+--tgt_length 512 \
+--fp16 \
+--fp16_opt_level O2 \
+--recompute True \
+--do_train \
+--do_eval \
+--disable_tqdm True \
+--metric_for_best_model accuracy \
+--load_best_model_at_end True \
+--do_generation False \
+--lora True \
+--r 8
+```
+
+### 单卡Prefix微调
+
+```
+python finetune_generation.py \
+--output_dir ./checkpoints/chatglm-6b \
+--per_device_train_batch_size 32 \
+--per_device_eval_batch_size 32 \
+--gradient_accumulation_steps 1 \
+--model_name_or_path THUDM/chatglm-6b \
+--task_name_or_path school_math_0.25M \
+--num_train_epochs 2 \
+--learning_rate 3e-2 \
+--warmup_ratio 0.03 \
+--logging_steps 1 \
+--eval_steps 500 \
+--save_steps 500 \
+--src_length 128 \
+--tgt_length 512 \
+--fp16 \
+--fp16_opt_level O2 \
+--recompute True \
+--do_train \
+--do_eval \
+--disable_tqdm True \
+--metric_for_best_model accuracy \
+--load_best_model_at_end True \
+--do_generation False \
+--prefix_tuning True \
+--num_prefix_tokens 64
+```
+
+其中新增参数释义如下：
+
+- `lora`: 是否使用LoRA技术。
+- `prefix_tuning`: 是否使用Prefix技术。
+- `merge_weights`: 是否合并原始模型和Lora模型的权重。
+- `r`: lora 算法中rank（秩）的值。
+- `num_prefix_tokens`: prefix tuning算法中前缀token数量。
+
 ## 模型预测
 
 可以将模型python前向与推理结果比较：
@@ -130,6 +200,22 @@ python -m paddle.distributed.launch --gpus 0,1,2,3 predict_generation.py \
 
 其中参数 `merge_tensor_parallel_path` 指定了合并后模型参数的存储位置。如果不设置这一参数，将只跑前向。
 
+### LoRA微调模型预测
+对merge后的单分片模型也可以进行直接预测，脚本如下
+```shell
+ python predict_generation.py
+    --model_name_or_path THUDM/chatglm-6b \
+    --lora_path ./checkpoints/chatglm-6b
+```
+
+### Prefix微调模型预测
+对merge后的单分片模型也可以进行直接预测，脚本如下
+```shell
+ python predict_generation.py
+    --model_name_or_path THUDM/chatglm-6b \
+    --prefix_path ./checkpoints/chatglm-6b
+```
+
 ## 模型导出
 
 在模型训练完毕后，可使用如下脚本将模型参数导出为静态图，用于模型推理。
@@ -140,11 +226,21 @@ python export_generation_model.py \
    --output_path ./checkpoints/infer/chatglm
 ```
 
+当在指定数据集上进行 LoRA finetune 后的导出脚本：
+
+```shell
+python export_generation_model.py
+    --model_name_or_path THUDM/chatglm-6b
+    --output_path inference/chatglm
+    --lora_path ./checkpoints/chatglm-6b
+```
+
 其中参数定义如下：
 
 - `model_name_or_path`: 预训练模型内置名称或者模型所在目录。
 - `output_path`: 导出模型存储地址和文件前缀。示例中导出地址为 `./checkpoints/infer`，模型前缀为 `chatglm`。
 - `dtype`: 模型参数类型，可选参数`float16`和`float32`，默认为None，即为加载的动态图模型参数类型一致。
+- `lora_path`: 存放LoRA参数的目录。
 
 ## 模型推理（c++推理）
 

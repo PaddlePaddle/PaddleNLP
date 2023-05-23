@@ -42,7 +42,7 @@ class DataArgument:
     src_length: int = field(default=128, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=180, metadata={"help": "The max length of target text."})
     num_beams: int = field(default=5, metadata={"help": "The number of beams."})
-    generate_num: int = field(default=100, metadata={"help": "Save first k examples generation result in dev dataset"})
+    generate_num: int = field(default=0, metadata={"help": "Save first k examples generation result in dev dataset"})
     src_length: int = field(default=256, metadata={"help": "Source length for generation."})
     tgt_length: int = field(default=512, metadata={"help": "Target length for generation."})
 
@@ -52,8 +52,14 @@ class ModelArgument:
     model_name_or_path: str = field(
         default="THUDM/chatglm-6b", metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
-    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix Tuning technique"})
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
+    r: int = field(default=8, metadata={"help": "Lora attention dimension"})
+    merge_weights: bool = field(
+        default=True, metadata={"help": "Merge weights of the original model and the Lora model"}
+    )
+    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
+    num_prefix_tokens: int = field(default=64, metadata={"help": "Number of prefix tokens"})
+    prefix_projection: bool = field(default=True, metadata={"help": "Whether to project the prefix tokens"})
     do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
 
 
@@ -100,11 +106,11 @@ def main():
     )
     if model_args.prefix_tuning:
         prefix_config = PrefixConfig(
-            num_prefix_tokens=64,
+            num_prefix_tokens=model_args.num_prefix_tokens,
             num_attention_heads=model.config.num_attention_heads,
             num_hidden_layers=model.config.num_hidden_layers,
             hidden_size=model.config.hidden_size,
-            # prefix_projection=True,
+            prefix_projection=model_args.prefix_projection,
             prefix_projection_hidden_size=model.config.hidden_size,
             dtype=dtype,
         )
@@ -119,9 +125,9 @@ def main():
     if model_args.lora:
         lora_config = LoRAConfig(
             target_modules=[".*query_key_value.*"],
-            r=8,
-            lora_alpha=16,
-            merge_weights=True,
+            r=model_args.r,
+            lora_alpha=2 * model_args.r,
+            merge_weights=model_args.merge_weights,
             enable_lora_list=[[True, False, True]],
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,

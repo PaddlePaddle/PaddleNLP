@@ -19,7 +19,7 @@ from functools import partial
 import paddle
 from data import DataCollatorForSupervisedDataset, convert_example
 from modeling_pp import LlamaForCausalLMPipe
-from utils import LlamaTrainer, compute_metrics
+from utils import LlamaTrainer, compute_metrics, save_infer_result
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, LoRAModel
@@ -54,6 +54,7 @@ class DataArgument:
             "help": "The number of highest probability tokens to keep for top-k-filtering in the 'sampling' strategy."
         },
     )
+    generate_num: int = field(default=0, metadata={"help": "Save first k examples generation result in dev dataset"})
 
 
 @dataclass
@@ -64,11 +65,17 @@ class ModelArgument:
     # label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
+    r: int = field(default=4, metadata={"help": "Lora attention dimension"})
+    merge_weights: bool = field(
+        default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
+    )
+    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
+    num_prefix_tokens: int = field(default=10, metadata={"help": "Number of prefix tokens"})
+    prefix_projection: bool = field(default=True, metadata={"help": "Whether to project the prefix tokens"})
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
     eval_with_do_generation: bool = field(
         default=True, metadata={"help": "Evaluate with generation, instead for calc loss."}
     )
-    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
 
 
 def main():
@@ -138,9 +145,9 @@ def main():
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
         lora_config = LoRAConfig(
             target_modules=[".*q_proj.*", ".*v_proj.*"],
-            r=4,
-            lora_alpha=8,
-            merge_weights=False,
+            r=model_args.r,
+            lora_alpha=2 * model_args.r,
+            merge_weights=model_args.merge_weights,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,
         )
@@ -150,11 +157,11 @@ def main():
 
     if model_args.prefix_tuning:
         prefix_config = PrefixConfig(
-            num_prefix_tokens=10,
+            num_prefix_tokens=model_args.num_prefix_tokens,
             num_attention_heads=model.config.n_head,
             num_hidden_layers=model.config.n_layer,
             hidden_size=model.config.hidden_size,
-            prefix_projection=True,
+            prefix_projection=model_args.prefix_projection,
             prefix_projection_hidden_size=model.config.hidden_size,
             dtype=dtype,
         )
@@ -231,6 +238,11 @@ def main():
     if training_args.do_eval:
         eval_result = trainer.evaluate()
         trainer.log_metrics("test", eval_result)
+
+    if data_args.generate_num > 0:
+        save_infer_result(
+            trainer, dev_ds, k=data_args.generate_num, src_length=data_args.src_length, tgt_length=data_args.tgt_length
+        )
 
 
 if __name__ == "__main__":
