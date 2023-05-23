@@ -251,6 +251,7 @@ def do_train(args):
             weight_decay=args.weight_decay,
             grad_clip=clip,
             apply_decay_param_fun=lambda x: x in decay_params,
+            multi_precision=args.use_pure_fp16,
         )
     else:
         optimizer = paddle.optimizer.AdamW(
