@@ -310,7 +310,7 @@ class GPTJModelTester:
         model.eval()
 
         result = model(input_ids, token_type_ids=token_type_ids, labels=input_ids, return_dict=True)
-        self.parent.assertEqual(result.loss.shape, [1])
+        self.parent.assertIsInstance(result.loss.item(), float)
         self.parent.assertEqual(result.logits.shape, list((self.batch_size, self.seq_length, self.vocab_size)))
 
     def create_and_check_forward_and_backwards(

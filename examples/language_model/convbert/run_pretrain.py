@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,9 +13,7 @@
 # limitations under the License.
 
 import argparse
-import copy
 import io
-import json
 import logging
 import os
 import random
@@ -25,10 +23,8 @@ import numpy as np
 import paddle
 
 from paddlenlp.transformers import (
-    ConvBertDiscriminator,
     ConvBertForTotalPretraining,
     ConvBertGenerator,
-    ConvBertModel,
     ConvBertPretrainingCriterion,
     ConvBertTokenizer,
     LinearDecayWithWarmup,
@@ -107,11 +103,6 @@ def parse_args():
 
     parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
     parser.add_argument("--save_steps", type=int, default=1000, help="Save checkpoint every X updates steps.")
-    parser.add_argument(
-        "--init_from_ckpt",
-        action="store_true",
-        help="Whether to load model checkpoint. if True, args.model_name_or_path must be dir store ckpt or will train from fresh start",
-    )
     parser.add_argument(
         "--use_amp", action="store_true", help="Whether to use float16(Automatic Mixed Precision) to train."
     )
@@ -350,49 +341,17 @@ def do_train(args):
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
 
     # Loads or initializes a model.
-    pretrained_models = list(tokenizer_class.pretrained_init_configuration.keys())
-    if args.model_name_or_path in pretrained_models:
-        tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-        generator = ConvBertGenerator(
-            ConvBertModel(**model_class.pretrained_init_configuration[args.model_name_or_path + "-generator"])
-        )
-        discriminator = ConvBertDiscriminator(
-            ConvBertModel(**model_class.pretrained_init_configuration[args.model_name_or_path + "-discriminator"])
-        )
-        model = model_class(generator, discriminator)
-        args.init_from_ckpt = False
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    pretrained_models_list = list(model_class.pretrained_init_configuration.keys())
+
+    if args.model_name_or_path in pretrained_models_list:
+        config = model_class.config_class.from_pretrained(args.model_name_or_path)
+        model = model_class(config)
     else:
-        if os.path.isdir(args.model_name_or_path) and args.init_from_ckpt:
-            # Load checkpoint
-            tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-            with open(os.path.join(args.model_name_or_path, "run_states.json"), "r") as f:
-                config_dict = json.load(f)
-                model_name = config_dict["model_name"]
-            if model_name in pretrained_models:
-                generator = ConvBertGenerator(
-                    ConvBertModel(**model_class.pretrained_init_configuration[model_name + "-generator"])
-                )
-                discriminator = ConvBertDiscriminator(
-                    ConvBertModel(**model_class.pretrained_init_configuration[model_name + "-discriminator"])
-                )
-                model = model_class(generator, discriminator)
-                model.set_state_dict(paddle.load(os.path.join(args.model_name_or_path, "model_state.pdparams")))
-            else:
-                raise ValueError(
-                    "initialize a model from ckpt need model_name "
-                    "in model_config_file. The supported model_name "
-                    "are as follows: {}".format(tokenizer_class.pretrained_init_configuration.keys())
-                )
-        else:
-            raise ValueError(
-                "initialize a model need identifier or the "
-                "directory of storing model. if use identifier, the supported model "
-                "identifiers are as follows: {}, if use directory, "
-                "make sure set init_from_ckpt as True".format(model_class.pretrained_init_configuration.keys())
-            )
+        model = model_class.from_pretrained(args.model_name_or_path)
 
     criterion = ConvBertPretrainingCriterion(
-        getattr(model.generator, ConvBertGenerator.base_model_prefix).config["vocab_size"],
+        getattr(model.generator, ConvBertGenerator.base_model_prefix).config.vocab_size,
         model.gen_weight,
         model.disc_weight,
     )
@@ -446,20 +405,6 @@ def do_train(args):
     loss_list = []
     log_list = []
     tic_train = time.time()
-    if os.path.isdir(args.model_name_or_path) and args.init_from_ckpt:
-        optimizer.set_state_dict(paddle.load(os.path.join(args.model_name_or_path, "model_state.pdopt")))
-        trained_global_step = global_step = config_dict["global_step"]
-        if trained_global_step < num_training_steps:
-            print(
-                "[ start train from checkpoint ] we have already trained %s steps, seeking next step : %s"
-                % (trained_global_step, trained_global_step + 1)
-            )
-        else:
-            print(
-                "[ start train from checkpoint ] we have already trained %s steps, but total training steps is %s, please check configuration !"
-                % (trained_global_step, num_training_steps)
-            )
-            exit(0)
 
     for epoch in range(args.num_train_epochs):
         for step, batch in enumerate(train_data_loader):
@@ -467,22 +412,22 @@ def do_train(args):
                 trained_global_step -= 1
                 continue
             global_step += 1
-            input_ids, raw_input_ids, gen_labels = batch
+            input_ids, raw_input_ids, generator_labels = batch
             if args.use_amp:
                 with paddle.amp.auto_cast():
                     gen_logits, disc_logits, disc_labels, attention_mask = model(
-                        input_ids=input_ids, raw_input_ids=raw_input_ids, gen_labels=gen_labels
+                        input_ids=input_ids, raw_input_ids=raw_input_ids, generator_labels=generator_labels
                     )
-                    loss = criterion(gen_logits, disc_logits, gen_labels, disc_labels, attention_mask)
+                    loss = criterion(gen_logits, disc_logits, generator_labels, disc_labels, attention_mask)
                 scaled = scaler.scale(loss)
                 scaled.backward()
                 t_loss += loss.detach()
                 scaler.minimize(optimizer, scaled)
             else:
                 gen_logits, disc_logits, disc_labels, attention_mask = model(
-                    input_ids=input_ids, raw_input_ids=raw_input_ids, gen_labels=gen_labels
+                    input_ids=input_ids, raw_input_ids=raw_input_ids, generator_labels=generator_labels
                 )
-                loss = criterion(gen_logits, disc_logits, gen_labels, disc_labels, attention_mask)
+                loss = criterion(gen_logits, disc_logits, generator_labels, disc_labels, attention_mask)
                 loss.backward()
                 t_loss += loss.detach()
                 optimizer.step()
@@ -527,24 +472,12 @@ def do_train(args):
                 tic_train = time.time()
             if global_step % args.save_steps == 0:
                 if paddle.distributed.get_rank() == 0:
-                    output_dir = os.path.join(args.output_dir, "model_%d.pdparams" % global_step)
+                    output_dir = os.path.join(args.output_dir, "model_%d" % global_step)
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
+                    # need better way to get inner model of DataParallel
                     model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
-                    config_to_save = copy.deepcopy(model_to_save.discriminator.convbert.config)
-                    if "self" in config_to_save:
-                        del config_to_save["self"]
-                    run_states = {
-                        "model_name": model_name if args.init_from_ckpt else args.model_name_or_path,
-                        "global_step": global_step,
-                        "epoch": epoch,
-                        "step": step,
-                    }
-                    with open(os.path.join(output_dir, "model_config.json"), "w") as f:
-                        json.dump(config_to_save, f)
-                    with open(os.path.join(output_dir, "run_states.json"), "w") as f:
-                        json.dump(run_states, f)
-                    paddle.save(model.state_dict(), os.path.join(output_dir, "model_state.pdparams"))
+                    model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
                     paddle.save(optimizer.state_dict(), os.path.join(output_dir, "model_state.pdopt"))
                     if len(log_list) > 0:

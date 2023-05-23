@@ -21,17 +21,23 @@ from pipelines.nodes.llm import ErnieBot
 
 class TestErnieBot(unittest.TestCase):
     def setUp(self):
-        self.ernie_bot_access_token = "your_access_token"
+        self.api_key = "your api_key"
+        self.secret_key = "your secret_key"
         self.valid_history = [{"role": "user", "content": "Hi"}, {"role": "assistant", "content": "Hello"}]
 
-    def test_init_missing_access_token(self):
-        os.environ.pop("ernie_bot_access_token", None)
-        with self.assertRaises(ValueError):
-            ErnieBot()
-
-    def test_init_with_access_token(self):
-        ernie_bot = ErnieBot(ernie_bot_access_token=self.ernie_bot_access_token)
+    @patch("requests.request")
+    def test_init_with_access_token(self, mock_request):
+        mock_response = MagicMock()
+        mock_response.text = '{"access_key": "1234567890"}'
+        mock_request.return_value = mock_response
+        ernie_bot = ErnieBot(api_key=self.api_key, secret_key=self.secret_key)
         self.assertIsNotNone(ernie_bot)
+
+    def test_init_missing_access_token(self):
+        os.environ.pop("ERNIE_BOT_API_KEY", None)
+        os.environ.pop("ERNIE_BOT_SECRET_KEY", None)
+        with self.assertRaises(Exception):
+            ErnieBot()
 
     @patch("requests.request")
     def test_run_without_history(self, mock_request):
@@ -39,7 +45,7 @@ class TestErnieBot(unittest.TestCase):
         mock_response.text = '{"result": "Hello, how can I help you?"}'
         mock_request.return_value = mock_response
 
-        ernie_bot = ErnieBot(ernie_bot_access_token=self.ernie_bot_access_token)
+        ernie_bot = ErnieBot(api_key=self.api_key, secret_key=self.secret_key)
         response, _ = ernie_bot.run("Hi")
 
         self.assertEqual(
@@ -53,7 +59,7 @@ class TestErnieBot(unittest.TestCase):
         mock_response.text = '{"result": "I can help you with that."}'
         mock_request.return_value = mock_response
 
-        ernie_bot = ErnieBot(ernie_bot_access_token=self.ernie_bot_access_token)
+        ernie_bot = ErnieBot(api_key=self.api_key, secret_key=self.secret_key)
         response, _ = ernie_bot.run("What can you do?", history=self.valid_history)
         self.assertEqual(
             response["history"],
@@ -64,16 +70,25 @@ class TestErnieBot(unittest.TestCase):
             ],
         )
 
-    def test_run_with_invalid_history_role(self):
+    @patch("requests.request")
+    def test_run_with_invalid_history_role(self, mock_request):
+        mock_response = MagicMock()
+        mock_response.text = '{"result": "I can help you with that."}'
+        mock_request.return_value = mock_response
         invalid_history = [{"role": "invalid", "content": "Hi"}, {"role": "assistant", "content": "Hello"}]
 
-        ernie_bot = ErnieBot(ernie_bot_access_token=self.ernie_bot_access_token)
+        ernie_bot = ErnieBot(api_key=self.api_key, secret_key=self.secret_key)
         with self.assertRaises(ValueError):
             ernie_bot.run("What can you do?", history=invalid_history)
 
-    def test_run_with_odd_history_length(self):
+    @patch("requests.request")
+    def test_run_with_odd_history_length(self, mock_request):
+        mock_response = MagicMock()
+        mock_response.text = '{"result": "I can help you with that."}'
+        mock_request.return_value = mock_response
+
         odd_history = [{"role": "user", "content": "Hi"}]
 
-        ernie_bot = ErnieBot(ernie_bot_access_token=self.ernie_bot_access_token)
+        ernie_bot = ErnieBot(api_key=self.api_key, secret_key=self.secret_key)
         with self.assertRaises(ValueError):
             ernie_bot.run("What can you do?", history=odd_history)

@@ -427,7 +427,7 @@ def do_train(args):
                                 global_step,
                                 epoch,
                                 step,
-                                loss_return[0],
+                                loss_return,
                                 avg_reader_cost,
                                 1.0 / speed,
                                 speed,
@@ -436,7 +436,7 @@ def do_train(args):
                                 lr_return,
                             )
                         )
-                        log_writer.add_scalar("loss", loss_return[0], global_step)
+                        log_writer.add_scalar("loss", loss_return, global_step)
                         log_writer.add_scalar("learning_rate", lr_return, global_step)
                     tic_train = time.time()
                     train_reader_cost = 0.0
@@ -473,9 +473,6 @@ def do_train(args):
                     output_dir = os.path.join(args.output_dir, "model_%d" % global_step)
                     logger.debug("saving models to {}".format(output_dir))
                     save_persistables(exe, os.path.join(output_dir, "static_vars"), main_program)
-                    if global_step <= args.save_steps:
-                        model.init_config["init_args"][0].init_config.pop("topo", None)
-                    model.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
                     tic_train = time.time()
 
@@ -530,7 +527,7 @@ def do_train(args):
                                     global_step,
                                     epoch,
                                     step,
-                                    loss_return[0],
+                                    loss_return,
                                     avg_reader_cost,
                                     1.0 / speed,
                                     speed,
@@ -539,7 +536,7 @@ def do_train(args):
                                     lr_return,
                                 )
                             )
-                            log_writer.add_scalar("loss", loss_return[0], global_step)
+                            log_writer.add_scalar("loss", loss_return, global_step)
                             log_writer.add_scalar("learning_rate", lr_return, global_step)
                         tic_train = time.time()
                         train_reader_cost = 0.0
@@ -558,9 +555,6 @@ def do_train(args):
                         save_persistables(
                             exe, os.path.join(output_dir, "static_vars"), main_program._pipeline_opt["section_program"]
                         )
-                        if global_step <= args.save_steps:
-                            model.init_config["init_args"][0].init_config.pop("topo", None)
-                        model.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
                         tic_train = time.time()
 

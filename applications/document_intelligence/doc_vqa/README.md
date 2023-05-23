@@ -17,7 +17,7 @@
 - 售后客服：需要配置大量客服人员，且客服专业知识培训周期长
 - 构建问题库：需要投入大量人力整理常见问题库，并且固定的问题库难以覆盖灵活多变的提问
 
-对于用户来说，汽车说明书问答系统能够支持通过车机助手/APP/小程序为用户提供即问即答的的功能。对于常见问题，用户不再需要查阅说明书，也无需打客服电话，从而缓解了人工客服的压力。
+对于用户来说，汽车说明书问答系统能够支持通过车机助手/APP/小程序为用户提供即问即答的功能。对于常见问题，用户不再需要查阅说明书，也无需打客服电话，从而缓解了人工客服的压力。
 
 对于客服来讲，汽车说明书问答系统帮助客服人员快速定位答案，高效查阅文档，提高客服的专业水平，同时也能够缩短客服的培训周期。
 
@@ -25,9 +25,9 @@
 
 #### 环境要求
 
-- paddlepaddle >= 2.2.0
-- paddlenlp >= 2.3.1
-- paddleocr >= 2.5
+- paddlepaddle == 2.3.2
+- paddlenlp == 2.5.2
+- paddleocr == 2.6.1.3
 
 安装相关问题可参考[PaddlePaddle](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)和[PaddleNLP](https://paddlenlp.readthedocs.io/zh/latest/get_started/installation.html)文档。
 

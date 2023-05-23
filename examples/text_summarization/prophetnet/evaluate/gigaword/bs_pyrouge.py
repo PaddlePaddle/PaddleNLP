@@ -1,3 +1,17 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from __future__ import print_function, unicode_literals, division
 
 import codecs
@@ -28,7 +42,7 @@ class DirectoryProcessor:
     @staticmethod
     def process(input_dir, output_dir, function):
         """
-        Apply function to all files in input_dir and save the resulting ouput
+        Apply function to all files in input_dir and save the resulting output
         files in output_dir.
 
         """
@@ -76,7 +90,7 @@ class Rouge155(object):
 
     rouge_output = rouge.evaluate()
     print(rouge_output)
-    output_dict = rouge.output_to_dict(rouge_ouput)
+    output_dict = rouge.output_to_dict(rouge_output)
     print(output_dict)
     ->    {'rouge_1_f_score': 0.95652,
          'rouge_1_f_score_cb': 0.95652,

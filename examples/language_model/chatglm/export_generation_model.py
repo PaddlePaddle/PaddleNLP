@@ -17,7 +17,12 @@ import os
 
 import paddle
 
-from paddlenlp.transformers import ChatGLMForConditionalGeneration, ChatGLMTokenizer
+from paddlenlp.layers import LoRAConfig, LoRAModel
+from paddlenlp.transformers import (
+    ChatGLMConfig,
+    ChatGLMForConditionalGeneration,
+    ChatGLMTokenizer,
+)
 
 
 def parse_args():
@@ -37,7 +42,8 @@ def parse_args():
         # required=True,
         help="The output file prefix used to save the exported inference model.",
     )
-    parser.add_argument("--dtype", default="float32", type=str, help="The data type of exported model")
+    parser.add_argument("--dtype", default=None, help="The data type of exported model")
+    parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     args = parser.parse_args()
     return args
 
@@ -45,12 +51,21 @@ def parse_args():
 def main():
     args = parse_args()
 
-    paddle.set_default_dtype(args.dtype)
-
     tokenizer = ChatGLMTokenizer.from_pretrained(args.model_name_or_path)
+    if args.lora_path is not None:
+        lora_config = LoRAConfig.from_pretrained(args.lora_path)
+        dtype = lora_config.dtype
+    elif args.dtype is not None:
+        dtype = args.dtype
+    else:
+        config = ChatGLMConfig.from_pretrained(args.model_name_or_path)
+        dtype = config.dtype if config.dtype is not None else config.paddle_dtype
+
     model = ChatGLMForConditionalGeneration.from_pretrained(
-        args.model_name_or_path, load_state_as_np=True, dtype=args.dtype
+        args.model_name_or_path, load_state_as_np=True, dtype=dtype
     )
+    if args.lora_path is not None:
+        model = LoRAModel.from_pretrained(model, args.lora_path)
 
     model.eval()
     input_spec = [
@@ -102,13 +117,10 @@ def main():
     ]
     model = paddle.jit.to_static(model.generate, input_spec=input_spec)
 
-    print("jit.to_static")
     # # Save converted static graph model
     paddle.jit.save(model, args.output_path)
-    print("jit.save")
     # # Also save tokenizer for inference usage
     tokenizer.save_pretrained(os.path.dirname(args.output_path))
-    print("save_pretrained")
 
 
 if __name__ == "__main__":

@@ -67,7 +67,7 @@ parser.add_argument("--layerwise_decay", default=1.0, type=float, help="Layerwis
 parser.add_argument("--max_steps", default=-1, type=int,
                     help="If > 0: set total number of training steps to perform. Override num_train_epochs.", )
 parser.add_argument("--test_results_file", default="./test_restuls.json", type=str,
-                    help="The file path you would like to save the model ouputs on test dataset.")
+                    help="The file path you would like to save the model outputs on test dataset.")
 
 args = parser.parse_args()
 # yapf: enable

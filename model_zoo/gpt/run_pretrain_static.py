@@ -159,7 +159,7 @@ def run_evaluate(
     for eval_step, batch in enumerate(data_loader):
         loss_return = exe.run(program, feed=batch, fetch_list=eval_fetch)
         if is_last:
-            all_loss.append(float(loss_return))
+            all_loss.append(float(loss_return[0]))
         if eval_step >= iter_steps - 1:
             if not is_last:
                 break
@@ -453,8 +453,6 @@ def do_train(args):
                 logger.debug("saving models to {}".format(output_dir))
                 save_persistables(exe, os.path.join(output_dir, "static_vars"), main_program)
 
-                if global_step <= args.save_steps:
-                    model.init_config["init_args"][0].init_config.pop("topo", None)
                 model.save_pretrained(output_dir)
                 tokenizer.save_pretrained(output_dir)
                 # tic_train = time.time()

@@ -62,7 +62,37 @@ class ModelMixin(metaclass=DummyObject):
         requires_backends(cls, ["paddle"])
 
 
+class MultiAdapter(metaclass=DummyObject):
+    _backends = ["paddle"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+
 class PriorTransformer(metaclass=DummyObject):
+    _backends = ["paddle"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+
+class T2IAdapter(metaclass=DummyObject):
     _backends = ["paddle"]
 
     def __init__(self, *args, **kwargs):
@@ -691,6 +721,21 @@ class UniPCMultistepScheduler(metaclass=DummyObject):
 
 
 class VQDiffusionScheduler(metaclass=DummyObject):
+    _backends = ["paddle"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+
+class DPMSolverUniDiffuserScheduler(metaclass=DummyObject):
     _backends = ["paddle"]
 
     def __init__(self, *args, **kwargs):

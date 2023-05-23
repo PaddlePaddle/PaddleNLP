@@ -100,6 +100,7 @@ python -u train_txt2img_laion400m_trainer.py \
 > * `--num_inference_steps`: 推理预测时候使用的步数。
 > * `--model_max_length`: `tokenizer`中的`model_max_length`参数，超过该长度将会被截断。
 > * `--tokenizer_name`: 我们需要使用的`tokenizer_name`，我们可以使用英文的分词器`bert-base-uncased`，也可以使用中文的分词器`ernie-1.0`。
+> * `--prediction_type`: 预测类型，可从`["epsilon", "v_prediction"]`选择。
 > * `--use_ema`: 是否对`unet`使用`ema`，默认为`False`。
 > * `--max_grad_norm`: 梯度剪裁的最大norm值，`-1`表示不使用梯度裁剪策略。
 > * `--recompute`: 是否开启重计算，(`bool`, 可选, 默认为 `False`)，在开启后我们可以增大batch_size，注意在小batch_size的条件下，开启recompute后显存变化不明显，只有当开大batch_size后才能明显感受到区别。
