@@ -16,12 +16,16 @@ import os
 from dataclasses import dataclass, field
 from functools import partial
 
+import numpy as np
 import paddle
 from data import DataCollatorForSupervisedDataset, custom_instruction_convert_example
-from utils import LlamaTrainer
+from sklearn.metrics import accuracy_score
+from utils import LlamaTrainer, compute_metrics, save_infer_result
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, LoRAModel
+from paddlenlp.prompt import PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.prompt.prefix import llama_postprocess_past_key_value
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.log import logger
@@ -34,6 +38,7 @@ class DataArgument:
     src_length: int = field(default=608, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=160, metadata={"help": "The max length of target text."})
     min_tgt_length: int = field(default=55, metadata={"help": "The min length of target text."})
+    generate_num: int = field(default=0, metadata={"help": "Save first k examples generation result in dev dataset"})
 
 
 @dataclass
@@ -44,7 +49,15 @@ class ModelArgument:
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
+    r: int = field(default=4, metadata={"help": "Lora attention dimension"})
+    merge_weights: bool = field(
+        default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
+    )
+    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
+    num_prefix_tokens: int = field(default=10, metadata={"help": "Number of prefix tokens"})
+    prefix_projection: bool = field(default=True, metadata={"help": "Whether to project the prefix tokens"})
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
+    do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
 
 
 def main():
@@ -108,14 +121,32 @@ def main():
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
         lora_config = LoRAConfig(
             target_modules=[".*q_proj.*", ".*v_proj.*"],
-            r=4,
-            lora_alpha=8,
-            merge_weights=False,
+            r=model_args.r,
+            lora_alpha=2 * model_args.r,
+            merge_weights=model_args.merge_weights,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,
         )
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()
+        model.print_trainable_parameters()
+
+    if model_args.prefix_tuning:
+        prefix_config = PrefixConfig(
+            num_prefix_tokens=model_args.num_prefix_tokens,
+            num_attention_heads=model.config.n_head,
+            num_hidden_layers=model.config.n_layer,
+            hidden_size=model.config.hidden_size,
+            prefix_projection=model_args.prefix_projection,
+            prefix_projection_hidden_size=model.config.hidden_size,
+            dtype=dtype,
+        )
+        model = PrefixModelForCausalLM(
+            model=model,
+            prefix_config=prefix_config,
+            postprocess_past_key_value=llama_postprocess_past_key_value,
+        )
+        model.mark_only_prefix_as_trainable()
         model.print_trainable_parameters()
 
     # Load the dataset.
@@ -126,13 +157,46 @@ def main():
     dev_ds = dev_ds.map(partial(trans_func))
     collate_fn = DataCollatorForSupervisedDataset(tokenizer)
 
+    def compute_metrics_trainer(eval_preds, tokenizer):
+        all_preds = []
+        all_labels = []
+        preds = eval_preds.predictions
+        preds = [x[x != -100] for x in preds]
+        all_preds.extend(tokenizer.batch_decode(preds, skip_special_tokens=True, clean_up_tokenization_spaces=False))
+        labels = [x[x != -100] for x in eval_preds.label_ids]
+        all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
+
+        all_preds = [pred.strip() for pred in all_preds]
+        all_labels = [label.strip() for label in all_labels]
+        all_preds = [pred.strip("question:") for pred in all_preds]
+        all_labels = [label.strip("question:") for label in all_labels]
+
+        eval_result = compute_metrics(all_preds, all_labels)
+        return eval_result
+
+    compute_metrics_func = partial(
+        compute_metrics_trainer,
+        tokenizer=tokenizer,
+    )
+
+    def compute_metrics_not_do_generation(eval_preds):
+        flattened_preds = np.array(eval_preds.predictions).flatten()
+        flattened_labels = np.array(eval_preds.label_ids).flatten()
+        filtered_preds = flattened_preds[flattened_labels != -100]
+        filtered_labels = flattened_labels[flattened_labels != -100]
+        accuracy = accuracy_score(y_true=filtered_labels, y_pred=filtered_preds)
+        return {
+            "accuracy": accuracy,
+        }
+
     trainer = LlamaTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
-        do_generation=False,
+        compute_metrics=compute_metrics_func if model_args.do_generation else compute_metrics_not_do_generation,
+        do_generation=model_args.do_generation,
         data_collator=collate_fn,
     )
 
@@ -146,6 +210,11 @@ def main():
     if training_args.do_eval:
         eval_result = trainer.evaluate()
         trainer.log_metrics("test", eval_result)
+
+    if data_args.generate_num > 0:
+        save_infer_result(
+            trainer, dev_ds, k=data_args.generate_num, src_length=data_args.src_length, tgt_length=data_args.tgt_length
+        )
 
 
 if __name__ == "__main__":

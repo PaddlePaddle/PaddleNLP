@@ -97,11 +97,7 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Fa
     if "input" in example["input"]:
         input = example["input"]
 
-    if "chat" in data_args.task_name:
-        input_seq = instruction + input
-    else:
-        input_seq = "Human: " + instruction + input + "\n Assistant: "
-
+    input_seq = instruction + input
     output_seq = output
 
     source_tokenized = tokenizer(
