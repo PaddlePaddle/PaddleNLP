@@ -19,7 +19,6 @@ from abc import ABC
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 from uuid import uuid4
 
-from pipelines.errors import NodeError
 from pipelines.nodes.base import BaseComponent
 from pipelines.nodes.prompt.shapers import AnswerParser, BaseOutputParser
 from pipelines.schema import Document, MultiLabel
@@ -58,14 +57,6 @@ class BasePromptTemplate(BaseComponent):
         debug: Optional[bool] = None,
     ):
         raise NotImplementedError("This method should never be implemented in the derived class")
-
-
-class PromptTemplateValidationError(NodeError):
-    """
-    The error raised when a PromptTemplate is invalid.
-    """
-
-    pass
 
 
 class _ValidationVisitor(ast.NodeVisitor):
@@ -122,7 +113,7 @@ class _ValidationVisitor(ast.NodeVisitor):
             # methods: instance.method(args, kwargs)
             self.used_functions.append(node.func.attr)
         else:
-            raise PromptTemplateValidationError(
+            raise Exception(
                 f"Invalid function in prompt text for prompt template {self.prompt_template_name}. "
                 f"Allowed functions are {PROMPT_TEMPLATE_ALLOWED_FUNCTIONS}."
             )
