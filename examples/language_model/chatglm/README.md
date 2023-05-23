@@ -163,8 +163,8 @@ python finetune_generation.py \
 - `lora`: 是否使用LoRA技术。
 - `prefix_tuning`: 是否使用Prefix技术。
 - `merge_weights`: 是否合并原始模型和Lora模型的权重。
-- `r`: LoRA注意力部分维度。
-- `num_prefix_tokens`: 前缀令牌数量。
+- `r`: lora 算法中rank（秩）的值。
+- `num_prefix_tokens`: prefix tuning算法中前缀token数量。
 
 ## 模型预测
 
