@@ -14,7 +14,7 @@
 
 from typing import Dict, List, Optional, Union
 
-from pipelines.document_stores import BaseDocumentStore
+from pipelines.document_stores.base import BaseDocumentStore
 from pipelines.nodes.base import BaseComponent
 from pipelines.nodes.prompt import PromptNode, PromptTemplate
 from pipelines.nodes.retriever import BaseRetriever
