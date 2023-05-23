@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
 import numpy as np
-
+import paddle
 import paddle.nn.functional as F
 
 
