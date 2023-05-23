@@ -49,7 +49,7 @@ class PromptNode(BaseComponent):
     the memory and time required to load the model multiple times.
 
     PromptNode also supports multiple model invocation layers:
-    - Hugging Face transformers (all text2text-generation models)
+    - PaddleNLP transformers (all text2text-generation models)
     - OpenAI InstructGPT models
     - Azure OpenAI InstructGPT models
 

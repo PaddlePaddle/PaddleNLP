@@ -37,7 +37,6 @@ class ChatGLMBot(BaseComponent):
             tgt_length=tgt_length,
             **self.kwargs,
         )
-        self.model_name_or_path = "chatglm-6b"
 
     def run(self, query, stream=False):
         """

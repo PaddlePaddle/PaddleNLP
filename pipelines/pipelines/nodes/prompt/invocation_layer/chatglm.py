@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 class ChatGLMInvocationLayer(PromptModelInvocationLayer):
     """
-    A subclass of the PromptModelInvocationLayer class. It loads a pre-trained model from Hugging Face and
+    A subclass of the PromptModelInvocationLayer class. It loads a pre-trained model from Taskflow and
     passes a prepared prompt into that model.
 
     Note: kwargs other than init parameter names are ignored to enable reflective construction of the class,
@@ -42,7 +42,7 @@ class ChatGLMInvocationLayer(PromptModelInvocationLayer):
         **kwargs,
     ):
         """
-        Creates an instance of HFLocalInvocationLayer used to invoke local Hugging Face models.
+        Creates an instance of ChatGLMInvocationLayer used to invoke local ChatGLM models.
 
         :param model_name_or_path: The name or path of the underlying model.
         :param max_length: The maximum number of tokens the output text can have.
@@ -50,18 +50,8 @@ class ChatGLMInvocationLayer(PromptModelInvocationLayer):
         :param use_gpu: Whether to use GPU for inference.
         :param device: The device to use for inference.
         :param kwargs: Additional keyword arguments passed to the underlying model. Due to reflective construction of
-        all PromptModelInvocationLayer instances, this instance of HFLocalInvocationLayer might receive some unrelated
-        kwargs. Only kwargs relevant to the HFLocalInvocationLayer are considered. The list of supported kwargs
-        includes: task_name, trust_remote_code, revision, feature_extractor, tokenizer, config, use_fast, torch_dtype, device_map.
-        For more details about pipeline kwargs in general, see
-        Hugging Face [documentation](https://huggingface.co/docs/transformers/en/main_classes/pipelines#transformers.pipeline).
-
-        This layer supports two additional kwargs: generation_kwargs and model_max_length.
-
-        The generation_kwargs are used to customize text generation for the underlying pipeline. See Hugging
-        Face [docs](https://huggingface.co/docs/transformers/main/en/generation_strategies#customize-text-generation)
-        for more details.
-
+        all PromptModelInvocationLayer instances, this instance of ChatGLMInvocationLayer might receive some unrelated
+        kwargs. Only kwargs relevant to the ChatGLMInvocationLayer are considered.
         The model_max_length is used to specify the custom sequence length for the underlying pipeline.
         """
         super().__init__(model_name_or_path)
