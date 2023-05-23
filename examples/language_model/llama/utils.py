@@ -121,6 +121,14 @@ class LlamaTrainer(Trainer):
             self.lr_scheduler = LambdaDecay(self.args.learning_rate, lr_lambda, last_epoch=-1)
         return self.lr_scheduler
 
+    def log(self, logs: Dict[str, float], **kwargs) -> None:
+        if "loss" in logs:
+            logs["ppl"] = np.exp(logs["loss"])
+        if "eval_loss" in logs:
+            logs["eval_ppl"] = np.exp(logs["eval_loss"])
+
+        super(LlamaTrainer, self).log(logs, **kwargs)
+
 
 def compute_metrics(preds, targets):
     assert len(preds) == len(targets), (
