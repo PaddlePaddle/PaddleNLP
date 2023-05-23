@@ -23,7 +23,7 @@ from pipelines.schema import Document, MultiLabel
 
 
 def instruction_following_models() -> List[str]:
-    return ["flan", "mt0", "bloomz", "davinci", "opt-iml", "gpt-3.5-turbo", "gpt-4", "gpt-35-turbo", "gpt-4-32k"]
+    return ["THUDM/chatglm-6b", "opt-iml", "gpt-3.5-turbo", "gpt-4", "gpt-35-turbo", "gpt-4-32k"]
 
 
 class PromptModel(BaseComponent):

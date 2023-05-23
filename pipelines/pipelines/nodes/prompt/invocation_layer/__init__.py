@@ -13,4 +13,5 @@
 # limitations under the License.
 
 from pipelines.nodes.prompt.invocation_layer.base import PromptModelInvocationLayer
+from pipelines.nodes.prompt.invocation_layer.chatglm import ChatGLMInvocationLayer
 from pipelines.nodes.prompt.invocation_layer.chatgpt import ChatGPTInvocationLayer

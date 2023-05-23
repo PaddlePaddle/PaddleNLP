@@ -67,7 +67,7 @@ class PromptNode(BaseComponent):
 
     def __init__(
         self,
-        model_name_or_path: str = "google/flan-t5-base",
+        model_name_or_path: str = "THUDM/chatglm-6b",
         default_prompt_template: Optional[Union[str, PromptTemplate]] = None,
         output_variable: Optional[str] = None,
         max_length: Optional[int] = 100,
@@ -148,7 +148,6 @@ class PromptNode(BaseComponent):
             self.prompt_model = model_name_or_path
         else:
             raise ValueError("model_name_or_path must be either a string or a PromptModel object")
-        # self.prompt_model = model_name_or_path
 
     def __call__(self, *args, **kwargs) -> List[Any]:
         """
