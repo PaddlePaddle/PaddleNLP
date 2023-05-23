@@ -51,25 +51,6 @@ class TestPromptNode(unittest.TestCase):
             node.remove_prompt_template("fake-template")
             assert e.match("Prompt template fake-template does not exist")
 
-    # @patch("pipelines.nodes.prompt.prompt_node.PromptModel")
-    # def test_prompt_after_adding_template(self, mock_model):
-    #     # Make model always return something positive on invoke
-    #     mock_model.return_value.invoke.return_value = ["positive"]
-
-    #     # Create a template
-    #     template = PromptTemplate(
-    #         name="fake-sentiment-analysis",
-    #         prompt_text="Please give a sentiment for this context. Answer with positive, "
-    #         "negative or neutral. Context: {documents}; Answer:",
-    #     )
-
-    #     # Execute prompt
-    #     node = PromptNode()
-    #     node.add_prompt_template(template)
-    #     result = node.prompt("fake-sentiment-analysis", documents=["Berlin is an amazing city."])
-
-    #     assert result == ["positive"]
-
     @patch.object(PromptNode, "prompt")
     @patch("pipelines.nodes.prompt.prompt_node.PromptModel")
     def test_prompt_call_with_no_kwargs(self, mock_model, mocked_prompt):

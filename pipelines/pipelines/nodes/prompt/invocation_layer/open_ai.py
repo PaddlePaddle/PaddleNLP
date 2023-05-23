@@ -159,7 +159,6 @@ class OpenAIInvocationLayer(PromptModelInvocationLayer):
 
         max_tokens_limit = 4096
         self.max_tokens_limit = max_tokens_limit
-        # self._tokenizer = load_openai_tokenizer(tokenizer_name=tokenizer_name)
 
     @property
     def url(self) -> str:
@@ -266,15 +265,6 @@ class OpenAIInvocationLayer(PromptModelInvocationLayer):
             n_answer_tokens,
             self.max_tokens_limit,
         )
-
-        # if USE_TIKTOKEN:
-        #     tokenized_payload = self._tokenizer.encode(prompt)
-        #     decoded_string = self._tokenizer.decode(tokenized_payload[: self.max_tokens_limit - n_answer_tokens])
-        # else:
-        #     tokenized_payload = self._tokenizer.tokenize(prompt)
-        #     decoded_string = self._tokenizer.convert_tokens_to_string(
-        #         tokenized_payload[: self.max_tokens_limit - n_answer_tokens]
-        #     )
         return prompt
 
     @classmethod

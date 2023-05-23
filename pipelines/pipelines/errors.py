@@ -15,17 +15,8 @@
 # coding: utf8
 """Custom Errors for pipelines stacks"""
 
-from typing import Optional
-
 
 class DuplicateDocumentError(ValueError):
     """Exception for Duplicate document"""
 
     pass
-
-
-class NodeError(Exception):
-    """Exception for issues that occur in a node"""
-
-    def __init__(self, message: Optional[str] = None, send_message_in_event: bool = True):
-        super().__init__(message=message, send_message_in_event=send_message_in_event)

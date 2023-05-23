@@ -97,15 +97,7 @@ class ChatGLMInvocationLayer(PromptModelInvocationLayer):
 
         :param prompt: Prompt text to be sent to the generative model.
         """
-        #  model_max_length = self.pipe.tokenizer.model_max_length
-        # model_max_length = self.max_seq_length
-        # n_prompt_tokens = len(prompt)
-        # n_answer_tokens = self.tgt_length
-        # if (n_prompt_tokens + n_answer_tokens) <= model_max_length:
-        # return prompt
-        # else:
         # TODO: support truncation
-        # return prompt[:model_max_length-n_answer_tokens]
         return prompt
 
     @classmethod

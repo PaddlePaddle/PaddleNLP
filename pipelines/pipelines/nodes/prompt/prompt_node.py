@@ -103,13 +103,6 @@ class PromptNode(BaseComponent):
         You should specify these parameters in the `model_kwargs` dictionary.
 
         """
-        # send_event(
-        #     event_name="PromptNode",
-        #     event_properties={
-        #         "llm.model_name_or_path": model_name_or_path,
-        #         "llm.default_prompt_template": default_prompt_template,
-        #     },
-        # )
         super().__init__()
 
         self.prompt_templates: Dict[str, PromptTemplate] = {pt.name: pt for pt in get_predefined_prompt_templates()}  # type: ignore
@@ -202,8 +195,6 @@ class PromptNode(BaseComponent):
                 prompt = self.prompt_model._ensure_token_limit(prompt)
                 prompt_collector.append(prompt)
                 logger.debug("Prompt being sent to LLM with prompt %s and kwargs %s ", prompt, kwargs_copy)
-                # breakpoint()
-                # output = self.prompt_model.run(prompt, **kwargs_copy)
                 output = self.prompt_model.invoke(prompt, **kwargs_copy)
                 results.extend(output)
         return results
@@ -384,7 +375,6 @@ class PromptNode(BaseComponent):
         results = self(prompt_collector=prompt_collector, **invocation_context)
 
         prompt_template_resolved: PromptTemplate = invocation_context.pop("prompt_template")
-        # output_variable = self.output_variable or prompt_template_resolved.output_variable or "results"
         try:
             output_variable = self.output_variable or prompt_template_resolved.output_variable or "results"
         except:
