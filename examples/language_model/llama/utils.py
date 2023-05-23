@@ -74,9 +74,13 @@ class LlamaTrainer(Trainer):
         ignore_keys: Optional[List[str]] = None,
     ) -> Tuple[Optional[paddle.Tensor], Optional[paddle.Tensor], Optional[paddle.Tensor]]:
 
-        if not self.do_generation:
+        if prediction_loss_only:
             return super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
-
+        elif not self.do_generation:
+            loss, logits, labels = super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
+            # argmax here to avoid gather all logits, which is too memory-consuming.
+            # keepdim in order to maintain the same shape as logits
+            return (loss, logits[..., :-1, :].argmax(axis=-1, keepdim=True), labels[..., 1:])
         model.eval()
 
         preds = model.generate(

@@ -317,10 +317,9 @@ def main():
     def compute_metrics_not_do_generation(eval_preds):
         flattened_preds = np.array(eval_preds.predictions).flatten()
         flattened_labels = np.array(eval_preds.label_ids).flatten()
-        filtered_preds = flattened_preds[flattened_labels != -100]
-        filtered_labels = flattened_labels[flattened_labels != -100]
-        filtered_preds = filtered_preds[filtered_labels != tokenizer.pad_token_id]
-        filtered_labels = filtered_labels[filtered_labels != tokenizer.pad_token_id]
+        cleaned_labels = [True if x != -100 and x != tokenizer.pad_token_id else False for x in flattened_labels]
+        filtered_preds = flattened_preds[cleaned_labels]
+        filtered_labels = flattened_labels[cleaned_labels]
         accuracy = accuracy_score(y_true=filtered_labels, y_pred=filtered_preds)
         return {
             "accuracy": accuracy,
