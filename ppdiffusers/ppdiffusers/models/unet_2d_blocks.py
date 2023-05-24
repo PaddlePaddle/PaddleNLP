@@ -855,7 +855,13 @@ class CrossAttnDownBlock2D(nn.Layer):
         self.gradient_checkpointing = False
 
     def forward(
-        self, hidden_states, temb=None, encoder_hidden_states=None, attention_mask=None, cross_attention_kwargs=None
+        self,
+        hidden_states,
+        temb=None,
+        encoder_hidden_states=None,
+        attention_mask=None,
+        cross_attention_kwargs=None,
+        additional_residuals=None,
     ):
         # TODO(Patrick, William) - attention mask is not used
         output_states = ()
@@ -888,6 +894,12 @@ class CrossAttnDownBlock2D(nn.Layer):
                 ).sample
 
             output_states += (hidden_states,)
+
+        if additional_residuals is not None:
+            hidden_states += additional_residuals
+
+        # westfish: add to align with torch features
+        output_states = tuple(output_states[:-1]) + (hidden_states,)
 
         if self.downsamplers is not None:
             for downsampler in self.downsamplers:

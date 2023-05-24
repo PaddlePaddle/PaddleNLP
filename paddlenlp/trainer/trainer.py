@@ -51,6 +51,11 @@ from ..transformers.model_utils import PretrainedModel, _add_variant, unwrap_mod
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils import device_guard
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
+from ..utils.env import (
+    LORA_WEIGHT_FILE_NAME,
+    PADDLE_WEIGHT_FILE_NAME,
+    PREFIX_WEIGHT_FILE_NAME,
+)
 from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
@@ -100,9 +105,6 @@ TRAINER_STATE_NAME = "trainer_state.json"
 OPTIMIZER_NAME = "optimizer.pdopt"
 SCHEDULER_NAME = "scheduler.pdparams"
 SCALER_NAME = "scaler.pdparams"
-
-WEIGHTS_NAME = "model_state.pdparams"
-CONFIG_NAME = "model_config.json"
 
 
 if is_datasets_available():
@@ -297,7 +299,7 @@ class Trainer:
                 else:
                     paddle.amp.decorate(models=model, level=self.args.fp16_opt_level)
 
-            if self.args.pipeline_parallel_degree > 1:
+            if self.args.pipeline_parallel_degree > 1 or self.args.tensor_parallel_degree > 1:
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
                 self.scaler = fleet.distributed_scaler(self.scaler)
             elif self.sharding is not None:
@@ -402,8 +404,15 @@ class Trainer:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
         if resume_from_checkpoint is not None:
+            if isinstance(self.model, LoRAModel):
+                weight_name = LORA_WEIGHT_FILE_NAME
+            elif isinstance(self.model, PrefixModelForCausalLM):
+                weight_name = PREFIX_WEIGHT_FILE_NAME
+            else:
+                weight_name = PADDLE_WEIGHT_FILE_NAME
+
             if not os.path.isfile(
-                os.path.join(resume_from_checkpoint, _add_variant(WEIGHTS_NAME, self.args.weight_name_suffix))
+                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
             ):
                 raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
 
@@ -411,7 +420,7 @@ class Trainer:
 
             # We load the model state dict on the CPU to avoid an OOM error.
             state_dict = paddle.load(
-                os.path.join(resume_from_checkpoint, _add_variant(WEIGHTS_NAME, self.args.weight_name_suffix)),
+                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)),
                 return_numpy=True,
             )
             # If the model is on the GPU, it still works!
@@ -451,8 +460,14 @@ class Trainer:
                 raise ValueError(f"No valid checkpoint found in output directory ({args.output_dir})")
 
         if resume_from_checkpoint is not None:
+            if isinstance(self.model, LoRAModel):
+                weight_name = LORA_WEIGHT_FILE_NAME
+            elif isinstance(self.model, PrefixModelForCausalLM):
+                weight_name = PREFIX_WEIGHT_FILE_NAME
+            else:
+                weight_name = PADDLE_WEIGHT_FILE_NAME
             if not os.path.isfile(
-                os.path.join(resume_from_checkpoint, _add_variant(WEIGHTS_NAME, self.args.weight_name_suffix))
+                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
             ):
                 raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
 
@@ -460,7 +475,7 @@ class Trainer:
 
             # TODO: Need to load the model state dict on the CPU to avoid an OOM error.
             state_dict = paddle.load(
-                os.path.join(resume_from_checkpoint, _add_variant(WEIGHTS_NAME, self.args.weight_name_suffix)),
+                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)),
                 return_numpy=True,
             )
             # If the model is on the GPU, it still works!
@@ -539,7 +554,9 @@ class Trainer:
         logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
         logger.info(f"  Total optimization steps = {max_steps}")
         logger.info(f"  Total num train samples = {num_train_samples}")
-        per_device_trainable_numel = sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)
+        # per_device_trainable_numel = sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)
+        # TODO: Temporary fix since Tensor.numel() not supported in distributed mode
+        per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
         logger.info(f"  Number of trainable parameters = {per_device_trainable_numel} (per device)")
         if self.args.use_hybrid_parallel:
             # todo fix for pipeline_parallel_degree
@@ -791,9 +808,14 @@ class Trainer:
             logger.info(
                 f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
             )
-
+            if isinstance(self.model, LoRAModel):
+                weight_name = LORA_WEIGHT_FILE_NAME
+            elif isinstance(self.model, PrefixModelForCausalLM):
+                weight_name = PREFIX_WEIGHT_FILE_NAME
+            else:
+                weight_name = PADDLE_WEIGHT_FILE_NAME
             best_model_path = os.path.join(
-                self.state.best_model_checkpoint, _add_variant(WEIGHTS_NAME, self.args.weight_name_suffix)
+                self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
             )
             if os.path.exists(best_model_path):
                 # We load the model state dict on the CPU to avoid an OOM error.
@@ -1322,6 +1344,12 @@ class Trainer:
                 )
                 self.optimizer = optimizer
 
+        # MP/TP only
+        elif self.args.pipeline_parallel_degree <= 1 and self.args.tensor_parallel_degree > 1:
+            model = fleet.distributed_model(model)
+            assert self.optimizer is not None, "Tensor parallel mode need decorate optimizer, pelease init optimizer."
+            self.optimizer = fleet.distributed_optimizer(self.optimizer)
+
         return model
 
     def _prepare_input(self, data: Union[paddle.Tensor, Any]) -> Union[paddle.Tensor, Any]:
@@ -1356,13 +1384,21 @@ class Trainer:
         arguments, depending on the situation.
         """
         if self.enable_autocast_context_manager:
-            black_list = ["reduce_sum", "c_softmax_with_cross_entropy"]
+            custom_black_list = ["reduce_sum", "c_softmax_with_cross_entropy"]
+            custom_white_list = []
+            if self.args.fp16_opt_level == "O2":
+                # https://github.com/PaddlePaddle/Paddle/blob/eb97f4f0adca40b16a309b927e480178beb8ae96/python/paddle/amp/amp_lists.py#L85-L86
+                # the lookup_table is in black_list, but in O2, we need it return fp16
+                custom_white_list.extend(["lookup_table", "lookup_table_v2"])
+
             if self.args.bf16 and self.args.fp16_opt_level == "O2":
-                black_list.append("c_embedding")
+                # c_embedding not support bf16 yet
+                custom_black_list.append("c_embedding")
 
             ctx_manager = autocast(
                 True,
-                custom_black_list=black_list,
+                custom_black_list=custom_black_list,
+                custom_white_list=custom_white_list,
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
             )
@@ -1684,7 +1720,8 @@ class Trainer:
                 if state_dict is None:
                     state_dict = self.model.state_dict()
                 paddle.save(
-                    state_dict, os.path.join(output_dir, _add_variant(WEIGHTS_NAME, self.args.weight_name_suffix))
+                    state_dict,
+                    os.path.join(output_dir, _add_variant(PADDLE_WEIGHT_FILE_NAME, self.args.weight_name_suffix)),
                 )
         else:
             self.model.save_pretrained(

@@ -28,7 +28,7 @@ from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import ColumnParallelLinear
 
 from ..transformers.conversion_utils import ConversionMixin
-from ..transformers.model_utils import PretrainedModel, _add_variant
+from ..transformers.model_utils import PretrainedModel, _add_variant, dtype_guard
 from ..utils.distributed import distributed_gather
 from ..utils.env import LORA_CONFIG_NAME, LORA_WEIGHT_FILE_NAME
 from ..utils.log import logger
@@ -599,7 +599,10 @@ class LoRAModel(nn.Layer):
     def __init__(self, model, lora_config: LoRAConfig) -> None:
         super().__init__()
         self.lora_config = lora_config
-        self.model = self.get_lora_model(model, lora_config)
+        if self.lora_config.dtype is None:
+            self.lora_config.dtype = paddle.get_default_dtype()
+        with dtype_guard(self.lora_config.dtype):
+            self.model = self.get_lora_model(model, lora_config)
         if self.lora_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
             self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
             logger.warning(
@@ -641,11 +644,15 @@ class LoRAModel(nn.Layer):
                 lora_state_dict = lora_model._convert_tensor_parallel(lora_state_dict=lora_state_dict)
 
             # set lora state dict
-            lora_model.model.set_state_dict(lora_state_dict)
+            lora_model.set_state_dict(lora_state_dict)
         else:
             logger.error(f"LoRA weights not found under {lora_path}, creating LoRA weights from scratch")
 
         return lora_model
+
+    def set_state_dict(self, state_dict):
+        self.model.set_state_dict(state_dict)
+        logger.info("Load lora weight successfully")
 
     def _merge_trainable_tensor_parallel(self, trainable_state_dict):
         from paddlenlp.transformers.conversion_utils import split_or_merge_func

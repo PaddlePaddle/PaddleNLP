@@ -22,7 +22,7 @@ import paddle
 import paddle.nn as nn
 from paddle.distributed import fleet
 
-from ..transformers.model_utils import _add_variant
+from ..transformers.model_utils import _add_variant, dtype_guard
 from ..utils.distributed import distributed_gather
 from ..utils.env import (
     PAST_KEY_VALUES_FILE_NAME,
@@ -136,8 +136,11 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         self.model = model
         self.forward_keys = signature(self.model.forward)
         self.config = model.config
-        self.prefix_encoder = self._create_prefix_encoder()
-        self.prefix_dropout = nn.Dropout(p=prefix_config.prefix_dropout)
+        if self.prefix_config.dtype is None:
+            self.prefix_config.dtype = paddle.get_default_dtype()
+        with dtype_guard(self.prefix_config.dtype):
+            self.prefix_encoder = self._create_prefix_encoder()
+            self.prefix_dropout = nn.Dropout(p=prefix_config.prefix_dropout)
         self.prefix_tokens = paddle.arange(self.prefix_config.num_prefix_tokens, dtype="int64")
         self.model_prepare_inputs_for_generation = self.model.prepare_inputs_for_generation
         self.inference = False
@@ -157,17 +160,17 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
     ):
 
         batch_size = input_ids.shape[0]
-        kwargs["use_cache"] = True
         past_key_values = self._get_past_key_values(batch_size)
 
         if attention_mask is not None:
-
             if self.pad_attention_mask is not None:
                 attention_mask = self.pad_attention_mask(
                     input_ids.shape, self.prefix_config.num_prefix_tokens, attention_mask
                 )
             else:
-                prefix_attention_mask = paddle.ones([batch_size, self.prefix_config.num_prefix_tokens])
+                prefix_attention_mask = paddle.ones(
+                    [batch_size, self.prefix_config.num_prefix_tokens], dtype=attention_mask.dtype
+                )
                 attention_mask = paddle.concat((prefix_attention_mask, attention_mask), axis=1)
             kwargs["attention_mask"] = attention_mask
 
@@ -197,7 +200,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             )
         else:
             prefix_attention_mask = paddle.ones(
-                [model_kwargs["input_ids"].shape[0], self.prefix_config.num_prefix_tokens]
+                [model_kwargs["input_ids"].shape[0], self.prefix_config.num_prefix_tokens], dtype=attention_mask.dtype
             )
             attention_mask = paddle.concat((prefix_attention_mask, attention_mask), axis=1)
         model_kwargs["attention_mask"] = attention_mask
@@ -365,7 +368,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
                 prefix_state_dict = prefix_model._convert_tensor_parallel(prefix_state_dict=prefix_state_dict)
 
             # set prefix state dict
-            prefix_model.model.set_state_dict(prefix_state_dict)
+            prefix_model.set_state_dict(prefix_state_dict)
         else:
             logger.error(f"prefix weights not found under {prefix_path}, creating prefix weights from scratch")
 
@@ -407,6 +410,10 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             self.prefix_config.save_pretrained(save_directory)
             self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
             paddle.save({"past_key_values": past_key_values}, os.path.join(save_directory, PAST_KEY_VALUES_FILE_NAME))
+
+    def set_state_dict(self, state_dict):
+        self.prefix_encoder.set_state_dict(state_dict)
+        logger.info("Load prefix weight successfully")
 
     def _merge_trainable_tensor_parallel(self, trainable_state_dict):
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
@@ -502,6 +509,8 @@ def llama_postprocess_past_key_value(past_key_values):
 
 
 def chatglm_pad_attention_mask(input_ids_shape, num_prefix_tokens, attention_mask):
-    prefix_attention_mask = paddle.ones([input_ids_shape[0], 1, input_ids_shape[-1], num_prefix_tokens])
+    prefix_attention_mask = paddle.ones(
+        [input_ids_shape[0], 1, input_ids_shape[-1], num_prefix_tokens], dtype=attention_mask.dtype
+    )
     prefix_attention_mask = (prefix_attention_mask < 0.5).astype("int64")
     return paddle.concat((prefix_attention_mask, attention_mask), axis=3)

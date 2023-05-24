@@ -20,7 +20,7 @@ import numpy as np
 import paddle
 from data import convert_example, custom_instruction_convert_example, read_local_dataset
 from sklearn.metrics import accuracy_score
-from utils import ChatGLMTrainer
+from utils import ChatGLMTrainer, save_infer_result
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
@@ -42,6 +42,9 @@ class DataArgument:
     src_length: int = field(default=128, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=180, metadata={"help": "The max length of target text."})
     num_beams: int = field(default=5, metadata={"help": "The number of beams."})
+    generate_num: int = field(default=0, metadata={"help": "Save first k examples generation result in dev dataset"})
+    src_length: int = field(default=256, metadata={"help": "Source length for generation."})
+    tgt_length: int = field(default=512, metadata={"help": "Target length for generation."})
 
 
 @dataclass
@@ -49,8 +52,14 @@ class ModelArgument:
     model_name_or_path: str = field(
         default="THUDM/chatglm-6b", metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
-    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix Tuning technique"})
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
+    r: int = field(default=8, metadata={"help": "Lora attention dimension"})
+    merge_weights: bool = field(
+        default=True, metadata={"help": "Merge weights of the original model and the Lora model"}
+    )
+    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
+    num_prefix_tokens: int = field(default=64, metadata={"help": "Number of prefix tokens"})
+    prefix_projection: bool = field(default=True, metadata={"help": "Whether to project the prefix tokens"})
     do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
 
 
@@ -97,11 +106,11 @@ def main():
     )
     if model_args.prefix_tuning:
         prefix_config = PrefixConfig(
-            num_prefix_tokens=64,
+            num_prefix_tokens=model_args.num_prefix_tokens,
             num_attention_heads=model.config.num_attention_heads,
             num_hidden_layers=model.config.num_hidden_layers,
             hidden_size=model.config.hidden_size,
-            prefix_projection=True,
+            prefix_projection=model_args.prefix_projection,
             prefix_projection_hidden_size=model.config.hidden_size,
             dtype=dtype,
         )
@@ -116,9 +125,9 @@ def main():
     if model_args.lora:
         lora_config = LoRAConfig(
             target_modules=[".*query_key_value.*"],
-            r=8,
-            lora_alpha=16,
-            merge_weights=True,
+            r=model_args.r,
+            lora_alpha=2 * model_args.r,
+            merge_weights=model_args.merge_weights,
             enable_lora_list=[[True, False, True]],
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,
@@ -176,10 +185,11 @@ def main():
         }
 
     def compute_metrics(eval_preds):
-
-        predictions = [x[x != -100] for x in eval_preds.predictions]
-        references = [x[x != -100] for x in eval_preds.label_ids]
-        accuracy = accuracy_score(y_true=np.array(references).flatten(), y_pred=np.array(predictions).flatten())
+        flattened_preds = np.array(eval_preds.predictions).flatten()
+        flattened_labels = np.array(eval_preds.label_ids).flatten()
+        filtered_preds = flattened_preds[flattened_labels != -100]
+        filtered_labels = flattened_labels[flattened_labels != -100]
+        accuracy = accuracy_score(y_true=filtered_labels, y_pred=filtered_preds)
         return {
             "accuracy": accuracy,
         }
@@ -208,6 +218,11 @@ def main():
     if training_args.do_eval:
         eval_result = trainer.evaluate(test_ds)
         trainer.log_metrics("test", eval_result)
+
+    if data_args.generate_num > 0:
+        save_infer_result(
+            trainer, dev_ds, k=data_args.generate_num, src_length=data_args.src_length, tgt_length=data_args.tgt_length
+        )
 
 
 if __name__ == "__main__":

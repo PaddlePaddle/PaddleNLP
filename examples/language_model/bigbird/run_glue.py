@@ -73,18 +73,19 @@ def convert_example(example, tokenizer, label_list, max_seq_length=512, is_test=
     token_type_ids = None
 
     if (int(is_test) + len(example)) == 2:
-        input_ids.extend(tokenizer.convert_tokens_to_ids(tokenizer(example["sentence"])[: max_seq_length - 2]))
+        input_ids.extend(tokenizer(example["sentence"])["input_ids"][: max_seq_length - 2])
         input_ids.append(tokenizer.sep_id)
         input_len = len(input_ids)
         token_type_ids = input_len * [0]
     else:
-        input_ids1 = tokenizer.convert_tokens_to_ids(tokenizer(example["sentence1"]))
-        input_ids2 = tokenizer.convert_tokens_to_ids(tokenizer(example["sentence2"]))
-        total_len = len(input_ids1) + len(input_ids2) + tokenizer.num_special_tokens_to_add(pair=True)
+        input_ids1 = tokenizer(example["sentence1"])["input_ids"]
+        input_ids2 = tokenizer(example["sentence2"])["input_ids"]
+        total_len = len(input_ids1) + len(input_ids2) + tokenizer.num_special_tokens_to_add(pair=True) + 1
         if total_len > max_seq_length:
             input_ids1, input_ids2, _ = tokenizer.truncate_sequences(
                 input_ids1, input_ids2, total_len - max_seq_length
             )
+
         input_ids.extend(input_ids1)
         input_ids.append(tokenizer.sep_id)
         input_len1 = len(input_ids)
@@ -257,7 +258,7 @@ def do_train(args):
         apply_decay_param_fun=lambda x: x in decay_params,
     )
 
-    loss_fct = paddle.nn.loss.CrossEntropyLoss() if train_ds.label_list else paddle.nn.loss.MSELoss()
+    loss_fct = paddle.nn.CrossEntropyLoss() if train_ds.label_list else paddle.nn.MSELoss()
 
     metric = metric_class()
     global_step = 0

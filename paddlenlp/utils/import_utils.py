@@ -118,17 +118,11 @@ def install_package(
     # 3. load the pypi mirror to speedup of installing packages
     mirror_key = "PYPI_MIRROR"
     mirror_source = os.environ.get(mirror_key, None)
-    if mirror_source is None:
-        logger.info(
-            f"use <https://mirror.baidu.com/pypi/simple> as the default "
-            f"mirror source. you can also change it by setting `{mirror_key}` environment variable"
-        )
-        mirror_source = "https://mirror.baidu.com/pypi/simple"
-    else:
-        logger.info(f"loading <{mirror_source}> as the final mirror source to install package.")
+    if mirror_source is not None:
+        logger.info(f"loading <{mirror_source}> from as the final mirror source to install package.")
+        arguments += ["-i", mirror_source]
 
-    arguments += ["-i", mirror_source, package_name]
-
+    arguments += [package_name]
     pip.main(arguments)
 
     # 4. add site-package to the top of package

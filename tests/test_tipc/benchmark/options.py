@@ -27,7 +27,11 @@ from .modules.lr_scheduler import *  # noqa: F403
 from .modules.optimizer import *  # noqa: F403
 from .modules.rnnlm import RNNLMBenchmark
 from .modules.seq2seq import Seq2SeqBenchmark
-from .modules.stablediffusion import StableDiffusionBenchmark
+
+try:
+    from .modules.stablediffusion import StableDiffusionBenchmark
+except Exception:
+    StableDiffusionBenchmark = None
 from .modules.t5_for_conditional_generation import T5ForConditionalGenerationBenchmark
 from .modules.xlnet import XLNetBenchmark
 
