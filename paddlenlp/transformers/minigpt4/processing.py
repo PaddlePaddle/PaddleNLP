@@ -96,8 +96,8 @@ class MiniGPT4Processor(ProcessorMixin):
     def __call__(
         self,
         images: ImageInput,
-        texts: Union[TextInput, List[TextInput]],
-        prompts: Union[TextInput, List[TextInput]] = None,
+        text: str,
+        prompt: str = None,
         return_tensors: Optional[Union[str, TensorType]] = TensorType.PADDLE,
         **kwargs,
     ) -> BatchFeature:
@@ -106,35 +106,21 @@ class MiniGPT4Processor(ProcessorMixin):
         [`LlamaTokenizer.__call__`] to prepare text for the model.
         Please refer to the docstring of the above two methods for more information.
         """
-
         image_tag = "<ImageHere>"
         text_tag = "<TextHere>"
-        prompts = prompts if prompts is not None else self.default_prompt
+        prompt = prompt if prompt is not None else self.default_prompt
 
-        if (not images) or (not texts):
+        if (not images) or (not text):
             raise ValueError("You have to specify either images and texts.")
-
+        if not isinstance(text, str):
+            raise TypeError("A str type of text is expected, but received {}.".format(type(text)))
+        if not isinstance(prompt, str):
+            raise TypeError("A str type of prompt is expected, but received {}.".format(type(prompt)))
         if isinstance(images, (Image.Image, np.ndarray, paddle.Tensor)):
             images = [images]
 
-        if isinstance(texts, TextInput):
-            texts = [texts]
-
-        if isinstance(prompts, TextInput):
-            prompts = [prompts]
-
-        max_size = max(len(images), len(texts), len(prompts))
-        for item in [images, texts, prompts]:
-            if len(item) == 1:
-                expand_item = item * (max_size - 1)
-                item.extend(expand_item)
-            else:
-                assert (
-                    len(item) == max_size
-                ), "You have to input the same amount of images, texts and prompts, or at least two of them are size 1, but received images:{}, texts:{}, prompts:{}".format(
-                    len(images), len(texts), len(prompts)
-                )
-
+        texts = [text] * len(images)
+        prompts = [prompt] * len(images)
         assemble_texts = []
         for text, prompt in zip(texts, prompts):
             if image_tag not in text:
