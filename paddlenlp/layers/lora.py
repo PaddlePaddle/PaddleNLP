@@ -124,6 +124,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
         merge_weights: bool = True,
+        lora_A_weight_attr: Optional[paddle.ParamAttr] = None,
         **kwargs
     ):
         ColumnParallelLinear.__init__(self, in_features, out_features, **kwargs)
@@ -147,9 +148,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
                 shape=[in_features, r],
                 dtype=self._dtype,
                 is_bias=False,
-                default_initializer=nn.initializer.KaimingUniform(
-                    negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
-                ),
+                attr=lora_A_weight_attr,
             )
             self.lora_B = self.create_parameter(
                 shape=[r, self.output_size_per_partition],
@@ -341,6 +340,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         lora_dropout: float = 0.0,
         merge_weights: bool = True,
         enable_lora: List[bool] = [False],
+        lora_A_weight_attr: Optional[paddle.ParamAttr] = None,
         **kwargs
     ):
         ColumnParallelLinear.__init__(self, in_features, out_features, **kwargs)
@@ -376,9 +376,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
                 shape=[in_features, r * sum(enable_lora)],
                 dtype=self._dtype,
                 is_bias=False,
-                default_initializer=nn.initializer.KaimingUniform(
-                    negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
-                ),
+                attr=lora_A_weight_attr,
             )
             # Make sure lora_B is split in column the same as ColumnParallelLoRALinear.
             self.lora_B = self.create_parameter(
@@ -779,6 +777,11 @@ class LoRAModel(nn.Layer):
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
+                    lora_A_weight_attr=paddle.ParamAttr(
+                        initializer=nn.initializer.KaimingUniform(
+                            negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
+                        )
+                    ),
                 )
         else:
             if isinstance(module, nn.Linear):
@@ -803,6 +806,11 @@ class LoRAModel(nn.Layer):
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
                     enable_lora=enable_lora,
+                    lora_A_weight_attr=paddle.ParamAttr(
+                        initializer=nn.initializer.KaimingUniform(
+                            negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
+                        )
+                    ),
                 )
 
         lora_module.weight = module.weight
