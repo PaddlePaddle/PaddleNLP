@@ -340,6 +340,13 @@ class MultimodalFeatureExtractionTask(Task):
                             self.predictor_map["image"].run()
                             image_features = self.output_handle_map["image"][0].copy_to_cpu()
                             all_feats.append(image_features)
+                    elif self._predictor_type == "fastdeploy":
+                        if "input_ids" in batch_inputs:
+                            text_features = self.predictor_map["text"].infer(dict(batch_inputs))
+                            all_feats.append(text_features)
+                        elif "pixel_values" in batch_inputs:
+                            image_features = self.predictor_map["image"].infer(dict(batch_inputs))
+                            all_feats.append(image_features)
                     else:
                         # onnx mode
                         if "input_ids" in batch_inputs:
@@ -445,6 +452,37 @@ class MultimodalFeatureExtractionTask(Task):
             self.input_handles_map["image"] = self.input_handles
             self.output_handle_map["image"] = self.output_handle
             self._config_map["image"] = self._config
+        elif self._predictor_type == "fastdeploy":
+            import fastdeploy as fd
+
+            # Get text inference model
+            self.inference_model_path = self.inference_text_model_path
+            self._static_model_file = self.inference_model_path + ".pdmodel"
+            self._static_params_file = self.inference_model_path + ".pdiparams"
+
+            option = fd.RuntimeOption()
+            option.set_model_path(self._static_model_file, self._static_params_file)
+            option.use_cpu()
+            # option.paddle_infer_option.enable_mkldnn = False
+            option.set_cpu_thread_num(self.cpu_num)
+            option.use_ort_backend()
+            self.predictor = fd.Runtime(option)
+            self.predictor_map["text"] = self.predictor
+
+            # Get image inference model
+            self.inference_model_path = self.inference_image_model_path
+            self._static_model_file = self.inference_model_path + ".pdmodel"
+            self._static_params_file = self.inference_model_path + ".pdiparams"
+
+            option = fd.RuntimeOption()
+            option.set_model_path(self._static_model_file, self._static_params_file)
+            option.use_cpu()
+            # option.paddle_infer_option.enable_mkldnn = False
+            option.set_cpu_thread_num(self.cpu_num)
+            option.use_ort_backend()
+            self.predictor = fd.Runtime(option)
+            self.predictor_map["image"] = self.predictor
+
         else:
             # Get text onnx model
             self.export_type = "text"
