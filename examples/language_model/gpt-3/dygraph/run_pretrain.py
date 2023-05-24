@@ -49,7 +49,6 @@ from dataset import create_pretrained_dataset  # noqa e402
 from modeling import (  # noqa e402
     GPTForPretraining,
     GPTForPretrainingPipe,
-    GPTModel,
     GPTPretrainingCriterion,
 )
 

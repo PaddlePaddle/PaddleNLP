@@ -763,10 +763,10 @@ class GPTForSequenceClassification(GPTPretrainedModel):
     """
 
     def __init__(self, config: GPTConfig):
-        super(GPTForSequenceClassification, self).__init__()
+        super(GPTForSequenceClassification, self).__init__(config)
         self.gpt = GPTModel(config)
         self.score = nn.Linear(config.hidden_size, config.num_labels, bias_attr=False)
-        self.num_labels = config.num_labels
+        self.num_classes = config.num_labels
 
     def forward(
         self,
@@ -1468,7 +1468,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
     """
 
     def __init__(self, config: GPTConfig):
-        super(GPTLMHeadModel, self).__init__()
+        super(GPTLMHeadModel, self).__init__(config)
         self.gpt = GPTModel(config)
         # def __init__(self, config: paddlenlp.transformers.GPTConfig):
         #     super(GPTLMHeadModel, self).__init__(config)
