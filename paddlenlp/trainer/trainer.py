@@ -2137,8 +2137,7 @@ class Trainer:
         prediction_step function for pipeline parallel mode.
         """
         if hasattr(model, "_prepare_pipeline_inputs_func"):
-            ret = model._prepare_pipeline_inputs_func(inputs)
-            inputs, labels = ret
+            inputs, labels = model._prepare_pipeline_inputs_func(inputs)
             has_labels = labels is not None
         else:
             has_labels = all(inputs.get(k) is not None for k in self.label_names)
