@@ -20,7 +20,7 @@ import numpy as np
 import paddle
 import PIL
 
-from paddlenlp.transformers import CLIPFeatureExtractor, CLIPVisionModelWithProjection
+from paddlenlp.transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
 from ...models import AutoencoderKL, UNet2DConditionModel
 from ...schedulers import KarrasDiffusionSchedulers
@@ -47,10 +47,10 @@ class VersatileDiffusionImageVariationPipeline(DiffusionPipeline):
         scheduler ([`SchedulerMixin`]):
             A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
             [`DDIMScheduler`], [`LMSDiscreteScheduler`], or [`PNDMScheduler`].
-        image_feature_extractor ([`CLIPFeatureExtractor`]):
+        image_feature_extractor ([`CLIPImageProcessor`]):
              that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
-    image_feature_extractor: CLIPFeatureExtractor
+    image_feature_extractor: CLIPImageProcessor
     image_encoder: CLIPVisionModelWithProjection
     image_unet: UNet2DConditionModel
     vae: AutoencoderKL
@@ -58,7 +58,7 @@ class VersatileDiffusionImageVariationPipeline(DiffusionPipeline):
 
     def __init__(
         self,
-        image_feature_extractor: CLIPFeatureExtractor,
+        image_feature_extractor: CLIPImageProcessor,
         image_encoder: CLIPVisionModelWithProjection,
         image_unet: UNet2DConditionModel,
         vae: AutoencoderKL,
@@ -98,7 +98,7 @@ class VersatileDiffusionImageVariationPipeline(DiffusionPipeline):
             return embeds
 
         if isinstance(prompt, paddle.Tensor) and len(prompt.shape) == 4:
-            prompt = [p for p in prompt]
+            prompt = list(prompt)
 
         batch_size = len(prompt) if isinstance(prompt, list) else 1
 
@@ -337,7 +337,7 @@ class VersatileDiffusionImageVariationPipeline(DiffusionPipeline):
         timesteps = self.scheduler.timesteps
 
         # 5. Prepare latent variables
-        num_channels_latents = self.image_unet.in_channels
+        num_channels_latents = self.image_unet.config.in_channels
         latents = self.prepare_latents(
             batch_size * num_images_per_prompt,
             num_channels_latents,
