@@ -19,8 +19,9 @@ import time
 import numpy as np
 import paddle
 from args import parse_args
+from configuration import GPTConfig
 from dataset import create_pretrained_dataset
-from modeling import GPTForPretraining, GPTModel, GPTPretrainingCriterion
+from modeling import GPTForPretraining, GPTPretrainingCriterion
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
     DygraphShardingOptimizer,
@@ -199,7 +200,7 @@ def do_train(args):
     model_config["num_partitions"] = args.mp_degree
     model_config["use_recompute"] = args.use_recompute
     model_config["enable_fuse_transformer"] = False
-    model = GPTForPretraining(GPTModel(**model_config))
+    model = GPTForPretraining(GPTConfig(**model_config))
     # Create the critrion for the gpt model
     criterion = GPTPretrainingCriterion()
 

@@ -21,7 +21,8 @@ from functools import partial
 import numpy as np
 import paddle
 from args import parse_args
-from modeling import GPTLMHeadModel, GPTModel
+from configuration import GPTConfig
+from modeling import GPTLMHeadModel
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
     DygraphShardingOptimizer,
@@ -202,7 +203,7 @@ def do_train(args):
     model_config["num_partitions"] = args.mp_degree
     model_config["use_recompute"] = args.use_recompute
     model_config["enable_fuse_transformer"] = False
-    model = GPTLMHeadModel(GPTModel(**model_config), pad_token_id=tokenizer.pad_token_id)
+    model = GPTLMHeadModel(GPTConfig(**model_config))
     # Create the critrion for the gpt model
 
     # Create the learning_rate sheduler and optimizer
