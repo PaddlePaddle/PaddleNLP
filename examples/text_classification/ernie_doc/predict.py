@@ -12,20 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import os
-import paddle
+from functools import partial
+
 import numpy as np
+import paddle
+import paddle.nn as nn
+from data import (
+    ClassifierIterator,
+    HYPTextPreprocessor,
+    ImdbTextPreprocessor,
+    to_json_file,
+)
+from modeling import ErnieDocForSequenceClassification
+from train import init_memory
+
+from paddlenlp.datasets import load_dataset
+from paddlenlp.taskflow.utils import dygraph_mode_guard
+from paddlenlp.transformers import ErnieDocBPETokenizer, ErnieDocTokenizer
 from paddlenlp.utils.env import PPNLP_HOME
 from paddlenlp.utils.log import logger
-from paddlenlp.taskflow.utils import dygraph_mode_guard
-from modeling import ErnieDocForSequenceClassification
-from paddlenlp.transformers import ErnieDocTokenizer, ErnieDocBPETokenizer
-from paddlenlp.datasets import load_dataset
-from data import ClassifierIterator, ImdbTextPreprocessor, HYPTextPreprocessor, to_json_file
-import paddle.nn as nn
-from train import init_memory
-from functools import partial
-import argparse
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -140,7 +147,7 @@ class LongDocClassifier:
             mode="eval",
             preprocess_text_fn=preprocess_text_fn,
         )
-        self.test_dataloader = paddle.io.DataLoader.from_generator(capacity=70, return_list=True)
+        self.test_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
         self.test_dataloader.set_batch_generator(self.test_ds_iter, paddle.get_device())
 
     def _construct_tokenizer(self, tokenizer_class):

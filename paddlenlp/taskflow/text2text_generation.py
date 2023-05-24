@@ -35,9 +35,9 @@ class ChatGLMTask(Task):
         self._static_mode = False
         self._dtype = kwargs.get("dtype", "float16")
         self.kwargs["generation_task"] = task
-        self._tgt_length = kwargs.get("tgt_length", 128)
+        self._tgt_length = kwargs.get("tgt_length", 2048)
         # Token max length
-        self._max_seq_length = kwargs.get("max_seq_length", 128)
+        self._max_seq_length = kwargs.get("max_seq_length", 2048)
         self._top_k = kwargs.get("top_k", 1)
         self._top_p = kwargs.get("top_p", 1.0)
         self._temperature = kwargs.get("temperature", 1.0)
@@ -82,9 +82,9 @@ class ChatGLMTask(Task):
             # early_stopping
             False,
             # bos_token_id
-            self._tokenizer.eos_token_id,
+            self._tokenizer.bos_token_id,
             # eos_token_id
-            self._tokenizer.end_token_id,
+            self._tokenizer.eos_token_id,
             # pad_token_id
             self._tokenizer.pad_token_id,
             # decoder_start_token_id
@@ -201,7 +201,7 @@ class ChatGLMTask(Task):
                     temperature=self._temperature,
                     max_length=self._tgt_length,
                     bos_token_id=self._tokenizer.bos_token_id,
-                    eos_token_id=self._tokenizer.end_token_id,
+                    eos_token_id=self._tokenizer.eos_token_id,
                     pad_token_id=self._tokenizer.pad_token_id,
                     num_return_sequences=self._num_return_sequences,
                     use_cache=True,

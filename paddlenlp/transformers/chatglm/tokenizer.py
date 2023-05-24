@@ -165,11 +165,12 @@ class ChatGLMTokenizer(PretrainedTokenizer):
     """
 
     resource_files_names = {"vocab_file": "ice_text.model"}
-    max_model_input_sizes = {"THUDM/chatglm-6b": 2048}
+    max_model_input_sizes = {"THUDM/chatglm-6b": 2048, "THUDM/chatglm-6b-v1.1": 2048}
     model_input_names = ["input_ids", "attention_mask", "position_ids"]
     pretrained_resource_files_map = {
         "model_file": {
-            "THUDM/chatglm-6b": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/chatglm-6b/ice_text.model"
+            "THUDM/chatglm-6b": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/chatglm-6b/ice_text.model",
+            "THUDM/chatglm-6b-v1.1": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/chatglm-6b-v1.1/ice_text.model",
         }
     }
 
@@ -223,6 +224,16 @@ class ChatGLMTokenizer(PretrainedTokenizer):
         if self.gmask_token is None:
             return None
         return self.convert_tokens_to_ids(self.gmask_token)
+
+    @property
+    def eos_token_id(self) -> Optional[int]:
+        """
+        `Optional[int]`: Id of the end of sentence token in the vocabulary. Returns `None` if the token has not been
+        set.
+        """
+        if self.eos_token is None:
+            return None
+        return self.convert_tokens_to_ids(self.eos_token)
 
     @property
     def end_token_id(self) -> Optional[int]:
