@@ -286,6 +286,7 @@ class Trainer:
 
         self.do_grad_scaling = False
         self.enable_autocast_context_manager = False
+
         if args.fp16 or args.bf16:
             logger.info("Using half precision")
             self.enable_autocast_context_manager = True
@@ -1292,10 +1293,27 @@ class Trainer:
             # hack for pipeline model mini batch to batch
             # need batter solution @ZHUI
             # make batch_fn compatible for fleet.distributed_model decorate.
-            orig_batch_fn = model.batch_fn if hasattr(model, "batch_fn") else None
+            prepare_pipeline_inputs_func = (
+                model._prepare_pipeline_inputs_func if hasattr(model, "_prepare_pipeline_inputs_func") else None
+            )
             model = fleet.distributed_model(model)
-            if orig_batch_fn:
-                model.batch_fn = orig_batch_fn
+            if prepare_pipeline_inputs_func is not None:
+                model._prepare_pipeline_inputs_func = prepare_pipeline_inputs_func
+            else:
+
+                def _prepare_pipeline_inputs_func(inputs):
+                    if type(inputs) is dict:
+                        return [inputs["input_ids"], inputs["labels"]]
+
+                    keys = list(inputs[0].keys())
+                    inputs_batch = {key: [data.pop(key) for data in inputs] for key in keys}
+
+                    return [inputs_batch["input_ids"], inputs_batch["labels"]]
+
+                logger.warning(
+                    "Using default prepare pipeline inputs func, only support input_ids and labels as inputs."
+                )
+                model._prepare_pipeline_inputs_func = _prepare_pipeline_inputs_func
 
             assert self.optimizer is not None, "Pipeline mode need decorate optimizer, pelease init optimizer."
             if self.args.amp_master_grad:
@@ -1377,6 +1395,8 @@ class Trainer:
         elif isinstance(data, paddle.Tensor):
             # kwargs = dict(device=self.args.current_device)
             # update data type for pure fp16
+            if data.place.is_cuda_pinned_place():
+                return data.cuda()
             return data
             # return data.to(**kwargs)
         return data
@@ -1512,23 +1532,19 @@ class Trainer:
         Return:
             `paddle.Tensor`: The tensor with training loss on this batch.
         """
-        model.micro_batch_size = self.args.per_device_train_batch_size  # hack Pipeline-layers
-        model.accumulate_steps = self.args.gradient_accumulation_steps
-
-        self.pp_data_buffer.append(inputs)
-        # logger.info(f'appending buffer:{len(self.pp_data_buffer)}')
-        if len(self.pp_data_buffer) != self.args.gradient_accumulation_steps:
+        # accumulation data
+        if not hasattr(self, "_pp_data_buffer"):
+            self._pp_data_buffer = []
+        self._pp_data_buffer.append(inputs)
+        if len(self._pp_data_buffer) != self.args.gradient_accumulation_steps:
             return paddle.zeros([])
-        # inputs = DefaultDataCollator()(self.pp_data_buffer)
-        inputs = {
-            k: paddle.concat([d[k] for d in self.pp_data_buffer], 0)
-            if isinstance(self.pp_data_buffer[0][k], paddle.Tensor)
-            else self.pp_data_buffer[0][k]
-            for k in self.pp_data_buffer[0].keys()
-        }
-        # logger.info({k: v.shape for k, v in inputs.items() if k != 'ignored_index'})
-        logger.info(f"fwd pipe: micro-bsz:{model.micro_batch_size} acc-steps:{model.accumulate_steps}")
-        inputs = model.batch_fn(inputs)
+
+        for v in self._pp_data_buffer[0].values():
+            assert isinstance(v, paddle.Tensor), f"Only support tensor as pipeline mode input, got type {type(v)}"
+
+        inputs = model._prepare_pipeline_inputs_func(self._pp_data_buffer)
+        self._pp_data_buffer = []
+
         # hack _prepare_training, remove additional optimizer or scheduler check
         # https://github.com/PaddlePaddle/Paddle/blob/4695122492eee3cc9e9c585e33429c0f98dbdbb0/python/paddle/distributed/fleet/meta_parallel/pipeline_parallel.py#L241
 
@@ -1548,13 +1564,21 @@ class Trainer:
             return data
 
         model.train()
+
+        # hack pipeline-layers
+        # since the pipeline layer will check input is valid every iter.
+        # in same case,  for example, batch size warmup, we need dynamic change gradient_accumulation_steps to implement.
+        config_backup = model.micro_batch_size, model.accumulate_steps
+        model.micro_batch_size = self.args.per_device_train_batch_size
+        model.accumulate_steps = self.args.gradient_accumulation_steps
+
         inputs = _prepare_training(model, inputs)
 
         with self.autocast_smart_context_manager():
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
 
-        self.pp_data_buffer = []
-        # self.return_value = loss
+        model.micro_batch_size, model.accumulate_steps = config_backup
+
         return loss.detach()
 
     def save_model(self, output_dir: Optional[str] = None, merge_tensor_parallel: Optional[bool] = False):
@@ -2112,8 +2136,9 @@ class Trainer:
         """
         prediction_step function for pipeline parallel mode.
         """
-        if hasattr(model, "batch_fn"):
-            inputs, labels = model.batch_fn(inputs)
+        if hasattr(model, "_prepare_pipeline_inputs_func"):
+            ret = model._prepare_pipeline_inputs_func(inputs)
+            inputs, labels = ret
             has_labels = labels is not None
         else:
             has_labels = all(inputs.get(k) is not None for k in self.label_names)
@@ -2170,6 +2195,7 @@ class Trainer:
         """
         if self.args.pipeline_parallel_degree > 1:
             # hack for pipeline mode
+            inputs = self._prepare_inputs(inputs)
             return self.prediction_pipeline_step(model, inputs, prediction_loss_only, ignore_keys)
 
         has_labels = all(inputs.get(k) is not None for k in self.label_names)
