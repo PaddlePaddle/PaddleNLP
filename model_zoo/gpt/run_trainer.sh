@@ -36,8 +36,8 @@ python -u  -m paddle.distributed.launch \
     --output_dir "output/$task_name" \
     --split 949,50,1 \
     --max_seq_length 2048 \
-    --per_device_train_batch_size 16 \
-    --per_device_eval_batch_size 16 \
+    --per_device_train_batch_size 1 \
+    --per_device_eval_batch_size 1 \
     --use_flash_attention 1 \
     --fp16  \
     --fp16_opt_level "O2"  \
@@ -50,6 +50,7 @@ python -u  -m paddle.distributed.launch \
     --max_grad_norm 1.0 \
     --logging_steps 20\
     --dataloader_num_workers 1 \
+    --sharding "stage2" \
     --eval_steps 1000 \
     --report_to "visualdl" \
     --disable_tqdm true \
