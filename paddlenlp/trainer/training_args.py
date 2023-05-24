@@ -391,6 +391,15 @@ class TrainingArguments:
             )
         },
     )
+    amp_master_grad: bool = field(
+        default=False,
+        metadata={
+            "help": "amp_master_grad (bool, optional) – For amp opt level=’O2’, whether to use float32 weight gradients "
+            " for calculations such as gradient clipping, weight decay, and weight updates. If master_grad is enabled,"
+            " the weight gradients will be float32 dtype after the backpropagation. Default is False, there is only float16 weight gradients."
+            "Note: only support pipeline parallell for now !!!"
+        },
+    )
     bf16_full_eval: bool = field(
         default=False,
         metadata={
@@ -448,13 +457,10 @@ class TrainingArguments:
                 "following config is support:\n"
                 "disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape. \n"
                 "disable_partial_send_recv, optmize send speed for tensor parallel.\n"
-                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
+                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n",
+                "enable_dp_comm_overlap, fuse data parallel gradient communication. \n",
             )
         },
-    )
-    use_main_grad: Optional[int] = field(
-        default=0,
-        metadata={},
     )
     recompute: bool = field(
         default=False,
@@ -649,6 +655,11 @@ class TrainingArguments:
         if len(self.sharding) > 0 or self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1:
             self.use_hybrid_parallel = True
 
+        if self.amp_master_grad and self.pipeline_parallel_degree <= 1:
+            raise ValueError(
+                "Temporarily amp master grad only suport for pipeline parallel. please set amp_master_grad to False."
+            )
+
         if self.use_hybrid_parallel:
             world_size = paddle.distributed.get_world_size()
             tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
@@ -697,9 +708,10 @@ class TrainingArguments:
                                 "disable_p2p_cache_shape",
                                 "disable_partial_send_recv",
                                 "enable_delay_scale_loss",
+                                "enable_dp_comm_overlap",
                             ]:
                                 raise ValueError(
-                                    f"Found unknown pipeline model config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
+                                    f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
                                 )
 
                     strategy.pipeline_configs = {
@@ -709,7 +721,7 @@ class TrainingArguments:
                         "p2p_cache_shape": False if "disable_p2p_cache_shape" in pipeline_parallel_config else True,
                         # "delay_scale_loss": True, Fix ME
                     }
-                    logger.info(f"PP configs:{strategy.pipeline_configs}, use_main_grad:{self.use_main_grad}")
+                    logger.info(f"PP configs:{strategy.pipeline_configs}, use master_grad: {self.amp_master_grad}")
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
                         "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config,

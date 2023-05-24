@@ -38,7 +38,6 @@ import paddle.distributed as dist
 import paddle.nn as nn
 from packaging import version
 from paddle.distributed import fleet
-from paddle.distributed.fleet.utils import mix_precision_utils
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
@@ -302,7 +301,9 @@ class Trainer:
 
             if self.args.pipeline_parallel_degree > 1 or self.args.tensor_parallel_degree > 1:
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
-                if self.args.use_main_grad:
+                if self.args.amp_master_grad:
+                    from paddle.distributed.fleet.utils import mix_precision_utils
+
                     mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
                 self.scaler = fleet.distributed_scaler(self.scaler)
             elif self.sharding is not None:
@@ -1278,22 +1279,33 @@ class Trainer:
             model = paddle.DataParallel(model)
             # Distributed training (should be after fp16 initialization)
 
-        # Pipeline model
-        if self.args.pipeline_parallel_degree > 1:
-            if self.args.use_main_grad:
+        in_pipeline_parallel_mode = self.args.pipeline_parallel_degree > 1
+        in_sharding_parallel_mode = self.sharding is not None
+        in_tensor_parallel_model = self.args.tensor_parallel_degree > 1
+
+        # Pipeline mode
+        if in_pipeline_parallel_mode:
+            if self.args.amp_master_grad:
+                from paddle.distributed.fleet.utils import mix_precision_utils
+
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
+            # hack for pipeline model mini batch to batch
+            # need batter solution @ZHUI
+            # make batch_fn compatible for fleet.distributed_model decorate.
             orig_batch_fn = model.batch_fn if hasattr(model, "batch_fn") else None
             model = fleet.distributed_model(model)
             if orig_batch_fn:
                 model.batch_fn = orig_batch_fn
 
             assert self.optimizer is not None, "Pipeline mode need decorate optimizer, pelease init optimizer."
-            if self.args.use_main_grad:
+            if self.args.amp_master_grad:
+                from paddle.distributed.fleet.utils import mix_precision_utils
+
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
 
-        # None pipeline mode (may be handle pure tensor parallel model ?)
-        if self.sharding is not None and self.args.pipeline_parallel_degree <= 1:
+        # No pipeline mode, sharding only
+        if not in_pipeline_parallel_mode and in_sharding_parallel_mode:
             # Sharded DDP!
             if self.args.tensor_parallel_degree > 1:
                 hcg = fleet.get_hybrid_communicate_group()
@@ -1346,8 +1358,8 @@ class Trainer:
                 )
                 self.optimizer = optimizer
 
-        # MP/TP only
-        elif self.args.pipeline_parallel_degree <= 1 and self.args.tensor_parallel_degree > 1:
+        # pure tesnor parallel mode, no pipeline_parallel, no sharding.
+        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and in_tensor_parallel_model:
             model = fleet.distributed_model(model)
             assert self.optimizer is not None, "Tensor parallel mode need decorate optimizer, pelease init optimizer."
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
