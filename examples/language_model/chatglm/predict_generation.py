@@ -68,6 +68,8 @@ class Predictor(object):
             self.tokenizer = ChatGLMTokenizer.from_pretrained(args.model_name_or_path)
             self.batch_size = args.batch_size
             self.args = args
+            self.src_length = self.args.src_length
+            self.tgt_length = self.args.tgt_length
 
             tensor_parallel_degree = paddle.distributed.get_world_size()
             tensor_parallel_rank = 0
@@ -106,6 +108,7 @@ class Predictor(object):
                 self.model = PrefixModelForCausalLM.from_pretrained(
                     self.model, self.args.prefix_path, chatglm_postprocess_past_key_value, chatglm_pad_attention_mask
                 )
+
         self.model.eval()
 
     def preprocess(self, input_text):
@@ -129,7 +132,7 @@ class Predictor(object):
             top_k=1,
             max_length=self.tgt_length,
             bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=self.tokenizer.end_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
             pad_token_id=self.tokenizer.pad_token_id,
             use_cache=True,
         )
