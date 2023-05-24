@@ -343,10 +343,10 @@ class MultimodalFeatureExtractionTask(Task):
                     elif self._predictor_type == "fastdeploy":
                         if "input_ids" in batch_inputs:
                             text_features = self.predictor_map["text"].infer(dict(batch_inputs))
-                            all_feats.append(text_features)
+                            all_feats.append(text_features[0])
                         elif "pixel_values" in batch_inputs:
                             image_features = self.predictor_map["image"].infer(dict(batch_inputs))
-                            all_feats.append(image_features)
+                            all_feats.append(image_features[0])
                     else:
                         # onnx mode
                         if "input_ids" in batch_inputs:
