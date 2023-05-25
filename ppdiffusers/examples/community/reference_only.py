@@ -46,11 +46,14 @@ from ppdiffusers.pipelines.stable_diffusion.safety_checker import (
 from ppdiffusers.schedulers import KarrasDiffusionSchedulers
 from ppdiffusers.utils import (
     PIL_INTERPOLATION,
+    check_min_version,
     deprecate,
     logging,
     randn_tensor,
     replace_example_docstring,
 )
+
+check_min_version("0.14.1")
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
