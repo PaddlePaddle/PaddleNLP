@@ -349,6 +349,13 @@ def rms_norm_fp32(x_in, w, eps):
         return (var_rsqrt * x_in_fp32 * w).astype(w.dtype)
 
 
+class LlamaRMSNorm2(nn.LayerNorm):
+    def __init__(self, config):
+        super().__init__(
+            normalized_shape=config.hidden_size, epsilon=config.rms_norm_eps, weight_attr=None, bias_attr=None
+        )  # False)
+
+
 class LlamaRMSNorm(nn.Layer):
     def __init__(self, config):
         super().__init__()
