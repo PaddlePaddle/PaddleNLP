@@ -50,7 +50,8 @@ python -u -m train_t2i_adapter_trainer.py \
     --control_type raw \
     --data_format img2img \
     --use_paddle_conv_init False \
-    --overwrite_output_dir
+    --overwrite_output_dir \
+    --timestep_sample_schedule cubic
 ```
 `train_t2i_adapter_trainer.py`关键传入的参数解释如下：
 > * `--pretrained_model_name_or_path`: 加载预训练SD模型的名称或本地路径，如`runwayml/stable-diffusion-v1-5`，`pretrained_model_name_or_path`的优先级高于`vae_name_or_path`, `text_encoder_name_or_path`和`unet_name_or_path`。
@@ -81,6 +82,8 @@ python -u -m train_t2i_adapter_trainer.py \
 > * `--is_ldmbert`: 是否使用`ldmbert`作为`text_encoder`，默认为`False`，即使用 `clip text_encoder`。
 > * `--overwrite_output_dir`: 加入该参数之后，将覆盖之前的模型保存路径，不会自动恢复训练。
 > * `--pretrained_adapter_name_or_path`: 加载预训练Adapter模型的名称或本地路径，默认为`None`，此时将随机初始化模型参数。
+> * `--timestep_sample_schedule`: 训练期间时间步采样策略的类型，从[`linear`, `cosine`, `cubic`]中选择，默认为`linear`。
+
 
 
 ### 单机多卡训练 (多机多卡训练，仅需在 paddle.distributed.launch 后加个 --ips IP1,IP2,IP3,IP4)
