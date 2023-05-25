@@ -122,12 +122,11 @@ python -u  -m paddle.distributed.launch \
     --do_eval \
     --num_train_epochs 1 \
     --dataloader_num_workers 1 \
-    --gradient_accumulation_steps 1 \
-    --per_device_train_batch_size 16 \
+    --gradient_accumulation_steps 16 \
+    --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 16 \
     --tensor_parallel_degree 2 \
     --pipeline_parallel_degree 2 \
-    --pipeline_parallel_mirco_batch_size 1 \
     --pipeline_parallel_config "disable_p2p_cache_shape" \
     --overwrite_output_dir \
     --output_dir ./checkpoints/ \
