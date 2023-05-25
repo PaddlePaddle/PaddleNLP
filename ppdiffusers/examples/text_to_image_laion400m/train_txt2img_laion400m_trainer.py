@@ -34,7 +34,8 @@ def main():
     # report to custom_visualdl
     training_args.report_to = ["custom_visualdl"]
     training_args.resolution = data_args.resolution
-
+    training_args.benchmark = model_args.benchmark
+    training_args.profiler_options = model_args.profiler_options
     training_args.image_logging_steps = model_args.image_logging_steps = (
         (math.ceil(model_args.image_logging_steps / training_args.logging_steps) * training_args.logging_steps)
         if model_args.image_logging_steps > 0
