@@ -65,6 +65,7 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
             / scaling_factor * z`. For more details, refer to sections 4.3.2 and D.1 of the [High-Resolution Image
             Synthesis with Latent Diffusion Models](https://arxiv.org/abs/2112.10752) paper.
     """
+    _supports_gradient_checkpointing = True
 
     @register_to_config
     def __init__(
@@ -84,16 +85,21 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
         scaling_factor: float = 0.18215,
     ):
         super().__init__()
+        # if down_block_out_channels not givien, we will use block_out_channels
+        _down_block_out_channels = (
+            self.config.block_out_channels if down_block_out_channels is None else self.config.down_block_out_channels
+        )
+        # if up_block_out_channels not givien, we will use block_out_channels
+        _up_block_out_channels = (
+            self.config.block_out_channels if up_block_out_channels is None else self.config.up_block_out_channels
+        )
 
         # pass init params to Encoder
         self.encoder = Encoder(
             in_channels=in_channels,
             out_channels=latent_channels,
             down_block_types=down_block_types,
-            block_out_channels=down_block_out_channels
-            if down_block_out_channels
-            is not None  # if down_block_out_channels not givien, we will use block_out_channels
-            else block_out_channels,
+            block_out_channels=_down_block_out_channels,
             layers_per_block=layers_per_block,
             act_fn=act_fn,
             norm_num_groups=norm_num_groups,
@@ -105,9 +111,7 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
             in_channels=latent_channels,
             out_channels=out_channels,
             up_block_types=up_block_types,
-            block_out_channels=up_block_out_channels  # if up_block_out_channels not givien, we will use block_out_channels
-            if up_block_out_channels is not None
-            else block_out_channels,
+            block_out_channels=_up_block_out_channels,
             layers_per_block=layers_per_block,
             norm_num_groups=norm_num_groups,
             act_fn=act_fn,
@@ -126,8 +130,12 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
             if isinstance(self.config.sample_size, (list, tuple))
             else self.config.sample_size
         )
-        self.tile_latent_min_size = int(sample_size / (2 ** (len(self.block_out_channels) - 1)))
+        self.tile_latent_min_size = int(sample_size / (2 ** (len(_up_block_out_channels) - 1)))
         self.tile_overlap_factor = 0.25
+
+    def _set_gradient_checkpointing(self, module, value=False):
+        if isinstance(module, (Encoder, Decoder)):
+            module.gradient_checkpointing = value
 
     def enable_tiling(self, use_tiling: bool = True):
         r"""
@@ -203,12 +211,12 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
         return DecoderOutput(sample=decoded)
 
     def blend_v(self, a, b, blend_extent):
-        for y in range(blend_extent):
+        for y in range(min(a.shape[2], b.shape[2], blend_extent)):
             b[:, :, y, :] = a[:, :, -blend_extent + y, :] * (1 - y / blend_extent) + b[:, :, y, :] * (y / blend_extent)
         return b
 
     def blend_h(self, a, b, blend_extent):
-        for x in range(blend_extent):
+        for x in range(min(a.shape[3], b.shape[3], blend_extent)):
             b[:, :, :, x] = a[:, :, :, -blend_extent + x] * (1 - x / blend_extent) + b[:, :, :, x] * (x / blend_extent)
         return b
 

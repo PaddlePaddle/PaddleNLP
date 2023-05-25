@@ -92,7 +92,7 @@ class PriorTransformer(metaclass=DummyObject):
         requires_backends(cls, ["paddle"])
 
 
-class T2IAdapter(metaclass=DummyObject):
+class T5FilmDecoder(metaclass=DummyObject):
     _backends = ["paddle"]
 
     def __init__(self, *args, **kwargs):

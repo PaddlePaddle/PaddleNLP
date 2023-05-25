@@ -31,6 +31,7 @@ from .constants import (
     FROM_HF_HUB,
     HF_MODULES_CACHE,
     HUGGINGFACE_CO_RESOLVE_ENDPOINT,
+    LOW_CPU_MEM_USAGE_DEFAULT,
     NEG_INF,
     PADDLE_WEIGHTS_NAME,
     PPDIFFUSERS_CACHE,
@@ -38,10 +39,12 @@ from .constants import (
     PPDIFFUSERS_MODULES_CACHE,
     PPNLP_BOS_RESOLVE_ENDPOINT,
     TEST_DOWNLOAD_SERVER,
+    TEXT_ENCODER_TARGET_MODULES,
     TO_DIFFUSERS,
     TORCH_SAFETENSORS_WEIGHTS_NAME,
     TORCH_WEIGHTS_NAME,
     WEIGHTS_NAME,
+    get_default_map_location,
 )
 from .deprecation_utils import deprecate
 from .doc_utils import replace_example_docstring
@@ -53,18 +56,26 @@ from .download_utils import (
     ppdiffusers_url_download,
 )
 from .dynamic_modules_utils import get_class_from_dynamic_module
-from .hub_utils import HF_HUB_OFFLINE, http_user_agent
+from .hub_utils import (  # _add_variant, in download_utils.py; _get_model_file, in download_utils.py
+    HF_HUB_OFFLINE,
+    extract_commit_hash,
+    http_user_agent,
+)
 from .import_utils import (
+    BACKENDS_MAPPING,
     ENV_VARS_TRUE_AND_AUTO_VALUES,
     ENV_VARS_TRUE_VALUES,
     DummyObject,
     OptionalDependencyNotAvailable,
+    is_bs4_available,
     is_einops_available,
     is_fastdeploy_available,
+    is_ftfy_available,
     is_inflect_available,
     is_k_diffusion_available,
     is_k_diffusion_version,
     is_librosa_available,
+    is_note_seq_available,
     is_omegaconf_available,
     is_paddle_available,
     is_paddle_version,
@@ -83,11 +94,11 @@ from .import_utils import (
 )
 
 # custom load_utils
-from .load_utils import safetensors_load, smart_load, torch_load
+from .load_utils import is_torch_file, safetensors_load, smart_load, torch_load
 from .logging import get_logger
 from .outputs import BaseOutput
 from .paddle_utils import rand_tensor, randint_tensor, randn_tensor
-from .pil_utils import PIL_INTERPOLATION
+from .pil_utils import PIL_INTERPOLATION, numpy_to_pil, pd_to_pil, pt_to_pil
 
 if is_paddle_available():
     from .testing_utils import (

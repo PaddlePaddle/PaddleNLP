@@ -29,6 +29,7 @@ from ..utils import (
     FROM_DIFFUSERS,
     FROM_HF_HUB,
     HF_HUB_OFFLINE,
+    LOW_CPU_MEM_USAGE_DEFAULT,
     PPDIFFUSERS_CACHE,
     TO_DIFFUSERS,
     _add_variant,
@@ -39,12 +40,33 @@ from ..utils import (
     is_ppxformers_available,
     is_safetensors_available,
     is_torch_available,
+    is_torch_file,
     smart_load,
 )
 
 logger = get_logger(__name__)
 
 __all__ = []
+
+from contextlib import ExitStack
+
+
+class ContextManagers:
+    """
+    Wrapper for `contextlib.ExitStack` which enters a collection of context managers. Adaptation of `ContextManagers`
+    in the `fastcore` library.
+    """
+
+    def __init__(self, context_managers):
+        self.context_managers = context_managers
+        self.stack = ExitStack()
+
+    def __enter__(self):
+        for context_manager in self.context_managers:
+            self.stack.enter_context(context_manager)
+
+    def __exit__(self, *args, **kwargs):
+        self.stack.__exit__(*args, **kwargs)
 
 
 def copy_func(f):
@@ -652,6 +674,7 @@ if is_paddle_available() and is_paddlenlp_available():
         kwargs.pop("dtype", None)
         subfolder = kwargs.pop("subfolder", None)
         variant = kwargs.pop("variant", None)
+        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", LOW_CPU_MEM_USAGE_DEFAULT)
 
         user_agent = {
             "ppdiffusers": __version__,
@@ -660,9 +683,13 @@ if is_paddle_available() and is_paddlenlp_available():
         }
 
         config = None
+
+        model_kwargs = kwargs
         # 1. get the PretrainedConfig to init model
         if not isinstance(config, PretrainedConfig):
             config_path = config if config is not None else pretrained_model_name_or_path
+
+            # TODO fix config  from_pretrained
             # must from hf hub
             if from_hf_hub:
                 if subfolder is not None:
@@ -675,10 +702,10 @@ if is_paddle_available() and is_paddlenlp_available():
                         else "/".join([config_path, subfolder])
                     )
 
-            config = cls.config_class.from_pretrained(
+            config, model_kwargs = cls.config_class.from_pretrained(
                 config_path,
                 cache_dir=cache_dir,
-                return_unused_kwargs=False,
+                return_unused_kwargs=True,
                 force_download=force_download,
                 from_hf_hub=from_hf_hub,
                 **kwargs,
@@ -689,7 +716,6 @@ if is_paddle_available() and is_paddlenlp_available():
         if not from_hf_hub and not os.path.exists(os.path.join(cache_dir, config_path, "config.json")):
             config.save_pretrained(os.path.join(cache_dir, config_path))
 
-        model = cls(config)
         # This variable will flag if we're loading a sharded checkpoint. In this case the archive file is just the
         # Load model
         model_file = None
@@ -746,12 +772,7 @@ if is_paddle_available() and is_paddlenlp_available():
 
         # try load model_file with paddle / torch / safetensor
         state_dict = smart_load(model_file)
-
-        # convert weights
-        if from_diffusers and hasattr(cls, "smart_convert"):
-            state_dict = cls.smart_convert(state_dict, model)
-
-        loaded_state_dict_keys = list(state_dict.keys())
+        init_contexts = []
 
         dtype = set(v.dtype for v in state_dict.values())
         if len(dtype) > 1 and paddle.float32 not in dtype:
@@ -763,7 +784,23 @@ if is_paddle_available() and is_paddlenlp_available():
             dtype = paddle.float32
         else:
             dtype = dtype.pop()
-        model = model.to(dtype=dtype)
+
+        init_contexts.append(paddle.dtype_guard(dtype))
+
+        if low_cpu_mem_usage:
+            # Instantiate model.
+            init_contexts.append(paddle.no_init_weights(_enable=True))
+            if hasattr(paddle, "LazyGuard"):
+                init_contexts.append(paddle.LazyGuard())
+
+        with ContextManagers(init_contexts):
+            model = cls(config, **model_kwargs)
+
+        # convert weights
+        if (from_diffusers or is_torch_file(model_file)) and hasattr(cls, "smart_convert"):
+            state_dict = cls.smart_convert(state_dict, model)
+
+        loaded_state_dict_keys = list(state_dict.keys())
 
         model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
             model=model,
@@ -877,7 +914,7 @@ if is_paddle_available() and is_paddlenlp_available():
         save_directory: str,
         is_main_process: bool = True,
         save_function: Callable = None,
-        safe_serialization: bool = True,
+        safe_serialization: bool = False,
         variant: Optional[str] = None,
         to_diffusers: Optional[bool] = None,
     ):
@@ -947,7 +984,7 @@ if is_paddle_available() and is_paddlenlp_available():
         save_dir: str,
         is_main_process: bool = True,
         save_function: Callable = None,
-        safe_serialization: bool = True,
+        safe_serialization: bool = False,
         variant: Optional[str] = None,
         to_diffusers: Optional[bool] = None,
     ):
@@ -975,7 +1012,6 @@ if is_paddle_available() and is_paddlenlp_available():
         DPTForDepthEstimation,
     )
 
-    # logger.set_level("WARNING")
     from ..models.modeling_pytorch_paddle_utils import (
         convert_pytorch_state_dict_to_paddle,
     )
@@ -1148,6 +1184,7 @@ if is_paddle_available() and is_paddlenlp_available():
     for cls_ in [DPTForDepthEstimation, BitBackbone]:
         setattr(cls_, "smart_convert", convert_pytorch_state_dict_to_paddle)
 
+    # TODO remove this when we updage ImageProcessingMixin
     # patch get_image_processor_dict support subfolder.
 
     IMAGE_PROCESSOR_NAME = "preprocessor_config.json"

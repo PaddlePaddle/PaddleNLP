@@ -23,6 +23,7 @@ from zipfile import ZipFile
 
 import numpy as np
 
+from .constants import get_default_map_location
 from .import_utils import (
     is_paddle_available,
     is_safetensors_available,
@@ -58,6 +59,13 @@ if is_paddle_available():
 
 
 MZ_ZIP_LOCAL_DIR_HEADER_SIZE = 30
+
+
+def is_torch_file(filename=None):
+    if filename is None:
+        return False
+    suffix = Path(str(filename)).suffix.lower()
+    return suffix in torch_suffix + safetensors_suffix
 
 
 def read_prefix_key(path):
@@ -244,7 +252,8 @@ def convert_to_paddle(state_dict, return_numpy=False, return_global_step=False):
     if "global_step" in state_dict and "state_dict" in state_dict:
         if return_global_step:
             pd_state_dict["global_step"] = state_dict.pop("global_step", -1)
-        state_dict = state_dict.get("state_dict", state_dict)
+    while "state_dict" in state_dict:
+        state_dict = state_dict["state_dict"]
 
     for k, v in state_dict.items():
         # maybe position id is bfloat32
@@ -302,7 +311,10 @@ def safetensors_load(path: str):
     return data
 
 
-def smart_load(path: str, map_location: str = "cpu", return_numpy=False, return_global_step=False):
+def smart_load(path: str, map_location: str = None, return_numpy=False, return_global_step=False):
+    if map_location is None:
+        map_location = get_default_map_location()
+
     suffix = Path(path).suffix
     name = Path(path).name
     state_dict = None

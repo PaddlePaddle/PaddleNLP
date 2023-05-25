@@ -38,7 +38,7 @@ from ...utils import logging
 from ..fastdeploy_utils import FastDeployRuntimeModel
 from . import StableDiffusionPipelineOutput
 
-logger = logging.get_logger(__name__)
+logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 
 class FastDeployStableDiffusionPipeline(DiffusionPipeline):
