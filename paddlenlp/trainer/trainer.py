@@ -111,6 +111,12 @@ if is_datasets_available():
     import datasets
 
 
+try:
+    from paddle.distributed.fleet.utils import mix_precision_utils
+except:
+    mix_precision_utils = None
+
+
 def paddlenlp_load(path, return_numpy=False):
     if return_numpy:
         with device_guard():
@@ -299,12 +305,12 @@ class Trainer:
                     paddle.amp.decorate(models=model, level=self.args.fp16_opt_level, dtype=self.amp_dtype)
                 else:
                     paddle.amp.decorate(models=model, level=self.args.fp16_opt_level)
-
-            if self.args.pipeline_parallel_degree > 1 or self.args.tensor_parallel_degree > 1:
+            # for pipeline mode and pure tensor parallel
+            if self.args.pipeline_parallel_degree > 1 or (
+                self.args.tensor_parallel_degree > 1 and self.sharding is None
+            ):
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
                 if self.args.amp_master_grad:
-                    from paddle.distributed.fleet.utils import mix_precision_utils
-
                     mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
                 self.scaler = fleet.distributed_scaler(self.scaler)
             elif self.sharding is not None:
@@ -1287,8 +1293,6 @@ class Trainer:
         # Pipeline mode
         if in_pipeline_parallel_mode:
             if self.args.amp_master_grad:
-                from paddle.distributed.fleet.utils import mix_precision_utils
-
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
             # hack for pipeline model mini batch to batch
             # need batter solution @ZHUI
@@ -1317,8 +1321,6 @@ class Trainer:
 
             assert self.optimizer is not None, "Pipeline mode need decorate optimizer, pelease init optimizer."
             if self.args.amp_master_grad:
-                from paddle.distributed.fleet.utils import mix_precision_utils
-
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
 
@@ -1378,8 +1380,13 @@ class Trainer:
 
         # pure tesnor parallel mode, no pipeline_parallel, no sharding.
         if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and in_tensor_parallel_model:
+            if self.args.amp_master_grad:
+                mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
+
             model = fleet.distributed_model(model)
             assert self.optimizer is not None, "Tensor parallel mode need decorate optimizer, pelease init optimizer."
+            if self.args.amp_master_grad:
+                self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
 
         return model

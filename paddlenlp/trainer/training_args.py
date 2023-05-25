@@ -656,9 +656,11 @@ class TrainingArguments:
             self.use_hybrid_parallel = True
 
         if self.amp_master_grad:
-            if self.pipeline_parallel_degree <= 1 or self.fp16_opt_level != "O2":
+            if (
+                self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1
+            ) or self.fp16_opt_level != "O2":
                 raise ValueError(
-                    "Temporarily amp master grad only suport for pipeline parallel with fp16_opt_level O2. please set amp_master_grad to False."
+                    "Temporarily amp master grad only suport for tensor/pipeline parallel with fp16_opt_level O2. please set amp_master_grad to False."
                 )
             if not (self.bf16 or self.fp16):
                 logger.warning("set amp_master_grad to false since amp is disabled.")
