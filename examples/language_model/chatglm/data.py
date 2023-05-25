@@ -44,8 +44,8 @@ def convert_example(example, tokenizer, data_args, is_test=True):
     # dataset for evaluation
     if is_test:
         inputs = {
-            **tokenizer(prompt, max_length=data_args.src_length, truncation=True, padding="max_length"),
-            "labels": tokenizer(response, max_length=data_args.tgt_length, truncation=True, padding="max_length")[
+            **tokenizer(prompt, max_length=data_args.src_length, truncation=True, truncation_side="left"),
+            "labels": tokenizer(response, max_length=data_args.tgt_length, truncation=True, truncation_side="right")[
                 "input_ids"
             ],
         }
@@ -103,8 +103,8 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Tr
     # dataset for evaluation
     if is_test:
         inputs = {
-            **tokenizer(prompt, max_length=data_args.src_length, truncation=True, padding="max_length"),
-            "labels": tokenizer(response, max_length=data_args.tgt_length, truncation=True, padding="max_length")[
+            **tokenizer(prompt, max_length=data_args.src_length, truncation=True, truncation_side="left"),
+            "labels": tokenizer(response, max_length=data_args.tgt_length, truncation=True, truncation_side="right")[
                 "input_ids"
             ],
         }

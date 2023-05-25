@@ -162,7 +162,7 @@ def main():
     else:
         train_ds = train_ds.map(partial(trans_func, is_test=False))
         test_ds = dev_ds.map(partial(trans_func, is_test=False))
-    dev_ds.new_data = dev_ds.new_data[:4]
+
     collate_fn = DataCollatorForSeq2Seq(
         tokenizer=tokenizer, max_length=data_args.src_length + data_args.tgt_length, padding=True
     )
