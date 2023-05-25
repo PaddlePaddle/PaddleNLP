@@ -393,6 +393,13 @@ elif [ ${MODE} = "benchmark_train" ];then
         cd -
     fi
 
+    if [[ ${model_name} =~ "latent_diffusion_model" ]]; then
+        rm -rf laion400m_demo_data.tar.gz
+        wget https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/laion400m_demo_data.tar.gz
+        rm -rf data
+        tar -zxvf laion400m_demo_data.tar.gz
+    fi
+
     export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
     python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
     python -m pip install setuptools_scm 

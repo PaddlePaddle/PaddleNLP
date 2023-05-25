@@ -56,6 +56,14 @@ class ModelArguments:
             "help": "prediction_type, prediction type of the scheduler function, one of `epsilon` (predicting the noise of the diffusion process), `sample` (directly predicting the noisy sample`) or `v_prediction` (see section 2.4 https://imagen.research.google/video/paper.pdf)"
         },
     )
+    benchmark: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether or not run benchmark."},
+    )
+    profiler_options: Optional[str] = field(
+        default=None,
+        metadata={"help": "profiler_options."},
+    )
 
 
 @dataclass
