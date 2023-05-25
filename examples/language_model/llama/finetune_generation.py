@@ -191,7 +191,9 @@ def main():
         is_test = model_args.eval_with_do_generation
         dev_ds = dev_ds.map(partial(trans_func, is_test=is_test))
 
-    collate_fn = DataCollatorForSupervisedDataset(tokenizer)
+    collate_fn = DataCollatorForSupervisedDataset(
+        tokenizer, max_length=1024 if data_args.always_pad_to_max_length else 0
+    )
 
     def compute_metrics_trainer(eval_preds, tokenizer):
         all_preds = []
