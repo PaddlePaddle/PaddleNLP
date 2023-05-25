@@ -19,7 +19,7 @@ import paddle.nn as nn
 from paddlenlp.transformers import (
     CLIPConfig,
     CLIPVisionModelWithProjection,
-    PreTrainedModel,
+    PretrainedModel,
 )
 
 from ...utils import logging
@@ -27,7 +27,7 @@ from ...utils import logging
 logger = logging.get_logger(__name__)
 
 
-class IFSafetyChecker(PreTrainedModel):
+class IFSafetyChecker(PretrainedModel):
     config_class = CLIPConfig
     _no_split_modules = ["CLIPEncoderLayer"]
 
