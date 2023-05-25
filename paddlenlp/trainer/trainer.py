@@ -111,6 +111,12 @@ if is_datasets_available():
     import datasets
 
 
+try:
+    from paddle.distributed.fleet.utils import mix_precision_utils
+except:
+    mix_precision_utils = None
+
+
 def paddlenlp_load(path, return_numpy=False):
     if return_numpy:
         with device_guard():
@@ -286,6 +292,7 @@ class Trainer:
 
         self.do_grad_scaling = False
         self.enable_autocast_context_manager = False
+
         if args.fp16 or args.bf16:
             logger.info("Using half precision")
             self.enable_autocast_context_manager = True
@@ -298,9 +305,13 @@ class Trainer:
                     paddle.amp.decorate(models=model, level=self.args.fp16_opt_level, dtype=self.amp_dtype)
                 else:
                     paddle.amp.decorate(models=model, level=self.args.fp16_opt_level)
-
-            if self.args.pipeline_parallel_degree > 1 or self.args.tensor_parallel_degree > 1:
+            # for pipeline mode and pure tensor parallel
+            if self.args.pipeline_parallel_degree > 1 or (
+                self.args.tensor_parallel_degree > 1 and self.sharding is None
+            ):
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
+                if self.args.amp_master_grad:
+                    mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
                 self.scaler = fleet.distributed_scaler(self.scaler)
             elif self.sharding is not None:
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
@@ -738,18 +749,13 @@ class Trainer:
                         fused_allreduce_gradients(list(model.parameters()), None)
 
                     # pipeline parallel mode,  handle gradient merge here
-                    if args.pipeline_parallel_degree > 1:
-                        real_accumulate_steps = args.gradient_accumulation_steps
-                        if hasattr(model, "_delay_scale_loss"):
-                            if model._delay_scale_loss:
-                                real_accumulate_steps *= model.accumulate_steps
-
+                    if args.pipeline_parallel_degree > 1 and getattr(model, "_delay_scale_loss", False):
                         for p in model._layers.parameters():
                             if hasattr(p, "main_grad") and p.main_grad is not None:
                                 assert p.grad is None
-                                p.main_grad = p.main_grad.scale(1.0 / real_accumulate_steps)
+                                p.main_grad = p.main_grad.scale(1.0 / model.accumulate_steps)
                             elif p.grad is not None:
-                                p.grad = p.grad.scale(1.0 / real_accumulate_steps)
+                                p.grad = p.grad.scale(1.0 / model.accumulate_steps)
 
                     # Optimizer step
                     optimizer_was_run = True
@@ -1280,18 +1286,46 @@ class Trainer:
             model = paddle.DataParallel(model)
             # Distributed training (should be after fp16 initialization)
 
+        in_pipeline_parallel_mode = self.args.pipeline_parallel_degree > 1
+        in_sharding_parallel_mode = self.sharding is not None
+        in_tensor_parallel_model = self.args.tensor_parallel_degree > 1
+
         # Pipeline mode
-        if self.args.pipeline_parallel_degree > 1:
-            orig_batch_fn = model.batch_fn if hasattr(model, "batch_fn") else None
+        if in_pipeline_parallel_mode:
+            if self.args.amp_master_grad:
+                mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
+            # hack for pipeline model mini batch to batch
+            # need batter solution @ZHUI
+            # make batch_fn compatible for fleet.distributed_model decorate.
+            prepare_pipeline_inputs_func = (
+                model._prepare_pipeline_inputs_func if hasattr(model, "_prepare_pipeline_inputs_func") else None
+            )
             model = fleet.distributed_model(model)
-            if orig_batch_fn:
-                model.batch_fn = orig_batch_fn
+            if prepare_pipeline_inputs_func is not None:
+                model._prepare_pipeline_inputs_func = prepare_pipeline_inputs_func
+            else:
+
+                def _prepare_pipeline_inputs_func(inputs):
+                    if type(inputs) is dict:
+                        return [inputs["input_ids"], inputs["labels"]]
+
+                    keys = list(inputs[0].keys())
+                    inputs_batch = {key: [data.pop(key) for data in inputs] for key in keys}
+
+                    return [inputs_batch["input_ids"], inputs_batch["labels"]]
+
+                logger.warning(
+                    "Using default prepare pipeline inputs func, only support input_ids and labels as inputs."
+                )
+                model._prepare_pipeline_inputs_func = _prepare_pipeline_inputs_func
 
             assert self.optimizer is not None, "Pipeline mode need decorate optimizer, pelease init optimizer."
+            if self.args.amp_master_grad:
+                self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
 
-        # None pipeline mode (may be handle pure tensor parallel model ?)
-        if self.sharding is not None and self.args.pipeline_parallel_degree <= 1:
+        # No pipeline mode, sharding only
+        if not in_pipeline_parallel_mode and in_sharding_parallel_mode:
             # Sharded DDP!
             if self.args.tensor_parallel_degree > 1:
                 hcg = fleet.get_hybrid_communicate_group()
@@ -1344,10 +1378,15 @@ class Trainer:
                 )
                 self.optimizer = optimizer
 
-        # MP/TP only
-        elif self.args.pipeline_parallel_degree <= 1 and self.args.tensor_parallel_degree > 1:
+        # pure tesnor parallel mode, no pipeline_parallel, no sharding.
+        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and in_tensor_parallel_model:
+            if self.args.amp_master_grad:
+                mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
+
             model = fleet.distributed_model(model)
             assert self.optimizer is not None, "Tensor parallel mode need decorate optimizer, pelease init optimizer."
+            if self.args.amp_master_grad:
+                self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
 
         return model
@@ -1363,6 +1402,8 @@ class Trainer:
         elif isinstance(data, paddle.Tensor):
             # kwargs = dict(device=self.args.current_device)
             # update data type for pure fp16
+            if data.place.is_cuda_pinned_place():
+                return data.cuda()
             return data
             # return data.to(**kwargs)
         return data
@@ -1498,21 +1539,28 @@ class Trainer:
         Return:
             `paddle.Tensor`: The tensor with training loss on this batch.
         """
-        if hasattr(model, "batch_fn"):
-            inputs = model.batch_fn(inputs)
-        else:
-            inputs = [inputs.pop("input_ids"), inputs.pop("labels")]
+        # accumulation data
+        if not hasattr(self, "_pp_data_buffer"):
+            self._pp_data_buffer = []
+        self._pp_data_buffer.append(inputs)
+        if len(self._pp_data_buffer) != self.args.gradient_accumulation_steps:
+            return paddle.zeros([])
+
+        for v in self._pp_data_buffer[0].values():
+            assert isinstance(v, paddle.Tensor), f"Only support tensor as pipeline mode input, got type {type(v)}"
+
+        inputs = model._prepare_pipeline_inputs_func(self._pp_data_buffer)
+        self._pp_data_buffer = []
 
         # hack _prepare_training, remove additional optimizer or scheduler check
         # https://github.com/PaddlePaddle/Paddle/blob/4695122492eee3cc9e9c585e33429c0f98dbdbb0/python/paddle/distributed/fleet/meta_parallel/pipeline_parallel.py#L241
+
         def _prepare_training(self, data):
             from paddle import framework
 
             # reset the virtual pp rank for each run
             self.set_virtual_pipeline_rank(0)
-
             assert framework._dygraph_tracer()._has_grad, "Please enable the generation of gradients."
-
             if self.is_pipeline_first_stage(ignore_virtual=True) or self.is_pipeline_last_stage(ignore_virtual=True):
                 assert data is not None, "For the first and the last stage, the data must be set."
             else:
@@ -1523,13 +1571,20 @@ class Trainer:
             return data
 
         model.train()
+
+        # hack pipeline-layers
+        # since the pipeline layer will check input is valid every iter.
+        # in same case,  for example, batch size warmup, we need dynamic change gradient_accumulation_steps to implement.
+        config_backup = model.micro_batch_size, model.accumulate_steps
+        model.micro_batch_size = self.args.per_device_train_batch_size
+        model.accumulate_steps = self.args.gradient_accumulation_steps
+
         inputs = _prepare_training(model, inputs)
 
         with self.autocast_smart_context_manager():
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
 
-        if self.args.gradient_accumulation_steps > 1:
-            loss = loss / self.args.gradient_accumulation_steps
+        model.micro_batch_size, model.accumulate_steps = config_backup
 
         return loss.detach()
 
@@ -2088,8 +2143,8 @@ class Trainer:
         """
         prediction_step function for pipeline parallel mode.
         """
-        if hasattr(model, "batch_fn"):
-            inputs, labels = model.batch_fn(inputs)
+        if hasattr(model, "_prepare_pipeline_inputs_func"):
+            inputs, labels = model._prepare_pipeline_inputs_func(inputs)
             has_labels = labels is not None
         else:
             has_labels = all(inputs.get(k) is not None for k in self.label_names)
@@ -2146,6 +2201,7 @@ class Trainer:
         """
         if self.args.pipeline_parallel_degree > 1:
             # hack for pipeline mode
+            inputs = self._prepare_inputs(inputs)
             return self.prediction_pipeline_step(model, inputs, prediction_loss_only, ignore_keys)
 
         has_labels = all(inputs.get(k) is not None for k in self.label_names)

@@ -391,6 +391,15 @@ class TrainingArguments:
             )
         },
     )
+    amp_master_grad: bool = field(
+        default=False,
+        metadata={
+            "help": "amp_master_grad (bool, optional) – For amp opt level=’O2’, whether to use float32 weight gradients "
+            " for calculations such as gradient clipping, weight decay, and weight updates. If master_grad is enabled,"
+            " the weight gradients will be float32 dtype after the backpropagation. Default is False, there is only float16 weight gradients."
+            "Note: only support pipeline parallell for now !!!"
+        },
+    )
     bf16_full_eval: bool = field(
         default=False,
         metadata={
@@ -439,9 +448,7 @@ class TrainingArguments:
     )
     tensor_parallel_degree: int = field(default=-1, metadata={"help": ("-1 for not use tensor parallel")})
     pipeline_parallel_degree: int = field(default=-1, metadata={"help": ("-1 for not use pipeline parallel")})
-    pipeline_parallel_micro_batch_size: int = field(
-        default=1, metadata={"help": ("mirco_batch_size in pipeline parallel mode")}
-    )
+
     pipeline_parallel_config: str = field(
         default="",
         metadata={
@@ -450,7 +457,8 @@ class TrainingArguments:
                 "following config is support:\n"
                 "disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape. \n"
                 "disable_partial_send_recv, optmize send speed for tensor parallel.\n"
-                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
+                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n",
+                "enable_dp_comm_overlap, fuse data parallel gradient communication. \n",
             )
         },
     )
@@ -647,6 +655,17 @@ class TrainingArguments:
         if len(self.sharding) > 0 or self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1:
             self.use_hybrid_parallel = True
 
+        if self.amp_master_grad:
+            if (
+                self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1
+            ) or self.fp16_opt_level != "O2":
+                raise ValueError(
+                    "Temporarily amp master grad only suport for tensor/pipeline parallel with fp16_opt_level O2. please set amp_master_grad to False."
+                )
+            if not (self.bf16 or self.fp16):
+                logger.warning("set amp_master_grad to false since amp is disabled.")
+                self.amp_master_grad = False
+
         if self.use_hybrid_parallel:
             world_size = paddle.distributed.get_world_size()
             tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
@@ -695,32 +714,32 @@ class TrainingArguments:
                                 "disable_p2p_cache_shape",
                                 "disable_partial_send_recv",
                                 "enable_delay_scale_loss",
+                                "enable_dp_comm_overlap",
                             ]:
                                 raise ValueError(
-                                    f"Found unknown pipeline model config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
+                                    f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
                                 )
-                    assert (
-                        self.per_device_train_batch_size % self.pipeline_parallel_micro_batch_size == 0
-                    ), "train_batch_size should be multiple of mirco_batch_size."
-                    pp_accumulate_steps = self.per_device_train_batch_size // self.pipeline_parallel_micro_batch_size
 
                     strategy.pipeline_configs = {
-                        "accumulate_steps": pp_accumulate_steps,
-                        "micro_batch_size": self.pipeline_parallel_micro_batch_size,
-                        "enable_partial_send_recv": False
-                        if "disable_partial_send_recv" in pipeline_parallel_config
-                        else True,
+                        "accumulate_steps": self.gradient_accumulation_steps,
+                        "micro_batch_size": self.per_device_train_batch_size,
+                        "enable_partial_send_recv": "disable_partial_send_recv" not in pipeline_parallel_config,
                         "p2p_cache_shape": False if "disable_p2p_cache_shape" in pipeline_parallel_config else True,
                         # "delay_scale_loss": True, Fix ME
                     }
+                    logger.info(f"PP configs:{strategy.pipeline_configs}, use master_grad: {self.amp_master_grad}")
                     dygraph_pp_configs = {
-                        "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False
+                        "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
+                        "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config,
                     }
 
                     if self.do_eval:
-                        assert self.per_device_train_batch_size == self.per_device_eval_batch_size, (
+                        assert (
+                            self.per_device_train_batch_size * self.gradient_accumulation_steps
+                            == self.per_device_eval_batch_size
+                        ), (
                             "In pipeline model, the evaluation also shares same setting with training. "
-                            "Please set per_device_eval_batch_size=per_device_train_batch_size."
+                            "Please set per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
                         )
 
                 if tensor_parallel_degree > 1:
@@ -734,8 +753,8 @@ class TrainingArguments:
                 }
 
                 if pipeline_parallel_degree > 1:
-                    if dygraph_pp_configs["delay_scale_loss"]:
-                        hybrid_configs["pp_configs"] = dygraph_pp_configs
+                    hybrid_configs["pp_configs"] = dygraph_pp_configs
+                    logger.info(f"using pipline configs:{dygraph_pp_configs}")
 
                 # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
                 strategy.hybrid_configs = hybrid_configs
