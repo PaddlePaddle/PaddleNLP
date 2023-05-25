@@ -595,8 +595,6 @@ class IFPipeline(DiffusionPipeline):
             image = (image / 2 + 0.5).clip(min=0, max=1)
             image = image.cpu().transpose(perm=[0, 2, 3, 1]).astype(dtype="float32").numpy()
             image, nsfw_detected, watermark_detected = self.run_safety_checker(image, prompt_embeds.dtype)
-        if hasattr(self, "final_offload_hook") and self.final_offload_hook is not None:
-            self.final_offload_hook.offload()
         if not return_dict:
             return image, nsfw_detected, watermark_detected
         return IFPipelineOutput(images=image, nsfw_detected=nsfw_detected, watermark_detected=watermark_detected)

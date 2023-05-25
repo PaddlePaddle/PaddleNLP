@@ -556,8 +556,6 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
         else:
             image = self.decode_latents(latents)
             image, has_nsfw_concept = self.run_safety_checker(image, prompt_embeds.dtype)
-        if hasattr(self, "final_offload_hook") and self.final_offload_hook is not None:
-            self.final_offload_hook.offload()
         if not return_dict:
             return image, has_nsfw_concept
         return StableDiffusionPipelineOutput(images=image, nsfw_content_detected=has_nsfw_concept)
