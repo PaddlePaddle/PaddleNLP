@@ -583,7 +583,7 @@ class TrainingArguments:
     custom_white_list: Optional[List[str]] = field(
         default=None,
         metadata={
-            "help": "The the set of ops that support fp16/bf16 calculation and are considered numerically-safe and performance-critical. These ops will be converted to fp16."
+            "help": "The the set of ops that support fp16/bf16 calculation and are considered numerically-safe and performance-critical. These ops will be converted to fp16/bf16."
         },
     )
 
