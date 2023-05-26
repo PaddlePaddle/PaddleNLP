@@ -468,6 +468,12 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
 
                         Recompute the forward pass to calculate gradients. Used for saving memory (default: False)
 
+  --recompute_granularity
+                        recompute训练的粒度，可选 `full` `full_attn` `core_attn`，full即recompute全部transformer，full_attn表明只recompute所有self attention部分，core_attn表明只recompute `softmax(qkT)v` 部分。注：显存占用方面，`core_attn` > `full_attn` > `full`，若所选策略产生OOM错误，可以适当更改recompute_granularity
+                        (`str`, 可选, 默认为 `full`)
+
+                        The granularity of recompute training can be selected as `full` or `full_attn` or `core_attn`. `full` means complete all transformers, `full_attn` indicates only recompute all self attention parts, `core_attn` indicates that only the `softmax (qkT) v` part is recomputed. Note: In terms of memory usage, `core_attn` > `full_attn` > `full`, if the selected policy generates an OOM error, the recompute can be changed appropriately recompute_granularity. (default: "full")
+
   --minimum_eval_times
                         最少评估次数，如果当前设置的eval_steps，评估次数少于minimum_eval_times，
                         此选项会覆盖eval_steps参数。
@@ -493,6 +499,12 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         （`int`，可选，默认为 None）
 
                         Run an evaluation every X steps. (default: None)
+
+  --max_eval_iters
+                        如果设置为正数，则表示要执行的评估步骤的总数。
+                        （`int`，可选，默认为 -1)
+
+                        If set to a positive number, the total number of evaluation steps to perform. (default: -1)
 
   --dataloader_num_workers
                         用于数据加载的子进程数。 0 表示数据将在主进程制造。
@@ -572,5 +584,15 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                        是否在优化器中使用flatten_param_grads策略，该策略将素有参数摊平后输入Optimizer更新。目前该策略仅在NPU设备上生效。（可选，默认为False）
                        Whether use flatten_param_grads method in optimizer,
                        only used on NPU devices.(default:False)
+
+  --custom_black_list
+                       飞桨有默认的黑名单，可以根据模型特点设置自定义黑名单。自定义黑名单中的算子在计算时会被认为是数值危险的，它们的影响也可能会在下游算子中观察到。该名单中的算子不会转为 float16/bfloat16 计算。(可选，默认为None)
+
+                       The custom black_list. The set of ops that support fp16/bf16 calculation and are considered numerically-dangerous and whose effects may also be observed in downstream ops. These ops will not be converted to fp16/bf16. (default:None)
+
+  --custom_white_list
+                       飞桨有默认的白名单，通常不需要设置自定义白名单。自定义白名单中的算子在计算时会被认为是数值安全的，并且对性能至关重要。如果设置了该名单，其中的算子会使用 float16/bfloat16 计算。(可选，默认为None)
+
+                       The custom white_list. It’s the set of ops that support fp16/bf16 calculation and are considered numerically-safe and performance-critical. These ops will be converted to fp16/bf16. (default:None)
 
 ```
