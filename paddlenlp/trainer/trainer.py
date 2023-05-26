@@ -1425,21 +1425,26 @@ class Trainer:
         arguments, depending on the situation.
         """
         if self.enable_autocast_context_manager:
-            custom_black_list = ["reduce_sum", "c_softmax_with_cross_entropy"]
-            custom_white_list = []
+            black_list = ["reduce_sum", "c_softmax_with_cross_entropy"]
+            white_list = []
             if self.args.fp16_opt_level == "O2":
                 # https://github.com/PaddlePaddle/Paddle/blob/eb97f4f0adca40b16a309b927e480178beb8ae96/python/paddle/amp/amp_lists.py#L85-L86
                 # the lookup_table is in black_list, but in O2, we need it return fp16
-                custom_white_list.extend(["lookup_table", "lookup_table_v2"])
+                white_list.extend(["lookup_table", "lookup_table_v2"])
 
             if self.args.bf16 and self.args.fp16_opt_level == "O2":
                 # c_embedding not support bf16 yet
-                custom_black_list.append("c_embedding")
+                black_list.append("c_embedding")
+
+            if self.args.custom_white_list is not None:
+                white_list.extend(self.args.custom_white_list)
+            if self.args.custom_black_list is not None:
+                black_list.extend(self.args.custom_black_list)
 
             ctx_manager = autocast(
                 True,
-                custom_black_list=custom_black_list,
-                custom_white_list=custom_white_list,
+                custom_black_list=set(black_list),
+                custom_white_list=set(white_list),
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
             )
@@ -1871,6 +1876,7 @@ class Trainer:
             prediction_loss_only=True if self.compute_metrics is None else None,
             ignore_keys=ignore_keys,
             metric_key_prefix=metric_key_prefix,
+            max_eval_iters=self.args.max_eval_iters,
         )
 
         total_batch_size = self.args.eval_batch_size * self.args.dataset_world_size
@@ -2117,7 +2123,11 @@ class Trainer:
 
         eval_loop = self.evaluation_loop
         output = eval_loop(
-            test_dataloader, description="Prediction", ignore_keys=ignore_keys, metric_key_prefix=metric_key_prefix
+            test_dataloader,
+            description="Prediction",
+            ignore_keys=ignore_keys,
+            metric_key_prefix=metric_key_prefix,
+            max_eval_iters=self.args.max_eval_iters,
         )
         total_batch_size = self.args.per_device_eval_batch_size * self.args.dataset_world_size
         output.metrics.update(

@@ -198,6 +198,11 @@ class TrainingArguments:
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
+        recompute_granularity (`str`, *optional*, defaults to `full`):
+            The granularity of recompute training can be selected as `full` or `full_attn` or `core_attn`. `full` means complete
+            all transformers, `full_attn` indicates only recompute all self attention parts, `core_attn` indicates that only
+            the `softmax (qkT) v` part is recomputed. Note: In terms of memory usage, `core_attn` > `full_attn` > `full`, if
+            the selected policy generates an OOM error, the recompute can be changed appropriately recompute_granularity.
         scale_loss (`float`,  *optional*, defaults to 32768):
             The value of initial scale_loss for fp16. (default: 32768)
         local_rank (`int`, *optional*, defaults to -1):
@@ -208,6 +213,8 @@ class TrainingArguments:
         eval_steps (`int`, *optional*):
             Number of update steps between two evaluations if `evaluation_strategy="steps"`. Will default to the same
             value as `logging_steps` if not set.
+        max_eval_iters (`int`, *optional*, defaults to -1):
+            If set to a positive number, the total number of evaluation steps to perform.
         dataloader_num_workers (`int`, *optional*, defaults to 0):
             Number of subprocesses to use for data loading. 0 means that the data will be loaded in the
             main process.
@@ -269,6 +276,12 @@ class TrainingArguments:
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
         flatten_param_grads (`bool`, *optional*):
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
+        custom_black_list (`List[str]`, *optional*, defaults to `None`):
+            The custom black_list. The set of ops that support fp16/bf16 calculation and are considered numerically-dangerous
+            and whose effects may also be observed in downstream ops. These ops will not be converted to fp16/bf16.
+        custom_white_list (`List[str]`, *optional*, defaults to `None`):
+            The custom white_list. It’s the set of ops that support fp16/bf16 calculation and are considered numerically-safe and
+             performance-critical. These ops will be converted to fp16/bf16.
     """
 
     output_dir: str = field(
@@ -470,6 +483,13 @@ class TrainingArguments:
         },
     )
 
+    recompute_granularity: str = field(
+        default="full",
+        metadata={
+            "help": "The granularity of recompute training can be selected as `full` or `full_attn` or `core_attn`. "
+        },
+    )
+
     scale_loss: float = field(default=2**15, metadata={"help": "The value of initial scale_loss for fp16."})
 
     minimum_eval_times: int = field(
@@ -485,6 +505,9 @@ class TrainingArguments:
         default=False, metadata={"help": "Drop the last incomplete batch if it is not divisible by the batch size."}
     )
     eval_steps: int = field(default=None, metadata={"help": "Run an evaluation every X steps."})
+    max_eval_iters: int = field(
+        default=-1, metadata={"help": "If set to a positive number, the total number of evaluation steps to perform."}
+    )
     dataloader_num_workers: int = field(
         default=0,
         metadata={
@@ -550,6 +573,18 @@ class TrainingArguments:
     lazy_data_processing: Optional[bool] = field(
         default=True,
         metadata={"help": "Whether use lazy data processing."},
+    )
+    custom_black_list: Optional[List[str]] = field(
+        default=None,
+        metadata={
+            "help": "The set of ops that support fp16/bf16 calculation and are considered numerically-dangerous and whose effects may also be observed in downstream ops."
+        },
+    )
+    custom_white_list: Optional[List[str]] = field(
+        default=None,
+        metadata={
+            "help": "The the set of ops that support fp16/bf16 calculation and are considered numerically-safe and performance-critical. These ops will be converted to fp16."
+        },
     )
 
     def __post_init__(self):
