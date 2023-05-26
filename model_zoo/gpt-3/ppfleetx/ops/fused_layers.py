@@ -44,8 +44,6 @@ if fused_ln_lib is not None:
     fused_ln = fused_ln_lib.fused_ln
     fused_rms_norm = fused_ln_lib.fused_rms_norm
 
-print(fused_ln)
-
 
 def check_normalized_shape(normalized_shape):
     if isinstance(normalized_shape, (list, tuple)):

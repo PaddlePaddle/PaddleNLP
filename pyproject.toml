@@ -10,7 +10,7 @@ exclude = ['.flake8']
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q --ignore model_zoo/gpt-3/ppfleetx"
+addopts = "-ra -q --ignore model_zoo/gpt-3/"
 pythonpath = ["."]
 testpaths = [
     "tests/data",
