@@ -102,10 +102,10 @@ class MiniGPT4ProcessorTest(unittest.TestCase):
 
         processor = MiniGPT4Processor(tokenizer=tokenizer, image_processor=image_processor)
 
-        input_str = ["lower newer"]
+        input_str = "lower newer"
         image_input = self.prepare_image_inputs()
 
-        inputs = processor(texts=input_str, images=image_input)
+        inputs = processor(text=input_str, images=image_input)
 
         # breakpoint()
         self.assertListEqual(
@@ -131,9 +131,9 @@ class MiniGPT4ProcessorTest(unittest.TestCase):
         tokenizer = self.get_tokenizer()
         processor = MiniGPT4Processor(tokenizer=tokenizer, image_processor=image_processor)
 
-        input_str = ["lower newer"]
+        input_str = "lower newer"
         image_input = self.prepare_image_inputs()
-        inputs = processor(texts=input_str, images=image_input)
+        inputs = processor(text=input_str, images=image_input)
 
         # For now the processor supports only ['pixel_values', 'input_ids', 'attention_mask']
         self.assertListEqual(
