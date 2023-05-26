@@ -41,6 +41,12 @@ from ..model_utils import (
 )
 from .configuration import ClapAudioConfig, ClapConfig, ClapTextConfig
 
+CLAP_PRETRAINED_MODEL_ARCHIVE_LIST = [
+    "laion/clap-htsat-fused",
+    "laion/clap-htsat-unfused",
+    # See all clap models at https://huggingface.co/models?filter=clap
+]
+
 
 def Parameter(tensor):
     return paddle.create_parameter(tensor.shape, dtype=tensor.dtype, default_initializer=nn.initializer.Assign(tensor))
@@ -123,7 +129,9 @@ def create_position_ids_from_input_ids(input_ids, padding_idx, past_key_values_l
     Returns: paddle.Tensor
     """
     # The series of casts and type-conversions here are carefully balanced to both work with ONNX export and XLA.
-    mask = input_ids.not_equal(paddle.to_tensor(padding_idx)).cast("int32")
+    # breakpoint()
+    mask = input_ids.not_equal(paddle.to_tensor(padding_idx, dtype="int32")).cast("int32")
+
     incremental_indices = (paddle.cumsum(mask, axis=1).cast(mask.dtype) + past_key_values_length) * mask
     return incremental_indices.cast("int64") + padding_idx
 
@@ -2148,7 +2156,7 @@ class ClapTextModelWithProjection(ClapPreTrainedModel):
         self.text_model = ClapTextModel(config)
         self.text_projection = ClapProjectionLayer(config)
         # Initialize weights and apply final processing
-        self.post_init()
+        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.text_model.embeddings.word_embeddings
@@ -2217,7 +2225,7 @@ class ClapAudioModelWithProjection(ClapPreTrainedModel):
         self.audio_model = ClapAudioModel(config)
         self.audio_projection = ClapProjectionLayer(config)
         # Initialize weights and apply final processing
-        self.post_init()
+        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.audio_model.audio_encoder.patch_embed.proj
