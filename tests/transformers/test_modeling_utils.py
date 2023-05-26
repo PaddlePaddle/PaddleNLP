@@ -18,7 +18,11 @@ import unittest
 from multiprocessing import Pool
 from tempfile import TemporaryDirectory
 
+import numpy as np
+from parameterized import parameterized
+
 from paddlenlp.transformers import BertModel, TinyBertModel
+from paddlenlp.transformers.model_utils import get_black_list_caster
 from paddlenlp.utils.env import CONFIG_NAME, MODEL_HOME, PADDLE_WEIGHT_FILE_NAME
 from tests.testing_utils import slow
 
@@ -100,3 +104,46 @@ class TestModeling(unittest.TestCase):
         # 2. downloaing tinybert modeling using multi-processing
         with Pool(num_process_in_pool) as pool:
             pool.starmap(download_bert_model, [(model_name,) for _ in range(num_jobs)])
+
+    @parameterized.expand(
+        [
+            ["numpy"],
+            ["paddle"],
+        ]
+    )
+    def test_get_black_list_caster(self, tensor_type: str):
+        def gen_state_dict():
+            if tensor_type == "numpy":
+                state_dict = {
+                    "a": np.random.randn(3, 4).astype("float32"),
+                    "b": np.random.randn(3, 4).astype("float16"),
+                }
+            else:
+                state_dict = {
+                    "a": np.random.randn(3, 4).astype("float32"),
+                    "b": np.random.randn(3, 4).astype("float16"),
+                }
+            return state_dict
+
+        # 1. test cast numpy data
+        state_dict = gen_state_dict()
+        caster = get_black_list_caster(cast_black_list=[])
+        state_dict = {key: caster(key, tensor, "float64") for key, tensor in state_dict.items()}
+
+        self.assertTrue(all([tensor.dtype == np.float64 for tensor in state_dict.values()]))
+
+        # 2. test cast numpy with caster config
+        state_dict = gen_state_dict()
+        caster = get_black_list_caster(cast_black_list=["a"])
+        state_dict = {key: caster(key, tensor, "float64") for key, tensor in state_dict.items()}
+
+        self.assertEqual(state_dict["a"].dtype, np.float32)
+        self.assertEqual(state_dict["b"].dtype, np.float64)
+
+        # 3. test cast numpy with caster config target dtype
+        state_dict = gen_state_dict()
+        caster = get_black_list_caster(cast_black_list=[["a", "bfloat16"]])
+        state_dict = {key: caster(key, tensor, "float64") for key, tensor in state_dict.items()}
+
+        self.assertEqual(state_dict["a"].dtype, np.uint16)
+        self.assertEqual(state_dict["b"].dtype, np.float64)
