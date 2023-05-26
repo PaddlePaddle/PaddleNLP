@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import inspect
-from typing import Callable, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import paddle
@@ -25,18 +25,12 @@ from PIL import Image
 from paddlenlp.transformers import CLIPImageProcessor, CLIPTextModel, CLIPTokenizer
 from ppdiffusers.configuration_utils import FrozenDict
 from ppdiffusers.models import AutoencoderKL, UNet2DConditionModel
-from ppdiffusers.models.cross_attention import (
-    CrossAttnProcessor,
-    LoRACrossAttnProcessor,
-    LoRAXFormersCrossAttnProcessor,
-    XFormersCrossAttnProcessor,
-)
+from ppdiffusers.models.cross_attention import CrossAttention
+from ppdiffusers.models.transformer_2d import Transformer2DModelOutput
 from ppdiffusers.models.unet_2d_blocks import (
-    CrossAttnDownBlock2D,
-    CrossAttnUpBlock2D,
-    DownBlock2D,
-    UNetMidBlock2DCrossAttn,
-    UpBlock2D,
+    ResnetBlock2D,
+    Transformer2DModel,
+    Upsample2D,
 )
 from ppdiffusers.pipeline_utils import DiffusionPipeline
 from ppdiffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
@@ -54,6 +48,8 @@ from ppdiffusers.utils import (
 )
 
 check_min_version("0.14.1")
+
+EPS = 1e-6
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -78,45 +74,206 @@ EXAMPLE_DOC_STRING = """
         ```
 """
 
-# patch this
-if not hasattr(XFormersCrossAttnProcessor, "original_call"):
-    XFormersCrossAttnProcessor.original_call = XFormersCrossAttnProcessor.__call__
-if not hasattr(CrossAttnProcessor, "original_call"):
-    CrossAttnProcessor.original_call = CrossAttnProcessor.__call__
+
+def var_mean(x, axis=-1, keepdim=True, unbiased=True, correction=None):
+    if correction is not None:
+        unbiased = correction
+    var = paddle.var(x, axis=axis, keepdim=keepdim, unbiased=unbiased)
+    mean = paddle.mean(x, axis=axis, keepdim=keepdim)
+    return var, mean
 
 
-def new_call(self, attn, hidden_states, encoder_hidden_states=None, attention_mask=None, **kwargs):
-    return self.original_call(
-        attn=attn,
-        hidden_states=hidden_states,
+def self_attn_forward(self, hidden_states, encoder_hidden_states=None, attention_mask=None, **cross_attention_kwargs):
+    attn_output = None
+
+    if getattr(self, "enable_attn", False):
+        assert attention_mask is None, "attention_mask must be None!"
+        if self.attention_auto_machine_weight > self.attn_weight:
+            do_classifier_free_guidance = len(self.current_uc_indices) > 0
+            chunk_num = 2 if do_classifier_free_guidance else 1
+            latent_hidden_states = hidden_states[:chunk_num]  # uc, c
+            image_hidden_states = hidden_states[chunk_num:]  # uc, c
+
+            image_self_attn1 = self.processor(
+                self,
+                hidden_states=image_hidden_states,
+                encoder_hidden_states=image_hidden_states,
+                attention_mask=attention_mask,
+                **cross_attention_kwargs,
+            )
+
+            latent_self_attn1_uc = self.processor(
+                self,
+                latent_hidden_states,
+                encoder_hidden_states=paddle.concat(
+                    [latent_hidden_states]
+                    + image_hidden_states.split([chunk_num] * (image_hidden_states.shape[0] // chunk_num)),
+                    axis=1,
+                ),
+                attention_mask=attention_mask,
+                **cross_attention_kwargs,
+            )
+
+            if do_classifier_free_guidance and self.current_style_fidelity > 1e-5:
+                latent_self_attn1_c = latent_self_attn1_uc.clone()
+                latent_self_attn1_c[self.current_uc_indices] = self.processor(
+                    self,
+                    hidden_states=latent_hidden_states[self.current_uc_indices],
+                    encoder_hidden_states=latent_hidden_states[self.current_uc_indices],
+                    attention_mask=attention_mask,
+                    **cross_attention_kwargs,
+                )
+                latent_self_attn1 = (
+                    self.current_style_fidelity * latent_self_attn1_c
+                    + (1.0 - self.current_style_fidelity) * latent_self_attn1_uc
+                )
+            else:
+                latent_self_attn1 = latent_self_attn1_uc
+
+            attn_output = paddle.concat([latent_self_attn1, image_self_attn1])
+
+    if attn_output is None:
+        attn_output = self.processor(
+            self,
+            hidden_states=hidden_states,
+            encoder_hidden_states=encoder_hidden_states,
+            attention_mask=attention_mask,
+            **cross_attention_kwargs,
+        )
+    return attn_output
+
+
+def transformer_2d_model_forward(
+    self,
+    hidden_states,
+    encoder_hidden_states=None,
+    timestep=None,
+    class_labels=None,
+    cross_attention_kwargs=None,
+    return_dict: bool = True,
+):
+    x = self.original_forward(
+        hidden_states,
         encoder_hidden_states=encoder_hidden_states,
-        attention_mask=attention_mask,
-    )
+        timestep=timestep,
+        class_labels=class_labels,
+        cross_attention_kwargs=cross_attention_kwargs,
+        return_dict=return_dict,
+    )[0]
+    output = None
+    if getattr(self, "enable_gn", False):
+        if self.gn_auto_machine_weight > self.gn_weight:
+            do_classifier_free_guidance = len(self.current_uc_indices) > 0
+            chunk_num = 2 if do_classifier_free_guidance else 1
+
+            latent_hidden_states = x[:chunk_num]  # uc, c
+            image_hidden_states = x[chunk_num:]  # uc, c
+            image_var, image_mean = var_mean(image_hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
+            var, mean = var_mean(latent_hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
+            std = paddle.maximum(var, paddle.zeros_like(var) + EPS) ** 0.5
+
+            div_num = image_hidden_states.shape[0] // chunk_num
+            mean_acc = sum(image_mean.split([chunk_num] * div_num)) / div_num
+            var_acc = sum(image_var.split([chunk_num] * div_num)) / div_num
+
+            std_acc = paddle.maximum(var_acc, paddle.zeros_like(var_acc) + EPS) ** 0.5
+            y_uc = (((latent_hidden_states - mean) / std) * std_acc) + mean_acc
+            if do_classifier_free_guidance and self.current_style_fidelity > 1e-5:
+                y_c = y_uc.clone()
+                y_c[self.current_uc_indices] = latent_hidden_states[self.current_uc_indices]
+                latent_hidden_states = self.current_style_fidelity * y_c + (1.0 - self.current_style_fidelity) * y_uc
+            else:
+                latent_hidden_states = y_uc
+            output = paddle.concat([latent_hidden_states, image_hidden_states])
+
+    if output is None:
+        output = x
+    if not return_dict:
+        return (output,)
+
+    return Transformer2DModelOutput(sample=output)
 
 
-XFormersCrossAttnProcessor.__call__ = new_call
-CrossAttnProcessor.__call__ = new_call
+def resnet_block_2d_forward(self, input_tensor, temb):
+    x = self.original_forward(input_tensor, temb=temb)
+    output = None
+    if getattr(self, "enable_gn", False):
+        if self.gn_auto_machine_weight > self.gn_weight:
+            do_classifier_free_guidance = len(self.current_uc_indices) > 0
+            chunk_num = 2 if do_classifier_free_guidance else 1
 
-if not hasattr(LoRAXFormersCrossAttnProcessor, "original_call"):
-    LoRAXFormersCrossAttnProcessor.original_call = LoRAXFormersCrossAttnProcessor.__call__
-if not hasattr(LoRACrossAttnProcessor, "original_call"):
-    LoRACrossAttnProcessor.original_call = LoRACrossAttnProcessor.__call__
+            latent_hidden_states = x[:chunk_num]  # uc, c
+            image_hidden_states = x[chunk_num:]  # uc, c
+            image_var, image_mean = var_mean(image_hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
+            var, mean = var_mean(latent_hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
+            std = paddle.maximum(var, paddle.zeros_like(var) + EPS) ** 0.5
+
+            div_num = image_hidden_states.shape[0] // chunk_num
+            mean_acc = sum(image_mean.split([chunk_num] * div_num)) / div_num
+            var_acc = sum(image_var.split([chunk_num] * div_num)) / div_num
+
+            std_acc = paddle.maximum(var_acc, paddle.zeros_like(var_acc) + EPS) ** 0.5
+            y_uc = (((latent_hidden_states - mean) / std) * std_acc) + mean_acc
+            if do_classifier_free_guidance and self.current_style_fidelity > 1e-5:
+                y_c = y_uc.clone()
+                y_c[self.current_uc_indices] = latent_hidden_states[self.current_uc_indices]
+                latent_hidden_states = self.current_style_fidelity * y_c + (1.0 - self.current_style_fidelity) * y_uc
+            else:
+                latent_hidden_states = y_uc
+            output = paddle.concat([latent_hidden_states, image_hidden_states])
+
+    if output is None:
+        output = x
+
+    return output
 
 
-def new_call(self, attn, hidden_states, encoder_hidden_states=None, attention_mask=None, scale=1.0, **kwargs):
-    return self.original_call(
-        attn=attn,
-        hidden_states=hidden_states,
-        encoder_hidden_states=encoder_hidden_states,
-        attention_mask=attention_mask,
-        scale=scale,
-    )
+def upsample_2d_forward(self, hidden_states, output_size=None):
+    x = self.original_forward(hidden_states, output_size=output_size)
+    output = None
+    if getattr(self, "enable_gn", False):
+        if self.gn_auto_machine_weight > self.gn_weight:
+            do_classifier_free_guidance = len(self.current_uc_indices) > 0
+            chunk_num = 2 if do_classifier_free_guidance else 1
+
+            latent_hidden_states = x[:chunk_num]  # uc, c
+            image_hidden_states = x[chunk_num:]  # uc, c
+            image_var, image_mean = var_mean(image_hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
+            var, mean = var_mean(latent_hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
+            std = paddle.maximum(var, paddle.zeros_like(var) + EPS) ** 0.5
+
+            div_num = image_hidden_states.shape[0] // chunk_num
+            mean_acc = sum(image_mean.split([chunk_num] * div_num)) / div_num
+            var_acc = sum(image_var.split([chunk_num] * div_num)) / div_num
+
+            std_acc = paddle.maximum(var_acc, paddle.zeros_like(var_acc) + EPS) ** 0.5
+            y_uc = (((latent_hidden_states - mean) / std) * std_acc) + mean_acc
+            if do_classifier_free_guidance and self.current_style_fidelity > 1e-5:
+                y_c = y_uc.clone()
+                y_c[self.current_uc_indices] = latent_hidden_states[self.current_uc_indices]
+                latent_hidden_states = self.current_style_fidelity * y_c + (1.0 - self.current_style_fidelity) * y_uc
+            else:
+                latent_hidden_states = y_uc
+            output = paddle.concat([latent_hidden_states, image_hidden_states])
+
+    if output is None:
+        output = x
+
+    return output
 
 
-LoRAXFormersCrossAttnProcessor.__call__ = new_call
-LoRACrossAttnProcessor.__call__ = new_call
-
-eps = 1e-6
+if not hasattr(CrossAttention, "original_forward"):
+    CrossAttention.original_forward = CrossAttention.forward
+if not hasattr(Transformer2DModel, "original_forward"):
+    Transformer2DModel.original_forward = Transformer2DModel.forward
+if not hasattr(ResnetBlock2D, "original_forward"):
+    ResnetBlock2D.original_forward = ResnetBlock2D.forward
+if not hasattr(Upsample2D, "original_forward"):
+    Upsample2D.original_forward = Upsample2D.forward
+CrossAttention.forward = self_attn_forward
+Transformer2DModel.forward = transformer_2d_model_forward
+ResnetBlock2D.forward = resnet_block_2d_forward
+Upsample2D.forward = upsample_2d_forward
 
 
 def preprocess(image, resize_mode, width, height):
@@ -207,116 +364,6 @@ def resize_image(resize_mode, im, width, height, upscaler_name=None):
             )
 
     return res
-
-
-class ReferenceOnlyAttnProcessor(CrossAttnProcessor):
-    def __init__(self, bank=None, style_cfgs=None, attn_weight=None):
-        super().__init__()
-        self.bank = bank
-        self.style_cfgs = style_cfgs
-        self.attn_weight = attn_weight
-
-    def __call__(self, attn, hidden_states, encoder_hidden_states=None, attention_mask=None, **cross_attention_kwargs):
-        attention_auto_machine = cross_attention_kwargs.get("attention_auto_machine", "read").lower()
-        current_uc_indices = cross_attention_kwargs.get("current_uc_indices", list(range(hidden_states.shape[0] // 2)))
-        attention_auto_machine_weight = cross_attention_kwargs.get("attention_auto_machine_weight", 1.0)
-        current_style_fidelity = cross_attention_kwargs.get("current_style_fidelity", 0.5)
-        assert attention_auto_machine in ["read", "write"]
-
-        self_attn1 = None
-        if attention_auto_machine == "write":
-            if attention_auto_machine_weight > self.attn_weight:
-                self.bank.append(hidden_states.detach().clone())
-                self.style_cfgs.append(current_style_fidelity)
-        else:
-            if len(self.bank) > 0:
-                style_cfg = sum(self.style_cfgs) / float(len(self.style_cfgs))
-                self_attention_context = encoder_hidden_states or hidden_states
-                # super call
-                self_attn1_uc = super().__call__(
-                    attn=attn,
-                    hidden_states=hidden_states,
-                    encoder_hidden_states=paddle.concat([self_attention_context] + self.bank, axis=1),
-                    attention_mask=attention_mask,
-                )
-                if len(current_uc_indices) > 0 and style_cfg > 1e-5:
-                    self_attn1_c = self_attn1_uc.clone()
-                    self_attn1_c[current_uc_indices] = super().__call__(
-                        attn=attn,
-                        hidden_states=hidden_states[current_uc_indices],
-                        encoder_hidden_states=self_attention_context[current_uc_indices],
-                        attention_mask=attention_mask,
-                    )
-                    self_attn1 = style_cfg * self_attn1_c + (1.0 - style_cfg) * self_attn1_uc
-                else:
-                    self_attn1 = self_attn1_uc
-            self.bank = []
-            self.style_cfgs = []
-
-        if self_attn1 is None:
-            # super call
-            self_attn1 = super().__call__(
-                attn=attn,
-                hidden_states=hidden_states,
-                encoder_hidden_states=encoder_hidden_states,
-                attention_mask=attention_mask,
-            )
-        return self_attn1
-
-
-class XFormersReferenceOnlyAttnProcessor(XFormersCrossAttnProcessor):
-    def __init__(self, attention_op=None, bank=None, style_cfgs=None, attn_weight=None):
-        super().__init__(attention_op=attention_op)
-        self.bank = bank
-        self.style_cfgs = style_cfgs
-        self.attn_weight = attn_weight
-
-    def __call__(self, attn, hidden_states, encoder_hidden_states=None, attention_mask=None, **cross_attention_kwargs):
-        attention_auto_machine = cross_attention_kwargs.get("attention_auto_machine", "read").lower()
-        current_uc_indices = cross_attention_kwargs.get("current_uc_indices", list(range(hidden_states.shape[0] // 2)))
-        attention_auto_machine_weight = cross_attention_kwargs.get("attention_auto_machine_weight", 1.0)
-        current_style_fidelity = cross_attention_kwargs.get("current_style_fidelity", 0.5)
-        assert attention_auto_machine in ["read", "write"]
-
-        attn_output = None
-        if attention_auto_machine == "write":
-            if attention_auto_machine_weight > self.attn_weight:
-                self.bank.append(hidden_states.detach().clone())
-                self.style_cfgs.append(current_style_fidelity)
-        else:
-            if len(self.bank) > 0:
-                style_cfg = sum(self.style_cfgs) / float(len(self.style_cfgs))
-                self_attention_context = encoder_hidden_states or hidden_states
-                encoder_hidden_states = paddle.concat([self_attention_context] + self.bank, axis=1)
-
-                # super call
-                attn_output_uc = super().__call__(
-                    attn=attn,
-                    hidden_states=hidden_states,
-                    encoder_hidden_states=encoder_hidden_states,
-                    attention_mask=attention_mask,
-                )
-                attn_output_c = attn_output_uc.clone()
-                if len(current_uc_indices) > 0 and style_cfg > 1e-5:
-                    attn_output_uc[current_uc_indices] = super().__call__(
-                        attn=attn,
-                        hidden_states=hidden_states[current_uc_indices],
-                        encoder_hidden_states=self_attention_context[current_uc_indices],
-                        attention_mask=attention_mask,
-                    )
-                attn_output = style_cfg * attn_output_c + (1.0 - style_cfg) * attn_output_uc
-            self.bank = []
-            self.style_cfgs = []
-
-        if attn_output is None:
-            # super call
-            attn_output = super().__call__(
-                attn=attn,
-                hidden_states=hidden_states,
-                encoder_hidden_states=encoder_hidden_states,
-                attention_mask=attention_mask,
-            )
-        return attn_output
 
 
 class ReferenceOnlyPipeline(DiffusionPipeline):
@@ -438,31 +485,40 @@ class ReferenceOnlyPipeline(DiffusionPipeline):
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
         self.register_to_config(requires_safety_checker=requires_safety_checker)
 
-        self.attn_procs = None
+        self.attn_modules = None
         self.gn_modules = None
 
     def set_reference_only(
         self,
-        control_name="none",
+        attention_auto_machine_weight=1.0,
         gn_auto_machine_weight=1.0,
         current_style_fidelity=0.5,
         enable_attn=True,
         enable_gn=True,
+        do_classifier_free_guidance=True,
     ):
-        if control_name == "none":
-            if self.gn_modules is not None:
-                for modules in self.gn_modules:
-                    module = modules[-1]
-                    module.gn_auto_machine = "do_nothing"
-            self.attn_procs = None
-            self.gn_modules = None
-            return
+        if self.attn_modules is not None:
+            for module in self.attn_modules:
+                module.enable_attn = enable_attn
+                module.attention_auto_machine_weight = attention_auto_machine_weight
+                module.current_style_fidelity = current_style_fidelity
+                module.current_uc_indices = [0] if do_classifier_free_guidance else []
 
-        if self.attn_procs is None and enable_attn:
+        if self.gn_modules is not None:
+            for module in self.gn_modules:
+                module.enable_gn = enable_gn
+                module.gn_auto_machine_weight = gn_auto_machine_weight
+                module.current_style_fidelity = current_style_fidelity
+                module.current_uc_indices = [0] if do_classifier_free_guidance else []
+
+        # init attn_modules
+        if self.attn_modules is None:
+            attn_modules = []
             self_attn_processors_keys = []
             for name in self.unet.attn_processors.keys():
                 if not name.endswith("attn1.processor"):
                     continue
+                name = name.replace(".processor", "")
                 if name.startswith("mid_block"):
                     hidden_size = self.unet.config.block_out_channels[-1]
                 elif name.startswith("up_blocks"):
@@ -473,26 +529,25 @@ class ReferenceOnlyPipeline(DiffusionPipeline):
                     hidden_size = self.unet.config.block_out_channels[block_id]
                 self_attn_processors_keys.append([name, hidden_size])
 
-            reference_only_attn_procs = self.unet.attn_processors
-
             # 先根据hidden_size排序，再根据字母大小写排序，先down、mid、up。注意diffusers实现的时候初始化顺序不一样。。。。先down、up、mid
-            for i, (name, hidden_size) in enumerate(sorted(self_attn_processors_keys, key=lambda x: (-x[1], x[0]))):
-                cls = (
-                    XFormersReferenceOnlyAttnProcessor
-                    if "xformers" in self.unet.attn_processors[name].__class__.__name__.lower()
-                    else ReferenceOnlyAttnProcessor
-                )
-                reference_only_attn_procs[name] = cls(
-                    bank=[], style_cfgs=[], attn_weight=float(i) / float(len(self_attn_processors_keys))
-                )
-            self.unet.set_attn_processor(reference_only_attn_procs)
-            self.attn_procs = reference_only_attn_procs
+            for i, (name, _) in enumerate(sorted(self_attn_processors_keys, key=lambda x: (-x[1], x[0]))):
+                module = self.unet.get_sublayer(name)
+                module.attn_weight = float(i) / float(len(self_attn_processors_keys))
 
-        if self.gn_modules is None and enable_gn:
+                module.enable_attn = enable_attn
+                module.attention_auto_machine_weight = attention_auto_machine_weight
+                module.current_style_fidelity = current_style_fidelity
+                module.current_uc_indices = [0] if do_classifier_free_guidance else []
+
+                attn_modules.append(module)
+            self.attn_modules = attn_modules
+
+        # init gn_modules
+        if self.gn_modules is None:
             gn_modules = [
-                [self.unet.mid_block],
+                self.unet.mid_block.attentions[-1],
             ]
-            self.unet.mid_block.gn_weight = 0.0
+            self.unet.mid_block.attentions[-1].gn_weight = 0.0
 
             input_block_names = [
                 ("down_blocks.1.resnets.0", "down_blocks.1.attentions.0"),  # 4
@@ -503,12 +558,9 @@ class ReferenceOnlyPipeline(DiffusionPipeline):
                 ("down_blocks.3.resnets.1",),  # 11
             ]
             for w, block_names in enumerate(input_block_names):
-                modules = []
-                for block_name in block_names:
-                    module = self.unet.get_sublayer(block_name)
-                    modules.append(module)
-                gn_modules.append(modules)
-                modules[-1].gn_weight = 1.0 - float(w) / float(len(input_block_names))
+                module = self.unet.get_sublayer(block_names[-1])
+                module.gn_weight = 1.0 - float(w) / float(len(input_block_names))
+                gn_modules.append(module)
 
             output_block_names = [
                 ("up_blocks.0.resnets.0",),  # 0
@@ -521,23 +573,17 @@ class ReferenceOnlyPipeline(DiffusionPipeline):
                 ("up_blocks.2.resnets.1", "up_blocks.2.attentions.1"),  # 7
             ]
             for w, block_names in enumerate(output_block_names):
-                modules = []
-                for block_name in block_names:
-                    module = self.unet.get_sublayer(block_name)
-                    modules.append(module)
-                gn_modules.append(modules)
-                modules[-1].gn_weight = float(w) / float(len(output_block_names))
+                module = self.unet.get_sublayer(block_names[-1])
+                module.gn_weight = float(w) / float(len(output_block_names))
+                gn_modules.append(module)
 
-            for i, modules in enumerate(gn_modules):
-                module = modules[-1]
-                module.mean_bank = []
-                module.var_bank = []
-                module.style_cfgs = []
+            for module in gn_modules:
                 module.gn_weight *= 2
-                module.gn_auto_machine = "write"
+                module.enable_gn = enable_gn
                 module.gn_auto_machine_weight = gn_auto_machine_weight
                 module.current_style_fidelity = current_style_fidelity
-                module.current_uc_indices = []
+                module.current_uc_indices = [0] if do_classifier_free_guidance else []
+
             self.gn_modules = gn_modules
 
     def _encode_prompt(
@@ -815,6 +861,7 @@ class ReferenceOnlyPipeline(DiffusionPipeline):
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
+        cross_attention_kwargs: Optional[Dict[str, Any]] = None,
         # reference
         control_name: str = "reference_only",  # "none", "reference_only", "reference_adain", "reference_adain+attn"
         attention_auto_machine_weight: float = 1.0,
@@ -878,7 +925,9 @@ class ReferenceOnlyPipeline(DiffusionPipeline):
             callback_steps (`int`, *optional*, defaults to 1):
                 The frequency at which the `callback` function will be called. If not specified, the callback will be
                 called at every step.
-
+            cross_attention_kwargs (`dict`, *optional*):
+                A kwargs dictionary that if specified is passed along to the `AttnProcessor` as defined under
+                `self.processor` in `ppdiffusers.models.cross_attention`.
         Examples:
 
         Returns:
@@ -889,7 +938,7 @@ class ReferenceOnlyPipeline(DiffusionPipeline):
             (nsfw) content, according to the `safety_checker`.
         """
         assert control_name in ["none", "reference_only", "reference_adain", "reference_adain+attn"]
-
+        assert num_images_per_prompt == 1
         # 0. Default height and width to unet
         height = height or self.unet.config.sample_size * self.vae_scale_factor
         width = width or self.unet.config.sample_size * self.vae_scale_factor
@@ -951,32 +1000,21 @@ class ReferenceOnlyPipeline(DiffusionPipeline):
             and attention_auto_machine_weight > 0
         )
         enable_gn = "adain" in control_name and image is not None and gn_auto_machine_weight > 0
-        self.set_reference_only(control_name, gn_auto_machine_weight, current_style_fidelity, enable_attn, enable_gn)
+        self.set_reference_only(
+            attention_auto_machine_weight,
+            gn_auto_machine_weight,
+            current_style_fidelity,
+            enable_attn,
+            enable_gn,
+            do_classifier_free_guidance,
+        )
 
-        cross_attention_kwargs_stage1 = {}
-        cross_attention_kwargs_stage2 = {}
-        current_uc_indices = list(range(prompt_embeds.shape[0] // 2)) if do_classifier_free_guidance else []
-        if "reference_" in control_name:
+        if enable_attn or enable_gn:
             image = preprocess(image, resize_mode, width, height)
             image_latents = self.prepare_image_latents(
                 image, batch_size, dtype, generator, do_classifier_free_guidance
             )
-            assert 0 <= current_style_fidelity <= 1, "current_style_fidelity must >=0.0 and <=1.0"
-
-            if enable_attn:
-                assert 0 <= attention_auto_machine_weight <= 1, "attention_auto_machine_weight must >=0.0 and <=1.0"
-
-                cross_attention_kwargs_stage1 = dict(
-                    attention_auto_machine="write",
-                    attention_auto_machine_weight=attention_auto_machine_weight,
-                    current_style_fidelity=current_style_fidelity,
-                )
-                cross_attention_kwargs_stage2 = dict(
-                    attention_auto_machine="read",
-                    current_uc_indices=current_uc_indices,
-                )
-            if enable_gn:
-                assert 0 <= gn_auto_machine_weight <= 1, "attention_auto_machine_weight must >=0.0 and <=1.0"
+            prompt_embeds = prompt_embeds.tile([1 + image.shape[0], 1, 1])
 
         # 8. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
@@ -991,33 +1029,20 @@ class ReferenceOnlyPipeline(DiffusionPipeline):
                     image_latent_model_input = self.scheduler.scale_model_input(
                         self.scheduler.add_noise(image_latents, image_noise, t), t
                     )
-
-                    if enable_gn:
-                        for modules in self.gn_modules:
-                            module = modules[-1]
-                            module.gn_auto_machine = "write"
-                            module.gn_auto_machine_weight = gn_auto_machine_weight
-                            module.current_style_fidelity = current_style_fidelity
-                    self.unet(
-                        image_latent_model_input,
+                    chunk_num = 2 if do_classifier_free_guidance else 1
+                    noise_pred = self.unet(
+                        paddle.concat([latent_model_input, image_latent_model_input]),
                         t,
                         encoder_hidden_states=prompt_embeds,
-                        cross_attention_kwargs=cross_attention_kwargs_stage1,
-                    )
-
-                if enable_gn:
-                    for modules in self.gn_modules:
-                        module = modules[-1]
-                        module.gn_auto_machine = "read"
-                        module.current_uc_indices = current_uc_indices
-
-                # predict the noise residual
-                noise_pred = self.unet(
-                    latent_model_input,
-                    t,
-                    encoder_hidden_states=prompt_embeds,
-                    cross_attention_kwargs=cross_attention_kwargs_stage2,
-                ).sample
+                        cross_attention_kwargs=cross_attention_kwargs,
+                    ).sample[:chunk_num]
+                else:
+                    noise_pred = self.unet(
+                        latent_model_input,
+                        t,
+                        encoder_hidden_states=prompt_embeds,
+                        cross_attention_kwargs=cross_attention_kwargs,
+                    ).sample
 
                 # perform guidance
                 if do_classifier_free_guidance:
@@ -1056,299 +1081,3 @@ class ReferenceOnlyPipeline(DiffusionPipeline):
             return (image, has_nsfw_concept)
 
         return StableDiffusionPipelineOutput(images=image, nsfw_content_detected=has_nsfw_concept)
-
-
-def var_mean(x, axis=-1, keepdim=True, unbiased=True, correction=None):
-    if correction is not None:
-        unbiased = correction
-    var = paddle.var(x, axis=axis, keepdim=keepdim, unbiased=unbiased)
-    mean = paddle.mean(x, axis=axis, keepdim=keepdim)
-    return var, mean
-
-
-def down_block2d_forward(self, hidden_states, temb=None):
-
-    output_states = ()
-
-    for resnet in self.resnets:
-        hidden_states = resnet(hidden_states, temb)
-        gn_auto_machine = getattr(resnet, "gn_auto_machine", "do_nothing")
-        if gn_auto_machine == "write":
-            if resnet.gn_auto_machine_weight > resnet.gn_weight:
-                var, mean = var_mean(hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
-                resnet.mean_bank.append(mean)
-                resnet.var_bank.append(var)
-                resnet.style_cfgs.append(resnet.current_style_fidelity)
-
-        if gn_auto_machine == "read":
-            if len(resnet.mean_bank) > 0 and len(resnet.var_bank) > 0:
-                style_cfg = sum(resnet.style_cfgs) / float(len(resnet.style_cfgs))
-                var, mean = var_mean(hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
-                std = paddle.maximum(var, paddle.zeros_like(var) + eps) ** 0.5
-                mean_acc = sum(resnet.mean_bank) / float(len(resnet.mean_bank))
-                var_acc = sum(resnet.var_bank) / float(len(resnet.var_bank))
-                std_acc = paddle.maximum(var_acc, paddle.zeros_like(var_acc) + eps) ** 0.5
-                y_uc = (((hidden_states - mean) / std) * std_acc) + mean_acc
-                y_c = y_uc.clone()
-                if len(resnet.current_uc_indices) > 0 and style_cfg > 1e-5:
-                    y_c[resnet.current_uc_indices] = hidden_states[resnet.current_uc_indices]
-                hidden_states = style_cfg * y_c + (1.0 - style_cfg) * y_uc
-            resnet.mean_bank = []
-            resnet.var_bank = []
-            resnet.style_cfgs = []
-
-        output_states += (hidden_states,)
-    if self.downsamplers is not None:
-        for downsampler in self.downsamplers:
-            hidden_states = downsampler(hidden_states)
-
-        output_states += (hidden_states,)
-
-    return hidden_states, output_states
-
-
-def cross_attn_down_block2d_forward(
-    self,
-    hidden_states,
-    temb=None,
-    encoder_hidden_states=None,
-    attention_mask=None,
-    cross_attention_kwargs=None,
-    additional_residuals=None,
-):
-
-    output_states = ()
-
-    for resnet, attn in zip(self.resnets, self.attentions):
-        hidden_states = resnet(hidden_states, temb)
-        hidden_states = attn(
-            hidden_states,
-            encoder_hidden_states=encoder_hidden_states,
-            cross_attention_kwargs=cross_attention_kwargs,
-        ).sample
-
-        gn_auto_machine = getattr(attn, "gn_auto_machine", "do_nothing")
-
-        if gn_auto_machine == "write":
-            if attn.gn_auto_machine_weight > attn.gn_weight:
-                var, mean = var_mean(hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
-                attn.mean_bank.append(mean)
-                attn.var_bank.append(var)
-                attn.style_cfgs.append(attn.current_style_fidelity)
-
-        if gn_auto_machine == "read":
-            if len(attn.mean_bank) > 0 and len(attn.var_bank) > 0:
-                style_cfg = sum(attn.style_cfgs) / float(len(attn.style_cfgs))
-                var, mean = var_mean(hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
-                std = paddle.maximum(var, paddle.zeros_like(var) + eps) ** 0.5
-                mean_acc = sum(attn.mean_bank) / float(len(attn.mean_bank))
-                var_acc = sum(attn.var_bank) / float(len(attn.var_bank))
-                std_acc = paddle.maximum(var_acc, paddle.zeros_like(var_acc) + eps) ** 0.5
-                y_uc = (((hidden_states - mean) / std) * std_acc) + mean_acc
-                y_c = y_uc.clone()
-                if len(attn.current_uc_indices) > 0 and style_cfg > 1e-5:
-                    y_c[attn.current_uc_indices] = hidden_states[attn.current_uc_indices]
-                hidden_states = style_cfg * y_c + (1.0 - style_cfg) * y_uc
-            attn.mean_bank = []
-            attn.var_bank = []
-            attn.style_cfgs = []
-
-        output_states += (hidden_states,)
-
-    if additional_residuals is not None:
-        hidden_states += additional_residuals
-
-    # westfish: add to align with torch features
-    output_states = tuple(output_states[:-1]) + (hidden_states,)
-
-    if self.downsamplers is not None:
-        for downsampler in self.downsamplers:
-            hidden_states = downsampler(hidden_states)
-
-        output_states += (hidden_states,)
-
-    return hidden_states, output_states
-
-
-def up_block2d_forward(self, hidden_states, res_hidden_states_tuple, temb=None, upsample_size=None):
-
-    for resnet in self.resnets:
-        # pop res hidden states
-        res_hidden_states = res_hidden_states_tuple[-1]
-        res_hidden_states_tuple = res_hidden_states_tuple[:-1]
-        hidden_states = paddle.concat([hidden_states, res_hidden_states], axis=1)
-
-        hidden_states = resnet(hidden_states, temb)
-
-        gn_auto_machine = getattr(resnet, "gn_auto_machine", "do_nothing")
-
-        if gn_auto_machine == "write":
-            if resnet.gn_auto_machine_weight > resnet.gn_weight:
-                var, mean = var_mean(hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
-                resnet.mean_bank.append(mean)
-                resnet.var_bank.append(var)
-                resnet.style_cfgs.append(resnet.current_style_fidelity)
-
-        if gn_auto_machine == "read":
-            if len(resnet.mean_bank) > 0 and len(resnet.var_bank) > 0:
-                style_cfg = sum(resnet.style_cfgs) / float(len(resnet.style_cfgs))
-                var, mean = var_mean(hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
-                std = paddle.maximum(var, paddle.zeros_like(var) + eps) ** 0.5
-                mean_acc = sum(resnet.mean_bank) / float(len(resnet.mean_bank))
-                var_acc = sum(resnet.var_bank) / float(len(resnet.var_bank))
-                std_acc = paddle.maximum(var_acc, paddle.zeros_like(var_acc) + eps) ** 0.5
-                y_uc = (((hidden_states - mean) / std) * std_acc) + mean_acc
-                y_c = y_uc.clone()
-                if len(resnet.current_uc_indices) > 0 and style_cfg > 1e-5:
-                    y_c[resnet.current_uc_indices] = hidden_states[resnet.current_uc_indices]
-                hidden_states = style_cfg * y_c + (1.0 - style_cfg) * y_uc
-            resnet.mean_bank = []
-            resnet.var_bank = []
-            resnet.style_cfgs = []
-
-    if self.upsamplers is not None:
-        for upsampler in self.upsamplers:
-            hidden_states = upsampler(hidden_states, upsample_size)
-            gn_auto_machine = getattr(upsampler, "gn_auto_machine", "do_nothing")
-
-            if gn_auto_machine == "write":
-                if upsampler.gn_auto_machine_weight > upsampler.gn_weight:
-                    var, mean = var_mean(hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
-                    upsampler.mean_bank.append(mean)
-                    upsampler.var_bank.append(var)
-                    upsampler.style_cfgs.append(upsampler.current_style_fidelity)
-            if gn_auto_machine == "read":
-                if len(upsampler.mean_bank) > 0 and len(upsampler.var_bank) > 0:
-                    style_cfg = sum(upsampler.style_cfgs) / float(len(upsampler.style_cfgs))
-                    var, mean = var_mean(hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
-                    std = paddle.maximum(var, paddle.zeros_like(var) + eps) ** 0.5
-                    mean_acc = sum(upsampler.mean_bank) / float(len(upsampler.mean_bank))
-                    var_acc = sum(upsampler.var_bank) / float(len(upsampler.var_bank))
-                    std_acc = paddle.maximum(var_acc, paddle.zeros_like(var_acc) + eps) ** 0.5
-                    y_uc = (((hidden_states - mean) / std) * std_acc) + mean_acc
-                    y_c = y_uc.clone()
-                    if len(upsampler.current_uc_indices) > 0 and style_cfg > 1e-5:
-                        y_c[upsampler.current_uc_indices] = hidden_states[upsampler.current_uc_indices]
-                    hidden_states = style_cfg * y_c + (1.0 - style_cfg) * y_uc
-                upsampler.mean_bank = []
-                upsampler.var_bank = []
-                upsampler.style_cfgs = []
-    return hidden_states
-
-
-def cross_attn_up_block2d_forward(
-    self,
-    hidden_states,
-    res_hidden_states_tuple,
-    temb=None,
-    encoder_hidden_states=None,
-    cross_attention_kwargs=None,
-    upsample_size=None,
-    attention_mask=None,
-):
-
-    for resnet, attn in zip(self.resnets, self.attentions):
-        # pop res hidden states
-        res_hidden_states = res_hidden_states_tuple[-1]
-        res_hidden_states_tuple = res_hidden_states_tuple[:-1]
-        hidden_states = paddle.concat([hidden_states, res_hidden_states], axis=1)
-
-        hidden_states = resnet(hidden_states, temb)
-        hidden_states = attn(
-            hidden_states,
-            encoder_hidden_states=encoder_hidden_states,
-            cross_attention_kwargs=cross_attention_kwargs,
-        ).sample
-
-        gn_auto_machine = getattr(attn, "gn_auto_machine", "do_nothing")
-        # 设置给attn
-        if gn_auto_machine == "write":
-            if attn.gn_auto_machine_weight > attn.gn_weight:
-                var, mean = var_mean(hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
-                attn.mean_bank.append(mean)
-                attn.var_bank.append(var)
-                attn.style_cfgs.append(attn.current_style_fidelity)
-
-        if gn_auto_machine == "read":
-            if len(attn.mean_bank) > 0 and len(attn.var_bank) > 0:
-                style_cfg = sum(attn.style_cfgs) / float(len(attn.style_cfgs))
-                var, mean = var_mean(hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
-                std = paddle.maximum(var, paddle.zeros_like(var) + eps) ** 0.5
-                mean_acc = sum(attn.mean_bank) / float(len(attn.mean_bank))
-                var_acc = sum(attn.var_bank) / float(len(attn.var_bank))
-                std_acc = paddle.maximum(var_acc, paddle.zeros_like(var_acc) + eps) ** 0.5
-                y_uc = (((hidden_states - mean) / std) * std_acc) + mean_acc
-                y_c = y_uc.clone()
-                if len(attn.current_uc_indices) > 0 and style_cfg > 1e-5:
-                    y_c[attn.current_uc_indices] = hidden_states[attn.current_uc_indices]
-                hidden_states = style_cfg * y_c + (1.0 - style_cfg) * y_uc
-            attn.mean_bank = []
-            attn.var_bank = []
-            attn.style_cfgs = []
-
-    if self.upsamplers is not None:
-        for upsampler in self.upsamplers:
-            hidden_states = upsampler(hidden_states, upsample_size)
-
-    return hidden_states
-
-
-def unet_mid_block2d_cross_attn_forward(
-    self, hidden_states, temb=None, encoder_hidden_states=None, attention_mask=None, cross_attention_kwargs=None
-):
-
-    hidden_states = self.resnets[0](hidden_states, temb)
-    for attn, resnet in zip(self.attentions, self.resnets[1:]):
-        hidden_states = attn(
-            hidden_states,
-            encoder_hidden_states=encoder_hidden_states,
-            cross_attention_kwargs=cross_attention_kwargs,
-        ).sample
-        hidden_states = resnet(hidden_states, temb)
-
-        gn_auto_machine = getattr(resnet, "gn_auto_machine", "do_nothing")
-        if gn_auto_machine == "write":
-            if resnet.gn_auto_machine_weight > resnet.gn_weight:
-                var, mean = var_mean(hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
-                resnet.mean_bank.append(mean)
-                resnet.var_bank.append(var)
-                resnet.style_cfgs.append(resnet.current_style_fidelity)
-
-        if gn_auto_machine == "read":
-            if len(resnet.mean_bank) > 0 and len(resnet.var_bank) > 0:
-                style_cfg = sum(resnet.style_cfgs) / float(len(resnet.style_cfgs))
-                var, mean = var_mean(hidden_states, axis=(2, 3), keepdim=True, unbiased=False)
-                std = paddle.maximum(var, paddle.zeros_like(var) + eps) ** 0.5
-                mean_acc = sum(resnet.mean_bank) / float(len(resnet.mean_bank))
-                var_acc = sum(resnet.var_bank) / float(len(resnet.var_bank))
-                std_acc = paddle.maximum(var_acc, paddle.zeros_like(var_acc) + eps) ** 0.5
-                y_uc = (((hidden_states - mean) / std) * std_acc) + mean_acc
-                y_c = y_uc.clone()
-                if len(resnet.current_uc_indices) > 0 and style_cfg > 1e-5:
-                    y_c[resnet.current_uc_indices] = hidden_states[resnet.current_uc_indices]
-                hidden_states = style_cfg * y_c + (1.0 - style_cfg) * y_uc
-            resnet.mean_bank = []
-            resnet.var_bank = []
-            resnet.style_cfgs = []
-
-    return hidden_states
-
-
-# backup
-if not hasattr(CrossAttnDownBlock2D, "original_forward"):
-    CrossAttnDownBlock2D.original_forward = CrossAttnDownBlock2D.forward
-if not hasattr(DownBlock2D, "original_forward"):
-    DownBlock2D.original_forward = DownBlock2D.forward
-if not hasattr(UpBlock2D, "original_forward"):
-    UpBlock2D.original_forward = UpBlock2D.forward
-if not hasattr(CrossAttnUpBlock2D, "original_forward"):
-    CrossAttnUpBlock2D.original_forward = CrossAttnUpBlock2D.forward
-if not hasattr(UNetMidBlock2DCrossAttn, "original_forward"):
-    UNetMidBlock2DCrossAttn.original_forward = UNetMidBlock2DCrossAttn.forward
-
-# update
-CrossAttnDownBlock2D.forward = cross_attn_down_block2d_forward
-DownBlock2D.forward = down_block2d_forward
-CrossAttnUpBlock2D.forward = cross_attn_up_block2d_forward
-UpBlock2D.forward = up_block2d_forward
-UNetMidBlock2DCrossAttn.forward = unet_mid_block2d_cross_attn_forward
