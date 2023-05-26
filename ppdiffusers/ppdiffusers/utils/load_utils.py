@@ -23,7 +23,7 @@ from zipfile import ZipFile
 
 import numpy as np
 
-from .constants import get_default_map_location
+from .constants import get_map_location_default
 from .import_utils import (
     is_paddle_available,
     is_safetensors_available,
@@ -313,7 +313,7 @@ def safetensors_load(path: str):
 
 def smart_load(path: str, map_location: str = None, return_numpy=False, return_global_step=False):
     if map_location is None:
-        map_location = get_default_map_location()
+        map_location = get_map_location_default()
 
     suffix = Path(path).suffix
     name = Path(path).name
