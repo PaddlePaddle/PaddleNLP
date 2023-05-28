@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import inspect
 from abc import ABC
-from typing import List, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import paddle
 import paddle.nn as nn
@@ -423,6 +423,126 @@ class GenerationMixin(object):
 
         return input_ids, model_kwargs
 
+    def _prepare_encoder_decoder_kwargs_for_generation(
+        self, inputs_tensor: paddle.Tensor, model_kwargs, model_input_name: Optional[str] = None
+    ) -> Dict[str, Any]:
+        # 1. get encoder
+        encoder = self.get_encoder()
+
+        # 2. Prepare encoder args and encoder kwargs from model kwargs.
+        irrelevant_prefix = ["decoder_", "cross_attn", "use_cache"]
+        encoder_kwargs = {
+            argument: value
+            for argument, value in model_kwargs.items()
+            if not any(argument.startswith(p) for p in irrelevant_prefix)
+        }
+        encoder_signature = set(inspect.signature(encoder.forward).parameters)
+        encoder_accepts_wildcard = "kwargs" in encoder_signature or "model_kwargs" in encoder_signature
+        if not encoder_accepts_wildcard:
+            encoder_kwargs = {
+                argument: value for argument, value in encoder_kwargs.items() if argument in encoder_signature
+            }
+
+        # 3. make sure that encoder returns `ModelOutput`
+        model_input_name = model_input_name if model_input_name is not None else self.main_input_name
+        encoder_kwargs["return_dict"] = True
+        encoder_kwargs[model_input_name] = inputs_tensor
+        model_kwargs["encoder_outputs"]: ModelOutput = encoder(**encoder_kwargs)
+
+        return model_kwargs
+
+    def _maybe_initialize_input_ids_for_generation(
+        self,
+        inputs: Optional[paddle.Tensor] = None,
+        bos_token_id: Optional[int] = None,
+        model_kwargs: Optional[Dict[str, paddle.Tensor]] = None,
+    ) -> paddle.Tensor:
+        """Initializes input ids for generation, if necessary."""
+        if inputs is not None:
+            return inputs
+
+        encoder_outputs = model_kwargs.get("encoder_outputs")
+        if self.config.is_encoder_decoder and encoder_outputs is not None:
+            # make dummy input_ids with value -100, as a sanity check ensuring that they won't be used for encoding
+            shape = encoder_outputs.last_hidden_state.size()[:-1]
+            return paddle.ones(shape, dtype="int64") * -100
+
+        if bos_token_id is None:
+            raise ValueError("`bos_token_id` has to be defined when no `input_ids` are provided.")
+
+        # If there is some tensor in `model_kwargs`, we can infer the batch size from it. This is helpful with
+        # soft-prompting or in multimodal implementations built on top of decoder-only language models.
+        batch_size = 1
+        for value in model_kwargs.values():
+            if isinstance(value, paddle.Tensor):
+                batch_size = value.shape[0]
+                break
+        return paddle.ones((batch_size, 1), dtype="int64") * bos_token_id
+
+    def _prepare_model_inputs(
+        self,
+        inputs: Optional[paddle.Tensor] = None,
+        bos_token_id: Optional[int] = None,
+        model_kwargs: Optional[Dict[str, paddle.Tensor]] = None,
+    ) -> Tuple[paddle.Tensor, Optional[str], Dict[str, paddle.Tensor]]:
+        """
+        This function extracts the model-specific `inputs` for generation.
+        """
+        # 1. retrieve all kwargs that are non-None or non-model input related.
+        # some encoder-decoder models have different names for model and encoder
+        if (
+            self.config.is_encoder_decoder
+            and hasattr(self, "encoder")
+            and self.encoder.main_input_name != self.main_input_name
+        ):
+            input_name = self.encoder.main_input_name
+        else:
+            input_name = self.main_input_name
+
+        model_kwargs = {k: v for k, v in model_kwargs.items() if v is not None or k != input_name}
+
+        # 2. check whether model_input_name is passed as kwarg
+        # if yes and `inputs` is None use kwarg inputs
+        inputs_kwarg = model_kwargs.pop(input_name, None)
+        if inputs_kwarg is not None and inputs is not None:
+            raise ValueError(
+                f"`inputs`: {inputs}` were passed alongside {input_name} which is not allowed."
+                f"Make sure to either pass {inputs} or {input_name}=..."
+            )
+        elif inputs_kwarg is not None:
+            inputs = inputs_kwarg
+
+        # 3. In the presence of `inputs_embeds` for text models:
+        # - decoder-only models should complain if the user attempts to pass `inputs_embeds`, but the model
+        # doesn't have its forwarding implemented. `inputs_embeds` is kept in `model_kwargs` and can coexist with
+        # input_ids (`inputs_embeds` will be used in the 1st generation step, as opposed to `input_ids`)
+        # - encoder-decoder models should complain if the user attempts to pass `inputs_embeds` and `input_ids`, and
+        # pull the former to inputs. It will be used in place of `input_ids` to get the encoder hidden states.
+        if input_name == "input_ids" and "inputs_embeds" in model_kwargs:
+            if not self.config.is_encoder_decoder:
+                has_inputs_embeds_forwarding = "inputs_embeds" in set(
+                    inspect.signature(self.prepare_inputs_for_generation).parameters.keys()
+                )
+                if not has_inputs_embeds_forwarding:
+                    raise ValueError(
+                        f"You passed `inputs_embeds` to `.generate()`, but the model class {self.__class__.__name__} "
+                        "doesn't have its forwarding implemented. See the GPT2 implementation for an example "
+                        "(https://github.com/huggingface/transformers/pull/21405), and feel free to open a PR with it!"
+                    )
+                # In this case, `input_ids` is moved to the `model_kwargs`, so a few automations (like the creation of
+                # the attention mask) can rely on the actual model input.
+                model_kwargs["input_ids"] = self._maybe_initialize_input_ids_for_generation(
+                    inputs, bos_token_id, model_kwargs=model_kwargs
+                )
+            else:
+                if inputs is not None:
+                    raise ValueError("You passed `inputs_embeds` and `input_ids` to `.generate()`. Please pick one.")
+            inputs, input_name = model_kwargs["inputs_embeds"], "inputs_embeds"
+
+        # 4. if `inputs` is still None, try to create `input_ids` from BOS token
+        inputs = self._maybe_initialize_input_ids_for_generation(inputs, bos_token_id, model_kwargs)
+        return inputs, input_name, model_kwargs
+
     @staticmethod
     def update_model_kwargs_for_generation(outputs, model_kwargs, is_encoder_decoder=False):
         # Update the model inputs during generation.
@@ -434,9 +554,11 @@ class GenerationMixin(object):
         # update cache
         if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
             model_kwargs["cache"] = outputs[1]
+            model_kwargs["past_key_values"] = outputs[1]
 
         if isinstance(outputs, ModelOutput) and "past_key_values" in outputs:
             model_kwargs["cache"] = outputs.past_key_values
+            model_kwargs["past_key_values"] = outputs.past_key_values
 
         # update token_type_ids with last value
         if "token_type_ids" in model_kwargs and model_kwargs["token_type_ids"] is not None:
@@ -506,7 +628,8 @@ class GenerationMixin(object):
             if "inputs_embeds" in encoder_kwargs:
                 model_kwargs["encoder_output"] = encoder(**encoder_kwargs)
             else:
-                model_kwargs["encoder_output"] = encoder(input_ids=input_ids, **encoder_kwargs)
+                # input_ids or decoder input_ids
+                model_kwargs["encoder_output"] = encoder(input_ids, **encoder_kwargs)
         return model_kwargs
 
     def prepare_decoder_input_ids_for_generation(self, input_ids, decoder_start_token_id=None, bos_token_id=None):
@@ -518,6 +641,62 @@ class GenerationMixin(object):
         decoder_input_ids = paddle.ones([input_ids.shape[0], 1], dtype="int64") * decoder_start_token_id
 
         return decoder_input_ids
+
+    def _get_decoder_start_token_id(self, decoder_start_token_id: int = None, bos_token_id: int = None) -> int:
+        decoder_start_token_id = (
+            decoder_start_token_id if decoder_start_token_id is not None else self.config.decoder_start_token_id
+        )
+        bos_token_id = bos_token_id if bos_token_id is not None else self.config.bos_token_id
+
+        if decoder_start_token_id is not None:
+            return decoder_start_token_id
+        elif bos_token_id is not None:
+            return bos_token_id
+        raise ValueError(
+            "`decoder_start_token_id` or `bos_token_id` has to be defined for encoder-decoder generation."
+        )
+
+    def _prepare_decoder_input_ids_for_generation(
+        self,
+        batch_size: int,
+        model_input_name: str,
+        model_kwargs: Dict[str, paddle.Tensor],
+        decoder_start_token_id: int = None,
+        bos_token_id: int = None,
+    ) -> Tuple[paddle.Tensor, Dict[str, paddle.Tensor]]:
+        """Prepares `decoder_input_ids` for generation with encoder-decoder models"""
+        # 1. Check whether the user has defined `decoder_input_ids` manually. To facilitate in terms of input naming,
+        # we also allow the user to pass it under `input_ids`, if the encoder does not use it as the main input.
+        if model_kwargs is not None and "decoder_input_ids" in model_kwargs:
+            decoder_input_ids = model_kwargs.pop("decoder_input_ids")
+        elif "input_ids" in model_kwargs and model_input_name != "input_ids":
+            decoder_input_ids = model_kwargs.pop("input_ids")
+        else:
+            decoder_input_ids = None
+
+        # 2. Encoder-decoder models expect the `decoder_input_ids` to start with a special token. Let's ensure that.
+        decoder_start_token_id = self._get_decoder_start_token_id(decoder_start_token_id, bos_token_id)
+        decoder_input_ids_start = paddle.ones((batch_size, 1), dtype="int64") * decoder_start_token_id
+
+        # no user input -> use decoder_start_token_id as decoder_input_ids
+        if decoder_input_ids is None:
+            decoder_input_ids = decoder_input_ids_start
+        # exception: Donut checkpoints have task-specific decoder starts and don't expect a BOS token
+        elif self.config.model_type == "vision-encoder-decoder" and "donut" in self.name_or_path.lower():
+            pass
+        # user input but doesn't start with decoder_start_token_id -> prepend decoder_start_token_id (and adjust
+        # decoder_attention_mask if provided)
+        elif (decoder_input_ids[:, 0] != decoder_start_token_id).all().item():
+            decoder_input_ids = paddle.concat([decoder_input_ids_start, decoder_input_ids], axis=-1)
+            if "decoder_attention_mask" in model_kwargs:
+                decoder_attention_mask = model_kwargs["decoder_attention_mask"]
+                decoder_attention_mask = paddle.concat(
+                    (paddle.ones_like(decoder_attention_mask)[:, :1], decoder_attention_mask),
+                    axis=-1,
+                )
+                model_kwargs["decoder_attention_mask"] = decoder_attention_mask
+
+        return decoder_input_ids, model_kwargs
 
     def get_decoder_start_token_id(self, decoder_start_token_id=None, bos_token_id=None):
         decoder_start_token_id = (
@@ -571,6 +750,7 @@ class GenerationMixin(object):
     @paddle.no_grad()
     def generate(
         self,
+        inputs: Optional[paddle.Tensor] = None,
         input_ids=None,
         attention_mask=None,
         position_ids=None,
@@ -867,6 +1047,21 @@ class GenerationMixin(object):
             model_kwargs["attention_mask"] = self.prepare_attention_mask_for_generation(
                 input_ids, pad_token_id, eos_token_id
             )
+
+        # inputs_tensor has to be defined
+        # model_input_name is defined if model-specific keyword input is passed
+        # otherwise model_input_name is None
+        # all model-specific keyword inputs are removed from `model_kwargs`
+        inputs_tensor, model_input_name, model_kwargs = self._prepare_model_inputs(inputs, bos_token_id, model_kwargs)
+        batch_size = inputs_tensor.shape[0]
+
+        if self.config.is_encoder_decoder and "encoder_outputs" not in model_kwargs:
+            # if model is encoder decoder encoder_outputs are created
+            # and added to `model_kwargs`
+            model_kwargs = self._prepare_encoder_decoder_kwargs_for_generation(
+                inputs_tensor, model_kwargs, model_input_name
+            )
+
         self.is_encoder_decoder = (
             getattr(self, "encoder", None) is not None and getattr(self, "decoder", None) is not None
         )
@@ -879,6 +1074,18 @@ class GenerationMixin(object):
                 input_ids = self.prepare_decoder_input_ids_for_generation(
                     input_ids, decoder_start_token_id, bos_token_id
                 )
+
+        elif self.config.is_encoder_decoder:
+            input_ids, model_kwargs = self._prepare_decoder_input_ids_for_generation(
+                batch_size=batch_size,
+                model_input_name=model_input_name,
+                model_kwargs=model_kwargs,
+                decoder_start_token_id=self.config.decoder_start_token_id,
+                bos_token_id=bos_token_id,
+            )
+        # else:
+        #      input_ids = inputs_tensor if model_input_name == "input_ids" else model_kwargs.pop("input_ids")
+
         if pad_token_id is None and eos_token_id is not None:
             print("Setting `pad_token_id` to `eos_token_id`:{} for " "open-end generation.".format(eos_token_id))
             pad_token_id = eos_token_id
@@ -1071,7 +1278,7 @@ class GenerationMixin(object):
                 break
 
             model_kwargs = self.update_model_kwargs_for_generation(
-                outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
+                outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder or self.config.is_encoder_decoder
             )
 
         return input_ids[:, origin_len:], scores

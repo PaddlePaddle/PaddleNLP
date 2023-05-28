@@ -92,7 +92,7 @@ def shift_tokens_right(input_ids: paddle.Tensor, pad_token_id: int, decoder_star
     if pad_token_id is None:
         raise ValueError("self.model.config.pad_token_id has to be defined.")
     # replace possible -100 values in labels by `pad_token_id`
-    shifted_input_ids.masked_fill_(shifted_input_ids == -100, pad_token_id)
+    masked_fill(shifted_input_ids, shifted_input_ids == -100, pad_token_id)
 
     return shifted_input_ids
 
@@ -109,7 +109,7 @@ def shift_spectrograms_right(input_values: paddle.Tensor, reduction_factor: int 
     shifted_input_values[:, 1:] = input_values[:, :-1].clone()
 
     # replace possible -100 values in labels by zeros
-    shifted_input_values.masked_fill_(shifted_input_values == -100.0, 0.0)
+    masked_fill(shifted_input_values, shifted_input_values == -100.0, 0.0)
 
     return shifted_input_values
 
@@ -120,9 +120,9 @@ def _make_causal_mask(input_ids_shape: paddle.shape, dtype: paddle.dtype, past_k
     Make causal mask used for bi-directional self-attention.
     """
     bsz, tgt_len = input_ids_shape
-    mask = paddle.full((tgt_len, tgt_len), paddle.to_tensor(finfo(dtype).min))
-    mask_cond = paddle.arange(mask.shape([-1]))
-    mask.masked_fill_(mask_cond < (mask_cond + 1).reshape([mask.shape([-1]), 1]), 0)
+    mask = paddle.full((tgt_len, tgt_len), float(finfo(dtype).min))
+    mask_cond = paddle.arange(mask.shape[-1])
+    masked_fill(mask, mask_cond < (mask_cond + 1).reshape([mask.shape[-1], 1]), 0)
     mask = mask.cast(dtype)
 
     if past_key_values_length > 0:
@@ -421,16 +421,6 @@ class SpeechT5PositionalConvEmbedding(nn.Layer):
             padding=config.num_conv_pos_embeddings // 2,
             groups=config.num_conv_pos_embedding_groups,
         )
-
-        # if is_deepspeed_zero3_enabled():
-        #     import deepspeed
-
-        #     with deepspeed.zero.GatheredParameters(self.conv.weight, modifier_rank=0):
-        #         self.conv = nn.utils.weight_norm(self.conv, name="weight", axis=2)
-        #     deepspeed.zero.register_external_parameter(self, self.conv.weight_v)
-        #     deepspeed.zero.register_external_parameter(self, self.conv.weight_g)
-        # else:
-        #     self.conv = nn.utils.weight_norm(self.conv, name="weight", axis=2)
         # self.conv = nn.utils.weight_norm(self.conv, name="weight", dim=2)
         self.padding = SpeechT5SamePadLayer(config.num_conv_pos_embeddings)
         self.activation = ACT2FN[config.feat_extract_activation]
@@ -440,11 +430,12 @@ class SpeechT5PositionalConvEmbedding(nn.Layer):
         hidden_states = hidden_states.transpose([0, 2, 1])
 
         hidden_states = self.conv(hidden_states)
-        # breakpoint()
+
         hidden_states = self.padding(hidden_states)
         hidden_states = self.activation(hidden_states)
 
         hidden_states = hidden_states.transpose([0, 2, 1])
+        # breakpoint()
         return hidden_states
 
 
@@ -536,7 +527,7 @@ class SpeechT5FeatureEncoder(nn.Layer):
 
         # make sure hidden_states require grad for gradient_checkpointing
         if self._requires_grad and self.training:
-            hidden_states.requires_grad = True
+            hidden_states.stop_gradiet = False
 
         for conv_layer in self.conv_layers:
             if self._requires_grad and self.gradient_checkpointing and self.training:
@@ -552,7 +543,8 @@ class SpeechT5FeatureEncoder(nn.Layer):
                     hidden_states,
                 )
             else:
-                hidden_states = conv_layer(hidden_states)
+                # breakpoint()
+                hidden_states = conv_layer(hidden_states.cast("float32"))
 
         return hidden_states
 
@@ -600,9 +592,10 @@ class SpeechT5SpeechEncoderPrenet(nn.Layer):
         attention_mask: Optional[paddle.Tensor] = None,
         mask_time_indices: Optional[paddle.Tensor] = None,
     ):
+        # breakpoint()
         extract_features = self.feature_encoder(input_values)
         extract_features = extract_features.transpose([0, 2, 1])
-
+        # breakpoint()
         if attention_mask is not None:
             # compute reduced attention_mask corresponding to feature vectors
             attention_mask = self._get_feature_vector_attention_mask(
@@ -625,7 +618,7 @@ class SpeechT5SpeechEncoderPrenet(nn.Layer):
 
         positional_sinusoidal_embeddings = self.pos_sinusoidal_embed(padding_mask)
         hidden_states = hidden_states + positional_sinusoidal_embeddings
-
+        # breakpoint()
         return hidden_states, attention_mask
 
     # Copied from paddlenlp.transformers.models.unispeech.modeling_unispeech.UniSpeechPretrainedModel._get_feature_vector_attention_mask
@@ -942,7 +935,6 @@ class SpeechT5Attention(nn.Layer):
         self.out_proj = nn.Linear(embed_dim, embed_dim, bias_attr=bias)
 
     def _shape(self, tensor: paddle.Tensor, seq_len: int, bsz: int):
-        # breakpoint()
         return tensor.reshape([bsz, seq_len, self.num_heads, self.head_dim]).transpose([0, 2, 1, 3])
 
     def forward(
@@ -1450,6 +1442,7 @@ class SpeechT5Encoder(SpeechT5PretrainedModel):
                         position_bias,
                     )
                 else:
+
                     layer_outputs = encoder_layer(
                         hidden_states,
                         attention_mask=attention_mask,
@@ -1457,7 +1450,9 @@ class SpeechT5Encoder(SpeechT5PretrainedModel):
                         layer_head_mask=(head_mask[idx] if head_mask is not None else None),
                         output_attentions=output_attentions,
                     )
-                    # breakpoint()
+                    # if idx==1:
+                    #     breakpoint()
+
                 hidden_states = layer_outputs[0]
 
             if skip_the_layer:
@@ -1514,7 +1509,7 @@ class SpeechT5EncoderWithSpeechPrenet(SpeechT5PretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-
+        # breakpoint()
         return outputs
 
 
@@ -1622,15 +1617,12 @@ class SpeechT5Decoder(SpeechT5PretrainedModel):
             combined_attention_mask = _make_causal_mask(
                 input_shape,
                 inputs_embeds.dtype,
-                device=inputs_embeds.device,
                 past_key_values_length=past_key_values_length,
             )
 
         if attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
-            expanded_attn_mask = _expand_mask(attention_mask, inputs_embeds.dtype, tgt_len=input_shape[-1]).to(
-                inputs_embeds.device
-            )
+            expanded_attn_mask = _expand_mask(attention_mask, inputs_embeds.dtype, tgt_len=input_shape[-1])
             combined_attention_mask = (
                 expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
             )
@@ -1893,7 +1885,8 @@ class SpeechT5DecoderWithTextPrenet(SpeechT5PretrainedModel):
         self.gradient_checkpointing = False
 
         # Initialize weights and apply final processing
-        self.post_init()
+        # self.post_init()
+        self.init_weights()
 
     def get_input_embeddings(self):
         return self.prenet.get_input_embeddings()
@@ -2179,7 +2172,7 @@ class SpeechT5Model(SpeechT5PretrainedModel):
         )
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
+        # breakpoint()
         # Encode if needed (training, first prediction pass)
         if encoder_outputs is None:
             encoder_outputs = self.encoder(
@@ -2268,7 +2261,8 @@ class SpeechT5ForSpeechToText(SpeechT5PretrainedModel):
         self.text_decoder_postnet = SpeechT5TextDecoderPostnet(config)
 
         # Initialize weights and apply final processing
-        self.post_init()
+        # self.post_init()
+        self.init_weights()
 
     def get_encoder(self):
         return self.speecht5.get_encoder()
@@ -2380,7 +2374,7 @@ class SpeechT5ForSpeechToText(SpeechT5PretrainedModel):
                 decoder_input_ids = shift_tokens_right(
                     labels, self.config.pad_token_id, self.config.decoder_start_token_id
                 )
-
+        # breakpoint()
         outputs = self.speecht5(
             input_values=input_values,
             attention_mask=attention_mask,
