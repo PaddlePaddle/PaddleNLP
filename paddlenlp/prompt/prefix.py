@@ -18,6 +18,7 @@ from dataclasses import asdict, dataclass, field
 from functools import partial
 from typing import Callable, Optional
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle.distributed import fleet
@@ -396,7 +397,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             ]
         )
         # (num_layers, 2, num_heads, prefixlen, head_dim)
-        past_key_values = paddle.transpose(past_key_values, perm=[2, 1, 3, 0, 4])
+        past_key_values = paddle.transpose(past_key_values, perm=[2, 1, 3, 0, 4]).numpy()
 
         if merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
             trainable_state_dict = self.prefix_encoder.state_dict()
@@ -421,7 +422,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         if is_main_process:
             self.prefix_config.save_pretrained(save_directory)
             self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
-            paddle.save({"past_key_values": past_key_values}, os.path.join(save_directory, PAST_KEY_VALUES_FILE_NAME))
+            np.save(os.path.join(save_directory, PAST_KEY_VALUES_FILE_NAME), past_key_values)
 
     def set_state_dict(self, state_dict):
         self.prefix_encoder.set_state_dict(state_dict)
