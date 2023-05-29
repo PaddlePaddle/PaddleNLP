@@ -46,6 +46,11 @@ MODEL_CLASSES = {
     "ernie": (ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer),
 }
 
+import sys
+sys.path.append('/workspace/paddle-symbolic-trace')
+from symbolic_trace import symbolic_trace
+
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -268,6 +273,15 @@ class PretrainingDataset(Dataset):
         return [input_ids, segment_ids, input_mask, masked_lm_positions, masked_lm_labels, next_sentence_labels]
 
 
+def resnet_call(net: paddle.nn.Layer, input_ids,
+                        token_type_ids,
+                        attention_mask,
+                        masked_positions):
+    return net(input_ids=input_ids,
+                        token_type_ids=token_type_ids,
+                        attention_mask=attention_mask,
+                        masked_positions=masked_positions,)
+
 def do_train(args):
     paddle.set_device(args.device)
     if paddle.distributed.get_world_size() > 1:
@@ -360,6 +374,8 @@ def do_train(args):
         # TODO(guosheng): better way to process single file
         single_file = True if f_start_id + 1 == len(files) else False
 
+        net_wrapper = symbolic_trace(resnet_call)
+
         for f_id in range(f_start_id, len(files)):
             if not single_file and f_id == f_start_id:
                 continue
@@ -403,12 +419,18 @@ def do_train(args):
                     custom_white_list=["layer_norm", "softmax", "gelu", "fused_attention", "fused_feedforward"],
                     level=args.amp_level,
                 ):
-                    prediction_scores, seq_relationship_score = model(
+                    prediction_scores, seq_relationship_score = net_wrapper(model,
                         input_ids=input_ids,
                         token_type_ids=segment_ids,
                         attention_mask=input_mask,
                         masked_positions=masked_lm_positions,
                     )
+                    # prediction_scores, seq_relationship_score = model(
+                    #     input_ids=input_ids,
+                    #     token_type_ids=segment_ids,
+                    #     attention_mask=input_mask,
+                    #     masked_positions=masked_lm_positions,
+                    # )
                     loss = criterion(
                         prediction_scores,
                         seq_relationship_score,
@@ -416,6 +438,11 @@ def do_train(args):
                         next_sentence_labels,
                         masked_lm_scale,
                     )
+    
+                # import objgraph
+                # objgraph.show_growth(limit=50)
+                # breakpoint()
+
                 if args.use_amp:
                     scaler.scale(loss).backward()
                     scaler.minimize(optimizer, loss)
