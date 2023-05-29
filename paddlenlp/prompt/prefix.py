@@ -384,7 +384,21 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         os.makedirs(save_directory, exist_ok=True)
 
         # past_key_values: (prefixlen, hidden_dim*layer_num*2)
-        past_key_values = self.prefix_encoder(self.prefix_tokens.unsqueeze(0).expand([1, -1]))[0].numpy()
+        past_key_values = self.prefix_encoder(self.prefix_tokens.unsqueeze(0).expand([1, -1]))
+        # (bs, prefixlen, layer_num*2, num_heads, head_dim)
+        past_key_values = past_key_values.reshape(
+            [
+                1,
+                self.prefix_config.num_prefix_tokens,
+                self.prefix_config.num_hidden_layers * 2,
+                self.prefix_config.num_attention_heads,
+                self.prefix_config.hidden_size // self.prefix_config.num_attention_heads,
+            ]
+        )
+        # (layer_num, bs, num_heads, prefixlen, head_dim)*2
+        past_keys, past_values = paddle.transpose(past_key_values, perm=[2, 0, 3, 1, 4]).split(2)
+        # (layer_num, 2, bs, num_heads, prefixlen, head_dim)
+        past_key_values = paddle.concat([past_keys.unsqueeze(1), past_values.unsqueeze(1)], axis=1).numpy()
 
         if merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
             trainable_state_dict = self.prefix_encoder.state_dict()
