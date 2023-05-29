@@ -129,7 +129,6 @@ def create_position_ids_from_input_ids(input_ids, padding_idx, past_key_values_l
     Returns: paddle.Tensor
     """
     # The series of casts and type-conversions here are carefully balanced to both work with ONNX export and XLA.
-    # breakpoint()
     mask = input_ids.not_equal(paddle.to_tensor(padding_idx, dtype="int32")).cast("int32")
 
     incremental_indices = (paddle.cumsum(mask, axis=1).cast(mask.dtype) + past_key_values_length) * mask
@@ -281,15 +280,15 @@ class ClapAudioAFFBlock(nn.Layer):
         self.local_att = nn.Sequential(
             nn.Conv2D(channels, inter_channels, kernel_size=1, stride=1, padding=0),
             nn.BatchNorm2D(inter_channels),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
             nn.Conv2D(inter_channels, channels, kernel_size=1, stride=1, padding=0),
             nn.BatchNorm2D(channels),
         )
         self.global_att = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),
+            nn.AdaptiveAvgPool2D(1),
             nn.Conv2D(channels, inter_channels, kernel_size=1, stride=1, padding=0),
             nn.BatchNorm2D(inter_channels),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
             nn.Conv2D(inter_channels, channels, kernel_size=1, stride=1, padding=0),
             nn.BatchNorm2D(channels),
         )
@@ -368,10 +367,11 @@ class ClapAudioPatchEmbed(nn.Layer):
                 )
 
             global_hidden_states = self.proj(global_hidden_states)
-            output_width = global_hidden_states.size(-1)
+            output_width = global_hidden_states.shape[-1]
             if len(is_longer_idx) > 0:
                 # local processing
-                local_hidden_states = hidden_states[is_longer_idx, 1:, :, :]
+                local_hidden_states = paddle.gather(hidden_states[:, 1:, :, :], is_longer_idx, axis=0)
+
                 batch_size, num_channels, height, width = local_hidden_states.shape
                 local_hidden_states = local_hidden_states.reshape([batch_size * num_channels, 1, height, width])
 
@@ -381,13 +381,14 @@ class ClapAudioPatchEmbed(nn.Layer):
                 local_hidden_states = local_hidden_states.reshape([batch_size, num_channels, features, height, width])
                 local_hidden_states = local_hidden_states.transpose((0, 2, 3, 1, 4)).flatten(3)
 
-                local_width = local_hidden_states.size(-1)
-                local_hidden_states = paddle.nn.functional.pad(
-                    local_hidden_states, (0, output_width - local_width), "constant", 0
+                local_width = local_hidden_states.shape[-1]
+
+                local_hidden_states = nn.functional.pad(
+                    local_hidden_states, (0, output_width - local_width, 0, 0), mode="constant", value=0.0
                 )
 
                 global_hidden_states[is_longer_idx] = self.fusion_model(
-                    global_hidden_states[is_longer_idx], local_hidden_states
+                    paddle.gather(global_hidden_states, is_longer_idx, axis=0), local_hidden_states
                 )
             hidden_states = global_hidden_states
         else:

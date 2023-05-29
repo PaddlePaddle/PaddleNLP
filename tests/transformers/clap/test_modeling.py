@@ -19,6 +19,7 @@ import unittest
 
 import numpy as np
 import paddle
+from datasets import load_dataset
 from paddle import nn
 
 from paddlenlp.transformers import (
@@ -27,6 +28,7 @@ from paddlenlp.transformers import (
     ClapAudioModelWithProjection,
     ClapConfig,
     ClapModel,
+    ClapProcessor,
     ClapTextConfig,
     ClapTextModel,
     ClapTextModelWithProjection,
@@ -549,3 +551,113 @@ class ClapModelTest(ModelTesterMixin, unittest.TestCase):
         for model_name in CLAP_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
             model = ClapModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
+
+
+@slow
+class ClapModelIntegrationTest(unittest.TestCase):
+    paddings = ["repeatpad", "repeat", "pad"]
+
+    def test_integration_unfused(self):
+        EXPECTED_MEANS_UNFUSED = {
+            "repeatpad": 0.0024,
+            "pad": 0.0020,
+            "repeat": 0.0023,
+        }
+
+        librispeech_dummy = load_dataset("hf-internal-testing/librispeech_asr_dummy", "clean", split="validation")
+        audio_sample = librispeech_dummy[-1]
+
+        model_id = "laion/clap-htsat-unfused"
+
+        model = ClapModel.from_pretrained(model_id)
+        model.eval()
+        processor = ClapProcessor.from_pretrained(model_id)
+
+        for padding in self.paddings:
+            inputs = processor(audios=audio_sample["audio"]["array"], return_tensors="pd", padding=padding)
+
+            audio_embed = model.get_audio_features(**inputs)
+            expected_mean = EXPECTED_MEANS_UNFUSED[padding]
+
+            self.assertTrue(
+                paddle.allclose(audio_embed.cpu().mean(), paddle.to_tensor([expected_mean]), atol=1e-3, rtol=1e-3)
+            )
+
+    def test_integration_fused(self):
+        EXPECTED_MEANS_FUSED = {
+            "repeatpad": 0.00069,
+            "repeat": 0.00196,
+            "pad": -0.000379,
+        }
+
+        librispeech_dummy = load_dataset("hf-internal-testing/librispeech_asr_dummy", "clean", split="validation")
+        audio_sample = librispeech_dummy[-1]
+
+        model_id = "laion/clap-htsat-fused"
+
+        model = ClapModel.from_pretrained(model_id)
+        model.eval()
+        processor = ClapProcessor.from_pretrained(model_id)
+
+        for padding in self.paddings:
+            inputs = processor(
+                audios=audio_sample["audio"]["array"], return_tensors="pd", padding=padding, truncation="fusion"
+            )
+
+            audio_embed = model.get_audio_features(**inputs)
+            expected_mean = EXPECTED_MEANS_FUSED[padding]
+
+            self.assertTrue(
+                paddle.allclose(audio_embed.cpu().mean(), paddle.to_tensor([expected_mean]), atol=1e-3, rtol=1e-3)
+            )
+
+    def test_batched_fused(self):
+        EXPECTED_MEANS_FUSED = {
+            "repeatpad": 0.0010,
+            "repeat": 0.0020,
+            "pad": 0.0006,
+        }
+
+        librispeech_dummy = load_dataset("hf-internal-testing/librispeech_asr_dummy", "clean", split="validation")
+        audio_samples = [sample["array"] for sample in librispeech_dummy[0:4]["audio"]]
+
+        model_id = "laion/clap-htsat-fused"
+
+        model = ClapModel.from_pretrained(model_id)
+        model.eval()
+        processor = ClapProcessor.from_pretrained(model_id)
+
+        for padding in self.paddings:
+            inputs = processor(audios=audio_samples, return_tensors="pd", padding=padding, truncation="fusion")
+
+            audio_embed = model.get_audio_features(**inputs)
+            expected_mean = EXPECTED_MEANS_FUSED[padding]
+            self.assertTrue(
+                paddle.allclose(audio_embed.cpu().mean(), paddle.to_tensor([expected_mean]), atol=1e-3, rtol=1e-3)
+            )
+
+    def test_batched_unfused(self):
+        EXPECTED_MEANS_FUSED = {
+            "repeatpad": 0.0016,
+            "repeat": 0.0019,
+            "pad": 0.0019,
+        }
+
+        librispeech_dummy = load_dataset("hf-internal-testing/librispeech_asr_dummy", "clean", split="validation")
+        audio_samples = [sample["array"] for sample in librispeech_dummy[0:4]["audio"]]
+
+        model_id = "laion/clap-htsat-unfused"
+
+        model = ClapModel.from_pretrained(model_id)
+        model.eval()
+        processor = ClapProcessor.from_pretrained(model_id)
+
+        for padding in self.paddings:
+            inputs = processor(audios=audio_samples, return_tensors="pd", padding=padding)
+
+            audio_embed = model.get_audio_features(**inputs)
+            expected_mean = EXPECTED_MEANS_FUSED[padding]
+
+            self.assertTrue(
+                paddle.allclose(audio_embed.cpu().mean(), paddle.to_tensor([expected_mean]), atol=1e-3, rtol=1e-3)
+            )
