@@ -15,7 +15,7 @@
 
 import copy
 import os
-from typing import Union
+from typing import Optional, Union
 
 from ...utils.log import logger
 from ..configuration_utils import PretrainedConfig
@@ -88,7 +88,7 @@ class ClapTextConfig(PretrainedConfig):
     Examples:
 
     ```python
-    >>> from transformers import ClapTextConfig, ClapTextModel
+    >>> from paddlenlp.transformers import ClapTextConfig, ClapTextModel
 
     >>> # Initializing a CLAP text configuration
     >>> configuration = ClapTextConfig()
@@ -126,6 +126,7 @@ class ClapTextConfig(PretrainedConfig):
         projection_hidden_act="relu",
         **kwargs,
     ):
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
 
         self.vocab_size = vocab_size
@@ -148,7 +149,14 @@ class ClapTextConfig(PretrainedConfig):
         self.projection_dim = projection_dim
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs) -> "PretrainedConfig":
+    def from_pretrained(
+        cls,
+        pretrained_model_name_or_path: Union[str, os.PathLike],
+        from_hf_hub: bool = False,
+        cache_dir: Optional[str] = None,
+        **kwargs
+    ) -> "PretrainedConfig":
+        kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         # get the text config dict if we are loading from ClapConfig
@@ -240,7 +248,7 @@ class ClapAudioConfig(PretrainedConfig):
     Example:
 
     ```python
-    >>> from transformers import ClapAudioConfig, ClapAudioModel
+    >>> from paddlenlp.transformers import ClapAudioConfig, ClapAudioModel
 
     >>> # Initializing a ClapAudioConfig with laion/clap-htsat-fused style configuration
     >>> configuration = ClapAudioConfig()
@@ -285,6 +293,7 @@ class ClapAudioConfig(PretrainedConfig):
         initializer_factor=1.0,
         **kwargs,
     ):
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         super().__init__(**kwargs)
         self.window_size = window_size
         self.num_mel_bins = num_mel_bins
@@ -316,7 +325,14 @@ class ClapAudioConfig(PretrainedConfig):
         self.projection_hidden_act = projection_hidden_act
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs) -> "PretrainedConfig":
+    def from_pretrained(
+        cls,
+        pretrained_model_name_or_path: Union[str, os.PathLike],
+        from_hf_hub: bool = False,
+        cache_dir: Optional[str] = None,
+        **kwargs
+    ) -> "PretrainedConfig":
+        kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         # get the audio config dict if we are loading from ClapConfig
@@ -361,7 +377,7 @@ class ClapConfig(PretrainedConfig):
     Example:
 
     ```python
-    >>> from transformers import ClapConfig, ClapModel
+    >>> from paddlenlp.transformers import ClapConfig, ClapModel
 
     >>> # Initializing a ClapConfig with laion-ai/base style configuration
     >>> configuration = ClapConfig()
@@ -373,7 +389,7 @@ class ClapConfig(PretrainedConfig):
     >>> configuration = model.config
 
     >>> # We can also initialize a ClapConfig from a ClapTextConfig and a ClapAudioConfig
-    >>> from transformers import ClapTextConfig, ClapAudioConfig
+    >>> from paddlenlp.transformers import ClapTextConfig, ClapAudioConfig
 
     >>> # Initializing a ClapText and ClapAudioConfig configuration
     >>> config_text = ClapTextConfig()
@@ -395,6 +411,7 @@ class ClapConfig(PretrainedConfig):
         initializer_factor=1.0,
         **kwargs,
     ):
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         super().__init__(**kwargs)
 
         if text_config is None:

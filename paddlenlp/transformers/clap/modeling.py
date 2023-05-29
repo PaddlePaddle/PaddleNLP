@@ -647,7 +647,7 @@ class ClapAudioLayer(nn.Layer):
         pad_values = (0, 0, 0, pad_right, 0, pad_bottom)
         # hidden_states = nn.functional.pad(hidden_states, pad_values)
         # TODO(wugaosheng): torch pad is different from paddle pad
-        hidden_states = nn.functional.pad(hidden_states.unsqueeze(1), pad_values, data_format="NCDHW").squeeze(1)
+        hidden_states = nn.functional.pad(hidden_states, (0, pad_right, 0, pad_bottom), data_format="NHWC")
 
         return hidden_states, pad_values
 
@@ -803,8 +803,8 @@ class ClapAudioPatchMerging(nn.Layer):
     def maybe_pad(self, input_feature, height, width):
         should_pad = (height % 2 == 1) or (width % 2 == 1)
         if should_pad:
-            pad_values = (0, 0, 0, width % 2, 0, height % 2)
-            input_feature = nn.functional.pad(input_feature, pad_values)
+            pad_values = (0, width % 2, 0, height % 2)
+            input_feature = nn.functional.pad(input_feature, pad_values, data_format="NHWC")
 
         return input_feature
 
@@ -1071,7 +1071,7 @@ class ClapTextEmbeddings(nn.Layer):
     # Copied from paddlenlp.transformers.models.bert.modeling_bert.BertEmbeddings.__init__
     def __init__(self, config):
         super().__init__()
-        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
         self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
         self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
 
@@ -1086,9 +1086,7 @@ class ClapTextEmbeddings(nn.Layer):
 
         # End copy
         self.padding_idx = config.pad_token_id
-        self.position_embeddings = nn.Embedding(
-            config.max_position_embeddings, config.hidden_size, padding_idx=self.padding_idx
-        )
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
 
     def forward(
         self, input_ids=None, token_type_ids=None, position_ids=None, inputs_embeds=None, past_key_values_length=0
@@ -1142,9 +1140,7 @@ class ClapTextEmbeddings(nn.Layer):
         input_shape = inputs_embeds.shape[:-1]
         sequence_length = input_shape[1]
 
-        position_ids = paddle.arange(
-            self.padding_idx + 1, sequence_length + self.padding_idx + 1, dtype="int64", device=inputs_embeds.device
-        )
+        position_ids = paddle.arange(self.padding_idx + 1, sequence_length + self.padding_idx + 1, dtype="int64")
         return position_ids.unsqueeze(0).expand(input_shape)
 
 
