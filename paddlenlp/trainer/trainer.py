@@ -626,9 +626,13 @@ class Trainer:
 
         epoch_iterator = train_dataloader
         # steps_in_epoch = len(epoch_iterator)
-        steps_in_epoch = (
-            len(epoch_iterator) if len_dataloader is not None else args.max_steps * args.gradient_accumulation_steps
-        )
+        global_steps_in_epoch = len(epoch_iterator) if len_dataloader is not None else args.max_steps
+        if len_dataloader is not None:
+            if self.args.gradient_accumulation_steps > len(epoch_iterator):
+                logger.warning(
+                    f"changing accumulation step from `{self.args.gradient_accumulation_steps}` to `{len(epoch_iterator)}` to avoid, cross epoch accumulate"
+                )
+                self.args.gradient_accumulation_steps = len(epoch_iterator)
 
         self.callback_handler.model = self.model
         self.callback_handler.optimizer = self.optimizer
@@ -657,12 +661,13 @@ class Trainer:
             ):
                 train_dataloader.batch_sampler.set_epoch(epoch)
 
-            step = -1
+            step = 0
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
+
                 # Skip past any already trained steps if resuming training
                 # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
                 # We use consumed_samples to reset the status
@@ -713,7 +718,6 @@ class Trainer:
                 # sharding
                 # stage1. the same as ddp
                 # stage2. manualy collect gradient on dp group
-
                 if is_no_sync:
                     # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
                     with model.no_sync():
@@ -723,11 +727,7 @@ class Trainer:
 
                 tr_loss += tr_loss_step
 
-                if (step + 1) % args.gradient_accumulation_steps == 0 or (
-                    # last step in epoch but step is always smaller than gradient_accumulation_steps
-                    steps_in_epoch <= args.gradient_accumulation_steps
-                    and (step + 1) == steps_in_epoch
-                ):
+                if (step + 1) % args.gradient_accumulation_steps == 0:
                     # Maunally collect gradients when group_sharded_parallel can't accept dp_group
                     # Case 1: Use sharding stage 2/3 with dp
                     # Case 2: Use recompute and dp
@@ -802,12 +802,14 @@ class Trainer:
                     )
 
                     self.state.global_step += 1
-                    self.state.epoch = epoch + (step + 1) / steps_in_epoch
+                    self.state.epoch = epoch + self.state.global_step / global_steps_in_epoch
 
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+                    step = 0
                 else:
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
+                    step += 1
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
