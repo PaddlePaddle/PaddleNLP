@@ -497,6 +497,9 @@ class ReferenceOnlyPipeline(DiffusionPipeline):
         enable_gn=True,
         do_classifier_free_guidance=True,
     ):
+        assert 0.0 <= attention_auto_machine_weight <= 1.0
+        assert 0.0 <= gn_auto_machine_weight <= 2.0
+
         if self.attn_modules is not None:
             for module in self.attn_modules:
                 module.enable_attn = enable_attn

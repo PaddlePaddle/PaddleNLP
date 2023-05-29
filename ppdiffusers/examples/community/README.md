@@ -438,7 +438,7 @@ for control_name in ["none", "reference_only", "reference_adain", "reference_ada
                  num_inference_steps=20,
                  generator=generator,
                  control_name=control_name, # "none", "reference_only", "reference_adain", "reference_adain+attn"
-                 attention_auto_machine_weight=1.0, # 0.0~2.0
+                 attention_auto_machine_weight=1.0, # 0.0~1.0
                  gn_auto_machine_weight=1.0, # 0.0~2.0
                  current_style_fidelity=0.5, # 0.0~1.0
                  resize_mode=0, # ["0 means Just resize", "1 means Crop and resize", "2 means Resize and fill", "-1 means Do nothing"]
