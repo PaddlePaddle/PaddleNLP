@@ -125,7 +125,6 @@ class ProcessorMixin(object):
     def _get_arguments_from_pretrained(cls, pretrained_model_name_or_path, **kwargs):
         args = []
         for attribute_name in cls.attributes:
-            # breakpoint()
             class_name = getattr(cls, f"{attribute_name}_class")
             attribute_class = getattr(paddlenlp.transformers, class_name)
             args.append(attribute_class.from_pretrained(pretrained_model_name_or_path, **kwargs))
