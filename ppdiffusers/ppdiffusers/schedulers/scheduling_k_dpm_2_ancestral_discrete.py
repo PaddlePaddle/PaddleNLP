@@ -115,8 +115,12 @@ class KDPM2AncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         #  set all values
         self.set_timesteps(num_train_timesteps, num_train_timesteps)
 
-    def index_for_timestep(self, timestep):
-        indices = (self.timesteps == timestep).nonzero()
+    def index_for_timestep(self, timestep, schedule_timesteps=None):
+        if schedule_timesteps is None:
+            schedule_timesteps = self.timesteps
+
+        indices = (schedule_timesteps == timestep).nonzero()
+
         if self.state_in_first_order:
             pos = -1
         else:
@@ -196,6 +200,8 @@ class KDPM2AncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         timesteps = paddle.to_tensor(timesteps, dtype=paddle.float32)
 
         timesteps_interpol = self.sigma_to_t(sigmas_interpol)
+        timesteps_interpol = paddle.cast(timesteps_interpol, dtype=timesteps.dtype)
+
         interleaved_timesteps = paddle.stack((timesteps_interpol[:-2, None], timesteps[1:, None]), axis=-1).flatten()
 
         self.timesteps = paddle.concat([timesteps[:1], interleaved_timesteps])
@@ -323,11 +329,12 @@ class KDPM2AncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         timesteps: paddle.Tensor,
     ) -> paddle.Tensor:
         # Make sure sigmas and timesteps have the same dtype as original_samples
-        self.sigmas = self.sigmas.cast(original_samples.dtype)
+        sigmas = self.sigmas.cast(original_samples.dtype)
 
-        step_indices = [self.index_for_timestep(t) for t in timesteps]
+        schedule_timesteps = self.timesteps
+        step_indices = [self.index_for_timestep(t, schedule_timesteps) for t in timesteps]
 
-        sigma = self.sigmas[step_indices].flatten()
+        sigma = sigmas[step_indices].flatten()
         while len(sigma.shape) < len(original_samples.shape):
             sigma = sigma.unsqueeze(-1)
 
