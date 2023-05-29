@@ -75,10 +75,24 @@ EXAMPLE_DOC_STRING = """
 """
 
 
+def stable_var(x, axis=None, unbiased=True, keepdim=False, name=None):
+    dtype = x.dtype
+    u = paddle.mean(x, axis=axis, keepdim=True, name=name)
+    n = paddle.cast(paddle.numel(x), paddle.int64) / paddle.cast(paddle.numel(u), paddle.int64)
+    n = n.astype(dtype)
+    if unbiased:
+        one_const = paddle.ones([], x.dtype)
+        n = paddle.where(n > one_const, n - 1.0, one_const)
+    n = n**0.5
+    n.stop_gradient = True
+    out = paddle.sum(paddle.pow((x - u) / n, 2), axis=axis, keepdim=keepdim, name=name)
+    return out
+
+
 def var_mean(x, axis=-1, keepdim=True, unbiased=True, correction=None):
     if correction is not None:
         unbiased = correction
-    var = paddle.var(x, axis=axis, keepdim=keepdim, unbiased=unbiased)
+    var = stable_var(x, axis=axis, keepdim=keepdim, unbiased=unbiased)
     mean = paddle.mean(x, axis=axis, keepdim=keepdim)
     return var, mean
 
@@ -551,15 +565,15 @@ class ReferenceOnlyPipeline(DiffusionPipeline):
             gn_modules = [
                 self.unet.mid_block.attentions[-1],
             ]
-            self.unet.mid_block.attentions[-1].gn_weight = 0.0
+            self.unet.mid_block.attentions[-1].gn_weight = 0.0  # mid             0.0
 
             input_block_names = [
-                ("down_blocks.1.resnets.0", "down_blocks.1.attentions.0"),  # 4
-                ("down_blocks.1.resnets.1", "down_blocks.1.attentions.1"),  # 5
-                ("down_blocks.2.resnets.0", "down_blocks.2.attentions.0"),  # 7
-                ("down_blocks.2.resnets.1", "down_blocks.2.attentions.1"),  # 8
-                ("down_blocks.3.resnets.0",),  # 10
-                ("down_blocks.3.resnets.1",),  # 11
+                ("down_blocks.1.resnets.0", "down_blocks.1.attentions.0"),  # 4   2.0
+                ("down_blocks.1.resnets.1", "down_blocks.1.attentions.1"),  # 5   1.66
+                ("down_blocks.2.resnets.0", "down_blocks.2.attentions.0"),  # 7   1.33
+                ("down_blocks.2.resnets.1", "down_blocks.2.attentions.1"),  # 8   1.0
+                ("down_blocks.3.resnets.0",),  # 10                               0.66
+                ("down_blocks.3.resnets.1",),  # 11                               0.33
             ]
             for w, block_names in enumerate(input_block_names):
                 module = self.unet.get_sublayer(block_names[-1])
@@ -567,14 +581,14 @@ class ReferenceOnlyPipeline(DiffusionPipeline):
                 gn_modules.append(module)
 
             output_block_names = [
-                ("up_blocks.0.resnets.0",),  # 0
-                ("up_blocks.0.resnets.1",),  # 1
-                ("up_blocks.0.resnets.2", "up_blocks.0.upsamplers.0"),  # 2
-                ("up_blocks.1.resnets.0", "up_blocks.1.attentions.0"),  # 3
-                ("up_blocks.1.resnets.1", "up_blocks.1.attentions.1"),  # 4
-                ("up_blocks.1.resnets.2", "up_blocks.1.attentions.2"),  # 5
-                ("up_blocks.2.resnets.0", "up_blocks.2.attentions.0"),  # 6
-                ("up_blocks.2.resnets.1", "up_blocks.2.attentions.1"),  # 7
+                ("up_blocks.0.resnets.0",),  # 0                                 0.0
+                ("up_blocks.0.resnets.1",),  # 1                                 0.25
+                ("up_blocks.0.resnets.2", "up_blocks.0.upsamplers.0"),  # 2      0.5
+                ("up_blocks.1.resnets.0", "up_blocks.1.attentions.0"),  # 3      0.75
+                ("up_blocks.1.resnets.1", "up_blocks.1.attentions.1"),  # 4      1.0
+                ("up_blocks.1.resnets.2", "up_blocks.1.attentions.2"),  # 5      1.25
+                ("up_blocks.2.resnets.0", "up_blocks.2.attentions.0"),  # 6      1.5
+                ("up_blocks.2.resnets.1", "up_blocks.2.attentions.1"),  # 7      1.75
             ]
             for w, block_names in enumerate(output_block_names):
                 module = self.unet.get_sublayer(block_names[-1])
