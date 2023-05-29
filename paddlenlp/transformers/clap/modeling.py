@@ -635,7 +635,6 @@ class ClapAudioLayer(nn.Layer):
             attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
             attn_mask = masked_fill(attn_mask, attn_mask != 0, float(-100.0))
             attn_mask = masked_fill(attn_mask, attn_mask == 0, float(0.0))
-            # attn_mask = attn_mask.masked_fill(attn_mask != 0, float(-100.0)).masked_fill(attn_mask == 0, float(0.0))
         else:
             attn_mask = None
         return attn_mask
@@ -687,8 +686,6 @@ class ClapAudioLayer(nn.Layer):
         hidden_states_windows = window_partition(shifted_hidden_states, self.window_size)
         hidden_states_windows = hidden_states_windows.reshape([-1, self.window_size * self.window_size, channels])
         attn_mask = self.get_attn_mask(height_pad, width_pad, dtype=hidden_states.dtype)
-        # if attn_mask is not None:
-        #     attn_mask = attn_mask
 
         attention_outputs = self.attention(
             hidden_states_windows, attn_mask, head_mask, output_attentions=output_attentions
@@ -1602,8 +1599,6 @@ class ClapPreTrainedModel(PretrainedModel):
             normal_(module.position_embeddings.weight, mean=0.0, std=factor * 0.02)
             normal_(module.token_type_embeddings.weight, mean=0.0, std=factor * 0.02)
         elif isinstance(module, ClapModel):
-            # nn.init.normal_(module.logit_scale_a, std=factor * 0.02)
-            # nn.init.normal_(module.logit_scale_t, std=factor * 0.02)
             normal_(module.logit_scale_a, std=factor * 0.02)
             normal_(module.logit_scale_t, std=factor * 0.02)
         elif isinstance(module, nn.Embedding):
@@ -1615,7 +1610,6 @@ class ClapPreTrainedModel(PretrainedModel):
             in_proj_std = (self.config.hidden_size**-0.5) * ((2 * self.config.num_hidden_layers) ** -0.5) * factor
             normal_(module.weight, std=in_proj_std)
             if module.bias is not None:
-                # module.bias.data.zero_()
                 zeros_(module.bias)
 
     def _set_gradient_checkpointing(self, module, value=False):
@@ -1707,7 +1701,6 @@ class ClapAudioModel(ClapPreTrainedModel):
         super().__init__(config)
         self.audio_encoder = ClapAudioEncoder(config)
         # Initialize weights and apply final processing
-        # self.post_init()
         self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
@@ -1786,7 +1779,6 @@ class ClapTextModel(ClapPreTrainedModel):
         self.pooler = ClapTextPooler(config) if add_pooling_layer else None
 
         # Initialize weights and apply final processing
-        # self.post_init()
         self.init_weights()
 
     def get_input_embeddings(self):
@@ -1958,7 +1950,6 @@ class ClapModel(ClapPreTrainedModel):
         self.audio_projection = ClapProjectionLayer(audio_config)
 
         # Initialize weights and apply final processing
-        # self.post_init()
         self.init_weights()
 
     def get_text_features(

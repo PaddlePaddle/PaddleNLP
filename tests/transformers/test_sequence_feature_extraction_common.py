@@ -102,7 +102,6 @@ class SequenceFeatureExtractionTestMixin(FeatureExtractionSavingTestMixin):
         batch_size = self.feat_extract_tester.batch_size
         feature_size = self.feat_extract_tester.feature_size
 
-        # breakpoint()
         # test padding for List[int] + numpy
         input_1 = feat_extract.pad(processed_features, padding=True)
         input_1 = input_1[input_name]
@@ -124,7 +123,6 @@ class SequenceFeatureExtractionTestMixin(FeatureExtractionSavingTestMixin):
             processed_features, padding="max_length", max_length=pad_max_length, return_tensors="np"
         )
         input_5 = input_5[input_name]
-        # breakpoint()
         # self.assertFalse(_inputs_have_equal_length(input_1))
         self.assertTrue(_inputs_have_equal_length(input_2))
         self.assertTrue(_inputs_have_equal_length(input_3))
@@ -218,19 +216,16 @@ class SequenceFeatureExtractionTestMixin(FeatureExtractionSavingTestMixin):
         input_name = feat_extract.model_input_names[0]
 
         processed_features = BatchFeature({input_name: speech_inputs})
-        # breakpoint()
         # truncate to smallest
         input_1 = feat_extract.pad(
             processed_features, padding="max_length", max_length=len(speech_inputs[0]), truncation=True
         )
         input_1 = input_1[input_name]
-        # breakpoint()
         input_2 = feat_extract.pad(
             processed_features, padding=True, max_length=len(speech_inputs[0]), truncation=False
         )
         input_2 = input_2[input_name]
 
-        # breakpoint()
         self.assertTrue(_inputs_have_equal_length(input_1))
         # self.assertFalse(_inputs_have_equal_length(input_2))
 
