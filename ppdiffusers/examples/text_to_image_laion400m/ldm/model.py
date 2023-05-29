@@ -252,7 +252,7 @@ class LatentDiffusionModel(nn.Layer):
         else:
             raise ValueError(f"Unknown prediction type {self.prediction_type}")
 
-        loss = F.mse_loss(noise_pred, target, reduction="none").mean([1, 2, 3]).mean()
+        loss = F.mse_loss(noise_pred.cast("float32"), target.cast("float32"), reduction="none").mean([1, 2, 3]).mean()
 
         return loss
 

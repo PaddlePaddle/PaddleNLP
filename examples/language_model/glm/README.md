@@ -50,6 +50,40 @@ python finetune_generation.py \
 --do_eval
 ```
 
+### 单卡LoRA微调
+
+```
+python finetune_generation.py \
+--model_name_or_path THUDM/glm-large-chinese \
+--num_train_epochs 4 \
+--learning_rate 3e-5 \
+--warmup_ratio 0.06 \
+--weight_decay 0.1 \
+--label_smoothing 0.1 \
+--save_steps 100 \
+--logging_steps 1 \
+--eval_steps 100 \
+--output_dir ./checkpoints/glm-large-chinese \
+--src_length 608 \
+--tgt_length 160 \
+--min_tgt_length 55 \
+--length_penalty 0.7 \
+--no_repeat_ngram_size 3 \
+--num_beams 5 \
+--select_topk True \
+--per_device_eval_batch_size 2 \
+--per_device_train_batch_size 2 \
+--max_grad_norm 1.0 \
+--lr_scheduler_type linear \
+--fp16 \
+--fp16_opt_level O2 \
+--recompute \
+--do_train \
+--do_eval \
+--lora True \
+--r 8
+```
+
 其中参数释义如下：
 
 - `model_name_or_path`: 预训练模型内置名称或者模型所在目录，默认为`THUDM/glm-large-chinese`。
@@ -60,6 +94,8 @@ python finetune_generation.py \
 - `num_beams`: 搜索方向数量，默认为5。
 - `label_smoothing`: 标签平滑因子，默认为0.1.
 - `lr_decay_ratio`: 学习率衰减因子，默认为0.1.
+- `lora`: 是否使用LoRA技术.
+- `r`: lora 算法中rank（秩）的值.
 
 ### Large 模型多卡训练脚本（模型并行策略）
 
@@ -146,6 +182,15 @@ python export_generation_model.py \
    --output_path ./checkpoints/infer/glm
 ```
 
+当在指定数据集上进行 LoRA finetune 后的导出脚本：
+
+```shell
+python export_generation_model.py
+    --model_name_or_path THUDM/glm-large-chinese
+    --output_path ./checkpoints/infer/glm
+    --lora_path ./checkpoints/glm-large-chinese
+```
+
 ## 模型推理 (c++推理)
 
 需要依赖` pip install fastdeploy-gpu-python==0.0.0 -f https://www.paddlepaddle.org.cn/whl/fastdeploy_nightly_build.html` (cpu请安装`fastdeploy-python`)
@@ -188,4 +233,12 @@ drwxr-xr-x 4 root root 4.0K Apr  7 20:02 ../
 python -m paddle.distributed.launch --gpus 0,1,2,3 predict_generation.py \
     --model_name_or_path  ./checkpoints/glm-large-chinese/checkpoint-100/ \
     --merge_tensor_parallel_path  ./checkpoints/glm-merged
+```
+
+### LoRA微调模型预测
+对merge后的单分片模型也可以进行直接预测，脚本如下
+```shell
+ python predict_generation.py
+    --model_name_or_path THUDM/glm-large-chinese \
+    --lora_path ./checkpoints/glm-large-chinese
 ```

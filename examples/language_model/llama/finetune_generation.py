@@ -81,8 +81,8 @@ class ModelArgument:
 def main():
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    data_args.always_pad_to_max_length = False
-    # data_args.always_pad_to_max_length = training_args.pipeline_parallel_degree > 1
+    # data_args.always_pad_to_max_length = False
+    data_args.always_pad_to_max_length = training_args.pipeline_parallel_degree > 1
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -191,7 +191,9 @@ def main():
         is_test = model_args.eval_with_do_generation
         dev_ds = dev_ds.map(partial(trans_func, is_test=is_test))
 
-    collate_fn = DataCollatorForSupervisedDataset(tokenizer)
+    collate_fn = DataCollatorForSupervisedDataset(
+        tokenizer, max_length=1024 if data_args.always_pad_to_max_length else 0
+    )
 
     def compute_metrics_trainer(eval_preds, tokenizer):
         all_preds = []

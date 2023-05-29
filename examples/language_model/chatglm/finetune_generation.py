@@ -22,7 +22,7 @@ from data import convert_example, custom_instruction_convert_example, read_local
 from sklearn.metrics import accuracy_score
 from utils import ChatGLMTrainer, save_infer_result
 
-from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers import LoRAConfig, LoRAModel
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
@@ -43,8 +43,6 @@ class DataArgument:
     tgt_length: int = field(default=180, metadata={"help": "The max length of target text."})
     num_beams: int = field(default=5, metadata={"help": "The number of beams."})
     generate_num: int = field(default=0, metadata={"help": "Save first k examples generation result in dev dataset"})
-    src_length: int = field(default=256, metadata={"help": "Source length for generation."})
-    tgt_length: int = field(default=512, metadata={"help": "Target length for generation."})
 
 
 @dataclass
@@ -53,7 +51,7 @@ class ModelArgument:
         default="THUDM/chatglm-6b", metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
-    r: int = field(default=8, metadata={"help": "Lora attention dimension"})
+    lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
     merge_weights: bool = field(
         default=True, metadata={"help": "Merge weights of the original model and the Lora model"}
     )
@@ -61,6 +59,7 @@ class ModelArgument:
     num_prefix_tokens: int = field(default=64, metadata={"help": "Number of prefix tokens"})
     prefix_projection: bool = field(default=True, metadata={"help": "Whether to project the prefix tokens"})
     do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
+    lora_all_linear: bool = field(default=False, metadata={"help": "Whether to use LoRA technique for all linear."})
 
 
 def main():
@@ -123,12 +122,18 @@ def main():
         model.mark_only_prefix_as_trainable()
         model.print_trainable_parameters()
     if model_args.lora:
+        if model_args.lora_all_linear:
+            target_modules = [".*query_key_value.*", ".*dense.*"]
+            enable_lora_list = [[True, False, True], None]
+        else:
+            target_modules = [".*query_key_value.*"]
+            enable_lora_list = [[True, False, True]]
         lora_config = LoRAConfig(
-            target_modules=[".*query_key_value.*"],
-            r=model_args.r,
-            lora_alpha=2 * model_args.r,
+            target_modules=target_modules,
+            r=model_args.lora_rank,
+            lora_alpha=2 * model_args.lora_rank,
             merge_weights=model_args.merge_weights,
-            enable_lora_list=[[True, False, True]],
+            enable_lora_list=enable_lora_list,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,
         )
@@ -158,7 +163,7 @@ def main():
         train_ds = train_ds.map(partial(trans_func, is_test=False))
         test_ds = dev_ds.map(partial(trans_func, is_test=False))
 
-    collate_fn = DataCollatorWithPadding(
+    collate_fn = DataCollatorForSeq2Seq(
         tokenizer=tokenizer, max_length=data_args.src_length + data_args.tgt_length, padding=True
     )
 
@@ -167,11 +172,12 @@ def main():
         rouge2 = Rouge2()
         rougel = RougeL()
         bleu4 = BLEU(n_size=4)
-        predictions = [x[x != -100] for x in eval_preds.predictions]
-        references = [x[x != -100] for x in eval_preds.label_ids]
 
+        predictions = [x[x != -100].tolist() for x in eval_preds.predictions]
+        references = [x[x != -100].tolist() for x in eval_preds.label_ids]
+        predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+        references = tokenizer.batch_decode(references, skip_special_tokens=True)
         # for pred in predictions:
-
         rouge1_score = rouge1.score(predictions, references)
         rouge2_score = rouge2.score(predictions, references)
         for pred, ref in zip(predictions, references):

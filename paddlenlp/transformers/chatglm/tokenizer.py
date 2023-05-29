@@ -432,13 +432,6 @@ class ChatGLMTokenizer(PretrainedTokenizer):
                 encoded_inputs["position_ids"] = np.pad(
                     encoded_inputs["position_ids"], pad_width=[(0, 0), (difference, 0)]
                 )
-            if "labels" in encoded_inputs:
-                encoded_inputs["labels"] = np.pad(
-                    encoded_inputs["labels"],
-                    pad_width=[(difference, 0)],
-                    mode="constant",
-                    constant_values=-100,
-                )
             encoded_inputs[self.model_input_names[0]] = [self.pad_token_id] * difference + required_input
 
         return encoded_inputs

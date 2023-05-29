@@ -57,6 +57,12 @@ class ModelArguments:
         metadata={"help": "Path to latents, used for alignment."},
     )
     random_alignment: bool = field(default=False, metadata={"help": "Whether to align random."})
+    timestep_sample_schedule: Optional[str] = field(
+        default="linear",
+        metadata={
+            "help": "The type of timestep-sampling schedule during training, select from ['linear', 'cosine', 'cubic']."
+        },
+    )
 
 
 @dataclass
