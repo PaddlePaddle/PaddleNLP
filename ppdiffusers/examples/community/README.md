@@ -414,7 +414,7 @@ image.show()
 
 
 ### ControlNet Reference Only
-`reference_only` 基于Stable Diffusion进行文图生成，同时启动高分辨率修复功能。该自定义Pipeline生成图像期间共包含两个阶段: 初始生成图像阶段和高清修复阶段。使用方式如下所示：
+[Reference-Only Control](https://github.com/Mikubill/sd-webui-controlnet#reference-only-control) 是一种不需要任何控制模型就可以直接使用图像作为参考来引导生成图像的方法。它使用方式如下所示：
 
 ```python
 import paddle
