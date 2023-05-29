@@ -265,7 +265,7 @@ class Trainer:
         self._signature_columns = None
         self.optimizer_grouped_parameters = None
 
-        if (self.sharding is not None) and (self.optimizer is not None or self.lr_scheduler is not None):
+        if self.sharding is not None and self.optimizer is not None:
             raise RuntimeError(
                 "Passing `optimizers` is not allowed if sharding is enabled."
                 "You should subclass `Trainer` and override the `create_optimizer_and_scheduler` method."
@@ -1306,13 +1306,27 @@ class Trainer:
             else:
 
                 def _prepare_pipeline_inputs_func(inputs):
+                    first_stage_keys = ["input_ids", "attention_mask", "position_ids"]
+                    last_stage_keys = ["labels"]
+
+                    def get_expected_keys(inputs, keys):
+                        ret = tuple([inputs.pop(k) for k in keys if k in inputs])
+                        if len(ret) == 1:
+                            ret = ret[0]
+                        return ret
+
                     if type(inputs) is dict:
-                        return [inputs["input_ids"], inputs["labels"]]
+                        return [
+                            get_expected_keys(inputs, first_stage_keys),
+                            get_expected_keys(inputs, last_stage_keys),
+                        ]
 
                     keys = list(inputs[0].keys())
                     inputs_batch = {key: [data.pop(key) for data in inputs] for key in keys}
-
-                    return [inputs_batch["input_ids"], inputs_batch["labels"]]
+                    return [
+                        get_expected_keys(inputs_batch, first_stage_keys),
+                        get_expected_keys(inputs_batch, last_stage_keys),
+                    ]
 
                 logger.warning(
                     "Using default prepare pipeline inputs func, only support input_ids and labels as inputs."

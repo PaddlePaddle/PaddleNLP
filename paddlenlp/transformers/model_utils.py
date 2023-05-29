@@ -1111,7 +1111,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
             for key in state_dict.keys():
                 if isinstance(state_dict[key], np.ndarray) and issubclass(state_dict[key].dtype.type, np.floating):
-                    state_dict[key] = state_dict[key].astype(dtype=dtype)
+                    if dtype == "bfloat16":
+                        state_dict[key] = paddle.Tensor(state_dict.pop(key), zero_copy=True)
+                    else:
+                        state_dict[key] = state_dict[key].astype(dtype=dtype)
                 if isinstance(state_dict[key], paddle.Tensor) and state_dict[key].is_floating_point():
                     state_dict[key] = paddle.cast(state_dict[key], dtype=dtype)
         else:

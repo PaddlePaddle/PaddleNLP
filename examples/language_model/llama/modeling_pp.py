@@ -23,6 +23,7 @@ from paddlenlp.transformers.llama.modeling import (
     LlamaConfig,
     LlamaDecoderLayer,
     LlamaLMHead,
+    LlamaModel,
     LlamaPretrainedModel,
     LlamaPretrainingCriterion,
     LlamaRMSNorm,
@@ -33,11 +34,44 @@ def get_hcg():
     return fleet.get_hybrid_communicate_group()
 
 
-class LlamaEmbedding(nn.Layer):
+def parse_args(args):
+    if isinstance(args, tuple):
+        if len(args) == 3:
+            hidden_states, attention_mask, position_ids = args
+        elif len(args) == 2:
+            hidden_states, attention_mask = args
+            position_ids = None
+    else:
+        hidden_states = args
+        attention_mask, position_ids = None, None
+
+    if position_ids is not None:
+        position_ids.stop_gradient = True
+
+    if attention_mask is not None:
+        attention_mask.stop_gradient = True
+
+    return hidden_states, attention_mask, position_ids
+
+
+def return_args(hidden_states, attention_mask=None, position_ids=None):
+    ret = (hidden_states,)
+
+    if attention_mask is not None:
+        ret += (attention_mask.clone(),)
+    if position_ids is not None:
+        ret += (position_ids.clone(),)
+    if len(ret) == 1:
+        ret = ret[0]
+
+    return ret
+
+
+class LlamaEmbeddingPipe(nn.Layer):
     """Extends LlamaEmbeddings to forward attention_mask through the pipeline."""
 
     def __init__(self, config):
-        super(LlamaEmbedding, self).__init__()
+        super(LlamaEmbeddingPipe, self).__init__()
         if config.tensor_parallel_degree > 1:
             self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
                 config.vocab_size,
@@ -47,7 +81,7 @@ class LlamaEmbedding(nn.Layer):
         else:
             self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
 
-    def forward(self, input_ids):
+    def forward(self, args):
         """_summary_
 
         Args:
@@ -56,7 +90,30 @@ class LlamaEmbedding(nn.Layer):
         Returns:
             _type_: _description_
         """
-        return self.embed_tokens(input_ids)
+        input_ids, attention_mask, position_ids = parse_args(args)
+
+        input_embeds = self.embed_tokens(input_ids)
+        batch_size, seq_length = input_ids.shape
+        if attention_mask is not None:
+            attention_mask = LlamaModel._prepare_decoder_attention_mask(
+                attention_mask, (batch_size, seq_length), 0, input_embeds.dtype
+            )
+            attention_mask.stop_gradient = True
+
+        return return_args(input_embeds, attention_mask, position_ids)
+
+
+class LlamaDecoderLayerPipe(LlamaDecoderLayer):
+    def forward(self, args):
+        hidden_states, attention_mask, position_ids = parse_args(args)
+        hidden_states = super().forward(hidden_states, attention_mask=attention_mask)
+        return return_args(hidden_states, attention_mask, position_ids)
+
+
+class LlamaRMSNormPipe(LlamaRMSNorm):
+    def forward(self, args):
+        hidden_states, attention_mask, position_ids = parse_args(args)
+        return super().forward(hidden_states)
 
 
 class PipelinePretrainedModel(PretrainedModel):
@@ -132,7 +189,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         config,
         # num_partitions=1,
         # topology=None,
-        use_recompute=True,
+        use_recompute=None,
         # fused_linear=False,
         # fuse_attn_qkv=False,
         # scale_qk_by_layer_num=True,
@@ -145,6 +202,8 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         # fused_softmax_with_triangular=False,
     ):
         self.config = config
+        if use_recompute is None:
+            use_recompute = self.config.use_recompute
 
         hcg = get_hcg()
         tensor_parallel_degree = max(hcg.get_model_parallel_world_size(), 1)
@@ -153,11 +212,11 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         config.tensor_parallel_degree = tensor_parallel_degree
         config.tensor_parallel_rank = tensor_parallel_rank
 
-        self.add_sequential_layer(LayerDesc(LlamaEmbedding, config=config), "llama")
+        self.add_sequential_layer(LayerDesc(LlamaEmbeddingPipe, config=config), "llama")
         for i in range(config.num_hidden_layers):
-            self.add_sequential_layer(LayerDesc(LlamaDecoderLayer, config=config), f"llama.layers.{i}")
+            self.add_sequential_layer(LayerDesc(LlamaDecoderLayerPipe, config=config), f"llama.layers.{i}")
 
-        self.add_sequential_layer(LayerDesc(LlamaRMSNorm, config=config), "llama.norm")
+        self.add_sequential_layer(LayerDesc(LlamaRMSNormPipe, config=config), "llama.norm")
         self.add_sequential_layer(LayerDesc(LlamaLMHead, config=config), "lm_head")
 
         recompute_interval = 0
