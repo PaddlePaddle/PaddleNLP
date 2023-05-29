@@ -15,14 +15,14 @@
 import paddle
 import paddle.nn as nn
 
-from paddlenlp.transformers.modeling_utils import ModuleUtilsMixin
-from paddlenlp.transformers.models.t5.modeling_t5 import T5Block, T5Config, T5LayerNorm
+from paddlenlp.transformers.t5.configuration import T5Config
+from paddlenlp.transformers.t5.modeling import T5Block, T5LayerNorm
 
 from ...configuration_utils import ConfigMixin, register_to_config
 from ...models import ModelMixin
 
 
-class SpectrogramContEncoder(ModelMixin, ConfigMixin, ModuleUtilsMixin):
+class SpectrogramContEncoder(ModelMixin, ConfigMixin):
     @register_to_config
     def __init__(
         self,

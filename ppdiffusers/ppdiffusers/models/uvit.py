@@ -81,9 +81,9 @@ class Attention(nn.Layer):
             else:
                 try:
                     _ = F.scaled_dot_product_attention_(
-                        paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
-                        paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
-                        paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
+                        paddle.ones((1, 1, 2, 40), dtype=paddle.float16),
+                        paddle.ones((1, 1, 2, 40), dtype=paddle.float16),
+                        paddle.ones((1, 1, 2, 40), dtype=paddle.float16),
                         attention_op=attention_op,
                     )
                 except Exception as e:
