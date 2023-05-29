@@ -61,7 +61,7 @@ def convert_example(example, tokenizer, data_args, is_test=False):
         input_seq + output_seq,
         return_tensors="pd",
         max_length=data_args.src_length + data_args.tgt_length,
-        padding="max_length" if data_args.always_pad_to_max_length else False,
+        padding=False,
         truncation=True,
     )
 
@@ -134,8 +134,7 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Fa
     )
 
 
-def left_padding(inputs, pad_id):
-    max_length = 0
+def left_padding(inputs, pad_id, max_length=0):
     for ids in inputs:
         max_length = max(max_length, len(ids))
 
@@ -157,12 +156,13 @@ class DataCollatorForSupervisedDataset(object):
     """Collate examples for supervised fine-tuning."""
 
     tokenizer: PretrainedTokenizerBase
+    max_length: 0
 
     def __call__(self, features: List[Dict]) -> Dict[str, paddle.Tensor]:
 
         input_ids, labels = tuple([feature[key] for feature in features] for key in ("input_ids", "labels"))
-        input_ids = left_padding(input_ids, pad_id=self.tokenizer.pad_token_id)
-        labels = left_padding(labels, pad_id=IGNORE_INDEX)
+        input_ids = left_padding(input_ids, pad_id=self.tokenizer.pad_token_id, max_length=self.max_length)
+        labels = left_padding(labels, pad_id=IGNORE_INDEX, max_length=self.max_length)
         attention_mask = paddle.cast(input_ids.not_equal(paddle.to_tensor(self.tokenizer.pad_token_id)), "int")
 
         return dict(
