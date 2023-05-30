@@ -45,6 +45,15 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
 __all__ = ["SpeechT5Tokenizer"]
 
 
+# Define type aliases and NamedTuples
+TextInput = str
+PreTokenizedInput = List[str]
+EncodedInput = List[int]
+TextInputPair = Tuple[str, str]
+PreTokenizedInputPair = Tuple[List[str], List[str]]
+EncodedInputPair = Tuple[List[int], List[int]]
+
+
 class SpeechT5Tokenizer(PretrainedTokenizer):
     """
     Construct a SpeechT5 tokenizer. Based on [SentencePiece](https://github.com/google/sentencepiece).
@@ -87,7 +96,9 @@ class SpeechT5Tokenizer(PretrainedTokenizer):
     """
 
     resource_files_names = VOCAB_FILES_NAMES
+    vocab_files_names = VOCAB_FILES_NAMES
     pretrained_vocab_files_map = PRETRAINED_VOCAB_FILES_MAP
+    pretrained_resource_files_map = PRETRAINED_VOCAB_FILES_MAP
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
     model_input_names = ["input_ids", "attention_mask"]
 
@@ -116,6 +127,7 @@ class SpeechT5Tokenizer(PretrainedTokenizer):
 
         self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
         self.sp_model.Load(vocab_file)
+        self._in_target_context_manager = False
 
     @property
     def vocab_size(self):
@@ -204,3 +216,244 @@ class SpeechT5Tokenizer(PretrainedTokenizer):
                 fi.write(content_spiece_model)
 
         return (out_vocab_file,)
+
+    # def __call__(
+    #     self,
+    #     text: Union[TextInput, PreTokenizedInput, List[TextInput], List[PreTokenizedInput]] = None,
+    #     text_pair: Optional[Union[TextInput, PreTokenizedInput, List[TextInput], List[PreTokenizedInput]]] = None,
+    #     text_target: Union[TextInput, PreTokenizedInput, List[TextInput], List[PreTokenizedInput]] = None,
+    #     text_pair_target: Optional[
+    #         Union[TextInput, PreTokenizedInput, List[TextInput], List[PreTokenizedInput]]
+    #     ] = None,
+    #     add_special_tokens: bool = True,
+    #     padding: Union[bool, str, PaddingStrategy] = False,
+    #     truncation: Union[bool, str, TruncationStrategy] = None,
+    #     max_length: Optional[int] = None,
+    #     stride: int = 0,
+    #     is_split_into_words: bool = False,
+    #     pad_to_multiple_of: Optional[int] = None,
+    #     return_tensors: Optional[str] = None,
+    #     return_token_type_ids: Optional[bool] = None,
+    #     return_attention_mask: Optional[bool] = None,
+    #     return_overflowing_tokens: bool = False,
+    #     return_special_tokens_mask: bool = False,
+    #     return_offsets_mapping: bool = False,
+    #     return_length: bool = False,
+    #     verbose: bool = True,
+    #     **kwargs,
+    # ) -> BatchEncoding:
+    #     """
+    #     Main method to tokenize and prepare for the model one or several sequence(s) or one or several pair(s) of
+    #     sequences.
+
+    #     Args:
+    #         text (`str`, `List[str]`, `List[List[str]]`, *optional*):
+    #             The sequence or batch of sequences to be encoded. Each sequence can be a string or a list of strings
+    #             (pretokenized string). If the sequences are provided as list of strings (pretokenized), you must set
+    #             `is_split_into_words=True` (to lift the ambiguity with a batch of sequences).
+    #         text_pair (`str`, `List[str]`, `List[List[str]]`, *optional*):
+    #             The sequence or batch of sequences to be encoded. Each sequence can be a string or a list of strings
+    #             (pretokenized string). If the sequences are provided as list of strings (pretokenized), you must set
+    #             `is_split_into_words=True` (to lift the ambiguity with a batch of sequences).
+    #         text_target (`str`, `List[str]`, `List[List[str]]`, *optional*):
+    #             The sequence or batch of sequences to be encoded as target texts. Each sequence can be a string or a
+    #             list of strings (pretokenized string). If the sequences are provided as list of strings (pretokenized),
+    #             you must set `is_split_into_words=True` (to lift the ambiguity with a batch of sequences).
+    #         text_pair_target (`str`, `List[str]`, `List[List[str]]`, *optional*):
+    #             The sequence or batch of sequences to be encoded as target texts. Each sequence can be a string or a
+    #             list of strings (pretokenized string). If the sequences are provided as list of strings (pretokenized),
+    #             you must set `is_split_into_words=True` (to lift the ambiguity with a batch of sequences).
+    #     """
+    #     # To avoid duplicating
+    #     all_kwargs = {
+    #         "add_special_tokens": add_special_tokens,
+    #         "padding": padding,
+    #         "truncation": truncation,
+    #         "max_length": max_length,
+    #         "stride": stride,
+    #         "is_split_into_words": is_split_into_words,
+    #         "pad_to_multiple_of": pad_to_multiple_of,
+    #         "return_tensors": return_tensors,
+    #         "return_token_type_ids": return_token_type_ids,
+    #         "return_attention_mask": return_attention_mask,
+    #         "return_overflowing_tokens": return_overflowing_tokens,
+    #         "return_special_tokens_mask": return_special_tokens_mask,
+    #         "return_offsets_mapping": return_offsets_mapping,
+    #         "return_length": return_length,
+    #         "verbose": verbose,
+    #     }
+    #     all_kwargs.update(kwargs)
+    #     if text is None and text_target is None:
+    #         raise ValueError("You need to specify either `text` or `text_target`.")
+    #     if text is not None:
+    #         # The context manager will send the inputs as normal texts and not text_target, but we shouldn't change the
+    #         # input mode in this case.
+    #         if not self._in_target_context_manager:
+    #             self._switch_to_input_mode()
+    #         encodings = self._call_one(text=text, text_pair=text_pair, **all_kwargs)
+    #     if text_target is not None:
+    #         self._switch_to_target_mode()
+    #         target_encodings = self._call_one(text=text_target, text_pair=text_pair_target, **all_kwargs)
+    #     # Leave back tokenizer in input mode
+    #     self._switch_to_input_mode()
+
+    #     if text_target is None:
+    #         return encodings
+    #     elif text is None:
+    #         return target_encodings
+    #     else:
+    #         encodings["labels"] = target_encodings["input_ids"]
+    #         return encodings
+
+    # def _call_one(
+    #     self,
+    #     text: Union[TextInput, PreTokenizedInput, List[TextInput], List[PreTokenizedInput]],
+    #     text_pair: Optional[Union[TextInput, PreTokenizedInput, List[TextInput], List[PreTokenizedInput]]] = None,
+    #     add_special_tokens: bool = True,
+    #     padding: Union[bool, str, PaddingStrategy] = False,
+    #     truncation: Union[bool, str, TruncationStrategy] = None,
+    #     max_length: Optional[int] = None,
+    #     stride: int = 0,
+    #     is_split_into_words: bool = False,
+    #     pad_to_multiple_of: Optional[int] = None,
+    #     return_tensors: Optional[str] = None,
+    #     return_token_type_ids: Optional[bool] = None,
+    #     return_attention_mask: Optional[bool] = None,
+    #     return_overflowing_tokens: bool = False,
+    #     return_special_tokens_mask: bool = False,
+    #     return_offsets_mapping: bool = False,
+    #     return_length: bool = False,
+    #     verbose: bool = True,
+    #     **kwargs,
+    # ) -> BatchEncoding:
+    #     # Input type checking for clearer error
+    #     def _is_valid_text_input(t):
+    #         if isinstance(t, str):
+    #             # Strings are fine
+    #             return True
+    #         elif isinstance(t, (list, tuple)):
+    #             # List are fine as long as they are...
+    #             if len(t) == 0:
+    #                 # ... empty
+    #                 return True
+    #             elif isinstance(t[0], str):
+    #                 # ... list of strings
+    #                 return True
+    #             elif isinstance(t[0], (list, tuple)):
+    #                 # ... list with an empty list or with a list of strings
+    #                 return len(t[0]) == 0 or isinstance(t[0][0], str)
+    #             else:
+    #                 return False
+    #         else:
+    #             return False
+
+    #     if not _is_valid_text_input(text):
+    #         raise ValueError(
+    #             "text input must of type `str` (single example), `List[str]` (batch or single pretokenized example) "
+    #             "or `List[List[str]]` (batch of pretokenized examples)."
+    #         )
+
+    #     if text_pair is not None and not _is_valid_text_input(text_pair):
+    #         raise ValueError(
+    #             "text input must of type `str` (single example), `List[str]` (batch or single pretokenized example) "
+    #             "or `List[List[str]]` (batch of pretokenized examples)."
+    #         )
+
+    #     if is_split_into_words:
+    #         is_batched = isinstance(text, (list, tuple)) and text and isinstance(text[0], (list, tuple))
+    #     else:
+    #         is_batched = isinstance(text, (list, tuple))
+
+    #     if is_batched:
+    #         if isinstance(text_pair, str):
+    #             raise TypeError(
+    #                 "when tokenizing batches of text, `text_pair` must be a list or tuple with the same length as"
+    #                 " `text`."
+    #             )
+    #         if text_pair is not None and len(text) != len(text_pair):
+    #             raise ValueError(
+    #                 f"batch length of `text`: {len(text)} does not match batch length of `text_pair`:"
+    #                 f" {len(text_pair)}."
+    #             )
+    #         batch_text_or_text_pairs = list(zip(text, text_pair)) if text_pair is not None else text
+    #         return self.batch_encode_plus(
+    #             batch_text_or_text_pairs=batch_text_or_text_pairs,
+    #             add_special_tokens=add_special_tokens,
+    #             padding=padding,
+    #             truncation=truncation,
+    #             max_length=max_length,
+    #             stride=stride,
+    #             is_split_into_words=is_split_into_words,
+    #             pad_to_multiple_of=pad_to_multiple_of,
+    #             return_tensors=return_tensors,
+    #             return_token_type_ids=return_token_type_ids,
+    #             return_attention_mask=return_attention_mask,
+    #             return_overflowing_tokens=return_overflowing_tokens,
+    #             return_special_tokens_mask=return_special_tokens_mask,
+    #             return_offsets_mapping=return_offsets_mapping,
+    #             return_length=return_length,
+    #             verbose=verbose,
+    #             **kwargs,
+    #         )
+    #     else:
+    #         return self.encode_plus(
+    #             text=text,
+    #             text_pair=text_pair,
+    #             add_special_tokens=add_special_tokens,
+    #             padding=padding,
+    #             truncation=truncation,
+    #             max_length=max_length,
+    #             stride=stride,
+    #             is_split_into_words=is_split_into_words,
+    #             pad_to_multiple_of=pad_to_multiple_of,
+    #             return_tensors=return_tensors,
+    #             return_token_type_ids=return_token_type_ids,
+    #             return_attention_mask=return_attention_mask,
+    #             return_overflowing_tokens=return_overflowing_tokens,
+    #             return_special_tokens_mask=return_special_tokens_mask,
+    #             return_offsets_mapping=return_offsets_mapping,
+    #             return_length=return_length,
+    #             verbose=verbose,
+    #             **kwargs,
+    #         )
+
+    # def encode(
+    #     self,
+    #     text: Union[TextInput, PreTokenizedInput, EncodedInput],
+    #     text_pair: Optional[Union[TextInput, PreTokenizedInput, EncodedInput]] = None,
+    #     add_special_tokens: bool = True,
+    #     padding: Union[bool, str, PaddingStrategy] = False,
+    #     truncation: Union[bool, str, TruncationStrategy] = None,
+    #     max_length: Optional[int] = None,
+    #     stride: int = 0,
+    #     return_tensors: Optional[str] = None,
+    #     **kwargs,
+    # ) -> List[int]:
+    #     """
+    #     Converts a string to a sequence of ids (integer), using the tokenizer and vocabulary.
+
+    #     Same as doing `self.convert_tokens_to_ids(self.tokenize(text))`.
+
+    #     Args:
+    #         text (`str`, `List[str]` or `List[int]`):
+    #             The first sequence to be encoded. This can be a string, a list of strings (tokenized string using the
+    #             `tokenize` method) or a list of integers (tokenized string ids using the `convert_tokens_to_ids`
+    #             method).
+    #         text_pair (`str`, `List[str]` or `List[int]`, *optional*):
+    #             Optional second sequence to be encoded. This can be a string, a list of strings (tokenized string using
+    #             the `tokenize` method) or a list of integers (tokenized string ids using the `convert_tokens_to_ids`
+    #             method).
+    #     """
+    #     encoded_inputs = self.encode_plus(
+    #         text,
+    #         text_pair=text_pair,
+    #         add_special_tokens=add_special_tokens,
+    #         padding=padding,
+    #         truncation=truncation,
+    #         max_length=max_length,
+    #         stride=stride,
+    #         return_tensors=return_tensors,
+    #         **kwargs,
+    #     )
+
+    #     return encoded_inputs["input_ids"]

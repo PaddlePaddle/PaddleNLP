@@ -181,7 +181,11 @@ class SpeechT5Config(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "speecht5"
-    attribute_map = {"num_attention_heads": "encoder_attention_heads", "num_hidden_layers": "encoder_layers"}
+    attribute_map = {
+        "num_attention_heads": "encoder_attention_heads",
+        "num_hidden_layers": "encoder_layers",
+        "num_classes": "num_labels",
+    }
 
     def __init__(
         self,
@@ -244,6 +248,7 @@ class SpeechT5Config(PretrainedConfig):
         is_encoder_decoder=True,
         **kwargs,
     ):
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.encoder_layers = encoder_layers
@@ -318,7 +323,6 @@ class SpeechT5Config(PretrainedConfig):
 
         self.use_cache = use_cache
         self.is_encoder_decoder = is_encoder_decoder
-
         super().__init__(
             pad_token_id=pad_token_id,
             bos_token_id=bos_token_id,
@@ -400,6 +404,7 @@ class SpeechT5HifiGanConfig(PretrainedConfig):
         normalize_before=True,
         **kwargs,
     ):
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         self.model_in_dim = model_in_dim
         self.sampling_rate = sampling_rate
         self.upsample_initial_channel = upsample_initial_channel
