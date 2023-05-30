@@ -568,6 +568,8 @@ class ChatGLMPretrainedModel(PretrainedModel):
     model_config_file = CONFIG_NAME
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = CHATGLM_PRETRAINED_RESOURCE_FILES_MAP
+    _keys_to_ignore_on_load_missing = [r"transformer.layers.*.attention.rotary_embeddings.inv_freq"]
+    _keys_to_ignore_on_load_unexpected = [r"transformer.layers.*.attention.rotary_emb.inv_freq"]
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -667,6 +669,7 @@ class ChatGLMModel(ChatGLMPretrainedModel):
     /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
     """
+    _keys_to_ignore_on_load_unexpected = [r"transformer.layers.*.attention.rotary_emb.inv_freq", r"lm_head.weight"]
 
     def __init__(self, config: ChatGLMConfig):
         super(ChatGLMModel, self).__init__(config)
