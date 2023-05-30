@@ -804,7 +804,6 @@ class LoRAModel(nn.Layer):
                 )
             elif isinstance(module, ColumnParallelLinear):
                 # recover the original output_features
-                print(module_name)
                 lora_module = ColumnParallelLoRAMergedLinear(
                     in_features=module.weight.shape[0],
                     out_features=module.weight.shape[1] * module.world_size,
