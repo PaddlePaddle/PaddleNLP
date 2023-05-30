@@ -120,7 +120,7 @@ class Attention(nn.Layer):
             )
         else:
             with paddle.amp.auto_cast(enable=False):
-                attention_scores = paddle.matmul(query_proj, key_proj, transpose_y=True) * self.scale
+                attention_scores = paddle.matmul(query_proj * self.scale, key_proj, transpose_y=True)
                 attention_probs = F.softmax(attention_scores, axis=-1)
                 hidden_states = paddle.matmul(attention_probs, value_proj).cast(x.dtype)
 

@@ -15,6 +15,8 @@
 # noqa F403
 import unittest
 
+from ppdiffusers_test.test_unet_blocks_common import UNetBlockTesterMixin
+
 from ppdiffusers.models.unet_2d_blocks import (
     AttnDownBlock2D,
     AttnDownEncoderBlock2D,
@@ -38,8 +40,6 @@ from ppdiffusers.models.unet_2d_blocks import (
     UpBlock2D,
     UpDecoderBlock2D,
 )
-
-from .test_unet_blocks_common import UNetBlockTesterMixin
 
 
 class DownBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):

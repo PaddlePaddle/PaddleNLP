@@ -662,7 +662,9 @@ if is_paddle_available() and is_paddlenlp_available():
         )
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", False)
         force_download = kwargs.pop("force_download", False)
-        from_diffusers = kwargs.pop("from_diffusers", FROM_DIFFUSERS)
+        from_diffusers = kwargs.pop("from_diffusers", None)
+        if from_diffusers is None:
+            from_diffusers = FROM_DIFFUSERS
         resume_download = kwargs.pop("resume_download", False)
         proxies = kwargs.pop("proxies", None)
         output_loading_info = kwargs.pop("output_loading_info", False)
@@ -874,7 +876,15 @@ if is_paddle_available() and is_paddlenlp_available():
 
     @classmethod
     def from_pretrained(
-        cls, pretrained_model_name_or_path, *args, from_hf_hub=False, subfolder=None, paddle_dtype=None, **kwargs
+        cls,
+        pretrained_model_name_or_path,
+        *args,
+        from_hf_hub=False,
+        subfolder=None,
+        paddle_dtype=None,
+        from_diffusers=None,
+        variant=None,
+        **kwargs
     ):
         if cls.constructed_from_pretrained_config() and hasattr(cls, "smart_convert"):
             return from_pretrained_v3(
@@ -884,6 +894,8 @@ if is_paddle_available() and is_paddlenlp_available():
                 from_hf_hub=from_hf_hub,
                 subfolder=subfolder,
                 paddle_dtype=paddle_dtype,
+                from_diffusers=from_diffusers,
+                variant=variant,
                 **kwargs,
             )
 

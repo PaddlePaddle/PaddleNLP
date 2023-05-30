@@ -274,7 +274,7 @@ class Attention(nn.Layer):
             query = query.cast(paddle.float32)
             key = key.cast(paddle.float32)
 
-        attention_scores = paddle.matmul(query, key, transpose_y=True) * self.scale
+        attention_scores = paddle.matmul(query * self.scale, key, transpose_y=True)
 
         if attention_mask is not None:
             attention_scores = attention_scores + attention_mask
@@ -889,7 +889,8 @@ class SlicedAttnProcessor:
         value = value.flatten(0, 1)
 
         batch_size_attention = query.shape[0]
-        hidden_states = paddle.zeros((batch_size_attention, sequence_length, attn.head_dim), dtype=query.dtype)
+        query_len = query.shape[1]
+        hidden_states = paddle.zeros((batch_size_attention, query_len, attn.head_dim), dtype=query.dtype)
         for i in range(batch_size_attention // self.slice_size):
             start_idx = i * self.slice_size
             end_idx = (i + 1) * self.slice_size
@@ -905,7 +906,7 @@ class SlicedAttnProcessor:
             hidden_states[start_idx:end_idx] = attn_slice
 
         # reshape back to [bs, num_heads, seqlen, head_dim]
-        hidden_states = hidden_states.reshape([-1, attn.heads, sequence_length, attn.head_dim])
+        hidden_states = hidden_states.reshape([-1, attn.heads, query_len, attn.head_dim])
 
         hidden_states = attn.batch_to_head_dim(hidden_states)
         # linear proj
@@ -970,7 +971,8 @@ class SlicedAttnAddedKVProcessor:
         value = value.flatten(0, 1)
 
         batch_size_attention = query.shape[0]
-        hidden_states = paddle.zeros((batch_size_attention, sequence_length, attn.head_dim), dtype=query.dtype)
+        query_len = query.shape[1]
+        hidden_states = paddle.zeros((batch_size_attention, query_len, attn.head_dim), dtype=query.dtype)
 
         for i in range(batch_size_attention // self.slice_size):
             start_idx = i * self.slice_size
@@ -987,7 +989,7 @@ class SlicedAttnAddedKVProcessor:
             hidden_states[start_idx:end_idx] = attn_slice
 
         # reshape back to [bs, num_heads, seqlen, head_dim]
-        hidden_states = hidden_states.reshape([-1, attn.heads, sequence_length, attn.head_dim])
+        hidden_states = hidden_states.reshape([-1, attn.heads, query_len, attn.head_dim])
 
         hidden_states = attn.batch_to_head_dim(hidden_states)
 
