@@ -139,6 +139,9 @@ class TestRmsNorm(unittest.TestCase):
 
         x_in.stop_gradient = False
         w.stop_gradient = False
+
+        # np.savez("rms_inputs.npz",x_in=x_in.numpy(), w=w.numpy(), w2=w2.numpy())
+
         return x_in, w, eps, w2
 
     def test_forward(self):
@@ -160,6 +163,8 @@ class TestRmsNorm(unittest.TestCase):
         ret2.sum().backward()
         x_in_g_2 = x_in.grad.numpy()
         w_g_2 = w.grad.numpy()
+
+        # np.savez("rms_grads.npz", x_in_g=x_in_g_2, w_g=w_g_2, ret=ret2.numpy())
 
         # np.testing.assert_equal(ret1.numpy(), ret2.numpy())
         np.testing.assert_allclose(ret1.numpy(), ret2.numpy(), rtol=1e-6)
