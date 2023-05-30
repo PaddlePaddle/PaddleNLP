@@ -16,6 +16,7 @@ import inspect
 from typing import Callable, List, Optional, Union
 
 import numpy as np
+import paddle
 import PIL.Image
 
 from ...utils import logging
@@ -57,7 +58,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         safety_checker ([`FastDeployRuntimeModel`]):
             Classification module that estimates whether generated images could be considered offensive or harmful.
             Please, refer to the [model card](https://huggingface.co/runwayml/stable-diffusion-v1-5) for details.
-        feature_extractor ([`CLIPFeatureExtractor`]):
+        feature_extractor ([`CLIPImageProcessor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
     _optional_components = ["safety_checker", "feature_extractor"]
@@ -76,6 +77,8 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         num_images_per_prompt: Optional[int] = 1,
         eta: Optional[float] = 0.0,
         generator: Optional[np.random.RandomState] = None,
+        prompt_embeds: Optional[paddle.Tensor] = None,
+        negative_prompt_embeds: Optional[paddle.Tensor] = None,
         latents: Optional[np.ndarray] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
@@ -98,6 +101,8 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             num_images_per_prompt=num_images_per_prompt,
             eta=eta,
             generator=generator,
+            prompt_embeds=prompt_embeds,
+            negative_prompt_embeds=negative_prompt_embeds,
             latents=latents,
             output_type=output_type,
             return_dict=return_dict,
@@ -117,6 +122,8 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         num_images_per_prompt: Optional[int] = 1,
         eta: Optional[float] = 0.0,
         generator: Optional[np.random.RandomState] = None,
+        prompt_embeds: Optional[paddle.Tensor] = None,
+        negative_prompt_embeds: Optional[paddle.Tensor] = None,
         noise: Optional[np.ndarray] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
@@ -138,6 +145,8 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             num_images_per_prompt=num_images_per_prompt,
             eta=eta,
             generator=generator,
+            prompt_embeds=prompt_embeds,
+            negative_prompt_embeds=negative_prompt_embeds,
             noise=noise,
             output_type=output_type,
             return_dict=return_dict,
@@ -159,6 +168,8 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         num_images_per_prompt: Optional[int] = 1,
         eta: Optional[float] = 0.0,
         generator: Optional[np.random.RandomState] = None,
+        prompt_embeds: Optional[paddle.Tensor] = None,
+        negative_prompt_embeds: Optional[paddle.Tensor] = None,
         noise: Optional[np.ndarray] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
@@ -183,6 +194,8 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             num_images_per_prompt=num_images_per_prompt,
             eta=eta,
             generator=generator,
+            prompt_embeds=prompt_embeds,
+            negative_prompt_embeds=negative_prompt_embeds,
             noise=noise,
             output_type=output_type,
             return_dict=return_dict,
