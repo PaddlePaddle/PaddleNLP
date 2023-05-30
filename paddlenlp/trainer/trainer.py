@@ -45,8 +45,7 @@ from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from tqdm.auto import tqdm
 
 from ..data import DataCollator, DataCollatorWithPadding, default_data_collator
-from ..layers.lora import LoRAModel
-from ..prompt import PrefixModelForCausalLM
+from ..peft import LoRAModel, PrefixModelForCausalLM
 from ..transformers.model_utils import PretrainedModel, _add_variant, unwrap_model
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils import device_guard
