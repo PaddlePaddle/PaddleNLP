@@ -6,7 +6,7 @@ numpy<1.27.0,>=1.19.5
 h11<0.13,>=0.11
 jinja2
 sphinx
-sphinx_rtd_theme
+sphinx_book_theme
 readthedocs-sphinx-search
 
 Markdown
