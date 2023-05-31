@@ -49,7 +49,7 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 下载以后通过以下命令解压：
 
 ```shell
-wget https://mystic.the-eye.eu/public/AI/pile_preliminary_components/openwebtext2.jsonl.zst.tar
+wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/openwebtext2.jsonl.zst.tar
 tar -xvf openwebtext2.json.zst.tar -C  /path/to/openwebtext
 ```
 
@@ -127,7 +127,6 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain_trainer.py \
 
 其他参数请参考Trainer文档 https://paddlenlp.readthedocs.io/zh/latest/trainer.html
 
-> 注：我们采用相同的数据流，同时也可以支持切换为llama模型训练，model_type设置为llama即可。
 
 #### 单机多卡
 
