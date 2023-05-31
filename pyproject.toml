@@ -14,6 +14,7 @@ addopts = "-ra -q --ignore model_zoo/gpt-3/"
 pythonpath = ["."]
 testpaths = [
     "tests/data",
+    "tests/dataaug",
     "tests/datasets",
     "tests/embeddings",
     "tests/experimental",
@@ -21,11 +22,11 @@ testpaths = [
     "tests/metrics",
     "tests/ops",
     "tests/transformers",
+    "tests/peft",
     "tests/prompt",
     "tests/taskflow",
     "tests/utils",
     "model_zoo",
-    "tests/dataaug",
 ]
 python_files = [
     "test.py",
