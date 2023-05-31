@@ -2,10 +2,14 @@
 
 **目录**
 
-- [1. 微调](#2)
-- [2. 动转静](#3)
-- [3. 模型预测](#4)
-- [4. 模型推理](#5)
+- [1. 微调](#1)
+- [2. 模型预测](#2)
+- [3. 动转静](#3)
+- [4. 模型推理](#4)
+
+## 协议
+
+Llama 模型的权重的使用则需要遵循[License](../../../paddlenlp/transformers/llama/LICENSE)。
 
 <a name="1"></a>
 
@@ -170,59 +174,6 @@ python -u  -m paddle.distributed.fleet.launch \
     --eval_steps 1000
 ```
 
-### 单卡LoRA微调
-
-```shell
-python finetune_instruction_generation.py \
-    --model_name_or_path facebook/llama-7b \
-    --do_train \
-    --do_eval \
-    --num_train_epochs 2 \
-    --per_device_train_batch_size 4 \
-    --per_device_eval_batch_size 4 \
-    --overwrite_output_dir \
-    --output_dir ./checkpoints/ \
-    --logging_steps 10 \
-    --fp16 \
-    --fp16_opt_level O2 \
-    --recompute \
-    --learning_rate 3e-4 \
-    --lr_scheduler_type linear \
-    --max_grad_norm 1.0 \
-    --warmup_steps 20 \
-    --gradient_accumulation_steps 4 \
-    --logging_steps 1 \
-    --eval_steps 1000 \
-    --lora True
-```
-
-### Prefix微调
-
-```shell
-python finetune_instruction_generation.py \
-    --model_name_or_path facebook/llama-7b \
-    --do_train \
-    --do_eval \
-    --num_train_epochs 2 \
-    --per_device_train_batch_size 4 \
-    --per_device_eval_batch_size 4 \
-    --overwrite_output_dir \
-    --output_dir ./checkpoints/ \
-    --logging_steps 10 \
-    --fp16 \
-    --fp16_opt_level O2 \
-    --recompute \
-    --learning_rate 3e-2 \
-    --lr_scheduler_type linear \
-    --max_grad_norm 1.0 \
-    --warmup_steps 20 \
-    --gradient_accumulation_steps 4 \
-    --logging_steps 1 \
-    --eval_steps 1000 \
-    --prefix_tuning True
-```
-
-
 <a name="2"></a>
 
 ## 模型预测
@@ -268,7 +219,7 @@ python -m paddle.distributed.launch --gpus 0,1,2,3 predict_generation.py \
 
 <a name="3"></a>
 
-## 模型导出
+## 动转静
 
 ```shell
 python export_generation_model.py \
