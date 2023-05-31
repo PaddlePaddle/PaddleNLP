@@ -547,7 +547,7 @@ class ReferenceOnlyPipeline(DiffusionPipeline):
                     hidden_size = self.unet.config.block_out_channels[block_id]
                 self_attn_processors_keys.append([name, hidden_size])
 
-            # 先根据hidden_size排序，再根据字母大小写排序，先down、mid、up。注意diffusers实现的时候初始化顺序不一样。。。。先down、up、mid
+            # sorted by (-hidden_size, name)，down -> mid -> up.
             for i, (name, _) in enumerate(sorted(self_attn_processors_keys, key=lambda x: (-x[1], x[0]))):
                 module = self.unet.get_sublayer(name)
                 module.attn_weight = float(i) / float(len(self_attn_processors_keys))
