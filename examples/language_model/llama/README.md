@@ -136,7 +136,7 @@ python -u  -m paddle.distributed.launch \
     --eval_with_do_generation 0 \
     --fp16 0\
     --fp16_opt_level O2 \
-    --recompute \
+    --recompute 0 \
     --learning_rate 3e-5 \
     --lr_scheduler_type linear \
     --max_grad_norm 1.0 \

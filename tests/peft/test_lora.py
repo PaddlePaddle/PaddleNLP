@@ -22,7 +22,7 @@ import numpy as np
 import paddle
 from parameterized import parameterized
 
-from paddlenlp.layers import LoRAConfig, LoRALinear, LoRAMergedLinear, LoRAModel
+from paddlenlp.peft.lora import LoRAConfig, LoRALinear, LoRAMergedLinear, LoRAModel
 from paddlenlp.transformers import AutoModel, BertModel
 
 
