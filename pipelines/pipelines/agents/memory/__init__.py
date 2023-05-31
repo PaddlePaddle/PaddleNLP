@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pipelines.pipelines.base import Pipeline, RootNode
-from pipelines.pipelines.standard_pipelines import (
-    BaseStandardPipeline,
-    DocPipeline,
-    ExtractiveQAPipeline,
-    QAGenerationPipeline,
-    SemanticSearchPipeline,
-    SentaPipeline,
-    TextToImagePipeline,
-    WebQAPipeline,
-)
+from pipelines.agents.memory.base import Memory
+from pipelines.agents.memory.conversation_memory import ConversationMemory
+from pipelines.agents.memory.no_memory import NoMemory
