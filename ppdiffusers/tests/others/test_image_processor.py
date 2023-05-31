@@ -38,18 +38,18 @@ class ImageProcessorTest(unittest.TestCase):
         if isinstance(image[0], PIL.Image.Image):
             return np.stack([np.array(i) for i in image], axis=0)
         elif isinstance(image, paddle.Tensor):
-            return image.transpose(0, 2, 3, 1).cpu().numpy()
+            return image.transpose([0, 2, 3, 1]).cpu().numpy()
         return image
 
     def test_vae_image_processor_pt(self):
         image_processor = VaeImageProcessor(do_resize=False, do_normalize=False)
 
-        input_pt = self.dummy_sample
-        input_np = self.to_np(input_pt)
+        input_pd = self.dummy_sample
+        input_np = self.to_np(input_pd)
 
-        for output_type in ["pt", "np", "pil"]:
+        for output_type in ["pd", "np", "pil"]:
             out = image_processor.postprocess(
-                image_processor.preprocess(input_pt),
+                image_processor.preprocess(input_pd),
                 output_type=output_type,
             )
             out_np = self.to_np(out)
@@ -60,9 +60,9 @@ class ImageProcessorTest(unittest.TestCase):
 
     def test_vae_image_processor_np(self):
         image_processor = VaeImageProcessor(do_resize=False, do_normalize=False)
-        input_np = self.dummy_sample.transpose(0, 2, 3, 1).cpu().numpy()
+        input_np = self.dummy_sample.transpose([0, 2, 3, 1]).cpu().numpy()
 
-        for output_type in ["pt", "np", "pil"]:
+        for output_type in ["pd", "np", "pil"]:
             out = image_processor.postprocess(image_processor.preprocess(input_np), output_type=output_type)
 
             out_np = self.to_np(out)
@@ -74,10 +74,10 @@ class ImageProcessorTest(unittest.TestCase):
     def test_vae_image_processor_pil(self):
         image_processor = VaeImageProcessor(do_resize=False, do_normalize=False)
 
-        input_np = self.dummy_sample.transpose(0, 2, 3, 1).cpu().numpy()
+        input_np = self.dummy_sample.transpose([0, 2, 3, 1]).cpu().numpy()
         input_pil = image_processor.numpy_to_pil(input_np)
 
-        for output_type in ["pt", "np", "pil"]:
+        for output_type in ["pd", "np", "pil"]:
             out = image_processor.postprocess(image_processor.preprocess(input_pil), output_type=output_type)
             for i, o in zip(input_pil, out):
                 in_np = np.array(i)
@@ -89,15 +89,15 @@ class ImageProcessorTest(unittest.TestCase):
     def test_preprocess_input_3d(self):
         image_processor = VaeImageProcessor(do_resize=False, do_normalize=False)
 
-        input_pt_4d = self.dummy_sample
-        input_pt_3d = input_pt_4d.squeeze(0)
+        input_pd_4d = self.dummy_sample
+        input_pd_3d = input_pd_4d.squeeze(0)
 
         out_pt_4d = image_processor.postprocess(
-            image_processor.preprocess(input_pt_4d),
+            image_processor.preprocess(input_pd_4d),
             output_type="np",
         )
         out_pt_3d = image_processor.postprocess(
-            image_processor.preprocess(input_pt_3d),
+            image_processor.preprocess(input_pd_3d),
             output_type="np",
         )
 
@@ -119,16 +119,16 @@ class ImageProcessorTest(unittest.TestCase):
     def test_preprocess_input_list(self):
         image_processor = VaeImageProcessor(do_resize=False, do_normalize=False)
 
-        input_pt_4d = self.dummy_sample
-        input_pt_list = list(input_pt_4d)
+        input_pd_4d = self.dummy_sample
+        input_pd_list = list(input_pd_4d)
 
         out_pt_4d = image_processor.postprocess(
-            image_processor.preprocess(input_pt_4d),
+            image_processor.preprocess(input_pd_4d),
             output_type="np",
         )
 
         out_pt_list = image_processor.postprocess(
-            image_processor.preprocess(input_pt_list),
+            image_processor.preprocess(input_pd_list),
             output_type="np",
         )
 
@@ -136,12 +136,12 @@ class ImageProcessorTest(unittest.TestCase):
         list(input_np_4d)
 
         out_np_4d = image_processor.postprocess(
-            image_processor.preprocess(input_pt_4d),
+            image_processor.preprocess(input_pd_4d),
             output_type="np",
         )
 
         out_np_list = image_processor.postprocess(
-            image_processor.preprocess(input_pt_list),
+            image_processor.preprocess(input_pd_list),
             output_type="np",
         )
 

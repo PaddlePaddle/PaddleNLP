@@ -46,9 +46,9 @@ class ScoreSdeVeSchedulerTest(unittest.TestCase):
 
         num_elems = batch_size * num_channels * height * width
         sample = paddle.arange(num_elems)
-        sample = sample.reshape(num_channels, height, width, batch_size)
+        sample = sample.reshape([num_channels, height, width, batch_size])
         sample = sample / num_elems
-        sample = sample.permute(3, 0, 1, 2)
+        sample = sample.transpose([3, 0, 1, 2])
 
         return sample
 

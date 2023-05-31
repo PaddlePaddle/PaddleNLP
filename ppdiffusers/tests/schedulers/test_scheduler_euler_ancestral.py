@@ -15,7 +15,6 @@
 import paddle
 
 from ppdiffusers import EulerAncestralDiscreteScheduler
-from ppdiffusers.utils import paddle_device
 
 from .test_schedulers import SchedulerCommonTest
 
@@ -62,7 +61,6 @@ class EulerAncestralDiscreteSchedulerTest(SchedulerCommonTest):
 
         model = self.dummy_model()
         sample = self.dummy_sample_deter * scheduler.init_noise_sigma
-        sample = sample.to(paddle_device)
 
         for i, t in enumerate(scheduler.timesteps):
             sample = scheduler.scale_model_input(sample, t)
@@ -89,7 +87,6 @@ class EulerAncestralDiscreteSchedulerTest(SchedulerCommonTest):
 
         model = self.dummy_model()
         sample = self.dummy_sample_deter * scheduler.init_noise_sigma
-        sample = sample.to(paddle_device)
 
         for i, t in enumerate(scheduler.timesteps):
             sample = scheduler.scale_model_input(sample, t)
@@ -110,12 +107,11 @@ class EulerAncestralDiscreteSchedulerTest(SchedulerCommonTest):
         scheduler_config = self.get_scheduler_config()
         scheduler = scheduler_class(**scheduler_config)
 
-        scheduler.set_timesteps(self.num_inference_steps, device=paddle_device)
+        scheduler.set_timesteps(self.num_inference_steps)
         generator = paddle.Generator().manual_seed(0)
 
         model = self.dummy_model()
         sample = self.dummy_sample_deter * scheduler.init_noise_sigma
-        sample = sample.to(paddle_device)
 
         for t in scheduler.timesteps:
             sample = scheduler.scale_model_input(sample, t)

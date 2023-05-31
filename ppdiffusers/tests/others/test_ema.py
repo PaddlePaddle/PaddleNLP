@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import tempfile
 import unittest
 
@@ -97,13 +98,13 @@ class EMAModelTests(unittest.TestCase):
         # Now the EMA'd parameters won't be equal to the original model parameters.
         orig_params = list(unet_pseudo_updated_step_one.parameters())
         for s_param, param in zip(ema_unet.shadow_params, orig_params):
-            assert ~paddle.allclose(s_param, param)
+            assert not paddle.allclose(s_param, param)
 
         # Ensure this is the case when we take multiple EMA steps.
         for _ in range(4):
             ema_unet.step(unet.parameters())
         for s_param, param in zip(ema_unet.shadow_params, orig_params):
-            assert ~paddle.allclose(s_param, param)
+            assert not paddle.allclose(s_param, param)
 
     def test_consecutive_shadow_params_updated(self):
         # If we call EMA step after a backpropagation consecutively for two times,
@@ -113,7 +114,7 @@ class EMAModelTests(unittest.TestCase):
         # First backprop + EMA
         unet_step_one = self.simulate_backprop(unet)
         ema_unet.step(unet_step_one.parameters())
-        step_one_shadow_params = ema_unet.shadow_params
+        step_one_shadow_params = copy.deepcopy(ema_unet.shadow_params)
 
         # Second backprop + EMA
         unet_step_two = self.simulate_backprop(unet_step_one)
@@ -121,7 +122,7 @@ class EMAModelTests(unittest.TestCase):
         step_two_shadow_params = ema_unet.shadow_params
 
         for step_one, step_two in zip(step_one_shadow_params, step_two_shadow_params):
-            assert ~paddle.allclose(step_one, step_two)
+            assert not paddle.allclose(step_one, step_two)
 
     def test_zero_decay(self):
         # If there's no decay even if there are backprops, EMA steps

@@ -15,7 +15,6 @@
 import paddle
 
 from ppdiffusers import LMSDiscreteScheduler
-from ppdiffusers.utils import paddle_device
 
 from .test_schedulers import SchedulerCommonTest
 
@@ -108,11 +107,10 @@ class LMSDiscreteSchedulerTest(SchedulerCommonTest):
         scheduler_config = self.get_scheduler_config()
         scheduler = scheduler_class(**scheduler_config)
 
-        scheduler.set_timesteps(self.num_inference_steps, device=paddle_device)
+        scheduler.set_timesteps(self.num_inference_steps)
 
         model = self.dummy_model()
         sample = self.dummy_sample_deter * scheduler.init_noise_sigma
-        sample = sample.to(paddle_device)
 
         for i, t in enumerate(scheduler.timesteps):
             sample = scheduler.scale_model_input(sample, t)

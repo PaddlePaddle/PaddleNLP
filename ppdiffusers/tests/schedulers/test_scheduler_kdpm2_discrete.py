@@ -15,7 +15,6 @@
 import paddle
 
 from ppdiffusers import KDPM2DiscreteScheduler
-from ppdiffusers.utils import paddle_device
 
 from .test_schedulers import SchedulerCommonTest
 
@@ -60,7 +59,6 @@ class KDPM2DiscreteSchedulerTest(SchedulerCommonTest):
 
         model = self.dummy_model()
         sample = self.dummy_sample_deter * scheduler.init_noise_sigma
-        sample = sample.to(paddle_device)
 
         for i, t in enumerate(scheduler.timesteps):
             sample = scheduler.scale_model_input(sample, t)
@@ -73,17 +71,12 @@ class KDPM2DiscreteSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        if paddle_device in ["cpu", "mps"]:
-            assert abs(result_sum.item() - 4.6934e-07) < 1e-2
-            assert abs(result_mean.item() - 6.1112e-10) < 1e-3
-        else:
-            # CUDA
-            assert abs(result_sum.item() - 4.693428650170972e-07) < 1e-2
-            assert abs(result_mean.item() - 0.0002) < 1e-3
+        # CUDA
+        assert abs(result_sum.item() - 4.693428650170972e-07) < 1e-2
+        assert abs(result_mean.item() - 0.0002) < 1e-3
 
     def test_full_loop_no_noise(self):
-        if paddle_device == "mps":
-            return
+
         scheduler_class = self.scheduler_classes[0]
         scheduler_config = self.get_scheduler_config()
         scheduler = scheduler_class(**scheduler_config)
@@ -92,7 +85,6 @@ class KDPM2DiscreteSchedulerTest(SchedulerCommonTest):
 
         model = self.dummy_model()
         sample = self.dummy_sample_deter * scheduler.init_noise_sigma
-        sample = sample.to(paddle_device)
 
         for i, t in enumerate(scheduler.timesteps):
             sample = scheduler.scale_model_input(sample, t)
@@ -105,25 +97,19 @@ class KDPM2DiscreteSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        if paddle_device in ["cpu", "mps"]:
-            assert abs(result_sum.item() - 20.4125) < 1e-2
-            assert abs(result_mean.item() - 0.0266) < 1e-3
-        else:
-            # CUDA
-            assert abs(result_sum.item() - 20.4125) < 1e-2
-            assert abs(result_mean.item() - 0.0266) < 1e-3
+        # CUDA
+        assert abs(result_sum.item() - 20.4125) < 1e-2
+        assert abs(result_mean.item() - 0.0266) < 1e-3
 
     def test_full_loop_device(self):
-        if paddle_device == "mps":
-            return
         scheduler_class = self.scheduler_classes[0]
         scheduler_config = self.get_scheduler_config()
         scheduler = scheduler_class(**scheduler_config)
 
-        scheduler.set_timesteps(self.num_inference_steps, device=paddle_device)
+        scheduler.set_timesteps(self.num_inference_steps)
 
         model = self.dummy_model()
-        sample = self.dummy_sample_deter.to(paddle_device) * scheduler.init_noise_sigma
+        sample = self.dummy_sample_deter * scheduler.init_noise_sigma
 
         for t in scheduler.timesteps:
             sample = scheduler.scale_model_input(sample, t)
@@ -136,11 +122,6 @@ class KDPM2DiscreteSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        if str(paddle_device).startswith("cpu"):
-            # The following sum varies between 148 and 156 on mps. Why?
-            assert abs(result_sum.item() - 20.4125) < 1e-2
-            assert abs(result_mean.item() - 0.0266) < 1e-3
-        else:
-            # CUDA
-            assert abs(result_sum.item() - 20.4125) < 1e-2
-            assert abs(result_mean.item() - 0.0266) < 1e-3
+        # CUDA
+        assert abs(result_sum.item() - 20.4125) < 1e-2
+        assert abs(result_mean.item() - 0.0266) < 1e-3

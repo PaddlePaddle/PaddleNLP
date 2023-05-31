@@ -15,7 +15,6 @@
 import paddle
 
 from ppdiffusers import KDPM2AncestralDiscreteScheduler
-from ppdiffusers.utils import paddle_device
 
 from .test_schedulers import SchedulerCommonTest
 
@@ -48,8 +47,7 @@ class KDPM2AncestralDiscreteSchedulerTest(SchedulerCommonTest):
             self.check_over_configs(beta_schedule=schedule)
 
     def test_full_loop_no_noise(self):
-        if paddle_device == "mps":
-            return
+
         scheduler_class = self.scheduler_classes[0]
         scheduler_config = self.get_scheduler_config()
         scheduler = scheduler_class(**scheduler_config)
@@ -60,7 +58,6 @@ class KDPM2AncestralDiscreteSchedulerTest(SchedulerCommonTest):
 
         model = self.dummy_model()
         sample = self.dummy_sample_deter * scheduler.init_noise_sigma
-        sample = sample.to(paddle_device)
 
         for i, t in enumerate(scheduler.timesteps):
             sample = scheduler.scale_model_input(sample, t)
@@ -81,8 +78,7 @@ class KDPM2AncestralDiscreteSchedulerTest(SchedulerCommonTest):
             self.check_over_configs(prediction_type=prediction_type)
 
     def test_full_loop_with_v_prediction(self):
-        if paddle_device == "mps":
-            return
+
         scheduler_class = self.scheduler_classes[0]
         scheduler_config = self.get_scheduler_config(prediction_type="v_prediction")
         scheduler = scheduler_class(**scheduler_config)
@@ -91,7 +87,6 @@ class KDPM2AncestralDiscreteSchedulerTest(SchedulerCommonTest):
 
         model = self.dummy_model()
         sample = self.dummy_sample_deter * scheduler.init_noise_sigma
-        sample = sample.to(paddle_device)
 
         generator = paddle.Generator().manual_seed(0)
 
@@ -110,17 +105,16 @@ class KDPM2AncestralDiscreteSchedulerTest(SchedulerCommonTest):
         assert abs(result_mean.item() - 0.4284) < 1e-3
 
     def test_full_loop_device(self):
-        if paddle_device == "mps":
-            return
+
         scheduler_class = self.scheduler_classes[0]
         scheduler_config = self.get_scheduler_config()
         scheduler = scheduler_class(**scheduler_config)
 
-        scheduler.set_timesteps(self.num_inference_steps, device=paddle_device)
+        scheduler.set_timesteps(self.num_inference_steps)
         generator = paddle.Generator().manual_seed(0)
 
         model = self.dummy_model()
-        sample = self.dummy_sample_deter.to(paddle_device) * scheduler.init_noise_sigma
+        sample = self.dummy_sample_deter * scheduler.init_noise_sigma
 
         for t in scheduler.timesteps:
             sample = scheduler.scale_model_input(sample, t)

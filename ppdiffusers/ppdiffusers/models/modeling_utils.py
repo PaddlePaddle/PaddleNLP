@@ -242,7 +242,7 @@ class ModelMixin(nn.Layer):
         save_directory: Union[str, os.PathLike],
         is_main_process: bool = True,
         save_function: Callable = None,
-        safe_serialization: bool = True,
+        safe_serialization: bool = False,
         variant: Optional[str] = None,
         to_diffusers: Optional[bool] = None,
     ):
@@ -265,7 +265,7 @@ class ModelMixin(nn.Layer):
                 If specified, weights are saved in the format pytorch_model.<variant>.bin.
             to_diffusers (`bool`, *optional*, defaults to `False`):
                 If specified, weights are saved in the format of torch. eg. linear need transpose.
-            safe_serialization (`bool`, *optional*, defaults to `True`):
+            safe_serialization (`bool`, *optional*, defaults to `False`):
                 Only when `to_diffusers` is True, Whether to save the model using `safetensors` or the traditional PyTorch way (that uses `pickle`).
         """
         if to_diffusers is None:
