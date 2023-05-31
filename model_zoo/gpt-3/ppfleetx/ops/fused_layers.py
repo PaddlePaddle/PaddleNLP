@@ -28,13 +28,21 @@ def try_import(module_name, func_name=None):
         func_name = module_name
     try:
         m = importlib.import_module(module_name)
-        return getattr(m, func_name)
+        return m
+    # return getattr(m, func_name)
     except ImportError:
         return None
 
 
-fast_ln = try_import("fast_ln")
-fused_ln = try_import("fused_ln")
+fast_ln_lib = try_import("fast_ln")
+fused_ln_lib = try_import("fused_ln")
+
+if fast_ln_lib is not None:
+    fast_ln = fast_ln_lib.fast_ln
+
+if fused_ln_lib is not None:
+    fused_ln = fused_ln_lib.fused_ln
+    fused_rms_norm = fused_ln_lib.fused_rms_norm
 
 
 def check_normalized_shape(normalized_shape):
@@ -43,21 +51,52 @@ def check_normalized_shape(normalized_shape):
 
 
 class FusedLayerNorm(OriginLayerNorm):
-    def __init__(self, normalized_shape, epsilon=1e-05, weight_attr=None, bias_attr=None, name=None):
+    def __init__(self,
+                 normalized_shape,
+                 epsilon=1e-05,
+                 weight_attr=None,
+                 bias_attr=None,
+                 name=None):
         super().__init__(
-            normalized_shape=normalized_shape, epsilon=epsilon, weight_attr=weight_attr, bias_attr=bias_attr
-        )
+            normalized_shape=normalized_shape,
+            epsilon=epsilon,
+            weight_attr=weight_attr,
+            bias_attr=bias_attr)
         check_normalized_shape(self._normalized_shape)
 
     def forward(self, input):
         return fused_ln(input, self.weight, self.bias, self._epsilon)[0]
 
 
-class FastLayerNorm(OriginLayerNorm):
-    def __init__(self, normalized_shape, epsilon=1e-05, weight_attr=None, bias_attr=None, name=None):
+class FusedRMSNorm(OriginLayerNorm):
+    def __init__(self,
+                 normalized_shape,
+                 epsilon=1e-05,
+                 weight_attr=None,
+                 name=None):
         super().__init__(
-            normalized_shape=normalized_shape, epsilon=epsilon, weight_attr=weight_attr, bias_attr=bias_attr
-        )
+            normalized_shape=normalized_shape,
+            epsilon=epsilon,
+            weight_attr=weight_attr,
+            bias_attr=False)
+        check_normalized_shape(self._normalized_shape)
+
+    def forward(self, input):
+        return fused_rms_norm(input, self.weight, self._epsilon)[0]
+
+
+class FastLayerNorm(OriginLayerNorm):
+    def __init__(self,
+                 normalized_shape,
+                 epsilon=1e-05,
+                 weight_attr=None,
+                 bias_attr=None,
+                 name=None):
+        super().__init__(
+            normalized_shape=normalized_shape,
+            epsilon=epsilon,
+            weight_attr=weight_attr,
+            bias_attr=bias_attr)
         check_normalized_shape(self._normalized_shape)
 
     def forward(self, input):
@@ -78,19 +117,21 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
 
         if bias is None:
             if hasattr(weight, "main_grad"):
-                weight.main_grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, weight.main_grad, None, True)
+                weight.main_grad, _ = _C_ops.fused_linear_param_grad_add(
+                    x, y_grad, weight.main_grad, None, True)
                 return x_grad, None
             else:
-                weight_grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False)
+                weight_grad, _ = _C_ops.fused_linear_param_grad_add(
+                    x, y_grad, None, None, False)
                 return x_grad, weight_grad
 
         if hasattr(weight, "main_grad") and hasattr(bias, "main_grad"):
             weight.main_grad, bias.main_grad = _C_ops.fused_linear_param_grad_add(
-                x, y_grad, weight.main_grad, bias.main_grad, True
-            )
+                x, y_grad, weight.main_grad, bias.main_grad, True)
             return x_grad, None, None
         else:
-            weight_grad, bias_grad = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False)
+            weight_grad, bias_grad = _C_ops.fused_linear_param_grad_add(
+                x, y_grad, None, None, False)
             return x_grad, weight_grad, bias_grad
 
 
@@ -107,6 +148,8 @@ def mock_layers():
         paddle.nn.LayerNorm = FastLayerNorm
     elif get_env("USE_FUSED_LN"):
         paddle.nn.LayerNorm = FusedLayerNorm
+    elif get_env("USE_FUSED_RMS_NORM"):
+        paddle.nn.LayerNorm = FusedRMSNorm
 
     if get_env("USE_LINEAR_WITH_GRAD_ADD"):
         paddle.nn.functional.linear = FusedLinearWithGradAdd.apply
