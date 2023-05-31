@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import os
-from dataclasses import asdict, dataclass, field
 from functools import partial
 from typing import Callable, Optional
 
@@ -23,101 +21,12 @@ import paddle
 import paddle.nn as nn
 from paddle.distributed import fleet
 
-from ..transformers.model_utils import _add_variant, dtype_guard
-from ..utils.distributed import distributed_gather
-from ..utils.env import (
-    PAST_KEY_VALUES_FILE_NAME,
-    PREFIX_CONFIG_NAME,
-    PREFIX_WEIGHT_FILE_NAME,
-)
-from ..utils.log import logger
-from .prompt_utils import signature
-
-__all__ = [
-    "PrefixConfig",
-    "PrefixModelForCausalLM",
-]
-
-
-@dataclass
-class PrefixConfig:
-    prefix_dropout: float = field(default=0.0, metadata={"help": "Prefix projection dropout"})
-    num_prefix_tokens: Optional[int] = field(default=None, metadata={"help": "Number of prefix tokens"})
-    num_attention_heads: Optional[int] = field(default=None, metadata={"help": "Number of attention heads"})
-    num_hidden_layers: Optional[int] = field(default=None, metadata={"help": "Number of transformer hidden layers"})
-    hidden_size: Optional[int] = field(
-        default=None, metadata={"help": "The hidden embedding dimension of the transformer model"}
-    )
-    prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
-    prefix_projection_hidden_size: Optional[int] = field(
-        default=None, metadata={"help": "The hidden embedding dimension of the transformer model"}
-    )
-    tensor_parallel_degree: int = field(default=-1, metadata={"help": ("1 for not use tensor parallel")})
-    dtype: Optional[str] = field(default=None, metadata={"help": "The data type of tensor"})
-
-    @property
-    def __dict__(self):
-        return asdict(self)
-
-    def to_dict(self):
-        return self.__dict__
-
-    def save_pretrained(self, save_directory):
-        r"""
-        This method saves the configuration of your adapter model in a directory.
-        Args:
-            save_directory (`str`):
-                The directory where the configuration will be saved.
-        """
-        if os.path.isfile(save_directory):
-            raise AssertionError(f"Provided path ({save_directory}) should be a directory, not a file")
-
-        os.makedirs(save_directory, exist_ok=True)
-
-        output_dict = self.__dict__
-        output_path = os.path.join(save_directory, PREFIX_CONFIG_NAME)
-
-        # save it
-        with open(output_path, "w") as writer:
-            writer.write(json.dumps(output_dict, indent=2, sort_keys=True))
-
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, **kwargs):
-        r"""
-        This method loads the configuration of your adapter model from a directory.
-        Args:
-            pretrained_model_name_or_path (`str`):
-                The directory or the hub-id where the configuration is saved.
-            **kwargs:
-                Additional keyword arguments passed along to the child class initialization.
-        """
-        if os.path.isfile(os.path.join(pretrained_model_name_or_path, PREFIX_CONFIG_NAME)):
-            config_file = os.path.join(pretrained_model_name_or_path, PREFIX_CONFIG_NAME)
-        else:
-            raise ValueError(f"Can't find prefix_config.json at '{pretrained_model_name_or_path}'")
-
-        loaded_attributes = cls.from_json_file(config_file)
-
-        config = cls(**kwargs)
-
-        for key, value in loaded_attributes.items():
-            if hasattr(config, key):
-                setattr(config, key, value)
-
-        return config
-
-    @classmethod
-    def from_json_file(cls, path_json_file):
-        r"""
-        Loads a configuration file from a json file.
-        Args:
-            path_json_file (`str`):
-                The path to the json file.
-        """
-        with open(path_json_file, "r") as file:
-            json_object = json.load(file)
-
-        return json_object
+from ...prompt.prompt_utils import signature
+from ...transformers.model_utils import _add_variant, dtype_guard
+from ...utils.distributed import distributed_gather
+from ...utils.env import PAST_KEY_VALUES_FILE_NAME, PREFIX_WEIGHT_FILE_NAME
+from ...utils.log import logger
+from .prefix_config import PrefixConfig
 
 
 class PrefixModelForCausalLM(paddle.nn.Layer):
@@ -490,40 +399,3 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             tensor = prefix_state_dict.pop(name)
             prefix_state_dict[name] = action(tensor)
         return prefix_state_dict
-
-
-def bloom_postprocess_past_key_value(past_key_values):
-    # (layer_num, bs, head_num/tensor_parallel_degree, prefixlen, head_dim)*2
-    past_key_values = paddle.transpose(past_key_values, perm=[2, 0, 3, 1, 4]).split(2)
-    # (layer_num, bs, head_num/tensor_parallel_degree, prefixlen, head_dim)
-    num_hidden_layers, batch_size, num_attention_heads, num_prefix_tokens, head_hidden_size = past_key_values[0].shape
-    # (layer_num, bs, prefixlen, head_num/tensor_parallel_degree, head_dim)
-    keys, values = past_key_values[0].transpose([0, 1, 3, 2, 4]), past_key_values[1].transpose([0, 1, 3, 2, 4])
-    # (layer_num, bs*head_num/tensor_parallel_degree, head_dim, prefixlen)
-    keys = keys.reshape([num_hidden_layers, batch_size * num_attention_heads, head_hidden_size, num_prefix_tokens])
-    # (layer_num, bs*head_num/tensor_parallel_degree, prefixlen, head_dim)
-    values = values.reshape([num_hidden_layers, batch_size * num_attention_heads, num_prefix_tokens, head_hidden_size])
-
-    return tuple(zip(keys, values))
-
-
-def chatglm_postprocess_past_key_value(past_key_values):
-    # (layer_num, prefixlen, bs, head_num/tensor_parallel_degree, head_dim)*2
-    keys, values = paddle.transpose(past_key_values, perm=[2, 1, 0, 3, 4]).split(2)
-
-    return tuple(zip(keys, values))
-
-
-def llama_postprocess_past_key_value(past_key_values):
-    # (layer_num, bs, prefixlen, head_num/tensor_parallel_degree, head_dim)*2
-    keys, values = paddle.transpose(past_key_values, perm=[2, 0, 1, 3, 4]).split(2)
-
-    return tuple(zip(keys, values))
-
-
-def chatglm_pad_attention_mask(input_ids_shape, num_prefix_tokens, attention_mask):
-    prefix_attention_mask = paddle.ones(
-        [input_ids_shape[0], 1, input_ids_shape[-1], num_prefix_tokens], dtype=attention_mask.dtype
-    )
-    prefix_attention_mask = (prefix_attention_mask < 0.5).astype("int64")
-    return paddle.concat((prefix_attention_mask, attention_mask), axis=3)
