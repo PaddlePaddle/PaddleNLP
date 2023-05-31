@@ -43,6 +43,7 @@ python -u  -m paddle.distributed.launch \
     --use_fused_rms_norm 0 \
     --learning_rate 0.0001 \
     --min_learning_rate 0.00001 \
+    --lr_scheduler_type "cosine" \ 
     --max_steps 10000 \
     --save_steps 5000 \
     --weight_decay 0.01 \

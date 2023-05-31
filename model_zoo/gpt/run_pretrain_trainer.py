@@ -392,7 +392,9 @@ def main():
 
     config = config_class.from_pretrained(model_args.model_name_or_path)
     config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
-    config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
+    if not model_args.continue_training:
+        config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
+        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
 
     config.lm_shift_labels = False
     config.use_flash_attention = model_args.use_flash_attention
@@ -400,12 +402,9 @@ def main():
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
-
     config.use_recompute = training_args.recompute
 
-    print(config)
-
-    # training_args.max_seq_length = data_args.max_seq_length
+    print("Final pre-training config:", config)
 
     # Set the dtype for loading model
     dtype = "float32"
