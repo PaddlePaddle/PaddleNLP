@@ -22,24 +22,29 @@ from paddlenlp.peft.prefix import (
     PrefixModelForCausalLM,
     llama_postprocess_past_key_value,
 )
-from paddlenlp.transformers import AutoModelForCausalLM
-from tests.testing_utils import slow
+from paddlenlp.transformers import LlamaConfig, LlamaForCausalLM
 
 
-@slow
 class TestPrefixModel(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.model = AutoModelForCausalLM.from_pretrained(
-            "facebook/tiny-random-llama", load_state_as_np=True, low_cpu_mem_usage=True, dtype="float16"
+        cls.config = LlamaConfig(
+            vocab_size=200,
+            hidden_size=32,
+            intermediate_size=86,
+            num_hidden_layers=1,
+            num_attention_heads=1,
+            dtype="float32",
         )
+
+        cls.model = LlamaForCausalLM(cls.config)
         cls.prefix_config = PrefixConfig(
             num_prefix_tokens=2,
-            num_attention_heads=cls.model.config.n_head,
-            num_hidden_layers=cls.model.config.n_layer,
+            num_attention_heads=cls.model.config.num_attention_heads,
+            num_hidden_layers=cls.model.config.num_hidden_layers,
             hidden_size=cls.model.config.hidden_size,
             prefix_projection_hidden_size=cls.model.config.hidden_size,
-            dtype="float16",
+            dtype="float32",
         )
         cls.prefix_model = PrefixModelForCausalLM(
             model=cls.model,
@@ -67,9 +72,9 @@ class TestPrefixModel(unittest.TestCase):
             loaded_results = loaded_prefix_model(input_ids)
 
             self.assertIsNotNone(original_results)
-            self.assertEqual(original_results[0].shape, [1, 20, 32000])
+            self.assertEqual(original_results[0].shape, [1, 20, self.config.vocab_size])
             self.assertIsNotNone(loaded_results)
-            self.assertEqual(loaded_results[0].shape, [1, 20, 32000])
+            self.assertEqual(loaded_results[0].shape, [1, 20, self.config.vocab_size])
             self.assertTrue(paddle.allclose(original_results[0], loaded_results[0]))
 
     def test_prefix_model_generate(self):
