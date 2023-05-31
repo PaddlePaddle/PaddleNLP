@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pipelines.pipelines.base import Pipeline, RootNode
-from pipelines.pipelines.standard_pipelines import (
-    BaseStandardPipeline,
-    DocPipeline,
-    ExtractiveQAPipeline,
-    QAGenerationPipeline,
-    SemanticSearchPipeline,
-    SentaPipeline,
-    TextToImagePipeline,
-    WebQAPipeline,
-)
+from unittest.mock import Mock
+
+
+def create_mock_layer_that_supports(model_name, response=["fake_response"]):
+    """
+    Create a mock invocation layer that supports the model_name and returns response.
+    """
+
+    def mock_supports(model_name_or_path, **kwargs):
+        return model_name_or_path == model_name
+
+    return Mock(**{"model_name_or_path": model_name, "supports": mock_supports, "invoke.return_value": response})
