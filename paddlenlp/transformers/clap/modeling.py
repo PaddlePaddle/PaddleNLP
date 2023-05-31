@@ -261,7 +261,7 @@ class ClapDropPath(nn.Layer):
 
         random_tensor = keep_prob + paddle.rand(shape, dtype=hidden_states.dtype)
         random_tensor = paddle.floor(random_tensor)  # binarize
-        output = hidden_states.div(keep_prob) * random_tensor
+        output = (hidden_states / keep_prob) * random_tensor
         return output
 
 
@@ -1111,7 +1111,7 @@ class ClapTextEmbeddings(nn.Layer):
         if token_type_ids is None:
             if hasattr(self, "token_type_ids"):
                 buffered_token_type_ids = self.token_type_ids[:, :seq_length]
-                buffered_token_type_ids_expanded = buffered_token_type_ids.expand(input_shape[0], seq_length)
+                buffered_token_type_ids_expanded = buffered_token_type_ids.expand([input_shape[0], seq_length])
                 token_type_ids = buffered_token_type_ids_expanded
             else:
                 token_type_ids = paddle.zeros(input_shape, dtype="int64")
@@ -1238,7 +1238,7 @@ class ClapTextSelfAttention(nn.Layer):
             distance = position_ids_l - position_ids_r
 
             positional_embedding = self.distance_embedding(distance + self.max_position_embeddings - 1)
-            positional_embedding = positional_embedding.to(dtype=query_layer.dtype)  # fp16 compatibility
+            positional_embedding = positional_embedding.cast(dtype=query_layer.dtype)  # fp16 compatibility
 
             if self.position_embedding_type == "relative_key":
                 relative_position_scores = paddle.einsum("bhld,lrd->bhlr", query_layer, positional_embedding)
@@ -1585,7 +1585,7 @@ class ClapPreTrainedModel(PretrainedModel):
 
     config_class = ClapConfig
     base_model_prefix = "clap"
-    supports_gradient_checkpointing = False
+    supports_gradient_checkpointing = True
     _keys_to_ignore_on_load_missing = [r"position_ids", r"logit_scale_a", r"logit_scale_t"]
 
     def _init_weights(self, module):
@@ -2074,7 +2074,7 @@ class ClapModel(ClapPreTrainedModel):
 
         >>> outputs = model(**inputs)
         >>> logits_per_audio = outputs.logits_per_audio  # this is the audio-text similarity score
-        >>> probs = logits_per_audio.softmax(dim=-1)  # we can take the softmax to get the label probabilities
+        >>> probs = F.softmax(logits_per_audio, axis=-1) # we can take the softmax to get the label probabilities
         ```"""
         # Use CLAP model's config for some fields (if specified) instead of those of audio & text components.
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
