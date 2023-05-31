@@ -182,28 +182,25 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     config_class = LlamaConfig
 
     _get_tensor_parallel_mappings = LlamaPretrainedModel._get_tensor_parallel_mappings
+
     # NO base_model_prefix !!!!
 
     def __init__(
         self,
         config,
-        # num_partitions=1,
-        # topology=None,
-        use_recompute=None,
-        # fused_linear=False,
-        # fuse_attn_qkv=False,
+        # use_recompute=None,
         # scale_qk_by_layer_num=True,
-        recompute_granularity="full",
-        virtual_pp_degree=1,
+        # recompute_granularity="full",
+        # virtual_pp_degree=4,
         # sequence_parallel=False,
         # no_recompute_layers=None,
         pp_recompute_interval=1,
-        # use_flash_attn=False,
-        # fused_softmax_with_triangular=False,
     ):
         self.config = config
-        if use_recompute is None:
-            use_recompute = self.config.use_recompute
+
+        use_recompute = self.config.use_recompute
+        recompute_granularity = self.config.recompute_granularity
+        virtual_pp_degree = self.config.virtual_pp_degree
 
         hcg = get_hcg()
         tensor_parallel_degree = max(hcg.get_model_parallel_world_size(), 1)
