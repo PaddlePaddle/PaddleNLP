@@ -295,3 +295,4 @@ class GPTConfig(PretrainedConfig):
         self.eol_token_id = eol_token_id
 
         self.fuse_attention_qkv = fuse_attention_qkv
+        self.use_flash_attention = use_flash_attention
