@@ -1231,7 +1231,7 @@ class ClapTextSelfAttention(nn.Layer):
         if self.position_embedding_type == "relative_key" or self.position_embedding_type == "relative_key_query":
             query_length, key_length = query_layer.shape[2], key_layer.shape[2]
             if use_cache:
-                position_ids_l = paddle.Tensor(key_length - 1, dtype="int64").reshape([-1, 1])
+                position_ids_l = paddle.to_tensor([key_length - 1], dtype="int64").reshape([-1, 1])
             else:
                 position_ids_l = paddle.arange(query_length, dtype="int64").reshape([-1, 1])
             position_ids_r = paddle.arange(key_length, dtype="int64").reshape([1, -1])
