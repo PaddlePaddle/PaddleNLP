@@ -22,9 +22,8 @@ from modeling_pp import LlamaForCausalLMPipe
 from utils import LlamaTrainer, compute_metrics, save_infer_result
 
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import LoRAConfig, LoRAModel
-from paddlenlp.prompt import PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.prompt.prefix import llama_postprocess_past_key_value
+from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.peft.prefix import llama_postprocess_past_key_value
 from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
@@ -191,7 +190,9 @@ def main():
         is_test = model_args.eval_with_do_generation
         dev_ds = dev_ds.map(partial(trans_func, is_test=is_test))
 
-    collate_fn = DataCollatorForSupervisedDataset(tokenizer)
+    collate_fn = DataCollatorForSupervisedDataset(
+        tokenizer, max_length=1024 if data_args.always_pad_to_max_length else 0
+    )
 
     def compute_metrics_trainer(eval_preds, tokenizer):
         all_preds = []
