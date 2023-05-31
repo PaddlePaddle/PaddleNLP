@@ -717,8 +717,6 @@ class LlamaModel(LlamaPretrainedModel):
             seq_length_with_past += cache_length
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
-            # print("inputs_embeds:", inputs_embeds.dtype, inputs_embeds.shape)
-            # print("inputs_embedsi weight:", self.embed_tokens.weight.dtype, self.embed_tokens.weight.shape)
 
         # embed positions
         if attention_mask is None:
