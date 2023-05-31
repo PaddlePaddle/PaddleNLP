@@ -2061,6 +2061,7 @@ class ClapModel(ClapPreTrainedModel):
         ```python
         >>> from datasets import load_dataset
         >>> from paddlenlp.transformers import AutoProcessor, ClapModel
+        >>> import paddle.nn.functional as F
 
         >>> dataset = load_dataset("ashraq/esc50")
         >>> audio_sample = dataset["train"]["audio"][0]["array"]
