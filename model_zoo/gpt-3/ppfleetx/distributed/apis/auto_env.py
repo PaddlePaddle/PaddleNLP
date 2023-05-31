@@ -23,6 +23,15 @@ _mesh = None
 
 def get_mesh():
     global _mesh
+    if _mesh is None and paddle.distributed.get_world_size() == 1:
+        set_mesh(
+            Mesh(
+                get_local_rank(),
+                1,
+                1,
+                1,
+            )
+        )
     return _mesh
 
 
