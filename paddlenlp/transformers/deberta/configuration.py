@@ -44,6 +44,28 @@ DEBERTA_PRETRAINED_INIT_CONFIGURATION = {
         "relative_attention": True,
         "num_labels": 2,
     },
+    "deberta-large": {
+        "vocab_size": 50265,
+        "hidden_size": 1024,
+        "num_hidden_layers": 24,
+        "num_attention_heads": 16,
+        "intermediate_size": 4096,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "attention_probs_dropout_prob": 0.1,
+        "max_position_embeddings": 512,
+        "type_vocab_size": 0,
+        "initializer_range": 0.02,
+        "layer_norm_eps": 1e-12,
+        "pad_token_id": 0,
+        "position_biased_input": False,
+        "pos_att_type": ["p2c", "c2p"],
+        "output_attentions": False,
+        "output_hidden_states": True,
+        "embedding_size": 1024,
+        "relative_attention": True,
+        "num_labels": 2,
+    },
 }
 
 DEBERTA_PRETRAINED_RESOURCE_FILES_MAP = {"model_state": {"_": "_"}}

@@ -47,6 +47,7 @@ __all__ = [
     "DebertaLayer",
     "DebertaEncoder",
     "DebertaModel",
+    "DebertaForSequenceClassification",
 ]
 
 
@@ -558,7 +559,11 @@ class DebertaEncoder(paddle.nn.Layer):
             all_hidden_states = all_hidden_states + (hidden_states,)
 
         if not return_dict:
-            return tuple(v for v in [hidden_states, all_hidden_states, all_attentions] if v is not None)
+            return BaseModelOutput(
+                last_hidden_state=hidden_states,
+                hidden_states=all_hidden_states,
+                attentions=all_attentions,
+            )
         return {
             "last_hidden_state": hidden_states,
             "hidden_states": all_hidden_states,
@@ -689,7 +694,7 @@ class DebertaPreTrainedModel(PretrainedModel):
 @register_base_model
 class DebertaModel(DebertaPreTrainedModel):
     def __init__(self, config: DebertaConfig):
-        super().__init__()
+        super(DebertaModel, self).__init__(config)
         self.config = config
         self.embeddings = DebertaEmbeddings(config)
         self.encoder = DebertaEncoder(config)
@@ -880,8 +885,10 @@ class DebertaForMaskedLM(DebertaPreTrainedModel):
 class ContextPooler(nn.Layer):
     def __init__(self, config):
         super().__init__()
-        self.dense = nn.Linear(config.pooler_hidden_size, config.pooler_hidden_size)
-        self.dropout = nn.Dropout(config.pooler_dropout)
+        hidden_size = config.pooler_hidden_size if config.pooler_hidden_size is not None else config.hidden_size
+        dropout = config.pooler_dropout if config.pooler_dropout is not None else config.hidden_dropout_prob
+        self.dense = nn.Linear(config.hidden_size, hidden_size)
+        self.dropout = nn.Dropout(dropout)
         self.config = config
 
     def forward(self, hidden_states):
@@ -899,15 +906,15 @@ class ContextPooler(nn.Layer):
 
 
 class DebertaForSequenceClassification(DebertaPreTrainedModel):
-    def __init__(self, config):
+    def __init__(self, config, num_classes=2):
         super().__init__(config)
 
-        self.num_labels = config.num_labels
+        self.num_labels = num_classes
         self.deberta = DebertaModel(config)
 
         # TODO: need to be modified
         self.pooler = ContextPooler(config)
-        output_dim = self.pooler.output_dim
+        output_dim = self.pooler.output_dim if self.pooler is not None else config.hidden_size
         self.classifier = nn.Linear(output_dim, config.num_labels)
 
         drop_out = getattr(config, "cls_dropout", None)
