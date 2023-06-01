@@ -35,6 +35,7 @@ PROCESSOR_MAPPING_NAMES = OrderedDict(
         ("ErnieViLProcessor", "ernie_vil"),
         ("CLIPSegProcessor", "clipseg"),
         ("SpeechT5Processor", "speecht5"),
+        ("ClapProcessor", "clap"),
     ]
 )
 

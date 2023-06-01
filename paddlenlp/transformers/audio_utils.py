@@ -654,7 +654,7 @@ def stft(frames: np.array, windowing_function: np.array, fft_window_size: int = 
     Example:
 
     ```python
-    >>> from transformers.audio_utils import stft, fram_wave
+    >>> from paddlenlp.transformers.audio_utils import stft, fram_wave
     >>> import numpy as np
 
     >>> audio = np.random.rand(50)
