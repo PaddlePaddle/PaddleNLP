@@ -49,10 +49,13 @@ from ..utils import (
     CONFIG_NAME,
     DEPRECATED_REVISION_ARGS,
     DIFFUSERS_CACHE,
+    FLAX_WEIGHTS_NAME,
     FROM_DIFFUSERS,
     FROM_HF_HUB,
     HF_HUB_OFFLINE,
     LOW_CPU_MEM_USAGE_DEFAULT,
+    ONNX_EXTERNAL_WEIGHTS_NAME,
+    ONNX_WEIGHTS_NAME,
     PPDIFFUSERS_CACHE,
     TO_DIFFUSERS,
     TORCH_SAFETENSORS_WEIGHTS_NAME,
@@ -81,6 +84,8 @@ from .fastdeploy_utils import FastDeployRuntimeModel
 
 TRANSFORMERS_SAFE_WEIGHTS_NAME = "model.safetensors"
 TRANSFORMERS_WEIGHTS_NAME = "pytorch_model.bin"
+TRANSFORMERS_FLAX_WEIGHTS_NAME = "flax_model.msgpack"
+
 
 TORCH_INDEX_FILE = "diffusion_pytorch_model.bin"
 PADDLE_INDEX_FILE = "model_state.pdparams"
@@ -207,6 +212,10 @@ def variant_compatible_siblings(filenames, variant=None) -> Union[List[os.PathLi
         TORCH_SAFETENSORS_WEIGHTS_NAME,
         TRANSFORMERS_WEIGHTS_NAME,
         TRANSFORMERS_SAFE_WEIGHTS_NAME,
+        TRANSFORMERS_FLAX_WEIGHTS_NAME,
+        FLAX_WEIGHTS_NAME,
+        ONNX_WEIGHTS_NAME,
+        ONNX_EXTERNAL_WEIGHTS_NAME,
     ]
     # model_pytorch, diffusion_model_pytorch, ...
     weight_prefixes = [w.split(".")[0] for w in weight_names]
@@ -1191,6 +1200,10 @@ class DiffusionPipeline(ConfigMixin):
             raise ValueError(
                 "`use_safetensors`=True but safetensors is not installed. Please install safetensors with `pip install safetenstors"
             )
+        allow_pickle = False
+        if use_safetensors is None:
+            use_safetensors = is_safetensors_available()
+            allow_pickle = True
 
         pipeline_is_cached = False
         allow_patterns = None
@@ -1280,8 +1293,12 @@ class DiffusionPipeline(ConfigMixin):
                 expected_components, _ = cls._get_signature_keys(pipeline_class)
                 passed_components = [k for k in expected_components if k in kwargs]
 
-                if use_safetensors and not is_safetensors_compatible(
-                    model_filenames, variant=variant, passed_components=passed_components
+                if (
+                    use_safetensors
+                    and not allow_pickle
+                    and not is_safetensors_compatible(
+                        model_filenames, variant=variant, passed_components=passed_components
+                    )
                 ):
                     raise EnvironmentError(
                         f"Could not found the necessary `safetensors` weights in {model_filenames} (variant={variant})"
@@ -1363,7 +1380,8 @@ class DiffusionPipeline(ConfigMixin):
                 use_auth_token=use_auth_token,
                 revision=revision,
                 allow_patterns=allow_patterns,
-                ignore_patterns=ignore_patterns,
+                ignore_patterns=ignore_patterns
+                + ignore_filenames,  # diffusers bug, so we must add this ignore_filenames!
                 user_agent=user_agent,
                 max_workers=max_workers,
             )

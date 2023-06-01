@@ -80,11 +80,19 @@ if is_paddle_available():
     @paddle.jit.not_to_static
     def randn_pt(shape, dtype=None, name=None, **kwargs):
         generator = kwargs.get("generator", None)
-        if generator is None:
-            return randn(shape, dtype=dtype, name=name)
+        is_bfloat16 = "bfloat16" in str(dtype) or "bfloat16" in paddle.get_default_dtype()
+        if is_bfloat16:
+            if generator is None:
+                return randn(shape, dtype="float16", name=name).cast(paddle.bfloat16)
+            else:
+                with get_rng_state_tracker().rng_state(generator):
+                    return randn(shape, dtype="float16", name=name).cast(paddle.bfloat16)
         else:
-            with get_rng_state_tracker().rng_state(generator):
+            if generator is None:
                 return randn(shape, dtype=dtype, name=name)
+            else:
+                with get_rng_state_tracker().rng_state(generator):
+                    return randn(shape, dtype=dtype, name=name)
 
     @paddle.jit.not_to_static
     def rand_pt(shape, dtype=None, name=None, **kwargs):

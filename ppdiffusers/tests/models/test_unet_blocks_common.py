@@ -55,12 +55,14 @@ class UNetBlockTesterMixin:
             temb_channels = 128
             dummy_input["temb"] = randn_tensor((batch_size, temb_channels), generator=generator)
         if include_res_hidden_states_tuple:
-            generator_1 = paddle.seed(seed=1)
+            generator_1 = paddle.Generator().manual_seed(1)
             dummy_input["res_hidden_states_tuple"] = (randn_tensor(shape, generator=generator_1),)
         if include_encoder_hidden_states:
             dummy_input["encoder_hidden_states"] = floats_tensor((batch_size, 32, 32))
         if include_skip_sample:
             dummy_input["skip_sample"] = randn_tensor((batch_size, 3) + sizes, generator=generator)
+
+        paddle.seed(0)
         return dummy_input
 
     def prepare_init_args_and_inputs_for_common(self):
@@ -80,7 +82,7 @@ class UNetBlockTesterMixin:
             output = unet_block(**inputs_dict)
         if isinstance(output, Tuple):
             output = output[0]
-        self.assertEqual(output.shape, self.output_shape)
+        self.assertEqual(list(output.shape), list(self.output_shape))
         output_slice = output[0, -1, -3:, -3:]
         expected_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice.flatten(), expected_slice, atol=0.005)
@@ -89,6 +91,9 @@ class UNetBlockTesterMixin:
         init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
         model = self.block_class(**init_dict)
         model.train()
+        for _, v in inputs_dict.items():
+            if paddle.is_tensor(v):
+                v.stop_gradient = False
         output = model(**inputs_dict)
         if isinstance(output, Tuple):
             output = output[0]

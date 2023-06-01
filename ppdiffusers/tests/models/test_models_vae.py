@@ -18,7 +18,6 @@ import unittest
 
 import paddle
 from parameterized import parameterized
-from ppdiffusers_test.test_modeling_common import ModelTesterMixin
 
 from ppdiffusers import AutoencoderKL
 from ppdiffusers.utils import (
@@ -28,6 +27,8 @@ from ppdiffusers.utils import (
     require_paddle_gpu,
     slow,
 )
+
+from .test_modeling_common import ModelTesterMixin
 
 
 class AutoencoderKLTests(ModelTesterMixin, unittest.TestCase):
@@ -187,7 +188,7 @@ class AutoencoderKLIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(image, generator=generator, sample_posterior=True).sample
         assert sample.shape == image.shape
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.01)
 
@@ -205,7 +206,7 @@ class AutoencoderKLIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(image, generator=generator, sample_posterior=True).sample
         assert sample.shape == image.shape
-        output_slice = sample[-1, -2:, :2, -2:].flatten().float().cpu()
+        output_slice = sample[-1, -2:, :2, -2:].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.01)
 
@@ -229,7 +230,7 @@ class AutoencoderKLIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(image).sample
         assert sample.shape == image.shape
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.01)
 
@@ -263,11 +264,11 @@ class AutoencoderKLIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model.decode(encoding).sample
         assert list(sample.shape) == [3, 3, 512, 512]
-        output_slice = sample[-1, -2:, :2, -2:].flatten().float().cpu()
+        output_slice = sample[-1, -2:, :2, -2:].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.005)
 
-    @parameterized.expand([13, 16, 27])
+    @parameterized.expand([(13,), (16,), (27,)])
     @require_paddle_gpu
     def test_stable_diffusion_decode_ppxformers_vs_2_5_fp16(self, seed):
         model = self.get_sd_vae_model(fp16=True)
@@ -284,7 +285,7 @@ class AutoencoderKLIntegrationTests(unittest.TestCase):
 
         assert paddle_all_close(sample, sample_2, atol=1e-1)
 
-    @parameterized.expand([13, 16, 37])
+    @parameterized.expand([(13,), (16,), (37,)])
     @require_paddle_gpu
     def test_stable_diffusion_decode_ppxformers_vs_2_5(self, seed):
         model = self.get_sd_vae_model()

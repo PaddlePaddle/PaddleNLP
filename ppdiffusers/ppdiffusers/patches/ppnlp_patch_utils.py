@@ -739,6 +739,7 @@ if is_paddle_available() and is_paddlenlp_available():
                         from_hf_hub=from_hf_hub,
                     )
                 except Exception:  # noqa: E722
+                    model_file = None
                     pass
             if model_file is None:
                 model_file = _get_model_file(

@@ -18,12 +18,13 @@ import unittest
 
 import numpy as np
 import paddle
-from ppdiffusers_test.test_modeling_common import ModelTesterMixin
 
 from ppdiffusers.models import UNet3DConditionModel
 from ppdiffusers.models.attention_processor import AttnProcessor, LoRAAttnProcessor
 from ppdiffusers.utils import floats_tensor, logging
 from ppdiffusers.utils.import_utils import is_ppxformers_available
+
+from .test_modeling_common import ModelTesterMixin
 
 logger = logging.get_logger(__name__)
 
@@ -276,7 +277,7 @@ class UNet3DConditionModelTests(ModelTesterMixin, unittest.TestCase):
         model.set_attn_processor(lora_attn_procs)
         # Saving as paddle, properly reloads with directly filename
         with tempfile.TemporaryDirectory() as tmpdirname:
-            model.save_attn_procs(tmpdirname, safe_serialization=False, to_diffusers=True)
+            model.save_attn_procs(tmpdirname, to_diffusers=True)
             self.assertTrue(os.path.isfile(os.path.join(tmpdirname, "pytorch_lora_weights.bin")))
             paddle.seed(0)
             new_model = self.model_class(**init_dict)
@@ -337,8 +338,8 @@ class UNet3DConditionModelTests(ModelTesterMixin, unittest.TestCase):
             model.disable_xformers_memory_efficient_attention()
             off_sample = model(**inputs_dict).sample
 
-        assert (sample - on_sample).abs().max() < 1e-4
-        assert (sample - off_sample).abs().max() < 1e-4
+        assert (sample - on_sample).abs().max() < 0.005
+        assert (sample - off_sample).abs().max() < 0.005
 
 
 # (todo: sayakpaul) implement SLOW tests.

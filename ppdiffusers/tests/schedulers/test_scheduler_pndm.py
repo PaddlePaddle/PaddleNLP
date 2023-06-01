@@ -169,7 +169,7 @@ class PNDMSchedulerTest(SchedulerCommonTest):
         scheduler_config = self.get_scheduler_config(steps_offset=1)
         scheduler = scheduler_class(**scheduler_config)
         scheduler.set_timesteps(10)
-        assert paddle.equal(
+        assert paddle.equal_all(
             scheduler.timesteps,
             paddle.to_tensor(
                 [901, 851, 851, 801, 801, 751, 751, 701, 701, 651, 651, 601, 601, 501, 401, 301, 201, 101, 1]

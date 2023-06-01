@@ -191,6 +191,8 @@ class UNet2DConditionLoadersMixin:
             raise ValueError(
                 "`use_safetensors`=True but safetensors is not installed. Please install safetensors with `pip install safetenstors"
             )
+        if use_safetensors is None:
+            use_safetensors = is_safetensors_available()
 
         user_agent = {
             "file_type": "attn_procs_weights",
@@ -221,6 +223,7 @@ class UNet2DConditionLoadersMixin:
                         )
                         state_dict = smart_load(model_file)
                     except Exception:
+                        model_file = None
                         pass
                 if model_file is None:
                     model_file = _get_model_file(
@@ -325,7 +328,7 @@ class UNet2DConditionLoadersMixin:
         is_main_process: bool = True,
         weight_name: str = None,
         save_function: Callable = None,
-        safe_serialization: bool = True,
+        safe_serialization: bool = False,
         to_diffusers: Optional[bool] = None,
     ):
         r"""
@@ -347,7 +350,7 @@ class UNet2DConditionLoadersMixin:
                 If specified, weights are saved in the format pytorch_model.<variant>.bin.
             to_diffusers (`bool`, *optional*, defaults to `None`):
                 If specified, weights are saved in the format of torch. eg. linear need transpose.
-            safe_serialization (`bool`, *optional*, defaults to `True`):
+            safe_serialization (`bool`, *optional*, defaults to `False`):
                 Only when `to_diffusers` is True, Whether to save the model using `safetensors` or the traditional PyTorch way (that uses `pickle`).
         """
         if to_diffusers is None:
@@ -590,7 +593,8 @@ class TextualInversionLoaderMixin:
             raise ValueError(
                 "`use_safetensors`=True but safetensors is not installed. Please install safetensors with `pip install safetenstors"
             )
-
+        if use_safetensors is None:
+            use_safetensors = is_safetensors_available()
         user_agent = {
             "file_type": "text_inversion",
             "framework": "pytorch" if from_diffusers else "paddle",
@@ -620,6 +624,7 @@ class TextualInversionLoaderMixin:
                     )
                     state_dict = safetensors_load(model_file)
                 except Exception:
+                    model_file = None
                     pass
             if model_file is None:
                 model_file = _get_model_file(
@@ -810,6 +815,8 @@ class LoraLoaderMixin:
             raise ValueError(
                 "`use_safetensors`=True but safetensors is not installed. Please install safetensors with `pip install safetenstors"
             )
+        if use_safetensors is None:
+            use_safetensors = is_safetensors_available()
 
         user_agent = {
             "file_type": "attn_procs_weights",
@@ -840,6 +847,7 @@ class LoraLoaderMixin:
                         )
                         state_dict = smart_load(model_file)
                     except Exception:
+                        model_file = None
                         pass
                 if model_file is None:
                     model_file = _get_model_file(
@@ -885,7 +893,8 @@ class LoraLoaderMixin:
         if all(key.startswith(self.unet_name) for key in keys):
             logger.info(f"Loading {self.unet_name}.")
             unet_lora_state_dict = {k: v for k, v in state_dict.items() if k.startswith(self.unet_name)}
-            self.unet.load_attn_procs(unet_lora_state_dict)
+            # add from_diffusers
+            self.unet.load_attn_procs(unet_lora_state_dict, from_diffusers=from_diffusers)
 
         # Load the layers corresponding to text encoder and make necessary adjustments.
         elif all(key.startswith(self.text_encoder_name) for key in keys):
@@ -893,7 +902,8 @@ class LoraLoaderMixin:
             text_encoder_lora_state_dict = {
                 k: v for k, v in state_dict.items() if k.startswith(self.text_encoder_name)
             }
-            attn_procs_text_encoder = self.load_attn_procs(text_encoder_lora_state_dict)
+            # add from_diffusers
+            attn_procs_text_encoder = self.load_attn_procs(text_encoder_lora_state_dict, from_diffusers=from_diffusers)
             self._modify_text_encoder(attn_procs_text_encoder)
 
         # Otherwise, we're dealing with the old format. This means the `state_dict` should only
@@ -901,7 +911,8 @@ class LoraLoaderMixin:
         elif not all(
             key.startswith(self.unet_name) or key.startswith(self.text_encoder_name) for key in state_dict.keys()
         ):
-            self.unet.load_attn_procs(state_dict)
+            # add from_diffusers
+            self.unet.load_attn_procs(state_dict, from_diffusers=from_diffusers)
             deprecation_message = "You have saved the LoRA weights using the old format. This will be"
             " deprecated soon. To convert the old LoRA weights to the new format, you can first load them"
             " in a dictionary and then create a new dictionary like the following:"
@@ -1013,7 +1024,8 @@ class LoraLoaderMixin:
             raise ValueError(
                 "`use_safetensors`=True but safetensors is not installed. Please install safetensors with `pip install safetenstors"
             )
-
+        if use_safetensors is None:
+            use_safetensors = is_safetensors_available()
         user_agent = {
             "file_type": "attn_procs_weights",
             "framework": "pytorch" if from_diffusers else "paddle",
@@ -1043,6 +1055,7 @@ class LoraLoaderMixin:
                         )
                         state_dict = smart_load(model_file)
                     except Exception:
+                        model_file = None
                         pass
                 if model_file is None:
                     model_file = _get_model_file(

@@ -52,7 +52,8 @@ def create_text_encoder_lora_layers(text_encoder: nn.Layer):
     text_lora_attn_procs = {}
     for name, module in text_encoder.named_sublayers():
         if any(x in name for x in TEXT_ENCODER_TARGET_MODULES):
-            text_lora_attn_procs[name] = LoRAAttnProcessor(hidden_size=module.out_features, cross_attention_dim=None)
+            out_features = module.weight.shape[1]
+            text_lora_attn_procs[name] = LoRAAttnProcessor(hidden_size=out_features, cross_attention_dim=None)
     text_encoder_lora_layers = AttnProcsLayers(text_lora_attn_procs)
     return text_encoder_lora_layers
 
@@ -159,7 +160,7 @@ class LoraLoaderMixinTests(unittest.TestCase):
                 to_diffusers=False,
             )
             self.assertTrue(os.path.isfile(os.path.join(tmpdirname, "paddle_lora_weights.pdparams")))
-            sd_pipe.load_lora_weights(tmpdirname)
+            sd_pipe.load_lora_weights(tmpdirname, from_diffusers=False)
 
         lora_images = sd_pipe(**pipeline_inputs).images
         lora_image_slice = lora_images[0, -3:, -3:, -1]
@@ -186,7 +187,7 @@ class LoraLoaderMixinTests(unittest.TestCase):
                 to_diffusers=True,
             )
             self.assertTrue(os.path.isfile(os.path.join(tmpdirname, "pytorch_lora_weights.safetensors")))
-            sd_pipe.load_lora_weights(tmpdirname)
+            sd_pipe.load_lora_weights(tmpdirname, from_diffusers=True)
 
         lora_images = sd_pipe(**pipeline_inputs).images
         lora_image_slice = lora_images[0, -3:, -3:, -1]
@@ -208,9 +209,9 @@ class LoraLoaderMixinTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdirname:
             unet = sd_pipe.unet
             unet.set_attn_processor(unet_lora_attn_procs)
-            unet.save_attn_procs(tmpdirname)
+            unet.save_attn_procs(tmpdirname, to_diffusers=False)
             self.assertTrue(os.path.isfile(os.path.join(tmpdirname, "paddle_lora_weights.pdparams")))
-            sd_pipe.load_lora_weights(tmpdirname)
+            sd_pipe.load_lora_weights(tmpdirname, from_diffusers=False)
 
         lora_images = sd_pipe(**pipeline_inputs).images
         lora_image_slice = lora_images[0, -3:, -3:, -1]

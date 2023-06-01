@@ -21,7 +21,6 @@ import unittest
 import paddle
 import paddle.nn as nn
 from parameterized import parameterized
-from ppdiffusers_test.test_modeling_common import ModelTesterMixin
 
 from ppdiffusers import UNet2DConditionModel
 from ppdiffusers.models.attention_processor import (
@@ -37,6 +36,8 @@ from ppdiffusers.utils import (
     slow,
 )
 from ppdiffusers.utils.import_utils import is_ppxformers_available
+
+from .test_modeling_common import ModelTesterMixin
 
 logger = logging.get_logger(__name__)
 
@@ -512,7 +513,7 @@ class UNet2DConditionModelTests(ModelTesterMixin, unittest.TestCase):
 
         init_dict["attention_head_dim"] = (8, 16)
 
-        paddle.manual_seed(0)
+        paddle.seed(0)
         model = self.model_class(**init_dict)
 
         with paddle.no_grad():
@@ -665,7 +666,7 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(latents, timestep=timestep, encoder_hidden_states=encoder_hidden_states).sample
         assert sample.shape == latents.shape
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.01)
 
@@ -686,7 +687,7 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(latents, timestep=timestep, encoder_hidden_states=encoder_hidden_states).sample
         assert sample.shape == latents.shape
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.005)
 
@@ -707,7 +708,7 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(latents, timestep=timestep, encoder_hidden_states=encoder_hidden_states).sample
         assert sample.shape == latents.shape
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.01)
 
@@ -728,7 +729,7 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(latents, timestep=timestep, encoder_hidden_states=encoder_hidden_states).sample
         assert sample.shape == latents.shape
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.005)
 
@@ -749,7 +750,7 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(latents, timestep=timestep, encoder_hidden_states=encoder_hidden_states).sample
         assert sample.shape == [4, 4, 64, 64]
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.01)
 
@@ -770,7 +771,7 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(latents, timestep=timestep, encoder_hidden_states=encoder_hidden_states).sample
         assert sample.shape == [4, 4, 64, 64]
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.005)
 
@@ -791,6 +792,6 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(latents, timestep=timestep, encoder_hidden_states=encoder_hidden_states).sample
         assert sample.shape == latents.shape
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.005)

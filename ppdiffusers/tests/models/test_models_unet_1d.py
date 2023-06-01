@@ -16,10 +16,11 @@
 import unittest
 
 import paddle
-from ppdiffusers_test.test_modeling_common import ModelTesterMixin
 
 from ppdiffusers import UNet1DModel
 from ppdiffusers.utils import floats_tensor, slow
+
+from .test_modeling_common import ModelTesterMixin
 
 
 class UNet1DModelTests(ModelTesterMixin, unittest.TestCase):

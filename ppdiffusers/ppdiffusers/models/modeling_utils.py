@@ -423,6 +423,8 @@ class ModelMixin(nn.Layer):
             raise ValueError(
                 "`use_safetensors`=True but safetensors is not installed. Please install safetensors with `pip install safetenstors"
             )
+        if use_safetensors is None:
+            use_safetensors = is_safetensors_available()
 
         # Load config if we don't provide a configuration
         config_path = pretrained_model_name_or_path
@@ -475,6 +477,7 @@ class ModelMixin(nn.Layer):
                     # try load model_file with paddle / torch / safetensor
                     state_dict = smart_load(model_file)
                 except Exception:
+                    model_file = None
                     pass
             if model_file is None:
                 model_file = _get_model_file(

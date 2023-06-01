@@ -91,7 +91,7 @@ class ModelUtilsTest(unittest.TestCase):
         ppdiffusers.utils.import_utils._safetensors_available = True
 
     def test_weight_overwrite(self):
-        with tempfile.TemporaryDirectory() as tmpdirname, self.assertRaises(ValueError) as error_context:
+        with tempfile.TemporaryDirectory() as tmpdirname, self.assertRaises(RuntimeError) as error_context:
             UNet2DConditionModel.from_pretrained(
                 "hf-internal-testing/tiny-stable-diffusion-torch",
                 subfolder="unet",
@@ -102,7 +102,7 @@ class ModelUtilsTest(unittest.TestCase):
             )
 
         # make sure that error message states what keys are missing
-        assert "Cannot load" in str(error_context.exception)
+        assert "size mismatch" in str(error_context.exception)
 
         with tempfile.TemporaryDirectory() as tmpdirname:
             model = UNet2DConditionModel.from_pretrained(

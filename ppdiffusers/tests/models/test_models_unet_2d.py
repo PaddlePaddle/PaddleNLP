@@ -18,10 +18,11 @@ import math
 import unittest
 
 import paddle
-from ppdiffusers_test.test_modeling_common import ModelTesterMixin
 
 from ppdiffusers import UNet2DModel
 from ppdiffusers.utils import floats_tensor, logging, paddle_all_close, slow
+
+from .test_modeling_common import ModelTesterMixin
 
 logger = logging.get_logger(__name__)
 
