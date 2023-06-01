@@ -21,13 +21,23 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 import paddle
+import requests_mock
 from requests.exceptions import HTTPError
 
 from ppdiffusers.models import UNet2DConditionModel
 from ppdiffusers.training_utils import EMAModel
+from ppdiffusers.utils import logging
+from ppdiffusers.utils.testing_utils import CaptureLogger
 
 
 class ModelUtilsTest(unittest.TestCase):
+    def tearDown(self):
+        super().tearDown()
+
+        import ppdiffusers
+
+        ppdiffusers.utils.import_utils._safetensors_available = True
+
     def test_cached_files_are_used_when_no_internet(self):
         response_mock = mock.Mock()
         response_mock.status_code = 500
@@ -45,15 +55,82 @@ class ModelUtilsTest(unittest.TestCase):
             if (p1 != p2).cast("int64").sum() > 0:
                 assert False, "Parameters not the same!"
 
+    def test_one_request_upon_cached(self):
+        import ppdiffusers
+
+        ppdiffusers.utils.import_utils._safetensors_available = False
+
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            with requests_mock.mock(real_http=True) as m:
+                UNet2DConditionModel.from_pretrained(
+                    "hf-internal-testing/tiny-stable-diffusion-torch",
+                    subfolder="unet",
+                    cache_dir=tmpdirname,
+                    from_hf_hub=True,
+                    from_diffusers=True,
+                )
+
+            download_requests = [r.method for r in m.request_history]
+            assert download_requests.count("HEAD") == 2, "2 HEAD requests one for config, one for model"
+            assert download_requests.count("GET") == 2, "2 GET requests one for config, one for model"
+
+            with requests_mock.mock(real_http=True) as m:
+                UNet2DConditionModel.from_pretrained(
+                    "hf-internal-testing/tiny-stable-diffusion-torch",
+                    subfolder="unet",
+                    cache_dir=tmpdirname,
+                    from_hf_hub=True,
+                    from_diffusers=True,
+                )
+
+            cache_requests = [r.method for r in m.request_history]
+            assert (
+                "HEAD" == cache_requests[0] and len(cache_requests) == 1
+            ), "We should call only `model_info` to check for _commit hash and `send_telemetry`"
+
+        ppdiffusers.utils.import_utils._safetensors_available = True
+
+    def test_weight_overwrite(self):
+        with tempfile.TemporaryDirectory() as tmpdirname, self.assertRaises(RuntimeError) as error_context:
+            UNet2DConditionModel.from_pretrained(
+                "hf-internal-testing/tiny-stable-diffusion-torch",
+                subfolder="unet",
+                cache_dir=tmpdirname,
+                in_channels=9,
+                from_hf_hub=True,
+                from_diffusers=True,
+            )
+
+        # make sure that error message states what keys are missing
+        assert "size mismatch" in str(error_context.exception)
+
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            model = UNet2DConditionModel.from_pretrained(
+                "hf-internal-testing/tiny-stable-diffusion-torch",
+                subfolder="unet",
+                cache_dir=tmpdirname,
+                in_channels=9,
+                low_cpu_mem_usage=False,
+                ignore_mismatched_sizes=True,
+                from_hf_hub=True,
+                from_diffusers=True,
+            )
+
+        assert model.config.in_channels == 9
+
 
 class ModelTesterMixin:
     def test_from_save_pretrained(self):
         init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
         model = self.model_class(**init_dict)
+        if hasattr(model, "set_default_attn_processor"):
+            model.set_default_attn_processor()
         model.eval()
         with tempfile.TemporaryDirectory() as tmpdirname:
             model.save_pretrained(tmpdirname)
             new_model = self.model_class.from_pretrained(tmpdirname)
+            if hasattr(new_model, "set_default_attn_processor"):
+                new_model.set_default_attn_processor()
         with paddle.no_grad():
             image = model(**inputs_dict)
             if isinstance(image, dict):
@@ -64,13 +141,60 @@ class ModelTesterMixin:
         max_diff = (image - new_image).abs().sum().item()
         self.assertLessEqual(max_diff, 5e-05, "Models give different forward passes")
 
+    def test_getattr_is_correct(self):
+        init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
+        model = self.model_class(**init_dict)
+
+        # save some things to test
+        model.dummy_attribute = 5
+        model.register_to_config(test_attribute=5)
+
+        logger = logging.get_logger("diffusers.models.modeling_utils")
+        # 30 for warning
+        logger.setLevel(30)
+        with CaptureLogger(logger) as cap_logger:
+            assert hasattr(model, "dummy_attribute")
+            assert getattr(model, "dummy_attribute") == 5
+            assert model.dummy_attribute == 5
+
+        # no warning should be thrown
+        assert cap_logger.out == ""
+
+        logger = logging.get_logger("diffusers.models.modeling_utils")
+        # 30 for warning
+        logger.setLevel(30)
+        with CaptureLogger(logger) as cap_logger:
+            assert hasattr(model, "save_pretrained")
+            fn = model.save_pretrained
+            fn_1 = getattr(model, "save_pretrained")
+
+            assert fn == fn_1
+        # no warning should be thrown
+        assert cap_logger.out == ""
+
+        # warning should be thrown
+        with self.assertWarns(FutureWarning):
+            assert model.test_attribute == 5
+
+        with self.assertWarns(FutureWarning):
+            assert getattr(model, "test_attribute") == 5
+
+        with self.assertRaises(AttributeError) as error:
+            model.does_not_exist
+
+        assert str(error.exception) == f"'{type(model).__name__}' object has no attribute 'does_not_exist'"
+
     def test_from_save_pretrained_variant(self):
         init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
         model = self.model_class(**init_dict)
+        if hasattr(model, "set_default_attn_processor"):
+            model.set_default_attn_processor()
         model.eval()
         with tempfile.TemporaryDirectory() as tmpdirname:
             model.save_pretrained(tmpdirname, variant="fp16")
             new_model = self.model_class.from_pretrained(tmpdirname, variant="fp16")
+            if hasattr(new_model, "set_default_attn_processor"):
+                new_model.set_default_attn_processor()
             # non-variant cannot be loaded
             with self.assertRaises(OSError) as error_context:
                 self.model_class.from_pretrained(tmpdirname)

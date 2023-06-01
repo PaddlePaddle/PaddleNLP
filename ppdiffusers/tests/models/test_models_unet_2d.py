@@ -15,14 +15,14 @@
 
 import gc
 import math
-import tracemalloc
 import unittest
 
 import paddle
-from ppdiffusers_test.test_modeling_common import ModelTesterMixin
 
 from ppdiffusers import UNet2DModel
 from ppdiffusers.utils import floats_tensor, logging, paddle_all_close, slow
+
+from .test_modeling_common import ModelTesterMixin
 
 logger = logging.get_logger(__name__)
 
@@ -133,26 +133,6 @@ class UNetLDMModelTests(ModelTesterMixin, unittest.TestCase):
         model_normal_load.eval()
         arr_normal_load = model_normal_load(noise, time_step)["sample"]
         assert paddle_all_close(arr_accelerate, arr_normal_load, rtol=0.001)
-
-    def test_memory_footprint_gets_reduced(self):
-        paddle.device.cuda.empty_cache()
-        gc.collect()
-        tracemalloc.start()
-        model_accelerate, _ = UNet2DModel.from_pretrained("fusing/unet-ldm-dummy-update", output_loading_info=True)
-        model_accelerate
-        model_accelerate.eval()
-        _, peak_accelerate = tracemalloc.get_traced_memory()
-        del model_accelerate
-        paddle.device.cuda.empty_cache()
-        gc.collect()
-        model_normal_load, _ = UNet2DModel.from_pretrained(
-            "fusing/unet-ldm-dummy-update",
-            output_loading_info=True,
-        )
-        model_normal_load.eval()
-        _, peak_normal = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
-        assert peak_accelerate < peak_normal
 
     def test_output_pretrained(self):
         model = UNet2DModel.from_pretrained("fusing/unet-ldm-dummy-update")

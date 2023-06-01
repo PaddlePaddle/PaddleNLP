@@ -47,7 +47,17 @@ class DownBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
     block_type = "down"
 
     def test_output(self):
-        expected_slice = [-0.0232, -0.9869, 0.8054, -0.0637, -0.1688, -1.4264, 0.447, -1.3394, 0.0904]
+        expected_slice = [
+            1.4686200618743896,
+            -1.0339399576187134,
+            -0.6087006330490112,
+            -0.9044048190116882,
+            0.21288111805915833,
+            -0.8680574297904968,
+            -0.4164941906929016,
+            -1.6082428693771362,
+            -1.5554661750793457,
+        ]
         super().test_output(expected_slice)
 
 
@@ -56,7 +66,17 @@ class ResnetDownsampleBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
     block_type = "down"
 
     def test_output(self):
-        expected_slice = [0.071, 0.241, -0.732, -1.0757, -1.1343, 0.354, -0.0133, -0.2576, 0.0948]
+        expected_slice = [
+            0.1373986005783081,
+            -0.06267327070236206,
+            0.6338546276092529,
+            0.9961339235305786,
+            0.012131750583648682,
+            0.2271430492401123,
+            0.4698519706726074,
+            -1.2050957679748535,
+            -0.12423264980316162,
+        ]
         super().test_output(expected_slice)
 
 
@@ -65,7 +85,17 @@ class AttnDownBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
     block_type = "down"
 
     def test_output(self):
-        expected_slice = [0.0636, 0.8964, -0.6234, -1.0131, 0.0844, 0.4935, 0.3437, 0.0911, -0.2957]
+        expected_slice = [
+            -3.9491326808929443,
+            -0.5726033449172974,
+            -0.1606975793838501,
+            0.16732816398143768,
+            0.480291485786438,
+            -0.6275963187217712,
+            0.8580896258354187,
+            -2.3375632762908936,
+            -1.4645881652832031,
+        ]
         super().test_output(expected_slice)
 
 
@@ -79,7 +109,17 @@ class CrossAttnDownBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
         return init_dict, inputs_dict
 
     def test_output(self):
-        expected_slice = [0.244, -0.6953, -0.214, -0.3874, 0.1966, 1.2077, 0.0441, -0.7718, 0.28]
+        expected_slice = [
+            2.6956636905670166,
+            -4.308715343475342,
+            1.5738945007324219,
+            0.9817700982093811,
+            -2.193608283996582,
+            -0.42364418506622314,
+            6.60827112197876,
+            0.9649910926818848,
+            2.8010499477386475,
+        ]
         super().test_output(expected_slice)
 
 
@@ -97,7 +137,17 @@ class SimpleCrossAttnDownBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
         return init_dict, inputs_dict
 
     def test_output(self):
-        expected_slice = [0.7921, -0.0992, -0.1962, -0.7695, -0.4242, 0.7804, 0.4737, 0.2765, 0.3338]
+        expected_slice = [
+            -1.6289970874786377,
+            1.3748600482940674,
+            -0.10375875234603882,
+            0.9955897331237793,
+            -0.8343256115913391,
+            0.382874071598053,
+            -0.10101768374443054,
+            -0.250579297542572,
+            -0.9541524648666382,
+        ]
         super().test_output(expected_slice)
 
 
@@ -110,7 +160,17 @@ class SkipDownBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
         return super().get_dummy_input(include_skip_sample=True)
 
     def test_output(self):
-        expected_slice = [-0.0845, -0.2087, -0.2465, 0.0971, 0.19, -0.0484, 0.2664, 0.4179, 0.5069]
+        expected_slice = [
+            0.2892754375934601,
+            -0.4464714229106903,
+            -0.18036654591560364,
+            -0.4965817928314209,
+            -0.050021037459373474,
+            -0.6248312592506409,
+            -0.5183243751525879,
+            -0.02524399757385254,
+            0.1424381136894226,
+        ]
         super().test_output(expected_slice)
 
 
@@ -123,7 +183,17 @@ class AttnSkipDownBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
         return super().get_dummy_input(include_skip_sample=True)
 
     def test_output(self):
-        expected_slice = [0.5539, 0.1609, 0.4924, 0.0537, -0.1995, 0.405, 0.0979, -0.2721, -0.0642]
+        expected_slice = [
+            -0.4862610697746277,
+            0.8827285766601562,
+            0.7600707411766052,
+            1.828415870666504,
+            0.7132594585418701,
+            -0.12354043126106262,
+            0.7799923419952393,
+            -0.2145882546901703,
+            -1.3009073734283447,
+        ]
         super().test_output(expected_slice)
 
 
@@ -141,7 +211,17 @@ class DownEncoderBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
         return init_dict, inputs_dict
 
     def test_output(self):
-        expected_slice = [1.1102, 0.5302, 0.4872, -0.0023, -0.8042, 0.0483, -0.3489, -0.5632, 0.7626]
+        expected_slice = [
+            2.2016096115112305,
+            -0.15662731230258942,
+            1.789330005645752,
+            0.392975389957428,
+            -4.444106578826904,
+            2.293689489364624,
+            -0.7877296805381775,
+            0.5266609191894531,
+            -0.15173353254795074,
+        ]
         super().test_output(expected_slice)
 
 
@@ -159,7 +239,17 @@ class AttnDownEncoderBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
         return init_dict, inputs_dict
 
     def test_output(self):
-        expected_slice = [0.8966, -0.1486, 0.8568, 0.8141, -0.9046, -0.1342, -0.0972, -0.7417, 0.1538]
+        expected_slice = [
+            2.127671957015991,
+            -0.11142143607139587,
+            1.2964460849761963,
+            3.6022450923919678,
+            -1.7154743671417236,
+            1.6823889017105103,
+            -1.6448723077774048,
+            -0.4970707595348358,
+            -3.637833833694458,
+        ]
         super().test_output(expected_slice)
 
 
@@ -173,7 +263,17 @@ class UNetMidBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
         return init_dict, inputs_dict
 
     def test_output(self):
-        expected_slice = [-0.1062, 1.7248, 0.3494, 1.4569, -0.091, -1.2421, -0.9984, 0.6736, 1.0028]
+        expected_slice = [
+            -2.115619421005249,
+            -0.18567246198654175,
+            -1.673149585723877,
+            -0.8526121973991394,
+            -0.09890538454055786,
+            -2.894134998321533,
+            -0.2579667568206787,
+            0.02939319610595703,
+            1.1619269847869873,
+        ]
         super().test_output(expected_slice)
 
 
@@ -187,7 +287,17 @@ class UNetMidBlock2DCrossAttnTests(UNetBlockTesterMixin, unittest.TestCase):
         return init_dict, inputs_dict
 
     def test_output(self):
-        expected_slice = [0.1879, 2.2653, 0.5987, 1.1568, -0.8454, -1.6109, -0.8919, 0.8306, 1.6758]
+        expected_slice = [
+            -2.235785961151123,
+            -2.2744078636169434,
+            0.22076213359832764,
+            -3.0804693698883057,
+            -1.8690654039382935,
+            -4.610274791717529,
+            -0.625274121761322,
+            0.4143417179584503,
+            -1.8598196506500244,
+        ]
         super().test_output(expected_slice)
 
 
@@ -205,7 +315,17 @@ class UNetMidBlock2DSimpleCrossAttnTests(UNetBlockTesterMixin, unittest.TestCase
         return init_dict, inputs_dict
 
     def test_output(self):
-        expected_slice = [0.7143, 1.9974, 0.5448, 1.3977, 0.1282, -1.1237, -1.4238, 0.553, 0.888]
+        expected_slice = [
+            -3.611351728439331,
+            0.17682641744613647,
+            -0.6845183968544006,
+            -1.3949161767959595,
+            -1.5919055938720703,
+            -1.4672787189483643,
+            -0.7878451943397522,
+            -1.2245429754257202,
+            1.1009857654571533,
+        ]
         super().test_output(expected_slice)
 
 
@@ -218,7 +338,17 @@ class UpBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
         return super().get_dummy_input(include_res_hidden_states_tuple=True)
 
     def test_output(self):
-        expected_slice = [-0.2041, -0.4165, -0.3022, 0.0041, -0.6628, -0.7053, 0.1928, -0.0325, 0.0523]
+        expected_slice = [
+            -4.957080364227295,
+            0.49701011180877686,
+            4.326162815093994,
+            -2.624238967895508,
+            1.4365060329437256,
+            3.467172145843506,
+            0.8403439521789551,
+            1.941118597984314,
+            -0.4804985523223877,
+        ]
         super().test_output(expected_slice)
 
 
@@ -231,7 +361,17 @@ class ResnetUpsampleBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
         return super().get_dummy_input(include_res_hidden_states_tuple=True)
 
     def test_output(self):
-        expected_slice = [0.2287, 0.3549, -0.1346, 0.4797, -0.1715, -0.9649, 0.7305, -0.5864, -0.6244]
+        expected_slice = [
+            -2.075526714324951,
+            -3.90122652053833,
+            -3.0005340576171875,
+            -0.9611822366714478,
+            -1.0546646118164062,
+            -1.7606399059295654,
+            -0.24509593844413757,
+            -0.025167375802993774,
+            -0.7591105699539185,
+        ]
         super().test_output(expected_slice)
 
 
@@ -249,7 +389,17 @@ class CrossAttnUpBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
         return init_dict, inputs_dict
 
     def test_output(self):
-        expected_slice = [-0.2796, -0.4364, -0.1067, -0.2693, 0.1894, 0.3869, -0.347, 0.4584, 0.5091]
+        expected_slice = [
+            -1.2535507678985596,
+            -2.480539083480835,
+            -3.7073025703430176,
+            -2.2757019996643066,
+            -3.044628143310547,
+            -2.0491058826446533,
+            0.8988063335418701,
+            0.9877803325653076,
+            1.679555892944336,
+        ]
         super().test_output(expected_slice)
 
 
@@ -267,7 +417,17 @@ class SimpleCrossAttnUpBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
         return init_dict, inputs_dict
 
     def test_output(self):
-        expected_slice = [0.2645, 0.148, 0.0909, 0.8044, -0.9758, -0.9083, 0.0994, -1.1453, -0.7402]
+        expected_slice = [
+            -0.2477731704711914,
+            -2.644524097442627,
+            -2.698854684829712,
+            -0.1323309689760208,
+            -1.104975700378418,
+            -0.9408857822418213,
+            -0.05827316641807556,
+            -0.3523079752922058,
+            -0.8070091009140015,
+        ]
         super().test_output(expected_slice)
 
 
@@ -280,7 +440,17 @@ class AttnUpBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
         return super().get_dummy_input(include_res_hidden_states_tuple=True)
 
     def test_output(self):
-        expected_slice = [0.0979, 0.1326, 0.0021, 0.0659, 0.2249, 0.0059, 0.1132, 0.5952, 0.1033]
+        expected_slice = [
+            -1.8902320861816406,
+            -1.3337427377700806,
+            -0.8851560354232788,
+            1.4004807472229004,
+            -0.6870196461677551,
+            -1.4291317462921143,
+            1.4414796829223633,
+            0.6205850839614868,
+            -0.7466438412666321,
+        ]
         super().test_output(expected_slice)
 
 
@@ -293,7 +463,17 @@ class SkipUpBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
         return super().get_dummy_input(include_res_hidden_states_tuple=True)
 
     def test_output(self):
-        expected_slice = [-0.0893, -0.1234, -0.1506, -0.0332, 0.0123, -0.0211, 0.0566, 0.0143, 0.0362]
+        expected_slice = [
+            -0.987883985042572,
+            -0.5670157074928284,
+            -0.6942511796951294,
+            -1.0125863552093506,
+            -0.605157732963562,
+            -0.8832322955131531,
+            -0.9034348726272583,
+            -0.7994486689567566,
+            -0.9313756227493286,
+        ]
         super().test_output(expected_slice)
 
 
@@ -306,7 +486,17 @@ class AttnSkipUpBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
         return super().get_dummy_input(include_res_hidden_states_tuple=True)
 
     def test_output(self):
-        expected_slice = [0.0361, 0.0617, 0.2787, -0.035, 0.0342, 0.3421, -0.0843, 0.0913, 0.3015]
+        expected_slice = [
+            0.5064516067504883,
+            0.582533061504364,
+            0.7436902523040771,
+            0.6235701441764832,
+            -0.03481818363070488,
+            -0.1513846069574356,
+            -0.40579983592033386,
+            -0.9227585196495056,
+            -0.9879465699195862,
+        ]
         super().test_output(expected_slice)
 
 
@@ -324,7 +514,17 @@ class UpDecoderBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
         return init_dict, inputs_dict
 
     def test_output(self):
-        expected_slice = [0.4404, 0.1998, -0.9886, -0.332, -0.3128, -0.7034, -0.6955, -0.2338, -0.3137]
+        expected_slice = [
+            -0.14693844318389893,
+            0.4114452600479126,
+            1.3881545066833496,
+            0.6828031539916992,
+            0.21913594007492065,
+            0.9397234320640564,
+            0.8490088582038879,
+            -0.9372509121894836,
+            -0.16005855798721313,
+        ]
         super().test_output(expected_slice)
 
 
@@ -342,5 +542,15 @@ class AttnUpDecoderBlock2DTests(UNetBlockTesterMixin, unittest.TestCase):
         return init_dict, inputs_dict
 
     def test_output(self):
-        expected_slice = [0.6738, 0.4491, 0.1055, 1.071, 0.7316, 0.3339, 0.3352, 0.1023, 0.3568]
+        expected_slice = [
+            -1.6499664783477783,
+            -2.1455278396606445,
+            -1.504562497138977,
+            -2.667104482650757,
+            -3.483185291290283,
+            -2.0631113052368164,
+            0.9261775612831116,
+            -0.60399329662323,
+            -0.1882866621017456,
+        ]
         super().test_output(expected_slice)

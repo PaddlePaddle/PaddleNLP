@@ -61,6 +61,7 @@ else:
         ModelMixin,
         MultiAdapter,
         PriorTransformer,
+        T2IAdapter,
         T5FilmDecoder,
         Transformer2DModel,
         UNet1DModel,

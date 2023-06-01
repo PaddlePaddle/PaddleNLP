@@ -183,11 +183,11 @@ cache_version_file = os.path.join(DIFFUSERS_CACHE, "version_diffusers_cache.txt"
 if not os.path.isfile(cache_version_file):
     cache_version = 0
 else:
-    with open(cache_version_file) as f:
-        try:
+    try:
+        with open(cache_version_file) as f:
             cache_version = int(f.read())
-        except ValueError:
-            cache_version = 0
+    except Exception:
+        cache_version = 0
 
 if cache_version < 1:
     old_cache_is_not_empty = os.path.isdir(old_diffusers_cache) and len(os.listdir(old_diffusers_cache)) > 0

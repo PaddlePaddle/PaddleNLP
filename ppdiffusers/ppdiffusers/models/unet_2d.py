@@ -305,21 +305,21 @@ class UNet2DModel(ModelMixin, ConfigMixin):
         # 3. down
         down_block_res_samples = (sample,)
 
-        # ! resnet_pre_temb_non_linearity
-        down_nonlinear_temb = self.down_resnet_temb_nonlinearity(emb) if self.resnet_pre_temb_non_linearity else emb
+        if self.resnet_pre_temb_non_linearity:
+            emb = self.down_resnet_temb_nonlinearity(emb)
 
         for downsample_block in self.down_blocks:
             if hasattr(downsample_block, "skip_conv"):
                 sample, res_samples, skip_sample = downsample_block(
-                    hidden_states=sample, temb=down_nonlinear_temb, skip_sample=skip_sample
+                    hidden_states=sample, temb=emb, skip_sample=skip_sample
                 )
             else:
-                sample, res_samples = downsample_block(hidden_states=sample, temb=down_nonlinear_temb)
+                sample, res_samples = downsample_block(hidden_states=sample, temb=emb)
 
             down_block_res_samples += res_samples
 
         # 4. mid
-        sample = self.mid_block(sample, down_nonlinear_temb)
+        sample = self.mid_block(sample, emb)
 
         # 5. up
         skip_sample = None
@@ -328,9 +328,9 @@ class UNet2DModel(ModelMixin, ConfigMixin):
             down_block_res_samples = down_block_res_samples[: -len(upsample_block.resnets)]
 
             if hasattr(upsample_block, "skip_conv"):
-                sample, skip_sample = upsample_block(sample, res_samples, down_nonlinear_temb, skip_sample)
+                sample, skip_sample = upsample_block(sample, res_samples, emb, skip_sample)
             else:
-                sample = upsample_block(sample, res_samples, down_nonlinear_temb)
+                sample = upsample_block(sample, res_samples, emb)
 
         # 6. post-process
         sample = self.conv_norm_out(sample)

@@ -242,7 +242,7 @@ class ModelMixin(nn.Layer):
         save_directory: Union[str, os.PathLike],
         is_main_process: bool = True,
         save_function: Callable = None,
-        safe_serialization: bool = True,
+        safe_serialization: bool = False,
         variant: Optional[str] = None,
         to_diffusers: Optional[bool] = None,
     ):
@@ -265,7 +265,7 @@ class ModelMixin(nn.Layer):
                 If specified, weights are saved in the format pytorch_model.<variant>.bin.
             to_diffusers (`bool`, *optional*, defaults to `False`):
                 If specified, weights are saved in the format of torch. eg. linear need transpose.
-            safe_serialization (`bool`, *optional*, defaults to `True`):
+            safe_serialization (`bool`, *optional*, defaults to `False`):
                 Only when `to_diffusers` is True, Whether to save the model using `safetensors` or the traditional PyTorch way (that uses `pickle`).
         """
         if to_diffusers is None:
@@ -423,6 +423,8 @@ class ModelMixin(nn.Layer):
             raise ValueError(
                 "`use_safetensors`=True but safetensors is not installed. Please install safetensors with `pip install safetenstors"
             )
+        if use_safetensors is None:
+            use_safetensors = is_safetensors_available()
 
         # Load config if we don't provide a configuration
         config_path = pretrained_model_name_or_path
@@ -475,6 +477,7 @@ class ModelMixin(nn.Layer):
                     # try load model_file with paddle / torch / safetensor
                     state_dict = smart_load(model_file)
                 except Exception:
+                    model_file = None
                     pass
             if model_file is None:
                 model_file = _get_model_file(

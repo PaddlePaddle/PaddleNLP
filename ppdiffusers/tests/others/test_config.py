@@ -108,6 +108,8 @@ class ConfigTester(unittest.TestCase):
 
     def test_load_ddim_from_pndm(self):
         logger = logging.get_logger("ppdiffusers.configuration_utils")
+        # 30 for warning
+        logger.setLevel(30)
         with CaptureLogger(logger) as cap_logger:
             ddim = DDIMScheduler.from_pretrained(
                 "hf-internal-testing/tiny-stable-diffusion-torch", subfolder="scheduler"
@@ -117,6 +119,8 @@ class ConfigTester(unittest.TestCase):
 
     def test_load_euler_from_pndm(self):
         logger = logging.get_logger("ppdiffusers.configuration_utils")
+        # 30 for warning
+        logger.setLevel(30)
         with CaptureLogger(logger) as cap_logger:
             euler = EulerDiscreteScheduler.from_pretrained(
                 "hf-internal-testing/tiny-stable-diffusion-torch", subfolder="scheduler"
@@ -126,6 +130,8 @@ class ConfigTester(unittest.TestCase):
 
     def test_load_euler_ancestral_from_pndm(self):
         logger = logging.get_logger("ppdiffusers.configuration_utils")
+        # 30 for warning
+        logger.setLevel(30)
         with CaptureLogger(logger) as cap_logger:
             euler = EulerAncestralDiscreteScheduler.from_pretrained(
                 "hf-internal-testing/tiny-stable-diffusion-torch", subfolder="scheduler"
@@ -135,6 +141,8 @@ class ConfigTester(unittest.TestCase):
 
     def test_load_pndm(self):
         logger = logging.get_logger("ppdiffusers.configuration_utils")
+        # 30 for warning
+        logger.setLevel(30)
         with CaptureLogger(logger) as cap_logger:
             pndm = PNDMScheduler.from_pretrained(
                 "hf-internal-testing/tiny-stable-diffusion-torch", subfolder="scheduler"
@@ -144,6 +152,8 @@ class ConfigTester(unittest.TestCase):
 
     def test_overwrite_config_on_load(self):
         logger = logging.get_logger("ppdiffusers.configuration_utils")
+        # 30 for warning
+        logger.setLevel(30)
         with CaptureLogger(logger) as cap_logger:
             ddpm = DDPMScheduler.from_pretrained(
                 "hf-internal-testing/tiny-stable-diffusion-torch",
@@ -162,6 +172,8 @@ class ConfigTester(unittest.TestCase):
 
     def test_load_dpmsolver(self):
         logger = logging.get_logger("ppdiffusers.configuration_utils")
+        # 30 for warning
+        logger.setLevel(30)
         with CaptureLogger(logger) as cap_logger:
             dpm = DPMSolverMultistepScheduler.from_pretrained(
                 "hf-internal-testing/tiny-stable-diffusion-torch", subfolder="scheduler"

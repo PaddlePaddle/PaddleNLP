@@ -124,7 +124,19 @@ class Upsample2DBlockTests(unittest.TestCase):
             upsampled = upsample(sample)
         assert tuple(upsampled.shape) == (1, 32, 64, 64)
         output_slice = upsampled[0, -1, -3:, -3:]
-        expected_slice = paddle.to_tensor([0.7145, 1.3773, 0.3492, 0.8448, 1.0839, -0.3341, 0.5956, 0.125, -0.4841])
+        expected_slice = paddle.to_tensor(
+            [
+                0.4583871364593506,
+                -0.8221798539161682,
+                -0.8228907585144043,
+                0.3325321078300476,
+                -0.24422502517700195,
+                1.344732642173767,
+                0.5239212512969971,
+                -0.4814918637275696,
+                0.17928099632263184,
+            ]
+        )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
     def test_upsample_with_conv_out_dim(self):
@@ -135,7 +147,19 @@ class Upsample2DBlockTests(unittest.TestCase):
             upsampled = upsample(sample)
         assert tuple(upsampled.shape) == (1, 64, 64, 64)
         output_slice = upsampled[0, -1, -3:, -3:]
-        expected_slice = paddle.to_tensor([0.2703, 0.1656, -0.2538, -0.0553, -0.2984, 0.1044, 0.1155, 0.2579, 0.7755])
+        expected_slice = paddle.to_tensor(
+            [
+                0.9049283266067505,
+                -1.6125869750976562,
+                -1.0837469100952148,
+                0.24520659446716309,
+                -0.6669139266014099,
+                0.5660533905029297,
+                1.1056761741638184,
+                2.1717309951782227,
+                0.7197026610374451,
+            ]
+        )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
     def test_upsample_with_transpose(self):
@@ -147,7 +171,17 @@ class Upsample2DBlockTests(unittest.TestCase):
         assert tuple(upsampled.shape) == (1, 32, 64, 64)
         output_slice = upsampled[0, -1, -3:, -3:]
         expected_slice = paddle.to_tensor(
-            [-0.3028, -0.1582, 0.0071, 0.035, -0.4799, -0.1139, 0.1056, -0.1153, -0.1046]
+            [
+                -0.05951342731714249,
+                0.26951998472213745,
+                0.2600363492965698,
+                1.12237548828125,
+                -0.07744798064231873,
+                0.006375734228640795,
+                0.6678807735443115,
+                0.44324278831481934,
+                -0.10978640615940094,
+            ]
         )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
@@ -161,7 +195,19 @@ class Downsample2DBlockTests(unittest.TestCase):
             downsampled = downsample(sample)
         assert tuple(downsampled.shape) == (1, 32, 32, 32)
         output_slice = downsampled[0, -1, -3:, -3:]
-        expected_slice = paddle.to_tensor([-0.0513, -0.3889, 0.064, 0.0836, -0.546, -0.0341, -0.0169, -0.6967, 0.1179])
+        expected_slice = paddle.to_tensor(
+            [
+                -0.24012964963912964,
+                -0.034197285771369934,
+                -1.0328047275543213,
+                0.7861506938934326,
+                -0.2086063176393509,
+                -0.3999312222003937,
+                0.25081655383110046,
+                -0.23891538381576538,
+                -1.4398303031921387,
+            ]
+        )
         max_diff = (output_slice.flatten() - expected_slice).abs().sum().item()
         assert max_diff <= 0.001
 
@@ -174,7 +220,17 @@ class Downsample2DBlockTests(unittest.TestCase):
         assert tuple(downsampled.shape) == (1, 32, 32, 32)
         output_slice = downsampled[0, -1, -3:, -3:]
         expected_slice = paddle.to_tensor(
-            [0.9267, 0.5878, 0.3337, 1.2321, -0.1191, -0.3984, -0.7532, -0.0715, -0.3913]
+            [
+                -0.009430217556655407,
+                0.8657761216163635,
+                1.7985490560531616,
+                -0.61894291639328,
+                -2.5752196311950684,
+                1.2352519035339355,
+                0.6046919822692871,
+                -1.6499173641204834,
+                -1.5272349119186401,
+            ]
         )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
@@ -187,7 +243,17 @@ class Downsample2DBlockTests(unittest.TestCase):
         assert tuple(downsampled.shape) == (1, 32, 32, 32)
         output_slice = downsampled[0, -1, -3:, -3:]
         expected_slice = paddle.to_tensor(
-            [0.9267, 0.5878, 0.3337, 1.2321, -0.1191, -0.3984, -0.7532, -0.0715, -0.3913]
+            [
+                -0.009430217556655407,
+                0.8657761216163635,
+                1.7985490560531616,
+                -0.61894291639328,
+                -2.5752196311950684,
+                1.2352519035339355,
+                0.6046919822692871,
+                -1.6499173641204834,
+                -1.5272349119186401,
+            ]
         )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
@@ -199,7 +265,19 @@ class Downsample2DBlockTests(unittest.TestCase):
             downsampled = downsample(sample)
         assert tuple(downsampled.shape) == (1, 16, 32, 32)
         output_slice = downsampled[0, -1, -3:, -3:]
-        expected_slice = paddle.to_tensor([-0.6586, 0.5985, 0.0721, 0.1256, -0.1492, 0.4436, -0.2544, 0.5021, 1.1522])
+        expected_slice = paddle.to_tensor(
+            [
+                0.10819266736507416,
+                0.43043053150177,
+                -0.7322822213172913,
+                -1.923148512840271,
+                1.0195047855377197,
+                0.48796477913856506,
+                1.6765365600585938,
+                -4.072991847991943,
+                0.8763526082038879,
+            ]
+        )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
 
@@ -214,7 +292,17 @@ class ResnetBlock2DTests(unittest.TestCase):
         assert tuple(output_tensor.shape) == (1, 32, 64, 64)
         output_slice = output_tensor[0, -1, -3:, -3:]
         expected_slice = paddle.to_tensor(
-            [-1.901, -0.2974, -0.8245, -1.3533, 0.8742, -0.9645, -2.0584, 1.3387, -0.4746]
+            [
+                1.9816107749938965,
+                1.4443503618240356,
+                -1.0354782342910767,
+                0.23985600471496582,
+                -1.0868161916732788,
+                -1.5830397605895996,
+                -0.041037797927856445,
+                -1.2574901580810547,
+                -0.5504958629608154,
+            ]
         )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
@@ -227,7 +315,19 @@ class ResnetBlock2DTests(unittest.TestCase):
             output_tensor = resnet_block(sample, temb)
         assert tuple(output_tensor.shape) == (1, 32, 64, 64)
         output_slice = output_tensor[0, -1, -3:, -3:]
-        expected_slice = paddle.to_tensor([0.2226, -1.0791, -0.1629, 0.3659, -0.2889, -1.2376, 0.0582, 0.9206, 0.0044])
+        expected_slice = paddle.to_tensor(
+            [
+                -0.9861348867416382,
+                -1.097771406173706,
+                0.268703430891037,
+                0.40997087955474854,
+                -4.26219367980957,
+                1.758486270904541,
+                -0.8979732990264893,
+                0.30774950981140137,
+                3.2780206203460693,
+            ]
+        )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
     def test_resnet_up(self):
@@ -240,7 +340,17 @@ class ResnetBlock2DTests(unittest.TestCase):
         assert tuple(output_tensor.shape) == (1, 32, 128, 128)
         output_slice = output_tensor[0, -1, -3:, -3:]
         expected_slice = paddle.to_tensor(
-            [1.213, -0.8753, -0.9027, 1.5783, -0.5362, -0.5001, 1.0726, -0.7732, -0.4182]
+            [
+                0.2874237298965454,
+                -2.6432056427001953,
+                -2.1900298595428467,
+                -0.48899877071380615,
+                -1.1637755632400513,
+                -1.084446907043457,
+                -1.1333439350128174,
+                0.2726985812187195,
+                -0.014697253704071045,
+            ]
         )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
@@ -254,7 +364,17 @@ class ResnetBlock2DTests(unittest.TestCase):
         assert tuple(output_tensor.shape) == (1, 32, 32, 32)
         output_slice = output_tensor[0, -1, -3:, -3:]
         expected_slice = paddle.to_tensor(
-            [-0.3002, -0.7135, 0.1359, 0.0561, -0.7935, 0.0113, -0.1766, -0.6714, -0.0436]
+            [
+                1.54087495803833,
+                0.26700693368911743,
+                -0.540952742099762,
+                2.7190208435058594,
+                -0.09766747057437897,
+                0.23407122492790222,
+                0.47980907559394836,
+                0.6348602771759033,
+                -0.75424242019653322,
+            ]
         )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
@@ -268,7 +388,17 @@ class ResnetBlock2DTests(unittest.TestCase):
         assert tuple(output_tensor.shape) == (1, 32, 32, 32)
         output_slice = output_tensor[0, -1, -3:, -3:]
         expected_slice = paddle.to_tensor(
-            [-0.0934, -0.5729, 0.0909, -0.271, -0.5044, 0.0243, -0.0665, -0.5267, -0.3136]
+            [
+                0.9914248585700989,
+                0.4773162007331848,
+                -0.021942138671875,
+                2.482321262359619,
+                0.18839354813098907,
+                0.1516135334968567,
+                0.7221578359603882,
+                0.3920581340789795,
+                -0.24661940336227417,
+            ]
         )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
@@ -282,7 +412,17 @@ class ResnetBlock2DTests(unittest.TestCase):
         assert tuple(output_tensor.shape) == (1, 32, 32, 32)
         output_slice = output_tensor[0, -1, -3:, -3:]
         expected_slice = paddle.to_tensor(
-            [-0.3002, -0.7135, 0.1359, 0.0561, -0.7935, 0.0113, -0.1766, -0.6714, -0.0436]
+            [
+                1.54087495803833,
+                0.26700693368911743,
+                -0.540952742099762,
+                2.7190208435058594,
+                -0.09766747057437897,
+                0.23407122492790222,
+                0.47980907559394836,
+                0.6348602771759033,
+                -0.7542424201965332,
+            ]
         )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
@@ -299,7 +439,17 @@ class AttentionBlockTests(unittest.TestCase):
         assert attention_scores.shape == [1, 32, 64, 64]
         output_slice = attention_scores[0, -1, -3:, -3:]
         expected_slice = paddle.to_tensor(
-            [-1.4975, -0.0038, -0.7847, -1.4567, 1.122, -0.8962, -1.7394, 1.1319, -0.5427]
+            [
+                1.638939619064331,
+                -0.15776772797107697,
+                -1.1130025386810303,
+                -0.8540273904800415,
+                -0.5696781873703003,
+                -2.0493741035461426,
+                -0.3732607960700989,
+                -1.740313172340393,
+                -0.5271167755126953,
+            ]
         )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
@@ -312,7 +462,17 @@ class AttentionBlockTests(unittest.TestCase):
         assert attention_scores.shape == [1, 512, 64, 64]
         output_slice = attention_scores[0, -1, -3:, -3:]
         expected_slice = paddle.to_tensor(
-            [-0.6621, -0.0156, -3.2766, 0.8025, -0.8609, 0.282, 0.0905, -1.1179, -3.2126]
+            [
+                -0.8007570505142212,
+                -0.770350992679596,
+                -3.5278191566467285,
+                -2.0540268421173096,
+                -0.7711739540100098,
+                -0.8278288245201111,
+                -0.48292720317840576,
+                1.6039936542510986,
+                0.626724362373352,
+            ]
         )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
@@ -329,7 +489,17 @@ class Transformer2DModelTests(unittest.TestCase):
         assert attention_scores.shape == [1, 32, 64, 64]
         output_slice = attention_scores[0, -1, -3:, -3:]
         expected_slice = paddle.to_tensor(
-            [-1.9455, -0.0066, -1.3933, -1.5878, 0.5325, -0.6486, -1.8648, 0.7515, -0.9689]
+            [
+                2.6310853958129883,
+                5.990478515625,
+                0.5715246200561523,
+                -2.5269505977630615,
+                -2.853764057159424,
+                -5.163403511047363,
+                0.2880846858024597,
+                -5.925153732299805,
+                2.316770076751709,
+            ]
         )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
@@ -345,7 +515,17 @@ class Transformer2DModelTests(unittest.TestCase):
         assert attention_scores.shape == [1, 64, 64, 64]
         output_slice = attention_scores[0, -1, -3:, -3:]
         expected_slice = paddle.to_tensor(
-            [-0.2555, -0.8877, -2.4739, -2.2251, 1.2714, 0.0807, -0.4161, -1.6408, -0.0471]
+            [
+                -0.08756911754608154,
+                -3.94197940826416,
+                -0.25678586959838867,
+                2.1481714248657227,
+                2.327033042907715,
+                0.29948690533638,
+                1.3845969438552856,
+                0.7825677394866943,
+                1.4856826066970825,
+            ]
         )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
@@ -371,10 +551,30 @@ class Transformer2DModelTests(unittest.TestCase):
         output_slice_1 = attention_scores_1[0, -1, -3:, -3:]
         output_slice_2 = attention_scores_2[0, -1, -3:, -3:]
         expected_slice_1 = paddle.to_tensor(
-            [-0.1874, -0.9704, -1.429, -1.3357, 1.5138, 0.3036, -0.0976, -1.1667, 0.1283]
+            [
+                -0.15322405099868774,
+                -1.265586018562317,
+                -5.424124717712402,
+                -0.7333418130874634,
+                -0.5904415249824524,
+                0.9293081760406494,
+                1.1033945083618164,
+                -5.200987815856934,
+                -0.7598087787628174,
+            ]
         )
         expected_slice_2 = paddle.to_tensor(
-            [-0.3493, -1.0924, -1.6161, -1.5016, 1.4245, 0.1367, -0.2526, -1.3109, -0.0547]
+            [
+                0.12572699785232544,
+                -1.0498149394989014,
+                -5.207070350646973,
+                -0.41757693886756897,
+                -0.25374162197113037,
+                1.152648687362671,
+                1.422953724861145,
+                -4.933906078338623,
+                -0.564710259437561,
+            ]
         )
         assert paddle.allclose(output_slice_1.flatten(), expected_slice_1, atol=0.01)
         assert paddle.allclose(output_slice_2.flatten(), expected_slice_2, atol=0.01)
@@ -390,7 +590,17 @@ class Transformer2DModelTests(unittest.TestCase):
         assert attention_scores.shape == [1, 32, 64, 64]
         output_slice = attention_scores[0, -1, -3:, -3:]
         expected_slice = paddle.to_tensor(
-            [-1.938, -0.0083, -1.3771, -1.5819, 0.5209, -0.6441, -1.8545, 0.7563, -0.9615]
+            [
+                2.535370349884033,
+                6.2350993156433105,
+                0.8244613409042358,
+                -2.6684911251068115,
+                -2.758057117462158,
+                -5.176937103271484,
+                0.3372979760169983,
+                -5.837750434875488,
+                2.3483340740203857,
+            ]
         )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
@@ -405,7 +615,16 @@ class Transformer2DModelTests(unittest.TestCase):
             attention_scores = spatial_transformer_block(sample).sample
         assert attention_scores.shape == [1, num_embed - 1, 32]
         output_slice = attention_scores[0, -2:, -3:]
-        expected_slice = paddle.to_tensor([-1.7648, -1.0241, -2.0985, -1.8035, -1.6404, -1.2098])
+        expected_slice = paddle.to_tensor(
+            [
+                -0.14130862057209015,
+                -0.14278407394886017,
+                -0.498604953289032,
+                -3.2408740520477295,
+                -3.852043390274048,
+                -2.099970579147339,
+            ]
+        )
         assert paddle.allclose(output_slice.flatten(), expected_slice, atol=0.01)
 
     def test_spatial_transformer_default_norm_layers(self):

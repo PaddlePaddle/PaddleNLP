@@ -133,7 +133,7 @@ class StableUnCLIPImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.TestCas
         if pil_image:
             input_image = input_image * 0.5 + 0.5
             input_image = input_image.clip(min=0, max=1)
-            input_image = input_image.cpu().transpose(perm=[0, 2, 3, 1]).float().numpy()
+            input_image = input_image.cpu().transpose(perm=[0, 2, 3, 1]).cast("float32").numpy()
             input_image = DiffusionPipeline.numpy_to_pil(input_image)[0]
         return {
             "prompt": "An anime racoon running a marathon",

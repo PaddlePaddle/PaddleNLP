@@ -874,7 +874,7 @@ class UNetFlatConditionModel(ModelMixin, ConfigMixin):
                 cross_attention_kwargs=cross_attention_kwargs,
             )
 
-        if mid_block_additional_residual is not None:
+        if is_controlnet:
             sample = sample + mid_block_additional_residual
 
         # 5. up

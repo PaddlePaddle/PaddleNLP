@@ -18,7 +18,6 @@ import unittest
 
 import paddle
 from parameterized import parameterized
-from ppdiffusers_test.test_modeling_common import ModelTesterMixin
 
 from ppdiffusers import AutoencoderKL
 from ppdiffusers.utils import (
@@ -28,6 +27,8 @@ from ppdiffusers.utils import (
     require_paddle_gpu,
     slow,
 )
+
+from .test_modeling_common import ModelTesterMixin
 
 
 class AutoencoderKLTests(ModelTesterMixin, unittest.TestCase):
@@ -66,6 +67,45 @@ class AutoencoderKLTests(ModelTesterMixin, unittest.TestCase):
 
     def test_training(self):
         pass
+
+    def test_gradient_checkpointing(self):
+        # enable deterministic behavior for gradient checkpointing
+        init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
+        model = self.model_class(**init_dict)
+
+        assert not model.is_gradient_checkpointing and model.training
+
+        out = model(**inputs_dict).sample
+        # run the backwards pass on the model. For backwards pass, for simplicity purpose,
+        # we won't calculate the loss and rather backprop on out.sum()
+        model.clear_gradients()
+
+        labels = paddle.randn(out.shape, dtype=out.dtype)
+        loss = (out - labels).mean()
+        loss.backward()
+
+        # re-instantiate the model now enabling gradient checkpointing
+        model_2 = self.model_class(**init_dict)
+        # clone model
+        model_2.load_dict(model.state_dict())
+        model_2.enable_gradient_checkpointing()
+
+        assert model_2.is_gradient_checkpointing and model_2.training
+
+        out_2 = model_2(**inputs_dict).sample
+        # run the backwards pass on the model. For backwards pass, for simplicity purpose,
+        # we won't calculate the loss and rather backprop on out.sum()
+        model_2.clear_gradients()
+        loss_2 = (out_2 - labels).mean()
+        loss_2.backward()
+
+        # compare the output and parameters gradients
+        self.assertTrue((loss - loss_2).abs() < 1e-5)
+        named_params = dict(model.named_parameters())
+        named_params_2 = dict(model_2.named_parameters())
+        with paddle.no_grad():
+            for name, param in named_params.items():
+                self.assertTrue(paddle_all_close(param.grad, named_params_2[name].grad, atol=5e-5))
 
     def test_from_pretrained_hub(self):
         model, loading_info = AutoencoderKL.from_pretrained("fusing/autoencoder-kl-dummy", output_loading_info=True)
@@ -148,7 +188,7 @@ class AutoencoderKLIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(image, generator=generator, sample_posterior=True).sample
         assert sample.shape == image.shape
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.01)
 
@@ -166,7 +206,7 @@ class AutoencoderKLIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(image, generator=generator, sample_posterior=True).sample
         assert sample.shape == image.shape
-        output_slice = sample[-1, -2:, :2, -2:].flatten().float().cpu()
+        output_slice = sample[-1, -2:, :2, -2:].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.01)
 
@@ -190,7 +230,7 @@ class AutoencoderKLIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(image).sample
         assert sample.shape == image.shape
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.01)
 
@@ -224,9 +264,43 @@ class AutoencoderKLIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model.decode(encoding).sample
         assert list(sample.shape) == [3, 3, 512, 512]
-        output_slice = sample[-1, -2:, :2, -2:].flatten().float().cpu()
+        output_slice = sample[-1, -2:, :2, -2:].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.005)
+
+    @parameterized.expand([(13,), (16,), (27,)])
+    @require_paddle_gpu
+    def test_stable_diffusion_decode_ppxformers_vs_2_5_fp16(self, seed):
+        model = self.get_sd_vae_model(fp16=True)
+        encoding = self.get_sd_image(seed, shape=(3, 4, 64, 64), fp16=True)
+
+        with paddle.no_grad():
+            sample = model.decode(encoding).sample
+
+        model.enable_xformers_memory_efficient_attention()
+        with paddle.no_grad():
+            sample_2 = model.decode(encoding).sample
+
+        assert list(sample.shape) == [3, 3, 512, 512]
+
+        assert paddle_all_close(sample, sample_2, atol=1e-1)
+
+    @parameterized.expand([(13,), (16,), (37,)])
+    @require_paddle_gpu
+    def test_stable_diffusion_decode_ppxformers_vs_2_5(self, seed):
+        model = self.get_sd_vae_model()
+        encoding = self.get_sd_image(seed, shape=(3, 4, 64, 64))
+
+        with paddle.no_grad():
+            sample = model.decode(encoding).sample
+
+        model.enable_xformers_memory_efficient_attention()
+        with paddle.no_grad():
+            sample_2 = model.decode(encoding).sample
+
+        assert list(sample.shape) == [3, 3, 512, 512]
+
+        assert paddle_all_close(sample, sample_2, atol=1e-2)
 
     @parameterized.expand(
         [

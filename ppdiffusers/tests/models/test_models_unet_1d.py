@@ -16,10 +16,11 @@
 import unittest
 
 import paddle
-from ppdiffusers_test.test_modeling_common import ModelTesterMixin
 
 from ppdiffusers import UNet1DModel
 from ppdiffusers.utils import floats_tensor, slow
+
+from .test_modeling_common import ModelTesterMixin
 
 
 class UNet1DModelTests(ModelTesterMixin, unittest.TestCase):
@@ -93,7 +94,7 @@ class UNet1DModelTests(ModelTesterMixin, unittest.TestCase):
     def test_output_pretrained(self):
         model = UNet1DModel.from_pretrained("bglick13/hopper-medium-v2-value-function-hor32", subfolder="unet")
         paddle.seed(0)
-        num_features = model.in_channels
+        num_features = model.config.in_channels
         seq_len = 16
         noise = paddle.randn(shape=(1, seq_len, num_features)).transpose(perm=[0, 2, 1])
         time_step = paddle.full(shape=(num_features,), fill_value=0)
@@ -220,7 +221,7 @@ class UNetRLModelTests(ModelTesterMixin, unittest.TestCase):
             "bglick13/hopper-medium-v2-value-function-hor32", output_loading_info=True, subfolder="value_function"
         )
         paddle.seed(0)
-        num_features = value_function.in_channels
+        num_features = value_function.config.in_channels
         seq_len = 14
         noise = paddle.randn(shape=(1, seq_len, num_features)).transpose(perm=[0, 2, 1])
         time_step = paddle.full(shape=(num_features,), fill_value=0)

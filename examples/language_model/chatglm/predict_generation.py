@@ -68,8 +68,8 @@ class Predictor(object):
             self.tokenizer = ChatGLMTokenizer.from_pretrained(args.model_name_or_path)
             self.batch_size = args.batch_size
             self.args = args
-            self.src_length = args.src_length
-            self.tgt_length = args.tgt_length
+            self.src_length = self.args.src_length
+            self.tgt_length = self.args.tgt_length
 
             tensor_parallel_degree = paddle.distributed.get_world_size()
             tensor_parallel_rank = 0
@@ -108,6 +108,7 @@ class Predictor(object):
                 self.model = PrefixModelForCausalLM.from_pretrained(
                     self.model, self.args.prefix_path, chatglm_postprocess_past_key_value, chatglm_pad_attention_mask
                 )
+
         self.model.eval()
 
     def preprocess(self, input_text):

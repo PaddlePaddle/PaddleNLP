@@ -90,7 +90,7 @@ class PipelineTesterMixin:
         raise NotImplementedError(
             "You need to set the attribute `params` in the child test class. "
             "`params` are checked for if all values are present in `__call__`'s signature."
-            " You can set `params` using one of the common set of parameters defined in`pipeline_params.py`"
+            " You can set `params` using one of the common set of parameters defined in `pipeline_params.py`"
             " e.g., `TEXT_TO_IMAGE_PARAMS` defines the common parameters used in text to  "
             "image pipelines, including prompts and prompt embedding overrides."
             "If your pipeline's set of arguments has minor changes from one of the common sets of arguments, "
@@ -173,8 +173,8 @@ class PipelineTesterMixin:
             f"Required optional parameters not present: {remaining_required_optional_parameters}",
         )
 
-    def test_inference_batch_consistent(self):
-        self._test_inference_batch_consistent()
+    def test_inference_batch_consistent(self, batch_sizes=[2, 4, 13]):
+        self._test_inference_batch_consistent(batch_sizes=batch_sizes)
 
     def _test_inference_batch_consistent(
         self, batch_sizes=[2, 4, 13], additional_params_copy_to_batched_inputs=["num_inference_steps"]
@@ -213,11 +213,12 @@ class PipelineTesterMixin:
             assert output.shape[0] == batch_size
         logger.setLevel(level=ppdiffusers.logging.WARNING)
 
-    def test_inference_batch_single_identical(self):
-        self._test_inference_batch_single_identical()
+    def test_inference_batch_single_identical(self, batch_size=3):
+        self._test_inference_batch_single_identical(batch_size=batch_size)
 
     def _test_inference_batch_single_identical(
         self,
+        batch_size=3,
         test_max_difference=None,
         test_mean_pixel_difference=None,
         relax_max_difference=False,
@@ -232,7 +233,6 @@ class PipelineTesterMixin:
         logger = logging.get_logger(pipe.__module__)
         logger.setLevel(level=ppdiffusers.logging.FATAL)
         batched_inputs = {}
-        batch_size = 3
         for name, value in inputs.items():
             if name in self.batch_params:
                 if name == "prompt":
@@ -286,21 +286,24 @@ class PipelineTesterMixin:
         self.assertTrue(set(pipe.components.keys()) == set(init_components.keys()))
 
     def test_float16_inference(self):
+        self._test_float16_inference()
+
+    def _test_float16_inference(self, expected_max_diff=1e-2):
         components = self.get_dummy_components()
         pipe = self.pipeline_class(**components)
         pipe.set_progress_bar_config(disable=None)
-        for name, module in components.items():
-            if hasattr(module, "to"):
-                module.to(dtype=paddle.float16)
-            components[name] = module
         pipe_fp16 = self.pipeline_class(**components)
+        pipe_fp16.to(paddle_dtype=paddle.float16)
         pipe_fp16.set_progress_bar_config(disable=None)
         output = pipe(**self.get_dummy_inputs())[0]
         output_fp16 = pipe_fp16(**self.get_dummy_inputs())[0]
         max_diff = np.abs(to_np(output) - to_np(output_fp16)).max()
-        self.assertLess(max_diff, 0.01, "The outputs of the fp16 and fp32 pipelines are too different.")
+        self.assertLess(max_diff, expected_max_diff, "The outputs of the fp16 and fp32 pipelines are too different.")
 
     def test_save_load_float16(self):
+        self._test_save_load_float16()
+
+    def _test_save_load_float16(self, expected_max_diff=1e-2):
         pass
         # components = self.get_dummy_components()
         # for name, module in components.items():
@@ -370,10 +373,24 @@ class PipelineTesterMixin:
     #     output_cuda = pipe(**self.get_dummy_inputs())[0]
     #     self.assertTrue(np.isnan(to_np(output_cuda)).sum() == 0)
 
+    def test_to_dtype(self):
+        components = self.get_dummy_components()
+        pipe = self.pipeline_class(**components)
+        pipe.set_progress_bar_config(disable=None)
+
+        model_dtypes = [component.dtype for component in components.values() if hasattr(component, "dtype")]
+        self.assertTrue(all(dtype == paddle.float32 for dtype in model_dtypes))
+
+        pipe.to(paddle_dtype=paddle.float16)
+        model_dtypes = [component.dtype for component in components.values() if hasattr(component, "dtype")]
+        self.assertTrue(all(dtype == paddle.float16 for dtype in model_dtypes))
+
     def test_attention_slicing_forward_pass(self):
         self._test_attention_slicing_forward_pass()
 
-    def _test_attention_slicing_forward_pass(self, test_max_difference=True, expected_max_diff=1e-3):
+    def _test_attention_slicing_forward_pass(
+        self, test_max_difference=True, test_mean_pixel_difference=True, expected_max_diff=1e-3
+    ):
         if not self.test_attention_slicing:
             return
 
@@ -389,7 +406,8 @@ class PipelineTesterMixin:
         if test_max_difference:
             max_diff = np.abs(to_np(output_with_slicing) - to_np(output_without_slicing)).max()
             self.assertLess(max_diff, expected_max_diff, "Attention slicing should not affect the inference results")
-        assert_mean_pixel_difference(output_with_slicing[0], output_without_slicing[0])
+        if test_mean_pixel_difference:
+            assert_mean_pixel_difference(output_with_slicing[0], output_without_slicing[0])
 
     def test_xformers_attention_forwardGenerator_pass(self):
         self._test_xformers_attention_forwardGenerator_pass()
@@ -426,6 +444,31 @@ class PipelineTesterMixin:
         with io.StringIO() as stderr, contextlib.redirect_stderr(stderr):
             _ = pipe(**inputs)
             self.assertTrue(stderr.getvalue() == "", "Progress bar should be disabled")
+
+    def test_num_images_per_prompt(self):
+        sig = inspect.signature(self.pipeline_class.__call__)
+
+        if "num_images_per_prompt" not in sig.parameters:
+            return
+
+        components = self.get_dummy_components()
+        pipe = self.pipeline_class(**components)
+        pipe.set_progress_bar_config(disable=None)
+
+        batch_sizes = [1, 2]
+        num_images_per_prompts = [1, 2]
+
+        for batch_size in batch_sizes:
+            for num_images_per_prompt in num_images_per_prompts:
+                inputs = self.get_dummy_inputs()
+
+                for key in inputs.keys():
+                    if key in self.batch_params:
+                        inputs[key] = batch_size * [inputs[key]]
+
+                images = pipe(**inputs, num_images_per_prompt=num_images_per_prompt).images
+
+                assert images.shape[0] == batch_size * num_images_per_prompt
 
 
 def assert_mean_pixel_difference(image, expected_image):

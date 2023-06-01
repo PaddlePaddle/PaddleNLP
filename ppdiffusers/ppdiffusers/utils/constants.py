@@ -27,6 +27,10 @@ diffusers_default_cache_path = HUGGINGFACE_HUB_CACHE
 CONFIG_NAME = "config.json"
 TORCH_WEIGHTS_NAME = "diffusion_pytorch_model.bin"
 TORCH_SAFETENSORS_WEIGHTS_NAME = "diffusion_pytorch_model.safetensors"
+FLAX_WEIGHTS_NAME = "diffusion_flax_model.msgpack"
+ONNX_WEIGHTS_NAME = "model.onnx"
+ONNX_EXTERNAL_WEIGHTS_NAME = "weights.pb"
+
 HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
 PPDIFFUSERS_CACHE = ppdiffusers_default_cache_path
 DIFFUSERS_CACHE = diffusers_default_cache_path
