@@ -99,6 +99,10 @@ class BertCompatibilityTest(unittest.TestCase):
             for name, pa in torch_model.named_parameters():
                 print(name)
             torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
+            paddle_output = paddle_model(paddle.to_tensor(input_ids), return_dict=True)
+            torch_output = torch_model(torch.tensor(input_ids), return_dict=True)
+            print(paddle_output)
+            print(torch_output)
 
             self.assertTrue(
                 np.allclose(
