@@ -11,6 +11,10 @@ ChatGLM-6B 是一个开源的、支持中英双语问答的对话语言模型，
 python -m pip install paddlepaddle-gpu==0.0.0.post112 -f https://www.paddlepaddle.org.cn/whl/linux/gpu/develop.html
 ```
 
+## 协议
+
+ChatGLM-6B 模型的权重的使用则需要遵循[License](../../../paddlenlp/transformers/chatglm/LICENSE)。
+
 ## AdvertiseGen 广告生成任务
 
 本示例基于广告生成数据集 AdvertiseGen，输入为服装描述关键词，输出为相应的广告语，可从[这里](https://paddlenlp.bj.bcebos.com/datasets/examples/AdvertiseGen.tar.gz)下载。

@@ -22,9 +22,8 @@ from modeling_pp import LlamaForCausalLMPipe
 from utils import LlamaTrainer, compute_metrics, save_infer_result
 
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import LoRAConfig, LoRAModel
-from paddlenlp.prompt import PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.prompt.prefix import llama_postprocess_past_key_value
+from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.peft.prefix import llama_postprocess_past_key_value
 from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,

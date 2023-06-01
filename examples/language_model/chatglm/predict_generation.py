@@ -15,9 +15,8 @@
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.layers import LoRAConfig, LoRAModel
-from paddlenlp.prompt import PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.prompt.prefix import (
+from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.peft.prefix import (
     chatglm_pad_attention_mask,
     chatglm_postprocess_past_key_value,
 )

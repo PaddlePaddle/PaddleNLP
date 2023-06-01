@@ -22,7 +22,7 @@ from data import DataCollatorForSupervisedDataset, convert_example
 from utils import OPTTrainer, compute_metrics
 
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import LoRAConfig, LoRAModel
+from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import GPTTokenizer, OPTForCausalLM
 from paddlenlp.utils.log import logger
