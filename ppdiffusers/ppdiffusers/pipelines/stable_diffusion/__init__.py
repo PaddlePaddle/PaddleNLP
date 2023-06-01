@@ -79,6 +79,9 @@ else:
         StableDiffusionLatentUpscalePipeline,
     )
     from .pipeline_stable_diffusion_mega import StableDiffusionMegaPipeline
+    from .pipeline_stable_diffusion_model_editing import (
+        StableDiffusionModelEditingPipeline,
+    )
     from .pipeline_stable_diffusion_panorama import StableDiffusionPanoramaPipeline
     from .pipeline_stable_diffusion_pix2pix_zero import (
         StableDiffusionPix2PixZeroPipeline,
@@ -113,4 +116,7 @@ else:
     )
     from .pipeline_fastdeploy_stable_diffusion_mega import (
         FastDeployStableDiffusionMegaPipeline,
+    )
+    from .pipeline_fastdeploy_stable_diffusion_upscale import (
+        FastDeployStableDiffusionUpscalePipeline,
     )

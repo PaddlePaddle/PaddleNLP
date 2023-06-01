@@ -21,7 +21,7 @@ import numpy as np
 import paddle
 import PIL.Image
 
-from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTokenizer
+from paddlenlp.transformers import CLIPImageProcessor, CLIPTokenizer
 
 from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import (
@@ -70,7 +70,7 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
         safety_checker ([`FastDeployRuntimeModel`]):
             Classification module that estimates whether generated images could be considered offensive or harmful.
             Please, refer to the [model card](https://huggingface.co/runwayml/stable-diffusion-v1-5) for details.
-        feature_extractor ([`CLIPFeatureExtractor`]):
+        feature_extractor ([`CLIPImageProcessor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
     _optional_components = ["vae_encoder", "safety_checker", "feature_extractor"]
@@ -93,7 +93,7 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
             PreconfigLMSDiscreteScheduler,
         ],
         safety_checker: FastDeployRuntimeModel,
-        feature_extractor: CLIPFeatureExtractor,
+        feature_extractor: CLIPImageProcessor,
         requires_safety_checker: bool = True,
     ):
         super().__init__()
@@ -128,10 +128,10 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
 
     def _encode_prompt(
         self,
-        prompt,
-        num_images_per_prompt,
-        do_classifier_free_guidance,
-        negative_prompt=None,
+        prompt: Union[str, List[str]],
+        num_images_per_prompt: Optional[int],
+        do_classifier_free_guidance: bool,
+        negative_prompt: Optional[str],
         prompt_embeds: Optional[np.ndarray] = None,
         negative_prompt_embeds: Optional[np.ndarray] = None,
     ):
@@ -525,7 +525,7 @@ class FastDeployStableDiffusionControlNetPipeline(DiffusionPipeline):
             cross_attention_kwargs (`dict`, *optional*):
                 A kwargs dictionary that if specified is passed along to the `AttnProcessor` as defined under
                 `self.processor` in
-                [ppdiffusers.cross_attention](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/cross_attention.py).
+                [diffusers.cross_attention](https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/cross_attention.py).
             controlnet_conditioning_scale (`float`, *optional*, defaults to 1.0):
                 The outputs of the controlnet are multiplied by `controlnet_conditioning_scale` before they are added
                 to the residual in the original unet.

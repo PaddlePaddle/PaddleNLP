@@ -19,7 +19,7 @@ from typing import Callable, List, Optional, Union
 import numpy as np
 import paddle
 
-from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTokenizer
+from paddlenlp.transformers import CLIPImageProcessor, CLIPTokenizer
 
 from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import (
@@ -38,7 +38,7 @@ from ...utils import logging
 from ..fastdeploy_utils import FastDeployRuntimeModel
 from . import StableDiffusionPipelineOutput
 
-logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
+logger = logging.get_logger(__name__)
 
 
 class FastDeployStableDiffusionPipeline(DiffusionPipeline):
@@ -68,7 +68,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
         safety_checker ([`FastDeployRuntimeModel`]):
             Classification module that estimates whether generated images could be considered offensive or harmful.
             Please, refer to the [model card](https://huggingface.co/runwayml/stable-diffusion-v1-5) for details.
-        feature_extractor ([`CLIPFeatureExtractor`]):
+        feature_extractor ([`CLIPImageProcessor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
     _optional_components = ["vae_encoder", "safety_checker", "feature_extractor"]
@@ -91,7 +91,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             DPMSolverMultistepScheduler,
         ],
         safety_checker: FastDeployRuntimeModel,
-        feature_extractor: CLIPFeatureExtractor,
+        feature_extractor: CLIPImageProcessor,
         requires_safety_checker: bool = True,
     ):
         super().__init__()
@@ -122,7 +122,15 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
         )
         self.register_to_config(requires_safety_checker=requires_safety_checker)
 
-    def _encode_prompt(self, prompt, num_images_per_prompt, do_classifier_free_guidance, negative_prompt):
+    def _encode_prompt(
+        self,
+        prompt: Union[str, List[str]],
+        num_images_per_prompt: Optional[int],
+        do_classifier_free_guidance: bool,
+        negative_prompt: Optional[str],
+        prompt_embeds: Optional[paddle.Tensor] = None,
+        negative_prompt_embeds: Optional[paddle.Tensor] = None,
+    ):
         r"""
         Encodes the prompt into text encoder hidden states.
 
@@ -136,31 +144,49 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             negative_prompt (`str` or `List[str]`):
                 The prompt or prompts not to guide the image generation. Ignored when not using guidance (i.e., ignored
                 if `guidance_scale` is less than `1`).
+            prompt_embeds (`paddle.Tensor`, *optional*):
+                Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
+                provided, text embeddings will be generated from `prompt` input argument.
+            negative_prompt_embeds (`paddle.Tensor`, *optional*):
+                Pre-generated negative text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt
+                weighting. If not provided, negative_prompt_embeds will be generated from `negative_prompt` input
+                argument.
         """
-        batch_size = len(prompt) if isinstance(prompt, list) else 1
+        if prompt is not None and isinstance(prompt, str):
+            batch_size = 1
+        elif prompt is not None and isinstance(prompt, list):
+            batch_size = len(prompt)
+        else:
+            batch_size = prompt_embeds.shape[0]
 
-        # get prompt text embeddings
-        text_inputs = self.tokenizer(
-            prompt,
-            padding="max_length",
-            max_length=self.tokenizer.model_max_length,
-            truncation=True,
-            return_tensors="np",
-        )
-        text_input_ids = text_inputs.input_ids
-        untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="np").input_ids
-
-        if not np.array_equal(text_input_ids, untruncated_ids):
-            removed_text = self.tokenizer.batch_decode(untruncated_ids[:, self.tokenizer.model_max_length - 1 : -1])
-            logger.warning(
-                "The following part of your input was truncated because CLIP can only handle sequences up to"
-                f" {self.tokenizer.model_max_length} tokens: {removed_text}"
+        if prompt_embeds is None:
+            # get prompt text embeddings
+            text_inputs = self.tokenizer(
+                prompt,
+                padding="max_length",
+                max_length=self.tokenizer.model_max_length,
+                truncation=True,
+                return_tensors="np",
             )
 
-        text_embeddings = self.text_encoder(input_ids=text_input_ids.astype(np.int64))[0]
+            text_input_ids = text_inputs.input_ids
+            untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="np").input_ids  # check
+
+            if not np.array_equal(text_input_ids, untruncated_ids):
+                removed_text = self.tokenizer.batch_decode(
+                    untruncated_ids[:, self.tokenizer.model_max_length - 1 : -1]
+                )
+                logger.warning(
+                    "The following part of your input was truncated because CLIP can only handle sequences up to"
+                    f" {self.tokenizer.model_max_length} tokens: {removed_text}"
+                )
+
+            text_embeddings = self.text_encoder(input_ids=text_input_ids.astype(np.int64))[0]
+
         text_embeddings = np.repeat(text_embeddings, num_images_per_prompt, axis=0)
+
         # get unconditional embeddings for classifier free guidance
-        if do_classifier_free_guidance:
+        if do_classifier_free_guidance and negative_prompt_embeds is None:
             uncond_tokens: List[str]
             if negative_prompt is None:
                 uncond_tokens = [""] * batch_size
@@ -180,7 +206,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             else:
                 uncond_tokens = negative_prompt
 
-            max_length = text_input_ids.shape[-1]
+            max_length = text_embeddings.shape[1]
             uncond_input = self.tokenizer(
                 uncond_tokens,
                 padding="max_length",
@@ -189,6 +215,8 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                 return_tensors="np",
             )
             uncond_embeddings = self.text_encoder(input_ids=uncond_input.input_ids.astype(np.int64))[0]
+
+        if do_classifier_free_guidance:
             uncond_embeddings = np.repeat(uncond_embeddings, num_images_per_prompt, axis=0)
 
             # For classifier free guidance, we need to do two forward passes.
@@ -197,6 +225,52 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             text_embeddings = np.concatenate([uncond_embeddings, text_embeddings])
 
         return text_embeddings
+
+    def check_inputs(
+        prompt: Union[str, List[str]],
+        height: Optional[int],
+        width: Optional[int],
+        callback_steps: int,
+        negative_prompt: Optional[str] = None,
+        prompt_embeds: Optional[paddle.Tensor] = None,
+        negative_prompt_embeds: Optional[paddle.Tensor] = None,
+    ):
+        if height % 8 != 0 or width % 8 != 0:
+            raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
+
+        if (callback_steps is None) or (
+            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
+        ):
+            raise ValueError(
+                f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
+                f" {type(callback_steps)}."
+            )
+
+        if prompt is not None and prompt_embeds is not None:
+            raise ValueError(
+                f"Cannot forward both `prompt`: {prompt} and `prompt_embeds`: {prompt_embeds}. Please make sure to"
+                " only forward one of the two."
+            )
+        elif prompt is None and prompt_embeds is None:
+            raise ValueError(
+                "Provide either `prompt` or `prompt_embeds`. Cannot leave both `prompt` and `prompt_embeds` undefined."
+            )
+        elif prompt is not None and (not isinstance(prompt, str) and not isinstance(prompt, list)):
+            raise ValueError(f"`prompt` has to be of type `str` or `list` but is {type(prompt)}")
+
+        if negative_prompt is not None and negative_prompt_embeds is not None:
+            raise ValueError(
+                f"Cannot forward both `negative_prompt`: {negative_prompt} and `negative_prompt_embeds`:"
+                f" {negative_prompt_embeds}. Please make sure to only forward one of the two."
+            )
+
+        if prompt_embeds is not None and negative_prompt_embeds is not None:
+            if prompt_embeds.shape != negative_prompt_embeds.shape:
+                raise ValueError(
+                    "`prompt_embeds` and `negative_prompt_embeds` must have the same shape when passed directly, but"
+                    f" got: `prompt_embeds` {prompt_embeds.shape} != `negative_prompt_embeds`"
+                    f" {negative_prompt_embeds.shape}."
+                )
 
     def run_safety_checker(self, image, dtype):
         if self.safety_checker is not None:
@@ -253,21 +327,6 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
         has_kwargs = any([True for p in params if p.kind == p.VAR_KEYWORD])
         return has_kwargs
 
-    def check_inputs(self, prompt, height, width, callback_steps):
-        if not isinstance(prompt, str) and not isinstance(prompt, list):
-            raise ValueError(f"`prompt` has to be of type `str` or `list` but is {type(prompt)}")
-
-        if height % 8 != 0 or width % 8 != 0:
-            raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
-
-        if (callback_steps is None) or (
-            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
-        ):
-            raise ValueError(
-                f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
-                f" {type(callback_steps)}."
-            )
-
     def prepare_latents(self, batch_size, num_channels_latents, height, width, dtype, generator, latents=None):
         if generator is None:
             generator = np.random
@@ -293,10 +352,12 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
         num_images_per_prompt: Optional[int] = 1,
         eta: Optional[float] = 0.0,
         generator: Optional[np.random.RandomState] = None,
-        latents: Optional[np.ndarray] = None,
+        latents: Optional[paddle.Tensor] = None,
+        prompt_embeds: Optional[paddle.Tensor] = None,
+        negative_prompt_embeds: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
-        callback: Optional[Callable[[int, int, np.ndarray], None]] = None,
+        callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
     ):
         r"""
@@ -328,10 +389,17 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                 [`schedulers.DDIMScheduler`], will be ignored for others.
             generator (`np.random.RandomState`, *optional*):
                 A np.random.RandomState to make generation deterministic.
-            latents (`np.ndarray`, *optional*):
+            latents (`paddle.Tensor`, *optional*):
                 Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for image
                 generation. Can be used to tweak the same generation with different prompts. If not provided, a latents
                 tensor will ge generated by sampling using the supplied random `generator`.
+            prompt_embeds (`paddle.Tensor`, *optional*):
+                Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
+                provided, text embeddings will be generated from `prompt` input argument.
+            negative_prompt_embeds (`paddle.Tensor`, *optional*):
+                Pre-generated negative text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt
+                weighting. If not provided, negative_prompt_embeds will be generated from `negative_prompt` input
+                argument.
             output_type (`str`, *optional*, defaults to `"pil"`):
                 The output format of the generate image. Choose between
                 [PIL](https://pillow.readthedocs.io/en/stable/): `PIL.Image.Image` or `np.array`.
@@ -340,7 +408,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                 plain tuple.
             callback (`Callable`, *optional*):
                 A function that will be called every `callback_steps` steps during inference. The function will be
-                called with the following arguments: `callback(step: int, timestep: int, latents: np.ndarray)`.
+                called with the following arguments: `callback(step: int, timestep: int, latents: paddle.Tensor)`.
             callback_steps (`int`, *optional*, defaults to 1):
                 The frequency at which the `callback` function will be called. If not specified, the callback will be
                 called at every step.
@@ -353,10 +421,17 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             (nsfw) content, according to the `safety_checker`.
         """
         # 1. Check inputs. Raise error if not correct
-        self.check_inputs(prompt, height, width, callback_steps)
+        self.check_inputs(
+            prompt, height, width, callback_steps, negative_prompt, prompt_embeds, negative_prompt_embeds
+        )
 
         # 2. Define call parameters
-        batch_size = 1 if isinstance(prompt, str) else len(prompt)
+        if prompt is not None and isinstance(prompt, str):
+            batch_size = len(prompt)
+        elif prompt is not None and isinstance(prompt, list):
+            batch_size = len(prompt)
+        else:
+            batch_size = prompt_embeds.shape[0]
 
         # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
         # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
@@ -366,9 +441,14 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
         # 3. Encode input prompt
         # start_time_encode_prompt = time.perf_counter()
         text_embeddings = self._encode_prompt(
-            prompt, num_images_per_prompt, do_classifier_free_guidance, negative_prompt
+            prompt,
+            num_images_per_prompt,
+            do_classifier_free_guidance,
+            negative_prompt,
+            prompt_embeds=prompt_embeds,
+            negative_prompt_embeds=negative_prompt_embeds,
         )
-        # print("_encode_prompt latency:", time.perf_counter() - start_time_encode_prompt)
+
         # 4. Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps)
         timesteps = self.scheduler.timesteps.cast(paddle.float32)
@@ -386,8 +466,10 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
         )
         if isinstance(latents, np.ndarray):
             latents = paddle.to_tensor(latents)
+
         # 6. Prepare extra step kwargs.
         extra_step_kwargs = self.prepare_extra_step_kwargs(eta)
+
         # 7. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         scheduler_support_kwagrs_scale_input = self.check_var_kwargs_of_scheduler_func(
@@ -445,9 +527,8 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                         callback(i, t, latents)
 
         # 8. Post-processing
-        # time_start_decoder = time.perf_counter()
         image = self.decode_latents(latents)
-        # print("decoder latency:", time.perf_counter() - time_start_decoder)
+
         # 9. Run safety checker
         image, has_nsfw_concept = self.run_safety_checker(image, text_embeddings.dtype)
 

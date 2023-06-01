@@ -257,12 +257,12 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         timesteps: paddle.Tensor,
     ) -> paddle.Tensor:
         # Make sure sigmas and timesteps have the same dtype as original_samples
-        self.sigmas = self.sigmas.cast(original_samples.dtype)
+        sigmas = self.sigmas.cast(original_samples.dtype)
 
         schedule_timesteps = self.timesteps
         step_indices = [(schedule_timesteps == t).nonzero().item() for t in timesteps]
 
-        sigma = self.sigmas[step_indices].flatten()
+        sigma = sigmas[step_indices].flatten()
         while len(sigma.shape) < len(original_samples.shape):
             sigma = sigma.unsqueeze(-1)
 

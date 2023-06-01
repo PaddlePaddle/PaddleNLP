@@ -21,9 +21,10 @@ import paddle
 import PIL
 from packaging import version
 
-from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
+from paddlenlp.transformers import CLIPImageProcessor, CLIPTextModel, CLIPTokenizer
 
 from ...configuration_utils import FrozenDict
+from ...loaders import TextualInversionLoaderMixin
 from ...models import AutoencoderKL, UNet2DConditionModel
 from ...schedulers import DDIMScheduler
 from ...utils import PIL_INTERPOLATION, deprecate, logging, randn_tensor
@@ -43,7 +44,7 @@ def preprocess(image):
 
     if isinstance(image[0], PIL.Image.Image):
         w, h = image[0].size
-        w, h = map(lambda x: x - x % 8, (w, h))  # resize to integer multiple of 8
+        w, h = (x - x % 8 for x in (w, h))  # resize to integer multiple of 8
 
         image = [np.array(i.resize((w, h), resample=PIL_INTERPOLATION["lanczos"]))[None, :] for i in image]
         image = np.concatenate(image, axis=0)
@@ -115,7 +116,7 @@ def compute_noise(scheduler, prev_latents, latents, timestep, noise_pred, eta):
     return noise
 
 
-class CycleDiffusionPipeline(DiffusionPipeline):
+class CycleDiffusionPipeline(DiffusionPipeline, TextualInversionLoaderMixin):
     r"""
     Pipeline for text-guided image to image generation using Stable Diffusion.
 
@@ -139,7 +140,7 @@ class CycleDiffusionPipeline(DiffusionPipeline):
         safety_checker ([`StableDiffusionSafetyChecker`]):
             Classification module that estimates whether generated images could be considered offensive or harmful.
             Please, refer to the [model card](https://huggingface.co/CompVis/stable-diffusion-v1-4) for details.
-        feature_extractor ([`CLIPFeatureExtractor`]):
+        feature_extractor ([`CLIPImageProcessor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
     _optional_components = ["safety_checker", "feature_extractor"]
@@ -152,7 +153,7 @@ class CycleDiffusionPipeline(DiffusionPipeline):
         unet: UNet2DConditionModel,
         scheduler: DDIMScheduler,
         safety_checker: StableDiffusionSafetyChecker,
-        feature_extractor: CLIPFeatureExtractor,
+        feature_extractor: CLIPImageProcessor,
         requires_safety_checker: bool = True,
     ):
         super().__init__()
@@ -240,8 +241,8 @@ class CycleDiffusionPipeline(DiffusionPipeline):
                 whether to use classifier free guidance or not
             negative_prompt (`str` or `List[str]`, *optional*):
                 The prompt or prompts not to guide the image generation. If not defined, one has to pass
-                `negative_prompt_embeds`. instead. If not defined, one has to pass `negative_prompt_embeds`. instead.
-                Ignored when not using guidance (i.e., ignored if `guidance_scale` is less than `1`).
+                `negative_prompt_embeds` instead. Ignored when not using guidance (i.e., ignored if `guidance_scale` is
+                less than `1`).
             prompt_embeds (`paddle.Tensor`, *optional*):
                 Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
                 provided, text embeddings will be generated from `prompt` input argument.
@@ -258,6 +259,10 @@ class CycleDiffusionPipeline(DiffusionPipeline):
             batch_size = prompt_embeds.shape[0]
 
         if prompt_embeds is None:
+            # textual inversion: procecss multi-vector tokens if necessary
+            if isinstance(self, TextualInversionLoaderMixin):
+                prompt = self.maybe_convert_prompt(prompt, self.tokenizer)
+
             text_inputs = self.tokenizer(
                 prompt,
                 padding="max_length",
@@ -318,6 +323,10 @@ class CycleDiffusionPipeline(DiffusionPipeline):
             else:
                 uncond_tokens = negative_prompt
 
+            # textual inversion: procecss multi-vector tokens if necessary
+            if isinstance(self, TextualInversionLoaderMixin):
+                uncond_tokens = self.maybe_convert_prompt(uncond_tokens, self.tokenizer)
+
             max_length = prompt_embeds.shape[1]
             uncond_input = self.tokenizer(
                 uncond_tokens,
@@ -343,7 +352,6 @@ class CycleDiffusionPipeline(DiffusionPipeline):
             seq_len = negative_prompt_embeds.shape[1]
 
             negative_prompt_embeds = negative_prompt_embeds.cast(self.text_encoder.dtype)
-
             negative_prompt_embeds = negative_prompt_embeds.tile([1, num_images_per_prompt, 1])
             negative_prompt_embeds = negative_prompt_embeds.reshape([batch_size * num_images_per_prompt, seq_len, -1])
 
@@ -439,7 +447,7 @@ class CycleDiffusionPipeline(DiffusionPipeline):
         init_timestep = min(int(num_inference_steps * strength), num_inference_steps)
 
         t_start = max(num_inference_steps - init_timestep, 0)
-        timesteps = self.scheduler.timesteps[t_start:]
+        timesteps = self.scheduler.timesteps[t_start * self.scheduler.order :]
 
         return timesteps, num_inference_steps - t_start
 

@@ -20,7 +20,7 @@ import numpy as np
 import paddle
 import PIL
 
-from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTokenizer
+from paddlenlp.transformers import CLIPImageProcessor, CLIPTokenizer
 
 from ...configuration_utils import FrozenDict
 from ...pipeline_utils import DiffusionPipeline
@@ -41,7 +41,7 @@ def preprocess(image):
 
     if isinstance(image[0], PIL.Image.Image):
         w, h = image[0].size
-        w, h = map(lambda x: x - x % 8, (w, h))  # resize to integer multiple of 8
+        w, h = (x - x % 64 for x in (w, h))  # resize to integer multiple of 64
 
         image = [np.array(i.resize((w, h), resample=PIL_INTERPOLATION["lanczos"]))[None, :] for i in image]
         image = np.concatenate(image, axis=0)
@@ -137,7 +137,7 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
         safety_checker ([`StableDiffusionSafetyChecker`]):
             Classification module that estimates whether generated images could be considered offensive or harmful.
             Please, refer to the [model card](https://huggingface.co/CompVis/stable-diffusion-v1-4) for details.
-        feature_extractor ([`CLIPFeatureExtractor`]):
+        feature_extractor ([`CLIPImageProcessor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
 
@@ -150,7 +150,7 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
         unet: FastDeployRuntimeModel,
         scheduler: DDIMScheduler,
         safety_checker: FastDeployRuntimeModel,
-        feature_extractor: CLIPFeatureExtractor,
+        feature_extractor: CLIPImageProcessor,
         requires_safety_checker: bool = True,
     ):
         super().__init__()
@@ -199,12 +199,12 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
     # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline._encode_prompt
     def _encode_prompt(
         self,
-        prompt,
-        num_images_per_prompt,
-        do_classifier_free_guidance,
-        negative_prompt=None,
-        prompt_embeds: Optional[Union[paddle.Tensor, np.ndarray]] = None,
-        negative_prompt_embeds: Optional[Union[paddle.Tensor, np.ndarray]] = None,
+        prompt: Union[str, List[str]],
+        num_images_per_prompt: Optional[int],
+        do_classifier_free_guidance: bool,
+        negative_prompt: Optional[str],
+        prompt_embeds: Optional[Union[paddle.Tensor]] = None,
+        negative_prompt_embeds: Optional[Union[paddle.Tensor]] = None,
     ):
         r"""
         Encodes the prompt into text encoder hidden states.
@@ -313,7 +313,13 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
 
     # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img.StableDiffusionImg2ImgPipeline.check_inputs
     def check_inputs(
-        self, prompt, strength, callback_steps, negative_prompt=None, prompt_embeds=None, negative_prompt_embeds=None
+        self,
+        prompt: Union[str, List[str]],
+        strength: float,
+        callback_steps: int,
+        negative_prompt: Optional[Union[str, List[str]]] = None,
+        prompt_embeds: Optional[paddle.Tensor] = None,
+        negative_prompt_embeds: Optional[paddle.Tensor] = None,
     ):
         if strength < 0 or strength > 1:
             raise ValueError(f"The value of strength should in [0.0, 1.0] but is {strength}")
@@ -475,8 +481,8 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
         num_images_per_prompt: Optional[int] = 1,
         eta: Optional[float] = 0.1,
         generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
-        prompt_embeds: Optional[Union[paddle.Tensor, np.ndarray]] = None,
-        negative_prompt_embeds: Optional[Union[paddle.Tensor, np.ndarray]] = None,
+        prompt_embeds: Optional[paddle.Tensor] = None,
+        negative_prompt_embeds: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
@@ -550,10 +556,16 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline):
             (nsfw) content, according to the `safety_checker`.
         """
         # 1. Check inputs
-        self.check_inputs(prompt, strength, callback_steps)
+        self.check_inputs(prompt, strength, callback_steps, negative_prompt, prompt_embeds, negative_prompt_embeds)
 
         # 2. Define call parameters
-        batch_size = 1 if isinstance(prompt, str) else len(prompt)
+        if prompt is not None and isinstance(prompt, str):
+            batch_size = 1
+        elif prompt is not None and isinstance(prompt, list):
+            batch_size = len(prompt)
+        else:
+            batch_size = prompt_embeds.shape[0]
+
         # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
         # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
         # corresponds to doing no classifier free guidance.

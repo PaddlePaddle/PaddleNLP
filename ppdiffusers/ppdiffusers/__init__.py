@@ -61,8 +61,8 @@ else:
         ModelMixin,
         MultiAdapter,
         PriorTransformer,
-        T5FilmDecoder,
         T2IAdapter,
+        T5FilmDecoder,
         Transformer2DModel,
         UNet1DModel,
         UNet2DConditionModel,
@@ -157,6 +157,7 @@ else:
         StableDiffusionInstructPix2PixPipeline,
         StableDiffusionLatentUpscalePipeline,
         StableDiffusionMegaPipeline,
+        StableDiffusionModelEditingPipeline,
         StableDiffusionPanoramaPipeline,
         StableDiffusionPipeline,
         StableDiffusionPipelineAllinOne,
@@ -201,6 +202,7 @@ else:
         FastDeployStableDiffusionInpaintPipelineLegacy,
         FastDeployStableDiffusionMegaPipeline,
         FastDeployStableDiffusionPipeline,
+        FastDeployStableDiffusionUpscalePipeline,
     )
 
 try:
