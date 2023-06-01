@@ -36,6 +36,7 @@ FILENAME=$1
 
 # change gpu to npu in tipc txt configs
 sed -i "s/--device:gpu/--device:npu/g" $FILENAME
+sed -i "s/--device:gpu|gpu/--device:npu|npu/g" $FILENAME
 sed -i "s/state=GPU/state=NPU/g" $FILENAME
 sed -i "s/trainer:pact_train/trainer:norm_train/g" $FILENAME
 sed -i "s/trainer:fpgm_train/trainer:norm_train/g" $FILENAME
