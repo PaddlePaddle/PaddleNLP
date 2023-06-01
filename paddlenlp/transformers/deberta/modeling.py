@@ -92,7 +92,7 @@ class DebertaEmbeddings(nn.Layer):
 
         if config.type_vocab_size > 0:
             self.token_type_embeddings = nn.Embedding(config.type_vocab_size, self.embedding_size)
-        if config.embedding_size != config.hidden_size:
+        if self.embedding_size != config.hidden_size:
             self.embed_proj = nn.Linear(config.embedding_size, config.hidden_size, bias_attr=False)
         self.LayerNorm = DebertaLayerNorm(config.hidden_size, config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)  # dropout需要修改
