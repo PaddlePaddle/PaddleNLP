@@ -909,7 +909,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         if not is_encoder_decoder and "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]
             model_kwargs["attention_mask"] = paddle.concat(
-                [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype="int64")], axis=-1
+                [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)], axis=-1
             )
         # update role_ids
         if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
