@@ -55,12 +55,11 @@ class DebertaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             "\u0120lowest",
             "\u0120newer",
             "\u0120wider",
-            "<unk>",
-            "<|endoftext|>",
+            "[UNK]",
         ]
         vocab_tokens = dict(zip(vocab, range(len(vocab))))
         merges = ["#version: 0.2", "\u0120 l", "\u0120l o", "\u0120lo w", "e r", ""]
-        self.special_tokens_map = {"unk_token": "<unk>"}
+        self.special_tokens_map = {"unk_token": "[UNK]"}
 
         self.vocab_file = os.path.join(self.tmpdirname, VOCAB_FILES_NAMES["vocab_file"])
         self.merges_file = os.path.join(self.tmpdirname, VOCAB_FILES_NAMES["merges_file"])
@@ -71,7 +70,7 @@ class DebertaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def get_tokenizer(self, **kwargs):
         kwargs.update(self.special_tokens_map)
-        return DebertaTokenizer.from_pretrained(self.tmpdirname, **kwargs)
+        return self.tokenizer_class.from_pretrained(self.tmpdirname, **kwargs)
 
     def get_input_output_texts(self, tokenizer):
         input_text = "lower newer"
@@ -79,109 +78,89 @@ class DebertaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         return input_text, output_text
 
     def test_full_tokenizer(self):
-        tokenizer = DebertaTokenizer(self.vocab_file, self.merges_file, **self.special_tokens_map)
+        tokenizer = self.get_tokenizer()
         text = "lower newer"
-        bpe_tokens = ["\u0120low", "er", "\u0120", "n", "e", "w", "er"]
-        tokens = tokenizer.tokenize(text, add_prefix_space=True)
+        bpe_tokens = ["l", "o", "w", "er", "\u0120", "n", "e", "w", "er"]
+        tokens = tokenizer.tokenize(text)
         self.assertListEqual(tokens, bpe_tokens)
 
         input_tokens = tokens + [tokenizer.unk_token]
-        input_bpe_tokens = [14, 15, 10, 9, 3, 2, 15, 19]
+        input_bpe_tokens = [0, 1, 2, 15, 10, 9, 3, 2, 15, 19]
         self.assertListEqual(tokenizer.convert_tokens_to_ids(input_tokens), input_bpe_tokens)
 
-    def test_pretokenized_inputs(self, *args, **kwargs):
-        pass
+    def test_token_type_ids(self):
+        tokenizer = self.get_tokenizer()
+        tokd = tokenizer("Hello", "World")
+        expected_token_type_ids = [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]
+        self.assertListEqual(tokd["token_type_ids"], expected_token_type_ids)
 
-    def test_padding_if_pad_token_set_slow(self):
-        tokenizer = DebertaTokenizer.from_pretrained(self.tmpdirname, pad_token="<pad>")
+    def test_sequence_builders(self):
+        tokenizer = self.tokenizer_class.from_pretrained("microsoft/deberta-base")
 
-        # Simple input
-        s = "This is a simple input"
-        s2 = ["This is a simple input looooooooong", "This is a simple input"]
-        p = ("This is a simple input", "This is a pair")
-        p2 = [
-            ("This is a simple input loooooong", "This is a simple input"),
-            ("This is a simple pair loooooong", "This is a simple pair"),
-        ]
+        text = tokenizer.encode("sequence builders", add_special_tokens=False)
+        text_2 = tokenizer.encode("multi-sequence build", add_special_tokens=False)
 
-        pad_token_id = tokenizer.pad_token_id
+        encoded_text_from_decode = tokenizer.encode(
+            "sequence builders", add_special_tokens=True, add_prefix_space=False
+        )
+        encoded_pair_from_decode = tokenizer.encode(
+            "sequence builders", "multi-sequence build", add_special_tokens=True, add_prefix_space=False
+        )
 
-        out_s = tokenizer(s, padding="max_length", max_length=30, return_tensors="np", return_attention_mask=True)
-        out_s2 = tokenizer(s2, padding=True, truncate=True, return_tensors="np", return_attention_mask=True)
-        out_p = tokenizer(*p, padding="max_length", max_length=60, return_tensors="np", return_attention_mask=True)
-        out_p2 = tokenizer(p2, padding=True, truncate=True, return_tensors="np", return_attention_mask=True)
+        encoded_sentence = tokenizer.build_inputs_with_special_tokens(text)
+        encoded_pair = tokenizer.build_inputs_with_special_tokens(text, text_2)
 
-        # s
-        # test single string max_length padding
-        self.assertEqual(out_s["input_ids"].shape[-1], 30)
-        self.assertTrue(pad_token_id in out_s["input_ids"])
-        self.assertTrue(0 in out_s["attention_mask"])
+        assert encoded_sentence == encoded_text_from_decode
+        assert encoded_pair == encoded_pair_from_decode
 
-        # s2
-        # test automatic padding
-        self.assertEqual(out_s2["input_ids"].shape[-1], 33)
-        # long slice doesn't have padding
-        self.assertFalse(pad_token_id in out_s2["input_ids"][0])
-        self.assertFalse(0 in out_s2["attention_mask"][0])
-        # short slice does have padding
-        self.assertTrue(pad_token_id in out_s2["input_ids"][1])
-        self.assertTrue(0 in out_s2["attention_mask"][1])
+    def test_tokenizer_integration(self):
+        tokenizer_classes = [self.tokenizer_class]
+        if self.test_rust_tokenizer:
+            tokenizer_classes.append(self.rust_tokenizer_class)
 
-        # p
-        # test single pair max_length padding
-        self.assertEqual(out_p["input_ids"].shape[-1], 60)
-        self.assertTrue(pad_token_id in out_p["input_ids"])
-        self.assertTrue(0 in out_p["attention_mask"])
+        for tokenizer_class in tokenizer_classes:
+            tokenizer = tokenizer_class.from_pretrained("microsoft/deberta-base")
 
-        # p2
-        # test automatic padding pair
-        self.assertEqual(out_p2["input_ids"].shape[-1], 52)
-        # long slice pair doesn't have padding
-        self.assertFalse(pad_token_id in out_p2["input_ids"][0])
-        self.assertFalse(0 in out_p2["attention_mask"][0])
-        # short slice pair does have padding
-        self.assertTrue(pad_token_id in out_p2["input_ids"][1])
-        self.assertTrue(0 in out_p2["attention_mask"][1])
+            sequences = [
+                "ALBERT: A Lite BERT for Self-supervised Learning of Language Representations",
+                "ALBERT incorporates two parameter reduction techniques",
+                "The first one is a factorized embedding parameterization. By decomposing the large vocabulary"
+                " embedding matrix into two small matrices, we separate the size of the hidden layers from the size of"
+                " vocabulary embedding.",
+            ]
 
-    def test_add_bos_token_slow(self):
-        bos_token = "$$$"
-        tokenizer = DebertaTokenizer.from_pretrained(self.tmpdirname, bos_token=bos_token, add_bos_token=True)
+            encoding = tokenizer(sequences, padding=True)
+            decoded_sequences = [tokenizer.decode(seq, skip_special_tokens=True) for seq in encoding["input_ids"]]
 
-        s = "This is a simple input"
-        s2 = ["This is a simple input 1", "This is a simple input 2"]
+            # fmt: off
+            expected_encoding = {
+                'input_ids': [
+                    [1, 2118, 11126, 565, 35, 83, 25191, 163, 18854, 13, 12156, 12, 16101, 25376, 13807, 9, 22205, 27893, 1635, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [1, 2118, 11126, 565, 24536, 80, 43797, 4878, 7373, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [1, 133, 78, 65, 16, 10, 3724, 1538, 33183, 11303, 43797, 1938, 4, 870, 24165, 29105, 5, 739, 32644, 33183, 11303, 36173, 88, 80, 650, 7821, 45940, 6, 52, 2559, 5, 1836, 9, 5, 7397, 13171, 31, 5, 1836, 9, 32644, 33183, 11303, 4, 2]
+                ],
+                'token_type_ids': [
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                ],
+                'attention_mask': [
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+                ]
+            }
+            # fmt: on
 
-        bos_token_id = tokenizer.bos_token_id
+            expected_decoded_sequence = [
+                "ALBERT: A Lite BERT for Self-supervised Learning of Language Representations",
+                "ALBERT incorporates two parameter reduction techniques",
+                "The first one is a factorized embedding parameterization. By decomposing the large vocabulary"
+                " embedding matrix into two small matrices, we separate the size of the hidden layers from the size of"
+                " vocabulary embedding.",
+            ]
 
-        out_s = tokenizer(s)
-        out_s2 = tokenizer(s2)
+            self.assertDictEqual(encoding.data, expected_encoding)
 
-        self.assertEqual(out_s.input_ids[0], bos_token_id)
-        self.assertTrue(all(o[0] == bos_token_id for o in out_s2["input_ids"]))
-
-        decode_s = tokenizer.decode(out_s["input_ids"])
-        decode_s2 = tokenizer.batch_decode(out_s2["input_ids"])
-
-        self.assertEqual(decode_s.split()[0], bos_token)
-        self.assertTrue(all(d.split()[0] == bos_token for d in decode_s2))
-
-    # tokenizer has no padding token
-    def test_padding_different_model_input_name(self):
-        pass
-
-    def test_pretrained_model_lists(self):
-        # No max_model_input_sizes
-        self.assertGreaterEqual(len(self.tokenizer_class.pretrained_resource_files_map), 1)
-        self.assertGreaterEqual(len(list(self.tokenizer_class.pretrained_resource_files_map.values())[0]), 1)
-
-    def test_consecutive_unk_string(self):
-        tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
-        for tokenizer in tokenizers:
-            tokens = [tokenizer.unk_token for _ in range(2)]
-            string = tokenizer.convert_tokens_to_string(tokens)
-            encoding = tokenizer(
-                text=string,
-                runcation=True,
-                return_offsets_mapping=True,
-            )
-            self.assertEqual(len(encoding["input_ids"]), 2)
-            self.assertEqual(len(encoding["offset_mapping"]), 2)
+            for expected, decoded in zip(expected_decoded_sequence, decoded_sequences):
+                self.assertEqual(expected, decoded)

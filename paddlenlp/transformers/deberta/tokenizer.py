@@ -141,6 +141,9 @@ class DebertaTokenizer(PretrainedTokenizer):
         **kwargs  # The token of newline.
     ):
 
+        self._vocab_file = vocab_file
+        self._merges_file = merges_file
+
         bos_token = AddedToken(bos_token, lstrip=False, rstrip=False) if isinstance(bos_token, str) else bos_token
         eos_token = AddedToken(eos_token, lstrip=False, rstrip=False) if isinstance(eos_token, str) else eos_token
         sep_token = AddedToken(sep_token, lstrip=False, rstrip=False) if isinstance(sep_token, str) else sep_token
