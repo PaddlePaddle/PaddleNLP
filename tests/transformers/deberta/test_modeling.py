@@ -85,8 +85,6 @@ class BertCompatibilityTest(unittest.TestCase):
             )
             paddle_model.eval()
             paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
-            for name, pa in paddle_model.named_parameters():
-                print(name)
 
             # 3. forward the torch  model
             import torch
@@ -96,8 +94,6 @@ class BertCompatibilityTest(unittest.TestCase):
                 "hf-internal-testing/tiny-random-DebertaModel", cache_dir=tempdir
             )
             torch_model.eval()
-            for name, pa in torch_model.named_parameters():
-                print(name)
             torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
 
             self.assertTrue(
