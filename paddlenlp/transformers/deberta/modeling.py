@@ -97,8 +97,6 @@ class DebertaEmbeddings(nn.Layer):
         self.LayerNorm = DebertaLayerNorm(config.hidden_size, config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)  # dropout需要修改
         self.config = config
-        print(self.embedding_size)
-        print(config.hidden_size)
 
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None, mask=None, inputs_embeds=None):
         if input_ids is not None:
