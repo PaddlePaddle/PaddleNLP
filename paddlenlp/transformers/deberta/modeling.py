@@ -80,7 +80,7 @@ class DebertaEmbeddings(nn.Layer):
         super().__init__()
 
         pad_token_id = getattr(config, "pad_token_id", 0)
-        self.position_biased_input = getattr(config, "position_biased_input", False)
+        self.position_biased_input = getattr(config, "position_biased_input", True)
         self.embedding_size = getattr(config, "embedding_size", config.hidden_size)
 
         if not self.position_biased_input:
