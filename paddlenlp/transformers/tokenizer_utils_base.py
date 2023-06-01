@@ -698,7 +698,7 @@ class BatchEncoding(UserDict):
                     tensor = as_tensor(value)
 
                     self[key] = tensor
-            except Exception as e:  # noqa E722
+            except:  # noqa E722
                 if key == "overflowing_tokens":
                     raise ValueError(
                         "Unable to create tensor returning overflowing tokens of different lengths. "
