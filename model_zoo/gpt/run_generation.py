@@ -18,11 +18,15 @@ import random
 import numpy as np
 import paddle
 
-from paddlenlp.transformers import GPTChineseTokenizer, GPTLMHeadModel, GPTTokenizer
+from paddlenlp.transformers import (
+    GPTChineseTokenizer,
+    GPTForGreedyGeneration,
+    GPTTokenizer,
+)
 
 MODEL_CLASSES = {
-    "gpt2": (GPTLMHeadModel, GPTTokenizer),
-    "gpt2-cn": (GPTLMHeadModel, GPTChineseTokenizer),
+    "gpt2": (GPTForGreedyGeneration, GPTTokenizer),
+    "gpt2-cn": (GPTForGreedyGeneration, GPTChineseTokenizer),
 }
 
 
@@ -30,7 +34,7 @@ def parse_args():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument(
         "--model_type",
-        default="gpt2-cn",
+        default="gpt2",
         type=str,
         help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
     )
@@ -125,19 +129,8 @@ def main(args, input_text):
     else:
         # [1, seq_len]
         input_ids = paddle.to_tensor(input_ids, dtype="int64").unsqueeze(0)
-
-    ids, scores = model.generate(
+    ids = model(
         input_ids=input_ids,
-        max_length=args.max_dec_len,
-        min_length=args.min_dec_len,
-        decode_strategy=args.decode_strategy,
-        temperature=args.temperature,
-        top_k=args.top_k,
-        top_p=args.top_p,
-        num_beams=args.num_beams,
-        length_penalty=args.length_penalty,
-        early_stopping=args.early_stopping,
-        num_return_sequences=args.num_return_sequences,
     )
 
     generated_sequences = []
