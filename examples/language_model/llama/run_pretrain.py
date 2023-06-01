@@ -400,6 +400,9 @@ def main():
     config.virtual_pp_degree = model_args.virtual_pp_degree
     config.use_recompute = training_args.recompute
 
+    config.tensor_parallel_degree = training_args.tensor_parallel_degree
+    config.tensor_parallel_rank = training_args.tensor_parallel_rank
+
     print("Final pre-training config:", config)
 
     # Set the dtype for loading model
@@ -418,6 +421,7 @@ def main():
             model_args.model_name_or_path,
             config=config,
             dtype=dtype,
+            load_state_as_np=True,
         )
     else:
         model = model_class._from_config(config, dtype=dtype)

@@ -65,7 +65,7 @@ python -u  create_pretraining_data.py \
 为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
 ```shell
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
-wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwentext_100k_idx.npz
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
 ```
 
 将所有预处理得到的文件统一放入一个文件夹中，以备训练使用：
@@ -73,5 +73,5 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwe
 ```
 mkdir data
 mv llama_openwebtext_100k_ids.npy ./data
-mv llama_openwentext_100k_idx.npz ./data
+mv llama_openwebtext_100k_idx.npz ./data
 ```

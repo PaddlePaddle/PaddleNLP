@@ -15,16 +15,12 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-# dp8 for 8 worker of data parallel
-# gb512 for the global batch size is 512 = 64 * 8
-# s1m for max steps is 1 million
-task_name="gpt_hybid"
+task_name="llama_hybid"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
-export PYTHONPATH=/usr/lib/python3.7/site-packages/fused_ln-0.0.0-py3.7-linux-x86_64.egg:$PYTHONPATH
 
-PYTHONPATH=/root/paddlejob/workspace/zhonghui03/PaddleNLP/:$PYTHONPATH  \
+PYTHONPATH=../../../:$PYTHONPATH  \
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "output/$task_name""_log" \
@@ -39,7 +35,7 @@ python -u  -m paddle.distributed.launch \
     --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 1 \
     --use_flash_attention 1 \
-    --use_fused_rms_norm 1 \
+    --use_fused_rms_norm 0 \
     --fp16  \
     --fp16_opt_level "O2"  \
     --scale_loss 1024 \
