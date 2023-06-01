@@ -3,7 +3,7 @@ sed -i "s/python3/python3.7/g" Makefile
 cd -
 
 python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
-python -m pip install -r ../requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+python -m pip install -r ../requirements.txt #-i https://pypi.tuna.tsinghua.edu.cn/simple
 python -m pip install pybind11 regex sentencepiece tqdm visualdl -i https://mirror.baidu.com/pypi/simple
 python -m pip install tool_helpers -i https://mirror.baidu.com/pypi/simple
 

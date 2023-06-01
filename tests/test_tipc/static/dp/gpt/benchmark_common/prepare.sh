@@ -19,7 +19,7 @@ python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
 python -m pip install tool_helpers -i https://mirror.baidu.com/pypi/simple
 python -m pip install setuptools_scm 
 python -m pip install Cython 
-python -m pip install -r ../requirements.txt  -i https://pypi.tuna.tsinghua.edu.cn/simple
+python -m pip install -r ../requirements.txt  #-i https://pypi.tuna.tsinghua.edu.cn/simple
 python -m pip install pybind11 regex sentencepiece tqdm visualdl attrdict pyyaml -i https://mirror.baidu.com/pypi/simple
 
 python -m pip install -e ../
