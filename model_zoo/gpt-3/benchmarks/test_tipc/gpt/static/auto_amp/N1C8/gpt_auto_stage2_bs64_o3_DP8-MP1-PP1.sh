@@ -13,7 +13,7 @@ model=gpt
 micro_bs=2
 
 cd ./benchmarks
-bash ./test_tipc/gpt/static/auto_parallel/benchmark_common/prepare.sh
+bash ./test_tipc/gpt/static/auto_amp/benchmark_common/prepare.sh
 # run
-bash ./test_tipc/gpt/static/auto_parallel/benchmark_common/run_benchmark.sh ${model_item} ${fp_item} ${dp_degree} ${mp_degree} ${pp_degree} ${micro_bs} ${bs_item} ${run_mode} ${device_num} \
+bash ./test_tipc/gpt/static/auto_amp/benchmark_common/run_benchmark.sh ${model_item} ${fp_item} ${dp_degree} ${mp_degree} ${pp_degree} ${micro_bs} ${bs_item} ${run_mode} ${device_num} \
 ${sharding_degree} ${sharding_stage} 2>&1;
