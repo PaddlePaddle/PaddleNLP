@@ -1206,8 +1206,8 @@ class DiffusionPipeline(ConfigMixin):
             allow_pickle = True
 
         pipeline_is_cached = False
-        allow_patterns = None
-        ignore_patterns = None
+        allow_patterns = []
+        ignore_patterns = []
 
         # load config
         config_dict, config_file = cls.load_config(
@@ -1379,9 +1379,10 @@ class DiffusionPipeline(ConfigMixin):
                 local_files_only=local_files_only,
                 use_auth_token=use_auth_token,
                 revision=revision,
-                allow_patterns=allow_patterns,
-                ignore_patterns=ignore_patterns
-                + ignore_filenames,  # diffusers bug, so we must add this ignore_filenames!
+                allow_patterns=list(set(allow_patterns) - set(ignore_filenames)),
+                ignore_patterns=list(
+                    set(ignore_patterns + ignore_filenames)
+                ),  # diffusers bug, so we must add this ignore_filenames!
                 user_agent=user_agent,
                 max_workers=max_workers,
             )

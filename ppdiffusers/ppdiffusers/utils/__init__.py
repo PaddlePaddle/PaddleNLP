@@ -120,6 +120,8 @@ if is_paddle_available():
         slow,
     )
 
+if is_torch_available():
+    from .testing_utils import require_torch
 
 logger = get_logger(__name__)
 

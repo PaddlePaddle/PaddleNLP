@@ -57,3 +57,14 @@ get_map_location_default = lambda *args, **kwargs: os.getenv("MAP_LOCATION_DEFAU
 FROM_HF_HUB = os.getenv("FROM_HF_HUB", False)
 FROM_DIFFUSERS = os.getenv("FROM_DIFFUSERS", False)
 TO_DIFFUSERS = os.getenv("TO_DIFFUSERS", False)
+
+# FOR tests
+if bool(os.getenv("PATCH_ALLCLOSE", False)):
+    import paddle
+
+    raw_all_close = paddle.allclose
+
+    def allclose(x, y, rtol=1e-05, atol=1e-08, equal_nan=False, name=None):
+        print(x.tolist())
+        print(y.tolist())
+        return raw_all_close(x, y, rtol=rtol, atol=atol, equal_nan=equal_nan, name=name)

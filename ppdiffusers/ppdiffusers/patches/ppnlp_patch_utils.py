@@ -901,6 +901,8 @@ if is_paddle_available() and is_paddlenlp_available():
             )
 
         dtype = kwargs.pop("dtype", paddle_dtype)
+        if isinstance(dtype, paddle.dtype):
+            dtype = str(dtype).replace("paddle.", "")
         return raw_from_pretrained(
             cls,
             pretrained_model_name_or_path,
