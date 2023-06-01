@@ -373,7 +373,7 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
         eta: float = 0.0,
         generator: Optional[np.random.RandomState] = None,
         latents: Optional[np.ndarray] = None,
-        prompt_embeds: Optional[paddle.Tesnor] = None,
+        prompt_embeds: Optional[paddle.Tensor] = None,
         negative_prompt_embeds: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
