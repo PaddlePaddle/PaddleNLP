@@ -35,15 +35,36 @@ __all__ = [
 
 class MiniGPT4Processor(ProcessorMixin):
     r"""
-    Constructs a MiniGPT4 processor which wraps a BLIP image processor and an OPT/T5 tokenizer into a single processor.
-    [`BlipProcessor`] offers all the functionalities of [`MiniGPT4ImageProcessor`] and [`LlamaTokenizer`]. See the docstring
+    Constructs a MiniGPT4 processor which wraps a MiniGPT4 image processor and an llama tokenizer into a single processor.
+    [`MiniGPT4Processor`] offers all the functionalities of [`MiniGPT4ImageProcessor`] and [`LlamaTokenizer`]. See the docstring
     of [`~MiniGPT4ImageProcessor.__call__`] and [`~LlamaTokenizer.decode`] for more information.
+
     Args:
         image_processor (`MiniGPT4ImageProcessor`):
             An instance of [`MiniGPT4ImageProcessor`]. The image processor is a required input.
         tokenizer (`LlamaTokenizer`):
             An instance of ['PreTrainedTokenizer`]. The tokenizer is a required input.
-    """
+
+    Examples:
+    ```python
+    >>> import requests
+    >>> from PIL import Image
+
+    >>> import paddle
+    >>> from paddlenlp.transformers import MiniGPT4Processor
+
+    >>> # load processor
+    >>> minigpt4_13b_path = "model_name"
+    >>> processor = MiniGPT4Processor.from_pretrained(minigpt4_13b_path)
+    >>> print("load processor and model done!")
+
+    >>> # prepare model inputs for MiniGPT4
+    >>> url = "https://paddlenlp.bj.bcebos.com/data/images/mugs.png"
+    >>> image = Image.open(requests.get(url, stream=True).raw)
+    >>> text = "describe this image"
+    >>> prompt = "Give the following image: <Img>ImageContent</Img>. You will be able to see the image once I provide it to you. Please answer my questions.###Human: <Img><ImageHere></Img> <TextHere>###Assistant:"
+    >>> res = processor([image], text, prompt)
+    ```"""
     attributes = ["image_processor", "tokenizer"]
     image_processor_class = "MiniGPT4ImageProcessor"
     tokenizer_class = "LlamaTokenizer"

@@ -73,29 +73,13 @@ def convert_weights_to_dtype(model, dtype: str):
         if isinstance(layer, (nn.Linear, nn.Conv1D, nn.Conv2D)):
             if layer.weight.dtype != dtype_mapping[dtype]:
                 layer.weight = transfer_param(layer.weight, restore_data=True, dtype=dtype)
-                if paddle.any(paddle.isnan(layer.weight)):
-                    print("vit", layer)
             if layer.bias is not None and layer.bias.dtype != dtype_mapping[dtype]:
                 layer.bias = transfer_param(layer.bias, restore_data=True, dtype=dtype)
-                if paddle.any(paddle.isnan(layer.weight)):
-                    "vit", print(layer)
-
-    def convert_for_common(layer):
-        if hasattr(layer, "weight"):
-            if layer.weight is not None and layer.weight.dtype != dtype_mapping[dtype]:
-                layer.weight = transfer_param(layer.weight, restore_data=True, dtype=dtype)
-                if paddle.any(paddle.isnan(layer.weight)):
-                    print(layer)
-        if hasattr(layer, "bias"):
-            if layer.bias is not None and layer.bias.dtype != dtype_mapping[dtype]:
-                layer.bias = transfer_param(layer.bias, restore_data=True, dtype=dtype)
-                if paddle.any(paddle.isnan(layer.bias)):
-                    paddle.print(layer)
 
     if isinstance(model, MiniGPT4VisionModel):
         model.apply(convert_for_vit)
     elif isinstance(model, (MiniGPT4QFormerModel, LlamaForCausalLM)):
-        model.apply(convert_for_common)
+        model.to(dtype=dtype)
     else:
         raise TypeError("Not support model type: {}.".format(type(model)))
 
@@ -177,7 +161,7 @@ class MiniGPT4PretrainedModel(PretrainedModel):
         pretrained_model_name_or_path,
         from_hf_hub: bool = False,
         subfolder: str = None,
-        vit_dtype: str = "float32",
+        vit_dtype: str = "float16",
         qformer_dtype: str = "float32",
         llama_dtype: str = "float16",
         *args,
@@ -212,9 +196,7 @@ class MiniGPT4VisionEmbeddings(nn.Layer):
         self.image_size = config.image_size
         self.patch_size = config.patch_size
 
-        self.class_embedding = Parameter(
-            paddle.randn([1, 1, self.embed_dim], dtype=paddle.get_default_dtype()),
-        )
+        self.class_embedding = Parameter(paddle.randn([1, 1, self.embed_dim]))
 
         self.patch_embedding = nn.Conv2D(
             in_channels=3, out_channels=self.embed_dim, kernel_size=self.patch_size, stride=self.patch_size
@@ -223,9 +205,7 @@ class MiniGPT4VisionEmbeddings(nn.Layer):
         self.num_patches = (self.image_size // self.patch_size) ** 2
         self.num_positions = self.num_patches + 1
 
-        self.position_embedding = Parameter(
-            paddle.randn([1, self.num_positions, self.embed_dim], dtype=paddle.get_default_dtype())
-        )
+        self.position_embedding = Parameter(paddle.randn([1, self.num_positions, self.embed_dim]))
 
     def forward(self, pixel_values: paddle.Tensor) -> paddle.Tensor:
         batch_size = pixel_values.shape[0]
@@ -260,8 +240,8 @@ class MiniGPT4Attention(nn.Layer):
         self.qkv = nn.Linear(self.embed_dim, 3 * self.embed_dim, bias_attr=False)
 
         if config.qkv_bias:
-            q_bias = Parameter(paddle.zeros([self.embed_dim], dtype=paddle.get_default_dtype()))
-            v_bias = Parameter(paddle.zeros([self.embed_dim], dtype=paddle.get_default_dtype()))
+            q_bias = Parameter(paddle.zeros([self.embed_dim]))
+            v_bias = Parameter(paddle.zeros([self.embed_dim]))
         else:
             q_bias = None
             v_bias = None
