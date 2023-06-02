@@ -59,7 +59,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--pretrained_name_or_path",
-        default="/wangqinghui/mynlp/PaddleNLP/paddlenlp/transformers/minigpt4/minigpt4-13b",
+        default="your directory of minigpt4",
         type=str,
         help="The dir name of minigpt4 checkpoint.",
     )
