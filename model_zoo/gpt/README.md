@@ -49,7 +49,7 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 下载以后通过以下命令解压：
 
 ```shell
-wget https://mystic.the-eye.eu/public/AI/pile_preliminary_components/openwebtext2.jsonl.zst.tar
+wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/openwebtext2.jsonl.zst.tar
 tar -xvf openwebtext2.json.zst.tar -C  /path/to/openwebtext
 ```
 
@@ -86,33 +86,47 @@ mv gpt_en_dataset_300m_idx.npz ./data
 #### 单卡训练
 
 ```shell
-CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
-    --model_type gpt \
-    --model_name_or_path gpt2-en \
-    --input_dir "./data"\
-    --output_dir "output"\
-    --weight_decay 0.01\
-    --grad_clip 1.0\
-    --max_steps 500000\
-    --save_steps 100000\
-    --decay_steps 320000\
-    --warmup_rate 0.01\
-    --micro_batch_size 4\
-    --device gpu
+CUDA_VISIBLE_DEVICES=0 python run_pretrain_trainer.py \
+    --model_type "gpt" \
+    --model_name_or_path "gpt2-en" \
+    --tokenizer_name_or_path "gpt2-en" \
+    --input_dir "./data" \
+    --output_dir "output" \
+    --split 949,50,1 \
+    --max_seq_length 1024 \
+    --per_device_train_batch_size 8 \
+    --per_device_eval_batch_size 8 \
+    --fp16  \
+    --fp16_opt_level "O2"  \
+    --learning_rate 0.0001 \
+    --min_learning_rate 0.00001 \
+    --max_steps 10000 \
+    --save_steps 5000 \
+    --weight_decay 0.01 \
+    --warmup_ratio 0.01 \
+    --max_grad_norm 1.0 \
+    --logging_steps 20 \
+    --dataloader_num_workers 1 \
+    --eval_steps 1000 \
+    --report_to "visualdl" \
+    --disable_tqdm true \
+    --do_train \
+    --do_eval \
+    --device "gpu"
 ```
 
 其中参数释义如下：
-- `model_name_or_path` 要训练的模型或者之前训练的checkpoint。
+- `model_name_or_path` 要训练的模型，paddlenlp已有的模型或者本地模型config文件均可。
+- `tokenizer_name_or_path` 模型的tokenizer，可以指定paddlenlp已有的tokenzier，或者本地自定义的tokenizer
 - `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
 - `output_dir` 指定输出文件。
-- `weight_decay` 权重衰减参数。
-- `grad_clip` 梯度裁剪范围。
-- `max_steps` 最大训练步数
-- `save_steps` 保存模型间隔
-- `mirco_batch_size` 训练的batch大小
-- `device` 训练设备
+- `min_learning_rate` 学习率decay的最小值。
+- `per_device_train_batch_size` 表示每次迭代**每张卡**上的训练样本数目。
+- `per_device_eval_batch_size` 表示每次迭代**每张卡**上的验证样本数目。
+- `split` 划分数据的，train、eval、test比例。
 
-用户也可以使用提供的shell脚本直接训练`sh scripts/run.sh`.
+其他参数请参考Trainer文档 https://paddlenlp.readthedocs.io/zh/latest/trainer.html
+
 
 #### 单机多卡
 
@@ -120,22 +134,14 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
-    --model_type gpt \
-    --model_name_or_path gpt2-en \
-    --input_dir "./data"\
-    --output_dir "output"\
-    --weight_decay 0.01\
-    --grad_clip 1.0\
-    --max_steps 500000\
-    --save_steps 100000\
-    --decay_steps 320000\
-    --warmup_rate 0.01\
-    --micro_batch_size 4\
-    --device gpu
+python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain_trainer.py \
+    --model_name_or_path "gpt2-en" \
+    --tokenizer_name_or_path "gpt2-en"
+    --input_dir "./data" \
+    --output_dir "output" \
+    --other_arguments
 ```
-
-用户也可以使用提供的shell脚本直接训练`sh scripts/run_multi.sh`.
+这里省略了其他的参数配置, 只需换用`paddle.distributed.launch`即可启动分布式训练。
 
 ### 模型评估
 
