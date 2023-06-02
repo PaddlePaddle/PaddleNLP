@@ -117,7 +117,7 @@ python finetune.py\
      --save_total_limit 1
 ```
 
-Mutiple GPUs:
+Multiple GPUs:
 
 ```shell
 python -u -m paddle.distributed.launch --gpus "0" finetune.py \

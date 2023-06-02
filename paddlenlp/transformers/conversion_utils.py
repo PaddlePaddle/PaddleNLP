@@ -937,7 +937,8 @@ class ConversionMixin:
         """
         name_action_mappings = cls._get_tensor_parallel_mappings(config)
         if state_dict is None:
-            state_dict = paddle.load(weight_file, return_numpy=True)
+            with device_guard("cpu"):
+                state_dict = paddle.load(weight_file, return_numpy=False)
 
         state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys(), ignore_error)
 

@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
 import numpy as np
-
+import paddle
 import paddle.nn.functional as F
 
 
@@ -115,7 +114,7 @@ class Perplexity(paddle.metric.Metric):
         if word_num is None:
             word_num = ce.shape[0] * ce.shape[1]
         else:
-            word_num = word_num[0]
+            word_num = word_num.item()
         self.total_ce += batch_ce
         self.total_word_num += word_num
 
