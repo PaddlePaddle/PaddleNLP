@@ -394,7 +394,9 @@ class GenerationMixin(object):
     @staticmethod
     def expand_inputs_for_generation(input_ids, expand_size, attention_mask=None, **model_kwargs):
 
-        index = paddle.tile(paddle.arange(paddle.shape(input_ids)[0]).unsqueeze(-1), [1, expand_size]).reshape([-1])
+        index = paddle.tile(
+            paddle.arange(paddle.shape(input_ids)[0], dtype="int64").unsqueeze(-1), [1, expand_size]
+        ).reshape([-1])
 
         input_ids = paddle.gather(input_ids, index)
 
@@ -1345,7 +1347,7 @@ class GenerationMixin(object):
             else:
                 next_scores, next_tokens = paddle.topk(next_scores, 2 * num_beams, axis=1)
 
-                sibling_score = paddle.arange(1, 2 * num_beams + 1).unsqueeze(0) * diversity_rate
+                sibling_score = paddle.arange(1, 2 * num_beams + 1, dtype="int64").unsqueeze(0) * diversity_rate
 
                 diversed_score = next_scores - sibling_score
 
@@ -1607,7 +1609,7 @@ class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids, logits):
         score = paddle.index_sample(logits, input_ids)
         score = paddle.where(score < 0, score * self.penalty, score / self.penalty)
-        input_ids = input_ids + paddle.arange(logits.shape[0]).unsqueeze(-1) * logits.shape[-1]
+        input_ids = input_ids + paddle.arange(logits.shape[0], dtype="int64").unsqueeze(-1) * logits.shape[-1]
         outputs = paddle.scatter(logits.flatten(), input_ids.flatten(), score.flatten()).reshape(logits.shape)
         return outputs
 
@@ -1793,7 +1795,7 @@ def TopPProcess(probs, top_p, min_tokens_to_keep):
     sorted_indices_to_remove[:, 0] = 0
 
     # Scatter sorted tensors to original indexing
-    sorted_indices = sorted_indices + paddle.arange(probs.shape[0]).unsqueeze(-1) * probs.shape[-1]
+    sorted_indices = sorted_indices + paddle.arange(probs.shape[0], dtype="int64").unsqueeze(-1) * probs.shape[-1]
     condition = paddle.scatter(
         sorted_indices_to_remove.flatten(), sorted_indices.flatten(), sorted_indices_to_remove.flatten()
     )
