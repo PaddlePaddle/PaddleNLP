@@ -1976,7 +1976,7 @@ class SpeechT5GuidedMultiheadAttentionLoss(nn.Layer):
         """
         guided_attn_masks = self._make_guided_attention_masks(input_masks, output_masks)
         masks = output_masks.unsqueeze(-1) & input_masks.unsqueeze(-2)
-        masks = masks.to(attentions.device).unsqueeze(1)
+        masks = masks.unsqueeze(1)
 
         losses = guided_attn_masks * attentions
         loss = paddle.mean(losses.masked_select(masks))
@@ -2926,7 +2926,7 @@ class SpeechT5ForSpeechToSpeech(SpeechT5PretrainedModel):
               input_sequence_length)` -- The outputs of the decoder's cross-attention layers.
         """
         if speaker_embeddings is None:
-            speaker_embeddings = paddle.zeros((1, 512), device=input_values.device)
+            speaker_embeddings = paddle.zeros((1, 512))
 
         return _generate_speech(
             self,
