@@ -17,7 +17,7 @@ import random
 
 import numpy as np
 import paddle
-from adapter import DataArguments, GenerateArguments, TextImagePair
+from adapter import DataArguments, Fill50kDataset, GenerateArguments, TextImagePair
 from annotator.canny import CannyDetector
 from annotator.util import HWC3
 from PIL import Image
@@ -94,8 +94,6 @@ def generate_images(
     guidance_scales=[3, 4, 5, 6, 7, 8],
     num_inference_steps=50,
     scheduler_type="ddim",
-    height=256,
-    width=256,
     device="gpu",
     max_generation_limits=1000,
     use_text_cond=True,
@@ -177,8 +175,6 @@ def generate_images(
                 image=data["adapter_cond"],
                 guidance_scale=float(cfg),
                 eta=eta,
-                height=height,
-                width=width,
                 num_inference_steps=num_inference_steps,
             )[0]
             data["adapter_cond"].save(os.path.join(cond_save_path, "{:05d}_000.png".format(i)))
@@ -201,17 +197,27 @@ if __name__ == "__main__":
     print("------------------------------------------------")
     set_seed(generate_args.seed)
 
-    test_dataset = TextImagePair(
-        file_list=generate_args.file,
-        size=data_args.resolution,
-        num_records=data_args.num_records,
-        buffer_size=data_args.buffer_size,
-        shuffle_every_n_samples=data_args.shuffle_every_n_samples,
-        interpolation="lanczos",
-        data_format=generate_args.generate_data_format,
-        control_image_processor=None,
-        do_image_processing=False,
-    )
+    if generate_args.use_dumpy_dataset:
+        test_dataset = Fill50kDataset(
+            tokenizer=None,
+            file_path=generate_args.file,
+            do_image_processing=False,
+            do_text_processing=False,
+        )
+
+    else:
+        test_dataset = TextImagePair(
+            file_list=generate_args.file,
+            size=data_args.resolution,
+            num_records=data_args.num_records,
+            buffer_size=data_args.buffer_size,
+            shuffle_every_n_samples=data_args.shuffle_every_n_samples,
+            interpolation="lanczos",
+            data_format=generate_args.generate_data_format,
+            control_image_processor=None,
+            do_image_processing=False,
+        )
+
     generate_images(
         use_controlnet=generate_args.use_controlnet,
         adapter_model_name_or_path=generate_args.adapter_model_name_or_path,
@@ -222,8 +228,6 @@ if __name__ == "__main__":
         guidance_scales=generate_args.guidance_scales,
         num_inference_steps=generate_args.num_inference_steps,
         scheduler_type=generate_args.scheduler_type,
-        height=generate_args.height,
-        width=generate_args.width,
         device=generate_args.device,
         max_generation_limits=generate_args.max_generation_limits,
         use_text_cond=generate_args.use_text_cond,
