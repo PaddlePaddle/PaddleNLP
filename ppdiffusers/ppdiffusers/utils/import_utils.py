@@ -58,11 +58,10 @@ if USE_PADDLE in ENV_VARS_TRUE_AND_AUTO_VALUES:
 
         if _paddle_available:
             try:
-                from paddle.incubate.nn.memory_efficient_attention import (
+                from paddle.incubate.nn.memory_efficient_attention import (  # noqa
                     memory_efficient_attention,
                 )
 
-                memory_efficient_attention
                 _ppxformers_available = True
             except ImportError:
                 _ppxformers_available = False
