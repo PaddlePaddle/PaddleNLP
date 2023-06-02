@@ -1,5 +1,5 @@
 # T2I-Adapter
-[T2I-Adapter](https://arxiv.org/abs/2302.08453) 是一种通过添加额外条件来控制扩散模型的神经网络结构。它通过将T2I（Text2Image）模型中的内部知识与外部控制信号对齐，根据不同条件训练各种适配器（Adapter），从而实现丰富的控制和编辑效果。
+[T2I-Adapter](https://arxiv.org/abs/2302.08453) 是一种通过添加额外条件来控制扩散模型的神经网络结构。它通过将T2I（Text2Image）模型的内部知识与外部控制信号进行对齐，并依据不同的条件来训练多种适配器（Adapter），可以实现丰富和精细的控制及编辑能力。
 <p align="center">
     <img src="https://github.com/TencentARC/T2I-Adapter/blob/main/assets/overview1.png?raw=true">
 </p>
@@ -17,7 +17,7 @@ pip install -r requirements.txt
 
 # 训练与推理
 ## Adapter模型训练
-下面我们将以pose2canny任务为例，介绍如何训练相应的Adapter模型。
+下面我们将以pose2image任务（即姿态控制）为例，介绍如何训练相应的Adapter模型。
 ### 数据准备
 请自行按照`adapter/data_preprocess.py`的数据处理逻辑准备好数据，并且将文件放置于`/data`目录，数据中需包含原图像、控制文本、控制图像等信息。
 
@@ -50,10 +50,11 @@ python -u -m train_t2i_adapter_trainer.py \
     --control_type raw \
     --data_format img2img \
     --use_paddle_conv_init False \
-    --overwrite_output_dir
+    --overwrite_output_dir \
+    --timestep_sample_schedule cubic
 ```
 `train_t2i_adapter_trainer.py`关键传入的参数解释如下：
-> * `--pretrained_model_name_or_path`: 加载预训练模型的名称或本地路径，如`runwayml/stable-diffusion-v1-5`，`pretrained_model_name_or_path`的优先级高于`vae_name_or_path`, `text_encoder_name_or_path`和`unet_name_or_path`。
+> * `--pretrained_model_name_or_path`: 加载预训练SD模型的名称或本地路径，如`runwayml/stable-diffusion-v1-5`，`pretrained_model_name_or_path`的优先级高于`vae_name_or_path`, `text_encoder_name_or_path`和`unet_name_or_path`。
 > * `--per_device_train_batch_size`: 训练时每张显卡所使用的`batch_size批量`，当我们的显存较小的时候，需要将这个值设置的小一点。
 > * `--gradient_accumulation_steps`: 梯度累积的步数，用户可以指定梯度累积的步数，以期在梯度累积的step中减少多卡之间梯度的通信量，减少更新的次数，扩大训练的batch_size。
 > * `--learning_rate`: 学习率。
@@ -80,6 +81,10 @@ python -u -m train_t2i_adapter_trainer.py \
 > * `--fp16_opt_level`: 混合精度训练模式，可为``O1``或``O2``模式，默认``O1``模式，默认O1. 只在fp16选项开启时候生效。
 > * `--is_ldmbert`: 是否使用`ldmbert`作为`text_encoder`，默认为`False`，即使用 `clip text_encoder`。
 > * `--overwrite_output_dir`: 加入该参数之后，将覆盖之前的模型保存路径，不会自动恢复训练。
+> * `--pretrained_adapter_name_or_path`: 加载预训练Adapter模型的名称或本地路径，默认为`None`，此时将随机初始化模型参数。
+> * `--timestep_sample_schedule`: 训练期间时间步采样策略的类型，从[`linear`, `cosine`, `cubic`]中选择，默认为`linear`。
+
+
 
 ### 单机多卡训练 (多机多卡训练，仅需在 paddle.distributed.launch 后加个 --ips IP1,IP2,IP3,IP4)
 ```bash

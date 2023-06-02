@@ -11,6 +11,10 @@ ChatGLM-6B 是一个开源的、支持中英双语问答的对话语言模型，
 python -m pip install paddlepaddle-gpu==0.0.0.post112 -f https://www.paddlepaddle.org.cn/whl/linux/gpu/develop.html
 ```
 
+## 协议
+
+ChatGLM-6B 模型的权重的使用则需要遵循[License](../../../paddlenlp/transformers/chatglm/LICENSE)。
+
 ## AdvertiseGen 广告生成任务
 
 本示例基于广告生成数据集 AdvertiseGen，输入为服装描述关键词，输出为相应的广告语，可从[这里](https://paddlenlp.bj.bcebos.com/datasets/examples/AdvertiseGen.tar.gz)下载。
@@ -39,6 +43,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 --recompute True \
 --do_train \
 --do_eval \
+--load_best_model_at_end True \
 --tensor_parallel_degree 4 \
 --do_generation True
 ```
@@ -90,11 +95,85 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir chatglm_log finet
 --do_train \
 --do_eval \
 --disable_tqdm True \
+--save_total_limit 1 \
 --metric_for_best_model accuracy \
 --load_best_model_at_end True \
 --do_generation False \
 --tensor_parallel_degree 4
 ```
+
+### 单卡LoRA微调
+
+```
+python finetune_generation.py \
+--output_dir ./checkpoints/chatglm-6b \
+--per_device_train_batch_size 32 \
+--per_device_eval_batch_size 32 \
+--gradient_accumulation_steps 1 \
+--model_name_or_path THUDM/chatglm-6b \
+--task_name_or_path school_math_0.25M \
+--num_train_epochs 2 \
+--learning_rate 3e-4 \
+--warmup_ratio 0.03 \
+--logging_steps 1 \
+--eval_steps 500 \
+--save_steps 500 \
+--src_length 128 \
+--tgt_length 512 \
+--fp16 \
+--fp16_opt_level O2 \
+--recompute True \
+--do_train \
+--do_eval \
+--disable_tqdm True \
+--metric_for_best_model accuracy \
+--load_best_model_at_end True \
+--do_generation False \
+--save_total_limit 1 \
+--lora True \
+--lora_rank 8 \
+--lora_all_linear
+```
+
+### 单卡Prefix微调
+
+```
+python finetune_generation.py \
+--output_dir ./checkpoints/chatglm-6b \
+--per_device_train_batch_size 32 \
+--per_device_eval_batch_size 32 \
+--gradient_accumulation_steps 1 \
+--model_name_or_path THUDM/chatglm-6b \
+--task_name_or_path school_math_0.25M \
+--num_train_epochs 2 \
+--learning_rate 3e-2 \
+--warmup_ratio 0.03 \
+--logging_steps 1 \
+--eval_steps 500 \
+--save_steps 500 \
+--src_length 128 \
+--tgt_length 512 \
+--fp16 \
+--fp16_opt_level O2 \
+--recompute True \
+--do_train \
+--do_eval \
+--disable_tqdm True \
+--metric_for_best_model accuracy \
+--load_best_model_at_end True \
+--do_generation False \
+--prefix_tuning True \
+--save_total_limit 1 \
+--num_prefix_tokens 64
+```
+
+其中新增参数释义如下：
+
+- `lora`: 是否使用LoRA技术。
+- `prefix_tuning`: 是否使用Prefix技术。
+- `merge_weights`: 是否合并原始模型和Lora模型的权重。
+- `lora_rank`: lora 算法中rank（秩）的值。
+- `num_prefix_tokens`: prefix tuning算法中前缀token数量。
 
 ## 模型预测
 
@@ -130,6 +209,22 @@ python -m paddle.distributed.launch --gpus 0,1,2,3 predict_generation.py \
 
 其中参数 `merge_tensor_parallel_path` 指定了合并后模型参数的存储位置。如果不设置这一参数，将只跑前向。
 
+### LoRA微调模型预测
+对merge后的单分片模型也可以进行直接预测，脚本如下
+```shell
+ python predict_generation.py
+    --model_name_or_path THUDM/chatglm-6b \
+    --lora_path ./checkpoints/chatglm-6b
+```
+
+### Prefix微调模型预测
+对merge后的单分片模型也可以进行直接预测，脚本如下
+```shell
+ python predict_generation.py
+    --model_name_or_path THUDM/chatglm-6b \
+    --prefix_path ./checkpoints/chatglm-6b
+```
+
 ## 模型导出
 
 在模型训练完毕后，可使用如下脚本将模型参数导出为静态图，用于模型推理。
@@ -140,11 +235,21 @@ python export_generation_model.py \
    --output_path ./checkpoints/infer/chatglm
 ```
 
+当在指定数据集上进行 LoRA finetune 后的导出脚本：
+
+```shell
+python export_generation_model.py
+    --model_name_or_path THUDM/chatglm-6b
+    --output_path inference/chatglm
+    --lora_path ./checkpoints/chatglm-6b
+```
+
 其中参数定义如下：
 
 - `model_name_or_path`: 预训练模型内置名称或者模型所在目录。
 - `output_path`: 导出模型存储地址和文件前缀。示例中导出地址为 `./checkpoints/infer`，模型前缀为 `chatglm`。
 - `dtype`: 模型参数类型，可选参数`float16`和`float32`，默认为None，即为加载的动态图模型参数类型一致。
+- `lora_path`: 存放LoRA参数的目录。
 
 ## 模型推理（c++推理）
 
