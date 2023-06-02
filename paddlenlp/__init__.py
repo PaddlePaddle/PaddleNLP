@@ -38,6 +38,7 @@ from . import (
     datasets,
     embeddings,
     experimental,
+    generation,
     layers,
     losses,
     metrics,

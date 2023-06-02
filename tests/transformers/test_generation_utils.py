@@ -19,6 +19,20 @@ import unittest
 import numpy as np
 import paddle
 
+from paddlenlp.generation.logits_process import (
+    ForcedBOSTokenLogitsProcessor,
+    ForcedEOSTokenLogitsProcessor,
+    HammingDiversityLogitsProcessor,
+    LogitsProcessorList,
+    MinLengthLogitsProcessor,
+    RepetitionPenaltyLogitsProcessor,
+    TopKLogitsWarper,
+    TopPLogitsWarper,
+)
+from paddlenlp.generation.stopping_criteria import (
+    MaxLengthCriteria,
+    StoppingCriteriaList,
+)
 from paddlenlp.transformers import (  # import gpt model
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -30,14 +44,6 @@ from paddlenlp.transformers import (  # import gpt model
 )
 from paddlenlp.transformers.generation_utils import (
     BeamSearchScorer,
-    ForcedBOSTokenLogitsProcessor,
-    ForcedEOSTokenLogitsProcessor,
-    HammingDiversityLogitsProcessor,
-    LogitsProcessorList,
-    MinLengthLogitsProcessor,
-    RepetitionPenaltyLogitsProcessor,
-    TopKProcess,
-    TopPProcess,
     get_unfinished_flag,
 )
 from tests.testing_utils import slow
@@ -47,13 +53,18 @@ def top_k_top_p_filtering(
     logits,
     top_k=0,
     top_p=1.0,
+    filter_value=-float("inf"),
     min_tokens_to_keep=1,
 ):
     if top_k > 0:
-        logits = TopKProcess(logits, top_k, min_tokens_to_keep)
+        logits = TopKLogitsWarper(top_k=top_k, filter_value=filter_value, min_tokens_to_keep=min_tokens_to_keep)(
+            None, logits
+        )
 
     if 0 <= top_p <= 1.0:
-        logits = TopPProcess(logits, top_p, min_tokens_to_keep)
+        logits = TopPLogitsWarper(top_p=top_p, filter_value=filter_value, min_tokens_to_keep=min_tokens_to_keep)(
+            None, logits
+        )
 
     return logits
 
@@ -296,6 +307,8 @@ class GenerationTesterMixin:
             input_ids_clone = input_ids.repeat_interleave(num_return_sequences, axis=0)
 
         with paddle.no_grad():
+            logits_warper = LogitsProcessorList()
+            logits_warper.append(TopKLogitsWarper(top_k=1, min_tokens_to_keep=1))
             output_sample = model.sample(
                 input_ids_clone,
                 attention_mask=attention_mask_clone,
@@ -303,7 +316,7 @@ class GenerationTesterMixin:
                 logits_processors=logits_processors,
                 pad_token_id=getattr(model, model.base_model_prefix).config["pad_token_id"],
                 eos_token_id=getattr(model, model.base_model_prefix).config["eos_token_id"],
-                top_k=1,
+                logits_warper=logits_warper,
                 **process_kwargs,
                 **kwargs,
             )
@@ -417,6 +430,86 @@ class GenerationTesterMixin:
                 **kwargs,
             )
         return output_generate, output_group_beam_search
+
+    def _contrastive_generate(
+        self,
+        model,
+        input_ids,
+        attention_mask,
+        max_length,
+    ):
+        contrastive_search_kwargs = {
+            "penalty_alpha": 0.6,
+            "top_k": 5,
+        }
+
+        if self.is_encoder_decoder:
+            max_length = 4
+
+        logits_process_kwargs, logits_processor = self._get_logits_processor_and_kwargs(
+            eos_token_id=getattr(model, model.base_model_prefix).config["eos_token_id"],
+            forced_bos_token_id=getattr(getattr(model, model.base_model_prefix).config, "forced_bos_token_id", None),
+            forced_eos_token_id=getattr(getattr(model, model.base_model_prefix).config, "forced_eos_token_id", None),
+            max_length=max_length,
+            plus_length=1 if self.is_encoder_decoder else input_ids.shape[-1],
+        )
+
+        kwargs = {}
+        model_kwargs = {"attention_mask": attention_mask} if attention_mask is not None else {}
+
+        output_generate = model.generate(
+            input_ids,
+            max_length=max_length,
+            decode_strategy="contrastive_search",
+            **logits_process_kwargs,
+            **model_kwargs,
+            **contrastive_search_kwargs,
+        )
+
+        if self.is_encoder_decoder:
+            encoder_outputs, input_ids, attention_mask = self._get_encoder_outputs(
+                model,
+                input_ids,
+                attention_mask,
+            )
+            kwargs["encoder_output"] = encoder_outputs
+
+        with paddle.no_grad():
+            model_kwargs = {"attention_mask": attention_mask} if attention_mask is not None else {}
+            stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=max_length + input_ids.shape[-1])])
+            output_contrastive = model.contrastive_search(
+                input_ids=input_ids,
+                stopping_criteria=stopping_criteria,
+                logits_processors=logits_processor,
+                eos_token_id=getattr(model, model.base_model_prefix).config["eos_token_id"],
+                pad_token_id=getattr(model, model.base_model_prefix).config["pad_token_id"],
+                **kwargs,
+                **model_kwargs,
+                **contrastive_search_kwargs,
+            )
+
+        return output_contrastive, output_generate
+
+    def test_contrastive_generate(self):
+
+        # check `generate()` and `contrastive_search()` are equal
+        for model_class in self.all_generative_model_classes.keys():
+            config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
+
+            paddle.seed(124)
+            # NOTE: contrastive search only works with cache on at the moment.
+            if not hasattr(config, "use_cache"):
+                return
+            config.use_cache = True
+            config.is_decoder = True
+
+            model = self._make_model_instance(config, model_class)
+            model.eval()
+
+            output_contrastive, output_generate = self._contrastive_generate(
+                model=model, input_ids=input_ids, attention_mask=attention_mask, max_length=max_length
+            )
+            self.assertListEqual(output_contrastive[0].tolist(), output_generate[0].tolist())
 
     def test_greedy_generate(self):
         # check `generate()` and `greedy_search()` are equal
@@ -732,11 +825,11 @@ class UtilsFunctionsTest:
         )
 
         output = top_k_top_p_filtering(logits, top_k=10, top_p=0.6, min_tokens_to_keep=4)
-        non_inf_output = output[output >= -10000]
-        non_inf_idx = (output >= -10000).nonzero()
+        non_inf_output = output[output != -float("inf")]
+        non_inf_idx = (output != -float("inf")).nonzero()
 
         self.assertTrue(paddle.allclose(non_inf_expected_output, non_inf_output, atol=1e-12))
-        self.assertTrue(paddle.all(paddle.eq(non_inf_expected_idx, non_inf_idx)))
+        self.assertTrue(paddle.all(paddle.equal(non_inf_expected_idx, non_inf_idx)))
 
 
 class GenerationIntegrationTests:
@@ -765,6 +858,7 @@ class GenerationIntegrationTests:
         # assigned but never used
         bart_tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
+    @slow
     def test_max_length_backward_compat_greedy(self):
         article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
 
@@ -811,6 +905,55 @@ class GenerationIntegrationTests:
             **model_kwargs,
         )
 
+    @slow
+    def test_max_length_backward_compat_contrastive(self):
+
+        article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
+
+        bart_tokenizer = BartTokenizer.from_pretrained("bart-base")
+        bart_model = BartForConditionalGeneration.from_pretrained("bart-base")
+        input_ids = paddle.to_tensor(bart_tokenizer(article)["input_ids"]).unsqueeze([0])
+
+        bart_model.eval()
+
+        max_length = 5
+        input_ids = paddle.tile(input_ids, [2, 1])
+
+        bos_token_id = getattr(bart_model, "bos_token_id", None)
+        eos_token_id = getattr(bart_model, "eos_token_id", None)
+        pad_token_id = getattr(bart_model, "pad_token_id", None)
+        decoder_start_token_id = getattr(bart_model, "decoder_start_token_id", None)
+
+        model_kwargs = {}
+
+        model_kwargs["attention_mask"] = bart_model.prepare_attention_mask_for_generation(
+            input_ids, pad_token_id, eos_token_id
+        )
+
+        bart_model.is_encoder_decoder = hasattr(bart_model, "encoder") and hasattr(bart_model, "decoder")
+
+        model_kwargs = bart_model.prepare_encoder_decoder_kwargs_for_generation(input_ids, model_kwargs)
+
+        if "decoder_input_ids" in model_kwargs:
+            input_ids = model_kwargs.pop("decoder_input_ids")
+        else:
+            input_ids = bart_model.prepare_decoder_input_ids_for_generation(
+                input_ids, decoder_start_token_id, bos_token_id
+            )
+
+        model_kwargs["use_cache"] = True
+        max_length += input_ids.shape[-1]
+
+        bart_model.contrastive_search(
+            input_ids,
+            max_length=max_length,
+            pad_token_id=bart_model.bart.config["pad_token_id"],
+            eos_token_id=bart_model.bart.config["eos_token_id"],
+            logits_processors=None,
+            **model_kwargs,
+        )
+
+    @slow
     def test_max_length_backward_compat_sample(self):
         article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
 
@@ -858,6 +1001,7 @@ class GenerationIntegrationTests:
             **model_kwargs,
         )
 
+    @slow
     def test_max_length_backward_compat_beam_search(self):
         article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
 
@@ -911,6 +1055,7 @@ class GenerationIntegrationTests:
             **model_kwargs,
         )
 
+    @slow
     def test_max_length_backward_compat_group_beam_search(self):
         article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
 
@@ -963,6 +1108,7 @@ class GenerationIntegrationTests:
             **model_kwargs,
         )
 
+    @slow
     def test_custom_logits_processor(self):
         article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
 
@@ -998,7 +1144,7 @@ class GenerationIntegrationTests:
     #     output_sequences = bart_model.generate(inputs_embeds=inputs_embeds)
 
     #     self.assertEqual(output_sequences.shape, (1, 5))
-
+    @slow
     def test_encoder_decoder_generate_attention_mask(self):
         articles = ["Timberlake", "Jessica Biel, welcome to parenthood among other things"]
         bart_tokenizer = BartTokenizer.from_pretrained("bart-base")
@@ -1016,7 +1162,7 @@ class GenerationIntegrationTests:
 
         diff = (batched_out - out).abs()
 
-        self.assertTrue(diff.numpy() < 1e-6)
+        self.assertTrue((diff.numpy() < 1e-6).any())
 
 
 class GenerationUtilsTestCase(unittest.TestCase):

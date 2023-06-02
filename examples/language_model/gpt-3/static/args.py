@@ -15,6 +15,7 @@
 import argparse
 
 import paddle
+
 from paddlenlp.utils.log import logger
 
 

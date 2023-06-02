@@ -12,16 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Union
-
 import logging
 import warnings
-import numpy as np
+from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Union
 
+import numpy as np
 from tqdm import tqdm
 
 try:
-    from pymilvus import FieldSchema, CollectionSchema, Collection, connections, utility
+    from pymilvus import Collection, CollectionSchema, FieldSchema, connections, utility
     from pymilvus.client.abstract import QueryResult
     from pymilvus.client.types import DataType
 except (ImportError, ModuleNotFoundError) as ie:
@@ -29,9 +28,9 @@ except (ImportError, ModuleNotFoundError) as ie:
 
     _optional_component_not_installed(__name__, "milvus2", ie)
 
-from pipelines.schema import Document
-from pipelines.document_stores.sql import SQLDocumentStore
 from pipelines.document_stores.base import get_batches_from_generator
+from pipelines.document_stores.sql import SQLDocumentStore
+from pipelines.schema import Document
 
 if TYPE_CHECKING:
     from pipelines.nodes.retriever.base import BaseRetriever

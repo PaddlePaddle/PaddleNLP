@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function, unicode_literals, division
+from __future__ import division, print_function, unicode_literals
 
 import codecs
 import os
@@ -28,6 +28,7 @@ except ImportError:
     from ConfigParser import ConfigParser
 
 import logging
+
 from pyrouge.utils import log
 from pyrouge.utils.file_utils import verify_dir
 
@@ -640,6 +641,7 @@ class Rouge155(object):
 
 if __name__ == "__main__":
     import argparse
+
     from utils.argparsers import rouge_path_parser
 
     parser = argparse.ArgumentParser(parents=[rouge_path_parser])

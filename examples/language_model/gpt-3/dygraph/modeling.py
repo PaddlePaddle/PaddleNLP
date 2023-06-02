@@ -38,9 +38,9 @@ from paddle.fluid import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
 import paddlenlp
+from paddlenlp.generation.logits_process import LogitsProcessorList
 from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import PretrainedModel, register_base_model
-from paddlenlp.transformers.generation_utils import LogitsProcessorList
 from paddlenlp.transformers.model_outputs import (
     CausalLMOutputWithCrossAttentions,
     SequenceClassifierOutputWithPast,

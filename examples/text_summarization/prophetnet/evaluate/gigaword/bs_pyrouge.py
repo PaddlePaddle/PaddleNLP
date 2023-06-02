@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function, unicode_literals, division
+from __future__ import division, print_function, unicode_literals
 
 import codecs
 import logging
@@ -640,6 +640,7 @@ class Rouge155(object):
 
 if __name__ == "__main__":
     import argparse
+
     from utils.argparsers import rouge_path_parser
 
     parser = argparse.ArgumentParser(parents=[rouge_path_parser])

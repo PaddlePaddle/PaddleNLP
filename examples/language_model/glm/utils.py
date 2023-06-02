@@ -20,12 +20,12 @@ import paddle.nn as nn
 from paddle import Tensor
 from paddle.optimizer.lr import LambdaDecay
 
-from paddlenlp.trainer import Trainer
-from paddlenlp.transformers.generation_utils import (
+from paddlenlp.generation.logits_process import (
     LogitsProcessorList,
     MinLengthLogitsProcessor,
     NoRepeatNGramLogitsProcessor,
 )
+from paddlenlp.trainer import Trainer
 
 
 class GLMTrainer(Trainer):
