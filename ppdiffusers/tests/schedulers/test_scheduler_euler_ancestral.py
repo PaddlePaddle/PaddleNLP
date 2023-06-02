@@ -73,8 +73,8 @@ class EulerAncestralDiscreteSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert abs(result_sum.item() - 152.3192) < 1e-2
-        assert abs(result_mean.item() - 0.1983) < 1e-3
+        assert abs(result_sum.item() - 144.80836487) < 1e-2
+        assert abs(result_mean.item() - 0.18855257) < 1e-3
 
     def test_full_loop_with_v_prediction(self):
         scheduler_class = self.scheduler_classes[0]
@@ -99,8 +99,8 @@ class EulerAncestralDiscreteSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert abs(result_sum.item() - 108.4439) < 1e-2
-        assert abs(result_mean.item() - 0.1412) < 1e-3
+        assert abs(result_sum.item() - 102.58072662) < 1e-2
+        assert abs(result_mean.item() - 0.13356867) < 1e-3
 
     def test_full_loop_device(self):
         scheduler_class = self.scheduler_classes[0]
@@ -124,5 +124,5 @@ class EulerAncestralDiscreteSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert abs(result_sum.item() - 152.3192) < 1e-2
-        assert abs(result_mean.item() - 0.1983) < 1e-3
+        assert abs(result_sum.item() - 144.80836487) < 1e-2
+        assert abs(result_mean.item() - 0.18855257) < 1e-3

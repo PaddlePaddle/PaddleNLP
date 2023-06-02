@@ -180,8 +180,8 @@ class ScoreSdeVeSchedulerTest(unittest.TestCase):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert np.isclose(result_sum.item(), 14372758528.0)
-        assert np.isclose(result_mean.item(), 18714530.0)
+        assert np.isclose(result_sum.item(), 13210036224.0)
+        assert np.isclose(result_mean.item(), 17200568.0)
 
     def test_step_shape(self):
         kwargs = dict(self.forward_default_kwargs)

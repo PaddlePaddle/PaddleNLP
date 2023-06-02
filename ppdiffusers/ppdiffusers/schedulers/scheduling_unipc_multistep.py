@@ -240,10 +240,13 @@ class UniPCMultistepScheduler(SchedulerMixin, ConfigMixin):
         abs_sample = sample.abs()  # "a certain percentile absolute pixel value"
 
         s = paddle.quantile(abs_sample, self.config.dynamic_thresholding_ratio, axis=1)
-        s = paddle.clip(
-            s, min=1, max=self.config.sample_max_value
-        )  # When clip to min=1, equivalent to standard clipping to [-1, 1]
-
+        # paddle.clip donot support min > max
+        if self.config.sample_max_value < 1:
+            s = paddle.ones_like(s) * self.config.sample_max_value
+        else:
+            s = paddle.clip(
+                s, min=1, max=self.config.sample_max_value
+            )  # When clip to min=1, equivalent to standard clipping to [-1, 1]
         s = s.unsqueeze(1)  # (batch_size, 1) because clip will broadcast along axis=0
         sample = paddle.clip(sample, -s, s) / s  # "we threshold xt0 to the range [-s, s] and then divide by s"
 

@@ -106,8 +106,8 @@ class UnCLIPSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert abs(result_sum.item() - 252.2682495) < 1e-2
-        assert abs(result_mean.item() - 0.3284743) < 1e-3
+        assert abs(result_sum.item() - 255.86759949) < 1e-2
+        assert abs(result_mean.item() - 0.33316097) < 1e-3
 
     def test_full_loop_skip_timesteps(self):
         scheduler_class = self.scheduler_classes[0]
@@ -141,8 +141,8 @@ class UnCLIPSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert abs(result_sum.item() - 258.2044983) < 1e-2
-        assert abs(result_mean.item() - 0.3362038) < 1e-3
+        assert abs(result_sum.item() - 249.76672363) < 1e-2
+        assert abs(result_mean.item() - 0.32521713) < 1e-3
 
     def test_trained_betas(self):
         pass

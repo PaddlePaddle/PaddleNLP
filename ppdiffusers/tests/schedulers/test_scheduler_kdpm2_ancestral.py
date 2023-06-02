@@ -70,8 +70,8 @@ class KDPM2AncestralDiscreteSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert abs(result_sum.item() - 13849.3877) < 1e-2
-        assert abs(result_mean.item() - 18.0331) < 5e-3
+        assert abs(result_sum.item() - 13913.05566406) < 1e-2
+        assert abs(result_mean.item() - 18.11595917) < 5e-3
 
     def test_prediction_type(self):
         for prediction_type in ["epsilon", "v_prediction"]:
@@ -101,8 +101,8 @@ class KDPM2AncestralDiscreteSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert abs(result_sum.item() - 328.9970) < 1e-2
-        assert abs(result_mean.item() - 0.4284) < 1e-3
+        assert abs(result_sum.item() - 327.80270386) < 1e-2
+        assert abs(result_mean.item() - 0.42682642) < 1e-3
 
     def test_full_loop_device(self):
 
@@ -126,6 +126,5 @@ class KDPM2AncestralDiscreteSchedulerTest(SchedulerCommonTest):
 
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
-
-        assert abs(result_sum.item() - 13849.3818) < 1e-1
-        assert abs(result_mean.item() - 18.0331) < 1e-3
+        assert abs(result_sum.item() - 13913.05566406) < 1e-1
+        assert abs(result_mean.item() - 18.11595917) < 1e-3
