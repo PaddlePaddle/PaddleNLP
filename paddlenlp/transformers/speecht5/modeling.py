@@ -68,7 +68,16 @@ def masked_fill(x, mask, value):
     return paddle.where(mask, y, x)
 
 
-def finfo(dtype):
+def finfo(dtype: paddle.dtype = None):
+    if dtype is None:
+        dtype = paddle.get_default_dtype()
+
+    if dtype == paddle.bfloat16:
+        # Numpy do not support `np.finfo(np.uint16)`, so try to construct a finfo object to fetch min value
+        class BFloatFInfo:
+            min = -3.3895313892515355e38
+
+        return BFloatFInfo
     if dtype == paddle.float32:
         return np.finfo(np.float32)
     if dtype == paddle.float16:
@@ -86,7 +95,7 @@ def shift_tokens_right(input_ids: paddle.Tensor, pad_token_id: int, decoder_star
     """
     Shift input ids one token to the right.
     """
-    shifted_input_ids = input_ids.new_zeros(input_ids.shape)
+    shifted_input_ids = paddle.zeros(input_ids.shape)
     shifted_input_ids[:, 1:] = input_ids[:, :-1].clone()
     shifted_input_ids[:, 0] = decoder_start_token_id
 
@@ -106,7 +115,7 @@ def shift_spectrograms_right(input_values: paddle.Tensor, reduction_factor: int 
     if reduction_factor > 1:
         input_values = input_values[:, reduction_factor - 1 :: reduction_factor]
 
-    shifted_input_values = input_values.new_zeros(input_values.shape)
+    shifted_input_values = paddle.zeros(input_values.shape)
     shifted_input_values[:, 1:] = input_values[:, :-1].clone()
 
     # replace possible -100 values in labels by zeros
@@ -302,7 +311,7 @@ class SpeechT5LayerNormConvLayer(nn.Layer):
             stride=config.conv_stride[layer_id],
             bias_attr=config.conv_bias,
         )
-        self.layer_norm = nn.LayerNorm(self.out_conv_dim, elementwise_affine=True)
+        self.layer_norm = nn.LayerNorm(self.out_conv_dim)
         self.activation = ACT2FN[config.feat_extract_activation]
 
     def forward(self, hidden_states):
@@ -422,7 +431,7 @@ class SpeechT5PositionalConvEmbedding(nn.Layer):
             padding=config.num_conv_pos_embeddings // 2,
             groups=config.num_conv_pos_embedding_groups,
         )
-        # self.conv = nn.utils.weight_norm(self.conv, name="weight", dim=2)
+        # self.conv = nn.utils.weight_norm(self.conv, name="weight")
         self.padding = SpeechT5SamePadLayer(config.num_conv_pos_embeddings)
         self.activation = ACT2FN[config.feat_extract_activation]
 
@@ -431,7 +440,7 @@ class SpeechT5PositionalConvEmbedding(nn.Layer):
         hidden_states = hidden_states.transpose([0, 2, 1])
 
         hidden_states = self.conv(hidden_states)
-
+        print(self.conv.weight)
         hidden_states = self.padding(hidden_states)
         hidden_states = self.activation(hidden_states)
 
@@ -519,7 +528,7 @@ class SpeechT5FeatureEncoder(nn.Layer):
 
     def _freeze_parameters(self):
         for param in self.parameters():
-            param.requires_grad = False
+            param.stop_gradient = True
         self._requires_grad = False
 
     def forward(self, input_values):
@@ -679,7 +688,7 @@ class SpeechT5SpeechEncoderPrenet(nn.Layer):
                 attention_mask=attention_mask,
                 min_masks=self.config.mask_time_min_masks,
             )
-            mask_time_indices = paddle.Tensor(mask_time_indices, dtype="bool")
+            mask_time_indices = paddle.to_tensor(mask_time_indices, dtype="bool")
             hidden_states[mask_time_indices] = self.masked_spec_embed.cast(hidden_states.dtype)
 
         if self.config.mask_feature_prob > 0 and self.training:
@@ -690,7 +699,7 @@ class SpeechT5SpeechEncoderPrenet(nn.Layer):
                 mask_length=self.config.mask_feature_length,
                 min_masks=self.config.mask_feature_min_masks,
             )
-            mask_feature_indices = paddle.Tensor(mask_feature_indices, dtype="bool")
+            mask_feature_indices = paddle.to_tensor(mask_feature_indices, dtype="bool")
             mask_feature_indices = mask_feature_indices[:, None].expand([-1, sequence_length, -1])
             hidden_states[mask_feature_indices] = 0
 
@@ -1270,12 +1279,6 @@ class SpeechT5PretrainedModel(PretrainedModel):
     def _init_weights(self, module):
         """Initialize the weights"""
         if isinstance(module, SpeechT5PositionalConvEmbedding):
-            # nn.init.normal_(
-            #     module.conv.weight,
-            #     mean=0,
-            #     std=2 * math.sqrt(1 / (module.conv.kernel_size[0] * module.conv.in_channels)),
-            # )
-            # nn.init.constant_(module.conv.bias, 0)
 
             normal_(
                 module.conv.weight,
@@ -1286,33 +1289,23 @@ class SpeechT5PretrainedModel(PretrainedModel):
         elif isinstance(module, SpeechT5FeatureProjection):
             # module.projection.weight.shape[0] == module.projection.in_features
             k = math.sqrt(1 / module.projection.weight.shape[0])
-            # nn.init.uniform_(module.projection.weight, a=-k, b=k)
-            # nn.init.uniform_(module.projection.bias, a=-k, b=k)
             uniform_(module.projection.weight, a=-k, b=k)
             uniform_(module.projection.bias, a=-k, b=k)
         elif isinstance(module, nn.Linear):
-            # module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
             normal_(module.weight, mean=0.0, std=self.config.initializer_range)
             if module.bias is not None:
-                # module.bias.data.zero_()
                 zeros_(module.bias)
         elif isinstance(module, (nn.LayerNorm, nn.GroupNorm)):
-            # module.bias.data.zero_()
-            # module.weight.data.fill_(1.0)
             zeros_(module.bias)
             ones_(module.weight)
         elif isinstance(module, nn.Conv1D):
-            # nn.init.kaiming_normal_(module.weight)
             kaiming_normal_(module.weight)
             if module.bias is not None:
                 k = math.sqrt(module._groups / (module._in_channels * module._kernel_size[0]))
-                # nn.init.uniform_(module.bias, a=-k, b=k)
                 uniform_(module.bias, a=-k, b=k)
         elif isinstance(module, nn.Embedding):
-            # module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
             normal_(module.weight, mean=0.0, std=self.config.initializer_range)
             if module._padding_idx is not None:
-                # module.weight.data[module.padding_idx].zero_()
                 zeros_(module.weight[module._padding_idx])
 
     def _set_gradient_checkpointing(self, module, value=False):
@@ -1981,7 +1974,7 @@ class SpeechT5GuidedMultiheadAttentionLoss(nn.Layer):
         Returns:
             `paddle.Tensor` with the loss value
         """
-        guided_attn_masks = self._make_guided_attention_masks(input_masks, output_masks, attentions.device)
+        guided_attn_masks = self._make_guided_attention_masks(input_masks, output_masks)
         masks = output_masks.unsqueeze(-1) & input_masks.unsqueeze(-2)
         masks = masks.to(attentions.device).unsqueeze(1)
 
@@ -1989,26 +1982,26 @@ class SpeechT5GuidedMultiheadAttentionLoss(nn.Layer):
         loss = paddle.mean(losses.masked_select(masks))
         return self.scale * loss
 
-    def _make_guided_attention_masks(self, input_masks, output_masks, device):
+    def _make_guided_attention_masks(self, input_masks, output_masks):
         input_lengths = input_masks.sum(-1)
         output_lengths = output_masks.sum(-1)
 
         guided_attn_masks = paddle.zeros((len(input_masks), output_masks.shape[1], input_masks.shape[1]))
 
         for idx, (ilen, olen) in enumerate(zip(input_lengths, output_lengths)):
-            guided_attn_masks[idx, :olen, :ilen] = self._make_guided_attention_mask(ilen, olen, self.sigma, device)
+            guided_attn_masks[idx, :olen, :ilen] = self._make_guided_attention_mask(ilen, olen, self.sigma)
 
         return guided_attn_masks.unsqueeze(1)
 
     @staticmethod
-    def _make_guided_attention_mask(input_length, output_length, sigma, device):
+    def _make_guided_attention_mask(input_length, output_length, sigma):
         grid_y, grid_x = paddle.meshgrid(
             paddle.arange(input_length),
             paddle.arange(output_length),
             indexing="xy",
         )
-        grid_x = grid_x.float() / output_length
-        grid_y = grid_y.float() / input_length
+        grid_x = grid_x.cast("float32") / output_length
+        grid_y = grid_y.cast("float32") / input_length
         return 1.0 - paddle.exp(-((grid_y - grid_x) ** 2) / (2 * (sigma**2)))
 
 
@@ -2024,7 +2017,7 @@ class SpeechT5SpectrogramLoss(nn.Layer):
         self.reduction_factor = config.reduction_factor
 
         self.l1_criterion = L1Loss()
-        self.bce_criterion = BCEWithLogitsLoss(pos_weight=paddle.Tensor(5.0))
+        self.bce_criterion = BCEWithLogitsLoss(pos_weight=paddle.to_tensor([5.0]))
 
         if self.use_guided_attention_loss:
             self.attn_criterion = SpeechT5GuidedMultiheadAttentionLoss(config)
@@ -2328,7 +2321,7 @@ class SpeechT5ForSpeechToText(SpeechT5PretrainedModel):
         >>> model = SpeechT5ForSpeechToText.from_pretrained("microsoft/speecht5_asr")
 
         >>> # audio file is decoded on the fly
-        >>> inputs = processor(audio=dataset[0]["audio"]["array"], sampling_rate=sampling_rate, return_tensors="pt")
+        >>> inputs = processor(audio=dataset[0]["audio"]["array"], sampling_rate=sampling_rate, return_tensors="pd")
         >>> predicted_ids = model.generate(**inputs, max_length=100)
 
         >>> # transcribe speech
@@ -2338,7 +2331,7 @@ class SpeechT5ForSpeechToText(SpeechT5PretrainedModel):
         ```
 
         ```python
-        >>> inputs["labels"] = processor(text_target=dataset[0]["text"], return_tensors="pt").input_ids
+        >>> inputs["labels"] = processor(text_target=dataset[0]["text"], return_tensors="pd").input_ids
 
         >>> # compute loss
         >>> loss = model(**inputs).loss
@@ -2603,7 +2596,7 @@ class SpeechT5ForTextToSpeech(SpeechT5PretrainedModel):
         >>> model = SpeechT5ForTextToSpeech.from_pretrained("microsoft/speecht5_tts")
         >>> vocoder = SpeechT5HifiGan.from_pretrained("microsoft/speecht5_hifigan")
 
-        >>> inputs = processor(text="Hello, my dog is cute", return_tensors="pt")
+        >>> inputs = processor(text="Hello, my dog is cute", return_tensors="pd")
         >>> speaker_embeddings = paddle.zeros((1, 512))  # or load xvectors from a file
 
         >>> set_seed(555)  # make deterministic
@@ -2824,7 +2817,7 @@ class SpeechT5ForSpeechToSpeech(SpeechT5PretrainedModel):
         >>> vocoder = SpeechT5HifiGan.from_pretrained("microsoft/speecht5_hifigan")
 
         >>> # audio file is decoded on the fly
-        >>> inputs = processor(audio=dataset[0]["audio"]["array"], sampling_rate=sampling_rate, return_tensors="pt")
+        >>> inputs = processor(audio=dataset[0]["audio"]["array"], sampling_rate=sampling_rate, return_tensors="pd")
 
         >>> speaker_embeddings = paddle.zeros((1, 512))  # or load xvectors from a file
 

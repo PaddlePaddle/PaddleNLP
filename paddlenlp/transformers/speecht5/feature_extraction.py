@@ -233,9 +233,7 @@ class SpeechT5FeatureExtractor(SequenceFeatureExtractor):
 
             return_tensors (`str` or [`~utils.TensorType`], *optional*):
                 If set, will return tensors instead of list of python integers. Acceptable values are:
-
-                - `'tf'`: Return TensorFlow `tf.constant` objects.
-                - `'pt'`: Return PaddlePaddle `paddle.Tensor` objects.
+                - `'pd'`: Return PaddlePaddle `paddle.Tensor` objects.
                 - `'np'`: Return Numpy `np.ndarray` objects.
             sampling_rate (`int`, *optional*):
                 The sampling rate at which the `audio` or `audio_target` input was sampled. It is strongly recommended
