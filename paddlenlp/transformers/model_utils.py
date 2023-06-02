@@ -59,6 +59,7 @@ from paddlenlp.utils.env import (
 )
 from paddlenlp.utils.log import logger
 
+from ..utils import device_guard
 from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
 from .generation_utils import GenerationMixin
@@ -1125,10 +1126,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 raise ValueError(
                     f"the value of `dtype` should be one of [`float32`, `float16`, `bfloat16`], but received {dtype}"
                 )
-            for key in state_dict.keys():
+
+            for key in list(state_dict.keys()):
                 if isinstance(state_dict[key], np.ndarray) and issubclass(state_dict[key].dtype.type, np.floating):
                     if dtype == "bfloat16":
-                        state_dict[key] = paddle.Tensor(state_dict.pop(key), zero_copy=True)
+                        with device_guard():
+                            state_dict[key] = paddle.Tensor(state_dict.pop(key), zero_copy=True)
                     else:
                         state_dict[key] = state_dict[key].astype(dtype=dtype)
                 if isinstance(state_dict[key], paddle.Tensor) and state_dict[key].is_floating_point():
