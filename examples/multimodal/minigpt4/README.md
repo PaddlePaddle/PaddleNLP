@@ -22,7 +22,7 @@ MiniGPT4 是一个具有图像理解能力的开源模型，其基于 Vicuna 大
 
 
 ## 3. 模型预测
-在下载和转换好上述模型权重之后，请执行以下命令，进行模型预测。其中可通过参数 `pretrained_name_or_path` 指定 MiniGPT4 的保存目录。
+在下载和转换好上述模型权重之后，可执行以下命令进行模型预测。其中参数 `pretrained_name_or_path` 用于指定 MiniGPT4 的保存目录。
 
 ```
 python run_predict.py \
