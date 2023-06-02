@@ -19,12 +19,13 @@ from functools import lru_cache
 
 import regex as re
 
-from .. import AddedToken, PretrainedTokenizer
+from .. import PretrainedTokenizer
 
 __all__ = [
     "DebertaTokenizer",
 ]
 
+# false
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "Deberta-base": 512,
 }
@@ -129,56 +130,30 @@ class DebertaTokenizer(PretrainedTokenizer):
         vocab_file,
         merges_file,
         errors="replace",
+        max_len=None,
         bos_token="[CLS]",
         eos_token="[SEP]",
         sep_token="[SEP]",
         cls_token="[CLS]",
-        unk_token="[unk]",
+        unk_token="[UNK]",
         pad_token="[PAD]",
         mask_token="[MASK]",
         add_prefix_space=False,
         add_bos_token=False,
         **kwargs  # The token of newline.
     ):
-
         self._vocab_file = vocab_file
         self._merges_file = merges_file
-
-        bos_token = AddedToken(bos_token, lstrip=False, rstrip=False) if isinstance(bos_token, str) else bos_token
-        eos_token = AddedToken(eos_token, lstrip=False, rstrip=False) if isinstance(eos_token, str) else eos_token
-        sep_token = AddedToken(sep_token, lstrip=False, rstrip=False) if isinstance(sep_token, str) else sep_token
-        cls_token = AddedToken(cls_token, lstrip=False, rstrip=False) if isinstance(cls_token, str) else cls_token
-        unk_token = AddedToken(unk_token, lstrip=False, rstrip=False) if isinstance(unk_token, str) else unk_token
-        pad_token = AddedToken(pad_token, lstrip=False, rstrip=False) if isinstance(pad_token, str) else pad_token
-
-        # Mask token behave like a normal word, i.e. include the space before it
-        mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
-
-        super().__init__(
-            errors=errors,
-            bos_token=bos_token,
-            eos_token=eos_token,
-            unk_token=unk_token,
-            sep_token=sep_token,
-            cls_token=cls_token,
-            pad_token=pad_token,
-            mask_token=mask_token,
-            add_prefix_space=add_prefix_space,
-            add_bos_token=add_bos_token,
-            **kwargs,
-        )
-
-        self.add_bos_token = add_bos_token
-
-        """self._build_special_tokens_map_extended(
-            bos_token=pad_token if getattr(self, "bos_token", None) is None else self.bos_token,
-            eos_token=eos_token,
-            unk_token=unk_token,
-        )"""
+        self.max_len = max_len if max_len is not None else int(1e12)
+        self.num_command_tokens = 2
+        self.num_type_tokens = 2
 
         with open(vocab_file, "r", encoding="utf-8") as f:
             self.encoder = json.load(f)
+
         self.decoder = {v: k for k, v in self.encoder.items()}
+        self.num_tokens = len(self.encoder)
+        self.num_text_tokens = self.num_tokens - 1
         self.errors = errors  # how to handle errors in decoding
         self.byte_encoder = bytes_to_unicode()
         self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
@@ -188,6 +163,7 @@ class DebertaTokenizer(PretrainedTokenizer):
         self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
         self.cache = {}
         self.add_prefix_space = add_prefix_space
+        self.add_bos_token = add_bos_token
 
         self.pat = re.compile(r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""")
 
@@ -244,11 +220,14 @@ class DebertaTokenizer(PretrainedTokenizer):
         self.cache[token] = word
         return word
 
+    # no
     def _tokenize(self, text):
         """Tokenize a string."""
         bpe_tokens = []
         for token in re.findall(self.pat, text):
-            token = "".join(self.byte_encoder[b] for b in token.encode("utf-8"))
+            token = "".join(
+                self.byte_encoder[b] for b in token.encode("utf-8")
+            )  # Maps all our bytes to unicode strings, avoiding control tokens of the BPE (spaces in our case)
             bpe_tokens.extend(bpe_token for bpe_token in self.bpe(token).split(" "))
         return bpe_tokens
 
@@ -349,8 +328,6 @@ class DebertaTokenizer(PretrainedTokenizer):
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens.
 
-        An Ernie sequence has the following format:
-
         - single sequence:      ``[CLS] X [SEP]``
         - pair of sequences:        ``[CLS] A [SEP] B [SEP]``
 
@@ -390,13 +367,10 @@ class DebertaTokenizer(PretrainedTokenizer):
         """
 
         if already_has_special_tokens:
-            if token_ids_1 is not None:
-                raise ValueError(
-                    "You should not supply a second sequence if the provided sequence of "
-                    "ids is already formatted with special tokens for the model."
-                )
-            return list(map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0, token_ids_0))
+            return super().get_special_tokens_mask(
+                token_ids_0=token_ids_0, token_ids_1=token_ids_1, already_has_special_tokens=True
+            )
 
-        if token_ids_1 is not None:
-            return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
-        return [1] + ([0] * len(token_ids_0)) + [1]
+        if token_ids_1 is None:
+            return [1] + ([0] * len(token_ids_0)) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
