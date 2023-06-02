@@ -94,8 +94,6 @@ def generate_images(
     guidance_scales=[3, 4, 5, 6, 7, 8],
     num_inference_steps=50,
     scheduler_type="ddim",
-    height=256,
-    width=256,
     device="gpu",
     max_generation_limits=1000,
     use_text_cond=True,
@@ -177,8 +175,6 @@ def generate_images(
                 image=data["adapter_cond"],
                 guidance_scale=float(cfg),
                 eta=eta,
-                height=height,
-                width=width,
                 num_inference_steps=num_inference_steps,
             )[0]
             data["adapter_cond"].save(os.path.join(cond_save_path, "{:05d}_000.png".format(i)))
@@ -232,8 +228,6 @@ if __name__ == "__main__":
         guidance_scales=generate_args.guidance_scales,
         num_inference_steps=generate_args.num_inference_steps,
         scheduler_type=generate_args.scheduler_type,
-        height=generate_args.height,
-        width=generate_args.width,
         device=generate_args.device,
         max_generation_limits=generate_args.max_generation_limits,
         use_text_cond=generate_args.use_text_cond,
