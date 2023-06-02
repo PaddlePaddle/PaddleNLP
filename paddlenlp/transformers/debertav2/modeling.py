@@ -660,7 +660,11 @@ class DebertaV2Encoder(nn.Layer):
             all_hidden_states = all_hidden_states + (output_states,)
 
         if not return_dict:
-            return tuple(v for v in [output_states, all_hidden_states, all_attentions] if v is not None)
+            return BaseModelOutput(
+                last_hidden_state=output_states,
+                hidden_states=all_hidden_states,
+                attentions=all_attentions,
+            )
         return {
             "last_hidden_state": output_states,
             "hidden_states": all_hidden_states,
