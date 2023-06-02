@@ -48,13 +48,13 @@ Blip2Model.from_pretrained("Salesforce/blip2-flan-t5-xxl")
 
 |  vicuna-7b-delta-v0  |  vicuna-13b-delta-v0 |
 :-------------------------------------:|:-----------------------------------:
- [Downlad](https://huggingface.co/lmsys/vicuna-7b-delta-v0/tree/main) | [Download](https://huggingface.co/lmsys/vicuna-13b-delta-v0g)
+ [Download](https://huggingface.co/lmsys/vicuna-7b-delta-v0/tree/main) | [Download](https://huggingface.co/lmsys/vicuna-13b-delta-v0g)
 
 #### 1.3.2 根据以上选择的vicuna delta 权重，下载 相应的 llama 权重。
 
 |  llama-7b  |  llama-13b |
 :-------------------------------------:|:-----------------------------------:
- [Downlad](https://huggingface.co/decapoda-research/llama-7b-hf/tree/main) | [Download](https://huggingface.co/decapoda-research/llama-13b-hf)
+ [Download](https://huggingface.co/decapoda-research/llama-7b-hf/tree/main) | [Download](https://huggingface.co/decapoda-research/llama-13b-hf)
 
 
 #### 1.3.3 结合上面的两个权重，得到可以使用的 vicuna 权重
