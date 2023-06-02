@@ -11,9 +11,9 @@
 
 根据你准备的Vicuna模型版本，下载预训练的MiniGPT4 权重。
 
-|  Checkpoint Aligned with Vicuna 13B  |  Checkpoint Aligned with Vicuna 7B |
+|  Checkpoint Aligned with Vicuna 7B  |  Checkpoint Aligned with Vicuna 13B |
 :-------------------------------------:|:-----------------------------------:
- [Downlad](https://drive.google.com/file/d/1a4zLvaiDBr-36pasffmgpvH5P7CKmpze/view?usp=share_link) | [Download](https://drive.google.com/file/d/1RY9jV0dyqLX-o38LrumkKRh6Jtaop58R/view?usp=sharing)
+[Download](https://drive.google.com/file/d/1RY9jV0dyqLX-o38LrumkKRh6Jtaop58R/view?usp=sharing) | [Download](https://drive.google.com/file/d/1a4zLvaiDBr-36pasffmgpvH5P7CKmpze/view?usp=share_link)
 
 ### 1.2准备 ViT and Qformer 权重
 MiniGPT4中使用的ViT和Qformer Weight来自blip2-flan-t5-xxl，这个weight在PaddleNLP中进行了转换。 所以你可以从 PaddleNLP 下载它，你有两种下载方式进行下载：
@@ -34,7 +34,7 @@ Blip2Model.from_pretrained("Salesforce/blip2-flan-t5-xxl")
 #### 1.2.2 直接点击下载
 可以直接进行点击下载：
 
-|  blip2-flan-t5-xxl 相关文件名称  |  点击下载 |
+|  blip2-flan-t5-xxl 权重  |  点击下载 |
 :-------------------------------------:|:-----------------------------------:
 | model_state.pdparams | [Download](https://paddlenlp.bj.bcebos.com/models/community/Salesforce/blip2-flan-t5-xxl/model_state.pdparams) |
 

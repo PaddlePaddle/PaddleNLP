@@ -14,9 +14,10 @@ MiniGPT4 是一个具有图像理解能力的开源模型，其基于 Vicuna 大
 
 ### 2.2 获取相关配置
 下载相关的配置文件，这里提供了两版配置文件，请根据你的需要，点击下载即可。
-|  files Aligned with MiniGPT4-13B  |  files Aligned with MiniGPT4-7B |
+|  files Aligned with MiniGPT4-7B  |  files Aligned with MiniGPT4-13B |
 :-------------------------------------:|:-----------------------------------:
- [Downlad](https://paddlenlp.bj.bcebos.com/models/community/minigpt4-13b/minigpt4_13b.tar.gz) | [Download](https://paddlenlp.bj.bcebos.com/models/community/minigpt4-7b/minigpt4_7b.tar.gz)
+ [Download](https://paddlenlp.bj.bcebos.com/models/community/minigpt4-7b/minigpt4_7b.tar.gz)|[Download](https://paddlenlp.bj.bcebos.com/models/community/minigpt4-13b/minigpt4_13b.tar.gz) |
+
 
 下载之后进行解压，请将其中相关文件放至 与 MiniGPT4 权重相同的目录中。
 
