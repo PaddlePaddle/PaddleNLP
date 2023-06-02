@@ -31,8 +31,19 @@ def save_infer_result(trainer, dev_ds, k=100, src_length=256, tgt_length=512):
     for i, ds in enumerate(dev_ds.data):
         if i == k:
             break
-        all_instructions.append(ds["instruction"])
-        all_answers.append(ds["output"])
+        if "instruction" in ds:
+            all_instructions.append(ds["instruction"])
+            all_answers.append(ds["output"])
+        elif "content" in ds:
+            all_instructions.append(ds["content"])
+            all_answers.append(ds["summary"])
+        elif "src" in ds:
+            if isinstance(ds["src"], list):
+                all_instructions.append(ds["src"][0])
+                all_answers.append(ds["tgt"][0])
+            else:
+                all_instructions.append(ds["src"])
+                all_answers.append(ds["tgt"])
     batch_texts = batchfy_text(all_instructions, trainer.args.per_device_eval_batch_size)
     predictor = Predictor(
         tokenizer=trainer.tokenizer, model=trainer.model, src_length=src_length, tgt_length=tgt_length
@@ -97,15 +108,9 @@ class ChatGLMTrainer(Trainer):
             return super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
         elif not self.do_generation:
             loss, logits, labels = super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
-            lm_logits = logits[0]
-            all_preds = []
-            all_labels = []
-            for p, l in zip(lm_logits[..., :-1, :].argmax(axis=-1), labels[..., 1:]):
-                all_preds.append(p[l != -100])
-                all_labels.append(l[l != -100])
-
-            return (loss, all_preds, all_labels)
-
+            # argmax here to avoid gather all logits, which is too memory-consuming.
+            # keepdim in order to maintain the same shape as logits
+            return (loss, logits[0][..., :-1, :].argmax(axis=-1, keepdim=True), labels[..., 1:])
         loss = None
 
         n_token_id = self.tokenizer.convert_tokens_to_ids("<n>")
@@ -117,7 +122,7 @@ class ChatGLMTrainer(Trainer):
                 decode_strategy="sampling",
                 top_k=1,
                 bos_token_id=self.tokenizer.bos_token_id,
-                eos_token_id=self.tokenizer.end_token_id,
+                eos_token_id=self.tokenizer.eos_token_id,
                 pad_token_id=self.tokenizer.pad_token_id,
                 use_cache=True,
             )[0]
@@ -132,12 +137,7 @@ class ChatGLMTrainer(Trainer):
             all_preds = paddle.to_tensor(all_preds)
 
             if "labels" in inputs:
-                all_labels = []
-                for index, label in enumerate(inputs["labels"]):
-                    label = label[:max_pred_length]
-                    label[all_preds[index] == -100] = -100
-                    all_labels.append(label)
-                all_labels = paddle.to_tensor(all_labels)
+                all_labels = paddle.to_tensor(inputs["labels"])
             else:
                 all_labels = None
 

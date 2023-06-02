@@ -12,7 +12,8 @@
 下载以后通过以下命令解压：
 
 ```shell
-wget https://mystic.the-eye.eu/public/AI/pile_preliminary_components/openwebtext2.jsonl.zst.tar
+# wget https://mystic.the-eye.eu/public/AI/pile_preliminary_components/openwebtext2.jsonl.zst.tar
+wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/openwebtext2.jsonl.zst.tar
 tar -xvf openwebtext2.json.zst.tar -C  /path/to/openwebtext
 ```
 
@@ -44,4 +45,33 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset
 mkdir data
 mv gpt_en_dataset_300m_ids.npy ./data
 mv gpt_en_dataset_300m_idx.npz ./data
+```
+## Llama训练数据制作
+
+然后使用[proprecess]](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-1.0/proprecess) 工具下的`create_pretraining_data.py`脚本进行数据集制作：
+```
+python -u  create_pretraining_data.py \
+    --model_name facebook/llama-7b  \
+    --tokenizer_name LlamaTokenizer \
+    --data_format JSON \
+    --input_path /path/to/openwebtext/ \
+    --append_eos \
+    --output_prefix llama_openwebtext  \
+    --workers 40 \
+    --log_interval 10000
+```
+处理时间约一个小时左右，就可以得到我们需要的`llama_openwebtext_ids.npy`, `llama_openwebtext_idx.npz`数据集文件。
+
+为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
+```shell
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
+```
+
+将所有预处理得到的文件统一放入一个文件夹中，以备训练使用：
+
+```
+mkdir data
+mv llama_openwebtext_100k_ids.npy ./data
+mv llama_openwebtext_100k_idx.npz ./data
 ```

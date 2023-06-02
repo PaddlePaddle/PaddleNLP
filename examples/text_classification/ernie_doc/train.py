@@ -217,11 +217,11 @@ def do_train(args):
         preprocess_text_fn=preprocess_text_fn,
     )
 
-    train_dataloader = paddle.io.DataLoader.from_generator(capacity=70, return_list=True)
+    train_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
     train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
-    eval_dataloader = paddle.io.DataLoader.from_generator(capacity=70, return_list=True)
+    eval_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
     eval_dataloader.set_batch_generator(eval_ds_iter, paddle.get_device())
-    test_dataloader = paddle.io.DataLoader.from_generator(capacity=70, return_list=True)
+    test_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
     test_dataloader.set_batch_generator(test_ds_iter, paddle.get_device())
 
     num_training_examples = train_ds_iter.get_num_examples()
