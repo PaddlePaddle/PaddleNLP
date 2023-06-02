@@ -364,6 +364,7 @@ class DebertaTokenizer(PretrainedTokenizer):
         Returns:
             List[int]: List of input_id with the appropriate special tokens.
         """
+
         if token_ids_1 is None:
             return [self.cls_token_id] + token_ids_0 + [self.sep_token_id]
         _cls = [self.cls_token_id]
