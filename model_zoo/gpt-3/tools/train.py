@@ -29,6 +29,7 @@ from ppfleetx.distributed.apis import env
 from ppfleetx.models import build_module
 from ppfleetx.ops.fused_layers import mock_layers
 from ppfleetx.utils import config
+from ppfleetx.utils.log import logger
 
 
 def set_default_flags(flags):
@@ -51,6 +52,11 @@ if __name__ == "__main__":
 
     module = build_module(cfg)
     config.print_config(cfg)
+
+    if cfg["Strategy"]["to_static"]:
+        paddle.jit.set_code_level()
+        module = paddle.jit.to_static(module)
+        logger.info("Successfully to apply @to_static, and model.forward convert into: {}".format(module.forward))
 
     train_data_loader = build_dataloader(cfg.Data, "Train")
     eval_data_loader = build_dataloader(cfg.Data, "Eval")
