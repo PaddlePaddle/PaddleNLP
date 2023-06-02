@@ -94,51 +94,42 @@ class PrefixEncoder(nn.Layer):
 
 
 class RotaryEmbeddings(nn.Layer):
-    def __init__(self, hidden_size, base=10000.0, learnable=False):
+    def __init__(self, hidden_size, base=10000.0):
         super().__init__()
         self.dtype = paddle.get_default_dtype()
         inv_freq = 1.0 / (base ** (paddle.arange(0, hidden_size, 2).astype("float32") / hidden_size))
         inv_freq = inv_freq.astype(self.dtype)
-        self.learnable = learnable
-        if learnable:
-            self.inv_freq = nn.Parameter(inv_freq)
-            self.max_seq_len_cached = None
-        else:
-            self.register_buffer("inv_freq", inv_freq)
-            self.max_seq_len_cached = None
-            self.cos_cached = None
-            self.sin_cached = None
+        self.register_buffer("inv_freq", inv_freq)
+        self.max_seq_len_cached = -1
+        self.cos_cached = None
+        self.sin_cached = None
 
     def forward(self, x, seq_dim=1, seq_len=None):
         if seq_len is None:
             seq_len = x.shape[seq_dim]
 
-        # x.shape = [b, s, n, h/n/2]
-        # TODO: Remove the condition for converting to static graph.
-        # if self.max_seq_len_cached is None or seq_len > self.max_seq_len_cached:
-        #    self.max_seq_len_cached = None if self.learnable else seq_len
-        # [s]
-        t = paddle.arange(seq_len).astype(self.dtype)
-        # [s, h/n/2]
-        # TODO: Failed for fp16 when converting to static graph.
-        freqs = paddle.einsum("i,j->ij", t.astype("float32"), self.inv_freq.astype("float32"))
-        freqs = freqs.astype(self.dtype)
-        # [s, h/n]
-        emb = paddle.concat([freqs, freqs], axis=-1)
-        if self.dtype == paddle.bfloat16:
-            emb = emb.astype("float32")
-        # [s, 1, h/n]
-        cos_cached = emb.cos().unsqueeze(1)
-        sin_cached = emb.sin().unsqueeze(1)
+        if self.max_seq_len_cached < 0 or seq_len > self.max_seq_len_cached:
+            self.max_seq_len_cached = seq_len
 
-        if self.dtype == paddle.bfloat16:
-            cos_cached = cos_cached.astype(self.dtype)
-            sin_cached = sin_cached.astype(self.dtype)
+            # x.shape = [b, s, n, h/n/2]
+            t = paddle.arange(seq_len, dtype=self.inv_freq.dtype)
+            # [s, h/n/2]
+            # TODO: Failed for fp16 when converting to static graph.
+            freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
+            freqs = freqs.cast(self.dtype)
+            # [s, h/n]
+            emb = paddle.concat([freqs, freqs], axis=-1)
+            if self.dtype == paddle.bfloat16:
+                emb = emb.cast("float32")
+            # [s, 1, h/n]
+            cos_cached = emb.cos().unsqueeze(1)
+            sin_cached = emb.sin().unsqueeze(1)
 
-        if self.learnable:
-            return cos_cached, sin_cached
+            if self.dtype == paddle.bfloat16:
+                cos_cached = cos_cached.astype(self.dtype)
+                sin_cached = sin_cached.astype(self.dtype)
 
-        self.cos_cached, self.sin_cached = cos_cached, sin_cached
+            self.cos_cached, self.sin_cached = cos_cached, sin_cached
 
         return self.cos_cached[:seq_len, ...], self.sin_cached[:seq_len, ...]
 
@@ -166,7 +157,6 @@ class ChatGLMAttention(nn.Layer):
             if self.position_encoding_2d
             else self.hidden_size // self.num_attention_heads,
             base=10000.0,
-            learnable=False,
         )
         self.scale_mask_softmax = False
         self.dtype = paddle.get_default_dtype()
