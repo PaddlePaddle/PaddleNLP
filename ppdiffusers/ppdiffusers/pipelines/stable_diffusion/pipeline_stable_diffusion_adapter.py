@@ -65,6 +65,8 @@ def preprocess(image):
         return image
     elif isinstance(image, PIL.Image.Image):
         image = [image]
+    else:
+        raise ValueError("Invalid image type!")
     if isinstance(image[0], PIL.Image.Image):
         w, h = image[0].size
         w, h = (x - x % 8 for x in (w, h))
@@ -83,6 +85,8 @@ def preprocess(image):
             raise ValueError(
                 f"Invalid image tensor! Expecting image tensor with 3 or 4 dimension, but recive: {image[0].ndim}"
             )
+    else:
+        raise ValueError("Invalid image type!")
     return image
 
 
