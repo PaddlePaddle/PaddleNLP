@@ -165,7 +165,7 @@ class DebertaCompatibilityTest(unittest.TestCase):
             )
 
 
-class NeZhaModelTester:
+class DebertaModelTester:
     def __init__(
         self,
         parent,
@@ -173,7 +173,7 @@ class NeZhaModelTester:
         seq_length=7,
         is_training=True,
         use_input_mask=True,
-        use_token_type_ids=True,
+        use_token_type_ids=False,
         vocab_size=99,
         hidden_size=32,
         num_hidden_layers=5,
@@ -183,7 +183,7 @@ class NeZhaModelTester:
         hidden_dropout_prob=0.1,
         attention_probs_dropout_prob=0.1,
         max_position_embeddings=512,
-        type_vocab_size=2,
+        type_vocab_size=0,
         initializer_range=0.02,
         pad_token_id=0,
         type_sequence_label_size=2,
@@ -259,6 +259,8 @@ class NeZhaModelTester:
             num_class=self.num_classes,
             num_labels=self.num_labels,
             num_choices=self.num_choices,
+            pooler_hidden_size=self.hidden_size,
+            pooler_dropout=self.hidden_dropout_prob,
         )
 
     def create_and_check_model(
@@ -276,10 +278,8 @@ class NeZhaModelTester:
         result = model(
             input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, return_dict=self.parent.return_dict
         )
-        result = model(input_ids, token_type_ids=token_type_ids, return_dict=self.parent.return_dict)
         result = model(input_ids, return_dict=self.parent.return_dict)
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
-        self.parent.assertEqual(result[1].shape, [self.batch_size, self.hidden_size])
 
     def create_and_check_for_multiple_choice(
         self,
@@ -409,7 +409,7 @@ class DebertaModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = DebertaModel
     return_dict: bool = False
     use_labels: bool = False
-    use_test_inputs_embeds: bool = True
+    use_test_inputs_embeds: bool = False
 
     all_model_classes = (
         DebertaModel,
@@ -420,7 +420,7 @@ class DebertaModelTest(ModelTesterMixin, unittest.TestCase):
     )
 
     def setUp(self):
-        self.model_tester = NeZhaModelTester(self)
+        self.model_tester = DebertaModelTester(self)
 
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()

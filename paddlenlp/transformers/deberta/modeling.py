@@ -504,7 +504,7 @@ class DebertaEncoder(paddle.nn.Layer):
         output_attentions=False,
         query_states=None,
         relative_pos=None,
-        return_dict=True,
+        return_dict=None,
     ):
         attention_mask = self.get_attention_mask(attention_mask)
         relative_pos = self.get_rel_pos(hidden_states, query_states, relative_pos)
@@ -564,16 +564,12 @@ class DebertaEncoder(paddle.nn.Layer):
             all_hidden_states = all_hidden_states + (hidden_states,)
 
         if not return_dict:
-            return BaseModelOutput(
-                last_hidden_state=hidden_states,
-                hidden_states=all_hidden_states,
-                attentions=all_attentions,
-            )
-        return {
-            "last_hidden_state": hidden_states,
-            "hidden_states": all_hidden_states,
-            "attentions": all_attentions,
-        }
+            return tuple(v for v in [hidden_states, all_hidden_states, all_attentions] if v is not None)
+        return BaseModelOutput(
+            last_hidden_state=hidden_states,
+            hidden_states=all_hidden_states,
+            attentions=all_attentions,
+        )
 
 
 class DebertaPreTrainedModel(PretrainedModel):
@@ -786,7 +782,7 @@ class DebertaModel(DebertaPreTrainedModel):
 
         return BaseModelOutput(
             last_hidden_state=sequence_output,
-            hidden_states=encoder_outputs.hidden_states,
+            hidden_states=encoder_outputs.hidden_states if output_hidden_states else None,
             attentions=encoder_outputs.attentions,
         )
 
