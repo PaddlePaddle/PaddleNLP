@@ -164,7 +164,6 @@ class DebertaConfig(PretrainedConfig):
         output_attentions: bool = False,
         output_hidden_states: bool = True,
         relative_attention: bool = True,
-        num_labels: int = 2,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -187,4 +186,3 @@ class DebertaConfig(PretrainedConfig):
         self.output_hidden_states = output_hidden_states
         self.relative_attention = relative_attention
         self.pad_token_id = pad_token_id
-        self.num_labels = num_labels
