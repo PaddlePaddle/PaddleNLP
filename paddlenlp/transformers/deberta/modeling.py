@@ -500,8 +500,8 @@ class DebertaEncoder(paddle.nn.Layer):
         self,
         hidden_states,
         attention_mask,
-        output_hidden_states=True,
-        output_attentions=False,
+        output_hidden_states=None,
+        output_attentions=None,
         query_states=None,
         relative_pos=None,
         return_dict=None,
@@ -751,7 +751,7 @@ class DebertaModel(DebertaPreTrainedModel):
         encoder_outputs = self.encoder(
             embedding_output,
             attention_mask,
-            output_hidden_states=True,
+            output_hidden_states=output_hidden_states,
             output_attentions=output_attentions,
             return_dict=return_dict,
         )

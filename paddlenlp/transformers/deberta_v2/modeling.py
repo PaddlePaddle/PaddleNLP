@@ -608,11 +608,11 @@ class DebertaV2Encoder(nn.Layer):
         self,
         hidden_states,
         attention_mask,
-        output_hidden_states=True,
-        output_attentions=False,
+        output_hidden_states=None,
+        output_attentions=None,
         query_states=None,
         relative_pos=None,
-        return_dict=True,
+        return_dict=None,
     ):
 
         if attention_mask.ndim <= 2:
@@ -859,7 +859,7 @@ class DebertaV2Model(DebertaV2PreTrainedModel):
         encoder_outputs = self.encoder(
             embedding_output,
             attention_mask,
-            output_hidden_states=True,
+            output_hidden_states=output_hidden_states,
             output_attentions=output_attentions,
             return_dict=return_dict,
         )
