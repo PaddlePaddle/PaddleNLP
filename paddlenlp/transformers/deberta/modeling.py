@@ -1044,10 +1044,8 @@ class DebertaForTokenClassification(DebertaPreTrainedModel):
 class DebertaForQuestionAnswering(DebertaPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
-        self.num_labels = config.num_labels
-
         self.deberta = DebertaModel(config)
-        self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
+        self.qa_outputs = nn.Linear(config.hidden_size, 2)
 
     def forward(
         self,
