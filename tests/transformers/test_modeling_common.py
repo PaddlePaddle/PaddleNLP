@@ -124,10 +124,9 @@ class ModelTesterMixin:
                 for tensor1, tensor2 in zip(first, second):
                     check_save_load(tensor1, tensor2)
             else:
-                try:
-                    check_save_load(first, second)
-                except AssertionError as e:
-                    raise AssertionError(f"error when testing {model_class} with config {config}") from e
+                print(model_class)
+                print(config)
+                check_save_load(first, second)
 
     def test_determinism(self):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
