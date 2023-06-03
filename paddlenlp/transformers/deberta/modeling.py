@@ -912,11 +912,11 @@ class ContextPooler(nn.Layer):
 
 
 class DebertaForSequenceClassification(DebertaPreTrainedModel):
-    def __init__(self, config, num_classes=2):
+    def __init__(self, config):
         super().__init__(config)
 
-        self.num_labels = num_classes
-        self.deberta = DebertaModel(config)
+        self.num_labels = config.num_ba
+        self.deberta = DebertaModel(config.num_labels)
 
         # TODO: need to be modified
         self.pooler = ContextPooler(config)
