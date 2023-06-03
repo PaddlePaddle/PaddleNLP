@@ -165,6 +165,8 @@ class DebertaV2Config(PretrainedConfig):
         pooler_dropout=0,
         pooler_hidden_act="gelu",
         share_attn_key=True,
+        output_hidden_states=True,
+        output_attentions=False,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -195,3 +197,5 @@ class DebertaV2Config(PretrainedConfig):
         self.pooler_dropout = pooler_dropout
         self.pooler_hidden_act = pooler_hidden_act
         self.share_attn_key = share_attn_key
+        self.output_hidden_states = output_hidden_states
+        self.output_attentions = output_attentions

@@ -608,8 +608,8 @@ class DebertaV2Encoder(nn.Layer):
         self,
         hidden_states,
         attention_mask,
-        output_hidden_states=None,
-        output_attentions=None,
+        output_hidden_states=True,
+        output_attentions=False,
         query_states=None,
         relative_pos=None,
         return_dict=None,
@@ -664,16 +664,12 @@ class DebertaV2Encoder(nn.Layer):
             all_hidden_states = all_hidden_states + (output_states,)
 
         if not return_dict:
-            return BaseModelOutput(
-                last_hidden_state=output_states,
-                hidden_states=all_hidden_states,
-                attentions=all_attentions,
-            )
-        return {
-            "last_hidden_state": output_states,
-            "hidden_states": all_hidden_states,
-            "attentions": all_attentions,
-        }
+            return tuple(v for v in [hidden_states, all_hidden_states, all_attentions] if v is not None)
+        return BaseModelOutput(
+            last_hidden_state=output_states,
+            hidden_states=all_hidden_states,
+            attentions=all_attentions,
+        )
 
 
 class DebertaV2PreTrainedModel(PretrainedModel):
@@ -859,12 +855,12 @@ class DebertaV2Model(DebertaV2PreTrainedModel):
         encoder_outputs = self.encoder(
             embedding_output,
             attention_mask,
-            output_hidden_states=output_hidden_states,
+            output_hidden_states=True,
             output_attentions=output_attentions,
             return_dict=return_dict,
         )
         if not return_dict:
-            encoded_layers = encoder_outputs[0]
+            encoded_layers = encoder_outputs[1]
         else:
             encoded_layers = encoder_outputs.hidden_states
 
@@ -893,7 +889,7 @@ class DebertaV2Model(DebertaV2PreTrainedModel):
 
         return BaseModelOutput(
             last_hidden_state=sequence_output,
-            hidden_states=encoder_outputs.hidden_states,
+            hidden_states=encoder_outputs.hidden_states if output_hidden_states else None,
             attentions=encoder_outputs.attentions,
         )
 
