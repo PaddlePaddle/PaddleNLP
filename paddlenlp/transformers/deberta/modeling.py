@@ -755,7 +755,10 @@ class DebertaModel(DebertaPreTrainedModel):
             output_attentions=output_attentions,
             return_dict=return_dict,
         )
-        encoded_layers = encoder_outputs["hidden_states"]
+        if not return_dict:
+            encoded_layers = encoder_outputs[1]
+        else:
+            encoded_layers = encoder_outputs.hidden_states
 
         if self.z_steps > 1:
             hidden_states = encoded_layers[-2]
@@ -1129,6 +1132,7 @@ class DebertaForMultipleChoice(DebertaPreTrainedModel):
         self.dropout = nn.Dropout(
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
+        self.pooler = ContextPooler(config)
         self.classifier = nn.Linear(config.hidden_size, 1)
         self.apply(self.init_weights)
 
@@ -1255,7 +1259,9 @@ class DebertaForMultipleChoice(DebertaPreTrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        pooled_output = outputs[1]
+
+        pooled_output = self.pooler(outputs[0])
+        pooled_output = self.dropout(pooled_output)
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
