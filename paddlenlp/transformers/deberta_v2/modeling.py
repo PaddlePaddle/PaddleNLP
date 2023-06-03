@@ -22,6 +22,7 @@ from ..activations import ACT2FN
 from ..model_outputs import (
     BaseModelOutput,
     MaskedLMOutput,
+    MultipleChoiceModelOutput,
     QuestionAnsweringModelOutput,
     SequenceClassifierOutput,
     TokenClassifierOutput,
@@ -43,8 +44,11 @@ __all__ = [
     "DebertaV2Encoder",
     "DebertaV2Model",
     "DebertaV2ForSequenceClassification",
+    "DebertaV2ForQuestionAnswering",
+    "DebertaV2ForTokenClassification",
+    "DebertaV2PreTrainedModel",
+    "DebertaV2ForMultipleChoice",
 ]
-
 from collections.abc import Sequence
 
 import paddle
@@ -859,7 +863,10 @@ class DebertaV2Model(DebertaV2PreTrainedModel):
             output_attentions=output_attentions,
             return_dict=return_dict,
         )
-        encoded_layers = encoder_outputs["hidden_states"]
+        if not return_dict:
+            encoded_layers = encoder_outputs[0]
+        else:
+            encoded_layers = encoder_outputs.hidden_states
 
         if self.z_steps > 1:
             hidden_states = encoded_layers[-2]
@@ -934,7 +941,7 @@ class DebertaV2OnlyMLMHead(nn.Layer):
         return prediction_scores
 
 
-class DebertaForMaskedLM(DebertaV2PreTrainedModel):
+class DebertaV2ForMaskedLM(DebertaV2PreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.deberta = DebertaV2Model(config)
@@ -1013,10 +1020,10 @@ class ContextPooler(nn.Layer):
 
 
 class DebertaV2ForSequenceClassification(DebertaV2PreTrainedModel):
-    def __init__(self, config, num_classes=2):
+    def __init__(self, config):
         super().__init__(config)
 
-        self.num_labels = num_classes
+        self.num_labels = config.num_labels
         self.deberta = DebertaV2Model(config)
 
         # TODO: need to be modified
@@ -1145,10 +1152,9 @@ class DebertaV2ForTokenClassification(DebertaV2PreTrainedModel):
 class DebertaV2ForQuestionAnswering(DebertaV2PreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
-        self.num_labels = config.num_labels
 
         self.deberta = DebertaV2Model(config)
-        self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
+        self.qa_outputs = nn.Linear(config.hidden_size, 2)
 
     def forward(
         self,
@@ -1205,6 +1211,180 @@ class DebertaV2ForQuestionAnswering(DebertaV2PreTrainedModel):
             loss=total_loss,
             start_logits=start_logits,
             end_logits=end_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
+
+
+class DebertaV2ForMultipleChoice(DebertaV2PreTrainedModel):
+
+    """
+    Deberta Model with a linear layer on top of the hidden-states output layer,
+    designed for multiple choice tasks like RocStories/SWAG tasks.
+
+    Args:
+        bert (:class:`DebertaModel`):
+            An instance of DebertaModel.
+        num_choices (int, optional):
+            The number of choices. Defaults to `2`.
+        dropout (float, optional):
+            The dropout probability for output of Bert.
+            If None, use the same value as `hidden_dropout_prob` of `DebertaModel`
+            instance `bert`. Defaults to None.
+    """
+
+    def __init__(self, config: DebertaV2Config):
+        super(DebertaV2ForMultipleChoice, self).__init__(config)
+        self.deberta = DebertaV2Model(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.pooler = ContextPooler(config)
+        self.classifier = nn.Linear(config.hidden_size, 1)
+        self.apply(self.init_weights)
+
+    def forward(
+        self,
+        input_ids=None,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        output_hidden_states=None,
+        output_attentions=None,
+        return_dict=None,
+    ):
+        r"""
+        The DebertaForMultipleChoice forward method, overrides the __call__() special method.
+
+        Args:
+            input_ids (Tensor):
+                See :class:`DebertaModel` and shape as [batch_size, num_choice, sequence_length].
+            token_type_ids(Tensor, optional):
+                See :class:`DebertaModel` and shape as [batch_size, num_choice, sequence_length].
+            position_ids(Tensor, optional):
+                See :class:`DebertaModel` and shape as [batch_size, num_choice, sequence_length].
+            attention_mask (list, optional):
+                See :class:`DebertaModel` and shape as [batch_size, num_choice, sequence_length].
+            inputs_embeds (list, optional):
+                See :class:`DebertaModel` and shape as [batch_size, num_choice, sequence_length].
+            labels (Tensor of shape `(batch_size, )`, optional):
+                Labels for computing the multiple choice classification loss. Indices should be in `[0, ...,
+                num_choices-1]` where `num_choices` is the size of the second dimension of the input tensors. (See
+                `input_ids` above)
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput` object. If
+                `False`, the output will be a tuple of tensors. Defaults to `False`.
+
+        Returns:
+            An instance of :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput` if `return_dict=True`.
+            Otherwise it returns a tuple of tensors corresponding to ordered and
+            not None (depending on the input arguments) fields of :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import BertForMultipleChoice, BertTokenizer
+                from paddlenlp.data import Pad, Dict
+
+                tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+                model = BertForMultipleChoice.from_pretrained('bert-base-uncased', num_choices=2)
+
+                data = [
+                    {
+                        "question": "how do you turn on an ipad screen?",
+                        "answer1": "press the volume button.",
+                        "answer2": "press the lock button.",
+                        "label": 1,
+                    },
+                    {
+                        "question": "how do you indent something?",
+                        "answer1": "leave a space before starting the writing",
+                        "answer2": "press the spacebar",
+                        "label": 0,
+                    },
+                ]
+
+                text = []
+                text_pair = []
+                for d in data:
+                    text.append(d["question"])
+                    text_pair.append(d["answer1"])
+                    text.append(d["question"])
+                    text_pair.append(d["answer2"])
+
+                inputs = tokenizer(text, text_pair)
+                batchify_fn = lambda samples, fn=Dict(
+                    {
+                        "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
+                        "token_type_ids": Pad(
+                            axis=0, pad_val=tokenizer.pad_token_type_id
+                        ),  # token_type_ids
+                    }
+                ): fn(samples)
+                inputs = batchify_fn(inputs)
+
+                reshaped_logits = model(
+                    input_ids=paddle.to_tensor(inputs[0], dtype="int64"),
+                    token_type_ids=paddle.to_tensor(inputs[1], dtype="int64"),
+                )
+                print(reshaped_logits.shape)
+                # [2, 2]
+
+        """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        if input_ids is not None:
+            num_choices = paddle.shape(input_ids)[1]
+        elif inputs_embeds is not None:
+            num_choices = paddle.shape(inputs_embeds)[1]
+
+        input_ids = input_ids.reshape((-1, input_ids.shape[-1])) if input_ids is not None else None
+        inputs_embeds = (
+            inputs_embeds.reshape((-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]))
+            if inputs_embeds is not None
+            else None
+        )
+        position_ids = position_ids.reshape((-1, position_ids.shape[-1])) if position_ids is not None else None
+        token_type_ids = token_type_ids.reshape((-1, token_type_ids.shape[-1])) if token_type_ids is not None else None
+        attention_mask = attention_mask.reshape((-1, attention_mask.shape[-1])) if attention_mask is not None else None
+
+        outputs = self.deberta(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+
+        pooled_output = self.pooler(outputs[0])
+        pooled_output = self.dropout(pooled_output)
+
+        pooled_output = self.dropout(pooled_output)
+        logits = self.classifier(pooled_output)
+        reshaped_logits = logits.reshape((-1, num_choices))
+
+        loss = None
+        if labels is not None:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            loss = loss_fct(reshaped_logits, labels)
+        if not return_dict:
+            output = (reshaped_logits,) + outputs[2:]
+            return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)
+
+        return MultipleChoiceModelOutput(
+            loss=loss,
+            logits=reshaped_logits,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
