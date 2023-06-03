@@ -708,31 +708,31 @@ class DebertaV2PreTrainedModel(PretrainedModel):
 
             layer_mappings = [
                 [
-                    f"encoder.layer.{layer_index}.attention.self.q_bias",
-                    f"encoder.layer.{layer_index}.attention.self.q_bias",
-                ],
-                [
-                    f"encoder.layer.{layer_index}.attention.self.v_bias",
-                    f"encoder.layer.{layer_index}.attention.self.v_bias",
-                ],
-                [
-                    f"encoder.layer.{layer_index}.attention.self.in_proj.weight",
-                    f"encoder.layer.{layer_index}.attention.self.in_proj.weight",
+                    f"encoder.layer.{layer_index}.attention.self.query_proj.weight",
+                    f"encoder.layer.{layer_index}.attention.self.query_proj.weight",
                     "transpose",
                 ],
                 [
-                    f"encoder.layer.{layer_index}.attention.self.pos_proj.weight",
-                    f"encoder.layer.{layer_index}.attention.self.pos_proj.weight",
+                    f"encoder.layer.{layer_index}.attention.self.query_proj.bias",
+                    f"encoder.layer.{layer_index}.attention.self.query_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.key_proj.weight",
+                    f"encoder.layer.{layer_index}.attention.self.key_proj.weight",
                     "transpose",
                 ],
                 [
-                    f"encoder.layer.{layer_index}.attention.self.pos_q_proj.weight",
-                    f"encoder.layer.{layer_index}.attention.self.pos_q_proj.weight",
+                    f"encoder.layer.{layer_index}.attention.self.key_proj.bias",
+                    f"encoder.layer.{layer_index}.attention.self.key_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.value_proj.weight",
+                    f"encoder.layer.{layer_index}.attention.self.value_proj.weight",
                     "transpose",
                 ],
                 [
-                    f"encoder.layer.{layer_index}.attention.self.pos_q_proj.bias",
-                    f"encoder.layer.{layer_index}.attention.self.pos_q_proj.bias",
+                    f"encoder.layer.{layer_index}.attention.self.value_proj.bias",
+                    f"encoder.layer.{layer_index}.attention.self.value_proj.bias",
                 ],
                 [
                     f"encoder.layer.{layer_index}.attention.output.dense.weight",
