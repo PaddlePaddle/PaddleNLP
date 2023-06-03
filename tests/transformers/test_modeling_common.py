@@ -124,8 +124,6 @@ class ModelTesterMixin:
                 for tensor1, tensor2 in zip(first, second):
                     check_save_load(tensor1, tensor2)
             else:
-                print(model_class)
-                print(config)
                 check_save_load(first, second)
 
     def test_determinism(self):
