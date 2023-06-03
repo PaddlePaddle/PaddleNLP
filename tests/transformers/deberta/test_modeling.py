@@ -294,12 +294,8 @@ class DebertaModelTester:
         model = DebertaForMultipleChoice(config)
         model.eval()
         multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand([-1, self.num_choices, -1])
-        multiple_choice_token_type_ids = token_type_ids.unsqueeze(1).expand([-1, self.num_choices, -1])
-        multiple_choice_input_mask = input_mask.unsqueeze(1).expand([-1, self.num_choices, -1])
         result = model(
             multiple_choice_inputs_ids,
-            attention_mask=multiple_choice_input_mask,
-            token_type_ids=multiple_choice_token_type_ids,
             labels=choice_labels,
             return_dict=self.parent.return_dict,
         )
