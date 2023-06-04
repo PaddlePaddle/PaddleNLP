@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class ChatGLMBot(BaseComponent):
-    def __init__(self, batch_size: int = 2, max_seq_length: int = 1024, tgt_length: int = 256, **kwargs):
+    def __init__(self, batch_size: int = 2, max_seq_length: int = 2048, tgt_length: int = 2048, **kwargs):
         """
         Initialize the ChatGLMBot instance.
 

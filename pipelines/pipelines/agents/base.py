@@ -394,11 +394,9 @@ class Agent:
     def _step(self, query: str, current_step: AgentStep, params: Optional[dict] = None):
         # plan next step using the LLM
         prompt_node_response = self._plan(query, current_step)
-
         # from the LLM response, create the next step
         next_step = current_step.create_next_step(prompt_node_response)
         self.callback_manager.on_agent_step(next_step)
-
         # run the tool selected by the LLM
         observation = self.tm.run_tool(next_step.prompt_node_response, params) if not next_step.is_last() else None
 

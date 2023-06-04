@@ -77,7 +77,6 @@ class ChatGLMInvocationLayer(PromptModelInvocationLayer):
                 f"Make sure to provide prompt in kwargs."
             )
         output = self.pipe(prompt)
-        # breakpoint()
         generated_texts = output["result"]
         return generated_texts
 
