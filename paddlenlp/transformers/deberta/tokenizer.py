@@ -19,7 +19,7 @@ from functools import lru_cache
 
 import regex as re
 
-from .. import PretrainedTokenizer
+from .. import AddedToken, PretrainedTokenizer
 
 __all__ = [
     "DebertaTokenizer",
@@ -34,15 +34,14 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
 @lru_cache()
 def bytes_to_unicode():
     """
-    Returns list of utf-8 byte and a corresponding list of unicode strings.
-    The reversible bpe codes work on unicode strings.
-    This means you need a large # of unicode characters in your vocab if you want to avoid UNKs.
-    When you're at something like a 10B token dataset you end up needing around 5K for decent coverage.
-    This is a signficant percentage of your normal, say, 32K bpe vocab.
-    To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
-    And avoids mapping to whitespace/control characters the bpe code barfs on.
+    Returns list of utf-8 byte and a mapping to unicode strings. We specifically avoids mapping to whitespace/control
+    characters the bpe code barfs on.
+
+    The reversible bpe codes work on unicode strings. This means you need a large # of unicode characters in your vocab
+    if you want to avoid UNKs. When you're at something like a 10B token dataset you end up needing around 5K for
+    decent coverage. This is a significant percentage of your normal, say, 32K bpe vocab. To avoid that, we want lookup
+    tables between utf-8 bytes and unicode strings.
     """
-    _chr = chr
     bs = (
         list(range(ord("!"), ord("~") + 1)) + list(range(ord("¡"), ord("¬") + 1)) + list(range(ord("®"), ord("ÿ") + 1))
     )
@@ -53,7 +52,7 @@ def bytes_to_unicode():
             bs.append(b)
             cs.append(2**8 + n)
             n += 1
-    cs = [_chr(n) for n in cs]
+    cs = [chr(n) for n in cs]
     return dict(zip(bs, cs))
 
 
@@ -142,6 +141,24 @@ class DebertaTokenizer(PretrainedTokenizer):
         add_bos_token=False,
         **kwargs  # The token of newline.
     ):
+        bos_token = AddedToken(bos_token, lstrip=False, rstrip=False) if isinstance(bos_token, str) else bos_token
+        eos_token = AddedToken(eos_token, lstrip=False, rstrip=False) if isinstance(eos_token, str) else eos_token
+        sep_token = AddedToken(sep_token, lstrip=False, rstrip=False) if isinstance(sep_token, str) else sep_token
+        cls_token = AddedToken(cls_token, lstrip=False, rstrip=False) if isinstance(cls_token, str) else cls_token
+        pad_token = AddedToken(pad_token, lstrip=False, rstrip=False) if isinstance(pad_token, str) else pad_token
+        eos_token = AddedToken(eos_token, lstrip=False, rstrip=False) if isinstance(eos_token, str) else eos_token
+        unk_token = AddedToken(unk_token, lstrip=False, rstrip=False) if isinstance(unk_token, str) else unk_token
+        mask_token = AddedToken(mask_token, lstrip=False, rstrip=False) if isinstance(mask_token, str) else mask_token
+        self._build_special_tokens_map_extended(
+            bos_token=bos_token,
+            eos_token=eos_token,
+            sep_token=sep_token,
+            cls_token=cls_token,
+            pad_token=pad_token,
+            mask_token=mask_token,
+            unk_token=unk_token,
+        )
+
         self._vocab_file = vocab_file
         self._merges_file = merges_file
         self.max_len = max_len if max_len is not None else int(1e12)
@@ -150,7 +167,6 @@ class DebertaTokenizer(PretrainedTokenizer):
 
         with open(vocab_file, "r", encoding="utf-8") as f:
             self.encoder = json.load(f)
-
         self.decoder = {v: k for k, v in self.encoder.items()}
         self.num_tokens = len(self.encoder)
         self.num_text_tokens = self.num_tokens - 1
