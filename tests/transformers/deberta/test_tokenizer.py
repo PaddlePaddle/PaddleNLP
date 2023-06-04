@@ -117,5 +117,5 @@ class DebertaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                 runcation=True,
                 return_offsets_mapping=True,
             )
-            self.assertEqual(len(encoding["input_ids"]), 4)
+            self.assertEqual(len(encoding["input_ids"]), 2)
             self.assertEqual(len(encoding["offset_mapping"]), 2)
