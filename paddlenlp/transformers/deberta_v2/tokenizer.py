@@ -293,6 +293,21 @@ class DebertaV2Tokenizer(PretrainedTokenizer):
 
         return [(0, 0)] + offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)]
 
+    def save_resources(self, save_directory):
+        """
+        Saves `SentencePiece <https://github.com/google/sentencepiece>`__ file
+        (ends with '.spm') under `save_directory`.
+
+        Args:
+            save_directory (str): Directory to save files into.
+        """
+        for name, file_name in self.resource_files_names.items():
+            source_path = getattr(self, "_%s" % name)
+
+            save_path = os.path.join(save_directory, file_name)
+            if os.path.abspath(source_path) != os.path.abspath(save_path):
+                shutil.copyfile(source_path, save_path)
+
 
 class SPMTokenizer:
     r"""
@@ -516,21 +531,6 @@ class SPMTokenizer:
             i += 1
 
         return ["".join(x) for x in output]
-
-    def save_resources(self, save_directory):
-        """
-        Saves `SentencePiece <https://github.com/google/sentencepiece>`__ file
-        (ends with '.spm') under `save_directory`.
-
-        Args:
-            save_directory (str): Directory to save files into.
-        """
-        for name, file_name in self.resource_files_names.items():
-            source_path = getattr(self, "_%s" % name)
-
-            save_path = os.path.join(save_directory, file_name)
-            if os.path.abspath(source_path) != os.path.abspath(save_path):
-                shutil.copyfile(source_path, save_path)
 
 
 def _is_whitespace(char):
