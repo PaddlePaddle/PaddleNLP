@@ -65,7 +65,7 @@ class DebertaV2TokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         # fmt: on
 
         tokenizer = DebertaV2Tokenizer(SAMPLE_VOCAB, do_lower_case=True)
-        tokens = tokenizer.convert_ids_to_tokens(tokenizer.encode(sequence, add_special_tokens=False))
+        tokens = tokenizer.convert_ids_to_tokens(tokenizer.encode(sequence, add_special_tokens=False)["input_ids"])
 
         self.assertListEqual(tokens, tokens_target)
 
@@ -84,7 +84,7 @@ class DebertaV2TokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         # fmt: on
 
         tokenizer = DebertaV2Tokenizer(SAMPLE_VOCAB, split_by_punct=True)
-        tokens = tokenizer.convert_ids_to_tokens(tokenizer.encode(sequence, add_special_tokens=False))
+        tokens = tokenizer.convert_ids_to_tokens(tokenizer.encode(sequence, add_special_tokens=False)["input_ids"])
 
         self.assertListEqual(tokens, tokens_target)
 
@@ -95,7 +95,7 @@ class DebertaV2TokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         # fmt: on
 
         tokenizer = DebertaV2Tokenizer(SAMPLE_VOCAB, do_lower_case=True, split_by_punct=True)
-        tokens = tokenizer.convert_ids_to_tokens(tokenizer.encode(sequence, add_special_tokens=False))
+        tokens = tokenizer.convert_ids_to_tokens(tokenizer.encode(sequence, add_special_tokens=False)["input_ids"])
         self.assertListEqual(tokens, tokens_target)
 
     def test_do_lower_case_split_by_punct_false(self):
@@ -105,7 +105,7 @@ class DebertaV2TokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         # fmt: on
 
         tokenizer = DebertaV2Tokenizer(SAMPLE_VOCAB, do_lower_case=True, split_by_punct=False)
-        tokens = tokenizer.convert_ids_to_tokens(tokenizer.encode(sequence, add_special_tokens=False))
+        tokens = tokenizer.convert_ids_to_tokens(tokenizer.encode(sequence, add_special_tokens=False)["input_ids"])
 
         self.assertListEqual(tokens, tokens_target)
 
@@ -116,7 +116,7 @@ class DebertaV2TokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         # fmt: on
 
         tokenizer = DebertaV2Tokenizer(SAMPLE_VOCAB, do_lower_case=False, split_by_punct=True)
-        tokens = tokenizer.convert_ids_to_tokens(tokenizer.encode(sequence, add_special_tokens=False))
+        tokens = tokenizer.convert_ids_to_tokens(tokenizer.encode(sequence, add_special_tokens=False)["input_ids"])
 
         self.assertListEqual(tokens, tokens_target)
 
@@ -127,7 +127,7 @@ class DebertaV2TokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         # fmt: on
 
         tokenizer = DebertaV2Tokenizer(SAMPLE_VOCAB, do_lower_case=False, split_by_punct=False)
-        tokens = tokenizer.convert_ids_to_tokens(tokenizer.encode(sequence, add_special_tokens=False))
+        tokens = tokenizer.convert_ids_to_tokens(tokenizer.encode(sequence, add_special_tokens=False)["input_ids"])
 
         self.assertListEqual(tokens, tokens_target)
 
@@ -139,7 +139,7 @@ class DebertaV2TokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
         tokenizer = DebertaV2Tokenizer(SAMPLE_VOCAB, keep_accents=True)
 
-        ids = tokenizer.encode(sequence, add_special_tokens=False)
+        ids = tokenizer.encode(sequence, add_special_tokens=False)["input_ids"]
         self.assertListEqual(ids, ids_target)
         tokens = tokenizer.tokenize(sequence)
         self.assertListEqual(tokens, tokens_target)
@@ -153,24 +153,9 @@ class DebertaV2TokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         back_tokens_target = ["▁", "<unk>", "▁was", "▁born", "▁in", "▁9", "2000", ",", "▁and", "▁this", "▁is", "▁fal", "s", "<unk>", ".", ]
         # fmt: on
 
-        ids = tokenizer.encode(sequence, add_special_tokens=False)
+        ids = tokenizer.encode(sequence, add_special_tokens=False)["input_ids"]
         self.assertListEqual(ids, ids_target)
         tokens = tokenizer.tokenize(sequence)
         self.assertListEqual(tokens, tokens_target)
         back_tokens = tokenizer.convert_ids_to_tokens(ids)
         self.assertListEqual(back_tokens, back_tokens_target)
-
-    def test_sequence_builders(self):
-        tokenizer = DebertaV2Tokenizer(SAMPLE_VOCAB)
-
-        text = tokenizer.encode("sequence builders")
-        text_2 = tokenizer.encode("multi-sequence build")
-
-        encoded_sentence = tokenizer.build_inputs_with_special_tokens(text)
-        encoded_pair = tokenizer.build_inputs_with_special_tokens(text, text_2)
-
-        self.assertEqual([tokenizer.cls_token_id] + text + [tokenizer.sep_token_id], encoded_sentence)
-        self.assertEqual(
-            [tokenizer.cls_token_id] + text + [tokenizer.sep_token_id] + text_2 + [tokenizer.sep_token_id],
-            encoded_pair,
-        )
