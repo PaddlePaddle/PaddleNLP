@@ -60,9 +60,11 @@ class LoRAModel(nn.Layer):
         self.forward = self.model.forward
 
     @classmethod
-    def from_pretrained(cls, model, lora_path):
+    def from_pretrained(cls, model, lora_path, **kwargs):
+        lora_config = kwargs.pop("lora_config", None)
         # init lora config & lora model
-        lora_config = LoRAConfig.from_pretrained(lora_path)
+        if not isinstance(lora_config, LoRAConfig):
+            lora_config = LoRAConfig.from_pretrained(lora_path)
         # define a new variable to conserve original lora_config.tensor_parallel_degree value which will update while initializing lora model
         lora_config_tensor_parallel_degree = lora_config.tensor_parallel_degree
         lora_model = cls(model, lora_config)

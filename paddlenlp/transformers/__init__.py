@@ -252,6 +252,10 @@ from .speecht5.modeling import *
 from .speecht5.tokenizer import *
 from .speecht5.processing import *
 from .speecht5.feature_extraction import *
+from .minigpt4.modeling import *
+from .minigpt4.configuration import *
+from .minigpt4.processing import *
+from .minigpt4.image_processing import *
 from .clap.configuration import *
 from .clap.feature_extraction import *
 from .clap.modeling import *
