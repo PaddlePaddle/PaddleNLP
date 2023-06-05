@@ -79,7 +79,7 @@ class DebertaV2CompatibilityTest(unittest.TestCase):
         self.assertEqual(diff, 0.0)
 
     @require_package("transformers", "torch")
-    def test_deberta_converter(self):
+    def test_deberta_v2_converter(self):
         with tempfile.TemporaryDirectory() as tempdir:
 
             # 1. create commmon input
@@ -92,9 +92,6 @@ class DebertaV2CompatibilityTest(unittest.TestCase):
                 "hf-internal-testing/tiny-random-DebertaV2Model", from_hf_hub=True, cache_dir=tempdir
             )
             paddle_model.eval()
-            for na, pa in paddle_model.named_parameters():
-                print(na)
-                print(pa.shape)
             paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
 
             # 3. forward the torch  model
@@ -105,9 +102,6 @@ class DebertaV2CompatibilityTest(unittest.TestCase):
                 "hf-internal-testing/tiny-random-DebertaV2Model", cache_dir=tempdir
             )
             torch_model.eval()
-            for na, pa in torch_model.named_parameters():
-                print(na)
-                print(pa.shape)
             torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
 
             self.assertTrue(
@@ -119,7 +113,7 @@ class DebertaV2CompatibilityTest(unittest.TestCase):
             )
 
     @require_package("transformers", "torch")
-    def test_deberta_converter_from_local_dir_with_enable_torch(self):
+    def test_deberta_v2_converter_from_local_dir_with_enable_torch(self):
         with tempfile.TemporaryDirectory() as tempdir:
 
             # 2. forward the torch  model
@@ -140,7 +134,7 @@ class DebertaV2CompatibilityTest(unittest.TestCase):
             model_utils.ENABLE_TORCH_CHECKPOINT = True
 
     @require_package("transformers", "torch")
-    def test_deberta_converter_from_local_dir(self):
+    def test_deberta_v2_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
 
             # 1. create commmon input
@@ -154,10 +148,6 @@ class DebertaV2CompatibilityTest(unittest.TestCase):
             torch_model.eval()
             torch_model.save_pretrained(tempdir)
             torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
-            for na, pa in torch_model.named_parameters():
-                print(na)
-                print(pa.shape)
-            print(torch_model.config)
 
             # 2. forward the paddle model
             from paddlenlp.transformers.deberta_v2.modeling import DebertaV2Model
@@ -165,10 +155,6 @@ class DebertaV2CompatibilityTest(unittest.TestCase):
             paddle_model = DebertaV2Model.from_pretrained(tempdir)
             paddle_model.eval()
             paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
-            for na, pa in paddle_model.named_parameters():
-                print(na)
-                print(pa.shape)
-            print(paddle_model.config)
 
             self.assertTrue(
                 np.allclose(

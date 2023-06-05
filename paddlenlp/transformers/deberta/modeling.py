@@ -38,15 +38,6 @@ from .configuration import (
 )
 
 __all__ = [
-    "DebertaEmbeddings",
-    "DebertaLayerNorm",
-    "DebertaSelfOutput",
-    "DisentangledSelfAttention",
-    "DebertaAttention",
-    "DebertaIntermediate",
-    "DebertaOutput",
-    "DebertaLayer",
-    "DebertaEncoder",
     "DebertaModel",
     "DebertaForSequenceClassification",
     "DebertaForQuestionAnswering",

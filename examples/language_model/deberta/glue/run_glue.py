@@ -51,6 +51,8 @@ METRIC_CLASSES = {
     "rte": Accuracy,
 }
 
+MODEL_VERSION = "v1"
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -202,13 +204,10 @@ def do_train(args):
 
     train_ds = load_dataset("glue", args.task_name, splits="train")
 
-    if args.tokenizer_name_or_path == "deberta-v1":
-        tokenizer = DebertaTokenizer.from_pretrained(args.model_name_or_path)
-    elif args.tokenizer_name_or_path == "deberta-v2":
-        tokenizer = DebertaV2Tokenizer.from_pretrained(args.model_name_or_path)
+    if MODEL_VERSION == "v1":
+        tokenizer = DebertaTokenizer.from_pretrained(args.tokenizer_name_or_path)
     else:
-        raise ValueError("Unknown tokenizer: %s" % args.tokenizer_name_or_path)
-
+        tokenizer = DebertaV2Tokenizer.from_pretrained(args.tokenizer_name_or_path)
     trans_func = partial(
         convert_example, tokenizer=tokenizer, label_list=train_ds.label_list, max_seq_length=args.max_seq_length
     )
@@ -258,12 +257,10 @@ def do_train(args):
     num_classes = 1 if train_ds.label_list is None else len(train_ds.label_list)
 
     # model = DebertaForSequenceClassification(config=model_config,num_classes=num_classes)
-    if args.model_name_or_path == "deberta-v1":
+    if MODEL_VERSION == "v1":
         model = DebertaForSequenceClassification.from_pretrained(args.model_name_or_path, num_classes=num_classes)
-    elif args.model_name_or_path == "deberta-v2":
-        model = DebertaV2ForSequenceClassification.from_pretrained(args.model_name_or_path, num_classes=num_classes)
     else:
-        raise ValueError("Unknown model: %s" % args.model_name_or_path)
+        model = DebertaV2ForSequenceClassification.from_pretrained(args.model_name_or_path, num_classes=num_classes)
     # pp_dict = paddle.load('/home/aistudio/data/data221622/model_state.pdparams')
     # model.deberta.set_dict(pp_dict)
     # model.deberta.set_dict(pp_dict)

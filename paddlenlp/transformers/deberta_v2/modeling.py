@@ -34,14 +34,6 @@ from .configuration import (
 )
 
 __all__ = [
-    "DebertaV2Embeddings",
-    "DebertaV2SelfOutput",
-    "DisentangledSelfAttention",
-    "DebertaV2Attention",
-    "DebertaV2Intermediate",
-    "DebertaV2Output",
-    "DebertaV2Layer",
-    "DebertaV2Encoder",
     "DebertaV2Model",
     "DebertaV2ForSequenceClassification",
     "DebertaV2ForQuestionAnswering",
