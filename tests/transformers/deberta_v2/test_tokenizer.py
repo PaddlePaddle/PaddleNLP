@@ -27,6 +27,7 @@ class DebertaV2TokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = DebertaV2Tokenizer
     from_pretrained_kwargs = {"add_prefix_space": True}
     test_seq2seq = False
+    from_pretrained_vocab_key = "sentencepiece_model_file"
 
     def setUp(self):
         super().setUp()

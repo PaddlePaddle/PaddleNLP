@@ -24,11 +24,32 @@ from .. import AddedToken, PretrainedTokenizer
 __all__ = ["DebertaV2Tokenizer"]
 
 
-PRETRAINED_VOCAB_FILES_MAP = {}
+PRETRAINED_VOCAB_FILES_MAP = {
+    "vocab_file": {
+        "microsoft/deberta-v2-xlarge": "https://huggingface.co/microsoft/deberta-v2-xlarge/resolve/main/spm.model",
+        "microsoft/deberta-v2-xxlarge": "https://huggingface.co/microsoft/deberta-v2-xxlarge/resolve/main/spm.model",
+        "microsoft/deberta-v2-xlarge-mnli": (
+            "https://huggingface.co/microsoft/deberta-v2-xlarge-mnli/resolve/main/spm.model"
+        ),
+        "microsoft/deberta-v2-xxlarge-mnli": (
+            "https://huggingface.co/microsoft/deberta-v2-xxlarge-mnli/resolve/main/spm.model"
+        ),
+    }
+}
 
-PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {}
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
+    "microsoft/deberta-v2-xlarge": 512,
+    "microsoft/deberta-v2-xxlarge": 512,
+    "microsoft/deberta-v2-xlarge-mnli": 512,
+    "microsoft/deberta-v2-xxlarge-mnli": 512,
+}
 
-PRETRAINED_INIT_CONFIGURATION = {}
+PRETRAINED_INIT_CONFIGURATION = {
+    "microsoft/deberta-v2-xlarge": {"do_lower_case": False},
+    "microsoft/deberta-v2-xxlarge": {"do_lower_case": False},
+    "microsoft/deberta-v2-xlarge-mnli": {"do_lower_case": False},
+    "microsoft/deberta-v2-xxlarge-mnli": {"do_lower_case": False},
+}
 
 
 class DebertaV2Tokenizer(PretrainedTokenizer):
