@@ -930,7 +930,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
 
     def forward(
         self,
-        input_ids,
+        input_ids=None,
         position_ids=None,
         attention_mask=None,
         inputs_embeds=None,
