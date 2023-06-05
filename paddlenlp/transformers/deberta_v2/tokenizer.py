@@ -25,7 +25,7 @@ __all__ = ["DebertaV2Tokenizer"]
 
 
 PRETRAINED_VOCAB_FILES_MAP = {
-    "vocab_file": {
+    "sentencepiece_model_file": {
         "microsoft/deberta-v2-xlarge": "https://huggingface.co/microsoft/deberta-v2-xlarge/resolve/main/spm.model",
         "microsoft/deberta-v2-xxlarge": "https://huggingface.co/microsoft/deberta-v2-xxlarge/resolve/main/spm.model",
         "microsoft/deberta-v2-xlarge-mnli": (
