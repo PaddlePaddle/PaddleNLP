@@ -45,7 +45,7 @@ def multi_head_attention(
     values = keys if values is None else values
 
     if not (len(queries.shape) == len(keys.shape) == len(values.shape) == 3):
-        raise ValueError("Inputs: quries, keys and values should all be 3-D tensors.")
+        raise ValueError("Inputs: queries, keys and values should all be 3-D tensors.")
 
     def __compute_qkv(queries, keys, values, n_head, d_key, d_value):
         """

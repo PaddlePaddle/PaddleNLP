@@ -267,11 +267,12 @@ class GPTConfig(PretrainedConfig):
         max_position_embeddings: int = 512,
         type_vocab_size: int = 16,
         initializer_range: float = 0.02,
+        fuse_attention_qkv: bool = False,
+        use_flash_attention: bool = False,
         pad_token_id: int = 0,
         eos_token_id: int = 7,
         bos_token_id: int = 0,
         eol_token_id: int = 3,
-        topo: int = None,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -287,8 +288,11 @@ class GPTConfig(PretrainedConfig):
         self.max_position_embeddings = max_position_embeddings
         self.type_vocab_size = type_vocab_size
         self.initializer_range = initializer_range
+
         self.pad_token_id = pad_token_id
         self.eos_token_id = eos_token_id
         self.bos_token_id = bos_token_id
         self.eol_token_id = eol_token_id
-        self.fuse_attention_qkv = False
+
+        self.fuse_attention_qkv = fuse_attention_qkv
+        self.use_flash_attention = use_flash_attention

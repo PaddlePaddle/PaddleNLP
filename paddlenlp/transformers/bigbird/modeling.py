@@ -1230,7 +1230,7 @@ class BigBirdForQuestionAnswering(BigBirdPretrainedModel):
 
     @staticmethod
     def prepare_question_mask(q_lengths, maxlen):
-        mask = paddle.arange(0, maxlen).unsqueeze_(0)
+        mask = paddle.arange(0, maxlen, dtype="int64").unsqueeze_(0)
         mask = mask < q_lengths
         return mask
 

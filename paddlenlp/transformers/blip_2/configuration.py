@@ -216,6 +216,7 @@ class Blip2QFormerConfig(PretrainedConfig):
         encoder_hidden_size=1408,
         **kwargs,
     ):
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         super().__init__(pad_token_id=pad_token_id, **kwargs)
 
         self.vocab_size = vocab_size
@@ -325,7 +326,6 @@ class Blip2Config(PretrainedConfig):
         self.qformer_config.encoder_hidden_size = self.vision_config.hidden_size
         self.use_decoder_only_language_model = self.text_config.model_type in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
         # CONFIGURATION_MODEL_MAPPING = get_init_configurations()
-        # breakpoint()
         # self.use_decoder_only_language_model = self.text_config.model_type in CONFIGURATION_MODEL_MAPPING
         self.initializer_factor = 1.0
         self.initializer_range = 0.02
