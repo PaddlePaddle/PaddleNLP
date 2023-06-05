@@ -22,7 +22,6 @@ import unittest.mock as mock
 
 from requests.exceptions import HTTPError
 
-# from .test_configuration_common import ConfigTester
 from paddlenlp.transformers import BertConfig
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 

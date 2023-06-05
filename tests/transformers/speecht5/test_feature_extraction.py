@@ -167,9 +167,6 @@ class SpeechT5FeatureExtractionTest(SequenceFeatureExtractionTestMixin, unittest
         paddings = ["longest", "max_length", "do_not_pad"]
         max_lengths = [None, 1600, None]
         for max_length, padding in zip(max_lengths, paddings):
-            # breakpoint()
-            # if padding=="do_not_pad":
-            #     breakpoint()
             processed = feat_extract(speech_inputs, padding=padding, max_length=max_length, return_tensors="np")
             input_values = processed.input_values
 
