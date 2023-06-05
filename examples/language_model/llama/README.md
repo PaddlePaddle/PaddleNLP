@@ -2,16 +2,18 @@
 
 **目录**
 
-- [1. 微调](#1)
-- [2. 模型预测](#2)
-- [3. 动转静](#3)
-- [4. 模型推理](#4)
+- [1. 预训练](#1)
+- [2. 微调](#1)
+- [3. 模型预测](#2)
+- [4. 动转静](#3)
+- [5. 模型推理](#4)
 
 ## 协议
 
 Llama 模型的权重的使用则需要遵循[License](../../../paddlenlp/transformers/llama/LICENSE)。
 
-<a name="1"></a>
+
+<a name="0"></a>
 
 ## 预训练
 
@@ -71,6 +73,7 @@ python -u  -m paddle.distributed.launch \
     --device "gpu"
 ```
 
+<a name="1"></a>
 
 ## 微调
 
