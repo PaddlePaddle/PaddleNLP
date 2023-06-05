@@ -37,10 +37,12 @@ from ..dygraph.processor import (
     RepetitionPenaltyLogitsProcessor,
 )
 
-try:
-    from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
-except:
-    FusedDropoutAdd = None
+# try:
+#     from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
+# except:
+#     FusedDropoutAdd = None
+
+FusedDropoutAdd = None
 
 
 def get_attr(layer, name):
