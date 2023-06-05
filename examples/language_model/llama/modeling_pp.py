@@ -121,7 +121,6 @@ class PipelinePretrainedModel(PretrainedModel):
     _pipeline_name_mapping = None
 
     def __init__(self, config, *args, **kwargs):
-        raise ValueError()
         super().__init__(config, *args, **kwargs)
 
     def add_sequential_layer(self, layer_desc, name_prefix=""):
