@@ -11,3 +11,5 @@ emoji
 ftfy
 yacs
 unidecode
+soundfile
+librosa

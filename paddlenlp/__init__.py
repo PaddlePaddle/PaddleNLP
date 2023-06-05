@@ -42,6 +42,7 @@ from . import (
     losses,
     metrics,
     ops,
+    peft,
     prompt,
     seq2vec,
     trainer,

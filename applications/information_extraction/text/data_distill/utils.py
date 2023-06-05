@@ -276,7 +276,7 @@ def schema2label_maps(task_type, schema=None):
         label_maps["entity2id"] = entity2id
     elif task_type == "opinion_extraction":
         schema = ["观点词", {"评价维度": ["观点词", "情感倾向[正向,负向]"]}]
-        logger.info("Opinion extracion does not support custom schema, the schema is default to %s." % schema)
+        logger.info("Opinion extraction does not support custom schema, the schema is default to %s." % schema)
         label_maps["entity2id"] = {"评价维度": 0, "观点词": 1}
         label_maps["sentiment2id"] = {"正向": 0, "负向": 1}
     else:

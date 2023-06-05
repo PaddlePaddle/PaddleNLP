@@ -36,7 +36,7 @@ logging.getLogger("pipelines").setLevel(logging.INFO)
 
 import pandas as pd
 
-from pipelines import pipelines, utils
+from pipelines import utils
 from pipelines.nodes import BaseComponent
 from pipelines.pipelines import Pipeline
 from pipelines.pipelines.standard_pipelines import (

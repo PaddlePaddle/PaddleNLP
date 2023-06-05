@@ -247,6 +247,10 @@ from .blip_2.processing import *
 from .chatglm.configuration import *
 from .chatglm.modeling import *
 from .chatglm.tokenizer import *
+from .clap.configuration import *
+from .clap.feature_extraction import *
+from .clap.modeling import *
+from .clap.processing import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available

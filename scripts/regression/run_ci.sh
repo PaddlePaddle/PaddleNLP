@@ -41,32 +41,6 @@ all_P0case_dic=(["waybill_ie"]=3 ["msra_ner"]=15 ["glue"]=2 ["bert"]=2 ["skep"]=
 ["fast_generation"]=10 ["ernie-3.0"]=5 ["ernie-layout"]=5 ["uie"]=5 ["ernie-health"]=5 \
 ["ernie"]=2 ["ernie_m"]=5 ["ernie_layout"]=5 ["ernie_csc"]=5 ["ernie_ctm"]=5 ["ernie_doc"]=20 ["ernie_health"]=5 ["gpt-3"]=5)
 ####################################
-# set python env
-case ${python} in
-27)
-export LD_LIBRARY_PATH=/opt/_internal/cpython-2.7.15-ucs2/lib/:${LD_LIBRARY_PATH}
-export PATH=/opt/_internal/cpython-2.7.15-ucs2/bin/:${PATH}
-;;
-35)
-export LD_LIBRARY_PATH=/opt/_internal/cpython-3.5.1/lib/:${LD_LIBRARY_PATH}
-export PATH=/opt/_internal/cpython-3.5.1/bin/:${PATH}
-;;
-36)
-export LD_LIBRARY_PATH=/opt/_internal/cpython-3.6.0/lib/:${LD_LIBRARY_PATH}
-export PATH=/opt/_internal/cpython-3.6.0/bin/:${PATH}
-;;
-37)
-export LD_LIBRARY_PATH=/opt/_internal/cpython-3.7.0/lib/:${LD_LIBRARY_PATH}
-export PATH=/opt/_internal/cpython-3.7.0/bin/:${PATH}
-;;
-38)
-export LD_LIBRARY_PATH=/opt/_internal/cpython-3.8.0/lib/:${LD_LIBRARY_PATH}
-export PATH=/opt/_internal/cpython-3.8.0/bin/:${PATH}
-;;
-esac
-python -c 'import sys; print(sys.version_info[:])'
-echo "python="${python}
-####################################
 # Insatll paddlepaddle-gpu
 install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
