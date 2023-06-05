@@ -94,15 +94,22 @@ class PrefixEncoder(nn.Layer):
 
 
 class RotaryEmbeddings(nn.Layer):
-    def __init__(self, hidden_size, base=10000.0):
+    def __init__(self, hidden_size, base=10000.0, position_encoding_2d=True):
         super().__init__()
         self.dtype = paddle.get_default_dtype()
         inv_freq = 1.0 / (base ** (paddle.arange(0, hidden_size, 2).astype("float32") / hidden_size))
         inv_freq = inv_freq.astype(self.dtype)
+        self.position_encoding_2d = position_encoding_2d
         self.register_buffer("inv_freq", inv_freq)
         self.max_seq_len_cached = -1
         self.cos_cached = None
         self.sin_cached = None
+
+    def get_rotary_embeds(self, cos, sin, position_ids):
+        # [s, b, 1, h/n]
+        cos = cos.squeeze(1)[position_ids].unsqueeze(2)
+        sin = sin.squeeze(1)[position_ids].unsqueeze(2)
+        return paddle.stack([cos, sin], axis=0)
 
     def forward(self, position_ids):
         seq_len = position_ids.max() + 1
@@ -130,7 +137,17 @@ class RotaryEmbeddings(nn.Layer):
             self.cos_cached, self.sin_cached = cos_cached, sin_cached
 
         cos, sin = self.cos_cached[:seq_len, ...], self.sin_cached[:seq_len, ...]
-        return paddle.stack([cos, sin], axis=0)
+        if self.position_encoding_2d:
+            block_position_ids = position_ids[:, 1, :].transpose([1, 0])
+            position_ids = position_ids[:, 0, :].transpose([1, 0])
+            block_rotary_embeds = self.get_rotary_embeds(cos, sin, block_position_ids)
+            position_rotary_embeds = self.get_rotary_embeds(cos, sin, position_ids)
+            rotary_embeds = paddle.stack([position_rotary_embeds, block_rotary_embeds], axis=0)
+        else:
+            position_ids = position_ids.transpose([1, 0])
+            rotary_embeds = self.get_rotary_embeds(cos, sin, position_ids)
+
+        return rotary_embeds
 
 
 class ChatGLMAttention(nn.Layer):
@@ -175,39 +192,32 @@ class ChatGLMAttention(nn.Layer):
         x1, x2 = paddle.chunk(x, 2, axis=-1)
         return paddle.concat([-x2, x1], axis=-1)
 
-    def _apply_rotary_position_embed_index(self, q, k, cos, sin, position_ids):
+    def _apply_rotary_position_embed_index(self, q, k, cos, sin):
         # q.shape = [s, b, n, h/n/2], cos.shape = [s, 1, h/n], position_ids.shape = [s, b]
-        # [s, b, 1, h/n]
-        cos = cos.squeeze(1)[position_ids].unsqueeze(2)
-        sin = sin.squeeze(1)[position_ids].unsqueeze(2)
         # [s, b, n, h/n]
         q = q * cos + self._rotate_half(q) * sin
         k = k * cos + self._rotate_half(k) * sin
         return q, k
 
     def _core_attention(self, q_layer: Tensor, k_layer: Tensor, position_ids: Tensor, rotary_embeds: Tensor):
-        cos, sin = rotary_embeds[0], rotary_embeds[1]
         # Set store_true, position_encoding_2d=False by default.
         if self.config.position_encoding_2d:
             # [s, b, n, h/n/2]
             q1, q2 = paddle.chunk(q_layer, 2, axis=-1)
             k1, k2 = paddle.chunk(k_layer, 2, axis=-1)
-            # [s, 1, h/n]
-            # [s, b]
-            block_position_ids = position_ids[:, 1, :].transpose([1, 0])
-            position_ids = position_ids[:, 0, :].transpose([1, 0])
+
+            pcos, psin = rotary_embeds[0][0], rotary_embeds[0][1]
+            bcos, bsin = rotary_embeds[1][0], rotary_embeds[1][1]
 
             # [s, b, n, h/n]
-            q1, k1 = self._apply_rotary_position_embed_index(q1, k1, cos, sin, position_ids)
-            q2, k2 = self._apply_rotary_position_embed_index(q2, k2, cos, sin, block_position_ids)
+            q1, k1 = self._apply_rotary_position_embed_index(q1, k1, pcos, psin)
+            q2, k2 = self._apply_rotary_position_embed_index(q2, k2, bcos, bsin)
             q_layer = paddle.concat([q1, q2], axis=-1)
             k_layer = paddle.concat([k1, k2], axis=-1)
         else:
-            # [s, b]
-            position_ids = position_ids.transpose([1, 0])
-            # [s, 1, h/n]
+            cos, sin = rotary_embeds[0], rotary_embeds[1]
             # [s, b, n, h/n]
-            q_layer, k_layer = self._apply_rotary_position_embed_index(q_layer, k_layer, cos, sin, position_ids)
+            q_layer, k_layer = self._apply_rotary_position_embed_index(q_layer, k_layer, cos, sin)
         return q_layer, k_layer
 
     def forward(
@@ -460,6 +470,7 @@ class ChatGLMStack(nn.Layer):
         position_ids: Tensor,
         use_cache: bool,
         cache: Tensor,
+        rotary_embeds: Tensor,
     ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
@@ -474,6 +485,7 @@ class ChatGLMStack(nn.Layer):
             position_ids,
             use_cache,
             cache,
+            rotary_embeds,
             use_reentrant=False,
         )
         return hidden_states
