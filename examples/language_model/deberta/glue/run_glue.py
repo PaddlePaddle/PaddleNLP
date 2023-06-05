@@ -256,14 +256,10 @@ def do_train(args):
 
     num_classes = 1 if train_ds.label_list is None else len(train_ds.label_list)
 
-    # model = DebertaForSequenceClassification(config=model_config,num_classes=num_classes)
     if MODEL_VERSION == "v1":
         model = DebertaForSequenceClassification.from_pretrained(args.model_name_or_path, num_classes=num_classes)
     else:
         model = DebertaV2ForSequenceClassification.from_pretrained(args.model_name_or_path, num_classes=num_classes)
-    # pp_dict = paddle.load('/home/aistudio/data/data221622/model_state.pdparams')
-    # model.deberta.set_dict(pp_dict)
-    # model.deberta.set_dict(pp_dict)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
