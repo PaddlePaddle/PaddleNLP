@@ -36,10 +36,11 @@ function _set_params(){
     num_workers=0                  # (可选)
     base_batch_size=$global_batch_size
     use_recompute=${11:-"False"}    # (可选)是否打开recompute
-    verbose=${12:-"3"}         # (可选)是否打印性能数据
-    logging_freq=${13:-"100000"} # (可选)loss打印频率
-    sharding_degree=${14:-"1"}      # (可选)
-    sharding_stage=${15:-"1"}       # (可选)sharding case
+    use_passes=${12:-"False"}       # (可选)是否使用pass优化
+    verbose=${13:-"3"}         # (可选)是否打印性能数据
+    logging_freq=${14:-"100000"} # (可选)loss打印频率
+    sharding_degree=${15:-"1"}      # (可选)
+    sharding_stage=${16:-"1"}       # (可选)sharding case
     
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
@@ -92,8 +93,9 @@ function _train(){
                -o Model.hidden_size=1024 \
                -o Model.num_layers=${num_layers} \
                -o Model.num_attention_heads=${num_attention_heads} \
-               -o Model.type_vocab_size=1 \
+               -o Model.type_vocab_size=16 \
                -o Model.use_recompute=${use_recompute} \
+               -o FusedPasses.enable=${use_passes} \
                -o Distributed.dp_degree=${dp_degree} \
                -o Distributed.mp_degree=${mp_degree} \
                -o Distributed.pp_degree=${pp_degree} \
@@ -110,24 +112,39 @@ function _train(){
     else
         PADDLE_RANK_OPTION=""
     fi
+
+    mylog=mylog
+
     # 以下为通用执行命令，无特殊可不用修改
     case ${run_mode} in
     DP1-MP1-PP1) echo "run run_mode: DP1-MP1-PP1"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0 ${PADDLE_RANK_OPTION}\
-            tools/auto.py -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_1.3B_dp8.yaml \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./${mylog} --devices=0 ${PADDLE_RANK_OPTION}\
+            tools/auto.py -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
             ${train_cmd}"
         workerlog_id=0
         ;;
     DP2-MP2-PP2) echo "run run_mode: ${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
-            tools/auto.py -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_1.3B_dp8.yaml \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./${mylog} --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
+            tools/auto.py -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
             ${train_cmd}"
-        workerlog_id_1=4
-        workerlog_id_2=6
+        workerlog_id_1=0
+        ;;
+    DP1-MP8-PP1) echo "run run_mode: ${run_mode}"
+        train_cmd="python -m paddle.distributed.launch --log_dir=./${mylog} --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
+            tools/auto.py -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
+            ${train_cmd}"
+        workerlog_id_1=0
+        ;;
+    DP4-MP8-PP1) echo "run run_mode: ${run_mode}"
+        train_cmd="python -m paddle.distributed.launch --log_dir=./${mylog} --devices=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
+            tools/auto.py -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
+            ${train_cmd}"
+        workerlog_id_1=0
         ;;
     *) echo "choose run_mode "; exit 1;
     esac
     cd ../
+    rm -rf ${mylog}/
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间
         ${train_cmd} > ${log_file} 2>&1
@@ -143,7 +160,6 @@ function _train(){
     if [ ${device_num} != "N1C1" -a -d mylog ]; then
         rm ${log_file}
         cp mylog/workerlog.${workerlog_id_1} ${log_file}
-        cp mylog/workerlog.${workerlog_id_2} ${log_file}_2
     fi
 }
 
@@ -151,5 +167,5 @@ export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
 
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@
-#_train       # 如果只产出训练log,不解析,可取消注释
+# _train       # 如果只产出训练log,不解析,可取消注释
 _run     # 该函数在run_model.sh中,执行时会调用_train; 如果不联调只产出训练log可以注掉本行,提交时需打开

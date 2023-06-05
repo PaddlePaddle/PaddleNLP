@@ -568,6 +568,12 @@ def process_auto_strategy(config):
     tuning.run_after_tuning = tuning_cfg.get("run_after_tuning", True)
     tuning.debug = tuning_cfg.get("debug", True)
 
+    # fusedpasses config
+    fused_passes_cfg = config.get("FusedPasses", {})
+    fused_passes = strategy.fused_passes
+    fused_passes.enable = fused_passes_cfg.get("enable", False)
+    fused_passes.fused_passes_list = fused_passes_cfg.get("fused_passes_list", [])
+
     engine_cfg = config["Engine"]
     engine_cfg["strategy"] = strategy
 

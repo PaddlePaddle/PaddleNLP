@@ -25,6 +25,9 @@ Engine:
     output_dir: ./output
     ckpt_dir:
 
+FusedPasses:
+  enable: False
+  fused_passes_list: ["fuse_adamw"]
 
 Model:
   module: "GPTModuleAuto"
