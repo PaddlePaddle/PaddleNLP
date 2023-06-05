@@ -101,7 +101,7 @@ class DebertaV2Tokenizer(PretrainedTokenizer):
               BPE-dropout.
     """
 
-    resource_files_names = {"vocab_file": "spm.model"}
+    resource_files_names = {"sentencepiece_model_file": "spm.model"}
     pretrained_resource_files_map = PRETRAINED_VOCAB_FILES_MAP
     pretrained_init_configuration = PRETRAINED_INIT_CONFIGURATION
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
