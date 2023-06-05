@@ -191,6 +191,12 @@ class ToolsManager:
                 try:
                     self.callback_manager.on_tool_start(tool_input, tool=tool)
                     tool_result = tool.run(tool_input, params)
+                    # self.callback_manager.on_tool_finish(
+                    #     tool_result,
+                    #     observation_prefix="观察：",
+                    #     llm_prefix="思考：",
+                    #     color=tool.logging_color,
+                    # )
                     self.callback_manager.on_tool_finish(
                         tool_result,
                         observation_prefix="Observation: ",
@@ -403,7 +409,6 @@ class Agent:
         # save the input, output and observation to memory (if memory is enabled)
         memory_data = self.prepare_data_for_memory(input=query, output=prompt_node_response, observation=observation)
         self.memory.save(data=memory_data)
-
         # update the next step with the observation
         next_step.completed(observation)
         return next_step

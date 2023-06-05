@@ -65,10 +65,22 @@ args = parser.parse_args()
 
 
 def search_and_action_example():
+
+    qa_template = PromptTemplate(
+        name="question-answering-with-document-scores",
+        prompt_text="使用以下段落作为来源回答以下问题。"
+        "答案应该简短，最多几个字。\n"
+        "段落:\n{documents}\n"
+        "问题: {query}\n\n"
+        "说明：考虑以上所有段落及其相应的分数，得出答案。 "
+        "虽然一个段落可能得分很高， "
+        "但重要的是要考虑同一候选答案的所有段落，以便准确回答。\n\n"
+        "在考虑了所有的可能性之后，最终答案是:\n",
+    )
     pn = PromptNode(
         args.llm_name,
         max_length=512,
-        default_prompt_template="question-answering-with-document-scores",
+        default_prompt_template=qa_template,
         api_key=args.api_key,
         secret_key=args.secret_key,
     )
@@ -92,12 +104,15 @@ def search_and_action_example():
     agent = Agent(
         prompt_node=prompt_node,
         prompt_template=few_shot_agent_template,
-        tools_manager=ToolsManager([web_qa_tool]),
-        max_steps=8,
+        tools_manager=ToolsManager(
+            tools=[web_qa_tool],
+            tool_pattern=r"工具:\s*(\w+)\s*工具输入:\s*(?:\"([\s\S]*?)\"|((?:.|\n)*))\s*",
+        ),
+        max_steps=4,
         final_answer_pattern=r"最终答案\s*:\s*(.*)",
     )
     hotpot_questions = [
-        "成龙的儿子的年龄是多少?",
+        "成龙的妻子是谁?",
     ]
     for question in hotpot_questions:
         result = agent.run(query=question)

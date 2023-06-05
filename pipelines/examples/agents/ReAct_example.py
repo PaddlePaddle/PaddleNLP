@@ -83,7 +83,7 @@ Thought:
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--search_api_key", default=None, type=str, help="The SerpAPI key.")
-parser.add_argument('--llm_name', choices=['THUDM/chatglm-6b', "THUDM/chatglm-6b-v1.1", "gpt-3.5-turbo"], default="THUDM/chatglm-6b-v1.1", help="The chatbot models ")
+parser.add_argument('--llm_name', choices=['THUDM/chatglm-6b', "THUDM/chatglm-6b-v1.1", "gpt-3.5-turbo", "gpt-4"], default="THUDM/chatglm-6b-v1.1", help="The chatbot models ")
 parser.add_argument("--api_key", default=None, type=str, help="The API Key.")
 args = parser.parse_args()
 # yapf: enable
@@ -92,7 +92,7 @@ args = parser.parse_args()
 def search_and_action_example():
     pn = PromptNode(
         args.llm_name,
-        max_length=512,
+        max_length=256,
         api_key=args.api_key,
         default_prompt_template="question-answering-with-document-scores",
     )
