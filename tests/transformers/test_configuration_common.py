@@ -164,7 +164,6 @@ class ConfigTester(object):
 
     def create_and_test_config_with_num_classes(self):
         config = self.config_class(**self.inputs_dict, num_classes=5)
-        # breakpoint()
         self.parent.assertEqual(len(config.id2label), 5)
         self.parent.assertEqual(len(config.label2id), 5)
 
