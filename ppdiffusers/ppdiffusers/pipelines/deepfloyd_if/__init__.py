@@ -58,10 +58,10 @@ class IFPipelineOutput(BaseOutput):
 
 
 try:
-    if not (is_paddlenlp_available() and is_paddle_available()):
+    if not (is_paddle_available() and is_paddlenlp_available()):
         raise OptionalDependencyNotAvailable()
 except OptionalDependencyNotAvailable:
-    from ...utils.dummy_paddle_and_paddlenlp_objects import *
+    from ...utils.dummy_paddle_and_paddlenlp_objects import *  # noqa F403
 else:
     from .pipeline_if import IFPipeline
     from .pipeline_if_img2img import IFImg2ImgPipeline

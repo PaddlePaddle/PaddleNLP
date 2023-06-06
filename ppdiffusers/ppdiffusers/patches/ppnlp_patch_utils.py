@@ -1033,6 +1033,7 @@ if is_paddle_available() and is_paddlenlp_available():
     from ..pipelines.alt_diffusion.modeling_roberta_series import (
         RobertaSeriesModelWithTransformation,
     )
+    from ..pipelines.deepfloyd_if.safety_checker import IFSafetyChecker
     from ..pipelines.latent_diffusion.pipeline_latent_diffusion import LDMBertModel
     from ..pipelines.paint_by_example.image_encoder import PaintByExampleImageEncoder
     from ..pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
@@ -1064,6 +1065,8 @@ if is_paddle_available() and is_paddlenlp_available():
         if cls in [PaintByExampleImageEncoder]:
             # ignore mapper. prefix, we will use convert_pytorch_state_dict_to_paddle to convert mapper.xxxx state_dict
             ignore_value.append("mapper.")
+        elif cls in [IFSafetyChecker]:
+            pass
         else:
             name_mapping_dict.update({".vision_model.": "."})
 
@@ -1190,6 +1193,7 @@ if is_paddle_available() and is_paddlenlp_available():
         StableDiffusionSafetyChecker,
         SafeStableDiffusionSafetyChecker,
         PaintByExampleImageEncoder,
+        IFSafetyChecker,
     ]:
         setattr(cls_, "smart_convert", clip_smart_convert)
 
