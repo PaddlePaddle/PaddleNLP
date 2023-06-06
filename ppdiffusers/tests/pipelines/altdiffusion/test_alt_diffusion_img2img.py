@@ -27,6 +27,7 @@ from ppdiffusers import (
     PNDMScheduler,
     UNet2DConditionModel,
 )
+from ppdiffusers.image_processor import VaeImageProcessor
 from ppdiffusers.pipelines.alt_diffusion.modeling_roberta_series import (
     RobertaSeriesConfig,
     RobertaSeriesModelWithTransformation,
@@ -124,6 +125,7 @@ class AltDiffusionImg2ImgPipelineFastTests(unittest.TestCase):
             safety_checker=None,
             feature_extractor=self.dummy_extractor,
         )
+        alt_pipe.image_processor = VaeImageProcessor(vae_scale_factor=alt_pipe.vae_scale_factor, do_normalize=False)
         alt_pipe.set_progress_bar_config(disable=None)
         prompt = "A painting of a squirrel eating a burger"
         generator = paddle.Generator().manual_seed(0)
@@ -150,7 +152,7 @@ class AltDiffusionImg2ImgPipelineFastTests(unittest.TestCase):
         image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
         assert image.shape == (1, 32, 32, 3)
         expected_slice = np.array(
-            [0.920333, 0.53369606, 0.56038886, 0.47739977, 0.18425128, 0.47001246, 0.5406687, 0.4329021, 0.6154301]
+            [0.9218242, 0.55050874, 0.58339375, 0.4774979, 0.18762481, 0.47443363, 0.54180235, 0.4383098, 0.6130641]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.005
         assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 0.005
@@ -176,6 +178,7 @@ class AltDiffusionImg2ImgPipelineFastTests(unittest.TestCase):
             safety_checker=None,
             feature_extractor=self.dummy_extractor,
         )
+        alt_pipe.image_processor = VaeImageProcessor(vae_scale_factor=alt_pipe.vae_scale_factor, do_normalize=False)
         alt_pipe.set_progress_bar_config(disable=None)
         prompt = "A painting of a squirrel eating a burger"
         generator = paddle.Generator().manual_seed(0)

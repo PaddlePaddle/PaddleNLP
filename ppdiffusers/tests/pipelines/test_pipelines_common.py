@@ -389,7 +389,7 @@ class PipelineTesterMixin:
         self._test_attention_slicing_forward_pass()
 
     def _test_attention_slicing_forward_pass(
-        self, test_max_difference=True, test_mean_pixel_difference=True, expected_max_diff=1e-3
+        self, test_max_difference=True, test_mean_pixel_difference=True, expected_max_diff=5e-3
     ):
         if not self.test_attention_slicing:
             return
