@@ -40,7 +40,7 @@ Blip2Model.from_pretrained("Salesforce/blip2-flan-t5-xxl")
 
 ### 1.3 准备 Vicuna 权重
 
-这里需要下载两个权重：Vicuna delta Weight和huggingface-formated Llama Weight。 然后你应该结合这两个重量来获得可以使用的Vicuna 权重。
+这里需要下载两个权重：Vicuna delta Weight和huggingface-formated Llama Weight。 然后你应该结合这两个权重来获得可以使用的Vicuna 权重。
 
 #### 1.3.1 下载 Vicuna delta 权重
 
