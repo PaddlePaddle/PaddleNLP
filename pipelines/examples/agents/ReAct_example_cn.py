@@ -13,12 +13,24 @@
 # limitations under the License.
 
 import argparse
+import glob
+import os
 
 from pipelines.agents import Agent, Tool
 from pipelines.agents.base import ToolsManager
-from pipelines.nodes import PromptNode, WebRetriever
+from pipelines.document_stores import FAISSDocumentStore
+from pipelines.nodes import (
+    CharacterTextSplitter,
+    DensePassageRetriever,
+    DocxToTextConverter,
+    FileTypeClassifier,
+    PDFToTextConverter,
+    PromptNode,
+    TextConverter,
+    WebRetriever,
+)
 from pipelines.nodes.prompt.prompt_template import PromptTemplate
-from pipelines.pipelines import WebQAPipeline
+from pipelines.pipelines import Pipeline, WebQAPipeline
 
 few_shot_prompt = """
 你是一个乐于助人、知识渊博的人工智能助手。为了实现正确回答复杂问题的目标，您可以使用以下工具:
@@ -44,7 +56,20 @@ few_shot_prompt = """
 
 # yapf: disable
 parser = argparse.ArgumentParser()
+parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to run dense_qa system, defaults to gpu.")
+parser.add_argument("--index_name", default='dureader_index', type=str, help="The ann index name of ANN.")
+parser.add_argument("--search_engine", choices=['faiss', 'milvus'], default="faiss", help="The type of ANN search engine.")
+parser.add_argument("--retriever", choices=['dense', 'SerpAPI'], default="dense", help="The type of Retriever.")
+parser.add_argument("--max_seq_len_query", default=64, type=int, help="The maximum total length of query after tokenization.")
+parser.add_argument("--max_seq_len_passage", default=256, type=int, help="The maximum total length of passage after tokenization.")
+parser.add_argument("--retriever_batch_size", default=16, type=int, help="The batch size of retriever to extract passage embedding for building ANN index.")
+parser.add_argument("--query_embedding_model", default="rocketqa-zh-base-query-encoder", type=str, help="The query_embedding_model path")
+parser.add_argument("--passage_embedding_model", default="rocketqa-zh-base-query-encoder", type=str, help="The passage_embedding_model path")
+parser.add_argument("--params_path", default="checkpoints/model_40/model_state.pdparams", type=str, help="The checkpoint path")
+parser.add_argument("--embedding_dim", default=768, type=int, help="The embedding_dim of index")
 parser.add_argument("--search_api_key", default=None, type=str, help="The SerpAPI key.")
+parser.add_argument('--embed_title', default=False, type=bool, help="The title to be  embedded into embedding")
+parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search'], default="ernie", help="the ernie model types")
 parser.add_argument('--llm_name', choices=['ernie-bot', 'THUDM/chatglm-6b', "gpt-3.5-turbo", "gpt-4"], default="THUDM/chatglm-6b", help="The chatbot models ")
 parser.add_argument("--api_key", default=None, type=str, help="The API Key.")
 parser.add_argument("--secret_key", default=None, type=str, help="The secret key.")
@@ -52,7 +77,78 @@ args = parser.parse_args()
 # yapf: enable
 
 
-def search_and_action_example():
+def indexing_files(retriever, document_store, filepaths, chunk_size):
+    try:
+        text_converter = TextConverter()
+        pdf_converter = PDFToTextConverter()
+        doc_converter = DocxToTextConverter()
+
+        text_splitter = CharacterTextSplitter(separator="\f", chunk_size=chunk_size, chunk_overlap=0, filters=["\n"])
+        pdf_splitter = CharacterTextSplitter(
+            separator="\f",
+            chunk_size=chunk_size,
+            chunk_overlap=0,
+            filters=['([﹒﹔﹖﹗．。！？]["’”」』]{0,2}|(?=["‘“「『]{1,2}|$))'],
+        )
+        file_classifier = FileTypeClassifier()
+        indexing_pipeline = Pipeline()
+        indexing_pipeline.add_node(component=file_classifier, name="file_classifier", inputs=["File"])
+        indexing_pipeline.add_node(component=doc_converter, name="DocConverter", inputs=["file_classifier.output_4"])
+        indexing_pipeline.add_node(component=text_converter, name="TextConverter", inputs=["file_classifier.output_1"])
+        indexing_pipeline.add_node(component=pdf_converter, name="PDFConverter", inputs=["file_classifier.output_2"])
+
+        indexing_pipeline.add_node(
+            component=text_splitter, name="TextSplitter", inputs=["TextConverter", "DocConverter"]
+        )
+        indexing_pipeline.add_node(component=pdf_splitter, name="PDFSplitter", inputs=["PDFConverter"])
+        indexing_pipeline.add_node(component=retriever, name="Retriever", inputs=["TextSplitter", "PDFSplitter"])
+        indexing_pipeline.add_node(component=document_store, name="DocumentStore", inputs=["Retriever"])
+        files = glob.glob(filepaths + "/*.*", recursive=True)
+        indexing_pipeline.run(file_paths=files)
+    except Exception as e:
+        print(e)
+        pass
+
+
+def get_faiss_retriever(use_gpu):
+    faiss_document_store = "faiss_document_store.db"
+    if os.path.exists(args.index_name) and os.path.exists(faiss_document_store):
+        # connect to existed FAISS Index
+        document_store = FAISSDocumentStore.load(args.index_name)
+        retriever = DensePassageRetriever(
+            document_store=document_store,
+            query_embedding_model=args.query_embedding_model,
+            passage_embedding_model=args.passage_embedding_model,
+            params_path=args.params_path,
+            output_emb_size=args.embedding_dim if args.model_type in ["ernie_search", "neural_search"] else None,
+            max_seq_len_query=args.max_seq_len_query,
+            max_seq_len_passage=args.max_seq_len_passage,
+            batch_size=args.retriever_batch_size,
+            use_gpu=use_gpu,
+            embed_title=args.embed_title,
+        )
+    else:
+        document_store = FAISSDocumentStore(embedding_dim=args.embedding_dim, faiss_index_factory_str="Flat")
+        retriever = DensePassageRetriever(
+            document_store=document_store,
+            query_embedding_model=args.query_embedding_model,
+            passage_embedding_model=args.passage_embedding_model,
+            params_path=args.params_path,
+            output_emb_size=args.embedding_dim if args.model_type in ["ernie_search", "neural_search"] else None,
+            max_seq_len_query=args.max_seq_len_query,
+            max_seq_len_passage=args.max_seq_len_passage,
+            batch_size=args.retriever_batch_size,
+            use_gpu=use_gpu,
+            embed_title=args.embed_title,
+            top_k=5,
+        )
+        filepaths = "data/dureader_dev/dureader_dev"
+        indexing_files(retriever, document_store, filepaths, chunk_size=500)
+        document_store.save(args.index_name)
+    return retriever
+
+
+def search_and_action_example(web_retriever):
 
     qa_template = PromptTemplate(
         name="文档问答",
@@ -73,8 +169,6 @@ def search_and_action_example():
         secret_key=args.secret_key,
     )
 
-    # https://serpapi.com/dashboard
-    web_retriever = WebRetriever(api_key=args.search_api_key, engine="bing", top_search_results=2)
     pipeline = WebQAPipeline(retriever=web_retriever, prompt_node=pn)
 
     prompt_node = PromptNode(
@@ -99,13 +193,17 @@ def search_and_action_example():
         max_steps=8,
         final_answer_pattern=r"最终答案\s*:\s*(.*)",
     )
-    hotpot_questions = [
-        " 成龙的儿子几岁了?",
-    ]
+    hotpot_questions = ["范冰冰的身高是多少?", "武则天传位给了谁？"]
     for question in hotpot_questions:
         result = agent.run(query=question)
         print(f"\n{result['transcript']}")
 
 
 if __name__ == "__main__":
-    search_and_action_example()
+    if args.retriever == "dense":
+        use_gpu = True if args.device == "gpu" else False
+        web_retriever = get_faiss_retriever(use_gpu)
+    else:
+        # https://serpapi.com/dashboard
+        web_retriever = WebRetriever(api_key=args.search_api_key, engine="bing", top_search_results=2)
+    search_and_action_example(web_retriever)

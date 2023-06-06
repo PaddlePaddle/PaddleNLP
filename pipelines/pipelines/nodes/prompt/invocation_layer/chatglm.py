@@ -68,8 +68,14 @@ class ChatGLMInvocationLayer(ChatGLMBot, PromptModelInvocationLayer):
                 f"No prompt provided. Model {self.model_name_or_path} requires prompt."
                 f"Make sure to provide prompt in kwargs."
             )
+        # return a list
         output = self.predict(prompt)
-        generated_texts = output["result"]
+        if "stop_words" in kwargs and kwargs["stop_words"] is not None:
+            # split text by stop words
+            result = output["result"][0].split(kwargs["stop_words"][0])[0]
+            generated_texts = [result]
+        else:
+            generated_texts = output["result"]
         return generated_texts
 
     def _ensure_token_limit(self, prompt: Union[str, List[Dict[str, str]]]) -> Union[str, List[Dict[str, str]]]:

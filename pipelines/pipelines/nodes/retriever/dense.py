@@ -16,7 +16,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 
 import numpy as np
 import paddle
@@ -56,6 +56,7 @@ class DensePassageRetriever(BaseRetriever):
         embed_title: bool = True,
         similarity_function: str = "dot_product",
         progress_bar: bool = True,
+        mode: Literal["snippets", "raw_documents", "preprocessed_documents"] = "preprocessed_documents",
     ):
         """
         Init the Retriever incl. the two encoder models from a local or remote model checkpoint.
@@ -124,6 +125,7 @@ class DensePassageRetriever(BaseRetriever):
         self.progress_bar = progress_bar
         self.top_k = top_k
         self.embed_title = embed_title
+        self.mode = mode
 
         if document_store is None:
             logger.warning("DensePassageRetriever initialized without a document store. ")
