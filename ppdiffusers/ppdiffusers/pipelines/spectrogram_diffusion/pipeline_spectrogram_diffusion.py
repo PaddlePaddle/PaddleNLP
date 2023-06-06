@@ -25,7 +25,7 @@ from ..pipeline_utils import AudioPipelineOutput, DiffusionPipeline
 from .continous_encoder import SpectrogramContEncoder
 from .notes_encoder import SpectrogramNotesEncoder
 
-logger = logging.get_logger(__name__)
+logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 TARGET_FEATURE_LENGTH = 256
 
 
@@ -41,8 +41,10 @@ class SpectrogramDiffusionPipeline(DiffusionPipeline):
         melgan: (Any),
     ) -> None:
         super().__init__()
-        self.min_value = math.log(1e-05)
-        self.max_value = 4.0
+
+        # From MELGAN
+        self.min_value = math.log(1e-05)  # Matches MelGAN training.
+        self.max_value = 4.0  # Largest value for most examples
         self.n_dims = 128
         self.register_modules(
             notes_encoder=notes_encoder,
@@ -57,14 +59,18 @@ class SpectrogramDiffusionPipeline(DiffusionPipeline):
         min_out, max_out = output_range
         if clip:
             features = paddle.clip(x=features, min=self.min_value, max=self.max_value)
+        # Scale to [0, 1].
         zero_one = (features - self.min_value) / (self.max_value - self.min_value)
+        # Scale to [min_out, max_out].
         return zero_one * (max_out - min_out) + min_out
 
     def scale_to_features(self, outputs, input_range=(-1.0, 1.0), clip=False):
         """Invert by linearly scaling network outputs to features range."""
         min_out, max_out = input_range
         outputs = paddle.clip(x=outputs, min=min_out, max=max_out) if clip else outputs
+        # Scale to [0, 1].
         zero_one = (outputs - min_out) / (max_out - min_out)
+        # Scale to [self.min_value, self.max_value].
         return zero_one * (self.max_value - self.min_value) + self.min_value
 
     def encode(self, input_tokens, continuous_inputs, continuous_mask):
@@ -91,6 +97,7 @@ class SpectrogramDiffusionPipeline(DiffusionPipeline):
             else:
                 dtype = timesteps[None].dtype
             timesteps = timesteps[None].cast(dtype)
+        # broadcast to batch dimension in a way that's compatible with ONNX/Core ML
         timesteps = timesteps * paddle.ones(shape=input_tokens.shape[0], dtype=timesteps.dtype)
         logits = self.decoder(
             encodings_and_masks=encodings_and_masks, decoder_input_tokens=input_tokens, decoder_noise_time=timesteps
@@ -122,8 +129,13 @@ class SpectrogramDiffusionPipeline(DiffusionPipeline):
         for i, encoder_input_tokens in enumerate(input_tokens):
             if i == 0:
                 encoder_continuous_inputs = paddle.to_tensor(data=pred_mel[:1].copy()).cast(self.decoder.dtype)
+                # The first chunk has no previous context.
                 encoder_continuous_mask = paddle.zeros(shape=(1, TARGET_FEATURE_LENGTH), dtype=bool)
             else:
+                # The full song pipeline does not feed in a context feature, so the mask
+                # will be all 0s after the feature converter. Because we know we're
+                # feeding in a full context chunk from the previous prediction, set it
+                # to all 1s.
                 encoder_continuous_mask = ones
             encoder_continuous_inputs = self.scale_features(
                 encoder_continuous_inputs, output_range=[-1.0, 1.0], clip=True
@@ -133,19 +145,29 @@ class SpectrogramDiffusionPipeline(DiffusionPipeline):
                 continuous_inputs=encoder_continuous_inputs,
                 continuous_mask=encoder_continuous_mask,
             )
+
+            # Sample encoder_continuous_inputs shaped gaussian noise to begin loop
             x = randn_tensor(shape=encoder_continuous_inputs.shape, generator=generator, dtype=self.decoder.dtype)
+
+            # set step values
             self.scheduler.set_timesteps(num_inference_steps)
+
+            # Denoising diffusion loop
             for j, t in enumerate(self.progress_bar(self.scheduler.timesteps)):
                 output = self.decode(
                     encodings_and_masks=encodings_and_masks,
                     input_tokens=x,
                     noise_time=t / self.scheduler.config.num_train_timesteps,
                 )
+
+                # Compute previous output: x_t -> x_t-1
                 x = self.scheduler.step(output, t, x, generator=generator).prev_sample
             mel = self.scale_to_features(x, input_range=[-1.0, 1.0])
             encoder_continuous_inputs = mel[:1]
             pred_mel = mel.cpu().astype(dtype="float32").numpy()
             full_pred_mel = np.concatenate([full_pred_mel, pred_mel[:1]], axis=1)
+
+            # call the callback, if provided
             if callback is not None and i % callback_steps == 0:
                 callback(i, full_pred_mel)
             logger.info("Generated segment", i)

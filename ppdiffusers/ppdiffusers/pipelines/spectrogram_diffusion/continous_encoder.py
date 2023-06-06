@@ -60,16 +60,23 @@ class SpectrogramContEncoder(ModelMixin, ConfigMixin):
         self.dropout_post = nn.Dropout(p=dropout_rate)
 
     def forward(self, encoder_inputs, encoder_inputs_mask):
+
+        # terminal relative positional encodings
         x = self.input_proj(encoder_inputs)
         max_positions = encoder_inputs.shape[1]
         input_positions = paddle.arange(end=max_positions)
+
         seq_lens = encoder_inputs_mask.sum(axis=-1)
         input_positions = paddle.roll(x=input_positions.unsqueeze(axis=0), shifts=tuple(seq_lens.tolist()), dims=0)
         x += self.position_encoding(input_positions)
         x = self.dropout_pre(x)
+
+        # inverted the attention mask
         input_shape = encoder_inputs.shape
         extended_attention_mask = self.get_extended_attention_mask(encoder_inputs_mask, input_shape)
+
         for lyr in self.encoders:
             x = lyr(x, extended_attention_mask)[0]
         x = self.layer_norm(x)
+
         return self.dropout_post(x), encoder_inputs_mask

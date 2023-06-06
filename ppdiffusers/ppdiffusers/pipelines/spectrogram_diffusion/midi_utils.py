@@ -104,6 +104,7 @@ class NoteEventData:
 class NoteEncodingState:
     """Encoding state for note transcription, keeping track of active pitches."""
 
+    # velocity bin for active pitches and programs
     active_pitches: MutableMapping[Tuple[int, int], int] = dataclasses.field(default_factory=dict)
 
 
@@ -122,6 +123,7 @@ class Event:
 
 class Tokenizer:
     def __init__(self, regular_ids: int):
+        # The special tokens: 0=PAD, 1=EOS, and 2=UNK
         self._num_special_tokens = 3
         self._num_regular_tokens = regular_ids
 
@@ -133,8 +135,13 @@ class Tokenizer:
                     f"token_id {token_id} does not fall within valid range of [0, {self._num_regular_tokens})"
                 )
             encoded.append(token_id + self._num_special_tokens)
+
+        # Add EOS token
         encoded.append(1)
+
+        # Pad to till INPUT_FEATURE_LENGTH
         encoded = encoded + [0] * (INPUT_FEATURE_LENGTH - len(encoded))
+
         return encoded
 
 
@@ -161,11 +168,16 @@ class Codec:
         self.steps_per_second = steps_per_second
         self._shift_range = EventRange(type="shift", min_value=0, max_value=max_shift_steps)
         self._event_ranges = [self._shift_range] + event_ranges
+
+        # Ensure all event types have unique names.
         assert len(self._event_ranges) == len({er.type for er in self._event_ranges})
 
     @property
     def num_classes(self) -> int:
         return sum(er.max_value - er.min_value + 1 for er in self._event_ranges)
+
+    # The next couple methods are simplified special case methods just for shift
+    # events that are intended to be used from within autograph functions.
 
     def is_shift_event_index(self, index: int) -> bool:
         return self._shift_range.min_value <= index and index <= self._shift_range.max_value
@@ -208,6 +220,7 @@ class Codec:
 
 @dataclasses.dataclass
 class ProgramGranularity:
+    # both tokens_map_fn and program_map_fn should be idempotent
     tokens_map_fn: Callable[[Sequence[int], Codec], Sequence[int]]
     program_map_fn: Callable[[int], int]
 
@@ -226,10 +239,14 @@ def programs_to_midi_classes(tokens, codec):
 
 
 PROGRAM_GRANULARITIES = {
+    # "flat" granularity; drop program change tokens and set NoteSequence
+    # programs to zero
     "flat": ProgramGranularity(tokens_map_fn=drop_programs, program_map_fn=lambda program: 0),
+    # map each program to the first program in its MIDI class
     "midi_class": ProgramGranularity(
         tokens_map_fn=programs_to_midi_classes, program_map_fn=lambda program: 8 * (program // 8)
     ),
+    # leave programs as is
     "full": ProgramGranularity(tokens_map_fn=lambda tokens, codec: tokens, program_map_fn=lambda program: program),
 }
 
@@ -271,6 +288,7 @@ def frame(signal, frame_length, frame_step, pad_end=False, pad_value=0, axis=-1)
 
 
 def program_to_slakh_program(program):
+    # this is done very hackily, probably should use a custom mapping
     for slakh_program in sorted(SLAKH_CLASS_PROGRAMS.values(), reverse=True):
         if program >= slakh_program:
             return slakh_program
@@ -280,6 +298,8 @@ def audio_to_frames(samples, hop_size: int, frame_rate: int) -> Tuple[Sequence[S
     """Convert audio samples to non-overlapping frames and frame times."""
     frame_size = hop_size
     samples = np.pad(samples, [0, frame_size - len(samples) % frame_size], mode="constant")
+
+    # Split audio into frames.
     frames = frame(
         paddle.to_tensor(data=samples).unsqueeze(axis=0), frame_length=frame_size, frame_step=frame_size, pad_end=False
     )
@@ -303,6 +323,8 @@ def note_sequence_to_onsets_and_offsets_and_programs(
       note
           offsets.
     """
+    # Sort by program and pitch and put offsets before onsets as a tiebreaker for
+    # subsequent stable sort.
     notes = sorted(ns.notes, key=lambda note: (note.is_drum, note.program, note.pitch))
     times = [note.end_time for note in notes if not note.is_drum] + [note.start_time for note in notes]
     values = [
@@ -322,6 +344,7 @@ def num_velocity_bins_from_codec(codec: Codec):
     return hi - lo
 
 
+# segment an array into segments of length n
 def segment(a, n):
     return [a[i : i + n] for i in range(0, len(a), n)]
 
@@ -338,17 +361,21 @@ def note_event_data_to_events(
 ) -> Sequence[Event]:
     """Convert note event data to a sequence of events."""
     if value.velocity is None:
+        # onsets only, no program or velocity
         return [Event("pitch", value.pitch)]
     else:
         num_velocity_bins = num_velocity_bins_from_codec(codec)
         velocity_bin = velocity_to_bin(value.velocity, num_velocity_bins)
         if value.program is None:
+            # onsets + offsets + velocities only, no programs
             if state is not None:
                 state.active_pitches[value.pitch, 0] = velocity_bin
             return [Event("velocity", velocity_bin), Event("pitch", value.pitch)]
         elif value.is_drum:
+            # drum events use a separate vocabulary
             return [Event("velocity", velocity_bin), Event("drum", value.pitch)]
         else:
+            # program + velocity + pitch
             if state is not None:
                 state.active_pitches[value.pitch, value.program] = velocity_bin
             return [Event("program", value.program), Event("velocity", velocity_bin), Event("pitch", value.pitch)]
@@ -424,16 +451,28 @@ def encode_and_index_events(
             cur_event_idx = len(events)
             cur_state_event_idx = len(state_events)
         if encoding_state_to_events_fn:
+            # Dump state to state events *before* processing the next event, because
+            # we want to capture the state prior to the occurrence of the event.
             for e in encoding_state_to_events_fn(state):
                 state_events.append(codec.encode_event(e))
         for e in encode_event_fn(state, event_value, codec):
             events.append(codec.encode_event(e))
+
+    # After the last event, continue filling out the event_start_indices array.
+    # The inequality is not strict because if our current step lines up exactly
+    # with (the start of) an audio frame, we need to add an additional shift event
+    # to "cover" that frame.
     while cur_step / codec.steps_per_second <= frame_times[-1]:
         events.append(codec.encode_event(Event(type="shift", value=1)))
         cur_step += 1
         fill_event_start_indices_to_cur_step()
         cur_event_idx = len(events)
+
+    # Now fill in event_end_indices. We need this extra array to make sure that
+    # when we slice events, each slice ends exactly where the subsequent slice
+    # begins.
     event_end_indices = event_start_indices[1:] + [len(events)]
+
     events = np.array(events).astype(np.int32)
     state_events = np.array(state_events).astype(np.int32)
     event_start_indices = segment(np.array(event_start_indices).astype(np.int32), TARGET_FEATURE_LENGTH)
@@ -460,6 +499,8 @@ def extract_sequence_with_indices(features, state_events_end_token=None, feature
     end_idx = features["event_end_indices"][-1]
     features[feature_key] = features[feature_key][start_idx:end_idx]
     if state_events_end_token is not None:
+        # Extract the state events corresponding to the audio start token, and
+        # prepend them to the targets array.
         state_event_start_idx = features["state_event_indices"][0]
         state_event_end_idx = state_event_start_idx + 1
         while features["state_events"][state_event_end_idx - 1] != state_events_end_token:
@@ -515,6 +556,8 @@ def run_length_encode_shifts_fn(
                 shift_steps += 1
                 total_shift_steps += 1
             else:
+                # If this event is a state change and has the same value as the current
+                # state, we can skip it entirely.
                 is_redundant = False
                 for i, (min_index, max_index) in enumerate(state_change_event_ranges):
                     if min_index <= event and event <= max_index:
@@ -523,6 +566,9 @@ def run_length_encode_shifts_fn(
                         current_state[i] = event
                 if is_redundant:
                     continue
+
+                # Once we've reached a non-shift event, RLE all previous shift events
+                # before outputting the non-shift event.
                 if shift_steps > 0:
                     shift_steps = total_shift_steps
                     while shift_steps > 0:

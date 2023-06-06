@@ -66,6 +66,8 @@ class SpectrogramNotesEncoder(ModelMixin, ConfigMixin):
         inputs_positions = paddle.arange(end=seq_length)
         x += self.position_encoding(inputs_positions)
         x = self.dropout_pre(x)
+
+        # inverted the attention mask
         input_shape = encoder_input_tokens.shape
         extended_attention_mask = self.get_extended_attention_mask(encoder_inputs_mask, input_shape)
         for lyr in self.encoders:
