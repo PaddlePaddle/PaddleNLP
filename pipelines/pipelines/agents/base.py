@@ -134,6 +134,8 @@ class ToolsManager:
         self,
         tools: Optional[List[Tool]] = None,
         tool_pattern: str = r"Tool:\s*(\w+)\s*Tool Input:\s*(?:\"([\s\S]*?)\"|((?:.|\n)*))\s*",
+        observation_prefix: str = "Observation: ",
+        llm_prefix: str = "Thought: ",
     ):
         """
         :param tools: A list of tools to add to the ToolManager. Each tool must have a unique name.
@@ -143,6 +145,8 @@ class ToolsManager:
         self._tools: Dict[str, Tool] = {tool.name: tool for tool in tools} if tools else {}
         self.tool_pattern = tool_pattern
         self.callback_manager = Events(("on_tool_start", "on_tool_finish", "on_tool_error"))
+        self.observation_prefix = observation_prefix
+        self.llm_prefix = llm_prefix
 
     def add_tool(self, tool: Tool):
         """
@@ -193,16 +197,10 @@ class ToolsManager:
                     tool_result = tool.run(tool_input, params)
                     self.callback_manager.on_tool_finish(
                         tool_result,
-                        observation_prefix="观察: ",
-                        llm_prefix="思考: ",
+                        observation_prefix=f"{self.observation_prefix}",
+                        llm_prefix="{self.llm_prefix}",
                         color=tool.logging_color,
                     )
-                    # self.callback_manager.on_tool_finish(
-                    #     tool_result,
-                    #     observation_prefix="Observation: ",
-                    #     llm_prefix="Thought: ",
-                    #     color=tool.logging_color,
-                    # )
                 except Exception as e:
                     self.callback_manager.on_tool_error(e, tool=self.tools[tool_name])
                     raise e
@@ -247,6 +245,8 @@ class Agent:
         prompt_parameters_resolver: Optional[Callable] = None,
         max_steps: int = 8,
         final_answer_pattern: str = r"Final Answer\s*:\s*(.*)",
+        observation_prefix: str = "Observation: ",
+        llm_prefix: str = "Thought: ",
     ):
         """
          Creates an Agent instance.
@@ -275,6 +275,8 @@ class Agent:
         self.prompt_node = prompt_node
         prompt_template = prompt_template or "zero-shot-react"
         resolved_prompt_template = prompt_node.get_prompt_template(prompt_template)
+        self.observation_prefix = observation_prefix
+        self.llm_prefix = llm_prefix
         if not resolved_prompt_template:
             raise ValueError(
                 f"Prompt template '{prompt_template}' not found. Please check the spelling of the template name."

@@ -31,6 +31,7 @@ from pipelines.nodes import (
 )
 from pipelines.nodes.prompt.prompt_template import PromptTemplate
 from pipelines.pipelines import Pipeline, WebQAPipeline
+from pipelines.utils import fetch_archive_from_http
 
 few_shot_prompt = """
 你是一个乐于助人、知识渊博的人工智能助手。为了实现正确回答复杂问题的目标，您可以使用以下工具:
@@ -128,6 +129,10 @@ def get_faiss_retriever(use_gpu):
             embed_title=args.embed_title,
         )
     else:
+        dureader_data = "https://paddlenlp.bj.bcebos.com/applications/dureader_dev.zip"
+        zip_dir = "data/dureader_dev"
+        fetch_archive_from_http(url=dureader_data, output_dir=zip_dir)
+
         document_store = FAISSDocumentStore(embedding_dim=args.embedding_dim, faiss_index_factory_str="Flat")
         retriever = DensePassageRetriever(
             document_store=document_store,
@@ -189,9 +194,13 @@ def search_and_action_example(web_retriever):
         tools_manager=ToolsManager(
             tools=[web_qa_tool],
             tool_pattern=r"工具:\s*(\w+)\s*工具输入:\s*(?:\"([\s\S]*?)\"|((?:.|\n)*))\s*",
+            observation_prefix="观察: ",
+            llm_prefix="思考: ",
         ),
         max_steps=8,
         final_answer_pattern=r"最终答案\s*:\s*(.*)",
+        observation_prefix="观察: ",
+        llm_prefix="思考: ",
     )
     hotpot_questions = ["范冰冰的身高是多少?", "武则天传位给了谁？"]
     for question in hotpot_questions:

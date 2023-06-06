@@ -36,6 +36,8 @@ class AgentStep:
         final_answer_pattern: Optional[str] = None,
         prompt_node_response: str = "",
         transcript: str = "",
+        observation_prefix: str = "Observation: ",
+        llm_prefix: str = "Thought: ",
     ):
         """
         :param current_step: The current step in the execution of the agent.
@@ -50,6 +52,8 @@ class AgentStep:
         self.final_answer_pattern = final_answer_pattern or r"^([\s\S]+)$"
         self.prompt_node_response = prompt_node_response
         self.transcript = transcript
+        self.observation_prefix = observation_prefix
+        self.llm_prefix = llm_prefix
 
     def create_next_step(self, prompt_node_response: Any, current_step: Optional[int] = None) -> AgentStep:
         """
@@ -118,13 +122,10 @@ class AgentStep:
         Update the transcript with the observation
         :param observation: received observation from the Agent environment.
         """
-        # self.transcript += (
-        #     f"{self.prompt_node_response}\nObservation: {observation}\nThought:"
-        #     if observation
-        #     else self.prompt_node_response
-        # )
         self.transcript += (
-            f"{self.prompt_node_response}\n观察: {observation}\n思考: " if observation else self.prompt_node_response
+            f"{self.prompt_node_response}\n{self.observation_prefix} {observation}\n{self.llm_prefix} "
+            if observation
+            else self.prompt_node_response
         )
 
     def __repr__(self) -> str:
