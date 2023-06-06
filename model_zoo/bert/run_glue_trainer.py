@@ -14,6 +14,7 @@
 
 from dataclasses import dataclass, field
 
+import numpy as np
 import paddle
 from datasets import load_dataset
 from paddle.metric import Accuracy
@@ -39,6 +40,7 @@ METRIC_CLASSES = {
     "mnli": Accuracy,
     "qnli": Accuracy,
     "rte": Accuracy,
+    "wnli": Accuracy,
 }
 
 task_to_keys = {
@@ -96,9 +98,9 @@ def do_train():
     label_list = None
     if not is_regression:
         label_list = train_ds.features["label"].names
-        num_classes = len(label_list)
+        num_labels = len(label_list)
     else:
-        num_classes = 1
+        num_labels = 1
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     def preprocess_function(examples):
@@ -106,7 +108,7 @@ def do_train():
         texts = (
             (examples[sentence1_key],) if sentence2_key is None else (examples[sentence1_key], examples[sentence2_key])
         )
-        result = tokenizer(*texts, max_seq_len=model_args.max_seq_length)
+        result = tokenizer(*texts, max_length=model_args.max_seq_length, truncation=True)
         if "label" in examples:
             # In all cases, rename the column to labels because the model will expect that.
             result["labels"] = examples["label"]
@@ -126,22 +128,31 @@ def do_train():
         dev_ds = load_dataset("glue", model_args.task_name, split="validation")
         dev_ds = dev_ds.map(preprocess_function, batched=True, remove_columns=columns)
 
-    model = AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path, num_classes=num_classes)
+    model = AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path, num_labels=num_labels)
 
     def compute_metrics(p):
-        # Define the metrics of tasks.
         preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
-
+        if is_regression:
+            preds = np.squeeze(preds)
         preds = paddle.to_tensor(preds)
         label = paddle.to_tensor(p.label_ids)
 
-        metric = Accuracy()
-        metric.reset()
+        metric = METRIC_CLASSES[model_args.task_name]()
         result = metric.compute(preds, label)
         metric.update(result)
-        accu = metric.accumulate()
-        metric.reset()
-        return {"accuracy": accu}
+
+        if isinstance(metric, AccuracyAndF1):
+            acc, precision, recall, f1, _ = metric.accumulate()
+            return {"accuracy": acc, "precision": precision, "recall": recall, "f1": f1}
+        elif isinstance(metric, Mcc):
+            mcc = metric.accumulate()
+            return {"mcc": mcc[0]}
+        elif isinstance(metric, PearsonAndSpearman):
+            pearson, spearman, _ = metric.accumulate()
+            return {"pearson": pearson, "spearman": spearman}
+        elif isinstance(metric, Accuracy):
+            acc = metric.accumulate()
+            return {"accuracy": acc}
 
     trainer = Trainer(
         model=model,
