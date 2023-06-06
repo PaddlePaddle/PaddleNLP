@@ -437,7 +437,7 @@ class AttentionPooling(nn.Layer):
             # (bs, n_heads, length, dim_per_head) --> (bs*n_heads, length, dim_per_head)
             x = x.reshape([bs * self.num_heads, -1, self.dim_per_head])
             # (bs*n_heads, length, dim_per_head) --> (bs*n_heads, dim_per_head, length)
-            x = x.transpose([0, 2, 1, 3])
+            x = x.transpose([0, 2, 1])
             return x
 
         class_token = x.mean(axis=1, keepdim=True) + self.positional_embedding.cast(x.dtype)
