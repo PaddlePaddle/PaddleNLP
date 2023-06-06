@@ -247,6 +247,10 @@ from .blip_2.processing import *
 from .chatglm.configuration import *
 from .chatglm.modeling import *
 from .chatglm.tokenizer import *
+from .minigpt4.modeling import *
+from .minigpt4.configuration import *
+from .minigpt4.processing import *
+from .minigpt4.image_processing import *
 from .clap.configuration import *
 from .clap.feature_extraction import *
 from .clap.modeling import *

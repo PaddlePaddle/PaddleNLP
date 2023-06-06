@@ -2,7 +2,7 @@
 model_name:gpt2
 python:python3.7
 gpu_list:0|0,1
---device:gpu
+--device:gpu|gpu
 --use_amp:null
 --max_steps:null
 null:null
