@@ -160,11 +160,15 @@ class AudioLDMPipeline(DiffusionPipeline):
                 )
             prompt_embeds = self.text_encoder(text_input_ids, attention_mask=attention_mask)
             prompt_embeds = prompt_embeds.text_embeds
+            # additional L_2 normalization over each hidden-state
             prompt_embeds = F.normalize(x=prompt_embeds, axis=-1)
         prompt_embeds = prompt_embeds.cast(self.text_encoder.dtype)
         bs_embed, seq_len = prompt_embeds.shape
+        # duplicate text embeddings for each generation per prompt, using mps friendly method
         prompt_embeds = prompt_embeds.tile(repeat_times=[1, num_waveforms_per_prompt])
         prompt_embeds = prompt_embeds.reshape([bs_embed * num_waveforms_per_prompt, seq_len])
+
+        # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance and negative_prompt_embeds is None:
             uncond_tokens: List[str]
             if negative_prompt is None:
@@ -189,12 +193,21 @@ class AudioLDMPipeline(DiffusionPipeline):
             attention_mask = uncond_input.attention_mask
             negative_prompt_embeds = self.text_encoder(uncond_input_ids, attention_mask=attention_mask)
             negative_prompt_embeds = negative_prompt_embeds.text_embeds
+            # additional L_2 normalization over each hidden-state
             negative_prompt_embeds = F.normalize(x=negative_prompt_embeds, axis=-1)
+
         if do_classifier_free_guidance:
+            # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
             seq_len = negative_prompt_embeds.shape[1]
+
             negative_prompt_embeds = negative_prompt_embeds.cast(self.text_encoder.dtype)
+
             negative_prompt_embeds = negative_prompt_embeds.tile(repeat_times=[1, num_waveforms_per_prompt])
             negative_prompt_embeds = negative_prompt_embeds.reshape([batch_size * num_waveforms_per_prompt, seq_len])
+
+            # For classifier free guidance, we need to do two forward passes.
+            # Here we concatenate the unconditional and text embeddings into a single batch
+            # to avoid doing two forward passes
             prompt_embeds = paddle.concat(x=[negative_prompt_embeds, prompt_embeds])
         return prompt_embeds
 
@@ -207,14 +220,22 @@ class AudioLDMPipeline(DiffusionPipeline):
         if mel_spectrogram.dim() == 4:
             mel_spectrogram = mel_spectrogram.squeeze(axis=1)
         waveform = self.vocoder(mel_spectrogram)
+        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
         waveform = waveform.cpu().astype(dtype="float32")
         return waveform
 
     def prepare_extra_step_kwargs(self, generator, eta):
+        # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
+        # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
+        # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
+        # and should be between [0, 1]
+
         accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
         extra_step_kwargs = {}
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
+
+        # check if the scheduler accepts generator
         accepts_generator = "generator" in set(inspect.signature(self.scheduler.step).parameters.keys())
         if accepts_generator:
             extra_step_kwargs["generator"] = generator
@@ -282,6 +303,8 @@ class AudioLDMPipeline(DiffusionPipeline):
             latents = randn_tensor(shape, generator=generator, dtype=dtype)
         else:
             latents = latents
+
+        # scale the initial noise by the standard deviation required by the scheduler
         latents = latents * self.scheduler.init_noise_sigma
         return latents
 
@@ -371,6 +394,7 @@ class AudioLDMPipeline(DiffusionPipeline):
             [`~pipelines.stable_diffusion.StableDiffusionPipelineOutput`] if `return_dict` is True, otherwise a `tuple.
             When returning a tuple, the first element is a list with the generated audios.
         """
+        # 0. Convert audio input length from seconds to spectrogram height
         vocoder_upsample_factor = np.prod(self.vocoder.config.upsample_rates) / self.vocoder.config.sampling_rate
         if audio_length_in_s is None:
             audio_length_in_s = self.unet.config.sample_size * self.vae_scale_factor * vocoder_upsample_factor
@@ -381,6 +405,8 @@ class AudioLDMPipeline(DiffusionPipeline):
             logger.info(
                 f"Audio length in seconds {audio_length_in_s} is increased to {height * vocoder_upsample_factor} so that it can be handled by the model. It will be cut to {audio_length_in_s} after the denoising process."
             )
+
+        # 1. Check inputs. Raise error if not correct
         self.check_inputs(
             prompt,
             audio_length_in_s,
@@ -390,13 +416,21 @@ class AudioLDMPipeline(DiffusionPipeline):
             prompt_embeds,
             negative_prompt_embeds,
         )
+
+        # 2. Define call parameters
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
         elif prompt is not None and isinstance(prompt, list):
             batch_size = len(prompt)
         else:
             batch_size = prompt_embeds.shape[0]
+
+        # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
+        # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
+        # corresponds to doing no classifier free guidance.
         do_classifier_free_guidance = guidance_scale > 1.0
+
+        # 3. Encode input prompt
         prompt_embeds = self._encode_prompt(
             prompt,
             num_waveforms_per_prompt,
@@ -405,8 +439,12 @@ class AudioLDMPipeline(DiffusionPipeline):
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
         )
+
+        # 4. Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps)
         timesteps = self.scheduler.timesteps
+
+        # 5. Prepare latent variables
         num_channels_latents = self.unet.config.in_channels
         latents = self.prepare_latents(
             batch_size * num_waveforms_per_prompt,
@@ -416,12 +454,19 @@ class AudioLDMPipeline(DiffusionPipeline):
             generator,
             latents,
         )
+
+        # 6. Prepare extra step kwargs
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
+
+        # 7. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
+                # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat(x=[latents] * 2) if do_classifier_free_guidance else latents
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+
+                # predict the noise residual
                 noise_pred = self.unet(
                     latent_model_input,
                     t,
@@ -429,19 +474,32 @@ class AudioLDMPipeline(DiffusionPipeline):
                     class_labels=prompt_embeds,
                     cross_attention_kwargs=cross_attention_kwargs,
                 ).sample
+
+                # perform guidance
                 if do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(chunks=2)
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+
+                # compute the previous noisy sample x_t -> x_t-1
                 latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
+
+                # call the callback, if provided
                 if i == len(timesteps) - 1 or i + 1 > num_warmup_steps and (i + 1) % self.scheduler.order == 0:
                     progress_bar.update()
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)
+
+        # 8. Post-processing
         mel_spectrogram = self.decode_latents(latents)
+
         audio = self.mel_spectrogram_to_waveform(mel_spectrogram)
+
         audio = audio[:, :original_waveform_length]
+
         if output_type == "np":
             audio = audio.numpy()
+
         if not return_dict:
             return (audio,)
+
         return AudioPipelineOutput(audios=audio)
