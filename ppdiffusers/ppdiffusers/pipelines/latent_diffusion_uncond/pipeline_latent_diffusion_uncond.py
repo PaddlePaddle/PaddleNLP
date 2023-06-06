@@ -74,15 +74,7 @@ class LDMPipeline(DiffusionPipeline):
             (batch_size, self.unet.config.in_channels, self.unet.config.sample_size, self.unet.config.sample_size),
             generator=generator,
         )
-        if isinstance(self.place, paddle.dtype):
-            dtype = self.place
-        elif isinstance(self.place, str) and self.place not in ["cpu", "cuda", "ipu", "xpu"]:
-            dtype = self.place
-        elif isinstance(self.place, paddle.Tensor):
-            dtype = self.place.dtype
-        else:
-            dtype = latents.dtype
-        latents = latents.cast(dtype)
+
         # scale the initial noise by the standard deviation required by the scheduler
         latents = latents * self.scheduler.init_noise_sigma
 

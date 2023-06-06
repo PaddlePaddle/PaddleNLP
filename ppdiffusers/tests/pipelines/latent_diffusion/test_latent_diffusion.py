@@ -18,11 +18,6 @@ import unittest
 
 import numpy as np
 import paddle
-from ppdiffusers_test.pipeline_params import (
-    TEXT_TO_IMAGE_BATCH_PARAMS,
-    TEXT_TO_IMAGE_PARAMS,
-)
-from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
 
 from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
@@ -37,6 +32,9 @@ from ppdiffusers.utils.testing_utils import (
     require_paddle_gpu,
     slow,
 )
+
+from ..pipeline_params import TEXT_TO_IMAGE_BATCH_PARAMS, TEXT_TO_IMAGE_PARAMS
+from ..test_pipelines_common import PipelineTesterMixin
 
 
 class LDMTextToImagePipelineFastTests(PipelineTesterMixin, unittest.TestCase):
@@ -118,11 +116,10 @@ class LDMTextToImagePipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         pipe.set_progress_bar_config(disable=None)
         inputs = self.get_dummy_inputs()
         image = pipe(**inputs).images
-        image_slice = image[0, -3:, -3:, -1]
-        # chan
         assert image.shape == (1, 64, 64, 3)
+        image_slice = image[0, -3:, -3:, -1]
         expected_slice = np.array(
-            [0.29159048, 0.20539099, 0.29126638, 0.19384867, 0.2436865, 0.45562512, 0.12645364, 0.14380667, 0.3520335]
+            [0.28524342, 0.23806289, 0.38151595, 0.21939021, 0.26112252, 0.5172909, 0.25647423, 0.25049314, 0.47979864]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.001
 

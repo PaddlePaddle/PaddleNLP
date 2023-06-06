@@ -126,7 +126,7 @@ class LDMSuperResolutionPipeline(DiffusionPipeline):
         latents_dtype = self.unet.dtype
         latents = randn_tensor(latents_shape, generator=generator, dtype=latents_dtype)
         image = image.cast(latents_dtype)
-        self.scheduler.set_timesteps(num_inference_steps, device=self.place)
+        self.scheduler.set_timesteps(num_inference_steps)
         timesteps_tensor = self.scheduler.timesteps
         # scale the initial noise by the standard deviation required by the scheduler
         latents = latents * self.scheduler.init_noise_sigma
