@@ -108,8 +108,10 @@ class DDIMPipeline(DiffusionPipeline):
             ).prev_sample
         image = (image / 2 + 0.5).clip(min=0, max=1)
         image = image.cpu().transpose(perm=[0, 2, 3, 1]).numpy()
+
         if output_type == "pil":
             image = self.numpy_to_pil(image)
+
         if not return_dict:
             return (image,)
         return ImagePipelineOutput(images=image)

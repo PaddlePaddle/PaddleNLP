@@ -108,7 +108,7 @@ class RobertaSeriesModelWithTransformation(RobertaPretrainedModel):
         if self.has_pre_transformation:
             self.transformation_pre = nn.Linear(config.hidden_size, config.project_dim)
             self.pre_LN = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
-        self.apply(self.init_weights)
+        self.init_weights()
 
     def forward(
         self,

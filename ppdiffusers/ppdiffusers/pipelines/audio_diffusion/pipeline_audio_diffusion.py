@@ -1,4 +1,5 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 
 from math import acos, sin
 from typing import List, Tuple, Union
@@ -62,9 +64,10 @@ class AudioDiffusionPipeline(DiffusionPipeline):
             `Tuple`: (height, width)
         """
         input_module = self.vqvae if self.vqvae is not None else self.unet
+        # For backwards compatibility
         sample_size = (
             (input_module.config.sample_size, input_module.config.sample_size)
-            if type(input_module.config.sample_size) == int
+            if type(input_module.sample_size) == int
             else input_module.config.sample_size
         )
         return sample_size
@@ -95,7 +98,8 @@ class AudioDiffusionPipeline(DiffusionPipeline):
         encoding: paddle.Tensor = None,
         return_dict=True,
     ) -> Union[
-        Union[AudioPipelineOutput, ImagePipelineOutput], Tuple[List[Image.Image], Tuple[int, List[np.ndarray]]]
+        Union[AudioPipelineOutput, ImagePipelineOutput],
+        Tuple[List[Image.Image], Tuple[int, List[np.ndarray]]],
     ]:
         """Generate random mel spectrogram from audio input and convert to audio.
 
@@ -118,9 +122,11 @@ class AudioDiffusionPipeline(DiffusionPipeline):
         Returns:
             `List[PIL Image]`: mel spectrograms (`float`, `List[np.ndarray]`): sample rate and raw audios
         """
+
         steps = steps or self.get_default_steps()
         self.scheduler.set_timesteps(steps)
         step_generator = step_generator or generator
+        # For backwards compatibility
         if type(self.unet.config.sample_size) == int:
             self.unet.config.sample_size = (self.unet.config.sample_size, self.unet.config.sample_size)
         input_dims = self.get_input_dims()
@@ -137,42 +143,40 @@ class AudioDiffusionPipeline(DiffusionPipeline):
             )
         images = noise
         mask = None
+
         if audio_file is not None or raw_audio is not None:
             self.mel.load_audio(audio_file, raw_audio)
             input_image = self.mel.audio_slice_to_image(slice)
             input_image = np.frombuffer(input_image.tobytes(), dtype="uint8").reshape(
                 (input_image.height, input_image.width)
             )
-            input_image = input_image / 255 * 2 - 1
-            if isinstance(self.place, paddle.dtype):
-                dtype = self.place
-            elif isinstance(self.place, str) and self.place not in ["cpu", "cuda", "ipu", "xpu"]:
-                dtype = self.place
-            elif isinstance(self.place, paddle.Tensor):
-                dtype = self.place.dtype
-            else:
-                dtype = paddle.to_tensor(data=input_image[(np.newaxis), :, :], dtype="float32").dtype
-            input_images = paddle.to_tensor(data=input_image[(np.newaxis), :, :], dtype="float32").cast(dtype)
+            input_image = (input_image / 255) * 2 - 1
+            input_images = paddle.to_tensor(input_image[np.newaxis, :, :], dtype=paddle.float32)
+
             if self.vqvae is not None:
                 input_images = self.vqvae.encode(paddle.unsqueeze(input_images, 0)).latent_dist.sample(
                     generator=generator
                 )[0]
                 input_images = self.vqvae.config.scaling_factor * input_images
+
             if start_step > 0:
                 images[0, 0] = self.scheduler.add_noise(input_images, noise, self.scheduler.timesteps[start_step - 1])
+
             pixels_per_second = (
                 self.unet.config.sample_size[1] * self.mel.get_sample_rate() / self.mel.x_res / self.mel.hop_length
             )
             mask_start = int(mask_start_secs * pixels_per_second)
             mask_end = int(mask_end_secs * pixels_per_second)
             mask = self.scheduler.add_noise(
-                input_images, noise, paddle.to_tensor(data=self.scheduler.timesteps[start_step:])
+                input_images, noise, paddle.to_tensor(self.scheduler.timesteps[start_step:])
             )
+
         for step, t in enumerate(self.progress_bar(self.scheduler.timesteps[start_step:])):
             if isinstance(self.unet, UNet2DConditionModel):
                 model_output = self.unet(images, t, encoding)["sample"]
             else:
                 model_output = self.unet(images, t)["sample"]
+
             if isinstance(self.scheduler, DDIMScheduler):
                 images = self.scheduler.step(
                     model_output=model_output,
@@ -188,26 +192,32 @@ class AudioDiffusionPipeline(DiffusionPipeline):
                     sample=images,
                     generator=step_generator,
                 )["prev_sample"]
+
             if mask is not None:
                 if mask_start > 0:
-                    images[:, :, :, :mask_start] = mask[:, (step), :, :mask_start]
+                    images[:, :, :, :mask_start] = mask[:, step, :, :mask_start]
                 if mask_end > 0:
-                    images[:, :, :, -mask_end:] = mask[:, (step), :, -mask_end:]
+                    images[:, :, :, -mask_end:] = mask[:, step, :, -mask_end:]
+
         if self.vqvae is not None:
+            # 0.18215 was scaling factor used in training to ensure unit variance
             images = 1 / self.vqvae.config.scaling_factor * images
             images = self.vqvae.decode(images)["sample"]
-        images = (images / 2 + 0.5).clip(min=0, max=1)
-        images = images.cpu().transpose(perm=[0, 2, 3, 1]).numpy()
+
+        images = (images / 2 + 0.5).clip(0, 1)
+        images = images.transpose([0, 2, 3, 1]).cast("float32").numpy()
         images = (images * 255).round().astype("uint8")
         images = list(
-            (Image.fromarray(_[:, :, (0)]) for _ in images)
+            (Image.fromarray(_[:, :, 0]) for _ in images)
             if images.shape[3] == 1
             else (Image.fromarray(_, mode="RGB").convert("L") for _ in images)
         )
+
         audios = [self.mel.image_to_audio(_) for _ in images]
         if not return_dict:
             return images, (self.mel.get_sample_rate(), audios)
-        return BaseOutput(**AudioPipelineOutput(np.array(audios)[:, (np.newaxis), :]), **ImagePipelineOutput(images))
+
+        return BaseOutput(**AudioPipelineOutput(np.array(audios)[:, np.newaxis, :]), **ImagePipelineOutput(images))
 
     @paddle.no_grad()
     def encode(self, images: List[Image.Image], steps: int = 50) -> np.ndarray:
@@ -220,22 +230,17 @@ class AudioDiffusionPipeline(DiffusionPipeline):
         Returns:
             `np.ndarray`: noise tensor of shape (batch_size, 1, height, width)
         """
+
+        # Only works with DDIM as this method is deterministic
         assert isinstance(self.scheduler, DDIMScheduler)
         self.scheduler.set_timesteps(steps)
         sample = np.array(
             [np.frombuffer(image.tobytes(), dtype="uint8").reshape((1, image.height, image.width)) for image in images]
         )
-        sample = sample / 255 * 2 - 1
-        if isinstance(self.place, paddle.dtype):
-            dtype = self.place
-        elif isinstance(self.place, str) and self.place not in ["cpu", "cuda", "ipu", "xpu"]:
-            dtype = self.place
-        elif isinstance(self.place, paddle.Tensor):
-            dtype = self.place.dtype
-        else:
-            dtype = paddle.to_tensor(data=sample).dtype
-        sample = paddle.to_tensor(data=sample).cast(dtype)
-        for t in self.progress_bar(paddle.flip(x=self.scheduler.timesteps, axis=(0,))):
+        sample = (sample / 255) * 2 - 1
+        sample = paddle.to_tensor(sample)
+
+        for t in self.progress_bar(paddle.flip(self.scheduler.timesteps, (0,))):
             prev_timestep = t - self.scheduler.num_train_timesteps // self.scheduler.num_inference_steps
             alpha_prod_t = self.scheduler.alphas_cumprod[t]
             alpha_prod_t_prev = (
@@ -245,9 +250,10 @@ class AudioDiffusionPipeline(DiffusionPipeline):
             )
             beta_prod_t = 1 - alpha_prod_t
             model_output = self.unet(sample, t)["sample"]
-            pred_sample_direction = (1 - alpha_prod_t_prev) ** 0.5 * model_output
-            sample = (sample - pred_sample_direction) * alpha_prod_t_prev**-0.5
-            sample = sample * alpha_prod_t**0.5 + beta_prod_t**0.5 * model_output
+            pred_sample_direction = (1 - alpha_prod_t_prev) ** (0.5) * model_output
+            sample = (sample - pred_sample_direction) * alpha_prod_t_prev ** (-0.5)
+            sample = sample * alpha_prod_t ** (0.5) + beta_prod_t ** (0.5) * model_output
+
         return sample
 
     @staticmethod
@@ -262,9 +268,6 @@ class AudioDiffusionPipeline(DiffusionPipeline):
         Returns:
             `paddle.Tensor`: interpolated tensor
         """
-        theta = acos(
-            paddle.dot(x=paddle.flatten(x=x0), y=paddle.flatten(x=x1))
-            / paddle.linalg.norm(x=x0)
-            / paddle.linalg.norm(x=x1)
-        )
+
+        theta = acos(paddle.dot(paddle.flatten(x0), paddle.flatten(x1)) / paddle.norm(x0) / paddle.norm(x1))
         return sin((1 - alpha) * theta) * x0 / sin(theta) + sin(alpha * theta) * x1 / sin(theta)
