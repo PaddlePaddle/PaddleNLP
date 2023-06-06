@@ -17,14 +17,15 @@ import unittest
 
 import numpy as np
 import paddle
-from ppdiffusers_test.pipeline_params import (
-    UNCONDITIONAL_IMAGE_GENERATION_BATCH_PARAMS,
-    UNCONDITIONAL_IMAGE_GENERATION_PARAMS,
-)
-from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
 
 from ppdiffusers import DDIMPipeline, DDIMScheduler, UNet2DModel
 from ppdiffusers.utils.testing_utils import require_paddle_gpu, slow
+
+from ..pipeline_params import (
+    UNCONDITIONAL_IMAGE_GENERATION_BATCH_PARAMS,
+    UNCONDITIONAL_IMAGE_GENERATION_PARAMS,
+)
+from ..test_pipelines_common import PipelineTesterMixin
 
 
 class DDIMPipelineFastTests(PipelineTesterMixin, unittest.TestCase):

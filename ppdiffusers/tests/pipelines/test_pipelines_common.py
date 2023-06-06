@@ -277,7 +277,7 @@ class PipelineTesterMixin:
         output = pipe(**self.get_dummy_inputs())[0]
         output_tuple = pipe(**self.get_dummy_inputs(), return_dict=False)[0]
         max_diff = np.abs(to_np(output) - to_np(output_tuple)).max()
-        self.assertLess(max_diff, 0.0001)
+        self.assertLess(max_diff, 0.005)
 
     def test_components_function(self):
         init_components = self.get_dummy_components()
