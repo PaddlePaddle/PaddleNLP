@@ -12,8 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pipelines.nodes.prompt.invocation_layer.base import PromptModelInvocationLayer
-from pipelines.nodes.prompt.invocation_layer.chatglm import ChatGLMInvocationLayer
-from pipelines.nodes.prompt.invocation_layer.chatgpt import ChatGPTInvocationLayer
-from pipelines.nodes.prompt.invocation_layer.ernie_bot import ErnieBotInvocationLayer
-from pipelines.nodes.prompt.invocation_layer.open_ai import OpenAIInvocationLayer
+import unittest
+
+from pipelines.nodes.prompt.invocation_layer import ChatGLMInvocationLayer
+
+
+class TestErnieBot(unittest.TestCase):
+    def test_invoke(self):
+        invocation_layer = ChatGLMInvocationLayer(
+            model_name_or_path="__internal_testing__/tiny-random-chatglm", dtype="float32", tgt_length=8
+        )
+        output = invocation_layer.invoke(prompt="dummy_prompt")
+        self.assertEqual(output, ["strained睡到睡到睡到睡到睡到睡到睡到"])
