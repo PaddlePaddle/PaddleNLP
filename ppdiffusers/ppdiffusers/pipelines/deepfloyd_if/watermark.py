@@ -26,33 +26,35 @@ from ...utils import PIL_INTERPOLATION
 class IFWatermarker(ModelMixin, ConfigMixin):
     def __init__(self):
         super().__init__()
-        self.register_buffer("watermark_image", paddle.zeros(shape=(62, 62, 4)))
+
+        self.register_buffer("watermark_image", paddle.zeros((62, 62, 4)))
         self.watermark_image_as_pil = None
 
     def apply_watermark(self, images: List[PIL.Image.Image], sample_size=None):
+        # copied from https://github.com/deep-floyd/IF/blob/b77482e36ca2031cb94dbca1001fc1e6400bf4ab/deepfloyd_if/modules/base.py#L287
+
         h = images[0].height
         w = images[0].width
+
         sample_size = sample_size or h
+
         coef = min(h / sample_size, w / sample_size)
         img_h, img_w = (int(h / coef), int(w / coef)) if coef < 1 else (h, w)
+
         S1, S2 = 1024**2, img_w * img_h
         K = (S2 / S1) ** 0.5
         wm_size, wm_x, wm_y = int(K * 62), img_w - int(14 * K), img_h - int(14 * K)
+
         if self.watermark_image_as_pil is None:
-            if isinstance("uint8", paddle.dtype):
-                dtype = "uint8"
-            elif isinstance("uint8", str) and "uint8" not in ["cpu", "cuda", "ipu", "xpu"]:
-                dtype = "uint8"
-            elif isinstance("uint8", paddle.Tensor):
-                dtype = "uint8".dtype
-            else:
-                dtype = self.watermark_image.dtype
-            watermark_image = self.watermark_image.cast(dtype).cpu().numpy()
+            watermark_image = self.watermark_image.cpu().numpy().astype("uint8")
             watermark_image = Image.fromarray(watermark_image, mode="RGBA")
             self.watermark_image_as_pil = watermark_image
+
         wm_img = self.watermark_image_as_pil.resize(
             (wm_size, wm_size), PIL_INTERPOLATION["bicubic"], reducing_gap=None
         )
+
         for pil_img in images:
             pil_img.paste(wm_img, box=(wm_x - wm_size, wm_y - wm_size, wm_x, wm_y), mask=wm_img.split()[-1])
+
         return images

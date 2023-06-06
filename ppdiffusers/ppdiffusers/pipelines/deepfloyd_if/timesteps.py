@@ -41,6 +41,7 @@ fast27_timesteps = [
     22,
     0,
 ]
+
 smart27_timesteps = [
     999,
     976,
@@ -70,6 +71,7 @@ smart27_timesteps = [
     24,
     0,
 ]
+
 smart50_timesteps = [
     999,
     988,
@@ -122,6 +124,7 @@ smart50_timesteps = [
     11,
     0,
 ]
+
 smart100_timesteps = [
     999,
     995,
@@ -224,6 +227,7 @@ smart100_timesteps = [
     44,
     0,
 ]
+
 smart185_timesteps = [
     999,
     997,
@@ -411,6 +415,7 @@ smart185_timesteps = [
     44,
     0,
 ]
+
 super27_timesteps = [
     999,
     991,
@@ -440,6 +445,7 @@ super27_timesteps = [
     100,
     0,
 ]
+
 super40_timesteps = [
     999,
     992,
@@ -482,6 +488,7 @@ super40_timesteps = [
     99,
     0,
 ]
+
 super100_timesteps = [
     999,
     996,
