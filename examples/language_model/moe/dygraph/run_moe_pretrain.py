@@ -534,20 +534,37 @@ def do_train(args):
                     start_index = i * args.micro_batch_size
                     end_index = start_index + args.micro_batch_size
                     timers("forward-compute").start()
-                    with paddle.amp.auto_cast(
-                        args.use_pure_fp16,
-                        custom_black_list=[
-                            "reduce_sum",
-                            "c_softmax_with_cross_entropy",
-                            "elementwise_div",
-                        ],
-                        level="O2",
-                        use_promote=False,
-                    ):
-                        preds = model(tokens[start_index:end_index, :])
-                        loss_mbs = criterion(
-                            preds, labels[start_index:end_index, :], loss_mask[start_index:end_index, :]
-                        )
+                    # paddle version >= 2.5.0 or develop
+                    paddle_version = float(paddle.__version__[:3])
+                    if (paddle_version == 0.0) or (paddle_version >= 2.5):
+                        with paddle.amp.auto_cast(
+                            args.use_pure_fp16,
+                            custom_black_list=[
+                                "reduce_sum",
+                                "c_softmax_with_cross_entropy",
+                                "elementwise_div",
+                            ],
+                            level="O2",
+                            use_promote=False,
+                        ):
+                            preds = model(tokens[start_index:end_index, :])
+                            loss_mbs = criterion(
+                                preds, labels[start_index:end_index, :], loss_mask[start_index:end_index, :]
+                            )
+                    else:
+                        with paddle.amp.auto_cast(
+                            args.use_pure_fp16,
+                            custom_black_list=[
+                                "reduce_sum",
+                                "c_softmax_with_cross_entropy",
+                                "elementwise_div",
+                            ],
+                            level="O2",
+                        ):
+                            preds = model(tokens[start_index:end_index, :])
+                            loss_mbs = criterion(
+                                preds, labels[start_index:end_index, :], loss_mask[start_index:end_index, :]
+                            )
                     timers("forward-compute").stop()
 
                     if args.gate != "naive" and args.balance_loss_weight:
