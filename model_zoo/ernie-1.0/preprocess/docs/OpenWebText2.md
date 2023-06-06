@@ -19,7 +19,7 @@ tar -xvf openwebtext2.json.zst.tar -C  /path/to/openwebtext
 
 ## GPT训练数据制作
 
-然后使用[proprecess]](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-1.0/proprecess) 工具下的`create_pretraining_data.py`脚本进行数据集制作：
+然后使用[proprecess](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-1.0/proprecess) 工具下的`create_pretraining_data.py`脚本进行数据集制作：
 ```
 python -u  create_pretraining_data.py \
     --model_name gpt2-en \
@@ -48,7 +48,7 @@ mv gpt_en_dataset_300m_idx.npz ./data
 ```
 ## Llama训练数据制作
 
-然后使用[proprecess]](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-1.0/proprecess) 工具下的`create_pretraining_data.py`脚本进行数据集制作：
+然后使用[proprecess](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-1.0/proprecess) 工具下的`create_pretraining_data.py`脚本进行数据集制作：
 ```
 python -u  create_pretraining_data.py \
     --model_name facebook/llama-7b  \
