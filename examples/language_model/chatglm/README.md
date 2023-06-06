@@ -43,6 +43,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 --recompute True \
 --do_train \
 --do_eval \
+--load_best_model_at_end True \
 --tensor_parallel_degree 4 \
 --do_generation True
 ```
@@ -94,6 +95,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir chatglm_log finet
 --do_train \
 --do_eval \
 --disable_tqdm True \
+--save_total_limit 1 \
 --metric_for_best_model accuracy \
 --load_best_model_at_end True \
 --do_generation False \
@@ -127,8 +129,10 @@ python finetune_generation.py \
 --metric_for_best_model accuracy \
 --load_best_model_at_end True \
 --do_generation False \
+--save_total_limit 1 \
 --lora True \
---r 8
+--lora_rank 8 \
+--lora_all_linear
 ```
 
 ### 单卡Prefix微调
@@ -159,6 +163,7 @@ python finetune_generation.py \
 --load_best_model_at_end True \
 --do_generation False \
 --prefix_tuning True \
+--save_total_limit 1 \
 --num_prefix_tokens 64
 ```
 
