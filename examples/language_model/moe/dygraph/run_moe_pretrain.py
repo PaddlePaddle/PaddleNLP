@@ -80,17 +80,31 @@ def run_evaluate(args, data_loader, model, criterion, iter_steps, log_writer, gl
     local_time = time.time()
     for eval_step, batch in enumerate(data_loader):
         tokens, loss_mask, labels = batch
-        with paddle.amp.auto_cast(
-            args.use_pure_fp16,
-            custom_black_list=[
-                "reduce_sum",
-                "c_softmax_with_cross_entropy",
-                "elementwise_div",
-            ],
-            level="O2",
-            use_promote=False,
-        ):
-            preds = model(tokens)
+        # paddle version >= 2.5.0 or develop
+        paddle_version = float(paddle.__version__[:3])
+        if (paddle_version == 0.0) or (paddle_version >= 2.5):
+            with paddle.amp.auto_cast(
+                args.use_pure_fp16,
+                custom_black_list=[
+                    "reduce_sum",
+                    "c_softmax_with_cross_entropy",
+                    "elementwise_div",
+                ],
+                level="O2",
+                use_promote=False,
+            ):
+                preds = model(tokens)
+        else:
+            with paddle.amp.auto_cast(
+                args.use_pure_fp16,
+                custom_black_list=[
+                    "reduce_sum",
+                    "c_softmax_with_cross_entropy",
+                    "elementwise_div",
+                ],
+                level="O2",
+            ):
+                preds = model(tokens)
         preds = paddle.cast(preds, dtype="float32")
         loss = criterion(preds, labels, loss_mask)
 
