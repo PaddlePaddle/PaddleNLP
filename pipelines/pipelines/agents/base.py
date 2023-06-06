@@ -191,18 +191,18 @@ class ToolsManager:
                 try:
                     self.callback_manager.on_tool_start(tool_input, tool=tool)
                     tool_result = tool.run(tool_input, params)
-                    # self.callback_manager.on_tool_finish(
-                    #     tool_result,
-                    #     observation_prefix="观察：",
-                    #     llm_prefix="思考：",
-                    #     color=tool.logging_color,
-                    # )
                     self.callback_manager.on_tool_finish(
                         tool_result,
-                        observation_prefix="Observation: ",
-                        llm_prefix="Thought: ",
+                        observation_prefix="观察: ",
+                        llm_prefix="思考: ",
                         color=tool.logging_color,
                     )
+                    # self.callback_manager.on_tool_finish(
+                    #     tool_result,
+                    #     observation_prefix="Observation: ",
+                    #     llm_prefix="Thought: ",
+                    #     color=tool.logging_color,
+                    # )
                 except Exception as e:
                     self.callback_manager.on_tool_error(e, tool=self.tools[tool_name])
                     raise e

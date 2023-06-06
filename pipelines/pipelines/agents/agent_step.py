@@ -118,16 +118,14 @@ class AgentStep:
         Update the transcript with the observation
         :param observation: received observation from the Agent environment.
         """
-        self.transcript += (
-            f"{self.prompt_node_response}\nObservation: {observation}\nThought:"
-            if observation
-            else self.prompt_node_response
-        )
         # self.transcript += (
-        #     f"{self.prompt_node_response}{observation}\n思考："
+        #     f"{self.prompt_node_response}\nObservation: {observation}\nThought:"
         #     if observation
         #     else self.prompt_node_response
         # )
+        self.transcript += (
+            f"{self.prompt_node_response}\n观察: {observation}\n思考: " if observation else self.prompt_node_response
+        )
 
     def __repr__(self) -> str:
         """
@@ -154,7 +152,6 @@ class AgentStep:
         """
         # Search for a match with the final answer pattern in the prompt node response
         final_answer_match = re.search(self.final_answer_pattern, self.prompt_node_response)
-        # breakpoint()
         if final_answer_match:
             # If a match is found, get the first group (i.e., the content inside the parentheses of the regex pattern)
             final_answer = final_answer_match.group(1)

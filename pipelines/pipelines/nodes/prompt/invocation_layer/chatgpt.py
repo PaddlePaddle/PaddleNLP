@@ -111,7 +111,6 @@ class ChatGPTInvocationLayer(OpenAIInvocationLayer):
             for idx, _ in enumerate(assistant_response):
                 for stop_word in stop_words:
                     assistant_response[idx] = assistant_response[idx].replace(stop_word, "").strip()
-
         return assistant_response
 
     def _extract_token(self, event_data: Dict[str, Any]):

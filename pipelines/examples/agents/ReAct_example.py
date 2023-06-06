@@ -77,7 +77,7 @@ Thought: We've learned Gainsville, Florida is the city Jeremy McKinnon was born 
 Final Answer: Gainsville, Florida
 ##
 Question: {query}
-Thought:
+Thought:{transcript}
 """
 
 # yapf: disable
