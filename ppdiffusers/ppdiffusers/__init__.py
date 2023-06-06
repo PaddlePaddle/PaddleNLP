@@ -139,10 +139,17 @@ try:
 except OptionalDependencyNotAvailable:
     from .utils.dummy_paddle_and_paddlenlp_objects import *  # noqa F403
 else:
-    from .pipelines import (  # AudioLDMPipeline,  # TODO add this pipeline; StableDiffusionModelEditingPipeline, # TODO add this pipeline; TextToVideoZeroPipeline, # TODO add this pipeline; IFImg2ImgPipeline,; IFImg2ImgSuperResolutionPipeline,; IFInpaintingPipeline,; IFInpaintingSuperResolutionPipeline,; IFPipeline,; IFSuperResolutionPipeline,
+    from .pipelines import (
         AltDiffusionImg2ImgPipeline,
         AltDiffusionPipeline,
+        AudioLDMPipeline,
         CycleDiffusionPipeline,
+        IFImg2ImgPipeline,
+        IFImg2ImgSuperResolutionPipeline,
+        IFInpaintingPipeline,
+        IFInpaintingSuperResolutionPipeline,
+        IFPipeline,
+        IFSuperResolutionPipeline,
         LDMTextToImagePipeline,
         PaintByExamplePipeline,
         SemanticStableDiffusionPipeline,
@@ -168,6 +175,7 @@ else:
         StableUnCLIPImg2ImgPipeline,
         StableUnCLIPPipeline,
         TextToVideoSDPipeline,
+        TextToVideoZeroPipeline,
         UnCLIPImageVariationPipeline,
         UnCLIPPipeline,
         UniDiffuserPipeline,
@@ -194,7 +202,7 @@ try:
 except OptionalDependencyNotAvailable:
     from .utils.dummy_paddle_and_paddlenlp_and_fastdeploy_objects import *  # noqa F403
 else:
-    from .pipelines import (  # FastDeployStableDiffusionUpscalePipeline, TODO junnyu
+    from .pipelines import (
         FastDeployCycleDiffusionPipeline,
         FastDeployStableDiffusionControlNetPipeline,
         FastDeployStableDiffusionImg2ImgPipeline,
