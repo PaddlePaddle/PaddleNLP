@@ -1,4 +1,5 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -63,50 +64,76 @@ def prepare_mask_and_masked_image(image, mask):
     if isinstance(image, paddle.Tensor):
         if not isinstance(mask, paddle.Tensor):
             raise TypeError(f"`image` is a paddle.Tensor but `mask` (type: {type(mask)} is not")
+
+        # Batch single image
         if image.ndim == 3:
             assert image.shape[0] == 3, "Image outside a batch should be of shape (3, H, W)"
-            image = image.unsqueeze(axis=0)
+            image = image.unsqueeze(0)
+
+        # Batch and add channel dim for single mask
         if mask.ndim == 2:
-            mask = mask.unsqueeze(axis=0).unsqueeze(axis=0)
+            mask = mask.unsqueeze(0).unsqueeze(0)
+
+        # Batch single mask or add channel dim
         if mask.ndim == 3:
+            # Batched mask
             if mask.shape[0] == image.shape[0]:
-                mask = mask.unsqueeze(axis=1)
+                mask = mask.unsqueeze(1)
             else:
-                mask = mask.unsqueeze(axis=0)
+                mask = mask.unsqueeze(0)
+
         assert image.ndim == 4 and mask.ndim == 4, "Image and Mask must have 4 dimensions"
         assert image.shape[-2:] == mask.shape[-2:], "Image and Mask must have the same spatial dimensions"
         assert image.shape[0] == mask.shape[0], "Image and Mask must have the same batch size"
         assert mask.shape[1] == 1, "Mask image must have a single channel"
+
+        # Check image is in [-1, 1]
         if image.min() < -1 or image.max() > 1:
             raise ValueError("Image should be in [-1, 1] range")
+
+        # Check mask is in [0, 1]
         if mask.min() < 0 or mask.max() > 1:
             raise ValueError("Mask should be in [0, 1] range")
+
+        # paint-by-example inverses the mask
         mask = 1 - mask
-        mask[mask < 0.5] = 0
-        mask[mask >= 0.5] = 1
-        image = image.cast("float32")
+
+        # Binarize mask
+        mask = paddle.where(mask < 0.5, 0.0, 1.0)
+
+        # Image as float32
+        image = image.cast(paddle.float32)
     elif isinstance(mask, paddle.Tensor):
-        raise TypeError(f"`mask` is a torch.Tensor but `image` (type: {type(image)} is not")
+        raise TypeError(f"`mask` is a paddle.Tensor but `image` (type: {type(image)} is not")
     else:
         if isinstance(image, PIL.Image.Image):
             image = [image]
-        image = np.concatenate([np.array(i.convert("RGB"))[(None), :] for i in image], axis=0)
+
+        image = np.concatenate([np.array(i.convert("RGB"))[None, :] for i in image], axis=0)
         image = image.transpose(0, 3, 1, 2)
-        image = paddle.to_tensor(data=image).cast("float32") / 127.5 - 1.0
+        image = paddle.to_tensor(image).cast(paddle.float32) / 127.5 - 1.0
+
+        # preprocess mask
         if isinstance(mask, PIL.Image.Image):
             mask = [mask]
-        mask = np.concatenate([np.array(m.convert("L"))[(None), (None), :] for m in mask], axis=0)
+
+        mask = np.concatenate([np.array(m.convert("L"))[None, None, :] for m in mask], axis=0)
         mask = mask.astype(np.float32) / 255.0
+
+        # paint-by-example inverses the mask
         mask = 1 - mask
+
         mask[mask < 0.5] = 0
         mask[mask >= 0.5] = 1
-        mask = paddle.to_tensor(data=mask)
+        mask = paddle.to_tensor(mask)
+
     masked_image = image * mask
+
     return mask, masked_image
 
 
 class PaintByExamplePipeline(DiffusionPipeline):
-    """
+    r"""
     Pipeline for image-guided image inpainting using Stable Diffusion. *This is an experimental feature*.
 
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
@@ -130,7 +157,8 @@ class PaintByExamplePipeline(DiffusionPipeline):
         feature_extractor ([`CLIPImageProcessor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
-
+    # TODO: feature_extractor is required to encode initial images (if they are in PIL format),
+    # we should give a descriptive message if the pipeline doesn't have one.
     _optional_components = ["safety_checker"]
 
     def __init__(
@@ -144,6 +172,7 @@ class PaintByExamplePipeline(DiffusionPipeline):
         requires_safety_checker: bool = False,
     ):
         super().__init__()
+
         self.register_modules(
             vae=vae,
             image_encoder=image_encoder,
@@ -166,23 +195,34 @@ class PaintByExamplePipeline(DiffusionPipeline):
             has_nsfw_concept = None
         return image, has_nsfw_concept
 
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_extra_step_kwargs
     def prepare_extra_step_kwargs(self, generator, eta):
+        # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
+        # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
+        # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
+        # and should be between [0, 1]
+
         accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
         extra_step_kwargs = {}
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
+
+        # check if the scheduler accepts generator
         accepts_generator = "generator" in set(inspect.signature(self.scheduler.step).parameters.keys())
         if accepts_generator:
             extra_step_kwargs["generator"] = generator
         return extra_step_kwargs
 
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents
     def decode_latents(self, latents):
         latents = 1 / self.vae.config.scaling_factor * latents
         image = self.vae.decode(latents).sample
-        image = (image / 2 + 0.5).clip(min=0, max=1)
-        image = image.cpu().transpose(perm=[0, 2, 3, 1]).astype(dtype="float32").numpy()
+        image = (image / 2 + 0.5).clip(0, 1)
+        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
+        image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
         return image
 
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_image_variation.StableDiffusionImageVariationPipeline.check_inputs
     def check_inputs(self, image, height, width, callback_steps):
         if (
             not isinstance(image, paddle.Tensor)
@@ -193,15 +233,16 @@ class PaintByExamplePipeline(DiffusionPipeline):
                 "`image` has to be of type `paddle.Tensor` or `PIL.Image.Image` or `List[PIL.Image.Image]` but is"
                 f" {type(image)}"
             )
+
         if height % 8 != 0 or width % 8 != 0:
             raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
-        if (
-            callback_steps is None
-            or callback_steps is not None
-            and (not isinstance(callback_steps, int) or callback_steps <= 0)
+
+        if (callback_steps is None) or (
+            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
         ):
             raise ValueError(
-                f"`callback_steps` has to be a positive integer but is {callback_steps} of type {type(callback_steps)}."
+                f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
+                f" {type(callback_steps)}."
             )
 
     # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_latents
@@ -315,9 +356,9 @@ class PaintByExamplePipeline(DiffusionPipeline):
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
-        callback_steps: int = 1,
+        callback_steps: Optional[int] = 1,
     ):
-        """
+        r"""
         Function invoked when calling the pipeline for generation.
 
         Args:
@@ -385,6 +426,9 @@ class PaintByExamplePipeline(DiffusionPipeline):
             batch_size = len(image)
         else:
             batch_size = image.shape[0]
+        # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
+        # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
+        # corresponds to doing no classifier free guidance.
         do_classifier_free_guidance = guidance_scale > 1.0
 
         # 2. Preprocess mask and image
