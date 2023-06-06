@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import copy
+import json
 from dataclasses import dataclass
 from typing import Dict, List
 
@@ -21,6 +22,26 @@ import paddle
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 
 IGNORE_INDEX = -100
+
+PROMPT_DICT = {
+    "prompt_input": (
+        "Below is an instruction that describes a task, paired with an input that provides further context. "
+        "Write a response that appropriately completes the request.\n\n"
+        "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:"
+    ),
+    "prompt_no_input": (
+        "Below is an instruction that describes a task. "
+        "Write a response that appropriately completes the request.\n\n"
+        "### Instruction:\n{instruction}\n\n### Response:"
+    ),
+}
+
+
+def reader(data_path):
+    with open(data_path, "r", encoding="utf-8") as f:
+        for line in f:
+            json_line = json.loads(line)
+            yield json_line
 
 
 def convert_example(example, tokenizer, data_args, is_test=False):
@@ -81,24 +102,34 @@ def convert_example(example, tokenizer, data_args, is_test=False):
     )
 
 
-def custom_instruction_convert_example(example, tokenizer, data_args, is_test=False):
+def custom_instruction_convert_example(example, tokenizer, data_args, is_test=False, benchmark=False):
     """
     Convert an example into necessary features.
     """
 
-    instruction = ""
-    input = ""
-    output = ""
-    if "instruction" in example and "output" in example:
-        instruction = example["instruction"]
-        output = example["output"]
-    else:
-        assert False, "instruction and output are not in the input dictionary."
-    if "input" in example["input"]:
-        input = example["input"]
+    if benchmark:
+        prompt_input, prompt_no_input = PROMPT_DICT["prompt_input"], PROMPT_DICT["prompt_no_input"]
 
-    input_seq = instruction + input
-    output_seq = output
+        if example.get("input", "") != "":
+            input_seq = prompt_input.format_map(example)
+        else:
+            input_seq = prompt_no_input.format_map(example)
+
+        output_seq = example["output"]
+    else:
+        instruction = ""
+        input = ""
+        output = ""
+        if "instruction" in example and "output" in example:
+            instruction = example["instruction"]
+            output = example["output"]
+        else:
+            assert False, "instruction and output are not in the input dictionary."
+        if "input" in example["input"]:
+            input = example["input"]
+
+        input_seq = instruction + input
+        output_seq = output
 
     source_tokenized = tokenizer(
         input_seq,
@@ -134,7 +165,7 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Fa
     )
 
 
-def left_padding(inputs, pad_id, max_length=0):
+def left_padding(inputs, pad_id, max_length=-1):
     for ids in inputs:
         max_length = max(max_length, len(ids))
 
@@ -156,7 +187,7 @@ class DataCollatorForSupervisedDataset(object):
     """Collate examples for supervised fine-tuning."""
 
     tokenizer: PretrainedTokenizerBase
-    max_length: 0
+    max_length: -1
 
     def __call__(self, features: List[Dict]) -> Dict[str, paddle.Tensor]:
 
