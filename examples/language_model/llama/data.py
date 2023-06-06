@@ -102,7 +102,9 @@ def convert_example(example, tokenizer, data_args, is_test=False):
     )
 
 
-def custom_instruction_convert_example(example, tokenizer, data_args, is_test=False, benchmark=False):
+def custom_instruction_convert_example(
+    example, tokenizer, data_args, is_test=False, benchmark=False, model_max_length=512
+):
     """
     Convert an example into necessary features.
     """
@@ -131,10 +133,12 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Fa
         input_seq = instruction + input
         output_seq = output
 
+    # To compatible with compile training mode in benchmark, input will be pad to fix length
     source_tokenized = tokenizer(
         input_seq,
         return_tensors="pd",
-        max_length=data_args.src_length,
+        padding="loggest" if not benchmark else "max_length",
+        max_length=data_args.src_length if not benchmark else model_max_length,
         truncation=True,
     )
 
@@ -142,10 +146,13 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Fa
         source_tokenized["input_ids"].not_equal(paddle.to_tensor(tokenizer.pad_token_id)).sum().item()
     )
 
+    total_length = data_args.src_length + data_args.tgt_length
+
     example_tokenized = tokenizer(
         input_seq + output_seq,
         return_tensors="pd",
-        max_length=data_args.src_length + data_args.tgt_length,
+        padding="loggest" if not benchmark else "max_length",
+        max_length=total_length if not benchmark else model_max_length,
         truncation=True,
     )
 

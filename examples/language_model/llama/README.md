@@ -72,28 +72,6 @@ python -u  -m paddle.distributed.launch \
 ```
 
 
-## benckmark
-
-python finetune_instruction_generation.py \
-    --model_name_or_path facebook/llama-7b-2l \
-    --do_train \
-    --num_train_epochs 1 \
-    --benchmark \
-    --per_device_train_batch_size 16 \
-    --overwrite_output_dir \
-    --output_dir ./checkpoints/ \
-    --logging_steps 10 \
-    --fp16 \
-    --fp16_opt_level O2 \
-    --recompute \
-    --gradient_accumulation_steps 1 \
-    --learning_rate 3e-5 \
-    --lr_scheduler_type constant \
-    --warmup_steps 0 \
-    --logging_steps 1 \
-    --max_grad_norm -1
-
-
 ## 微调
 
 ```shell
