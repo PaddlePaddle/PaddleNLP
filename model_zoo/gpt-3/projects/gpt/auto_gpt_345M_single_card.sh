@@ -15,6 +15,5 @@
 # limitations under the License.
 
 
-export FLAGS_USE_STANDALONE_EXECUTOR=False
 export CUDA_VISIBLE_DEVICES=0
 python ./tools/auto.py -c ./ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml 
