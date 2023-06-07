@@ -529,10 +529,12 @@ class ModelMixin(nn.Layer):
         else:
             dtype = dtype.pop()
 
+        # for
         if "uint8" in str(dtype):
             state_dict = {k: v.astype("float32") for k, v in state_dict.items()}
-        else:
-            init_contexts.append(paddle.dtype_guard(dtype))
+            dtype = paddle.float32
+
+        init_contexts.append(paddle.dtype_guard(dtype))
 
         if low_cpu_mem_usage:
             # Instantiate model.

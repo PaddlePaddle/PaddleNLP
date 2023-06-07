@@ -513,7 +513,7 @@ class StableDiffusionUpscalePipeline(DiffusionPipeline):
 
                 # concat latents, mask, masked_image_latents in the channel dimension
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
-                latent_model_input = paddle.concat([latent_model_input, image], axis=1)
+                latent_model_input = paddle.concat([latent_model_input, image.cast(latent_model_input.dtype)], axis=1)
 
                 # predict the noise residual
                 noise_pred = self.unet(

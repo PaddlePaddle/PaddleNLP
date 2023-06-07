@@ -339,14 +339,15 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
 
         # pre_temb_act_fun opt
         self.resnet_pre_temb_non_linearity = resnet_pre_temb_non_linearity
-        if act_fn == "swish":
-            self.down_resnet_temb_nonlinearity = lambda x: F.silu(x)
-        elif act_fn == "mish":
-            self.down_resnet_temb_nonlinearity = nn.Mish()
-        elif act_fn == "silu":
-            self.down_resnet_temb_nonlinearity = nn.Silu()
-        elif act_fn == "gelu":
-            self.down_resnet_temb_nonlinearity = nn.GELU()
+        if resnet_pre_temb_non_linearity:
+            if act_fn == "swish":
+                self.down_resnet_temb_nonlinearity = lambda x: F.silu(x)
+            elif act_fn == "mish":
+                self.down_resnet_temb_nonlinearity = nn.Mish()
+            elif act_fn == "silu":
+                self.down_resnet_temb_nonlinearity = nn.Silu()
+            elif act_fn == "gelu":
+                self.down_resnet_temb_nonlinearity = nn.GELU()
 
         # down
         output_channel = block_out_channels[0]
@@ -726,8 +727,11 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             aug_emb = self.add_embedding(encoder_hidden_states)
             emb = emb + aug_emb
 
-        if self.time_embed_act is not None:
-            emb = self.time_embed_act(emb)
+        if self.resnet_pre_temb_non_linearity:
+            emb = self.down_resnet_temb_nonlinearity(emb)
+        else:
+            if self.time_embed_act is not None:
+                emb = self.time_embed_act(emb)
 
         if self.encoder_hid_proj is not None:
             encoder_hidden_states = self.encoder_hid_proj(encoder_hidden_states)
@@ -741,9 +745,6 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         is_adapter = mid_block_additional_residual is None and down_block_additional_residuals is not None
 
         down_block_res_samples = (sample,)
-
-        if self.resnet_pre_temb_non_linearity:
-            emb = self.down_resnet_temb_nonlinearity(emb)
 
         for downsample_block in self.down_blocks:
             if hasattr(downsample_block, "has_cross_attention") and downsample_block.has_cross_attention:

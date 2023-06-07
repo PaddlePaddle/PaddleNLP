@@ -347,7 +347,6 @@ class StableDiffusionLatentUpscalePipeline(DiffusionPipeline):
 
         # 1. Check inputs
         self.check_inputs(prompt, image, callback_steps)
-        breakpoint()
 
         # 2. Define call parameters
         batch_size = 1 if isinstance(prompt, str) else len(prompt)
@@ -434,10 +433,11 @@ class StableDiffusionLatentUpscalePipeline(DiffusionPipeline):
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
                 scaled_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
-                scaled_model_input = paddle.concat([scaled_model_input, image_cond], axis=1)
+                scaled_model_input = paddle.concat(
+                    [scaled_model_input, image_cond.cast(scaled_model_input.dtype)], axis=1
+                )
                 # preconditioning parameter based on  Karras et al. (2022) (table 1)
                 timestep = paddle.log(sigma) * 0.25
-                breakpoint()
                 noise_pred = self.unet(
                     scaled_model_input,
                     timestep,
