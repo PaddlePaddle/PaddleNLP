@@ -152,14 +152,15 @@ class UNet2DModel(ModelMixin, ConfigMixin):
 
         # pre_temb_act_fun opt
         self.resnet_pre_temb_non_linearity = resnet_pre_temb_non_linearity
-        if act_fn == "swish":
-            self.down_resnet_temb_nonlinearity = lambda x: F.silu(x)
-        elif act_fn == "mish":
-            self.down_resnet_temb_nonlinearity = nn.Mish()
-        elif act_fn == "silu":
-            self.down_resnet_temb_nonlinearity = nn.Silu()
-        elif act_fn == "gelu":
-            self.down_resnet_temb_nonlinearity = nn.GELU()
+        if resnet_pre_temb_non_linearity:
+            if act_fn == "swish":
+                self.down_resnet_temb_nonlinearity = lambda x: F.silu(x)
+            elif act_fn == "mish":
+                self.down_resnet_temb_nonlinearity = nn.Mish()
+            elif act_fn == "silu":
+                self.down_resnet_temb_nonlinearity = nn.Silu()
+            elif act_fn == "gelu":
+                self.down_resnet_temb_nonlinearity = nn.GELU()
 
         # down
         output_channel = block_out_channels[0]
