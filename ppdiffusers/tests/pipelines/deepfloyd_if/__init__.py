@@ -29,13 +29,14 @@ from ..test_pipelines_common import to_np
 
 class IFPipelineTesterMixin:
     def _get_dummy_components(self):
-        paddle.Generator().manual_seed(0)
+        paddle.seed(0)
         text_encoder = T5EncoderModel.from_pretrained("hf-internal-testing/tiny-random-t5")
+        text_encoder.eval()
 
-        paddle.Generator().manual_seed(0)
+        paddle.seed(0)
         tokenizer = AutoTokenizer.from_pretrained("hf-internal-testing/tiny-random-t5")
 
-        paddle.Generator().manual_seed(0)
+        paddle.seed(0)
         unet = UNet2DConditionModel(
             sample_size=32,
             layers_per_block=1,
@@ -59,7 +60,7 @@ class IFPipelineTesterMixin:
         )
         unet.set_attn_processor(AttnAddedKVProcessor())  # For reproducibility tests
 
-        paddle.Generator().manual_seed(0)
+        paddle.seed(0)
         scheduler = DDPMScheduler(
             num_train_timesteps=1000,
             beta_schedule="squaredcos_cap_v2",
@@ -72,7 +73,7 @@ class IFPipelineTesterMixin:
             variance_type="learned_range",
         )
 
-        paddle.Generator().manual_seed(0)
+        paddle.seed(0)
         watermarker = IFWatermarker()
 
         return {
@@ -86,13 +87,14 @@ class IFPipelineTesterMixin:
         }
 
     def _get_superresolution_dummy_components(self):
-        paddle.Generator().manual_seed(0)
+        paddle.seed(0)
         text_encoder = T5EncoderModel.from_pretrained("hf-internal-testing/tiny-random-t5")
+        text_encoder.eval()
 
-        paddle.Generator().manual_seed(0)
+        paddle.seed(0)
         tokenizer = AutoTokenizer.from_pretrained("hf-internal-testing/tiny-random-t5")
 
-        paddle.Generator().manual_seed(0)
+        paddle.seed(0)
         unet = UNet2DConditionModel(
             sample_size=32,
             layers_per_block=[1, 2],
@@ -120,7 +122,7 @@ class IFPipelineTesterMixin:
         )
         unet.set_attn_processor(AttnAddedKVProcessor())  # For reproducibility tests
 
-        paddle.Generator().manual_seed(0)
+        paddle.seed(0)
         scheduler = DDPMScheduler(
             num_train_timesteps=1000,
             beta_schedule="squaredcos_cap_v2",
@@ -133,7 +135,7 @@ class IFPipelineTesterMixin:
             variance_type="learned_range",
         )
 
-        paddle.Generator().manual_seed(0)
+        paddle.seed(0)
         image_noising_scheduler = DDPMScheduler(
             num_train_timesteps=1000,
             beta_schedule="squaredcos_cap_v2",
@@ -141,7 +143,7 @@ class IFPipelineTesterMixin:
             beta_end=0.02,
         )
 
-        paddle.Generator().manual_seed(0)
+        paddle.seed(0)
         watermarker = IFWatermarker()
 
         return {
@@ -265,7 +267,6 @@ class IFPipelineTesterMixin:
 
         inputs = self.get_dummy_inputs()
         output = pipe(**inputs)[0]
-
         with tempfile.TemporaryDirectory() as tmpdir:
             pipe.save_pretrained(tmpdir)
             pipe_loaded = self.pipeline_class.from_pretrained(tmpdir)

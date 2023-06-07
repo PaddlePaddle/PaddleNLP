@@ -232,6 +232,7 @@ class PipelineTesterMixin:
         inputs = self.get_dummy_inputs()
         logger = logging.get_logger(pipe.__module__)
         logger.setLevel(level=ppdiffusers.logging.FATAL)
+
         batched_inputs = {}
         for name, value in inputs.items():
             if name in self.batch_params:
@@ -247,6 +248,7 @@ class PipelineTesterMixin:
                 batched_inputs[name] = [self.get_generator(i) for i in range(batch_size)]
             else:
                 batched_inputs[name] = value
+
         for arg in additional_params_copy_to_batched_inputs:
             batched_inputs[arg] = inputs[arg]
         if self.pipeline_class.__name__ != "DanceDiffusionPipeline":
@@ -254,6 +256,7 @@ class PipelineTesterMixin:
         output_batch = pipe(**batched_inputs)
         assert output_batch[0].shape[0] == batch_size
         inputs["generator"] = self.get_generator(0)
+
         output = pipe(**inputs)
         logger.setLevel(level=ppdiffusers.logging.WARNING)
         if test_max_difference:
@@ -285,8 +288,8 @@ class PipelineTesterMixin:
         self.assertTrue(hasattr(pipe, "components"))
         self.assertTrue(set(pipe.components.keys()) == set(init_components.keys()))
 
-    def test_float16_inference(self):
-        self._test_float16_inference()
+    def test_float16_inference(self, expected_max_diff=1e-2):
+        self._test_float16_inference(expected_max_diff)
 
     def _test_float16_inference(self, expected_max_diff=1e-2):
         components = self.get_dummy_components()
@@ -300,8 +303,8 @@ class PipelineTesterMixin:
         max_diff = np.abs(to_np(output) - to_np(output_fp16)).max()
         self.assertLess(max_diff, expected_max_diff, "The outputs of the fp16 and fp32 pipelines are too different.")
 
-    def test_save_load_float16(self):
-        self._test_save_load_float16()
+    def test_save_load_float16(self, expected_max_diff=1e-2):
+        self._test_save_load_float16(expected_max_diff)
 
     def _test_save_load_float16(self, expected_max_diff=1e-2):
         pass
@@ -397,7 +400,6 @@ class PipelineTesterMixin:
         components = self.get_dummy_components()
         pipe = self.pipeline_class(**components)
         pipe.set_progress_bar_config(disable=None)
-
         inputs = self.get_dummy_inputs()
         output_without_slicing = pipe(**inputs)[0]
         pipe.enable_attention_slicing(slice_size=1)
