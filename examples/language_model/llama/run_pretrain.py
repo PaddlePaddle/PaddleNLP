@@ -111,18 +111,17 @@ class ModelArguments:
         default="llama", metadata={"help": "Only support for llama pre-training for now."}
     )
     model_name_or_path: str = field(
-        default="gpt2-meidum-en",
+        default="facebook/tiny-random-llama",
         metadata={
             "help": "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
         },
     )
-    hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
-    attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention probs dropout prob."})
+    tokenizer_name_or_path: Optional[str] = field(
+        default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
+    )
+
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
-    )
-    tokenizer_name_or_path: Optional[str] = field(
-        default="gpt2-meidum-en", metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
     use_flash_attention: bool = field(
         default=False,
@@ -202,7 +201,7 @@ def create_pretrained_dataset(
     def build_dataset(index, name):
         dataset = GPTDataset(
             file_prefix=input_prefix,
-            build_data_file=training_args.local_rank == 0,
+            build_data_file=training_args.local_process_index == 0,
             micro_batch_size=training_args.per_device_train_batch_size
             if name == "train"
             else training_args.per_device_eval_batch_size,
