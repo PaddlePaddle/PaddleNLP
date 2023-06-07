@@ -3105,11 +3105,11 @@ class InferGptDecoding(nn.Layer):
         params["pos_emb"].append((self.model.gpt.embeddings.position_embeddings, "weight"))
 
         # if model share word_embeddings weight
-        if id(self.model.gpt.embeddings.word_embeddings) == id(self.model.lm_head.decoder_weight):
+        if id(self.model.gpt.embeddings.word_embeddings) == id(self.model.lm_head.decoder.weight):
             params["linear_weight"].append((self.model.gpt.embeddings.word_embeddings, "weight"))
         else:
             params["linear_weight"].append(
-                (self.model.lm_head.decoder_weight, False, partial(setattr, self, "decoder_weight"))
+                (self.model.lm_head.decoder.weight, False, partial(setattr, self, "weight"))
             )
 
         for k, v in params.items():
