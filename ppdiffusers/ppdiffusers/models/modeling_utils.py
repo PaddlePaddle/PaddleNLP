@@ -66,7 +66,10 @@ def get_parameter_device(parameter: nn.Layer):
         # TODO https://github.com/huggingface/diffusers/compare/v0.15.0...v0.16.0#diff-6a3b9a08c1d37dbc341131632415fea800af242a84fb31f1bcd40d725e2eeeebR64
         return next(parameter.named_parameters())[1].place
     except StopIteration:
-        return paddle.get_device()
+        try:
+            return next(parameter.named_buffers())[1].place
+        except StopIteration:
+            return paddle.get_device()
 
 
 def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
@@ -74,7 +77,10 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
         # TODO https://github.com/huggingface/diffusers/compare/v0.15.0...v0.16.0#diff-6a3b9a08c1d37dbc341131632415fea800af242a84fb31f1bcd40d725e2eeeebR80
         return next(parameter.named_parameters())[1].dtype
     except StopIteration:
-        return parameter._dtype
+        try:
+            return next(parameter.named_buffers())[1].dtype
+        except StopIteration:
+            return parameter._dtype
 
 
 def convert_state_dict(state_dict, framework="torch"):
