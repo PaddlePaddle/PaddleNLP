@@ -503,6 +503,21 @@ class DiffusionPipeline(ConfigMixin):
 
                 register_dict = {name: (library, class_name)}
 
+                # TODO junnyu, before register model, we may need to keep some module in fp32
+                if (
+                    isinstance(module, nn.Layer)
+                    and hasattr(module, "_keep_in_fp32_modules")
+                    and module.dtype == paddle.float16
+                ):
+                    for name, sub_module in module.named_sublayers(include_self=True):
+                        if any(n in name for n in module._keep_in_fp32_modules):
+                            sub_module.to(dtype=paddle.float32)
+                            if hasattr(sub_module, "pre_hook"):
+                                sub_module.pre_hook.remove()
+                            sub_module.pre_hook = sub_module.register_forward_pre_hook(
+                                lambda layer, input: input[0].cast("float32")
+                            )
+
             # save model index config
             self.register_to_config(**register_dict)
 

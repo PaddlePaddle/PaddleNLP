@@ -321,7 +321,6 @@ if is_paddle_available():
     nn.Layer.__init__ = __init__
 
 if is_paddle_available() and is_paddlenlp_available():
-    # set logger level warning
     import paddle
 
     import paddlenlp.transformers
@@ -329,6 +328,8 @@ if is_paddle_available() and is_paddlenlp_available():
     from paddlenlp.transformers import PretrainedConfig, PretrainedModel
     from paddlenlp.utils.log import logger as ppnlp_logger
 
+    # set logger level warning
+    ppnlp_logger.set_level("WARNING")
     if is_ppxformers_available():
         from paddle.incubate.nn.memory_efficient_attention import (
             memory_efficient_attention,
@@ -1025,7 +1026,11 @@ if is_paddle_available() and is_paddlenlp_available():
         CLIPVisionModel,
         CLIPVisionModelWithProjection,
         DPTForDepthEstimation,
+        T5EncoderModel,
     )
+
+    if not hasattr(T5EncoderModel, "_keep_in_fp32_modules"):
+        T5EncoderModel._keep_in_fp32_modules = ["wo"]
 
     from ..models.modeling_pytorch_paddle_utils import (
         convert_pytorch_state_dict_to_paddle,
@@ -1258,3 +1263,15 @@ if is_paddle_available() and is_paddlenlp_available():
         return image_processor_dict, kwargs
 
     ImageProcessingMixin.get_image_processor_dict = get_image_processor_dict
+
+    # patch T5LayerFF, we will remove this in the near future.
+    from paddlenlp.transformers.t5.modeling import T5LayerFF
+
+    def new_forward(self, hidden_states):
+        forwarded_states = self.layer_norm(hidden_states)
+        forwarded_states = self.DenseReluDense(forwarded_states)
+        # make sure FP32 + FP16 = FP32
+        hidden_states = self.dropout(forwarded_states) + hidden_states
+        return hidden_states
+
+    T5LayerFF.forward = new_forward
