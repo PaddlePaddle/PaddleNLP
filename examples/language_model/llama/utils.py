@@ -27,7 +27,6 @@ from rouge import Rouge
 from paddlenlp.metrics import BLEU
 from paddlenlp.trainer import PrinterCallback, ProgressCallback, Trainer
 from paddlenlp.trainer.integrations import TrainerCallback
-from paddlenlp.utils import profiler
 from paddlenlp.utils.log import logger
 
 
@@ -116,9 +115,6 @@ class BenchmarkCallback(TrainerCallback):
             self.reader_cost_avg.record(time.time() - self.batch_start)
 
     def on_step_end(self, args, state, control, **kwargs):
-        if self.profiler_options is not None:
-            profiler.add_profiler_step(self.profiler_options)
-
         if self.benchmark:
             self.batch_start = time.time()
             if control.should_log:

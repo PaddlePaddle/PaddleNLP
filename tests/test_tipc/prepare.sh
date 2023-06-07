@@ -402,7 +402,6 @@ elif [ ${MODE} = "benchmark_train" ];then
 
     if [[ ${model_name} =~ "llama" ]]; then
         rm -rf llama_sft_demo_data.tar.gz
-        rm -rf data
         wget https://paddlenlp.bj.bcebos.com/models/community/facebook/llama_sft_demo_data.tar.gz
         tar -xvf llama_sft_demo_data.tar.gz
     fi
