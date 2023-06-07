@@ -35,9 +35,9 @@ from paddlenlp.utils.log import logger
 
 from .model_outputs import ModelOutput
 
-
 try:
     from paddle import top_p_sampling
+
     is_top_p_sampling_avaliable = True
 except:
     is_top_p_sampling_avaliable = False
@@ -1787,11 +1787,12 @@ def TopKProcess(probs, top_k, min_tokens_to_keep):
 
 
 def TopPProcess(probs, top_p, min_tokens_to_keep):
+
     if is_top_p_sampling_avaliable:
         top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
-        probs, _ = paddle.top_p_sampling(probs, top_ps_tensor)
+        probs, _ = top_p_sampling(probs, top_ps_tensor)
         return probs
-    
+
     sorted_probs = paddle.sort(probs, descending=True)
     sorted_indices = paddle.argsort(probs, descending=True)
     cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)
