@@ -384,14 +384,20 @@ if is_paddle_available() and is_paddlenlp_available():
         try:
             return next(parameter.named_parameters())[1].dtype
         except StopIteration:
-            return parameter._dtype
+            try:
+                return next(parameter.named_buffers())[1].dtype
+            except StopIteration:
+                return parameter._dtype
 
     @patch_to(PretrainedModel, as_prop=True)
     def device(self):
         try:
             return next(self.named_parameters())[1].place
         except StopIteration:
-            return paddle.get_device()
+            try:
+                return next(self.named_buffers())[1].place
+            except StopIteration:
+                return paddle.get_device()
 
     try:
         from paddlenlp.transformers import XLMRobertaTokenizer
