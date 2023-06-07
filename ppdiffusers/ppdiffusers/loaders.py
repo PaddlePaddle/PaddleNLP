@@ -485,7 +485,10 @@ class TextualInversionLoaderMixin:
         return prompt
 
     def load_textual_inversion(
-        self, pretrained_model_name_or_path: Union[str, Dict[str, torch.Tensor]], token: Optional[str] = None, **kwargs
+        self,
+        pretrained_model_name_or_path: Union[str, Dict[str, paddle.Tensor]],
+        token: Optional[str] = None,
+        **kwargs
     ):
         r"""
         Load textual inversion embeddings into the text encoder of stable diffusion pipelines. Both `diffusers` and
@@ -745,7 +748,7 @@ class LoraLoaderMixin:
     text_encoder_name = "text_encoder"
     unet_name = "unet"
 
-    def load_lora_weights(self, pretrained_model_name_or_path_or_dict: Union[str, Dict[str, torch.Tensor]], **kwargs):
+    def load_lora_weights(self, pretrained_model_name_or_path_or_dict: Union[str, Dict[str, paddle.Tensor]], **kwargs):
         r"""
         Load pretrained attention processor layers (such as LoRA) into [`UNet2DConditionModel`] and
         [`CLIPTextModel`](https://huggingface.co/docs/transformers/model_doc/clip#transformers.CLIPTextModel)).
@@ -952,7 +955,7 @@ class LoraLoaderMixin:
         else:
             return "to_out_lora"
 
-    def load_attn_procs(self, pretrained_model_name_or_path_or_dict: Union[str, Dict[str, torch.Tensor]], **kwargs):
+    def load_attn_procs(self, pretrained_model_name_or_path_or_dict: Union[str, Dict[str, paddle.Tensor]], **kwargs):
         r"""
         Load pretrained attention processor layers for
         [`CLIPTextModel`](https://huggingface.co/docs/transformers/model_doc/clip#transformers.CLIPTextModel).
