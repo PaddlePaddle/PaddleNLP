@@ -372,7 +372,7 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline, TextualInversionLoaderMi
     def decode_latents(self, latents):
         latents = 1 / self.vae.config.scaling_factor * latents
         image = self.vae.decode(latents).sample
-        image = (image / 2 + 0.5).clip(0, 1)
+        # image = (image / 2 + 0.5).clip(0, 1)
         return image
 
     # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_extra_step_kwargs
@@ -443,10 +443,8 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline, TextualInversionLoaderMi
         return timesteps, num_inference_steps - t_start
 
     def prepare_latents(self, image, timestep, batch_size, num_images_per_prompt, dtype, generator=None):
-        if not isinstance(image, (paddle.Tensor, PIL.Image.Image, list)):
-            raise ValueError(
-                f"`image` has to be of type `paddle.Tensor`, `PIL.Image.Image` or list but is {type(image)}"
-            )
+        if not isinstance(image, (paddle.Tensor, list)):
+            raise ValueError(f"`image` has to be of type `paddle.Tensor` or list but is {type(image)}")
 
         image = image.cast(dtype)
 

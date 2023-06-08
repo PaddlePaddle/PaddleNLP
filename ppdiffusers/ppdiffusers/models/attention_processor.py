@@ -279,7 +279,7 @@ class Attention(nn.Layer):
             query = query.cast(paddle.float32)
             key = key.cast(paddle.float32)
 
-        attention_scores = paddle.matmul(query * self.scale, key, transpose_y=True)
+        attention_scores = paddle.matmul(query, key, transpose_y=True) * self.scale
 
         if attention_mask is not None:
             attention_scores = attention_scores + attention_mask

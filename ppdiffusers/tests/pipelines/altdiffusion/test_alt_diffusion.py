@@ -19,6 +19,7 @@ import unittest
 import numpy as np
 import paddle
 
+import ppdiffusers  # noqa F401
 from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, XLMRobertaTokenizer
 from ppdiffusers import (
     AltDiffusionPipeline,
