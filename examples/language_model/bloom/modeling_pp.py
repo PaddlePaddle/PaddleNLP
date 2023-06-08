@@ -37,30 +37,30 @@ def get_hcg():
 def parse_args(args):
     if isinstance(args, tuple):
         if len(args) == 3:
-            hidden_states, attention_mask, position_ids = args
+            hidden_states, attention_mask, alibi = args
         elif len(args) == 2:
             hidden_states, attention_mask = args
-            position_ids = None
+            alibi = None
     else:
         hidden_states = args
-        attention_mask, position_ids = None, None
+        attention_mask, alibi = None, None
 
-    if position_ids is not None:
-        position_ids.stop_gradient = True
+    if alibi is not None:
+        alibi.stop_gradient = True
 
     if attention_mask is not None:
         attention_mask.stop_gradient = True
 
-    return hidden_states, attention_mask, position_ids
+    return hidden_states, attention_mask, alibi
 
 
-def return_args(hidden_states, attention_mask=None, position_ids=None):
+def return_args(hidden_states, attention_mask=None, alibi=None):
     ret = (hidden_states,)
 
     if attention_mask is not None:
         ret += (attention_mask.clone(),)
-    if position_ids is not None:
-        ret += (position_ids.clone(),)
+    if alibi is not None:
+        ret += (alibi.clone(),)
     if len(ret) == 1:
         ret = ret[0]
 
@@ -70,8 +70,11 @@ def return_args(hidden_states, attention_mask=None, position_ids=None):
 class BloomEmbeddingPipe(nn.Layer):
     """Extends BloomEmbeddings to forward attention_mask through the pipeline."""
 
+    _prepare_attn_mask = BloomModel._prepare_attn_mask
+
     def __init__(self, config):
         super(BloomEmbeddingPipe, self).__init__()
+        self.config = config
         if config.tensor_parallel_degree > 1:
             self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
                 config.vocab_size,
@@ -90,51 +93,61 @@ class BloomEmbeddingPipe(nn.Layer):
         Returns:
             _type_: _description_
         """
-        input_ids, attention_mask, position_ids = parse_args(args)
+        input_ids, attention_mask, alibi = parse_args(args)
 
         input_embeds = self.embed_tokens(input_ids)
+
         batch_size, seq_length = input_ids.shape
         if attention_mask is not None:
             attention_mask = BloomModel._prepare_decoder_attention_mask(
                 attention_mask, (batch_size, seq_length), 0, input_embeds.dtype
             )
             attention_mask.stop_gradient = True
+        else:
+            attention_mask = paddle.ones([batch_size, seq_length], dtype=paddle.get_default_dtype())
+            alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=input_embeds.dtype)
 
-        return return_args(input_embeds, attention_mask, position_ids)
+            causal_mask = self._prepare_attn_mask(
+                attention_mask,
+                input_shape=(batch_size, seq_length),
+                past_key_values_length=0,
+            )
+
+            if self.config.tensor_parallel_degree > 1:
+                block_size = self.config.n_head // self.config.tensor_parallel_degree
+                alibi = alibi[
+                    :,
+                    self.config.tensor_parallel_rank
+                    * block_size : (self.config.tensor_parallel_rank + 1)
+                    * block_size,
+                ]
+                alibi = alibi.reshape([batch_size * block_size, 1, seq_length])
+                # causal_mask = paddle.cast(
+                #     paddle.repeat_interleave(paddle.cast(causal_mask, "int32"), block_size, axis=0), "bool"
+                # )
+                causal_mask = paddle.repeat_interleave(paddle.cast(causal_mask, "int32"), block_size, axis=0)
+            else:
+                alibi = alibi.reshape([batch_size * self.config.n_head, 1, seq_length])
+                # causal_mask = paddle.cast(
+                #     paddle.repeat_interleave(paddle.cast(causal_mask, "int32"), self.config.n_head, axis=0), "bool"
+                # )
+                paddle.repeat_interleave(paddle.cast(causal_mask, "int32"), self.config.n_head, axis=0)
+
+            alibi.stop_gradient = True
+            causal_mask.stop_gradient = True
+
+        return return_args(input_embeds, causal_mask, alibi)
 
 
 class BloomBlockPipe(BloomBlock):
     _prepare_attn_mask = BloomModel._prepare_attn_mask
 
     def forward(self, args):
-        hidden_states, attention_mask, position_ids = parse_args(args)
-        batch_size, seq_length = hidden_states.shape[0], hidden_states.shape[1]
-        attention_mask = paddle.ones([batch_size, seq_length], dtype=paddle.get_default_dtype())
-        alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
-
-        causal_mask = self._prepare_attn_mask(
-            attention_mask,
-            input_shape=(batch_size, seq_length),
-            past_key_values_length=0,
-        )
-
-        if self.config.tensor_parallel_degree > 1:
-            block_size = self.config.n_head // self.config.tensor_parallel_degree
-            alibi = alibi[
-                :, self.config.tensor_parallel_rank * block_size : (self.config.tensor_parallel_rank + 1) * block_size
-            ]
-            alibi = alibi.reshape([batch_size * block_size, 1, seq_length])
-            causal_mask = paddle.cast(
-                paddle.repeat_interleave(paddle.cast(causal_mask, "int32"), block_size, axis=0), "bool"
-            )
-        else:
-            alibi = alibi.reshape([batch_size * self.config.n_head, 1, seq_length])
-            causal_mask = paddle.cast(
-                paddle.repeat_interleave(paddle.cast(causal_mask, "int32"), self.config.n_head, axis=0), "bool"
-            )
-
+        hidden_states, attention_mask, alibi = parse_args(args)
+        # use int32 instead of bool since pp not support bool
+        causal_mask = paddle.cast(attention_mask, "bool")
         hidden_states = super().forward(hidden_states, attention_mask=causal_mask, alibi=alibi)
-        return return_args(hidden_states[0], attention_mask, position_ids)
+        return return_args(hidden_states[0], attention_mask, alibi)
 
 
 class LayerNormPipe(nn.LayerNorm):
@@ -143,7 +156,7 @@ class LayerNormPipe(nn.LayerNorm):
         super().__init__(config.hidden_size, epsilon=config.layer_norm_epsilon)
 
     def forward(self, args):
-        hidden_states, attention_mask, position_ids = parse_args(args)
+        hidden_states, attention_mask, alibi = parse_args(args)
         return super().forward(hidden_states)
 
 

@@ -15,6 +15,13 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
+unset NCCL_DEBUG_SUBSYS
+unset NCCL_DEBUG_FILE
+export NCCL_DEBUG=INFO 
+export NCCL_DEBUG_SUBSYS=ALL
+# export GLOG_v=5
+
+
 task_name="llama_hybid"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
@@ -36,8 +43,8 @@ python -u  -m paddle.distributed.launch \
     --split 949,50,1 \
     --max_seq_length 2048 \
     --per_device_train_batch_size 1 \
-    --gradient_accumulation_steps 32 \
-    --per_device_eval_batch_size 32 \
+    --gradient_accumulation_steps 4 \
+    --per_device_eval_batch_size 4 \
     --use_flash_attention 1 \
     --use_fused_rms_norm 1 \
     --amp_master_grad 1 \
@@ -61,7 +68,7 @@ python -u  -m paddle.distributed.launch \
     --sharding "" \
     --disable_tqdm true \
     --continue_training 0 \
-    --recompute 0 \
+    --recompute 1 \
     --do_train \
     --do_eval \
     --device "gpu"
