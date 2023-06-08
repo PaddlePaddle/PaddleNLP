@@ -114,7 +114,10 @@ try:
 except OptionalDependencyNotAvailable:
     from ..utils.dummy_fastdeploy_objects import *  # noqa F403
 else:
-    from .fastdeploy_utils import FastDeployRuntimeModel
+    from .fastdeploy_utils import (
+        FastDeployDiffusionPipelineMixin,
+        FastDeployRuntimeModel,
+    )
 
 try:
     if not (is_paddle_available() and is_paddlenlp_available() and is_fastdeploy_available()):

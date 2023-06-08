@@ -41,7 +41,7 @@ class ImageProcessorTest(unittest.TestCase):
             return image.transpose([0, 2, 3, 1]).cpu().numpy()
         return image
 
-    def test_vae_image_processor_pt(self):
+    def test_vae_image_processor_pd(self):
         image_processor = VaeImageProcessor(do_resize=False, do_normalize=False)
 
         input_pd = self.dummy_sample

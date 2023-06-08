@@ -16,6 +16,7 @@
 # limitations under the License.
 
 
+import inspect
 import os
 import shutil
 from pathlib import Path
@@ -23,6 +24,7 @@ from typing import Dict, Optional, Union
 
 import numpy as np
 
+from ..image_processor import VaeImageProcessor
 from ..utils import (
     DIFFUSERS_CACHE,
     FASTDEPLOY_MODEL_NAME,
@@ -35,10 +37,11 @@ from ..utils import (
     is_fastdeploy_available,
     is_paddle_available,
     logging,
+    randn_tensor,
 )
 from ..version import VERSION as __version__
 
-__all__ = ["FastDeployRuntimeModel"]
+__all__ = ["FastDeployRuntimeModel", "FastDeployDiffusionPipelineMixin"]
 
 if is_paddle_available():
     import paddle
@@ -67,6 +70,349 @@ if is_fastdeploy_available():
 
 
 logger = logging.get_logger(__name__)
+
+
+class FastDeployDiffusionPipelineMixin:
+    def post_init(self, vae_scaling_factor=0.18215, vae_scale_factor=8, dtype="float32"):
+        self.vae_scaling_factor = vae_scaling_factor
+        self.vae_scale_factor = vae_scale_factor
+        self.image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
+        self.dtype = dtype
+
+    def get_timesteps(self, num_inference_steps, strength=0.0):
+        if strength <= 0:
+            return self.scheduler.timesteps.cast(self.dtype), num_inference_steps
+
+        # get the original timestep using init_timestep
+        init_timestep = min(int(num_inference_steps * strength), num_inference_steps)
+
+        t_start = max(num_inference_steps - init_timestep, 0)
+        timesteps = self.scheduler.timesteps[t_start * self.scheduler.order :].cast(self.dtype)
+
+        return timesteps, num_inference_steps - t_start
+
+    def check_inputs_img2img(
+        self, prompt, strength, callback_steps, negative_prompt=None, prompt_embeds=None, negative_prompt_embeds=None
+    ):
+        if strength < 0 or strength > 1:
+            raise ValueError(f"The value of strength should in [0.0, 1.0] but is {strength}")
+
+        if (callback_steps is None) or (
+            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
+        ):
+            raise ValueError(
+                f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
+                f" {type(callback_steps)}."
+            )
+
+        if prompt is not None and prompt_embeds is not None:
+            raise ValueError(
+                f"Cannot forward both `prompt`: {prompt} and `prompt_embeds`: {prompt_embeds}. Please make sure to"
+                " only forward one of the two."
+            )
+        elif prompt is None and prompt_embeds is None:
+            raise ValueError(
+                "Provide either `prompt` or `prompt_embeds`. Cannot leave both `prompt` and `prompt_embeds` undefined."
+            )
+        elif prompt is not None and (not isinstance(prompt, str) and not isinstance(prompt, list)):
+            raise ValueError(f"`prompt` has to be of type `str` or `list` but is {type(prompt)}")
+
+        if negative_prompt is not None and negative_prompt_embeds is not None:
+            raise ValueError(
+                f"Cannot forward both `negative_prompt`: {negative_prompt} and `negative_prompt_embeds`:"
+                f" {negative_prompt_embeds}. Please make sure to only forward one of the two."
+            )
+
+        if prompt_embeds is not None and negative_prompt_embeds is not None:
+            if prompt_embeds.shape != negative_prompt_embeds.shape:
+                raise ValueError(
+                    "`prompt_embeds` and `negative_prompt_embeds` must have the same shape when passed directly, but"
+                    f" got: `prompt_embeds` {prompt_embeds.shape} != `negative_prompt_embeds`"
+                    f" {negative_prompt_embeds.shape}."
+                )
+
+    def check_inputs_txt2img(
+        self,
+        prompt,
+        height,
+        width,
+        callback_steps,
+        negative_prompt=None,
+        prompt_embeds=None,
+        negative_prompt_embeds=None,
+    ):
+        if height % self.vae_scale_factor != 0 or width % self.vae_scale_factor != 0:
+            raise ValueError(
+                f"`height` and `width` have to be divisible by {self.vae_scale_factor} but are {height} and {width}."
+            )
+
+        if (callback_steps is None) or (
+            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
+        ):
+            raise ValueError(
+                f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
+                f" {type(callback_steps)}."
+            )
+
+        if prompt is not None and prompt_embeds is not None:
+            raise ValueError(
+                f"Cannot forward both `prompt`: {prompt} and `prompt_embeds`: {prompt_embeds}. Please make sure to"
+                " only forward one of the two."
+            )
+        elif prompt is None and prompt_embeds is None:
+            raise ValueError(
+                "Provide either `prompt` or `prompt_embeds`. Cannot leave both `prompt` and `prompt_embeds` undefined."
+            )
+        elif prompt is not None and (not isinstance(prompt, str) and not isinstance(prompt, list)):
+            raise ValueError(f"`prompt` has to be of type `str` or `list` but is {type(prompt)}")
+
+        if negative_prompt is not None and negative_prompt_embeds is not None:
+            raise ValueError(
+                f"Cannot forward both `negative_prompt`: {negative_prompt} and `negative_prompt_embeds`:"
+                f" {negative_prompt_embeds}. Please make sure to only forward one of the two."
+            )
+
+        if prompt_embeds is not None and negative_prompt_embeds is not None:
+            if prompt_embeds.shape != negative_prompt_embeds.shape:
+                raise ValueError(
+                    "`prompt_embeds` and `negative_prompt_embeds` must have the same shape when passed directly, but"
+                    f" got: `prompt_embeds` {prompt_embeds.shape} != `negative_prompt_embeds`"
+                    f" {negative_prompt_embeds.shape}."
+                )
+
+    def prepare_latents_txt2img(self, batch_size, num_channels_latents, height, width, generator, latents=None):
+        shape = [batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor]
+        if isinstance(generator, list) and len(generator) != batch_size:
+            raise ValueError(
+                f"You have passed a list of generators of length {len(generator)}, but requested an effective batch"
+                f" size of {batch_size}. Make sure the batch size matches the length of the generators."
+            )
+
+        if latents is None:
+            latents = randn_tensor(shape, generator=generator, dtype=self.dtype)
+        else:
+            if str(latents.dtype).replace("paddle.", "") != self.dtype:
+                latents = latents.cast(self.dtype)
+
+        # scale the initial noise by the standard deviation required by the scheduler
+        latents = latents * float(self.scheduler.init_noise_sigma)
+        return latents
+
+    def prepare_latents_img2img(self, image, timestep, batch_size, num_images_per_prompt, generator=None, noise=None):
+        if not isinstance(image, (paddle.Tensor, list)):
+            raise ValueError(f"`image` has to be of type `paddle.Tensor` or list but is {type(image)}")
+
+        image = image.cast(self.dtype)
+
+        batch_size = batch_size * num_images_per_prompt
+        if isinstance(generator, list) and len(generator) != batch_size:
+            raise ValueError(
+                f"You have passed a list of generators of length {len(generator)}, but requested an effective batch"
+                f" size of {batch_size}. Make sure the batch size matches the length of the generators."
+            )
+
+        image_shape = image.shape
+        init_latents = paddle.zeros(
+            [image_shape[0], 4, image_shape[2] // self.vae_scale_factor, image_shape[3] // self.vae_scale_factor],
+            dtype=self.dtype,
+        )
+        vae_input_name = self.vae_encoder.model.get_input_info(0).name
+        vae_output_name = self.vae_encoder.model.get_output_info(0).name
+
+        self.vae_encoder.zero_copy_infer(
+            prebinded_inputs={vae_input_name: image},
+            prebinded_outputs={vae_output_name: init_latents},
+            share_with_raw_ptr=True,
+        )
+
+        init_latents = self.vae_scaling_factor * init_latents
+
+        if noise is None:
+            shape = init_latents.shape
+            noise = randn_tensor(shape, generator=generator, dtype=self.dtype)
+        else:
+            if str(noise.dtype).replace("paddle.", "") != self.dtype:
+                noise = noise.cast(self.dtype)
+
+        clean_latents = init_latents
+        # get latents
+        init_latents = self.scheduler.add_noise(init_latents, noise, timestep)
+        latents = init_latents
+
+        return latents, clean_latents
+
+    def is_scheduler_support_step_index(self):
+        kwargs_keys = set(inspect.signature(self.scheduler.step).parameters.keys())
+        return "kwargs" in kwargs_keys or "step_index" in kwargs_keys
+
+    def decode_latents(self, latents):
+        latents_shape = latents.shape
+        vae_output_shape = [
+            latents_shape[0],
+            3,
+            latents_shape[2] * self.vae_scale_factor,
+            latents_shape[3] * self.vae_scale_factor,
+        ]
+        images_vae = paddle.zeros(vae_output_shape, dtype=self.dtype)
+
+        vae_input_name = self.vae_decoder.model.get_input_info(0).name
+        vae_output_name = self.vae_decoder.model.get_output_info(0).name
+
+        self.vae_decoder.zero_copy_infer(
+            prebinded_inputs={vae_input_name: latents},
+            prebinded_outputs={vae_output_name: images_vae},
+            share_with_raw_ptr=True,
+        )
+
+        return images_vae
+
+    def _encode_prompt(
+        self,
+        prompt,
+        num_images_per_prompt,
+        do_classifier_free_guidance,
+        negative_prompt=None,
+        prompt_embeds: Optional[paddle.Tensor] = None,
+        negative_prompt_embeds: Optional[paddle.Tensor] = None,
+    ):
+        r"""
+        Encodes the prompt into text encoder hidden states.
+
+        Args:
+            prompt (`str` or `List[str]`, *optional*):
+                prompt to be encoded
+            num_images_per_prompt (`int`):
+                number of images that should be generated per prompt
+            do_classifier_free_guidance (`bool`):
+                whether to use classifier free guidance or not
+            negative_prompt (`str` or `List[str]`, *optional*):
+                The prompt or prompts not to guide the image generation. If not defined, one has to pass
+                `negative_prompt_embeds` instead. Ignored when not using guidance (i.e., ignored if `guidance_scale` is
+                less than `1`).
+            prompt_embeds (`paddle.Tensor`, *optional*):
+                Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
+                provided, text embeddings will be generated from `prompt` input argument.
+            negative_prompt_embeds (`paddle.Tensor`, *optional*):
+                Pre-generated negative text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt
+                weighting. If not provided, negative_prompt_embeds will be generated from `negative_prompt` input
+                argument.
+        """
+        if prompt is not None and isinstance(prompt, str):
+            batch_size = 1
+        elif prompt is not None and isinstance(prompt, list):
+            batch_size = len(prompt)
+        else:
+            batch_size = prompt_embeds.shape[0]
+
+        if prompt_embeds is None:
+            # get prompt text embeddings
+            text_inputs = self.tokenizer(
+                prompt,
+                padding="max_length",
+                max_length=self.tokenizer.model_max_length,
+                truncation=True,
+                return_tensors="np",
+            )
+
+            text_input_ids = text_inputs.input_ids
+            untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="np").input_ids  # check
+
+            if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not np.array_equal(
+                text_input_ids, untruncated_ids
+            ):
+                removed_text = self.tokenizer.batch_decode(
+                    untruncated_ids[:, self.tokenizer.model_max_length - 1 : -1]
+                )
+                logger.warning(
+                    "The following part of your input was truncated because CLIP can only handle sequences up to"
+                    f" {self.tokenizer.model_max_length} tokens: {removed_text}"
+                )
+
+            prompt_embeds = self.text_encoder(input_ids=text_input_ids.astype(np.int64))[0]
+            prompt_embeds = paddle.to_tensor(prompt_embeds, dtype=self.dtype)
+
+        bs_embed, seq_len, _ = prompt_embeds.shape
+        # duplicate text embeddings for each generation per prompt, using mps friendly method
+        prompt_embeds = prompt_embeds.tile([1, num_images_per_prompt, 1])
+        prompt_embeds = prompt_embeds.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
+
+        # get unconditional embeddings for classifier free guidance
+        if do_classifier_free_guidance and negative_prompt_embeds is None:
+            if negative_prompt is None:
+                uncond_tokens = [""]
+            elif type(prompt) is not type(negative_prompt):
+                raise TypeError(
+                    f"`negative_prompt` should be the same type to `prompt`, but got {type(negative_prompt)} !="
+                    f" {type(prompt)}."
+                )
+            elif isinstance(negative_prompt, str):
+                uncond_tokens = [negative_prompt]
+            elif batch_size != len(negative_prompt):
+                raise ValueError(
+                    f"`negative_prompt`: {negative_prompt} has batch size {len(negative_prompt)}, but `prompt`:"
+                    f" {prompt} has batch size {batch_size}. Please make sure that passed `negative_prompt` matches"
+                    " the batch size of `prompt`."
+                )
+            else:
+                uncond_tokens = negative_prompt
+
+            max_length = prompt_embeds.shape[1]
+            uncond_input = self.tokenizer(
+                uncond_tokens,
+                padding="max_length",
+                max_length=max_length,
+                truncation=True,
+                return_tensors="np",
+            )
+            negative_prompt_embeds = self.text_encoder(
+                input_ids=uncond_input.input_ids.astype(np.int64),
+            )[0]
+            negative_prompt_embeds = paddle.to_tensor(negative_prompt_embeds, dtype=self.dtype)
+
+        if do_classifier_free_guidance:
+            # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
+            seq_len = negative_prompt_embeds.shape[1]
+            negative_prompt_embeds = negative_prompt_embeds.tile([1, num_images_per_prompt, 1])
+            negative_prompt_embeds = negative_prompt_embeds.reshape([batch_size * num_images_per_prompt, seq_len, -1])
+
+            # For classifier free guidance, we need to do two forward passes.
+            # Here we concatenate the unconditional and text embeddings into a single batch
+            # to avoid doing two forward passes
+            prompt_embeds = paddle.concat([negative_prompt_embeds, prompt_embeds])
+
+        return prompt_embeds
+
+    def run_safety_checker(self, image):
+        if self.safety_checker is None:
+            has_nsfw_concept = None
+        else:
+            if paddle.is_tensor(image):
+                feature_extractor_input = self.image_processor.postprocess(image, output_type="pil")
+            else:
+                feature_extractor_input = self.image_processor.numpy_to_pil(image)
+            safety_checker_input = self.feature_extractor(feature_extractor_input, return_tensors="np")
+            image, has_nsfw_concept = self.safety_checker(
+                images=image.numpy(), clip_input=safety_checker_input.pixel_values.astype(self.dtype)
+            )
+            image = paddle.to_tensor(image, dtype=self.dtype)
+        return image, has_nsfw_concept
+
+    def prepare_extra_step_kwargs(self, generator, eta):
+        # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
+        # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
+        # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
+        # and should be between [0, 1]
+
+        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
+        extra_step_kwargs = {}
+        if accepts_eta:
+            extra_step_kwargs["eta"] = eta
+
+        # check if the scheduler accepts generator
+        accepts_generator = "generator" in set(inspect.signature(self.scheduler.step).parameters.keys())
+        if accepts_generator:
+            extra_step_kwargs["generator"] = generator
+        return extra_step_kwargs
 
 
 class FastDeployRuntimeModel:
