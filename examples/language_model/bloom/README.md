@@ -23,6 +23,10 @@ mv llama_openwebtext_100k_idx.npz ./data
 ```
 暂时使用llama的词表即可训练bloom模型.
 
+```shell
+bash -x run_trainer_tp4pp2.sh
+```
+开始训练
 
 
 ## 模型 Finetune
