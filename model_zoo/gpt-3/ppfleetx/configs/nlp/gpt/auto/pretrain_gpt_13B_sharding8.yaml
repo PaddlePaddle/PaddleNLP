@@ -1,0 +1,39 @@
+_base_: ./pretrain_gpt_base.yaml
+
+Global:
+  global_batch_size: 
+  local_batch_size: 1
+  micro_batch_size: 1
+
+
+Model:
+  vocab_size: 50304
+  hidden_size: 5120
+  num_layers: 40
+  num_attention_heads: 40
+  ffn_hidden_size:
+  hidden_dropout_prob: 0.1
+  attention_probs_dropout_prob: 0.1
+  max_position_embeddings: 1024
+  type_vocab_size: 16
+  initializer_range: 0.02
+  fuse_attn_qkv: True
+  use_recompute: True
+  recompute_granularity:
+  no_recompute_layers:
+
+
+Distributed:
+  dp_degree:
+  mp_degree: 1
+  pp_degree: 1
+  sharding:
+    sharding_degree: 8
+    sharding_stage: 3
+    reduce_overlap: True
+    broadcast_overlap: True
+    param_comm_stream_num: 3
+    grad_comm_stream_num: 3
+    param_bucket_size_numel: 210355872
+    grad_bucket_size_numel: 210355872
+    enable_hierarchical_comm: False
