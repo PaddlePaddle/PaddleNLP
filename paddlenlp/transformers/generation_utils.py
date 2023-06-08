@@ -35,6 +35,13 @@ from paddlenlp.utils.log import logger
 
 from .model_outputs import ModelOutput
 
+try:
+    from paddle import top_p_sampling
+
+    is_top_p_sampling_avaliable = True
+except:
+    is_top_p_sampling_avaliable = False
+
 __all__ = ["GenerationMixin"]
 
 
@@ -436,9 +443,11 @@ class GenerationMixin(object):
         # update cache
         if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
             model_kwargs["cache"] = outputs[1]
+            model_kwargs["past_key_values"] = outputs[1]
 
         if isinstance(outputs, ModelOutput) and "past_key_values" in outputs:
             model_kwargs["cache"] = outputs.past_key_values
+            model_kwargs["past_key_values"] = outputs.past_key_values
 
         # update token_type_ids with last value
         if "token_type_ids" in model_kwargs and model_kwargs["token_type_ids"] is not None:
@@ -1778,6 +1787,12 @@ def TopKProcess(probs, top_k, min_tokens_to_keep):
 
 
 def TopPProcess(probs, top_p, min_tokens_to_keep):
+
+    if is_top_p_sampling_avaliable:
+        top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
+        probs, _ = top_p_sampling(probs, top_ps_tensor)
+        return probs
+
     sorted_probs = paddle.sort(probs, descending=True)
     sorted_indices = paddle.argsort(probs, descending=True)
     cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)

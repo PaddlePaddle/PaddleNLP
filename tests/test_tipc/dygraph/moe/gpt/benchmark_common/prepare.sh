@@ -11,4 +11,4 @@ python3 -m pip install --upgrade paddlenlp
 cd ../examples/language_model/moe/dygraph/
 rm -rf data
 mkdir data && cd data
-wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/train.data.json_ids.npz
+wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt2/train.data.json_ids.npz
