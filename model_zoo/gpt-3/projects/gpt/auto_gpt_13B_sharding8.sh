@@ -17,7 +17,10 @@
 log_dir=log_auto
 rm -rf $log_dir
 
-# 6.7B+sharding16 run_pretrain
+# 10B+sharding8 run_pretrain
 python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3,4,5,6,7" \
     ./tools/auto.py \
-    -c ./ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_6.7B_sharding16.yaml
+    -c ./ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_13B_sharding8.yaml \
+    -o Engine.max_steps=1000 \
+    -o Engine.logging_freq=1 \
+    -o Engine.verbose=3

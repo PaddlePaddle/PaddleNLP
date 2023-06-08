@@ -93,7 +93,7 @@ class MultiHeadAttention(nn.Layer):
         self.ipp = ipp
 
         self.head_dim = embed_dim // num_heads
-        assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
+        assert self.head_dim * num_heads == self.embed_dim, "embed_dim[{}] must be divisible by num_heads[{}]".format(self.embed_dim, num_heads)
 
         if self.fuse_attn_qkv:
             assert self.kdim == embed_dim
@@ -290,7 +290,8 @@ class TransformerDecoder(nn.Layer):
         new_caches = []
 
         for i, mod in enumerate(self.layers):
-            mod = auto.shard_op(mod, auto_env.get_mesh()[mod.ipp])
+            ipp = mod.ipp
+            mod = auto.shard_op(mod, auto_env.get_mesh()[ipp])
 
             if cache is None:
                 if use_cache:
@@ -304,6 +305,8 @@ class TransformerDecoder(nn.Layer):
             else:
                 output, new_cache = mod(output, memory, tgt_mask=tgt_mask, use_cache=use_cache, cache=cache[i])
                 new_caches.append(new_cache)
+
+            auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().dp_dim, None, None])
 
         if self.norm is not None:
             output = self.norm(output)
