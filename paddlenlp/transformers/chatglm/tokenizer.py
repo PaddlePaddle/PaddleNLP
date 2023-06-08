@@ -62,13 +62,13 @@ class ChatGLMTokenizer(PretrainedTokenizer):
             unk_token=unk_token,
             bos_token=bos_token,
             eos_token=eos_token,
-            end_token=end_token,
             mask_token=mask_token,
-            gmask_token=gmask_token,
             padding_side=padding_side,
-            do_lower_case=do_lower_case,
             **kwargs,
         )
+        self.end_token = end_token
+        self.gmask_token = gmask_token
+        self.do_lower_case = do_lower_case
         self.vocab_file = vocab_file
         self.num_image_tokens = num_image_tokens
         self.max_blank_length = kwargs.get("max_blank_length", 80)
