@@ -236,14 +236,14 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
 
         unet_output_name = self.unet.model.get_output_info(0).name
         unet_input_names = [self.unet.model.get_input_info(i).name for i in range(self.unet.model.num_inputs())]
-
+        is_scheduler_support_step_index = self.is_scheduler_support_step_index()
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
                 noise_pred_unet = paddle.zeros_like(latent_model_input)
 
-                if self.is_scheduler_support_step_index():
+                if is_scheduler_support_step_index:
                     latent_model_input = self.scheduler.scale_model_input(latent_model_input, t, step_index=i)
                 else:
                     latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
@@ -263,7 +263,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
                     noise_pred_uncond, noise_pred_text = noise_pred_unet.chunk(2)
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
                 # compute the previous noisy sample x_t -> x_t-1
-                if self.is_scheduler_support_step_index():
+                if is_scheduler_support_step_index:
                     scheduler_output = self.scheduler.step(
                         noise_pred, t, latents, step_index=i, return_pred_original_sample=False, **extra_step_kwargs
                     )
