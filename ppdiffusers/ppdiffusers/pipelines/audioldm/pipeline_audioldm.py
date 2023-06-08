@@ -22,7 +22,6 @@ import paddle.nn.functional as F
 from paddlenlp.transformers import (
     ClapTextModelWithProjection,
     RobertaTokenizer,
-    RobertaTokenizerFast,
     SpeechT5HifiGan,
 )
 
@@ -73,7 +72,7 @@ class AudioLDMPipeline(DiffusionPipeline):
         self,
         vae: AutoencoderKL,
         text_encoder: ClapTextModelWithProjection,
-        tokenizer: Union[RobertaTokenizer, RobertaTokenizerFast],
+        tokenizer: Union[RobertaTokenizer],
         unet: UNet2DConditionModel,
         scheduler: KarrasDiffusionSchedulers,
         vocoder: SpeechT5HifiGan,
@@ -142,12 +141,15 @@ class AudioLDMPipeline(DiffusionPipeline):
                 prompt,
                 padding="max_length",
                 max_length=self.tokenizer.model_max_length,
+                return_attention_mask=True,
                 truncation=True,
                 return_tensors="pd",
             )
             text_input_ids = text_inputs.input_ids
             attention_mask = text_inputs.attention_mask
-            untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="pd").input_ids
+            untruncated_ids = self.tokenizer(
+                prompt, padding="longest", return_tensors="pd", return_attention_mask=True
+            ).input_ids
             if (
                 untruncated_ids.shape[-1] >= text_input_ids.shape[-1]
                 and not paddle.equal_all(x=text_input_ids, y=untruncated_ids).item()
@@ -187,7 +189,12 @@ class AudioLDMPipeline(DiffusionPipeline):
                 uncond_tokens = negative_prompt
             max_length = prompt_embeds.shape[1]
             uncond_input = self.tokenizer(
-                uncond_tokens, padding="max_length", max_length=max_length, truncation=True, return_tensors="pd"
+                uncond_tokens,
+                padding="max_length",
+                max_length=max_length,
+                truncation=True,
+                return_tensors="pd",
+                return_attention_mask=True,
             )
             uncond_input_ids = uncond_input.input_ids
             attention_mask = uncond_input.attention_mask
