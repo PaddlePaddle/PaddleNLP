@@ -65,7 +65,7 @@ class T5FilmDecoder(ModelMixin, ConfigMixin):
         self.spec_out = nn.Linear(d_model, input_dims, bias_attr=False)
 
     def encoder_decoder_mask(self, query_input, key_input):
-        mask = paddle.multiply(query_input.unsqueeze(-1), key_input.unsqueeze(-2))
+        mask = paddle.multiply(query_input.unsqueeze(-1), key_input.unsqueeze(-2).cast(query_input.dtype))
         return mask.unsqueeze(-3)
 
     def forward(self, encodings_and_masks, decoder_input_tokens, decoder_noise_time):
@@ -95,8 +95,7 @@ class T5FilmDecoder(ModelMixin, ConfigMixin):
         )
 
         position_encodings = self.position_encoding(decoder_positions)
-
-        inputs = self.continuous_inputs_projection(decoder_input_tokens)
+        inputs = self.continuous_inputs_projection(decoder_input_tokens.cast(position_encodings.dtype))
         inputs += position_encodings
         y = self.dropout(inputs)
 
@@ -167,7 +166,7 @@ class DecoderLayer(nn.Layer):
         )
 
         if encoder_hidden_states is not None:
-            encoder_extended_attention_mask = paddle.where(encoder_attention_mask > 0, 0, -1e10).cast(
+            encoder_extended_attention_mask = paddle.where(encoder_attention_mask > 0, 0.0, -1e10).cast(
                 encoder_hidden_states.dtype
             )
 

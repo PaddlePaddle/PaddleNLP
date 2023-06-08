@@ -25,6 +25,7 @@ from pathlib import PosixPath
 from typing import Any, Dict, Tuple, Union
 
 import numpy as np
+import paddle
 
 from .utils import (
     DIFFUSERS_CACHE,
@@ -593,3 +594,48 @@ def register_to_config(init):
         init(self, *args, **init_kwargs)
 
     return inner_init
+
+
+class ModuleUtilsMixin:
+    """
+    A few utilities for `torch.nn.Modules`, to be used as a mixin.
+    """
+
+    def get_extended_attention_mask(
+        self,
+        attention_mask: paddle.Tensor,
+        input_shape: Tuple[int],
+        has_query: bool = False,
+    ) -> paddle.Tensor:
+        """
+        Makes broadcastable attention and causal masks so that future and masked tokens are ignored.
+        Arguments:
+            attention_mask (`paddle.Tensor`):
+                Mask with ones indicating tokens to attend to, zeros for tokens to ignore.
+            input_shape (`Tuple[int]`):
+                The shape of the input to the model.
+        Returns:
+            `paddle.Tensor` The extended attention mask, with a the same dtype as `attention_mask.dtype`.
+        """
+        # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
+        # ourselves in which case we just need to make it broadcastable to all heads.
+        if attention_mask.dim() == 3:
+            extended_attention_mask = attention_mask[:, None, :, :]
+        elif attention_mask.dim() == 2:
+            # Provided a padding mask of dimensions [batch_size, seq_length]
+            # - the model is an encoder, so make the mask broadcastable to [batch_size, num_heads, seq_length, seq_length]
+            extended_attention_mask = attention_mask[:, None, None, :]
+        else:
+            raise ValueError(
+                "Wrong shape for input_ids (shape {}) or attention_mask (shape {})".format(
+                    input_shape, attention_mask.shape
+                )
+            )
+
+        # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
+        # masked positions, this operation will create a tensor which is 0.0 for
+        # positions we want to attend and -10000.0 for masked positions.
+        # Since we are adding it to the raw scores before the softmax, this is
+        # effectively the same as removing these entirely.
+        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+        return extended_attention_mask
