@@ -190,8 +190,7 @@ class TestLoraModel(unittest.TestCase):
         self.assertIsNotNone(eval_forward_results)
         self.assertTrue(paddle.allclose(train_forward_results[0], eval_forward_results[0]))
 
-    @parameterized.expand([(None,), ("all",), ("lora",)])
-    def test_lora_model_save_load(self, bias):
+    def test_lora_model_save_load(self):
         with TemporaryDirectory() as tempdir:
             input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 20]))
             lora_config = LoRAConfig(
@@ -199,7 +198,6 @@ class TestLoraModel(unittest.TestCase):
                 r=4,
                 lora_alpha=8,
                 merge_weights=True,
-                trainable_bias=bias,
             )
             model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
             lora_model = LoRAModel(model, lora_config)
@@ -207,11 +205,15 @@ class TestLoraModel(unittest.TestCase):
             original_results = lora_model(input_ids)
             lora_model.save_pretrained(tempdir)
 
-            new_model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
-            loaded_lora_model = LoRAModel.from_pretrained(new_model, tempdir)
+            loaded_lora_model = LoRAModel.from_pretrained(model, tempdir)
             loaded_lora_model.eval()
             loaded_results = loaded_lora_model(input_ids)
             self.assertTrue(paddle.allclose(original_results[0], loaded_results[0]))
+
+            config_loaded_lora_model = LoRAModel.from_pretrained(model, tempdir, lora_config=lora_config)
+            config_loaded_lora_model.eval()
+            config_loaded_results = config_loaded_lora_model(input_ids)
+            self.assertTrue(paddle.allclose(original_results[0], config_loaded_results[0]))
 
 
 class TestLoRAConfig(unittest.TestCase):

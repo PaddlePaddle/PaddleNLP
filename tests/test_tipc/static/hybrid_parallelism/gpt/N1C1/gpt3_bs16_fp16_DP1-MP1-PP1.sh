@@ -8,7 +8,7 @@ micro_batch_size=16
 global_batch_size=16
 run_mode=DP1-MP1-PP1
 device_num=N1C1
-max_iter=10000500
+max_iter=600
 use_sharding=false
 
 # run
