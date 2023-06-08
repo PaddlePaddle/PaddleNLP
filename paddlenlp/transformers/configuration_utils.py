@@ -572,8 +572,7 @@ class PretrainedConfig:
             self.id2label = dict((int(key), value) for key, value in self.id2label.items())
             # Keys are always strings in JSON so convert ids to int here.
         else:
-            num_labels = kwargs.pop("num_labels", 2)
-            self.num_labels = num_labels if num_labels is not None else 2
+            self.num_labels = kwargs.pop("num_labels", 2)
 
         self.classifier_dropout = kwargs.pop("classifier_dropout", None)
 

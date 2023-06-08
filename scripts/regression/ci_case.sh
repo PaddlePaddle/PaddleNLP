@@ -17,8 +17,8 @@ export nlp_dir=${PWD}
 export log_path=${nlp_dir}/model_logs
 export cudaid1=$2
 export cudaid2=$3
-export PATH=${PATH}
-export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=/opt/_internal/cpython-3.7.0/lib/:${LD_LIBRARY_PATH}
+export PATH=/opt/_internal/cpython-3.7.0/bin/:${PATH}
 if [ ! -d "model_logs" ];then
     mkdir model_logs
 fi
