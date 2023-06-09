@@ -1680,7 +1680,7 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
         >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
         >>> image = Image.open(requests.get(url, stream=True).raw)
         >>> image = processor.process_images(images=image, return_tensors="pd")
-        >>> image_features = model.encode_images(**image)
+        >>> image_features, image_attention_mask = model.encode_images(**image)
         """
         # step 1: forward the images through the vision encoder,
         # to get image embeddings of shape (batch_size, seq_len, hidden_size)
@@ -1727,10 +1727,12 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
                 The first input prompt before the tag `<ImageHere>`, it's embeddings will concat with image embeddings and the embeddings of the second_input_ids for the generation.
             second_input_ids (`paddle.Tensor` of shape (batch_size, sequence_length), *optional*):
                 The second input prompt after the tag `<ImageHere>`, it's embeddings will concat with image embeddings and the embeddings of the first_input_ids for the generation.
+            image_attention_mask (`paddle.Tensor` of shape (batch_size, image_sequence_length), *optional*):
+                The attention mask to the image_features.
             first_attention_mask (`paddle.Tensor` of shape (batch_size, sequence_length), *optional*):
-                The attention mask corresponding with the first_input_ids, whill will mask to avoid performing attention on padding token indices.
+                The attention mask corresponding to the first_input_ids.
             second_attention_mask (`paddle.Tensor` of shape (batch_size, sequence_length), *optional*):
-                The attention mask corresponding with the second_input_ids, whill will mask to avoid performing attention on padding token indices.
+                The attention mask corresponding to the second_input_ids.
         Returns:
             captions (list): A list of strings of length batch_size * num_captions.
 
@@ -1742,14 +1744,14 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
         >>> from paddlenlp.transformers import MiniGPT4Processor, MiniGPT4ForConditionalGeneration
         >>> processor = MiniGPT4Processor.from_pretrained("model_name")
         >>> model = MiniGPT4ForConditionalGeneration.from_pretrained("model_name")
-        >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+        >>>  url = "https://paddlenlp.bj.bcebos.com/data/images/dog.png"
         >>> image = Image.open(requests.get(url, stream=True).raw)
-        >>> image = processor.process_images(images=image, return_tensors="pd")
-        >>> image_features = model.encode_images(**image)
+        >>> processed_image = processor.process_images(images=image, return_tensors="pd")
+        >>> image_features, image_attention_mask = model.encode_images(**processed_image)
         >>> text = "describe this image"
         >>> prompt = "###Human: <Img><ImageHere></Img> <TextHere>###Assistant:"
         >>> inputs = processor(text=text, prompt=prompt, return_tensors="pd")
-        >>> generated_ids, scores= model.generate_with_image_features(image_features, **inputs)
+        >>> generated_ids, scores= model.generate_with_image_features(image_features, image_attention_mask=image_attention_mask, **inputs)
         >>> generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
         """
         first_embeds = self.language_model.llama.embed_tokens(first_input_ids)
