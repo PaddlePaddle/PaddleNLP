@@ -172,7 +172,7 @@ class SpectrogramDiffusionPipeline(DiffusionPipeline):
                 callback(i, full_pred_mel)
             logger.info("Generated segment", i)
         if output_type == "numpy":
-            output = self.melgan(input_features=full_pred_mel.astype(np.float32))
+            output = self.melgan(input_features=full_pred_mel.astype(np.float32))[0]
         else:
             output = full_pred_mel
         if not return_dict:

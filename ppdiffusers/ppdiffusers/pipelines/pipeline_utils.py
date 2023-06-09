@@ -359,8 +359,8 @@ def _get_pipeline_class(class_obj, config, custom_pipeline=None, cache_dir=None,
     if class_obj != DiffusionPipeline:
         return class_obj
 
-    diffusers_module = importlib.import_module(class_obj.__module__.split(".")[0])
-    return getattr(diffusers_module, config["_class_name"])
+    ppdiffusers_module = importlib.import_module(class_obj.__module__.split(".")[0])
+    return getattr(ppdiffusers_module, config["_class_name"])
 
 
 def load_sub_model(
@@ -379,6 +379,12 @@ def load_sub_model(
     cached_folder: Union[str, os.PathLike] = None,
     **kwargs,
 ):
+    # support huggingface diffusers onnx model
+    is_onnx_model = False
+    if "Onnx" in class_name:
+        class_name = class_name.replace("Onnx", "FastDeploy")
+        is_onnx_model = True
+
     """Helper method to load the module `name` from `library_name` and `class_name`"""
     # retrieve class candidates
     class_obj, class_candidates = get_class_obj_and_candidates(
@@ -416,6 +422,12 @@ def load_sub_model(
         loading_kwargs["runtime_options"] = (
             runtime_options.get(name, None) if isinstance(runtime_options, dict) else runtime_options
         )
+        if not is_onnx_model:
+            if os.path.isdir(os.path.join(cached_folder, name)):
+                is_onnx_model = any(".onnx" in d or ".pb" in d for d in os.listdir(os.path.join(cached_folder, name)))
+            else:
+                is_onnx_model = any(".onnx" in d or ".pb" in d for d in os.listdir(os.path.join(cached_folder)))
+        loading_kwargs["is_onnx_model"] = is_onnx_model
 
     from ppdiffusers import ModelMixin
 
@@ -951,6 +963,7 @@ class DiffusionPipeline(ConfigMixin):
                 custom_revision=custom_revision,
                 variant=variant,
                 from_hf_hub=from_hf_hub,
+                from_diffusers=from_diffusers,
                 **kwargs,
             )
         else:
@@ -1338,8 +1351,6 @@ class DiffusionPipeline(ConfigMixin):
                 ):
                     ignore_patterns = [
                         "*.msgpack",
-                        "*.onnx",
-                        "*.pb",
                         "*.bin",
                         "*.pdparams",
                         "*.pdiparams",
@@ -1356,7 +1367,7 @@ class DiffusionPipeline(ConfigMixin):
                             f"\nA mixture of {variant} and non-{variant} filenames will be loaded.\nLoaded {variant} filenames:\n[{', '.join(safetensors_variant_filenames)}]\nLoaded non-{variant} filenames:\n[{', '.join(safetensors_model_filenames - safetensors_variant_filenames)}\nIf this behavior is not expected, please check your folder structure."
                         )
                 else:
-                    ignore_patterns = ["*.safetensors", "*.msgpack", "*.onnx", "*.pb"]
+                    ignore_patterns = ["*.safetensors", "*.msgpack"]
                     if from_diffusers:
                         ignore_patterns.extend(["*.pdparams", "*.pdiparams", "*.pdmodel"])
                         suffix = ".bin"

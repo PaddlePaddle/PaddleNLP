@@ -31,6 +31,8 @@ from ..utils import (
     FASTDEPLOY_WEIGHTS_NAME,
     FROM_HF_HUB,
     HF_HUB_OFFLINE,
+    ONNX_EXTERNAL_WEIGHTS_NAME,
+    ONNX_WEIGHTS_NAME,
     PPDIFFUSERS_CACHE,
     _add_variant,
     _get_model_file,
@@ -48,6 +50,7 @@ if is_paddle_available():
 
 if is_fastdeploy_available():
     import fastdeploy as fd
+    from fastdeploy import ModelFormat
 
     def fdtensor2pdtensor(fdtensor: "fd.C.FDTensor"):
         dltensor = fdtensor.to_dlpack()
@@ -420,8 +423,21 @@ class FastDeployRuntimeModel:
         logger.info("`ppdiffusers.FastDeployRuntimeModel` is experimental and might change in the future.")
         self.model = model
         self.model_save_dir = kwargs.get("model_save_dir", None)
-        self.latest_model_name = kwargs.get("latest_model_name", FASTDEPLOY_MODEL_NAME)
-        self.latest_params_name = kwargs.get("latest_params_name", FASTDEPLOY_WEIGHTS_NAME)
+        self.model_format = kwargs.get("model_format", None)
+        self.latest_model_name = kwargs.get("latest_model_name", None)
+        self.latest_params_name = kwargs.get("latest_params_name", None)
+
+        if self.model_format in [ModelFormat.PADDLE, "PADDLE", None]:
+            if self.latest_model_name is None:
+                self.latest_model_name = FASTDEPLOY_MODEL_NAME
+            if self.latest_params_name is None:
+                self.latest_params_name = FASTDEPLOY_WEIGHTS_NAME
+            self.model_format = ModelFormat.PADDLE
+        if self.model_format in [ModelFormat.ONNX, "ONNX"]:
+            if self.latest_model_name is None:
+                self.latest_model_name = ONNX_WEIGHTS_NAME
+            self.latest_params_name = None
+            self.model_format = ModelFormat.ONNX
 
     def zero_copy_infer(self, prebinded_inputs: dict, prebinded_outputs: dict, share_with_raw_ptr=True, **kwargs):
         """
@@ -450,7 +466,7 @@ class FastDeployRuntimeModel:
     @staticmethod
     def load_model(
         model_path: Union[str, Path],
-        params_path: Union[str, Path],
+        params_path: Union[str, Path] = None,
         runtime_options: Optional["fd.RuntimeOption"] = None,
     ):
         """
@@ -471,7 +487,12 @@ class FastDeployRuntimeModel:
             option = fd.RuntimeOption()
             option.use_paddle_backend()
             option.use_cpu()
-        option.set_model_path(model_path, params_path)
+
+        if params_path is None or model_path.endswith(".onnx"):
+            option.use_ort_backend()
+            option.set_model_path(model_path, model_format=ModelFormat.ONNX)
+        else:
+            option.set_model_path(model_path, params_path)
         return fd.Runtime(option)
 
     def _save_pretrained(
@@ -496,20 +517,41 @@ class FastDeployRuntimeModel:
                 Overwrites the default model file name from `"inference.pdiparams"` to `params_file_name`. This allows you to save the
                 model with a different name.
         """
-
-        model_file_name = model_file_name if model_file_name is not None else FASTDEPLOY_MODEL_NAME
+        is_onnx_model = self.model_format == ModelFormat.ONNX
+        model_file_name = (
+            model_file_name
+            if model_file_name is not None
+            else FASTDEPLOY_MODEL_NAME
+            if not is_onnx_model
+            else ONNX_WEIGHTS_NAME
+        )
         params_file_name = params_file_name if params_file_name is not None else FASTDEPLOY_WEIGHTS_NAME
 
         src_model_path = self.model_save_dir.joinpath(self.latest_model_name)
         dst_model_path = Path(save_directory).joinpath(model_file_name)
 
-        src_params_path = self.model_save_dir.joinpath(self.latest_params_name)
-        dst_params_path = Path(save_directory).joinpath(params_file_name)
         try:
             shutil.copyfile(src_model_path, dst_model_path)
-            shutil.copyfile(src_params_path, dst_params_path)
         except shutil.SameFileError:
             pass
+
+        if is_onnx_model:
+            # copy external weights (for models >2GB)
+            src_model_path = self.model_save_dir.joinpath(ONNX_EXTERNAL_WEIGHTS_NAME)
+            if src_model_path.exists():
+                dst_model_path = Path(save_directory).joinpath(ONNX_EXTERNAL_WEIGHTS_NAME)
+                try:
+                    shutil.copyfile(src_model_path, dst_model_path)
+                except shutil.SameFileError:
+                    pass
+
+        if not is_onnx_model:
+            src_params_path = self.model_save_dir.joinpath(self.latest_params_name)
+            dst_params_path = Path(save_directory).joinpath(params_file_name)
+            try:
+                shutil.copyfile(src_params_path, dst_params_path)
+            except shutil.SameFileError:
+                pass
 
     def save_pretrained(
         self,
@@ -550,6 +592,7 @@ class FastDeployRuntimeModel:
         resume_download: bool = False,
         local_files_only: bool = False,
         user_agent: Union[Dict, str, None] = None,
+        is_onnx_model: bool = False,
         **kwargs,
     ):
         """
@@ -582,14 +625,24 @@ class FastDeployRuntimeModel:
             kwargs (`Dict`, *optional*):
                 kwargs will be passed to the model during initialization
         """
-        model_file_name = model_file_name if model_file_name is not None else FASTDEPLOY_MODEL_NAME
+
+        model_file_name = (
+            model_file_name
+            if model_file_name is not None
+            else FASTDEPLOY_MODEL_NAME
+            if not is_onnx_model
+            else ONNX_WEIGHTS_NAME
+        )
         params_file_name = params_file_name if params_file_name is not None else FASTDEPLOY_WEIGHTS_NAME
+        kwargs["model_format"] = "ONNX" if is_onnx_model else "PADDLE"
 
         # load model from local directory
         if os.path.isdir(pretrained_model_name_or_path):
+            model_path = os.path.join(pretrained_model_name_or_path, model_file_name)
+            params_path = None if is_onnx_model else os.path.join(pretrained_model_name_or_path, params_file_name)
             model = FastDeployRuntimeModel.load_model(
-                os.path.join(pretrained_model_name_or_path, model_file_name),
-                os.path.join(pretrained_model_name_or_path, params_file_name),
+                model_path,
+                params_path,
                 runtime_options=runtime_options,
             )
             kwargs["model_save_dir"] = Path(pretrained_model_name_or_path)
@@ -609,26 +662,32 @@ class FastDeployRuntimeModel:
                 use_auth_token=use_auth_token,
                 user_agent=user_agent,
             )
-
-            params_cache_path = _get_model_file(
-                pretrained_model_name_or_path=pretrained_model_name_or_path,
-                weights_name=params_file_name,
-                subfolder=subfolder,
-                cache_dir=cache_dir,
-                force_download=force_download,
-                revision=revision,
-                from_hf_hub=from_hf_hub,
-                proxies=proxies,
-                resume_download=resume_download,
-                local_files_only=local_files_only,
-                use_auth_token=use_auth_token,
-                user_agent=user_agent,
-            )
+            if is_onnx_model:
+                params_cache_path = None
+                kwargs["latest_params_name"] = None
+            else:
+                params_cache_path = _get_model_file(
+                    pretrained_model_name_or_path=pretrained_model_name_or_path,
+                    weights_name=params_file_name,
+                    subfolder=subfolder,
+                    cache_dir=cache_dir,
+                    force_download=force_download,
+                    revision=revision,
+                    from_hf_hub=from_hf_hub,
+                    proxies=proxies,
+                    resume_download=resume_download,
+                    local_files_only=local_files_only,
+                    use_auth_token=use_auth_token,
+                    user_agent=user_agent,
+                )
+                kwargs["latest_params_name"] = Path(params_cache_path).name
             kwargs["model_save_dir"] = Path(model_cache_path).parent
             kwargs["latest_model_name"] = Path(model_cache_path).name
-            kwargs["latest_params_name"] = Path(params_cache_path).name
+
             model = FastDeployRuntimeModel.load_model(
-                model_cache_path, params_cache_path, runtime_options=runtime_options
+                model_cache_path,
+                params_cache_path,
+                runtime_options=runtime_options,
             )
         return cls(model=model, **kwargs)
 
@@ -639,6 +698,7 @@ class FastDeployRuntimeModel:
         model_file_name: Optional[str] = None,
         params_file_name: Optional[str] = None,
         runtime_options: Optional["fd.RuntimeOption"] = None,
+        is_onnx_model: bool = False,
         **kwargs,
     ):
         from_hf_hub = kwargs.pop("from_hf_hub", FROM_HF_HUB)
@@ -675,5 +735,6 @@ class FastDeployRuntimeModel:
             resume_download=resume_download,
             local_files_only=local_files_only,
             user_agent=user_agent,
+            is_onnx_model=is_onnx_model,
             **kwargs,
         )

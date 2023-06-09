@@ -487,6 +487,14 @@ class ConfigMixin:
         if "_diffusers_version" not in data and "_ppdiffusers_version" not in data:
             data["_ppdiffusers_version"] = __version__
 
+        # remove Onnx and Flax prefix
+        _class_name = data.get("_class_name", None)
+        if _class_name is not None:
+            if _class_name.startswith("Flax"):
+                data["_class_name"] = _class_name[4:]
+            elif _class_name.startswith("Onnx"):
+                data["_class_name"] = "FastDeploy" + _class_name[4:]
+
         return data
 
     def __repr__(self):

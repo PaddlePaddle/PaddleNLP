@@ -102,7 +102,7 @@ class VaeImageProcessor(ConfigMixin):
         """
         Convert a paddle tensor to a numpy image
         """
-        images = images.cast("float32").transpose([0, 2, 3, 1]).cpu().numpy()
+        images = images.cast("float32").transpose([0, 2, 3, 1]).numpy()
         return images
 
     @staticmethod
