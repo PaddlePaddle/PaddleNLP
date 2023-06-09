@@ -29,6 +29,8 @@ mkdir /workspace/PaddleNLP/unittest_logs
 mkdir /workspace/PaddleNLP/coverage_logs
 mkdir /workspace/PaddleNLP/upload
 export log_path=/workspace/PaddleNLP/model_logs
+export LD_LIBRARY_PATH=/opt/_internal/cpython-3.7.0/lib/:${LD_LIBRARY_PATH}
+export PATH=/opt/_internal/cpython-3.7.0/bin/:${PATH}
 export P0case_list=()
 export APIcase_list=()
 declare -A Normal_dic
@@ -127,7 +129,7 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
         elif [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
             P0case_list[${#P0case_list[*]}]=${dir2}
         elif [[ ${dir2} =~ "transformers" ]];then
-            P0case_list[${#P0case_list[*]}]=transformers
+            # P0case_list[${#P0case_list[*]}]=transformers
             if [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
                 P0case_list[${#P0case_list[*]}]=${dir3}
             fi
@@ -251,9 +253,9 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     echo -e "\033[35m ---- unittest length: ${#APIcase_list[*]}, unittest cases: ${APIcase_list[*]} \033[0m"
     for apicase in ${APIcase_list[*]};do
         if [[ ${apicase} =~ "taskflow" ]] ; then
-            pytest tests/taskflow/test_*.py >${nlp_dir}/unittest_logs/${apicase}_unittest.log 2>&1
+            python -m pytest tests/taskflow/test_*.py >${nlp_dir}/unittest_logs/${apicase}_unittest.log 2>&1
         else
-            pytest tests/transformers/${apicase}/test_*.py  >${nlp_dir}/unittest_logs/${apicase}_unittest.log 2>&1
+            python -m pytest tests/transformers/${apicase}/test_*.py  >${nlp_dir}/unittest_logs/${apicase}_unittest.log 2>&1
             # sh run_coverage.sh paddlenlp.transformers.${apicase} >unittest_logs/${apicase}_coverage.log 2>&1
         fi
         UT_EXCODE=$? || true
