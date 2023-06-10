@@ -90,7 +90,7 @@ def main():
 
         return model_inputs
 
-    dataset = load_dataset("json", data_files={"train": "nl2sql/train.jsonl", "dev": "nl2sql/dev.jsonl"})
+    dataset = load_dataset("json", data_files={"train": data_args.train_file, "dev": data_args.validation_file})
     dataset = dataset.map(lambda example: preprocess_function(example))
 
     trainer = Trainer(
