@@ -94,53 +94,60 @@ class PrefixEncoder(nn.Layer):
 
 
 class RotaryEmbeddings(nn.Layer):
-    def __init__(self, hidden_size, base=10000.0, learnable=False):
+    def __init__(self, hidden_size, base=10000.0, position_encoding_2d=True):
         super().__init__()
         self.dtype = paddle.get_default_dtype()
         inv_freq = 1.0 / (base ** (paddle.arange(0, hidden_size, 2).astype("float32") / hidden_size))
         inv_freq = inv_freq.astype(self.dtype)
-        self.learnable = learnable
-        if learnable:
-            self.inv_freq = nn.Parameter(inv_freq)
-            self.max_seq_len_cached = None
+        self.position_encoding_2d = position_encoding_2d
+        self.register_buffer("inv_freq", inv_freq)
+        self.max_seq_len_cached = -1
+        self.cos_cached = None
+        self.sin_cached = None
+
+    def get_rotary_embeds(self, cos, sin, position_ids):
+        # [s, b, 1, h/n]
+        cos = cos.squeeze(1)[position_ids].unsqueeze(2)
+        sin = sin.squeeze(1)[position_ids].unsqueeze(2)
+        return paddle.stack([cos, sin], axis=0)
+
+    def forward(self, position_ids):
+        seq_len = position_ids.max() + 1
+        if self.max_seq_len_cached < 0 or seq_len > self.max_seq_len_cached:
+            self.max_seq_len_cached = seq_len
+
+            # x.shape = [b, s, n, h/n/2]
+            t = paddle.arange(seq_len, dtype=self.inv_freq.dtype)
+            # [s, h/n/2]
+            # TODO: Failed for fp16 when converting to static graph.
+            freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
+            freqs = freqs.cast(self.dtype)
+            # [s, h/n]
+            emb = paddle.concat([freqs, freqs], axis=-1)
+            if self.dtype == paddle.bfloat16:
+                emb = emb.cast("float32")
+            # [s, 1, h/n]
+            cos_cached = emb.cos().unsqueeze(1)
+            sin_cached = emb.sin().unsqueeze(1)
+
+            if self.dtype == paddle.bfloat16:
+                cos_cached = cos_cached.astype(self.dtype)
+                sin_cached = sin_cached.astype(self.dtype)
+
+            self.cos_cached, self.sin_cached = cos_cached, sin_cached
+
+        cos, sin = self.cos_cached[:seq_len, ...], self.sin_cached[:seq_len, ...]
+        if self.position_encoding_2d:
+            block_position_ids = position_ids[:, 1, :].transpose([1, 0])
+            position_ids = position_ids[:, 0, :].transpose([1, 0])
+            block_rotary_embeds = self.get_rotary_embeds(cos, sin, block_position_ids)
+            position_rotary_embeds = self.get_rotary_embeds(cos, sin, position_ids)
+            rotary_embeds = paddle.stack([position_rotary_embeds, block_rotary_embeds], axis=0)
         else:
-            self.register_buffer("inv_freq", inv_freq)
-            self.max_seq_len_cached = None
-            self.cos_cached = None
-            self.sin_cached = None
+            position_ids = position_ids.transpose([1, 0])
+            rotary_embeds = self.get_rotary_embeds(cos, sin, position_ids)
 
-    def forward(self, x, seq_dim=1, seq_len=None):
-        if seq_len is None:
-            seq_len = x.shape[seq_dim]
-
-        # x.shape = [b, s, n, h/n/2]
-        # TODO: Remove the condition for converting to static graph.
-        # if self.max_seq_len_cached is None or seq_len > self.max_seq_len_cached:
-        #    self.max_seq_len_cached = None if self.learnable else seq_len
-        # [s]
-        t = paddle.arange(seq_len).astype(self.dtype)
-        # [s, h/n/2]
-        # TODO: Failed for fp16 when converting to static graph.
-        freqs = paddle.einsum("i,j->ij", t.astype("float32"), self.inv_freq.astype("float32"))
-        freqs = freqs.astype(self.dtype)
-        # [s, h/n]
-        emb = paddle.concat([freqs, freqs], axis=-1)
-        if self.dtype == paddle.bfloat16:
-            emb = emb.astype("float32")
-        # [s, 1, h/n]
-        cos_cached = emb.cos().unsqueeze(1)
-        sin_cached = emb.sin().unsqueeze(1)
-
-        if self.dtype == paddle.bfloat16:
-            cos_cached = cos_cached.astype(self.dtype)
-            sin_cached = sin_cached.astype(self.dtype)
-
-        if self.learnable:
-            return cos_cached, sin_cached
-
-        self.cos_cached, self.sin_cached = cos_cached, sin_cached
-
-        return self.cos_cached[:seq_len, ...], self.sin_cached[:seq_len, ...]
+        return rotary_embeds
 
 
 class ChatGLMAttention(nn.Layer):
@@ -161,13 +168,6 @@ class ChatGLMAttention(nn.Layer):
         self.attention_head_size = config.hidden_size // config.num_attention_heads
         self.hidden_size = config.hidden_size
         self.position_encoding_2d = config.position_encoding_2d
-        self.rotary_embeddings = RotaryEmbeddings(
-            self.hidden_size // (self.num_attention_heads * 2)
-            if self.position_encoding_2d
-            else self.hidden_size // self.num_attention_heads,
-            base=10000.0,
-            learnable=False,
-        )
         self.scale_mask_softmax = False
         self.dtype = paddle.get_default_dtype()
 
@@ -192,40 +192,32 @@ class ChatGLMAttention(nn.Layer):
         x1, x2 = paddle.chunk(x, 2, axis=-1)
         return paddle.concat([-x2, x1], axis=-1)
 
-    def _apply_rotary_position_embed_index(self, q, k, cos, sin, position_ids):
+    def _apply_rotary_position_embed_index(self, q, k, cos, sin):
         # q.shape = [s, b, n, h/n/2], cos.shape = [s, 1, h/n], position_ids.shape = [s, b]
-        # [s, b, 1, h/n]
-        cos = cos.squeeze(1)[position_ids].unsqueeze(2)
-        sin = sin.squeeze(1)[position_ids].unsqueeze(2)
         # [s, b, n, h/n]
         q = q * cos + self._rotate_half(q) * sin
         k = k * cos + self._rotate_half(k) * sin
         return q, k
 
-    def _core_attention(self, q_layer: Tensor, k_layer: Tensor, position_ids: Tensor):
+    def _core_attention(self, q_layer: Tensor, k_layer: Tensor, position_ids: Tensor, rotary_embeds: Tensor):
         # Set store_true, position_encoding_2d=False by default.
         if self.config.position_encoding_2d:
             # [s, b, n, h/n/2]
             q1, q2 = paddle.chunk(q_layer, 2, axis=-1)
             k1, k2 = paddle.chunk(k_layer, 2, axis=-1)
-            # [s, 1, h/n]
-            cos, sin = self.rotary_embeddings(q1, seq_len=position_ids.max() + 1)
-            # [s, b]
-            block_position_ids = position_ids[:, 1, :].transpose([1, 0])
-            position_ids = position_ids[:, 0, :].transpose([1, 0])
+
+            pcos, psin = rotary_embeds[0][0], rotary_embeds[0][1]
+            bcos, bsin = rotary_embeds[1][0], rotary_embeds[1][1]
 
             # [s, b, n, h/n]
-            q1, k1 = self._apply_rotary_position_embed_index(q1, k1, cos, sin, position_ids)
-            q2, k2 = self._apply_rotary_position_embed_index(q2, k2, cos, sin, block_position_ids)
+            q1, k1 = self._apply_rotary_position_embed_index(q1, k1, pcos, psin)
+            q2, k2 = self._apply_rotary_position_embed_index(q2, k2, bcos, bsin)
             q_layer = paddle.concat([q1, q2], axis=-1)
             k_layer = paddle.concat([k1, k2], axis=-1)
         else:
-            # [s, b]
-            position_ids = position_ids.transpose([1, 0])
-            # [s, 1, h/n]
-            cos, sin = self.rotary_embeddings(q_layer, seq_len=position_ids.max() + 1)
+            cos, sin = rotary_embeds[0], rotary_embeds[1]
             # [s, b, n, h/n]
-            q_layer, k_layer = self._apply_rotary_position_embed_index(q_layer, k_layer, cos, sin, position_ids)
+            q_layer, k_layer = self._apply_rotary_position_embed_index(q_layer, k_layer, cos, sin)
         return q_layer, k_layer
 
     def forward(
@@ -236,6 +228,7 @@ class ChatGLMAttention(nn.Layer):
         use_cache: bool = False,
         cache: Tensor = None,
         layer_id=0,
+        rotary_embeds=None,
     ):
         # [s, b, h]
         query_length, batch_size = hidden_states.shape[:2]
@@ -248,7 +241,7 @@ class ChatGLMAttention(nn.Layer):
         # [s, b, n, h//n]
         q_layer, k_layer, v_layer = paddle.split(mixed_layer, 3, axis=-1)
         # [s, b, n, h/n]
-        q_layer, k_layer = self._core_attention(q_layer, k_layer, position_ids)
+        q_layer, k_layer = self._core_attention(q_layer, k_layer, position_ids, rotary_embeds)
 
         if cache is not None:
             cache_k, cache_v = cache[0], cache[1]
@@ -342,6 +335,7 @@ class ChatGLMBlock(nn.Layer):
         position_ids: Tensor,
         use_cache: bool = False,
         cache: Tensor = None,
+        rotary_embeds: Tensor = None,
     ):
         # Layer norm before transformer layer
         attention_input = self.input_layernorm(hidden_states)
@@ -353,6 +347,7 @@ class ChatGLMBlock(nn.Layer):
             cache=cache,
             use_cache=use_cache,
             layer_id=self.layer_id,
+            rotary_embeds=rotary_embeds,
         )
         # Residual connection
         alpha = (2 * self.config.num_hidden_layers) ** 0.5
@@ -415,6 +410,13 @@ class ChatGLMStack(nn.Layer):
         self.position_encoding_2d = config.position_encoding_2d
         self.hidden_size = config.hidden_size
         self.enable_recompute = config.recompute
+        self.num_attention_heads = config.num_attention_heads
+        self.rotary_embeddings = RotaryEmbeddings(
+            self.hidden_size // (self.num_attention_heads * 2)
+            if self.position_encoding_2d
+            else self.hidden_size // self.num_attention_heads,
+            base=10000.0,
+        )
         # self.embedding_dropout = nn.Dropout(config.embedding_dropout_prob)
 
         if self.config.tensor_parallel_degree > 1:
@@ -468,6 +470,7 @@ class ChatGLMStack(nn.Layer):
         position_ids: Tensor,
         use_cache: bool,
         cache: Tensor,
+        rotary_embeds: Tensor,
     ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
@@ -482,6 +485,7 @@ class ChatGLMStack(nn.Layer):
             position_ids,
             use_cache,
             cache,
+            rotary_embeds,
             use_reentrant=False,
         )
         return hidden_states
@@ -508,6 +512,8 @@ class ChatGLMStack(nn.Layer):
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
         inputs_embeds = inputs_embeds.transpose([1, 0, 2])
+
+        rotary_embeds = self.rotary_embeddings(position_ids)
 
         if cache is None:
             if self.config.pre_seq_len is not None:
@@ -537,6 +543,7 @@ class ChatGLMStack(nn.Layer):
                     position_ids=position_ids,
                     use_cache=use_cache,
                     cache=cache_i,
+                    rotary_embeds=rotary_embeds,
                 )
             else:
                 hidden_states, new_cache = layer(
@@ -545,6 +552,7 @@ class ChatGLMStack(nn.Layer):
                     position_ids=position_ids,
                     use_cache=use_cache,
                     cache=cache_i,
+                    rotary_embeds=rotary_embeds,
                 )
 
             if use_cache:
