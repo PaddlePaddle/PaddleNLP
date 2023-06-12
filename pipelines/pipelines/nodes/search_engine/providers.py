@@ -75,7 +75,6 @@ class SerpAPI(SearchEngine):
             raise Exception(f"Error while querying {self.__class__.__name__}: {response.text}")
 
         json_result = json.loads(response.text)
-
         organic = [
             Document.from_dict(d, field_map={"snippet": "content"})
             for d in json_result["organic_results"]
