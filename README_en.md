@@ -23,6 +23,9 @@
 
 ## News 📢
 
+* **2023.6.12: [Release of PaddleNLP v2.6rc](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0rc)**
+  * 🔨 LLM Tools：Introduces comprehensive examples of open-source LLM training and inference, including [Bloom](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/bloom), [ChatGLM](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/chatglm), [GLM](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/glm), [Llama](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/llama) and [OPT](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/opt). Added Tensor Parallel capability to [Trainer API](./docs/trainer.md) for distributed LLM trainin. Also released [Parameter-Efficient Finetuning](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/peft),which enables training LLMs on consumer hardware.
+
 * **2023.1.12: [Release of PaddleNLP v2.5](<https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.5.0>)**
 
     * 🔨 NLP Tools: [PPDiffusers](./ppdiffusers), our cross-modal diffusion model toolbox based on PaddlePaddle, has been released! It provides a complete training process for diffusion models, and supports FastDeploy inference acceleration and multi-hardware deployment (supports Ascend chips and Kunlun core deployment).
@@ -327,7 +330,7 @@ To connect with other users and contributors, welcome to join our [Slack channel
 Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
 
 <div align="center">
-<img src="https://user-images.githubusercontent.com/11793384/212060369-4642d16e-f0ad-4359-aa57-b8303042f9c1.jpg" width="150" height="150" />
+<img src="https://user-images.githubusercontent.com/11987277/245085922-0aa68d24-00ff-442e-9c53-2f1e898151ce.png" width="150" height="150" />
 </div>
 
 
