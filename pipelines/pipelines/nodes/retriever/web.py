@@ -70,7 +70,9 @@ class WebRetriever(BaseRetriever):
         self,
         api_key: str,
         search_engine_provider: Union[str, SearchEngine] = "SerpAPI",
+        engine: Optional[str] = "google",
         top_search_results: Optional[int] = 10,
+        search_engine_kwargs: Optional[Dict[str, Any]] = None,
         top_k: Optional[int] = 5,
         mode: Literal["snippets", "raw_documents", "preprocessed_documents"] = "snippets",
         preprocessor: Optional[PreProcessor] = None,
@@ -90,7 +92,11 @@ class WebRetriever(BaseRetriever):
         """
         super().__init__()
         self.web_search = WebSearch(
-            api_key=api_key, top_k=top_search_results, search_engine_provider=search_engine_provider
+            api_key=api_key,
+            top_k=top_search_results,
+            search_engine_provider=search_engine_provider,
+            engine=engine,
+            search_engine_kwargs=search_engine_kwargs,
         )
         self.mode = mode
         self.cache_document_store = cache_document_store

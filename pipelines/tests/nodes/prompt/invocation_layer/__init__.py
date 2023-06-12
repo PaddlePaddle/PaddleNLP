@@ -11,9 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from pipelines.nodes.prompt.invocation_layer.base import PromptModelInvocationLayer
-from pipelines.nodes.prompt.invocation_layer.chatglm import ChatGLMInvocationLayer
-from pipelines.nodes.prompt.invocation_layer.chatgpt import ChatGPTInvocationLayer
-from pipelines.nodes.prompt.invocation_layer.ernie_bot import ErnieBotInvocationLayer
-from pipelines.nodes.prompt.invocation_layer.open_ai import OpenAIInvocationLayer
