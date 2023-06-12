@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import inspect
 from abc import ABC
-from typing import List, Union
+from collections import OrderedDict
+from typing import Union
 
 import paddle
 import paddle.nn as nn
@@ -897,7 +898,7 @@ class GenerationMixin(object):
 
         model_kwargs["use_cache"] = use_cache
 
-        if is_tracing:
+        if not paddle.is_tensor(max_length):
             min_len = input_ids.shape[-1]
             max_len = input_ids.shape[-1]
             paddle.increment(min_len, min_length)
@@ -1546,9 +1547,14 @@ class GenerationMixin(object):
         return pred_ids[:, origin_len:], scores
 
 
-class LogitsProcessorList(List):
+class LogitsProcessorList:
+    """use ordered dict to store processors"""
+
+    def __init__(self) -> None:
+        self._processors = OrderedDict()
+
     def __call__(self, input_ids, logits, **kwargs):
-        for processor in self:
+        for processor in self._processors.values():
             processor_args = inspect.signature(processor.__call__).parameters
             if len(processor_args) > 2:
                 assert all(
@@ -1558,6 +1564,9 @@ class LogitsProcessorList(List):
             else:
                 logits = processor(input_ids, logits)
         return logits
+
+    def append(self, processor):
+        self._processors[len(self._processors)] = processor
 
 
 class LogitsProcessor(ABC):
@@ -1582,7 +1591,7 @@ class MinLengthLogitsProcessor(LogitsProcessor):
     """
 
     def __init__(self, min_length, eos_token_id):
-        if not isinstance(min_length, int) or min_length < 0:
+        if min_length < 0:
             raise ValueError("`min_length` should be a positive integer, but get {}".format(min_length))
 
         if not isinstance(eos_token_id, int) or eos_token_id < 0:
@@ -1609,7 +1618,7 @@ class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
     """
 
     def __init__(self, penalty: float):
-        if not isinstance(penalty, float) or not (penalty > 0):
+        if not (penalty > 0):
             raise ValueError(f"`penalty` has to be a strictly positive float, but is {penalty}")
 
         self.penalty = penalty
@@ -1787,7 +1796,6 @@ def TopKProcess(probs, top_k, min_tokens_to_keep):
 
 
 def TopPProcess(probs, top_p, min_tokens_to_keep):
-
     if is_top_p_sampling_avaliable:
         top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
         probs, _ = top_p_sampling(probs, top_ps_tensor)
@@ -1795,6 +1803,11 @@ def TopPProcess(probs, top_p, min_tokens_to_keep):
 
     sorted_probs = paddle.sort(probs, descending=True)
     sorted_indices = paddle.argsort(probs, descending=True)
+    if isinstance(sorted_indices, tuple):
+        sorted_indices, sorted_probs = sorted_indices
+    else:
+        sorted_probs = paddle.sort(probs, descending=True)
+
     cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)
 
     # Remove tokens with cumulative probs above the top_p, But keep at

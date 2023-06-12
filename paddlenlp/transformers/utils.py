@@ -23,12 +23,42 @@ from typing import TYPE_CHECKING, ContextManager, List, Optional, Type
 if TYPE_CHECKING:
     from paddlenlp.transformers import PretrainedModel
 
+import numpy as np
 import paddle
+from paddle.common_ops_import import convert_dtype
 from paddle.nn import Layer
 
 from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.import_utils import import_module
 from paddlenlp.utils.log import logger
+
+
+def convert_ndarray_dtype(np_array: np.ndarray, target_dtype: str) -> np.ndarray:
+    """convert ndarray
+
+    Args:
+        np_array (np.ndarray): numpy ndarray instance
+        target_dtype (str): the target dtype
+
+    Returns:
+        np.ndarray: converted numpy ndarray instance
+    """
+    source_dtype = convert_dtype(np_array.dtype)
+    if source_dtype == "uint16" or target_dtype == "bfloat16":
+        tensor = paddle.to_tensor(np_array)
+        tensor = paddle.cast(tensor, target_dtype)
+        return tensor.numpy()
+
+        # TODO(wj-Mcat): device_guard will slow the converting
+        # with device_guard("cpu"):
+        #     tensor = paddle.to_tensor(np_array)
+        #     tensor = paddle.cast(tensor, target_dtype)
+        # return tensor.numpy()
+
+    if target_dtype == "bfloat16":
+        target_dtype = "uint16"
+
+    return np_array.astype(target_dtype)
 
 
 def fn_args_to_dict(func, *args, **kwargs):
