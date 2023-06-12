@@ -1143,13 +1143,19 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             for key in state_dict.keys():
                 target_dtype = dtype
                 if isinstance(state_dict[key], np.ndarray):
+                    if not issubclass(state_dict[key].dtype.type, np.floating):
+                        continue
+
                     # TODO(wj-Mcat): add `keep_in_fp32` feature to enable hybrid fp32 state-dict
                     # this is the temp hard code for fused-mt transformer
                     if model.keep_in_fp32_modules(key, model.config, dtype):
                         target_dtype = "float32"
                     state_dict[key] = convert_ndarray_dtype(state_dict[key], target_dtype)
 
-                elif isinstance(state_dict[key], paddle.Tensor) and state_dict[key].is_floating_point():
+                elif isinstance(state_dict[key], paddle.Tensor):
+                    if not state_dict[key].is_floating_point():
+                        continue
+
                     # TODO(wj-Mcat): add `keep_in_fp32` feature to enable hybrid fp32 state-dict
                     # this is the temp hard code for fused-mt transformer
                     if model.keep_in_fp32_modules(key, model.config, dtype):

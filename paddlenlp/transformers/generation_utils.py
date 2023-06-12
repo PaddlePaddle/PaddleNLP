@@ -898,7 +898,7 @@ class GenerationMixin(object):
 
         model_kwargs["use_cache"] = use_cache
 
-        if not paddle.is_tensor(max_length):
+        if is_tracing and not paddle.is_tensor(max_length):
             min_len = input_ids.shape[-1]
             max_len = input_ids.shape[-1]
             paddle.increment(min_len, min_length)
@@ -1550,8 +1550,11 @@ class GenerationMixin(object):
 class LogitsProcessorList:
     """use ordered dict to store processors"""
 
-    def __init__(self) -> None:
+    def __init__(self, processors: list[LogitsProcessor] = None) -> None:
         self._processors = OrderedDict()
+        processors = processors or []
+        for processor in processors:
+            self.append(processor)
 
     def __call__(self, input_ids, logits, **kwargs):
         for processor in self._processors.values():
