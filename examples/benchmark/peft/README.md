@@ -1,5 +1,6 @@
 # Benchmark Results
 
+### Bloom
 
 | Model     | Method   | Num GPUs | Setup         | Paddle (s/epoch) | Torch (s/epoch) | Delta |
 |-----------|----------|----------|---------------|------------------|-----------------|-------|
