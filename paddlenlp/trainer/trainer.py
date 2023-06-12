@@ -324,18 +324,10 @@ class Trainer:
                         self.scaler = fleet.distributed_scaler(self.scaler)
                     else:
                         # scaler for stage2 and stage3
-                        if paddle.framework.in_dygraph_mode():
-                            from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
-                                GroupShardedScaler,
-                            )
-
-                            self.scaler = GroupShardedScaler(self.scaler)
-                        else:
-                            from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import (
-                                ShardingScaler,
-                            )
-
-                            self.scaler = ShardingScaler(self.scaler)
+                        from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
+                            GroupShardedScaler,
+                        )
+                        self.scaler = GroupShardedScaler(self.scaler)
                 else:
                     self.do_grad_scaling = False
                     self.use_cuda_amp = False
