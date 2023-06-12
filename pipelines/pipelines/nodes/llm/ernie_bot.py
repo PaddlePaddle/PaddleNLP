@@ -62,16 +62,7 @@ class ErnieBot(BaseComponent):
 
         return res["access_token"]
 
-    def run(self, query, history=None, stream=False):
-        """
-        Send a request to the Ernie Bot API with the given query and optional conversation history.
-        Returns the chatbot response and updates the conversation history accordingly.
-
-        :param query: The user's input/query to be sent to the Ernie Bot API.
-        :param history: A list of dictionaries representing the conversation history,
-        :param stream: Whether to use streaming mode when making the request. Currently not in use. Defaults to False.
-        """
-        logger.info(query)
+    def predict(self, query, history=None, stream=False):
         payload = {"messages": []}
         if history is not None:
             if len(history) % 2 == 0:
@@ -105,4 +96,17 @@ class ErnieBot(BaseComponent):
         except Exception as e:
             print(e)
             print(response_json)
+        return response_json
+
+    def run(self, query, history=None, stream=False):
+        """
+        Send a request to the Ernie Bot API with the given query and optional conversation history.
+        Returns the chatbot response and updates the conversation history accordingly.
+
+        :param query: The user's input/query to be sent to the Ernie Bot API.
+        :param history: A list of dictionaries representing the conversation history,
+        :param stream: Whether to use streaming mode when making the request. Currently not in use. Defaults to False.
+        """
+        logger.info(query)
+        response_json = self.predict(query, history, stream)
         return response_json, "output_1"

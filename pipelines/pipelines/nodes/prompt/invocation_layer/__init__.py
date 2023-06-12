@@ -15,3 +15,5 @@
 from pipelines.nodes.prompt.invocation_layer.base import PromptModelInvocationLayer
 from pipelines.nodes.prompt.invocation_layer.chatglm import ChatGLMInvocationLayer
 from pipelines.nodes.prompt.invocation_layer.chatgpt import ChatGPTInvocationLayer
+from pipelines.nodes.prompt.invocation_layer.ernie_bot import ErnieBotInvocationLayer
+from pipelines.nodes.prompt.invocation_layer.open_ai import OpenAIInvocationLayer
