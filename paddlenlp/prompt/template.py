@@ -268,10 +268,8 @@ class Template(nn.Layer):
         if not os.path.exists(save_path):
             os.makedirs(save_path, exist_ok=True)
         template_config_file = os.path.join(save_path, TEMPLATE_CONFIG_FILE)
-        template_class = self.__class__.__name__
         with open(template_config_file, "w", encoding="utf-8") as fp:
             fp.write(json.dumps(self._prompt, ensure_ascii=False) + "\n")
-            fp.write(json.dumps({"class": template_class}, ensure_ascii=False) + "\n")
         template_param_file = os.path.join(save_path, TEMPLATE_PARAMETER_FILE)
         template_state_dict = self.state_dict()
         if len(template_state_dict) > 0:
