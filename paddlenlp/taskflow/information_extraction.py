@@ -1536,7 +1536,7 @@ class GPTask(Task):
                                 "text": ent["text"],
                                 "start": ent["start_index"],
                                 "end": ent["start_index"] + len(ent["text"]),
-                                "probability": ent["probability"],
+                                "probability": ent["probability"].astype("float"),
                             }
                             result.setdefault(node.name, []).append(ent_res)
                             cnt += 1
@@ -1557,7 +1557,7 @@ class GPTask(Task):
                                         "text": rel["object"],
                                         "start": rel["object_start_index"],
                                         "end": rel["object_start_index"] + len(rel["object"]),
-                                        "probability": rel["probability"],
+                                        "probability": rel["probability"].astype("float"),
                                     }
                                     r["relations"].setdefault(node.name, []).append(rel_res)
                                     cnt += 1
@@ -1584,7 +1584,7 @@ class GPTask(Task):
                             "text": ent["text"],
                             "start": ent["start_index"],
                             "end": ent["start_index"] + len(ent["text"]),
-                            "probability": ent["probability"],
+                            "probability": ent["probability"].astype("float"),
                         }
                         result.setdefault(node.name, []).append(ent_res)
             results.append(result)
