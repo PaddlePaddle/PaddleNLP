@@ -61,6 +61,30 @@ def convert_ndarray_dtype(np_array: np.ndarray, target_dtype: str) -> np.ndarray
     return np_array.astype(target_dtype)
 
 
+def get_scale_by_dtype(dtype: str = None, return_positive: bool = True) -> float:
+    """get scale value by dtype
+
+    Args:
+        dtype (str): the string dtype value
+
+    Returns:
+        float: the scale value
+    """
+    if dtype is None:
+        dtype = paddle.get_default_dtype()
+
+    dtype = convert_dtype(dtype)
+    scale_value = 1e6
+
+    # TODO(wj-Mcaf): support int8, int4 dtypes later
+    if dtype == "float16":
+        scale_value = 1e4
+
+    if return_positive:
+        return scale_value
+    return -1 * scale_value
+
+
 def fn_args_to_dict(func, *args, **kwargs):
     """
     Inspect function `func` and its arguments for running, and extract a
