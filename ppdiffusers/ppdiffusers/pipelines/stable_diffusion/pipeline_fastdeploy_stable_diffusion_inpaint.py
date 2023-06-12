@@ -1,4 +1,5 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2022 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import inspect
 from typing import Callable, List, Optional, Union
 
 import numpy as np
@@ -22,43 +22,143 @@ import PIL
 from paddlenlp.transformers import CLIPImageProcessor, CLIPTokenizer
 
 from ...pipeline_utils import DiffusionPipeline
-from ...schedulers import (
-    DDIMScheduler,
-    DPMSolverMultistepScheduler,
-    EulerAncestralDiscreteScheduler,
-    EulerDiscreteScheduler,
-    LMSDiscreteScheduler,
-    PNDMScheduler,
-)
+from ...schedulers import KarrasDiffusionSchedulers
 from ...utils import PIL_INTERPOLATION, logging
-from ..fastdeploy_utils import FastDeployRuntimeModel
+from ..fastdeploy_utils import FastDeployDiffusionPipelineMixin, FastDeployRuntimeModel
 from . import StableDiffusionPipelineOutput
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
-NUM_UNET_INPUT_CHANNELS = 9
-NUM_LATENT_CHANNELS = 4
+
+def prepare_mask_and_masked_image(image, mask, height=None, width=None, return_image: bool = False):
+    """
+    Prepares a pair (image, mask) to be consumed by the Stable Diffusion pipeline. This means that those inputs will be
+    converted to ``paddle.Tensor`` with shapes ``batch x channels x height x width`` where ``channels`` is ``3`` for the
+    ``image`` and ``1`` for the ``mask``.
+
+    The ``image`` will be converted to ``paddle.float32`` and normalized to be in ``[-1, 1]``. The ``mask`` will be
+    binarized (``mask > 0.5``) and cast to ``paddle.float32`` too.
+
+    Args:
+        image (Union[np.array, PIL.Image, paddle.Tensor]): The image to inpaint.
+            It can be a ``PIL.Image``, or a ``height x width x 3`` ``np.array`` or a ``channels x height x width``
+            ``paddle.Tensor`` or a ``batch x channels x height x width`` ``paddle.Tensor``.
+        mask (_type_): The mask to apply to the image, i.e. regions to inpaint.
+            It can be a ``PIL.Image``, or a ``height x width`` ``np.array`` or a ``1 x height x width``
+            ``paddle.Tensor`` or a ``batch x 1 x height x width`` ``paddle.Tensor``.
 
 
-def prepare_mask_and_masked_image(image, mask, latents_shape):
-    image = np.array(image.convert("RGB").resize((latents_shape[1] * 8, latents_shape[0] * 8)))
-    image = image[None].transpose(0, 3, 1, 2)
-    image = image.astype(np.float32) / 127.5 - 1.0
+    Raises:
+        ValueError: ``paddle.Tensor`` images should be in the ``[-1, 1]`` range. ValueError: ``paddle.Tensor`` mask
+        should be in the ``[0, 1]`` range. ValueError: ``mask`` and ``image`` should have the same spatial dimensions.
+        TypeError: ``mask`` is a ``paddle.Tensor`` but ``image`` is not
+            (ot the other way around).
 
-    image_mask = np.array(mask.convert("L").resize((latents_shape[1] * 8, latents_shape[0] * 8)))
-    masked_image = image * (image_mask < 127.5)
+    Returns:
+        tuple[paddle.Tensor]: The pair (mask, masked_image) as ``paddle.Tensor`` with 4
+            dimensions: ``batch x channels x height x width``.
+    """
 
-    mask = mask.resize((latents_shape[1], latents_shape[0]), PIL_INTERPOLATION["nearest"])
-    mask = np.array(mask.convert("L"))
-    mask = mask.astype(np.float32) / 255.0
-    mask = mask[None, None]
-    mask[mask < 0.5] = 0
-    mask[mask >= 0.5] = 1
+    if image is None:
+        raise ValueError("`image` input cannot be undefined.")
+
+    if mask is None:
+        raise ValueError("`mask_image` input cannot be undefined.")
+
+    if isinstance(image, paddle.Tensor):
+        if not isinstance(mask, paddle.Tensor):
+            raise TypeError(f"`image` is a paddle.Tensor but `mask` (type: {type(mask)} is not")
+
+        # Batch single image
+        if image.ndim == 3:
+            assert image.shape[0] == 3, "Image outside a batch should be of shape (3, H, W)"
+            image = image.unsqueeze(0)
+
+        # Batch and add channel dim for single mask
+        if mask.ndim == 2:
+            mask = mask.unsqueeze(0).unsqueeze(0)
+
+        # Batch single mask or add channel dim
+        if mask.ndim == 3:
+            # Single batched mask, no channel dim or single mask not batched but channel dim
+            if mask.shape[0] == 1:
+                mask = mask.unsqueeze(0)
+
+            # Batched masks no channel dim
+            else:
+                mask = mask.unsqueeze(1)
+
+        assert image.ndim == 4 and mask.ndim == 4, "Image and Mask must have 4 dimensions"
+        assert image.shape[-2:] == mask.shape[-2:], "Image and Mask must have the same spatial dimensions"
+        assert image.shape[0] == mask.shape[0], "Image and Mask must have the same batch size"
+
+        # Check image is in [-1, 1]
+        if image.min() < -1 or image.max() > 1:
+            raise ValueError("Image should be in [-1, 1] range")
+
+        # Check mask is in [0, 1]
+        if mask.min() < 0 or mask.max() > 1:
+            raise ValueError("Mask should be in [0, 1] range")
+
+        # Binarize mask
+        mask[mask < 0.5] = 0
+        mask[mask >= 0.5] = 1
+
+        # Image as float32
+        image = image.cast(dtype=paddle.float32)
+    elif isinstance(mask, paddle.Tensor):
+        raise TypeError(f"`mask` is a paddle.Tensor but `image` (type: {type(image)} is not")
+    else:
+        # preprocess image
+        if isinstance(image, (PIL.Image.Image, np.ndarray)):
+            image = [image]
+        if isinstance(image, list) and isinstance(image[0], PIL.Image.Image):
+            # resize all images w.r.t passed height an width
+            if width is None or height is None:
+                w, h = image[0].size
+            else:
+                w, h = width, height
+            w, h = (x - x % 8 for x in (w, h))  # resize to integer multiple of 8
+            image = [i.resize((w, h), resample=PIL_INTERPOLATION["lanczos"]) for i in image]
+            image = [np.array(i.convert("RGB"))[None, :] for i in image]
+            image = np.concatenate(image, axis=0)
+        elif isinstance(image, list) and isinstance(image[0], np.ndarray):
+            image = np.concatenate([i[None, :] for i in image], axis=0)
+
+        image = image.transpose(0, 3, 1, 2)
+        image = paddle.to_tensor(image, dtype=paddle.float32) / 127.5 - 1.0
+
+        # preprocess mask
+        if isinstance(mask, (PIL.Image.Image, np.ndarray)):
+            mask = [mask]
+
+        if isinstance(mask, list) and isinstance(mask[0], PIL.Image.Image):
+            # resize all images w.r.t passed height an width
+            if width is None or height is None:
+                w, h = mask[0].size
+            else:
+                w, h = width, height
+            w, h = (x - x % 8 for x in (w, h))  # resize to integer multiple of 8
+            mask = [i.resize((w, h), resample=PIL_INTERPOLATION["lanczos"]) for i in mask]
+            mask = np.concatenate([np.array(m.convert("L"))[None, None, :] for m in mask], axis=0)
+            mask = mask.astype(np.float32) / 255.0
+        elif isinstance(mask, list) and isinstance(mask[0], np.ndarray):
+            mask = np.concatenate([m[None, None, :] for m in mask], axis=0)
+
+        mask[mask < 0.5] = 0
+        mask[mask >= 0.5] = 1
+        mask = paddle.to_tensor(mask)
+
+    masked_image = image * (mask < 0.5)
+
+    # n.b. ensure backwards compatibility as old function does not return image
+    if return_image:
+        return mask, masked_image, image
 
     return mask, masked_image
 
 
-class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
+class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline, FastDeployDiffusionPipelineMixin):
     r"""
     Pipeline for text-guided image inpainting using Stable Diffusion.
 
@@ -97,17 +197,10 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
         text_encoder: FastDeployRuntimeModel,
         tokenizer: CLIPTokenizer,
         unet: FastDeployRuntimeModel,
-        scheduler: Union[
-            DDIMScheduler,
-            PNDMScheduler,
-            LMSDiscreteScheduler,
-            EulerDiscreteScheduler,
-            EulerAncestralDiscreteScheduler,
-            DPMSolverMultistepScheduler,
-        ],
+        scheduler: KarrasDiffusionSchedulers,
         safety_checker: FastDeployRuntimeModel,
         feature_extractor: CLIPImageProcessor,
-        requires_safety_checker: bool = True,
+        requires_safety_checker: bool = False,
     ):
         super().__init__()
         if safety_checker is None and requires_safety_checker:
@@ -136,271 +229,60 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
             feature_extractor=feature_extractor,
         )
         self.register_to_config(requires_safety_checker=requires_safety_checker)
-
-    def _encode_prompt(
-        self,
-        prompt: Union[str, List[str]],
-        num_images_per_prompt: Optional[int],
-        do_classifier_free_guidance: bool,
-        negative_prompt: Optional[str],
-        prompt_embeds: Optional[paddle.Tensor] = None,
-        negative_prompt_embeds: Optional[paddle.Tensor] = None,
-    ):
-        r"""
-        Encodes the prompt into text encoder hidden states.
-
-        Args:
-            prompt (`str` or `list(int)`):
-                prompt to be encoded
-            num_images_per_prompt (`int`):
-                number of images that should be generated per prompt
-            do_classifier_free_guidance (`bool`):
-                whether to use classifier free guidance or not
-            negative_prompt (`str` or `List[str]`):
-                The prompt or prompts not to guide the image generation. Ignored when not using guidance (i.e., ignored
-                if `guidance_scale` is less than `1`).
-            prompt_embeds (`paddle.Tensor`, *optional*):
-                Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
-                provided, text embeddings will be generated from `prompt` input argument.
-            negative_prompt_embeds (`paddle.Tensor`, *optional*):
-                Pre-generated negative text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt
-                weighting. If not provided, negative_prompt_embeds will be generated from `negative_prompt` input
-                argument.
-        """
-        if prompt is not None and isinstance(prompt, str):
-            batch_size = 1
-        elif prompt is not None and isinstance(prompt, list):
-            batch_size = len(prompt)
-        else:
-            batch_size = prompt_embeds.shape[0]
-
-        if prompt_embeds is None:
-            # get prompt text embeddings
-            text_inputs = self.tokenizer(
-                prompt,
-                padding="max_length",
-                max_length=self.tokenizer.model_max_length,
-                truncation=True,
-                return_tensors="np",
-            )
-            text_input_ids = text_inputs.input_ids
-            untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="np").input_ids
-
-            if not np.array_equal(text_input_ids, untruncated_ids):
-                removed_text = self.tokenizer.batch_decode(
-                    untruncated_ids[:, self.tokenizer.model_max_length - 1 : -1]
-                )
-                logger.warning(
-                    "The following part of your input was truncated because CLIP can only handle sequences up to"
-                    f" {self.tokenizer.model_max_length} tokens: {removed_text}"
-                )
-
-            text_embeddings = self.text_encoder(input_ids=text_input_ids.astype(np.int64))[0]
-        text_embeddings = np.repeat(text_embeddings, num_images_per_prompt, axis=0)
-
-        # get unconditional embeddings for classifier free guidance
-        if do_classifier_free_guidance and negative_prompt_embeds is None:
-            uncond_tokens: List[str]
-            if negative_prompt is None:
-                uncond_tokens = [""] * batch_size
-            elif type(prompt) is not type(negative_prompt):
-                raise TypeError(
-                    f"`negative_prompt` should be the same type to `prompt`, but got {type(negative_prompt)} !="
-                    f" {type(prompt)}."
-                )
-            elif isinstance(negative_prompt, str):
-                uncond_tokens = [negative_prompt] * batch_size
-            elif batch_size != len(negative_prompt):
-                raise ValueError(
-                    f"`negative_prompt`: {negative_prompt} has batch size {len(negative_prompt)}, but `prompt`:"
-                    f" {prompt} has batch size {batch_size}. Please make sure that passed `negative_prompt` matches"
-                    " the batch size of `prompt`."
-                )
-            else:
-                uncond_tokens = negative_prompt
-
-            max_length = text_embeddings.shape[1]
-            uncond_input = self.tokenizer(
-                uncond_tokens,
-                padding="max_length",
-                max_length=max_length,
-                truncation=True,
-                return_tensors="np",
-            )
-            uncond_embeddings = self.text_encoder(input_ids=uncond_input.input_ids.astype(np.int64))[0]
-
-        if do_classifier_free_guidance:
-            uncond_embeddings = np.repeat(uncond_embeddings, num_images_per_prompt, axis=0)
-
-            # For classifier free guidance, we need to do two forward passes.
-            # Here we concatenate the unconditional and text embeddings into a single batch
-            # to avoid doing two forward passes
-            text_embeddings = np.concatenate([uncond_embeddings, text_embeddings])
-
-        return text_embeddings
-
-    def run_safety_checker(self, image, dtype):
-        if self.safety_checker is not None:
-            safety_checker_input = self.feature_extractor(
-                self.numpy_to_pil(image), return_tensors="np"
-            ).pixel_values.astype(dtype)
-            # There will throw an error if use safety_checker batchsize>1
-            images, has_nsfw_concept = [], []
-            for i in range(image.shape[0]):
-                image_i, has_nsfw_concept_i = self.safety_checker(
-                    clip_input=safety_checker_input[i : i + 1], images=image[i : i + 1]
-                )
-                images.append(image_i)
-                has_nsfw_concept.append(has_nsfw_concept_i[0])
-            image = np.concatenate(images)
-        else:
-            has_nsfw_concept = None
-        return image, has_nsfw_concept
-
-    def decode_latents(self, latents):
-        latents = 1 / 0.18215 * latents
-        image = np.concatenate(
-            [self.vae_decoder(latent_sample=latents[i : i + 1])[0] for i in range(latents.shape[0])]
-        )
-        image = np.clip(image / 2 + 0.5, 0, 1)
-        image = image.transpose([0, 2, 3, 1])
-        return image
-
-    def prepare_extra_step_kwargs(self, eta):
-        # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
-        # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
-        # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
-        # and should be between [0, 1]
-
-        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
-        extra_step_kwargs = {}
-        if accepts_eta:
-            extra_step_kwargs["eta"] = eta
-
-        return extra_step_kwargs
-
-    def check_inputs(
-        self,
-        prompt: Union[str, List[str]],
-        height: Optional[int],
-        width: Optional[int],
-        callback_steps: int,
-        negative_prompt: Optional[str] = None,
-        prompt_embeds: Optional[paddle.Tensor] = None,
-        negative_prompt_embeds: Optional[paddle.Tensor] = None,
-    ):
-        if height % 8 != 0 or width % 8 != 0:
-            raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
-
-        if (callback_steps is None) or (
-            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
-        ):
-            raise ValueError(
-                f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
-                f" {type(callback_steps)}."
-            )
-
-        if prompt is not None and prompt_embeds is not None:
-            raise ValueError(
-                f"Cannot forward both `prompt`: {prompt} and `prompt_embeds`: {prompt_embeds}. Please make sure to"
-                " only forward one of the two."
-            )
-        elif prompt is None and prompt_embeds is None:
-            raise ValueError(
-                "Provide either `prompt` or `prompt_embeds`. Cannot leave both `prompt` and `prompt_embeds` undefined."
-            )
-        elif prompt is not None and (not isinstance(prompt, str) and not isinstance(prompt, list)):
-            raise ValueError(f"`prompt` has to be of type `str` or `list` but is {type(prompt)}")
-
-        if negative_prompt is not None and negative_prompt_embeds is not None:
-            raise ValueError(
-                f"Cannot forward both `negative_prompt`: {negative_prompt} and `negative_prompt_embeds`:"
-                f" {negative_prompt_embeds}. Please make sure to only forward one of the two."
-            )
-
-        if prompt_embeds is not None and negative_prompt_embeds is not None:
-            if prompt_embeds.shape != negative_prompt_embeds.shape:
-                raise ValueError(
-                    "`prompt_embeds` and `negative_prompt_embeds` must have the same shape when passed directly, but"
-                    f" got: `prompt_embeds` {prompt_embeds.shape} != `negative_prompt_embeds`"
-                    f" {negative_prompt_embeds.shape}."
-                )
-
-    def prepare_latents(self, batch_size, num_channels_latents, height, width, dtype, generator, latents=None):
-        if generator is None:
-            generator = np.random
-
-        latents_shape = (batch_size, num_channels_latents, height // 8, width // 8)
-        if latents is None:
-            latents = paddle.to_tensor(generator.randn(*latents_shape), dtype=dtype)
-        elif latents.shape != latents_shape:
-            raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}")
-
-        # scale the initial noise by the standard deviation required by the scheduler
-        latents = latents * float(self.scheduler.init_noise_sigma)
-        return latents
-
-    def prepare_mask_latents(self, mask, masked_image, batch_size, dtype, do_classifier_free_guidance):
-        mask = mask.astype(dtype)
-        masked_image = masked_image.astype(dtype)
-
-        # encode the mask image into latents space so we can concatenate it to the latents
-        masked_image_latents = self.vae_encoder(sample=masked_image)[0]
-        masked_image_latents = 0.18215 * masked_image_latents
-
-        # duplicate mask and masked_image_latents for each generation per prompt, using mps friendly method
-        mask = mask.repeat(batch_size, 0)
-        masked_image_latents = masked_image_latents.repeat(batch_size, 0)
-
-        mask = np.concatenate([mask] * 2) if do_classifier_free_guidance else mask
-        masked_image_latents = (
-            np.concatenate([masked_image_latents] * 2) if do_classifier_free_guidance else masked_image_latents
-        )
-        masked_image_latents = masked_image_latents.astype(dtype)
-        return mask, masked_image_latents
+        self.post_init()
 
     def __call__(
         self,
-        prompt: Union[str, List[str]],
-        image: PIL.Image.Image,
-        mask_image: PIL.Image.Image,
-        height: int = 512,
-        width: int = 512,
+        prompt: Union[str, List[str]] = None,
+        image: Union[paddle.Tensor, PIL.Image.Image] = None,
+        mask_image: Union[paddle.Tensor, PIL.Image.Image] = None,
+        height: int = None,
+        width: int = None,
+        strength: float = 1.0,
         num_inference_steps: int = 50,
         guidance_scale: float = 7.5,
         negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: Optional[int] = 1,
+        add_predicted_noise: Optional[bool] = False,
         eta: float = 0.0,
-        generator: Optional[np.random.RandomState] = None,
-        latents: Optional[np.ndarray] = None,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
+        latents: Optional[paddle.Tensor] = None,
         prompt_embeds: Optional[paddle.Tensor] = None,
         negative_prompt_embeds: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
-        callback: Optional[Callable[[int, int, np.ndarray], None]] = None,
+        callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
+        controlnet_cond: Union[paddle.Tensor, PIL.Image.Image] = None,
+        controlnet_conditioning_scale: float = 1.0,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
 
         Args:
-            prompt (`str` or `List[str]`):
-                The prompt or prompts to guide the image generation.
-            image (`PIL.Image.Image`):
-                `Image`, or tensor representing an image batch which will be inpainted, *i.e.* parts of the image will
-                be masked out with `mask_image` and repainted according to `prompt`.
-            mask_image (`PIL.Image.Image`):
+            prompt (`str` or `List[str]`, *optional*):
+                The prompt or prompts to guide the image generation. If not defined, one has to pass `prompt_embeds`.
+                instead.
+            image (`paddle.Tensor` or `PIL.Image.Image`):
+                `Image`, or tensor representing an image batch, that will be used as the starting point for the
+                process. This is the image whose masked region will be inpainted.
+            mask_image (`paddle.Tensor` or `PIL.Image.Image`):
                 `Image`, or tensor representing an image batch, to mask `image`. White pixels in the mask will be
-                repainted, while black pixels will be preserved. If `mask_image` is a PIL image, it will be converted
-                to a single channel (luminance) before use. If it's a tensor, it should contain one color channel (L)
-                instead of 3, so the expected shape would be `(B, H, W, 1)`.
-            height (`int`, *optional*, defaults to 512):
+                replaced by noise and therefore repainted, while black pixels will be preserved. If `mask_image` is a
+                PIL image, it will be converted to a single channel (luminance) before use. If mask is a tensor, the
+                expected shape should be either `(B, H, W, C)` or `(B, C, H, W)`, where C is 1 or 3.
+            height (`int`, *optional*, defaults to None):
                 The height in pixels of the generated image.
-            width (`int`, *optional*, defaults to 512):
+            width (`int`, *optional*, defaults to None):
                 The width in pixels of the generated image.
+            strength (`float`, *optional*, defaults to 1.0):
+                Conceptually, indicates how much to inpaint the masked area. Must be between 0 and 1. When `strength`
+                is 1, the denoising process will be run on the masked area for the full number of iterations specified
+                in `num_inference_steps`. `image` will be used as a reference for the masked area, adding more noise to
+                that region the larger the `strength`. If `strength` is 0, no inpainting will occur.
             num_inference_steps (`int`, *optional*, defaults to 50):
-                The number of denoising steps. More denoising steps usually lead to a higher quality image at the
-                expense of slower inference.
+                The reference number of denoising steps. More denoising steps usually lead to a higher quality image at
+                the expense of slower inference. This parameter will be modulated by `strength`, as explained above.
             guidance_scale (`float`, *optional*, defaults to 7.5):
                 Guidance scale as defined in [Classifier-Free Diffusion Guidance](https://arxiv.org/abs/2207.12598).
                 `guidance_scale` is defined as `w` of equation 2. of [Imagen
@@ -408,19 +290,23 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
                 1`. Higher guidance scale encourages to generate images that are closely linked to the text `prompt`,
                 usually at the expense of lower image quality.
             negative_prompt (`str` or `List[str]`, *optional*):
-                The prompt or prompts not to guide the image generation. Ignored when not using guidance (i.e., ignored
-                if `guidance_scale` is less than `1`).
+                The prompt or prompts not to guide the image generation. If not defined, one has to pass
+                `negative_prompt_embeds`. instead. Ignored when not using guidance (i.e., ignored if `guidance_scale`
+                is less than `1`).
             num_images_per_prompt (`int`, *optional*, defaults to 1):
                 The number of images to generate per prompt.
+            add_predicted_noise (`bool`, *optional*, defaults to False):
+                Use predicted noise instead of random noise when constructing noisy versions of the original image in
+                the reverse diffusion process
             eta (`float`, *optional*, defaults to 0.0):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
-            generator (`np.random.RandomState`, *optional*):
-                A np.random.RandomState to make generation deterministic.
-            latents (`np.ndarray`, *optional*):
-                Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for image
-                generation. Can be used to tweak the same generation with different prompts. If not provided, a latents
-                tensor will ge generated by sampling using the supplied random `generator`.
+            generator (`paddle.Generator`, *optional*):
+                One or a list of [paddle generator(s)] to make generation deterministic.
+            latents (`paddle.Tensor`, *optional*):
+                Pre-generated noise tensor, sampled from a Gaussian distribution, to be used as inputs for image
+                generation. If not provided, a noise tensor will ge generated by sampling using the supplied random
+                `generator`.
             prompt_embeds (`paddle.Tensor`, *optional*):
                 Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
                 provided, text embeddings will be generated from `prompt` input argument.
@@ -436,7 +322,7 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
                 plain tuple.
             callback (`Callable`, *optional*):
                 A function that will be called every `callback_steps` steps during inference. The function will be
-                called with the following arguments: `callback(step: int, timestep: int, latents: np.ndarray)`.
+                called with the following arguments: `callback(step: int, timestep: int, latents: paddle.Tensor)`.
             callback_steps (`int`, *optional*, defaults to 1):
                 The frequency at which the `callback` function will be called. If not specified, the callback will be
                 called at every step.
@@ -448,9 +334,26 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
             list of `bool`s denoting whether the corresponding generated image likely represents "not-safe-for-work"
             (nsfw) content, according to the `safety_checker`.
         """
+        # 0. Preprocess mask and image
+        mask, masked_image, init_image = prepare_mask_and_masked_image(
+            image,
+            mask_image,
+            height,
+            width,
+            return_image=True,
+        )
+        height, width = init_image.shape[-2:]
+
         # 1. Check inputs
         self.check_inputs(
-            prompt, height, width, callback_steps, negative_prompt, prompt_embeds, negative_prompt_embeds
+            prompt,
+            height,
+            width,
+            callback_steps,
+            negative_prompt,
+            prompt_embeds,
+            negative_prompt_embeds,
+            strength,
         )
 
         # 2. Define call parameters
@@ -467,7 +370,7 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
         do_classifier_free_guidance = guidance_scale > 1.0
 
         # 3. Encode input prompt
-        text_embeddings = self._encode_prompt(
+        prompt_embeds = self._encode_prompt(
             prompt,
             num_images_per_prompt,
             do_classifier_free_guidance,
@@ -478,93 +381,155 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
 
         # 4. set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
-        timesteps = self.scheduler.timesteps
+        timesteps, num_inference_steps = self.get_timesteps(num_inference_steps, strength)
+        # at which timestep to set the initial noise (n.b. 50% if strength is 0.5)
+        latent_timestep = timesteps[:1].tile([batch_size * num_images_per_prompt])
+        # create a boolean to check if the strength is set to 1. if so then initialise the latents with pure noise
+        is_strength_max = strength == 1.0
 
         # 5. Prepare latent variables
-        num_channels_latents = NUM_LATENT_CHANNELS
-        latents = self.prepare_latents(
+        num_channels_latents = self.vae_decoder_num_latent_channels
+        num_channels_unet = self.unet_num_latent_channels
+        is_legacy = return_image_latents = num_channels_unet == 4
+
+        latents_outputs = self.prepare_latents(
             batch_size * num_images_per_prompt,
-            num_channels_latents,
             height,
             width,
-            text_embeddings.dtype,
             generator,
             latents,
+            image=init_image,
+            timestep=latent_timestep,
+            is_strength_max=is_strength_max,
+            return_noise=True,
+            return_image_latents=return_image_latents,
         )
 
-        # 6. Preprocess mask and image
-        if isinstance(image, PIL.Image.Image) and isinstance(mask_image, PIL.Image.Image):
-            mask, masked_image = prepare_mask_and_masked_image(image, mask_image, latents.shape[-2:])
+        if return_image_latents:
+            latents, noise, image_latents = latents_outputs
+        else:
+            latents, noise = latents_outputs
 
-        # 7. Prepare mask latent variables
+        # 6. Prepare mask latent variables
         mask, masked_image_latents = self.prepare_mask_latents(
             mask,
             masked_image,
             batch_size * num_images_per_prompt,
-            text_embeddings.dtype,
+            height,
+            width,
             do_classifier_free_guidance,
+            return_masked_image_latents=True,
         )
-        num_channels_mask = mask.shape[1]
-        num_channels_masked_image = masked_image_latents.shape[1]
-        mask = paddle.to_tensor(mask)
-        masked_image_latents = paddle.to_tensor(masked_image_latents)
 
-        # 8. Check that sizes of mask, masked image and latents match
-        unet_input_channels = NUM_UNET_INPUT_CHANNELS
-        if num_channels_latents + num_channels_mask + num_channels_masked_image != unet_input_channels:
-            raise ValueError(
-                "Incorrect configuration settings! The config of `pipeline.unet` expects"
-                f" {unet_input_channels} but received `num_channels_latents`: {num_channels_latents} +"
-                f" `num_channels_mask`: {num_channels_mask} + `num_channels_masked_image`: {num_channels_masked_image}"
-                f" = {num_channels_latents+num_channels_masked_image+num_channels_mask}. Please verify the config of"
-                " `pipeline.unet` or your `mask_image` or `image` input."
+        # 7. Check that sizes of mask, masked image and latents match
+        if num_channels_unet == 9:
+            # default case for runwayml/stable-diffusion-inpainting
+            num_channels_mask = mask.shape[1]
+            num_channels_masked_image = masked_image_latents.shape[1]
+            if num_channels_latents + num_channels_mask + num_channels_masked_image != num_channels_unet:
+                raise ValueError(
+                    f"Incorrect configuration settings! Received `num_channels_latents`: {num_channels_latents} +"
+                    f" `num_channels_mask`: {num_channels_mask} + `num_channels_masked_image`: {num_channels_masked_image}"
+                    f" = {num_channels_latents+num_channels_masked_image+num_channels_mask}. Please verify the config of"
+                    " `pipeline.unet` or your `mask_image` or `image` input."
+                )
+        elif num_channels_unet != 4:
+            raise ValueError(f"The unet should have either 4 or 9 input channels, not {num_channels_unet}.")
+        # do_controlnet
+        do_controlnet = controlnet_cond is not None and num_channels_unet == 4
+        if do_controlnet:
+            control_image, control_conditioning_scale = self.prepare_controlnet_cond(
+                controlnet_cond=controlnet_cond,
+                controlnet_conditioning_scale=controlnet_conditioning_scale,
+                width=width,
+                height=height,
+                batch_size=batch_size,
+                num_images_per_prompt=num_images_per_prompt,
+                do_classifier_free_guidance=do_classifier_free_guidance,
             )
 
-        # 9. Prepare extra step kwargs.
-        extra_step_kwargs = self.prepare_extra_step_kwargs(eta)
-        text_embeddings = paddle.to_tensor(text_embeddings, dtype="float32")
+        # 8. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
+        extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
 
-        # 10. Denoising loop
+        unet_output_name = self.unet.model.get_output_info(0).name
+        unet_input_names = [self.unet.model.get_input_info(i).name for i in range(self.unet.model.num_inputs())]
+
+        if do_classifier_free_guidance:
+            init_mask = mask[: mask.shape[0] // 2]
+        else:
+            init_mask = mask
+
+        # 9. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
-                # concat latents, mask, masked_image_latnets in the channel dimension
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
-                latent_model_input = paddle.concat([latent_model_input, mask, masked_image_latents], axis=1)
+                noise_pred_unet = paddle.zeros_like(latent_model_input)
+
+                if not is_legacy:
+                    # concat latents, mask, masked_image_latents in the channel dimension
+                    latent_model_input = paddle.concat([latent_model_input, mask, masked_image_latents], axis=1)
+
+                unet_inputs = {
+                    unet_input_names[0]: latent_model_input,
+                    unet_input_names[1]: t,
+                    unet_input_names[2]: prompt_embeds,
+                }
+                if do_controlnet:
+                    unet_inputs[unet_input_names[3]] = control_image
+                    unet_inputs[unet_input_names[4]] = control_conditioning_scale
 
                 # predict the noise residual
-                noise_pred_unet = self.unet(
-                    sample=latent_model_input.numpy(),
-                    timestep=t.cast("float32").numpy(),
-                    encoder_hidden_states=text_embeddings.numpy(),
-                )[0]
-                noise_pred_unet = paddle.to_tensor(noise_pred_unet)
+                self.unet.zero_copy_infer(
+                    prebinded_inputs=unet_inputs,
+                    prebinded_outputs={unet_output_name: noise_pred_unet},
+                    share_with_raw_ptr=True,
+                )
+
                 # perform guidance
                 if do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred_unet.chunk(2)
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
-
+                else:
+                    noise_pred = noise_pred_unet
                 # compute the previous noisy sample x_t -> x_t-1
-                scheduler_output = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
-                latents = scheduler_output.prev_sample
+                latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs, return_dict=False)[0]
+
+                if is_legacy:
+                    if i < len(timesteps) - 1:
+                        # masking
+                        if add_predicted_noise:
+                            init_latents_proper = self.scheduler.add_noise(image_latents, noise_pred_uncond, t)
+                        else:
+                            init_latents_proper = self.scheduler.add_noise(image_latents, noise, t)
+                    else:
+                        init_latents_proper = image_latents
+                    latents = (1 - init_mask) * init_latents_proper + init_mask * latents
 
                 # call the callback, if provided
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)
+                    if i == len(timesteps) - 1:
+                        # sync for accuracy it/s measure
+                        paddle.device.cuda.synchronize()
 
-        # 11. Post-processing
-        image = self.decode_latents(latents.numpy())
+        if not output_type == "latent":
+            image = self._decode_vae_latents(latents / self.vae_scaling_factor)
+            image, has_nsfw_concept = self.run_safety_checker(image)
+        else:
+            image = latents
+            has_nsfw_concept = None
 
-        # 12. Run safety checker
-        image, has_nsfw_concept = self.run_safety_checker(image, text_embeddings.dtype)
+        if has_nsfw_concept is None:
+            do_denormalize = [True] * image.shape[0]
+        else:
+            do_denormalize = [not has_nsfw for has_nsfw in has_nsfw_concept]
 
-        # 13. Convert to PIL
-        if output_type == "pil":
-            image = self.numpy_to_pil(image)
+        image = self.image_processor.postprocess(image, output_type=output_type, do_denormalize=do_denormalize)
 
         if not return_dict:
             return (image, has_nsfw_concept)

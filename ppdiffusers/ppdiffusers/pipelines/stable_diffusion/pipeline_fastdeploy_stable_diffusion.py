@@ -16,6 +16,7 @@
 from typing import Callable, List, Optional, Union
 
 import paddle
+import PIL
 
 from paddlenlp.transformers import CLIPImageProcessor, CLIPTokenizer
 
@@ -25,7 +26,7 @@ from ...utils import logging
 from ..fastdeploy_utils import FastDeployDiffusionPipelineMixin, FastDeployRuntimeModel
 from . import StableDiffusionPipelineOutput
 
-logger = logging.get_logger(__name__)
+logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 
 class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPipelineMixin):
@@ -70,7 +71,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
         scheduler: KarrasDiffusionSchedulers,
         safety_checker: FastDeployRuntimeModel,
         feature_extractor: CLIPImageProcessor,
-        requires_safety_checker: bool = True,
+        requires_safety_checker: bool = False,
     ):
         super().__init__()
         if safety_checker is None and requires_safety_checker:
@@ -119,6 +120,8 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
+        controlnet_cond: Union[paddle.Tensor, PIL.Image.Image] = None,
+        controlnet_conditioning_scale: float = 1.0,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -127,9 +130,9 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
             prompt (`str` or `List[str]`, *optional*):
                 The prompt or prompts to guide the image generation. If not defined, one has to pass `prompt_embeds`.
                 instead.
-            height (`int`, *optional*, defaults to self.unet.config.sample_size * self.vae_scale_factor):
+            height (`int`, *optional*, defaults to None):
                 The height in pixels of the generated image.
-            width (`int`, *optional*, defaults to self.unet.config.sample_size * self.vae_scale_factor):
+            width (`int`, *optional*, defaults to None):
                 The width in pixels of the generated image.
             num_inference_steps (`int`, *optional*, defaults to 50):
                 The number of denoising steps. More denoising steps usually lead to a higher quality image at the
@@ -142,14 +145,14 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
                 usually at the expense of lower image quality.
             negative_prompt (`str` or `List[str]`, *optional*):
                 The prompt or prompts not to guide the image generation. If not defined, one has to pass
-                `negative_prompt_embeds` instead. Ignored when not using guidance (i.e., ignored if `guidance_scale` is
-                less than `1`).
+                `negative_prompt_embeds`. instead. Ignored when not using guidance (i.e., ignored if `guidance_scale`
+                is less than `1`).
             num_images_per_prompt (`int`, *optional*, defaults to 1):
                 The number of images to generate per prompt.
             eta (`float`, *optional*, defaults to 0.0):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
-            generator (`paddle.Generator` or `List[paddle.Generator]`, *optional*):
+            generator (`paddle.Generator`, *optional*):
                 One or a list of paddle generator(s) to make generation deterministic.
             latents (`paddle.Tensor`, *optional*):
                 Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for image
@@ -186,8 +189,14 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
         height = height or 512
         width = width or 512
         # 1. Check inputs. Raise error if not correct
-        self.check_inputs_txt2img(
-            prompt, height, width, callback_steps, negative_prompt, prompt_embeds, negative_prompt_embeds
+        self.check_inputs(
+            prompt,
+            height,
+            width,
+            callback_steps,
+            negative_prompt,
+            prompt_embeds,
+            negative_prompt_embeds,
         )
 
         # 2. Define call parameters
@@ -202,6 +211,19 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
         # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
         # corresponds to doing no classifier free guidance.
         do_classifier_free_guidance = guidance_scale > 1.0
+
+        # do_controlnet
+        do_controlnet = controlnet_cond is not None
+        if do_controlnet:
+            control_image, control_conditioning_scale = self.prepare_controlnet_cond(
+                controlnet_cond=controlnet_cond,
+                controlnet_conditioning_scale=controlnet_conditioning_scale,
+                width=width,
+                height=height,
+                batch_size=batch_size,
+                num_images_per_prompt=num_images_per_prompt,
+                do_classifier_free_guidance=do_classifier_free_guidance,
+            )
 
         # 3. Encode input prompt
         prompt_embeds = self._encode_prompt(
@@ -218,10 +240,8 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
         timesteps, num_inference_steps = self.get_timesteps(num_inference_steps)
 
         # 5. Prepare latent variables
-        num_channels_latents = 4
-        latents = self.prepare_latents_txt2img(
+        latents = self.prepare_latents(
             batch_size * num_images_per_prompt,
-            num_channels_latents,
             height,
             width,
             generator,
@@ -241,20 +261,24 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
             for i, t in enumerate(timesteps):
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
-                noise_pred_unet = paddle.zeros_like(latent_model_input)
-
                 if is_scheduler_support_step_index:
                     latent_model_input = self.scheduler.scale_model_input(latent_model_input, t, step_index=i)
                 else:
                     latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+                noise_pred_unet = paddle.zeros_like(latent_model_input)
+
+                unet_inputs = {
+                    unet_input_names[0]: latent_model_input,
+                    unet_input_names[1]: t,
+                    unet_input_names[2]: prompt_embeds,
+                }
+                if do_controlnet:
+                    unet_inputs[unet_input_names[3]] = control_image
+                    unet_inputs[unet_input_names[4]] = control_conditioning_scale
 
                 # predict the noise residual
                 self.unet.zero_copy_infer(
-                    prebinded_inputs={
-                        unet_input_names[0]: latent_model_input,
-                        unet_input_names[1]: t,
-                        unet_input_names[2]: prompt_embeds,
-                    },
+                    prebinded_inputs=unet_inputs,
                     prebinded_outputs={unet_output_name: noise_pred_unet},
                     share_with_raw_ptr=True,
                 )
@@ -262,6 +286,8 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
                 if do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred_unet.chunk(2)
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+                else:
+                    noise_pred = noise_pred_unet
                 # compute the previous noisy sample x_t -> x_t-1
                 if is_scheduler_support_step_index:
                     scheduler_output = self.scheduler.step(
@@ -270,19 +296,17 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
                 else:
                     scheduler_output = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
                 latents = scheduler_output.prev_sample
-                if i == num_inference_steps - 1:
-                    # sync for accuracy it/s measure
-                    paddle.device.cuda.synchronize()
                 # call the callback, if provided
-                if i == num_inference_steps - 1 or (
-                    (i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0
-                ):
+                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)
+                    if i == len(timesteps) - 1:
+                        # sync for accuracy it/s measure
+                        paddle.device.cuda.synchronize()
 
         if not output_type == "latent":
-            image = self.decode_latents(latents / self.vae_scaling_factor)
+            image = self._decode_vae_latents(latents / self.vae_scaling_factor)
             image, has_nsfw_concept = self.run_safety_checker(image)
         else:
             image = latents

@@ -18,7 +18,6 @@ from typing import List, Optional, Union
 
 import numpy as np
 import paddle
-import paddle.nn.functional as F
 import PIL
 from PIL import Image
 
@@ -152,6 +151,7 @@ class VaeImageProcessor(ConfigMixin):
         image: Union[paddle.Tensor, PIL.Image.Image, np.ndarray],
         height: Optional[int] = None,
         width: Optional[int] = None,
+        do_normalize: Optional[bool] = None,
     ) -> paddle.Tensor:
         """
         Preprocess the image input, accepted formats are PIL images, numpy arrays or paddle tensors"
@@ -201,7 +201,7 @@ class VaeImageProcessor(ConfigMixin):
                 )
 
         # expected range [0,1], normalize to [-1,1]
-        do_normalize = self.config.do_normalize
+        do_normalize = self.config.do_normalize if do_normalize is None else do_normalize
         if image.min() < 0:
             warnings.warn(
                 "Passing `image` as paddle tensor with value range in [-1,1] is deprecated. The expected value range for image tensor is [0,1] "
@@ -214,37 +214,6 @@ class VaeImageProcessor(ConfigMixin):
             image = self.normalize(image)
 
         return image
-
-    def preprocess_mask(self, mask, batch_size=1):
-        if not isinstance(mask, paddle.Tensor):
-            mask = mask.convert("L")
-            w, h = mask.size
-            w, h = (x - x % 8 for x in (w, h))  # resize to integer multiple of 8
-            mask = mask.resize(
-                (w // self.config.vae_scale_factor, h // self.config.vae_scale_factor),
-                resample=PIL_INTERPOLATION["nearest"],
-            )
-            mask = np.array(mask).astype(np.float32) / 255.0
-            mask = np.tile(mask, (4, 1, 1))
-            mask = np.vstack([mask[None]] * batch_size)
-            mask = 1 - mask  # repaint white, keep black
-            mask = paddle.to_tensor(mask)
-        else:
-            valid_mask_channel_sizes = [1, 3]
-            # if mask channel is fourth tensor dimension, permute dimensions to pytorch standard (B, C, H, W)
-            if mask.shape[3] in valid_mask_channel_sizes:
-                mask = mask.transpose([0, 3, 1, 2])
-            elif mask.shape[1] not in valid_mask_channel_sizes:
-                raise ValueError(
-                    f"Mask channel dimension of size in {valid_mask_channel_sizes} should be second or fourth dimension,"
-                    f" but received mask of shape {tuple(mask.shape)}"
-                )
-            # (potentially) reduce mask channel dimension from 3 to 1 for broadcasting to latent shape
-            mask = mask.mean(axis=1, keepdim=True)
-            h, w = mask.shape[-2:]
-            h, w = (x - x % 8 for x in (h, w))  # resize to integer multiple of 8
-            mask = F.interpolate(mask, (h // self.config.vae_scale_factor, w // self.config.vae_scale_factor))
-        return mask
 
     def postprocess(
         self,

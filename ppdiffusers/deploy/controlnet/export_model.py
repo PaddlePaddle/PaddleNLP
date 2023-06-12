@@ -79,6 +79,8 @@ def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
         feature_extractor=None,
         requires_safety_checker=False,
     )
+    # make sure we disable xformers
+    pipeline.disable_xformers_memory_efficient_attention()
     output_path = Path(output_path)
     # calculate latent's H and W
     latent_height = height // 8 if height is not None else None

@@ -424,9 +424,13 @@ def load_sub_model(
         )
         if not is_onnx_model:
             if os.path.isdir(os.path.join(cached_folder, name)):
-                is_onnx_model = any(".onnx" in d or ".pb" in d for d in os.listdir(os.path.join(cached_folder, name)))
+                is_onnx_model = any(
+                    d.endswith(".onnx") or d.endswith(".pb") for d in os.listdir(os.path.join(cached_folder, name))
+                )
             else:
-                is_onnx_model = any(".onnx" in d or ".pb" in d for d in os.listdir(os.path.join(cached_folder)))
+                is_onnx_model = any(
+                    d.endswith(".onnx") or d.endswith(".pb") for d in os.listdir(os.path.join(cached_folder))
+                )
         loading_kwargs["is_onnx_model"] = is_onnx_model
 
     from ppdiffusers import ModelMixin
