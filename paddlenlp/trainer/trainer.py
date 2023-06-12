@@ -327,6 +327,7 @@ class Trainer:
                         from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
                             GroupShardedScaler,
                         )
+
                         self.scaler = GroupShardedScaler(self.scaler)
                 else:
                     self.do_grad_scaling = False
