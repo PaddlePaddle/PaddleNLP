@@ -581,7 +581,6 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline, TextualInversionLoaderMi
             list of `bool`s denoting whether the corresponding generated image likely represents "not-safe-for-work"
             (nsfw) content, according to the `safety_checker`.
         """
-
         # 1. Check inputs. Raise error if not correct
         self.check_inputs(prompt, strength, callback_steps, negative_prompt, prompt_embeds, negative_prompt_embeds)
 
@@ -675,10 +674,7 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline, TextualInversionLoaderMi
             else:
                 has_nsfw_concept = False
 
-        # 11. Convert to PIL
-        if output_type == "pil":
             image = self.image_processor.postprocess(image, output_type=output_type)
-
         if not return_dict:
             return (image, has_nsfw_concept)
 

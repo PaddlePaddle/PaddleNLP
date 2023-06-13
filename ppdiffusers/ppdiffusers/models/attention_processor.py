@@ -318,7 +318,9 @@ class Attention(nn.Layer):
                 attention_mask = attention_mask.repeat_interleave(num_heads, axis=0)
         elif out_dim == 4:
             attention_mask = attention_mask.unsqueeze(1)
-            attention_mask = attention_mask.repeat_interleave(num_heads, axis=1)
+            if attention_mask.shape[0] < batch_size * num_heads:
+                attention_mask = attention_mask.repeat_interleave(num_heads, axis=1)
+            attention_mask = paddle.reshape(attention_mask, [batch_size, num_heads, -1, attention_mask.shape[-1]])
 
         if attention_mask.ndim == 4:
             if not transpose:

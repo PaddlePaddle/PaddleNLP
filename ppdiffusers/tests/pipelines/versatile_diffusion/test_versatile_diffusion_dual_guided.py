@@ -21,14 +21,10 @@ import numpy as np
 import paddle
 
 from ppdiffusers import VersatileDiffusionDualGuidedPipeline
-from ppdiffusers.utils.testing_utils import load_image, require_paddle_gpu, slow
+from ppdiffusers.utils.testing_utils import load_image, require_paddle_gpu, nightly
 
 
-class VersatileDiffusionDualGuidedPipelineFastTests(unittest.TestCase):
-    pass
-
-
-@slow
+@nightly
 @require_paddle_gpu
 class VersatileDiffusionDualGuidedPipelineIntegrationTests(unittest.TestCase):
     def tearDown(self):

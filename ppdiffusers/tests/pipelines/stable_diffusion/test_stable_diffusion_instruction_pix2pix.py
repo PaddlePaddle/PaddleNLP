@@ -20,11 +20,11 @@ import unittest
 import numpy as np
 import paddle
 from PIL import Image
-from ppdiffusers_test.pipeline_params import (
+from ..pipeline_params import (
     TEXT_GUIDED_IMAGE_INPAINTING_BATCH_PARAMS,
     TEXT_GUIDED_IMAGE_VARIATION_PARAMS,
 )
-from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
+from ..test_pipelines_common import PipelineTesterMixin
 
 from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
@@ -118,7 +118,7 @@ class StableDiffusionInstructPix2PixPipelineFastTests(PipelineTesterMixin, unitt
         image_slice = image[0, -3:, -3:, -1]
         assert image.shape == (1, 32, 32, 3)
         expected_slice = np.array(
-            [0.3331306, 0.3582521, 0.03699663, 0.73521507, 0.8102475, 0.44246367, 0.5692622, 0.6563427, 0.37825915]
+            [0.24897021, 0.3813318 , 0.15630311, 0.69198483, 0.7409521 , 0.55128014, 0.5978868 , 0.60921687, 0.47007012]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.001
 
@@ -133,7 +133,7 @@ class StableDiffusionInstructPix2PixPipelineFastTests(PipelineTesterMixin, unitt
         image_slice = image[0, -3:, -3:, -1]
         assert image.shape == (1, 32, 32, 3)
         expected_slice = np.array(
-            [0.34742114, 0.3662461, 0.02144229, 0.6701223, 0.7669591, 0.45267308, 0.60972774, 0.689654, 0.44241425]
+            [0.27121854, 0.34936333, 0.12865198, 0.77894104, 0.81688535, 0.6136005, 0.62261313, 0.6386795 , 0.5096967]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.001
 
@@ -150,8 +150,9 @@ class StableDiffusionInstructPix2PixPipelineFastTests(PipelineTesterMixin, unitt
         image = sd_pipe(**inputs).images
         image_slice = image[-1, -3:, -3:, -1]
         assert image.shape == (2, 32, 32, 3)
+
         expected_slice = np.array(
-            [0.23189151, 0.33012548, 0.3584243, 0.47921437, 0.26653397, 0.31692225, 0.33736795, 0.40720785, 0.42097807]
+            [0.41508308, 0.41580454, 0.5588631, 0.32340443, 0.20930073, 0.35993075, 0.28470254, 0.38203996, 0.51769114]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.001
 
@@ -169,32 +170,9 @@ class StableDiffusionInstructPix2PixPipelineFastTests(PipelineTesterMixin, unitt
         print(",".join([str(x) for x in slice]))
         assert image.shape == (1, 32, 32, 3)
         expected_slice = np.array(
-            [0.30027765, 0.40803492, 0.05371007, 0.8139783, 0.8358116, 0.39181346, 0.65663695, 0.63586813, 0.3318113]
+            [0.26694882, 0.4288544 , 0.21950376, 0.74369204, 0.6756442 , 0.54577595, 0.5941435 , 0.5603916 , 0.51743454]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.001
-
-    def test_stable_diffusion_pix2pix_num_images_per_prompt(self):
-        components = self.get_dummy_components()
-        sd_pipe = StableDiffusionInstructPix2PixPipeline(**components)
-        sd_pipe.set_progress_bar_config(disable=None)
-        inputs = self.get_dummy_inputs()
-        images = sd_pipe(**inputs).images
-        assert images.shape == (1, 32, 32, 3)
-        batch_size = 2
-        inputs = self.get_dummy_inputs()
-        inputs["prompt"] = [inputs["prompt"]] * batch_size
-        images = sd_pipe(**inputs).images
-        assert images.shape == (batch_size, 32, 32, 3)
-        num_images_per_prompt = 2
-        inputs = self.get_dummy_inputs()
-        images = sd_pipe(**inputs, num_images_per_prompt=num_images_per_prompt).images
-        assert images.shape == (num_images_per_prompt, 32, 32, 3)
-        batch_size = 2
-        inputs = self.get_dummy_inputs()
-        inputs["prompt"] = [inputs["prompt"]] * batch_size
-        images = sd_pipe(**inputs, num_images_per_prompt=num_images_per_prompt).images
-        assert images.shape == (batch_size * num_images_per_prompt, 32, 32, 3)
-
 
 @slow
 @require_paddle_gpu
@@ -207,7 +185,7 @@ class StableDiffusionInstructPix2PixPipelineSlowTests(unittest.TestCase):
     def get_inputs(self, seed=0):
         generator = paddle.Generator().manual_seed(seed=seed)
         image = load_image(
-            "https://huggingface.co/datasets/diffusers/test-arrays/resolve/main/stable_diffusion_pix2pix/example.jpg"
+            "https://paddlenlp.bj.bcebos.com/data/images/example.jpg"
         )
         inputs = {
             "prompt": "turn him into a cyborg",

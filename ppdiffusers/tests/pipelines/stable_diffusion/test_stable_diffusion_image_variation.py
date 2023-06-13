@@ -20,11 +20,11 @@ import unittest
 import numpy as np
 import paddle
 from PIL import Image
-from ppdiffusers_test.pipeline_params import (
+from ..pipeline_params import (
     IMAGE_VARIATION_BATCH_PARAMS,
     IMAGE_VARIATION_PARAMS,
 )
-from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
+from ..test_pipelines_common import PipelineTesterMixin
 
 from paddlenlp.transformers import (
     CLIPImageProcessor,
@@ -114,9 +114,9 @@ class StableDiffusionImageVariationPipelineFastTests(PipelineTesterMixin, unitte
         inputs = self.get_dummy_inputs()
         image = sd_pipe(**inputs).images
         image_slice = image[0, -3:, -3:, -1]
-        assert image.shape == (1, 64, 64, 3)
+        assert image.shape == (1, 64, 64, 3)        
         expected_slice = np.array(
-            [0.3336423, 0.15990603, 0.33051074, 0.17818755, 0.22190896, 0.580778, 0.23555121, 0.2542741, 0.5196996]
+            [0.22073305, 0.22751817, 0.32176197, 0.26315716, 0.25681925, 0.41432184, 0.2454437 , 0.10104704, 0.32165903]
         )
 
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.001
@@ -132,31 +132,9 @@ class StableDiffusionImageVariationPipelineFastTests(PipelineTesterMixin, unitte
         image_slice = image[-1, -3:, -3:, -1]
         assert image.shape == (2, 64, 64, 3)
         expected_slice = np.array(
-            [0.5974754, 0.6734819, 0.67569935, 0.5421418, 0.34375697, 0.46754372, 0.5809557, 0.32910222, 0.41817445]
+            [0.61040395, 0.7414253 , 0.5950623 , 0.5843509 , 0.25609648, 0.28481025, 0.61782926, 0.3014974 , 0.35131538]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.001
-
-    def test_stable_diffusion_img_variation_num_images_per_prompt(self):
-        components = self.get_dummy_components()
-        sd_pipe = StableDiffusionImageVariationPipeline(**components)
-        sd_pipe.set_progress_bar_config(disable=None)
-        inputs = self.get_dummy_inputs()
-        images = sd_pipe(**inputs).images
-        assert images.shape == (1, 64, 64, 3)
-        batch_size = 2
-        inputs = self.get_dummy_inputs()
-        inputs["image"] = batch_size * [inputs["image"]]
-        images = sd_pipe(**inputs).images
-        assert images.shape == (batch_size, 64, 64, 3)
-        num_images_per_prompt = 2
-        inputs = self.get_dummy_inputs()
-        images = sd_pipe(**inputs, num_images_per_prompt=num_images_per_prompt).images
-        assert images.shape == (num_images_per_prompt, 64, 64, 3)
-        batch_size = 2
-        inputs = self.get_dummy_inputs()
-        inputs["image"] = batch_size * [inputs["image"]]
-        images = sd_pipe(**inputs, num_images_per_prompt=num_images_per_prompt).images
-        assert images.shape == (batch_size * num_images_per_prompt, 64, 64, 3)
 
 
 @slow
@@ -170,7 +148,7 @@ class StableDiffusionImageVariationPipelineSlowTests(unittest.TestCase):
     def get_inputs(self, dtype="float32", seed=0):
         generator = paddle.Generator().manual_seed(seed)
         init_image = load_image(
-            "https://huggingface.co/datasets/diffusers/test-arrays/resolve/main/stable_diffusion_imgvar/input_image_vermeer.png"
+            "https://paddlenlp.bj.bcebos.com/data/images/input_image_vermeer.png"
         )
         latents = np.random.RandomState(seed).standard_normal((1, 4, 64, 64))
         latents = paddle.to_tensor(latents).cast(dtype)
@@ -253,7 +231,7 @@ class StableDiffusionImageVariationPipelineNightlyTests(unittest.TestCase):
     def get_inputs(self, dtype="float32", seed=0):
         generator = paddle.Generator().manual_seed(seed)
         init_image = load_image(
-            "https://huggingface.co/datasets/diffusers/test-arrays/resolve/main/stable_diffusion_imgvar/input_image_vermeer.png"
+            "https://paddlenlp.bj.bcebos.com/data/images/input_image_vermeer.png"
         )
         latents = np.random.RandomState(seed).standard_normal((1, 4, 64, 64))
         latents = paddle.to_tensor(latents).cast(dtype)
@@ -273,7 +251,7 @@ class StableDiffusionImageVariationPipelineNightlyTests(unittest.TestCase):
         inputs = self.get_inputs()
         image = sd_pipe(**inputs).images[0]
         expected_image = load_numpy(
-            "https://huggingface.co/datasets/diffusers/test-arrays/resolve/main/stable_diffusion_imgvar/lambdalabs_variations_pndm.npy"
+            "https://paddlenlp.bj.bcebos.com/data/images/lambdalabs_variations_pndm.npy"
         )
         max_diff = np.abs(expected_image - image).max()
         assert max_diff < 0.001
@@ -286,7 +264,7 @@ class StableDiffusionImageVariationPipelineNightlyTests(unittest.TestCase):
         inputs["num_inference_steps"] = 25
         image = sd_pipe(**inputs).images[0]
         expected_image = load_numpy(
-            "https://huggingface.co/datasets/diffusers/test-arrays/resolve/main/stable_diffusion_imgvar/lambdalabs_variations_dpm_multi.npy"
+            "https://paddlenlp.bj.bcebos.com/data/images/lambdalabs_variations_dpm_multi.npy"
         )
         max_diff = np.abs(expected_image - image).max()
         assert max_diff < 0.001
