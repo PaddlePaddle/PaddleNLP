@@ -1622,6 +1622,10 @@ class Trainer:
 
         output_dir = os.path.join(run_dir, checkpoint_folder)
 
+        if ShardingOption.FULL_SHARD in self.args.sharding:
+            # TODO(ZHUI) fix it and set convert2cpu=True to save gpu memory
+            model.get_all_parameters(convert2cpu=False)
+
         self.save_model(output_dir)
 
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)

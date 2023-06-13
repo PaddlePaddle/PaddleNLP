@@ -502,7 +502,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         默认值-1, 表示不启用张量并行,
                         (`int`, 可选, 默认为 `-1`)
                         (注: 该方法需要修改模型结构, 目前支持GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM)
-                        (注: 该方法对通信开销较大, 建议 tensor_parallel_degree <8, 尽量使用机器内部通信)
+                        (注: 该方法对通信开销较大, 建议 tensor_parallel_degree<=8, 尽量使用机器内部通信)
 
                         Tensor parallelism is a parallel technique which proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.3 Tensor Model Parallelism).
                         This techique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts)
