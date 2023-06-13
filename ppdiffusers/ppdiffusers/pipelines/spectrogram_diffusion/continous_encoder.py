@@ -40,7 +40,7 @@ class SpectrogramContEncoder(ModelMixin, ConfigMixin, ModuleUtilsMixin):
         super().__init__()
         self.input_proj = nn.Linear(in_features=input_dims, out_features=d_model, bias_attr=False)
         self.position_encoding = nn.Embedding(targets_context_length, d_model)
-        self.position_encoding.weight.stop_gradient = not False
+        self.position_encoding.weight.stop_gradient = True
         self.dropout_pre = nn.Dropout(p=dropout_rate)
         t5config = T5Config(
             d_model=d_model,
@@ -78,5 +78,4 @@ class SpectrogramContEncoder(ModelMixin, ConfigMixin, ModuleUtilsMixin):
         for lyr in self.encoders:
             x = lyr(x, extended_attention_mask)[0]
         x = self.layer_norm(x)
-
         return self.dropout_post(x), encoder_inputs_mask

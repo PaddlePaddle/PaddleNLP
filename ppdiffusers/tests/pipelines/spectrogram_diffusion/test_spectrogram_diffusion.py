@@ -171,12 +171,11 @@ class PipelineIntegrationTests(unittest.TestCase):
         # clean up the VRAM after each test
         super().tearDown()
         gc.collect()
-        paddle.cuda.empty_cache()
+        paddle.device.cuda.empty_cache()
 
     def test_callback(self):
         # TODO - test that pipeline can decode tokens in a callback
         # so that music can be played live
-
         pipe = SpectrogramDiffusionPipeline.from_pretrained("google/music-spectrogram-diffusion")
         melgan = pipe.melgan
         pipe.melgan = None
@@ -194,7 +193,7 @@ class PipelineIntegrationTests(unittest.TestCase):
         input_tokens = processor(MIDI_FILE)
 
         input_tokens = input_tokens[:3]
-        generator = paddle.seed(0)
+        generator = paddle.Generator().manual_seed(0)
         pipe(input_tokens, num_inference_steps=5, generator=generator, callback=callback, output_type="mel")
 
     def test_spectrogram_fast(self):
@@ -207,12 +206,12 @@ class PipelineIntegrationTests(unittest.TestCase):
         # just run two denoising loops
         input_tokens = input_tokens[:2]
 
-        generator = paddle.seed(0)
+        generator = paddle.Generator().manual_seed(0)
         output = pipe(input_tokens, num_inference_steps=2, generator=generator)
 
         audio = output.audios[0]
 
-        assert abs(np.abs(audio).sum() - 3612.841) < 1e-1
+        assert abs(np.abs(audio).sum() - 3815.163) < 1e-1
 
     def test_spectrogram(self):
 
@@ -226,8 +225,8 @@ class PipelineIntegrationTests(unittest.TestCase):
         # just run 4 denoising loops
         input_tokens = input_tokens[:4]
 
-        generator = paddle.seed(0)
+        generator = paddle.Generator().manual_seed(0)
         output = pipe(input_tokens, num_inference_steps=100, generator=generator)
 
         audio = output.audios[0]
-        assert abs(np.abs(audio).sum() - 9389.1111) < 5e-2
+        assert abs(np.abs(audio).sum() - 14418.089) < 5e-2

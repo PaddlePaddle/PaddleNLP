@@ -110,6 +110,7 @@ LOADABLE_CLASSES = {
         "FeatureExtractionMixin": ["save_pretrained", "from_pretrained"],
         "ProcessorMixin": ["save_pretrained", "from_pretrained"],
         "ImageProcessingMixin": ["save_pretrained", "from_pretrained"],
+        "RobertaTokenizer": ["save_pretrained", "from_pretrained"],
     },
 }
 
@@ -335,7 +336,7 @@ def get_class_obj_and_candidates(library_name, class_name, importable_classes, p
     else:
         # else we just import it from the library.
         library = importlib.import_module(library_name)
-
+        # breakpoint()
         class_obj = getattr(library, class_name)
         class_candidates = {c: getattr(library, c, None) for c in importable_classes.keys()}
 
@@ -346,7 +347,7 @@ def _get_pipeline_class(class_obj, config, custom_pipeline=None, cache_dir=None,
     if custom_pipeline is not None:
         if custom_pipeline.endswith(".py"):
             path = Path(custom_pipeline)
-            # decompose into folder & file
+            # decompose into folder & filex
             file_name = path.name
             custom_pipeline = path.parent.absolute()
         else:

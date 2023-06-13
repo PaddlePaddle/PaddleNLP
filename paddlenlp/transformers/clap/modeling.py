@@ -49,6 +49,16 @@ CLAP_PRETRAINED_MODEL_ARCHIVE_LIST = [
 ]
 
 
+__all__ = [
+    "ClapTextModelWithProjection",
+    "ClapAudioModelWithProjection",
+    "ClapModel",
+    "ClapAudioConfig",
+    "ClapAudioModel",
+    "ClapTextModel",
+]
+
+
 def Parameter(tensor):
     return paddle.create_parameter(tensor.shape, dtype=tensor.dtype, default_initializer=nn.initializer.Assign(tensor))
 

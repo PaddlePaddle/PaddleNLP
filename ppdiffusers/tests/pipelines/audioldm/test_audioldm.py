@@ -35,7 +35,7 @@ from ppdiffusers import (
     UNet2DConditionModel,
 )
 from ppdiffusers.training_utils import enable_full_determinism
-from ppdiffusers.utils import slow
+from ppdiffusers.utils import require_paddle_gpu, slow
 
 from ..pipeline_params import TEXT_TO_AUDIO_BATCH_PARAMS, TEXT_TO_AUDIO_PARAMS
 from ..test_pipelines_common import PipelineTesterMixin
@@ -344,17 +344,17 @@ class AudioLDMPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 
 
 @slow
-# @require_paddle_gpu
+@require_paddle_gpu
 class AudioLDMPipelineSlowTests(unittest.TestCase):
     def tearDown(self):
         super().tearDown()
         gc.collect()
-        paddle.cuda.empty_cache()
+        paddle.device.cuda.empty_cache()
 
     def get_inputs(self, dtype=paddle.float32, seed=0):
         generator = paddle.Generator().manual_seed(seed)
         latents = np.random.RandomState(seed).standard_normal((1, 8, 128, 16))
-        latents = paddle.from_numpy(latents).cast(dtype=dtype)
+        latents = paddle.to_tensor(latents).cast(dtype=dtype)
         inputs = {
             "prompt": "A hammer hitting a wooden surface",
             "latents": latents,
@@ -366,7 +366,7 @@ class AudioLDMPipelineSlowTests(unittest.TestCase):
 
     def test_audioldm(self):
         audioldm_pipe = AudioLDMPipeline.from_pretrained("cvssp/audioldm")
-        # audioldm_pipe.set_progress_bar_config(disable=None)
+        audioldm_pipe.set_progress_bar_config(disable=None)
 
         inputs = self.get_inputs()
         inputs["num_inference_steps"] = 25
@@ -385,7 +385,7 @@ class AudioLDMPipelineSlowTests(unittest.TestCase):
     def test_audioldm_lms(self):
         audioldm_pipe = AudioLDMPipeline.from_pretrained("cvssp/audioldm")
         audioldm_pipe.scheduler = LMSDiscreteScheduler.from_config(audioldm_pipe.scheduler.config)
-        # audioldm_pipe.set_progress_bar_config(disable=None)
+        audioldm_pipe.set_progress_bar_config(disable=None)
 
         inputs = self.get_inputs()
         audio = audioldm_pipe(**inputs).audios[0]

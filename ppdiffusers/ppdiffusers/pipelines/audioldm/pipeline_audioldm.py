@@ -72,7 +72,7 @@ class AudioLDMPipeline(DiffusionPipeline):
         self,
         vae: AutoencoderKL,
         text_encoder: ClapTextModelWithProjection,
-        tokenizer: Union[RobertaTokenizer],
+        tokenizer: RobertaTokenizer,
         unet: UNet2DConditionModel,
         scheduler: KarrasDiffusionSchedulers,
         vocoder: SpeechT5HifiGan,
