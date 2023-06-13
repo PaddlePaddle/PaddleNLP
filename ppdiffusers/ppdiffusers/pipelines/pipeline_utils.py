@@ -346,7 +346,7 @@ def _get_pipeline_class(class_obj, config, custom_pipeline=None, cache_dir=None,
     if custom_pipeline is not None:
         if custom_pipeline.endswith(".py"):
             path = Path(custom_pipeline)
-            # decompose into folder & filex
+            # decompose into folder & file
             file_name = path.name
             custom_pipeline = path.parent.absolute()
         else:
