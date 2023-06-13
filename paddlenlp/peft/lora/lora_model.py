@@ -246,6 +246,7 @@ class LoRAModel(nn.Layer):
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
                     enable_lora=enable_lora,
+                    head_dim=lora_config.head_dim,
                 )
             elif isinstance(module, ColumnParallelLinear):
                 # recover the original output_features
@@ -259,6 +260,7 @@ class LoRAModel(nn.Layer):
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
                     enable_lora=enable_lora,
+                    head_dim=lora_config.head_dim,
                     lora_A_weight_attr=paddle.ParamAttr(
                         initializer=nn.initializer.KaimingUniform(
                             negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
