@@ -68,18 +68,6 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
 
-    # training_args = TrainingArguments(
-    #     per_device_train_batch_size=2,
-    #     evaluation_strategy="epoch",
-    #     save_strategy="epoch",
-    #     num_train_epochs=1,
-    #     learning_rate=2e-4,
-    #     fp16=True,
-    #     fp16_opt_level="O2",
-    #     logging_steps=50,
-    #     output_dir="outputs",
-    # )
-
     if model_args.lora:
         target_modules = ["query_key_value"]
         peft_config = LoraConfig(
@@ -112,7 +100,6 @@ def main():
         batch_size=training_args.per_device_train_batch_size,
         pin_memory=True,
     )
-    # eval_dataloader = DataLoader(eval_dataset, collate_fn=collate_fn, batch_size=batch_size, pin_memory=True)
 
     # optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=training_args.learning_rate)

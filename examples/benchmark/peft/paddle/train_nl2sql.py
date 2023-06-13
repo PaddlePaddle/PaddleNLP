@@ -31,12 +31,21 @@ python bloom_nl2sql.py --model_name_or_path bigscience/bloomz-3b  \
     --fp16 --fp16_opt_level O2 \
     --logging_steps 50 --output_dir outputs
 
-多卡
+多卡 mp
 python bloom_nl2sql.py --model_name_or_path bigscience/bloomz-3b  \
+    --train_file nl2sql/dev.jsonl --validation_file nl2sql/dev.jsonl \
+    --num_train_epochs 1 --per_device_train_batch_size 16 \
+    --evaluation_strategy epoch --save_strategy epoch \
+    --fp16 --fp16_opt_level O2 \
+    --logging_steps 50 --output_dir outputs
+
+多卡 sharding 3
+python -m paddle.distributed.launch --gpus "0,1,2,3" train_nl2sql.py --model_name_or_path bigscience/bloomz-7b1-mt  \
     --train_file nl2sql/dev.jsonl --validation_file nl2sql/dev.jsonl \
     --num_train_epochs 1 --per_device_train_batch_size 4 \
     --evaluation_strategy epoch --save_strategy epoch \
     --fp16 --fp16_opt_level O2 \
+    --sharding "stage3" --sharding_parallel_degree 4 \
     --logging_steps 50 --output_dir outputs
 """
 
@@ -77,8 +86,8 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         load_state_as_np=True,
-        low_cpu_mem_usage=True,  # todo enable low_cpu_mem_usage=True
-        dtype=dtype,  # todo enable set dtype to avoid additional mem usage
+        low_cpu_mem_usage=True,
+        dtype=dtype,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         use_recompute=training_args.recompute,

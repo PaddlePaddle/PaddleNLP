@@ -63,18 +63,6 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
 
-    # training_args = TrainingArguments(
-    #     per_device_train_batch_size=4,
-    #     evaluation_strategy="epoch",
-    #     save_strategy="epoch",
-    #     num_train_epochs=1,
-    #     learning_rate=2e-4,
-    #     fp16=True,
-    #     fp16_opt_level="O2",
-    #     logging_steps=50,
-    #     output_dir="outputs",
-    # )
-
     if model_args.lora:
         target_modules = ["query_key_value"]
         peft_config = LoraConfig(
