@@ -1318,7 +1318,7 @@ class GenerationMixin(object):
         )
 
         beam_scores = paddle.zeros((batch_size, num_beams), dtype=paddle.get_default_dtype())
-        beam_scores[:, 1:] = get_scale_by_dtype()
+        beam_scores[:, 1:] = -1e9
         beam_scores = paddle.reshape(beam_scores, [-1])
 
         while cur_len < max_length:
@@ -1440,7 +1440,7 @@ class GenerationMixin(object):
             num_beams * batch_size, batch_beam_size
         )
 
-        beam_scores = paddle.full((batch_size, num_beams), get_scale_by_dtype("float32"), dtype="float32")
+        beam_scores = paddle.full((batch_size, num_beams), -1e9, dtype="float32")
         # initialise score of first beam of each group with 0 and the rest with 1e-9. This ensures that the beams in
         # the same group don't produce same tokens everytime.
         beam_scores[:, ::num_sub_beams] = 0
