@@ -604,16 +604,31 @@ def register_to_config(init):
     return inner_init
 
 
+def finfo(dtype: paddle.dtype = None):
+    if dtype is None:
+        dtype = paddle.get_default_dtype()
+
+    if dtype == paddle.bfloat16:
+        # Numpy do not support `np.finfo(np.uint16)`, so try to construct a finfo object to fetch min value
+        class BFloatFInfo:
+            min = -3.3895313892515355e38
+
+        return BFloatFInfo
+    if dtype == paddle.float32:
+        return np.finfo(np.float32)
+    if dtype == paddle.float16:
+        return np.finfo(np.float16)
+    if dtype == paddle.float64:
+        return np.finfo(np.float64)
+
+
 class ModuleUtilsMixin:
     """
     A few utilities for `torch.nn.Modules`, to be used as a mixin.
     """
 
     def get_extended_attention_mask(
-        self,
-        attention_mask: paddle.Tensor,
-        input_shape: Tuple[int],
-        has_query: bool = False,
+        self, attention_mask: paddle.Tensor, input_shape: Tuple[int], dtype: paddle.float32 = None
     ) -> paddle.Tensor:
         """
         Makes broadcastable attention and causal masks so that future and masked tokens are ignored.
@@ -625,6 +640,8 @@ class ModuleUtilsMixin:
         Returns:
             `paddle.Tensor` The extended attention mask, with a the same dtype as `attention_mask.dtype`.
         """
+        if dtype is None:
+            dtype = self.dtype
         # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
         # ourselves in which case we just need to make it broadcastable to all heads.
         if attention_mask.dim() == 3:
@@ -645,5 +662,5 @@ class ModuleUtilsMixin:
         # positions we want to attend and -10000.0 for masked positions.
         # Since we are adding it to the raw scores before the softmax, this is
         # effectively the same as removing these entirely.
-        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+        extended_attention_mask = (1.0 - extended_attention_mask) * finfo(dtype).min
         return extended_attention_mask

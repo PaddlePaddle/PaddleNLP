@@ -111,7 +111,7 @@ class SpectrogramDiffusionPipeline(DiffusionPipeline):
         generator: Optional[paddle.Generator] = None,
         num_inference_steps: int = 100,
         return_dict: bool = True,
-        output_type: str = "mel",
+        output_type: str = "numpy",
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: int = 1,
     ) -> Union[AudioPipelineOutput, Tuple]:
@@ -145,13 +145,10 @@ class SpectrogramDiffusionPipeline(DiffusionPipeline):
                 continuous_inputs=encoder_continuous_inputs,
                 continuous_mask=encoder_continuous_mask,
             )
-
             # Sample encoder_continuous_inputs shaped gaussian noise to begin loop
             x = randn_tensor(shape=encoder_continuous_inputs.shape, generator=generator, dtype=self.decoder.dtype)
-
             # set step values
             self.scheduler.set_timesteps(num_inference_steps)
-
             # Denoising diffusion loop
             for j, t in enumerate(self.progress_bar(self.scheduler.timesteps)):
                 output = self.decode(
