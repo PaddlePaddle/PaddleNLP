@@ -1116,8 +1116,8 @@ class ClapTextEmbeddings(nn.Layer):
 
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
-        token_type_ids = token_type_ids.cast(input_ids.dtype)
-        token_type_embeddings = self.token_type_embeddings(token_type_ids)
+
+        token_type_embeddings = self.token_type_embeddings(token_type_ids.cast("int64"))
 
         embeddings = inputs_embeds + token_type_embeddings
         if self.position_embedding_type == "absolute":
