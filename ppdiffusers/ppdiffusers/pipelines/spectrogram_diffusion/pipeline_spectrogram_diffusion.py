@@ -79,7 +79,7 @@ class SpectrogramDiffusionPipeline(DiffusionPipeline):
             encoder_input_tokens=input_tokens, encoder_inputs_mask=tokens_mask
         )
         continuous_encoded, continuous_mask = self.continuous_encoder(
-            encoder_inputs=continuous_inputs, encoder_inputs_mask=continuous_mask
+            encoder_inputs=continuous_inputs.cast(self.continuous_encoder.dtype), encoder_inputs_mask=continuous_mask
         )
         return [(tokens_encoded, tokens_mask), (continuous_encoded, continuous_mask)]
 

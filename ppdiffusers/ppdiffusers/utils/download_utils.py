@@ -167,6 +167,7 @@ ALLOW_PATTERNS_MAPPING = {
         "config.json",
     ],
     "mel": ["mel_config.json"],
+    "melgan": ["model.onnx"],
     "others": [
         "model_state.pdparams",
         "model_config.json",
@@ -174,6 +175,7 @@ ALLOW_PATTERNS_MAPPING = {
         "model_config.json",
         "scheduler_config.json",
         "preprocessor_config.json",
+        "model.onnx",
         "pipeline.py",
     ],
 }

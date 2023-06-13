@@ -347,7 +347,27 @@ if is_paddle_available() and is_paddlenlp_available():
             training=False,
             attention_op="cutlass",
         ):
-            if attention_op is None or attention_op == "cutlass" or training:
+            if attn_mask is not None or attention_op == "math":
+                if scale is None:
+                    scale = 1 / math.sqrt(query.shape[-1])
+                qt = paddle.transpose(query, [0, 2, 1, 3])
+                kt = paddle.transpose(key, [0, 2, 1, 3])
+                vt = paddle.transpose(value, [0, 2, 1, 3])
+                s = paddle.matmul(qt * scale, kt, transpose_y=True)
+                if is_causal:
+                    p = paddle.incubate.softmax_mask_fuse_upper_triangle(s)
+                else:
+                    if attn_mask is not None:
+                        attn_mask = paddle.transpose(attn_mask, [0, 2, 1, 3])
+                        if attn_mask.cast("float32").min() == 0 and attn_mask.cast("float32").max() == 1:
+                            attn_mask = (attn_mask.cast(s.dtype) - 1) * 10000.0
+                        s = s + attn_mask
+                    p = paddle.nn.functional.softmax(s)
+                if dropout_p > 0.0:
+                    p = paddle.nn.functional.dropout(p, dropout_p, training=training, mode="upscale_in_train")
+                o = paddle.matmul(p, vt)
+                return paddle.transpose(o, [0, 2, 1, 3])
+            elif attention_op is None or attention_op == "cutlass" or training:
                 if scale is None:
                     scale = 1 / math.sqrt(query.shape[-1])
                 # support fp32, fp16, bfp16
@@ -355,7 +375,7 @@ if is_paddle_available() and is_paddlenlp_available():
                     query,
                     key,
                     value,
-                    attn_mask,
+                    None,
                     p=dropout_p,
                     scale=scale,
                     training=training,
@@ -374,7 +394,7 @@ if is_paddle_available() and is_paddlenlp_available():
                 if raw_dtype == paddle.float32:
                     output = output.cast(raw_dtype)
             else:
-                raise ValueError("ppxformers's attention_op shoulde be in ['cutlass', 'flash']")
+                raise ValueError("ppxformers's attention_op shoulde be in ['cutlass', 'flash', 'math']")
             return output
 
         paddle.nn.functional.scaled_dot_product_attention_ = scaled_dot_product_attention_
@@ -1027,11 +1047,13 @@ if is_paddle_available() and is_paddlenlp_available():
     from paddlenlp.transformers import (
         BertModel,
         BitBackbone,
+        ClapTextModelWithProjection,
         CLIPTextModel,
         CLIPTextModelWithProjection,
         CLIPVisionModel,
         CLIPVisionModelWithProjection,
         DPTForDepthEstimation,
+        SpeechT5HifiGan,
         T5EncoderModel,
     )
 
@@ -1211,7 +1233,7 @@ if is_paddle_available() and is_paddlenlp_available():
     for cls_ in [BertModel, RobertaSeriesModelWithTransformation]:
         setattr(cls_, "smart_convert", bert_smart_convert)
 
-    for cls_ in [DPTForDepthEstimation, BitBackbone]:
+    for cls_ in [DPTForDepthEstimation, BitBackbone, SpeechT5HifiGan, ClapTextModelWithProjection]:
         setattr(cls_, "smart_convert", convert_pytorch_state_dict_to_paddle)
 
     # TODO remove this when we updage ImageProcessingMixin
