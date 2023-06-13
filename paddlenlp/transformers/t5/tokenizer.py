@@ -73,6 +73,8 @@ class T5Tokenizer(AlbertEnglishTokenizer):
             "t5-11b": "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-11b/spiece.model",
             "t5-v1_1-base": "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-v1_1-base/spiece.model",
             "t5-v1_1-large": "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-v1_1-large/spiece.model",
+            "ernie-code-base": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-code/ernie-code-base/spiece.model",
+            "ernie-code-base-L512": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-code/ernie-code-base-L512/spiece.model",
         },
     }
 
@@ -84,6 +86,8 @@ class T5Tokenizer(AlbertEnglishTokenizer):
         "t5-11b": {"do_lower_case": False},
         "t5-v1_1-base": {"do_lower_case": False},
         "t5-v1_1-large": {"do_lower_case": False},
+        "ernie-code-base": {"do_lower_case": False},
+        "ernie-code-base-L512": {"do_lower_case": False},
     }
 
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES

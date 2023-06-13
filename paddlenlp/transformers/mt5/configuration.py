@@ -19,9 +19,71 @@ from typing import Dict
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
-__all__ = ["MT5_PRETRAINED_INIT_CONFIGURATION", "MT5Config"]
+__all__ = ["MT5_PRETRAINED_INIT_CONFIGURATION", "MT5Config", "MT5_PRETRAINED_RESOURCE_FILES_MAP"]
 
-MT5_PRETRAINED_INIT_CONFIGURATION = {}
+MT5_PRETRAINED_INIT_CONFIGURATION = {
+    "ernie-code-base": {
+        "d_ff": 2048,
+        "d_kv": 64,
+        "d_model": 768,
+        "decoder_start_token_id": 0,
+        "dense_act_fn": "gelu_new",
+        "dropout_rate": 0.1,
+        "eos_token_id": 1,
+        "feed_forward_proj": "gated-gelu",
+        "initializer_factor": 1.0,
+        "is_encoder_decoder": True,
+        "is_gated_act": True,
+        "layer_norm_epsilon": 1e-06,
+        "model_type": "mt5",
+        "num_decoder_layers": 12,
+        "num_heads": 12,
+        "num_layers": 12,
+        "output_past": True,
+        "pad_token_id": 0,
+        "relative_attention_max_distance": 128,
+        "relative_attention_num_buckets": 32,
+        "tie_word_embeddings": False,
+        "tokenizer_class": "T5Tokenizer",
+        "transformers_version": "4.20.1",
+        "use_cache": True,
+        "vocab_size": 250105,
+    },
+    "ernie-code-base-L512": {
+        "d_ff": 2048,
+        "d_kv": 64,
+        "d_model": 768,
+        "decoder_start_token_id": 0,
+        "dense_act_fn": "gelu_new",
+        "dropout_rate": 0.1,
+        "eos_token_id": 1,
+        "feed_forward_proj": "gated-gelu",
+        "initializer_factor": 1.0,
+        "is_encoder_decoder": True,
+        "is_gated_act": True,
+        "layer_norm_epsilon": 1e-06,
+        "model_type": "mt5",
+        "num_decoder_layers": 12,
+        "num_heads": 12,
+        "num_layers": 12,
+        "output_past": True,
+        "pad_token_id": 0,
+        "relative_attention_max_distance": 128,
+        "relative_attention_num_buckets": 32,
+        "tie_word_embeddings": False,
+        "tokenizer_class": "T5Tokenizer",
+        "transformers_version": "4.20.1",
+        "use_cache": True,
+        "vocab_size": 250105,
+    },
+}
+
+MT5_PRETRAINED_RESOURCE_FILES_MAP = {
+    "model_state": {
+        "ernie-code-base": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-code/ernie-code-base/model_state.pdparams",
+        "ernie-code-base-L512": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-code/ernie-code-base-L512/model_state.pdparams",
+    }
+}
 
 
 class MT5Config(PretrainedConfig):
