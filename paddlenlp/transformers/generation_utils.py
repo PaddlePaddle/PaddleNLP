@@ -93,7 +93,7 @@ class BeamHypotheses:
         self.early_stopping = early_stopping
         self.num_beams = num_beams
         self.beams = []
-        self.worst_score = get_scale_by_dtype()
+        self.worst_score = 1e9
 
     def __len__(self):
         """
@@ -333,7 +333,7 @@ class GenerationMixin(object):
             (eos_token_id is not None) and (pad_token_id != eos_token_id)
         )
         if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
-            attention_mask = (input_ids == pad_token_id).astype(paddle.get_default_dtype()) * get_scale_by_dtype()
+            attention_mask = (input_ids == pad_token_id).astype(paddle.get_default_dtype()) * -1e4
         else:
             attention_mask = paddle.zeros_like(input_ids, dtype=paddle.get_default_dtype())
         return paddle.unsqueeze(attention_mask, axis=[1, 2])
@@ -1318,7 +1318,7 @@ class GenerationMixin(object):
         )
 
         beam_scores = paddle.zeros((batch_size, num_beams), dtype=paddle.get_default_dtype())
-        beam_scores[:, 1:] = get_scale_by_dtype()
+        beam_scores[:, 1:] = -1e9
         beam_scores = paddle.reshape(beam_scores, [-1])
 
         while cur_len < max_length:
@@ -1440,7 +1440,7 @@ class GenerationMixin(object):
             num_beams * batch_size, batch_beam_size
         )
 
-        beam_scores = paddle.full((batch_size, num_beams), get_scale_by_dtype("float32"), dtype="float32")
+        beam_scores = paddle.full((batch_size, num_beams), -1e9, dtype="float32")
         # initialise score of first beam of each group with 0 and the rest with 1e-9. This ensures that the beams in
         # the same group don't produce same tokens everytime.
         beam_scores[:, ::num_sub_beams] = 0
