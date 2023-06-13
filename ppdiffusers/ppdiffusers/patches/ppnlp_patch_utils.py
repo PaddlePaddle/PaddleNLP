@@ -700,7 +700,9 @@ if is_paddle_available() and is_paddlenlp_available():
         revision = kwargs.pop("revision", None)
         paddle_dtype = kwargs.pop("paddle_dtype", None)
         # do not use paddlenlp dtype
-        kwargs.pop("dtype", None)
+        _dtype = kwargs.pop("dtype", None)
+        if _dtype is not None and paddle_dtype is None:
+            paddle_dtype = _dtype
         subfolder = kwargs.pop("subfolder", None)
         variant = kwargs.pop("variant", None)
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", LOW_CPU_MEM_USAGE_DEFAULT)
@@ -745,6 +747,8 @@ if is_paddle_available() and is_paddlenlp_available():
         if not from_hf_hub and not os.path.exists(os.path.join(cache_dir, config_path, "config.json")):
             config.save_pretrained(os.path.join(cache_dir, config_path))
 
+        if paddle_dtype is None:
+            paddle_dtype = config.get("dtype", paddle.get_default_dtype())
         # This variable will flag if we're loading a sharded checkpoint. In this case the archive file is just the
         # Load model
         model_file = None
@@ -846,11 +850,11 @@ if is_paddle_available() and is_paddlenlp_available():
             "error_msgs": "",
         }
 
-        if paddle_dtype is not None and not isinstance(paddle_dtype, paddle.dtype):
-            raise ValueError(
-                f"{paddle_dtype} needs to be of type `paddle.dtype`, e.g. `paddle.float16`, but is {type(paddle_dtype)}."
-            )
-        elif paddle_dtype is not None:
+        # if paddle_dtype is not None and not isinstance(paddle_dtype, paddle.dtype):
+        #     raise ValueError(
+        #         f"{paddle_dtype} needs to be of type `paddle.dtype`, e.g. `paddle.float16`, but is {type(paddle_dtype)}."
+        #     )
+        if paddle_dtype is not None:
             model = model.to(dtype=paddle_dtype)
 
         if len(unexpected_keys) > 0:
@@ -1030,7 +1034,7 @@ if is_paddle_available() and is_paddlenlp_available():
         variant: Optional[str] = None,
         to_diffusers: Optional[bool] = None,
     ):
-        if self.constructed_from_pretrained_config() and hasattr(self, "paddle_torch_name_mapping"):
+        if self.constructed_from_pretrained_config() and hasattr(self, "smart_convert"):
             return save_pretrained_v3(
                 self,
                 save_dir,
@@ -1040,7 +1044,7 @@ if is_paddle_available() and is_paddlenlp_available():
                 variant=variant,
                 to_diffusers=to_diffusers,
             )
-        return raw_save_pretrained(self, save_dir)
+        return raw_save_pretrained(self, save_dir, variant=variant)
 
     PretrainedModel.save_pretrained = save_pretrained
 
@@ -1061,7 +1065,7 @@ if is_paddle_available() and is_paddlenlp_available():
         T5EncoderModel._keep_in_fp32_modules = ["wo"]
 
     from ..models.modeling_pytorch_paddle_utils import (
-        convert_pytorch_state_dict_to_paddle,
+        convert_pytorch_state_dict_to_paddle_class_method,
     )
     from ..pipelines.alt_diffusion.modeling_roberta_series import (
         RobertaSeriesModelWithTransformation,
@@ -1104,8 +1108,8 @@ if is_paddle_available() and is_paddlenlp_available():
             name_mapping_dict.update({".vision_model.": "."})
 
         donot_transpose = ["embeddings", "norm", "concept_embeds", "special_care_embeds"]
-
-        paddle_torch_name_mapping = {}
+        if not hasattr(cls, "paddle_torch_name_mapping"):
+            cls.paddle_torch_name_mapping = {}
         for name, value in state_dict.items():
             torch_name = name
             # step1: ignore position_ids
@@ -1125,12 +1129,11 @@ if is_paddle_available() and is_paddlenlp_available():
                 name = "clip." + name
             new_model_state[name] = value
 
-            paddle_torch_name_mapping[name] = torch_name
+            cls.paddle_torch_name_mapping[name] = torch_name
 
-        cls.paddle_torch_name_mapping = paddle_torch_name_mapping
         if cls in [PaintByExampleImageEncoder]:
             # convert mapper
-            mappersd = convert_pytorch_state_dict_to_paddle(state_dict, pd_model, sub_layer="mapper.")
+            mappersd = cls.smart_convert(state_dict, pd_model, sub_layer="mapper.")
             new_model_state.update(mappersd)
 
         return new_model_state
@@ -1163,8 +1166,8 @@ if is_paddle_available() and is_paddlenlp_available():
         }
         ignore_value = ["position_ids"]
         donot_transpose = ["embeddings", "norm"]
-        paddle_torch_name_mapping = {}
-
+        if not hasattr(cls, "paddle_torch_name_mapping"):
+            cls.paddle_torch_name_mapping = {}
         for name, value in state_dict.items():
             torch_name = name
             # step1: ignore position_ids
@@ -1177,9 +1180,7 @@ if is_paddle_available() and is_paddlenlp_available():
             for hf_name, ppnlp_name in name_mapping_dict.items():
                 name = name.replace(hf_name, ppnlp_name)
             new_model_state[name] = value
-            paddle_torch_name_mapping[name] = torch_name
-
-        cls.paddle_torch_name_mapping = paddle_torch_name_mapping
+            cls.paddle_torch_name_mapping[name] = torch_name
 
         return new_model_state
 
@@ -1198,7 +1199,8 @@ if is_paddle_available() and is_paddlenlp_available():
         ignore_value = ["to_logits"]
         donot_transpose = ["embed_tokens", "embed_positions", "norm"]
         new_model_state = {}
-        paddle_torch_name_mapping = {}
+        if not hasattr(cls, "paddle_torch_name_mapping"):
+            cls.paddle_torch_name_mapping = {}
         for name, value in state_dict.items():
             torch_name = name
             # step1: ignore to_logits
@@ -1211,9 +1213,7 @@ if is_paddle_available() and is_paddlenlp_available():
             for hf_name, ppnlp_name in transformers2ppnlp.items():
                 name = name.replace(hf_name, ppnlp_name)
             new_model_state[name] = value
-            paddle_torch_name_mapping[name] = torch_name
-
-        cls.paddle_torch_name_mapping = paddle_torch_name_mapping
+            cls.paddle_torch_name_mapping[name] = torch_name
 
         return new_model_state
 
@@ -1233,8 +1233,8 @@ if is_paddle_available() and is_paddlenlp_available():
     for cls_ in [BertModel, RobertaSeriesModelWithTransformation]:
         setattr(cls_, "smart_convert", bert_smart_convert)
 
-    for cls_ in [DPTForDepthEstimation, BitBackbone, SpeechT5HifiGan, ClapTextModelWithProjection]:
-        setattr(cls_, "smart_convert", convert_pytorch_state_dict_to_paddle)
+    for cls_ in [DPTForDepthEstimation, BitBackbone, SpeechT5HifiGan, ClapTextModelWithProjection, T5EncoderModel]:
+        setattr(cls_, "smart_convert", convert_pytorch_state_dict_to_paddle_class_method)
 
     # TODO remove this when we updage ImageProcessingMixin
     # patch get_image_processor_dict support subfolder.

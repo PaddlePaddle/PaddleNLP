@@ -58,6 +58,49 @@ def convert_pytorch_state_dict_to_paddle(pt_state_dict, paddle_model: nn.Layer, 
     return paddle_state_dict
 
 
+@classmethod
+def convert_pytorch_state_dict_to_paddle_class_method(cls, pt_state_dict, paddle_model: nn.Layer, sub_layer=None):
+    # Step 1: Find Linear layer which need transpose weight
+    linear_need_transpose = []
+    for k, v in paddle_model.named_sublayers(include_self=True):
+        if isinstance(v, nn.Linear):
+            if sub_layer is not None and sub_layer not in k:
+                continue
+            linear_need_transpose.append(k + ".weight")
+
+    paddle_state_dict = {}
+    ignore_keys = ["position_ids", ".num_batches_tracked"]
+    ptname2pdname = {
+        # torch.nn.BatchNorm2d -> paddle.nn.BatchNorm2D
+        ".running_var": "._variance",
+        ".running_mean": "._mean",
+    }
+    if not hasattr(cls, "paddle_torch_name_mapping"):
+        cls.paddle_torch_name_mapping = {}
+    # Need to change some parameters name to match paddle names
+    for pt_key, pt_tensor in pt_state_dict.items():
+        torch_name = pt_key
+        # only convert sub_layer state dict
+        if sub_layer is not None and sub_layer not in pt_key:
+            continue
+        # (0) ignore_keys
+        if any(i in pt_key for i in ignore_keys):
+            continue
+        # (1) transpose linear
+        if pt_key in linear_need_transpose and pt_tensor.ndim == 2:
+            pt_tensor = pt_tensor.T
+        # (2) 0d tensor -> 1d tensor
+        if pt_tensor.ndim == 0:
+            pt_tensor = pt_tensor.reshape((1,))
+        # (3) name mapping
+        for old_key, new_key in ptname2pdname.items():
+            pt_key = pt_key.replace(old_key, new_key)
+
+        cls.paddle_torch_name_mapping[pt_key] = torch_name
+        paddle_state_dict[pt_key] = pt_tensor
+    return paddle_state_dict
+
+
 def convert_paddle_state_dict_to_pytorch(pd_state_dict, paddle_model: nn.Layer):
     # Step 2: Find Linear layer which need transpose weight
     linear_need_transpose = []
