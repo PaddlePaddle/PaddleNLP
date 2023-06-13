@@ -214,10 +214,11 @@ python -u  -m paddle.distributed.launch \
 
 ```shell
 python -u  -m paddle.distributed.fleet.launch \
-    --gpus "0,1,2,3" finetune_instruction_generation.py \
+    --gpus "0,1,2,3" finetune_generation.py \
     --model_name_or_path facebook/llama-7b \
     --do_train \
     --do_eval \
+    --instruction_generation \
     --num_train_epochs 1 \
     --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
@@ -227,14 +228,12 @@ python -u  -m paddle.distributed.fleet.launch \
     --logging_steps 10 \
     --fp16 \
     --fp16_opt_level O2 \
+    --gradient_accumulation_steps 32 \
     --recompute \
     --learning_rate 3e-5 \
     --lr_scheduler_type linear \
     --max_grad_norm 1.0 \
-    --warmup_steps 20 \
-    --gradient_accumulation_steps 32 \
-    --logging_steps 1 \
-    --eval_steps 1000
+    --warmup_steps 20
 ```
 
 <a name="2"></a>

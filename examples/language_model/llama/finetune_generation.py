@@ -17,9 +17,19 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-from data import DataCollatorForSupervisedDataset, convert_example
+from data import (
+    DataCollatorForSupervisedDataset,
+    convert_example,
+    custom_instruction_convert_example,
+    reader,
+)
 from modeling_pp import LlamaForCausalLMPipe
-from utils import LlamaTrainer, compute_metrics, save_infer_result
+from utils import (
+    LlamaTrainer,
+    compute_metrics,
+    compute_metrics_not_do_generation,
+    save_infer_result,
+)
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
@@ -36,9 +46,11 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class DataArgument:
+    # task_name: str = field(default="school_math_0.25M", metadata={"help": "The name of task."})
+    # data_name: str = field(default="bellegroup", metadata={"help": "The name of data."})
     task_name: str = field(default="squad", metadata={"help": "The name of task."})
-    src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
-    tgt_length: int = field(default=142, metadata={"help": "The max length of target text."})
+    src_length: int = field(default=608, metadata={"help": "The max length of source text."})
+    tgt_length: int = field(default=160, metadata={"help": "The max length of target text."})
     min_tgt_length: int = field(default=0, metadata={"help": "The min length of target text."})
     length_penalty: float = field(default=0.7, metadata={"help": "The length penalty."})
     no_repeat_ngram_size: int = field(default=3, metadata={"help": "The no repeat ngram size."})
@@ -61,7 +73,7 @@ class ModelArgument:
     model_name_or_path: str = field(
         default="facebook/llama-7b", metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
-    # label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
+    label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
     r: int = field(default=4, metadata={"help": "Lora attention dimension"})
@@ -75,17 +87,27 @@ class ModelArgument:
     eval_with_do_generation: bool = field(
         default=True, metadata={"help": "Evaluate with generation, instead for calc loss."}
     )
+    instruction_generation: bool = field(default=False, metadata={"help": "Instruction generation finetuning"})
+    benchmark: bool = field(
+        default=False,
+        metadata={"help": "Whether or not run benchmark."},
+    )
+    profiler_options: str = field(
+        default=None,
+        metadata={"help": "profiler_options."},
+    )
 
 
 def main():
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    # data_args.always_pad_to_max_length = False
     data_args.always_pad_to_max_length = training_args.pipeline_parallel_degree > 1
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
-    # setattr(training_args, "label_smoothing", model_args.label_smoothing)
+    training_args.benchmark = model_args.benchmark
+    training_args.profiler_options = model_args.profiler_options
+    setattr(training_args, "label_smoothing", model_args.label_smoothing)
     setattr(training_args, "lr_decay_ratio", model_args.lr_decay_ratio)
 
     paddle.set_device(training_args.device)
@@ -178,10 +200,18 @@ def main():
     )
     tokenizer.pad_token = tokenizer.unk_token
 
+    trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
     # Load the dataset.
-    if training_args.do_train or training_args.do_eval:
-        train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train_v1", "dev_v1"])
-        trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
+    if training_args.benchmark:
+        train_ds = load_dataset(reader, data_path="./data/train.txt", lazy=False)
+        training_args.do_eval = False
+        data_args.always_pad_to_max_length = True
+    elif training_args.do_train or training_args.do_eval:
+        if model_args.instruction_generation:
+            train_ds, dev_ds = load_dataset("bellegroup", "school_math_0.25M", splits=["train", "dev"])
+        else:
+            train_ds, dev_ds = load_dataset("squad", splits=["train_v1", "dev_v1"])
+            trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
 
     if training_args.do_train:
         train_ds = train_ds.map(partial(trans_func))
@@ -190,8 +220,9 @@ def main():
         is_test = model_args.eval_with_do_generation
         dev_ds = dev_ds.map(partial(trans_func, is_test=is_test))
 
+    model_max_length = 1024 if not training_args.benchmark else 512
     collate_fn = DataCollatorForSupervisedDataset(
-        tokenizer, max_length=1024 if data_args.always_pad_to_max_length else 0
+        tokenizer, max_length=model_max_length if data_args.always_pad_to_max_length else -1
     )
 
     def compute_metrics_trainer(eval_preds, tokenizer):
@@ -223,8 +254,8 @@ def main():
         eval_dataset=dev_ds if training_args.do_eval else None,
         tokenizer=tokenizer,
         compute_metrics=compute_metrics_func
-        if (model_args.eval_with_do_generation and training_args.do_eval)
-        else None,
+        if model_args.eval_with_do_generation
+        else compute_metrics_not_do_generation,
         do_generation=model_args.eval_with_do_generation,
         data_collator=collate_fn,
     )
