@@ -56,6 +56,7 @@ python -u  -m paddle.distributed.launch \
     --scale_loss 1024 \
     --learning_rate 0.00001 \
     --min_learning_rate 0.000005 \
+    --lr_scheduler_type "cosine" \
     --max_steps 10000 \
     --save_steps 5000 \
     --weight_decay 0.01 \
@@ -73,6 +74,12 @@ python -u  -m paddle.distributed.launch \
     --do_eval \
     --device "gpu"
 ```
+注意：
+1. 需要paddle develop版本训练，需要安装`pip install tool_helpers visualdl=2.5.3`等相关缺失whl包
+2. `use_flash_attention` 需要在A100机器开启，否则loss可能不正常（很快变成0.00x,非常小不正常）。建议使用cuda11.8环境。
+3. `continue_training` 表示从现有的预训练模型加载训练。7b模型初始loss大概为1.99x, 随机初始化模型loss从11.x左右下降。
+4. `use_fused_rms_norm` 需要安装[此目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt-3/external_ops)下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置PYTHONPATH
+5. 当前脚本为sharding版本，需要4D并行训练（数据、sharding、张量、流水线并行）的用户，请参考 `run_trainer_tp4pp2.sh`脚本。
 
 <a name="1"></a>
 
