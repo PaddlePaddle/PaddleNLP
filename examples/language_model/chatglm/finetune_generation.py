@@ -135,6 +135,7 @@ def main():
             enable_lora_list=enable_lora_list,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,
+            head_dim=model.config.hidden_size // model.config.num_attention_heads,
         )
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()
