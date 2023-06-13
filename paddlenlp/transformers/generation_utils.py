@@ -1320,6 +1320,7 @@ class GenerationMixin(object):
         )
 
         beam_scores = paddle.zeros((batch_size, num_beams), dtype=paddle.get_default_dtype())
+
         beam_scores[:, 1:] = get_scale_by_dtype(return_positive=False)
         beam_scores = paddle.reshape(beam_scores, [-1])
 
