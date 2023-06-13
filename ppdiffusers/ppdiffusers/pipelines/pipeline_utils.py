@@ -159,21 +159,6 @@ class AudioPipelineOutput(BaseOutput):
     audios: np.ndarray
 
 
-def str2bool(variable):
-    if isinstance(variable, bool):
-        return variable
-
-    if not isinstance(variable, str):
-        variable = str(variable)
-
-    if variable.lower() == "false":
-        return False
-    elif variable.lower() == "true":
-        return True
-    else:
-        raise ValueError("Not supported value: {}".format(variable))
-
-
 def is_safetensors_compatible(filenames, variant=None, passed_components=None) -> bool:
     """
     Checking for safetensors compatibility:
@@ -940,7 +925,7 @@ class DiffusionPipeline(ConfigMixin):
         local_files_only = kwargs.pop("local_files_only", HF_HUB_OFFLINE)
         use_auth_token = kwargs.pop("use_auth_token", None)
         revision = kwargs.pop("revision", None)
-        from_diffusers = kwargs.pop("from_diffusers", str2bool(FROM_DIFFUSERS))
+        from_diffusers = kwargs.pop("from_diffusers", FROM_DIFFUSERS)
         paddle_dtype = kwargs.pop("paddle_dtype", None)
         custom_pipeline = kwargs.pop("custom_pipeline", None)
         custom_revision = kwargs.pop("custom_revision", None)
@@ -948,7 +933,7 @@ class DiffusionPipeline(ConfigMixin):
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", LOW_CPU_MEM_USAGE_DEFAULT)
         use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
         variant = kwargs.pop("variant", None)
-        from_hf_hub = kwargs.pop("from_hf_hub", str2bool(FROM_HF_HUB))
+        from_hf_hub = kwargs.pop("from_hf_hub", FROM_HF_HUB)
 
         # deperate
         return_cached_folder = kwargs.pop("return_cached_folder", False)
@@ -1248,7 +1233,7 @@ class DiffusionPipeline(ConfigMixin):
         cache_dir = (
             kwargs.pop("cache_dir", DIFFUSERS_CACHE) if from_hf_hub else kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
         )
-        from_diffusers = kwargs.pop("from_diffusers", str2bool(FROM_DIFFUSERS))
+        from_diffusers = kwargs.pop("from_diffusers", FROM_DIFFUSERS)
         resume_download = kwargs.pop("resume_download", False)
         force_download = kwargs.pop("force_download", False)
         proxies = kwargs.pop("proxies", None)
