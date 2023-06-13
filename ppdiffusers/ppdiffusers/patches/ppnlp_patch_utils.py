@@ -326,6 +326,7 @@ if is_paddle_available() and is_paddlenlp_available():
     import paddlenlp.transformers
     from paddlenlp import __version__
     from paddlenlp.transformers import PretrainedConfig, PretrainedModel
+    from paddlenlp.transformers.model_utils import no_init_weights
     from paddlenlp.utils.log import logger as ppnlp_logger
 
     # set logger level warning
@@ -823,7 +824,7 @@ if is_paddle_available() and is_paddlenlp_available():
 
         if low_cpu_mem_usage:
             # Instantiate model.
-            init_contexts.append(paddle.no_init_weights(_enable=True))
+            init_contexts.append(no_init_weights(_enable=True))
             if hasattr(paddle, "LazyGuard"):
                 init_contexts.append(paddle.LazyGuard())
 

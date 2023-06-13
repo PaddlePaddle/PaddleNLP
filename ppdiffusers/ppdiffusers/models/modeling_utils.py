@@ -36,6 +36,7 @@ from ..utils import (
     _add_variant,
     _get_model_file,
     deprecate,
+    is_paddlenlp_available,
     is_safetensors_available,
     is_torch_available,
     is_torch_file,
@@ -59,6 +60,9 @@ if is_safetensors_available():
 
 if is_torch_available():
     import torch
+
+if is_paddlenlp_available:
+    from paddlenlp.transformers.model_utils import no_init_weights
 
 
 def get_parameter_device(parameter: nn.Layer):
@@ -544,7 +548,7 @@ class ModelMixin(nn.Layer):
 
         if low_cpu_mem_usage:
             # Instantiate model.
-            init_contexts.append(paddle.no_init_weights(_enable=True))
+            init_contexts.append(no_init_weights(_enable=True))
             if hasattr(paddle, "LazyGuard"):
                 init_contexts.append(paddle.LazyGuard())
 
