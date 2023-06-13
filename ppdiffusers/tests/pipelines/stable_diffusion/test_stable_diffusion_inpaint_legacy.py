@@ -34,7 +34,7 @@ from ppdiffusers import (
     VQModel,
 )
 from ppdiffusers.utils import floats_tensor, load_image, nightly, slow
-from ppdiffusers.utils.testing_utils import load_numpy, require_paddle_gpu
+from ppdiffusers.utils.testing_utils import load_numpy, preprocess_image, require_paddle_gpu
 
 
 class StableDiffusionInpaintLegacyPipelineFastTests(unittest.TestCase):
@@ -203,6 +203,53 @@ class StableDiffusionInpaintLegacyPipelineFastTests(unittest.TestCase):
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
         assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 0.01
 
+    def test_stable_diffusion_inpaint_legacy_batched(self):
+        unet = self.dummy_cond_unet
+        scheduler = PNDMScheduler(skip_prk_steps=True)
+        vae = self.dummy_vae
+        bert = self.dummy_text_encoder
+        tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
+
+        image = self.dummy_image.permute(0, 2, 3, 1)[0]
+        init_image = Image.fromarray(np.uint8(image)).convert("RGB")
+        init_images_tens = preprocess_image(init_image, batch_size=2)
+        init_masks_tens = init_images_tens + 4
+
+        # make sure here that pndm scheduler skips prk
+        sd_pipe = StableDiffusionInpaintPipelineLegacy(
+            unet=unet,
+            scheduler=scheduler,
+            vae=vae,
+            text_encoder=bert,
+            tokenizer=tokenizer,
+            safety_checker=None,
+            feature_extractor=self.dummy_extractor,
+        )
+        sd_pipe.set_progress_bar_config(disable=None)
+
+        prompt = "A painting of a squirrel eating a burger"
+        generator = paddle.Generator().manual_seed(0)
+        images = sd_pipe(
+            [prompt] * 2,
+            generator=generator,
+            guidance_scale=6.0,
+            num_inference_steps=2,
+            output_type="np",
+            image=init_images_tens,
+            mask_image=init_masks_tens,
+        ).images
+
+        assert images.shape == (2, 32, 32, 3)
+
+        image_slice_0 = images[0, -3:, -3:, -1].flatten()
+        image_slice_1 = images[1, -3:, -3:, -1].flatten()
+
+        expected_slice_0 = np.array([0.36070424, 0.6893935 , 0.5395819 , 0.43957978, 0.52270013, 0.41502672, 0.5263115 , 0.57829964, 0.61257005])
+        expected_slice_1 = np.array([0.5639288 , 0.6165064 , 0.6162699 , 0.6441643 , 0.56632555, 0.39611217, 0.62690437, 0.5277921 , 0.5135379])
+
+        assert np.abs(expected_slice_0 - image_slice_0).max() < 1e-2
+        assert np.abs(expected_slice_1 - image_slice_1).max() < 1e-2
+
     def test_stable_diffusion_inpaint_legacy_negative_prompt(self):
         unet = self.dummy_cond_unet
         scheduler = PNDMScheduler(skip_prk_steps=True)
@@ -302,13 +349,13 @@ class StableDiffusionInpaintLegacyPipelineSlowTests(unittest.TestCase):
         gc.collect()
         paddle.device.cuda.empty_cache()
 
-    def get_inputs(self, dtype="float32", seed=0):
+    def get_inputs(self, seed=0):
         generator = paddle.Generator().manual_seed(seed)
         init_image = load_image(
-            "https://huggingface.co/datasets/diffusers/test-arrays/resolve/main/stable_diffusion_inpaint/input_bench_image.png"
+            "https://paddlenlp.bj.bcebos.com/data/images/input_bench_image.png"
         )
         mask_image = load_image(
-            "https://huggingface.co/datasets/diffusers/test-arrays/resolve/main/stable_diffusion_inpaint/input_bench_mask.png"
+            "https://paddlenlp.bj.bcebos.com/data/images/input_bench_mask.png"
         )
         inputs = {
             "prompt": "A red cat sitting on a park bench",
@@ -336,6 +383,39 @@ class StableDiffusionInpaintLegacyPipelineSlowTests(unittest.TestCase):
             [0.27226633, 0.29068208, 0.3450312, 0.21444553, 0.26328486, 0.34392387, 0.18026042, 0.24961185, 0.3214044]
         )
         assert np.abs(expected_slice - image_slice).max() < 0.0001
+    
+    def test_stable_diffusion_inpaint_legacy_batched(self):
+        pipe = StableDiffusionInpaintPipelineLegacy.from_pretrained(
+            "CompVis/stable-diffusion-v1-4", safety_checker=None
+        )
+        pipe.set_progress_bar_config(disable=None)
+        pipe.enable_attention_slicing()
+
+        inputs = self.get_inputs()
+        inputs["prompt"] = [inputs["prompt"]] * 2
+        inputs["image"] = preprocess_image(inputs["image"], batch_size=2)
+
+        mask = inputs["mask_image"].convert("L")
+        mask = np.array(mask).astype(np.float32) / 255.0
+        mask = paddle.to_tensor(1 - mask)
+        masks = paddle.stack([mask[None]] * 2, axis=0)
+        inputs["mask_image"] = masks
+
+        image = pipe(**inputs).images
+        assert image.shape == (2, 512, 512, 3)
+
+        image_slice_0 = image[0, 253:256, 253:256, -1].flatten()
+        image_slice_1 = image[1, 253:256, 253:256, -1].flatten()
+
+        expected_slice_0 = np.array(
+            [0.27526367, 0.29158682, 0.35184938, 0.21504477, 0.26708275, 0.35169, 0.18185198, 0.2572803 , 0.32425082]
+        )
+        expected_slice_1 = np.array(
+            [0.        , 0.18929192, 0.7068148 , 0.07977328, 0.13444492, 0.5016247 , 0.49761847, 0.2830933 , 0.36412603] 
+        )
+
+        assert np.abs(expected_slice_0 - image_slice_0).max() < 1e-4
+        assert np.abs(expected_slice_1 - image_slice_1).max() < 1e-4
 
     def test_stable_diffusion_inpaint_legacy_k_lms(self):
         pipe = StableDiffusionInpaintPipelineLegacy.from_pretrained(
@@ -379,7 +459,7 @@ class StableDiffusionInpaintLegacyPipelineSlowTests(unittest.TestCase):
         )
         pipe.set_progress_bar_config(disable=None)
         pipe.enable_attention_slicing()
-        inputs = self.get_inputs(dtype="float16")
+        inputs = self.get_inputs()
         pipe(**inputs, callback=callback_fn, callback_steps=1)
         assert callback_fn.has_been_called
         assert number_of_steps == 2
