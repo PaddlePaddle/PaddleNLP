@@ -59,7 +59,6 @@ from paddlenlp.utils.env import (
 )
 from paddlenlp.utils.log import logger
 
-from ..utils import device_guard
 from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
 from .generation_utils import GenerationMixin
@@ -67,6 +66,7 @@ from .utils import (
     ContextManagers,
     InitTrackerMeta,
     adapt_stale_fwd_patch,
+    convert_ndarray_dtype,
     fn_args_to_dict,
     is_paddle_support_lazy_init,
     resolve_cache_dir,
@@ -992,6 +992,20 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         raise FileNotFoundError(msg)
 
     @classmethod
+    def keep_in_fp32_modules(cls, key: str, config: PretrainedConfig, dtype: str) -> bool:
+        """should keep parameter in fp32
+
+        Args:
+            key (str): key of state-dict
+            config (PretrainedConfig): the instance of current pretrianed model
+            dtype (str): the source dtype
+
+        Returns:
+            bool: whether keep parameter in fp32 dtype
+        """
+        return False
+
+    @classmethod
     def _load_pretrained_model(
         cls,
         model: PretrainedModel,
@@ -1126,16 +1140,29 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 raise ValueError(
                     f"the value of `dtype` should be one of [`float32`, `float16`, `bfloat16`], but received {dtype}"
                 )
+            for key in state_dict.keys():
+                target_dtype = dtype
+                if isinstance(state_dict[key], np.ndarray):
+                    if not issubclass(state_dict[key].dtype.type, np.floating):
+                        continue
 
-            for key in list(state_dict.keys()):
-                if isinstance(state_dict[key], np.ndarray) and issubclass(state_dict[key].dtype.type, np.floating):
-                    if dtype == "bfloat16":
-                        with device_guard():
-                            state_dict[key] = paddle.Tensor(state_dict.pop(key), zero_copy=True)
-                    else:
-                        state_dict[key] = state_dict[key].astype(dtype=dtype)
-                if isinstance(state_dict[key], paddle.Tensor) and state_dict[key].is_floating_point():
-                    state_dict[key] = paddle.cast(state_dict[key], dtype=dtype)
+                    # TODO(wj-Mcat): add `keep_in_fp32` feature to enable hybrid fp32 state-dict
+                    # this is the temp hard code for fused-mt transformer
+                    if model.keep_in_fp32_modules(key, model.config, dtype):
+                        target_dtype = "float32"
+                    state_dict[key] = convert_ndarray_dtype(state_dict[key], target_dtype)
+
+                elif isinstance(state_dict[key], paddle.Tensor):
+                    if not state_dict[key].is_floating_point():
+                        continue
+
+                    # TODO(wj-Mcat): add `keep_in_fp32` feature to enable hybrid fp32 state-dict
+                    # this is the temp hard code for fused-mt transformer
+                    if model.keep_in_fp32_modules(key, model.config, dtype):
+                        target_dtype = "float32"
+                    state_dict[key] = paddle.cast(state_dict[key], dtype=target_dtype)
+                else:
+                    raise ValueError(f"the dtype<{state_dict[key].dtype}> of current state-dict[{key}] is not valid")
         else:
             dtype_prefix_len = len("paddle.")
             for k, v in model_to_load.state_dict().items():
