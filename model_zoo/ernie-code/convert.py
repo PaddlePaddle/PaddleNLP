@@ -43,6 +43,7 @@ def convert_pytorch_checkpoint_to_paddle(pytorch_checkpoint_path, paddle_dump_pa
 
         if k != "lm_head.weight":
             k = "mt5." + k
+        # The bf16 data of torch cannot be directly converted to paddle
         paddle_state_dict[k] = paddle.to_tensor(v.to(torch.float32).numpy()).cast(paddle.bfloat16).numpy()
 
     paddle.save(paddle_state_dict, paddle_dump_path)
@@ -52,14 +53,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--pytorch_checkpoint_path",
-        default="/home/models/codem-models/ds.ernie_codem.mt5-base.maxlen512.resume2/step_3500/pytorch_model.bin",
+        default="/home/models/pytorch_model.bin",
         type=str,
         required=False,
         help="Path to the Pytorch checkpoint path.",
     )
     parser.add_argument(
         "--paddle_dump_path",
-        default="/home/models/codem-models/ds.ernie_codem.mt5-base.maxlen512.resume2/step_3500/model_state.pdparams",
+        default="/home/models/model_state.pdparams",
         type=str,
         required=False,
         help="Path to the output Paddle model.",

@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import argparse
 
 import numpy as np
@@ -18,19 +19,18 @@ import paddle
 
 from paddlenlp.transformers import MT5ForConditionalGeneration, T5Tokenizer
 
-parser = argparse.ArgumentParser("seq2seq model with ERNIE-CODE")
+parser = argparse.ArgumentParser("ERNIE-CODE")
 parser.add_argument(
     "--model_name_or_path",
     default="ernie-code-base",
     type=str,
 )
-parser.add_argument("--source_lang", default="code", type=str)
-parser.add_argument("--target_lang", default="text", type=str)
+parser.add_argument("--source_lang", default="text", type=str)
+parser.add_argument("--target_lang", default="code", type=str)
 parser.add_argument("--source_prefix", default="translate Japanese to Python: \n", type=str)
 parser.add_argument("--max_length", type=int, default=1024)
 parser.add_argument("--num_beams", type=int, default=3)
 parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"])
-
 
 args = parser.parse_args()
 
@@ -58,15 +58,16 @@ def predict():
         preds = [clean_up_codem_spaces(pred).strip() for pred in preds]
         return preds
 
+    paddle.set_device(args.device)
+    tokenizer = T5Tokenizer.from_pretrained(args.model_name_or_path)
+    model = MT5ForConditionalGeneration.from_pretrained(args.model_name_or_path)
+    prefix = args.source_prefix if args.source_prefix is not None else ""
+
     def preprocess_function(inputs, tokenizer):
         inputs = [prefix + inp for inp in inputs]
         model_inputs = tokenizer(inputs, max_length=args.max_length)
         return model_inputs
 
-    paddle.set_device(args.device)
-    tokenizer = T5Tokenizer.from_pretrained(args.model_name_or_path)
-    model = MT5ForConditionalGeneration.from_pretrained(args.model_name_or_path)
-    prefix = args.source_prefix if args.source_prefix is not None else ""
     dev_dataset = ["BadZipFileのAliasは、古い Python バージョンとの互換性のために。"]
     model_inputs = preprocess_function(dev_dataset, tokenizer)
 
@@ -89,7 +90,7 @@ def predict():
     elif args.target_lang == "code":
         decoded_preds = tokenizer.batch_decode(
             generated_tokens.numpy(), skip_special_tokens=False, clean_up_tokenization_spaces=False
-        )  # codem
+        )
         decoded_preds = postprocess_code(decoded_preds)
     print(decoded_preds)
 
