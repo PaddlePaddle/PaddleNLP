@@ -22,8 +22,25 @@ from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 
+"""
+单卡
+python bloom_nl2sql.py --model_name_or_path bigscience/bloomz-3b  \
+    --train_file nl2sql/dev.jsonl --validation_file nl2sql/dev.jsonl \
+    --num_train_epochs 1 --per_device_train_batch_size 4 \
+    --evaluation_strategy epoch --save_strategy epoch \
+    --fp16 --fp16_opt_level O2 \
+    --logging_steps 50 --output_dir outputs
 
-# python bloom_nl2sql.py --model_name_or_path bigscience/bloomz-3b --train_file nl2sql/train.jsonl --validation_file nl2sql/dev.jsonl
+多卡
+python bloom_nl2sql.py --model_name_or_path bigscience/bloomz-3b  \
+    --train_file nl2sql/dev.jsonl --validation_file nl2sql/dev.jsonl \
+    --num_train_epochs 1 --per_device_train_batch_size 4 \
+    --evaluation_strategy epoch --save_strategy epoch \
+    --fp16 --fp16_opt_level O2 \
+    --logging_steps 50 --output_dir outputs
+"""
+
+
 @dataclass
 class ModelArguments:
     """
@@ -45,29 +62,29 @@ class DataTrainingArguments:
 
 
 def main():
-    parser = PdArgumentParser((ModelArguments, DataTrainingArguments))
-    model_args, data_args = parser.parse_args_into_dataclasses()
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
+    parser = PdArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    training_args = TrainingArguments(
-        per_device_train_batch_size=8,
-        evaluation_strategy="epoch",
-        save_strategy="epoch",
-        num_train_epochs=1,
-        learning_rate=2e-4,
-        fp16=True,
-        fp16_opt_level="O1",
-        logging_steps=50,
-        output_dir="outputs",
+    # Set the dtype for loading model
+    dtype = None
+    if training_args.fp16_opt_level == "O2":
+        if training_args.fp16:
+            dtype = "float16"
+        if training_args.bf16:
+            dtype = "bfloat16"
+
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_args.model_name_or_path,
+        load_state_as_np=True,
+        low_cpu_mem_usage=True,  # todo enable low_cpu_mem_usage=True
+        dtype=dtype,  # todo enable set dtype to avoid additional mem usage
+        tensor_parallel_degree=training_args.tensor_parallel_degree,
+        tensor_parallel_rank=training_args.tensor_parallel_rank,
+        use_recompute=training_args.recompute,
     )
+
     if model_args.lora:
-        dtype = model.config.dtype
-        if training_args.fp16_opt_level == "O2":
-            if training_args.fp16:
-                dtype = "float16"
-            if training_args.bf16:
-                dtype = "bfloat16"
         # hardcode parameters for now
         lora_config = LoRAConfig(
             target_modules=[".*query_key_value.*"],

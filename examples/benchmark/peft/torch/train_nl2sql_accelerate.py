@@ -30,6 +30,16 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
+"""
+多卡
+accelerate launch train_nl2sql_accelerate.py --model_name_or_path bigscience/bloomz-7b1-mt  \
+    --train_file nl2sql/dev.jsonl --validation_file nl2sql/dev.jsonl \
+    --num_train_epochs 1 --per_device_train_batch_size 4 \
+    --evaluation_strategy epoch --save_strategy epoch \
+    --fp16 \
+    --logging_steps 50 --output_dir outputs
+"""
+
 
 @dataclass
 class ModelArguments:
@@ -53,22 +63,22 @@ class DataTrainingArguments:
 
 def main():
     accelerator = Accelerator()
-    parser = HfArgumentParser((ModelArguments, DataTrainingArguments))
-    model_args, data_args = parser.parse_args_into_dataclasses()
+    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
 
-    training_args = TrainingArguments(
-        per_device_train_batch_size=4,
-        evaluation_strategy="epoch",
-        save_strategy="epoch",
-        num_train_epochs=1,
-        learning_rate=2e-4,
-        fp16=True,
-        fp16_opt_level="O2",
-        logging_steps=50,
-        output_dir="outputs",
-    )
+    # training_args = TrainingArguments(
+    #     per_device_train_batch_size=2,
+    #     evaluation_strategy="epoch",
+    #     save_strategy="epoch",
+    #     num_train_epochs=1,
+    #     learning_rate=2e-4,
+    #     fp16=True,
+    #     fp16_opt_level="O2",
+    #     logging_steps=50,
+    #     output_dir="outputs",
+    # )
 
     if model_args.lora:
         target_modules = ["query_key_value"]
@@ -118,7 +128,7 @@ def main():
         model, train_dataloader, optimizer, lr_scheduler
     )
 
-    for epoch in range(training_args.num_train_epochs):
+    for epoch in range(int(training_args.num_train_epochs)):
         model.train()
         for step, batch in enumerate(tqdm(train_dataloader)):
             outputs = model(**batch)

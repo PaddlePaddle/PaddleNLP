@@ -26,8 +26,17 @@ from transformers import (
     TrainingArguments,
 )
 
+"""
+单卡
+python train_nl2sql.py --model_name_or_path bigscience/bloomz-3b  \
+    --train_file nl2sql/dev.jsonl --validation_file nl2sql/dev.jsonl \
+    --num_train_epochs 1 --per_device_train_batch_size 4 \
+    --evaluation_strategy epoch --save_strategy epoch \
+    --fp16 \
+    --logging_steps 50 --output_dir outputs
+"""
 
-# python bloom_nl2sql.py --model_name_or_path bigscience/bloomz-3b --train_file nl2sql/train.jsonl --validation_file nl2sql/dev.jsonl
+
 @dataclass
 class ModelArguments:
     """
@@ -49,22 +58,22 @@ class DataTrainingArguments:
 
 
 def main():
-    parser = HfArgumentParser((ModelArguments, DataTrainingArguments))
-    model_args, data_args = parser.parse_args_into_dataclasses()
+    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
 
-    training_args = TrainingArguments(
-        per_device_train_batch_size=8,
-        evaluation_strategy="epoch",
-        save_strategy="epoch",
-        num_train_epochs=1,
-        learning_rate=2e-4,
-        fp16=True,
-        fp16_opt_level="O1",
-        logging_steps=50,
-        output_dir="outputs",
-    )
+    # training_args = TrainingArguments(
+    #     per_device_train_batch_size=4,
+    #     evaluation_strategy="epoch",
+    #     save_strategy="epoch",
+    #     num_train_epochs=1,
+    #     learning_rate=2e-4,
+    #     fp16=True,
+    #     fp16_opt_level="O2",
+    #     logging_steps=50,
+    #     output_dir="outputs",
+    # )
 
     if model_args.lora:
         target_modules = ["query_key_value"]
