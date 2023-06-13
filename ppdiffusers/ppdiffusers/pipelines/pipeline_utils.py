@@ -1073,6 +1073,9 @@ class DiffusionPipeline(ConfigMixin):
             if class_name.startswith("Flax"):
                 class_name = class_name[4:]
 
+            if class_name.endswith("TokenizerFast"):
+                class_name = class_name[:-4]
+
             # 6.2 Define all importable classes
             is_pipeline_module = hasattr(pipelines, library_name)
             importable_classes = ALL_IMPORTABLE_CLASSES if is_pipeline_module else LOADABLE_CLASSES[library_name]
