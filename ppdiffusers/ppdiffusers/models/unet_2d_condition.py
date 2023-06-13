@@ -596,6 +596,10 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
         sample = self.conv_in(sample)
 
         # 3. down
+
+        is_controlnet = mid_block_additional_residual is not None and down_block_additional_residuals is not None
+        is_adapter = mid_block_additional_residual is None and down_block_additional_residuals is not None
+
         down_block_res_samples = (sample,)
 
         # ! resnet_pre_temb_non_linearity
@@ -603,27 +607,36 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
 
         for downsample_block in self.down_blocks:
             if hasattr(downsample_block, "has_cross_attention") and downsample_block.has_cross_attention:
+                additional_kwargs = {}
+                if is_adapter and len(down_block_additional_residuals) > 0:
+                    additional_kwargs["additional_residuals"] = down_block_additional_residuals.pop(0)
+
                 sample, res_samples = downsample_block(
                     hidden_states=sample,
                     temb=down_nonlinear_temb,
                     encoder_hidden_states=encoder_hidden_states,
                     attention_mask=attention_mask,
                     cross_attention_kwargs=cross_attention_kwargs,
+                    **additional_kwargs,
                 )
             else:
                 sample, res_samples = downsample_block(hidden_states=sample, temb=down_nonlinear_temb)
 
+                if is_adapter and len(down_block_additional_residuals) > 0:
+                    sample += down_block_additional_residuals.pop(0)
+
+                # westfish: add to align with torch features
+                res_samples = tuple(res_samples[:-1]) + (sample,)
             down_block_res_samples += res_samples
 
-        if down_block_additional_residuals is not None:
+        if is_controlnet:
             new_down_block_res_samples = ()
 
             for down_block_res_sample, down_block_additional_residual in zip(
                 down_block_res_samples, down_block_additional_residuals
             ):
-                down_block_res_sample += down_block_additional_residual
+                down_block_res_sample = down_block_res_sample + down_block_additional_residual
                 new_down_block_res_samples += (down_block_res_sample,)
-
             down_block_res_samples = new_down_block_res_samples
 
         # 4. mid
@@ -636,7 +649,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                 cross_attention_kwargs=cross_attention_kwargs,
             )
 
-        if mid_block_additional_residual is not None:
+        if is_controlnet:
             sample += mid_block_additional_residual
 
         # 5. up
@@ -668,6 +681,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                     res_hidden_states_tuple=res_samples,
                     upsample_size=upsample_size,
                 )
+
         # 6. post-process
         if self.conv_norm_out:
             sample = self.conv_norm_out(sample)

@@ -19,7 +19,7 @@
 import importlib
 import json
 
-from ..layers.lora import LoRAModel
+from ..peft import LoRAModel, PrefixModelForCausalLM
 from ..transformers import PretrainedModel
 from ..utils.log import logger
 from .trainer_callback import TrainerCallback
@@ -98,7 +98,7 @@ class VisualDLCallback(TrainerCallback):
             self.vdl_writer.add_text("args", args.to_json_string())
             if "model" in kwargs:
                 model = kwargs["model"]
-                if isinstance(model, LoRAModel):
+                if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
                     model = kwargs["model"].model
                 if isinstance(model, PretrainedModel) and model.constructed_from_pretrained_config():
                     model.config.architectures = [model.__class__.__name__]

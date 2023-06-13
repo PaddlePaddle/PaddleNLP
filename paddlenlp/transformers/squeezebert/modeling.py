@@ -58,7 +58,9 @@ class SqueezeBertEmbeddings(nn.Layer):
         self.LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        self.register_buffer("position_ids", paddle.arange(config.max_position_embeddings).expand((1, -1)))
+        self.register_buffer(
+            "position_ids", paddle.arange(config.max_position_embeddings, dtype="int64").expand((1, -1))
+        )
 
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None):
         input_shape = input_ids.shape

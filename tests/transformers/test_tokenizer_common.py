@@ -72,7 +72,6 @@ class TokenizerTesterMixin:
     only_english_character: bool = True
 
     def setUp(self) -> None:
-
         tokenizers_list = [
             (
                 self.tokenizer_class,
@@ -345,8 +344,8 @@ class TokenizerTesterMixin:
         tokenizer_slow_2 = self.tokenizer_class.from_pretrained(tmpdirname_1)
         encoding_tokenizer_slow_2 = tokenizer_slow_2(text)
 
-        shutil.rmtree(tmpdirname_1)
         tokenizer_slow_2.save_pretrained(tmpdirname_2)
+        shutil.rmtree(tmpdirname_1)
 
         tokenizer_slow_3 = self.tokenizer_class.from_pretrained(tmpdirname_2)
         encoding_tokenizer_slow_3 = tokenizer_slow_3(text)

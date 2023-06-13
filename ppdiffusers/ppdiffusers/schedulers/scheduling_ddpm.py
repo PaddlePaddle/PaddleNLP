@@ -259,7 +259,7 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
         prev_t = timestep - self.config.num_train_timesteps // num_inference_steps
 
         if model_output.shape[1] == sample.shape[1] * 2 and self.variance_type in ["learned", "learned_range"]:
-            model_output, predicted_variance = paddle.split(model_output, sample.shape[1], axis=1)
+            model_output, predicted_variance = model_output.chunk(2, axis=1)
         else:
             predicted_variance = None
 
