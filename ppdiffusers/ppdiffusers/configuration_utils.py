@@ -26,7 +26,6 @@ from typing import Any, Dict, Tuple, Union
 
 import numpy as np
 import paddle
-from paddle import nn
 
 from .utils import (
     DIFFUSERS_CACHE,
@@ -605,7 +604,16 @@ def register_to_config(init):
     return inner_init
 
 
-def finfo(dtype):
+def finfo(dtype: paddle.dtype = None):
+    if dtype is None:
+        dtype = paddle.get_default_dtype()
+
+    if dtype == paddle.bfloat16:
+        # Numpy do not support `np.finfo(np.uint16)`, so try to construct a finfo object to fetch min value
+        class BFloatFInfo:
+            min = -3.3895313892515355e38
+
+        return BFloatFInfo
     if dtype == paddle.float32:
         return np.finfo(np.float32)
     if dtype == paddle.float16:
@@ -614,37 +622,10 @@ def finfo(dtype):
         return np.finfo(np.float64)
 
 
-def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
-    """get dtype of parameter which should be sub-class of nn.Layer
-
-    Args:
-        parameter (nn.Layer): the instance of layer
-
-    Returns:
-        paddle.dtype: the dtype of tensor
-    """
-
-    last_dtype = None
-    for t in parameter.parameters():
-        last_dtype = t.dtype
-        if t.is_floating_point():
-            return t.dtype
-
-    # TODO(wj-Mcat): get dtype of model when it's in DataParallel Mode.
-    return last_dtype
-
-
 class ModuleUtilsMixin:
     """
     A few utilities for `torch.nn.Modules`, to be used as a mixin.
     """
-
-    @property
-    def dtype(self) -> paddle.dtype:
-        """
-        `torch.dtype`: The dtype of the module (assuming that all the module parameters have the same dtype).
-        """
-        return get_parameter_dtype(self)
 
     def get_extended_attention_mask(
         self, attention_mask: paddle.Tensor, input_shape: Tuple[int], dtype: paddle.float32 = None
