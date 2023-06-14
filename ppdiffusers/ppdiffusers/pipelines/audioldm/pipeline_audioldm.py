@@ -22,7 +22,6 @@ import paddle.nn.functional as F
 from paddlenlp.transformers import (
     ClapTextModelWithProjection,
     RobertaTokenizer,
-    RobertaTokenizerFast,
     SpeechT5HifiGan,
 )
 
@@ -73,7 +72,7 @@ class AudioLDMPipeline(DiffusionPipeline):
         self,
         vae: AutoencoderKL,
         text_encoder: ClapTextModelWithProjection,
-        tokenizer: Union[RobertaTokenizer, RobertaTokenizerFast],
+        tokenizer: RobertaTokenizer,
         unet: UNet2DConditionModel,
         scheduler: KarrasDiffusionSchedulers,
         vocoder: SpeechT5HifiGan,
@@ -83,22 +82,6 @@ class AudioLDMPipeline(DiffusionPipeline):
             vae=vae, text_encoder=text_encoder, tokenizer=tokenizer, unet=unet, scheduler=scheduler, vocoder=vocoder
         )
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
-
-    def enable_vae_slicing(self):
-        """
-        Enable sliced VAE decoding.
-
-        When this option is enabled, the VAE will split the input tensor in slices to compute decoding in several
-        steps. This is useful to save some memory and allow larger batch sizes.
-        """
-        self.vae.enable_slicing()
-
-    def disable_vae_slicing(self):
-        """
-        Disable sliced VAE decoding. If `enable_vae_slicing` was previously invoked, this method will go back to
-        computing decoding in one step.
-        """
-        self.vae.disable_slicing()
 
     def _encode_prompt(
         self,
@@ -131,6 +114,15 @@ class AudioLDMPipeline(DiffusionPipeline):
                 weighting. If not provided, negative_prompt_embeds will be generated from `negative_prompt` input
                 argument.
         """
+        if self.text_encoder.text_model.embeddings.token_type_ids.dtype not in [
+            paddle.int16,
+            paddle.int32,
+            paddle.int64,
+        ]:
+            self.text_encoder.text_model.embeddings.token_type_ids = (
+                self.text_encoder.text_model.embeddings.token_type_ids.cast("int32")
+            )
+
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
         elif prompt is not None and isinstance(prompt, list):
@@ -142,12 +134,15 @@ class AudioLDMPipeline(DiffusionPipeline):
                 prompt,
                 padding="max_length",
                 max_length=self.tokenizer.model_max_length,
+                return_attention_mask=True,
                 truncation=True,
                 return_tensors="pd",
             )
             text_input_ids = text_inputs.input_ids
             attention_mask = text_inputs.attention_mask
-            untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="pd").input_ids
+            untruncated_ids = self.tokenizer(
+                prompt, padding="longest", return_tensors="pd", return_attention_mask=True
+            ).input_ids
             if (
                 untruncated_ids.shape[-1] >= text_input_ids.shape[-1]
                 and not paddle.equal_all(x=text_input_ids, y=untruncated_ids).item()
@@ -158,7 +153,7 @@ class AudioLDMPipeline(DiffusionPipeline):
                 logger.warning(
                     f"The following part of your input was truncated because CLAP can only handle sequences up to {self.tokenizer.model_max_length} tokens: {removed_text}"
                 )
-            prompt_embeds = self.text_encoder(text_input_ids, attention_mask=attention_mask)
+            prompt_embeds = self.text_encoder(text_input_ids.cast("int32"), attention_mask=attention_mask)
             prompt_embeds = prompt_embeds.text_embeds
             # additional L_2 normalization over each hidden-state
             prompt_embeds = F.normalize(x=prompt_embeds, axis=-1)
@@ -187,11 +182,16 @@ class AudioLDMPipeline(DiffusionPipeline):
                 uncond_tokens = negative_prompt
             max_length = prompt_embeds.shape[1]
             uncond_input = self.tokenizer(
-                uncond_tokens, padding="max_length", max_length=max_length, truncation=True, return_tensors="pd"
+                uncond_tokens,
+                padding="max_length",
+                max_length=max_length,
+                truncation=True,
+                return_tensors="pd",
+                return_attention_mask=True,
             )
             uncond_input_ids = uncond_input.input_ids
             attention_mask = uncond_input.attention_mask
-            negative_prompt_embeds = self.text_encoder(uncond_input_ids, attention_mask=attention_mask)
+            negative_prompt_embeds = self.text_encoder(uncond_input_ids.cast("int32"), attention_mask=attention_mask)
             negative_prompt_embeds = negative_prompt_embeds.text_embeds
             # additional L_2 normalization over each hidden-state
             negative_prompt_embeds = F.normalize(x=negative_prompt_embeds, axis=-1)
@@ -221,7 +221,7 @@ class AudioLDMPipeline(DiffusionPipeline):
             mel_spectrogram = mel_spectrogram.squeeze(axis=1)
         waveform = self.vocoder(mel_spectrogram)
         # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
-        waveform = waveform.cpu().astype(dtype="float32")
+        waveform = waveform.astype(dtype="float32").cpu()
         return waveform
 
     def prepare_extra_step_kwargs(self, generator, eta):

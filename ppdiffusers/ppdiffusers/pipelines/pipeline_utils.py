@@ -110,6 +110,7 @@ LOADABLE_CLASSES = {
         "FeatureExtractionMixin": ["save_pretrained", "from_pretrained"],
         "ProcessorMixin": ["save_pretrained", "from_pretrained"],
         "ImageProcessingMixin": ["save_pretrained", "from_pretrained"],
+        "RobertaTokenizer": ["save_pretrained", "from_pretrained"],
     },
 }
 
@@ -335,7 +336,6 @@ def get_class_obj_and_candidates(library_name, class_name, importable_classes, p
     else:
         # else we just import it from the library.
         library = importlib.import_module(library_name)
-
         class_obj = getattr(library, class_name)
         class_candidates = {c: getattr(library, c, None) for c in importable_classes.keys()}
 
@@ -359,8 +359,8 @@ def _get_pipeline_class(class_obj, config, custom_pipeline=None, cache_dir=None,
     if class_obj != DiffusionPipeline:
         return class_obj
 
-    diffusers_module = importlib.import_module(class_obj.__module__.split(".")[0])
-    return getattr(diffusers_module, config["_class_name"])
+    ppdiffusers_module = importlib.import_module(class_obj.__module__.split(".")[0])
+    return getattr(ppdiffusers_module, config["_class_name"])
 
 
 def load_sub_model(
@@ -379,6 +379,12 @@ def load_sub_model(
     cached_folder: Union[str, os.PathLike] = None,
     **kwargs,
 ):
+    # support huggingface diffusers onnx model
+    is_onnx_model = False
+    if "Onnx" in class_name:
+        class_name = class_name.replace("Onnx", "FastDeploy")
+        is_onnx_model = True
+
     """Helper method to load the module `name` from `library_name` and `class_name`"""
     # retrieve class candidates
     class_obj, class_candidates = get_class_obj_and_candidates(
@@ -416,6 +422,16 @@ def load_sub_model(
         loading_kwargs["runtime_options"] = (
             runtime_options.get(name, None) if isinstance(runtime_options, dict) else runtime_options
         )
+        if not is_onnx_model:
+            if os.path.isdir(os.path.join(cached_folder, name)):
+                is_onnx_model = any(
+                    d.endswith(".onnx") or d.endswith(".pb") for d in os.listdir(os.path.join(cached_folder, name))
+                )
+            else:
+                is_onnx_model = any(
+                    d.endswith(".onnx") or d.endswith(".pb") for d in os.listdir(os.path.join(cached_folder))
+                )
+        loading_kwargs["is_onnx_model"] = is_onnx_model
 
     from ppdiffusers import ModelMixin
 
@@ -508,6 +524,21 @@ class DiffusionPipeline(ConfigMixin):
 
             # set models
             setattr(self, name, module)
+
+            # TODO junnyu, before register model, we may need to keep some module in fp32
+            if (
+                isinstance(module, nn.Layer)
+                and hasattr(module, "_keep_in_fp32_modules")
+                and module.dtype == paddle.float16
+            ):
+                for module_name, sub_module in module.named_sublayers(include_self=True):
+                    if any(n in module_name for n in module._keep_in_fp32_modules):
+                        sub_module.to(dtype=paddle.float32)
+                        if hasattr(sub_module, "pre_hook"):
+                            sub_module.pre_hook.remove()
+                        sub_module.pre_hook = sub_module.register_forward_pre_hook(
+                            lambda layer, input: input[0].cast("float32")
+                        )
 
     def __setattr__(self, name: str, value: Any):
         if name in self.__dict__ and hasattr(self.config, name):
@@ -707,6 +738,21 @@ class DiffusionPipeline(ConfigMixin):
             if paddle_dtype is not None:
                 kwargs["dtype"] = paddle_dtype
             module.to(**kwargs)
+
+            # TODO junnyu, before register model, we may need to keep some module in fp32
+            if (
+                isinstance(module, nn.Layer)
+                and hasattr(module, "_keep_in_fp32_modules")
+                and module.dtype == paddle.float16
+            ):
+                for module_name, sub_module in module.named_sublayers(include_self=True):
+                    if any(n in module_name for n in module._keep_in_fp32_modules):
+                        sub_module.to(dtype=paddle.float32)
+                        if hasattr(sub_module, "pre_hook"):
+                            sub_module.pre_hook.remove()
+                        sub_module.pre_hook = sub_module.register_forward_pre_hook(
+                            lambda layer, input: input[0].cast("float32")
+                        )
         return self
 
     @property
@@ -921,6 +967,7 @@ class DiffusionPipeline(ConfigMixin):
                 custom_revision=custom_revision,
                 variant=variant,
                 from_hf_hub=from_hf_hub,
+                from_diffusers=from_diffusers,
                 **kwargs,
             )
         else:
@@ -1025,6 +1072,9 @@ class DiffusionPipeline(ConfigMixin):
             # 6.1 - now that JAX/Flax is an official framework of the library, we might load from Flax names
             if class_name.startswith("Flax"):
                 class_name = class_name[4:]
+
+            if class_name.endswith("TokenizerFast"):
+                class_name = class_name[:-4]
 
             # 6.2 Define all importable classes
             is_pipeline_module = hasattr(pipelines, library_name)
@@ -1308,8 +1358,6 @@ class DiffusionPipeline(ConfigMixin):
                 ):
                     ignore_patterns = [
                         "*.msgpack",
-                        "*.onnx",
-                        "*.pb",
                         "*.bin",
                         "*.pdparams",
                         "*.pdiparams",
@@ -1326,7 +1374,7 @@ class DiffusionPipeline(ConfigMixin):
                             f"\nA mixture of {variant} and non-{variant} filenames will be loaded.\nLoaded {variant} filenames:\n[{', '.join(safetensors_variant_filenames)}]\nLoaded non-{variant} filenames:\n[{', '.join(safetensors_model_filenames - safetensors_variant_filenames)}\nIf this behavior is not expected, please check your folder structure."
                         )
                 else:
-                    ignore_patterns = ["*.safetensors", "*.msgpack", "*.onnx", "*.pb"]
+                    ignore_patterns = ["*.safetensors", "*.msgpack"]
                     if from_diffusers:
                         ignore_patterns.extend(["*.pdparams", "*.pdiparams", "*.pdmodel"])
                         suffix = ".bin"

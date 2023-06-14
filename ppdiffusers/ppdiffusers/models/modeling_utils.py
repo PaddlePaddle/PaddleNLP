@@ -36,6 +36,7 @@ from ..utils import (
     _add_variant,
     _get_model_file,
     deprecate,
+    is_paddlenlp_available,
     is_safetensors_available,
     is_torch_available,
     is_torch_file,
@@ -60,13 +61,19 @@ if is_safetensors_available():
 if is_torch_available():
     import torch
 
+if is_paddlenlp_available:
+    from paddlenlp.transformers.model_utils import no_init_weights
+
 
 def get_parameter_device(parameter: nn.Layer):
     try:
         # TODO https://github.com/huggingface/diffusers/compare/v0.15.0...v0.16.0#diff-6a3b9a08c1d37dbc341131632415fea800af242a84fb31f1bcd40d725e2eeeebR64
         return next(parameter.named_parameters())[1].place
     except StopIteration:
-        return paddle.get_device()
+        try:
+            return next(parameter.named_buffers())[1].place
+        except StopIteration:
+            return paddle.get_device()
 
 
 def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
@@ -74,7 +81,10 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
         # TODO https://github.com/huggingface/diffusers/compare/v0.15.0...v0.16.0#diff-6a3b9a08c1d37dbc341131632415fea800af242a84fb31f1bcd40d725e2eeeebR80
         return next(parameter.named_parameters())[1].dtype
     except StopIteration:
-        return parameter._dtype
+        try:
+            return next(parameter.named_buffers())[1].dtype
+        except StopIteration:
+            return parameter._dtype
 
 
 def convert_state_dict(state_dict, framework="torch"):
@@ -529,14 +539,16 @@ class ModelMixin(nn.Layer):
         else:
             dtype = dtype.pop()
 
+        # for
         if "uint8" in str(dtype):
             state_dict = {k: v.astype("float32") for k, v in state_dict.items()}
-        else:
-            init_contexts.append(paddle.dtype_guard(dtype))
+            dtype = paddle.float32
+
+        init_contexts.append(paddle.dtype_guard(dtype))
 
         if low_cpu_mem_usage:
             # Instantiate model.
-            init_contexts.append(paddle.no_init_weights(_enable=True))
+            init_contexts.append(no_init_weights(_enable=True))
             if hasattr(paddle, "LazyGuard"):
                 init_contexts.append(paddle.LazyGuard())
 

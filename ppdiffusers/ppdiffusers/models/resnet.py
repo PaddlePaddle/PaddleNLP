@@ -570,7 +570,7 @@ class ResnetBlock2D(nn.Layer):
         hidden_states = self.conv1(hidden_states)
 
         if self.time_emb_proj is not None:
-            if not self.skip_time_act or not self.pre_temb_non_linearity:
+            if not self.pre_temb_non_linearity and not self.skip_time_act:
                 temb = self.nonlinearity(temb)
             temb = self.time_emb_proj(temb)[:, :, None, None]
 

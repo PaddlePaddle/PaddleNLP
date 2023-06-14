@@ -18,11 +18,11 @@ import paddle.nn as nn
 from paddlenlp.transformers.t5.configuration import T5Config
 from paddlenlp.transformers.t5.modeling import T5Block, T5LayerNorm
 
-from ...configuration_utils import ConfigMixin, register_to_config
+from ...configuration_utils import ConfigMixin, ModuleUtilsMixin, register_to_config
 from ...models import ModelMixin
 
 
-class SpectrogramNotesEncoder(ModelMixin, ConfigMixin):
+class SpectrogramNotesEncoder(ModelMixin, ConfigMixin, ModuleUtilsMixin):
     @register_to_config
     def __init__(
         self,

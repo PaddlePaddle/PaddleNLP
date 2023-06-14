@@ -912,7 +912,7 @@ class IFImg2ImgSuperResolutionPipeline(DiffusionPipeline):
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
-                model_input = paddle.concat([intermediate_images, upscaled], dim=1)
+                model_input = paddle.concat([intermediate_images, upscaled.cast(intermediate_images.dtype)], axis=1)
 
                 model_input = paddle.concat([model_input] * 2) if do_classifier_free_guidance else model_input
                 model_input = self.scheduler.scale_model_input(model_input, t)

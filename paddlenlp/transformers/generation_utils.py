@@ -35,6 +35,13 @@ from paddlenlp.utils.log import logger
 
 from .model_outputs import ModelOutput
 
+try:
+    from paddle import top_p_sampling
+
+    is_top_p_sampling_avaliable = True
+except:
+    is_top_p_sampling_avaliable = False
+
 __all__ = ["GenerationMixin"]
 
 
@@ -394,7 +401,9 @@ class GenerationMixin(object):
     @staticmethod
     def expand_inputs_for_generation(input_ids, expand_size, attention_mask=None, **model_kwargs):
 
-        index = paddle.tile(paddle.arange(paddle.shape(input_ids)[0]).unsqueeze(-1), [1, expand_size]).reshape([-1])
+        index = paddle.tile(
+            paddle.arange(paddle.shape(input_ids)[0], dtype="int64").unsqueeze(-1), [1, expand_size]
+        ).reshape([-1])
 
         input_ids = paddle.gather(input_ids, index)
 
@@ -434,9 +443,11 @@ class GenerationMixin(object):
         # update cache
         if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
             model_kwargs["cache"] = outputs[1]
+            model_kwargs["past_key_values"] = outputs[1]
 
         if isinstance(outputs, ModelOutput) and "past_key_values" in outputs:
             model_kwargs["cache"] = outputs.past_key_values
+            model_kwargs["past_key_values"] = outputs.past_key_values
 
         # update token_type_ids with last value
         if "token_type_ids" in model_kwargs and model_kwargs["token_type_ids"] is not None:
@@ -856,6 +867,7 @@ class GenerationMixin(object):
             input_ids = self.prepare_input_ids_for_generation(
                 bos_token_id, encoder_output=model_kwargs["inputs_embeds"]
             )
+
         # Add to model_kwargs
         model_kwargs["attention_mask"] = attention_mask
         if position_ids is not None:
@@ -920,7 +932,6 @@ class GenerationMixin(object):
                     "`num_return_sequences` has to be 1, but is {} "
                     "when doing greedy search.".format(num_return_sequences)
                 )
-
             return self.greedy_search(
                 input_ids, logits_processors, max_len, pad_token_id, eos_token_id, **model_kwargs
             )
@@ -1023,7 +1034,6 @@ class GenerationMixin(object):
     def greedy_search(self, input_ids, logits_processors, max_length, pad_token_id, eos_token_id, **model_kwargs):
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
-
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
@@ -1345,7 +1355,7 @@ class GenerationMixin(object):
             else:
                 next_scores, next_tokens = paddle.topk(next_scores, 2 * num_beams, axis=1)
 
-                sibling_score = paddle.arange(1, 2 * num_beams + 1).unsqueeze(0) * diversity_rate
+                sibling_score = paddle.arange(1, 2 * num_beams + 1, dtype="int64").unsqueeze(0) * diversity_rate
 
                 diversed_score = next_scores - sibling_score
 
@@ -1607,7 +1617,7 @@ class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids, logits):
         score = paddle.index_sample(logits, input_ids)
         score = paddle.where(score < 0, score * self.penalty, score / self.penalty)
-        input_ids = input_ids + paddle.arange(logits.shape[0]).unsqueeze(-1) * logits.shape[-1]
+        input_ids = input_ids + paddle.arange(logits.shape[0], dtype="int64").unsqueeze(-1) * logits.shape[-1]
         outputs = paddle.scatter(logits.flatten(), input_ids.flatten(), score.flatten()).reshape(logits.shape)
         return outputs
 
@@ -1777,6 +1787,12 @@ def TopKProcess(probs, top_k, min_tokens_to_keep):
 
 
 def TopPProcess(probs, top_p, min_tokens_to_keep):
+
+    if is_top_p_sampling_avaliable:
+        top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
+        probs, _ = top_p_sampling(probs, top_ps_tensor)
+        return probs
+
     sorted_probs = paddle.sort(probs, descending=True)
     sorted_indices = paddle.argsort(probs, descending=True)
     cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)
@@ -1793,7 +1809,7 @@ def TopPProcess(probs, top_p, min_tokens_to_keep):
     sorted_indices_to_remove[:, 0] = 0
 
     # Scatter sorted tensors to original indexing
-    sorted_indices = sorted_indices + paddle.arange(probs.shape[0]).unsqueeze(-1) * probs.shape[-1]
+    sorted_indices = sorted_indices + paddle.arange(probs.shape[0], dtype="int64").unsqueeze(-1) * probs.shape[-1]
     condition = paddle.scatter(
         sorted_indices_to_remove.flatten(), sorted_indices.flatten(), sorted_indices_to_remove.flatten()
     )

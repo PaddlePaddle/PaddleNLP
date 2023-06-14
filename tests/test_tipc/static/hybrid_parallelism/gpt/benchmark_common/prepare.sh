@@ -10,4 +10,4 @@ python -m pip install tool_helpers -i https://mirror.baidu.com/pypi/simple
 # get data
 cd ../examples/language_model/gpt-3/static/
 mkdir train_data && cd train_data
-wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/train.data.json_ids.npz
+wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt2/train.data.json_ids.npz

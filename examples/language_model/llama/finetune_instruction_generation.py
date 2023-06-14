@@ -18,7 +18,11 @@ from functools import partial
 
 import numpy as np
 import paddle
-from data import DataCollatorForSupervisedDataset, custom_instruction_convert_example
+from data import (
+    DataCollatorForSupervisedDataset,
+    custom_instruction_convert_example,
+    reader,
+)
 from sklearn.metrics import accuracy_score
 from utils import LlamaTrainer, compute_metrics, save_infer_result
 
@@ -57,6 +61,14 @@ class ModelArgument:
     prefix_projection: bool = field(default=True, metadata={"help": "Whether to project the prefix tokens"})
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
     do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
+    benchmark: bool = field(
+        default=False,
+        metadata={"help": "Whether or not run benchmark."},
+    )
+    profiler_options: str = field(
+        default=None,
+        metadata={"help": "profiler_options."},
+    )
 
 
 def main():
@@ -65,6 +77,8 @@ def main():
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
+    training_args.benchmark = model_args.benchmark
+    training_args.profiler_options = model_args.profiler_options
     setattr(training_args, "label_smoothing", model_args.label_smoothing)
     setattr(training_args, "lr_decay_ratio", model_args.lr_decay_ratio)
 
@@ -115,6 +129,7 @@ def main():
         model_args.model_name_or_path,
         padding_side="left",  # Allow batch inference
     )
+    tokenizer.pad_token = tokenizer.unk_token
 
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
@@ -149,12 +164,20 @@ def main():
         model.print_trainable_parameters()
 
     # Load the dataset.
-    train_ds, dev_ds = load_dataset(data_args.data_name, data_args.task_name, splits=["train", "dev"])
+    if training_args.benchmark:
+        train_ds = load_dataset(reader, data_path="./data/train.txt", lazy=False)
+        dev_ds = None
+    else:
+        train_ds, dev_ds = load_dataset(data_args.data_name, data_args.task_name, splits=["train", "dev"])
 
-    trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
+    trans_func = partial(
+        custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args, benchmark=training_args.benchmark
+    )
     train_ds = train_ds.map(partial(trans_func))
-    dev_ds = dev_ds.map(partial(trans_func))
-    collate_fn = DataCollatorForSupervisedDataset(tokenizer)
+
+    if not training_args.benchmark:
+        dev_ds = dev_ds.map(partial(trans_func))
+    collate_fn = DataCollatorForSupervisedDataset(tokenizer, max_length=-1)
 
     def compute_metrics_trainer(eval_preds, tokenizer):
         all_preds = []

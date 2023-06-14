@@ -18,11 +18,11 @@ import paddle.nn as nn
 from paddlenlp.transformers.t5.configuration import T5Config
 from paddlenlp.transformers.t5.modeling import T5Block, T5LayerNorm
 
-from ...configuration_utils import ConfigMixin, register_to_config
+from ...configuration_utils import ConfigMixin, ModuleUtilsMixin, register_to_config
 from ...models import ModelMixin
 
 
-class SpectrogramContEncoder(ModelMixin, ConfigMixin):
+class SpectrogramContEncoder(ModelMixin, ConfigMixin, ModuleUtilsMixin):
     @register_to_config
     def __init__(
         self,
@@ -40,7 +40,7 @@ class SpectrogramContEncoder(ModelMixin, ConfigMixin):
         super().__init__()
         self.input_proj = nn.Linear(in_features=input_dims, out_features=d_model, bias_attr=False)
         self.position_encoding = nn.Embedding(targets_context_length, d_model)
-        self.position_encoding.weight.stop_gradient = not False
+        self.position_encoding.weight.stop_gradient = True
         self.dropout_pre = nn.Dropout(p=dropout_rate)
         t5config = T5Config(
             d_model=d_model,
@@ -67,7 +67,7 @@ class SpectrogramContEncoder(ModelMixin, ConfigMixin):
         input_positions = paddle.arange(end=max_positions)
 
         seq_lens = encoder_inputs_mask.sum(axis=-1)
-        input_positions = paddle.roll(x=input_positions.unsqueeze(axis=0), shifts=tuple(seq_lens.tolist()), dims=0)
+        input_positions = paddle.roll(x=input_positions.unsqueeze(axis=0), shifts=tuple(seq_lens.tolist()), axis=0)
         x += self.position_encoding(input_positions)
         x = self.dropout_pre(x)
 
@@ -78,5 +78,4 @@ class SpectrogramContEncoder(ModelMixin, ConfigMixin):
         for lyr in self.encoders:
             x = lyr(x, extended_attention_mask)[0]
         x = self.layer_norm(x)
-
         return self.dropout_post(x), encoder_inputs_mask

@@ -25,6 +25,7 @@ from pathlib import PosixPath
 from typing import Any, Dict, Tuple, Union
 
 import numpy as np
+import paddle
 
 from .utils import (
     DIFFUSERS_CACHE,
@@ -486,6 +487,14 @@ class ConfigMixin:
         if "_diffusers_version" not in data and "_ppdiffusers_version" not in data:
             data["_ppdiffusers_version"] = __version__
 
+        # remove Onnx and Flax prefix
+        _class_name = data.get("_class_name", None)
+        if _class_name is not None:
+            if _class_name.startswith("Flax"):
+                data["_class_name"] = _class_name[4:]
+            elif _class_name.startswith("Onnx"):
+                data["_class_name"] = "FastDeploy" + _class_name[4:]
+
         return data
 
     def __repr__(self):
@@ -593,3 +602,65 @@ def register_to_config(init):
         init(self, *args, **init_kwargs)
 
     return inner_init
+
+
+def finfo(dtype: paddle.dtype = None):
+    if dtype is None:
+        dtype = paddle.get_default_dtype()
+
+    if dtype == paddle.bfloat16:
+        # Numpy do not support `np.finfo(np.uint16)`, so try to construct a finfo object to fetch min value
+        class BFloatFInfo:
+            min = -3.3895313892515355e38
+
+        return BFloatFInfo
+    if dtype == paddle.float32:
+        return np.finfo(np.float32)
+    if dtype == paddle.float16:
+        return np.finfo(np.float16)
+    if dtype == paddle.float64:
+        return np.finfo(np.float64)
+
+
+class ModuleUtilsMixin:
+    """
+    A few utilities for `torch.nn.Modules`, to be used as a mixin.
+    """
+
+    def get_extended_attention_mask(
+        self, attention_mask: paddle.Tensor, input_shape: Tuple[int], dtype: paddle.float32 = None
+    ) -> paddle.Tensor:
+        """
+        Makes broadcastable attention and causal masks so that future and masked tokens are ignored.
+        Arguments:
+            attention_mask (`paddle.Tensor`):
+                Mask with ones indicating tokens to attend to, zeros for tokens to ignore.
+            input_shape (`Tuple[int]`):
+                The shape of the input to the model.
+        Returns:
+            `paddle.Tensor` The extended attention mask, with a the same dtype as `attention_mask.dtype`.
+        """
+        if dtype is None:
+            dtype = self.dtype
+        # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
+        # ourselves in which case we just need to make it broadcastable to all heads.
+        if attention_mask.dim() == 3:
+            extended_attention_mask = attention_mask[:, None, :, :]
+        elif attention_mask.dim() == 2:
+            # Provided a padding mask of dimensions [batch_size, seq_length]
+            # - the model is an encoder, so make the mask broadcastable to [batch_size, num_heads, seq_length, seq_length]
+            extended_attention_mask = attention_mask[:, None, None, :]
+        else:
+            raise ValueError(
+                "Wrong shape for input_ids (shape {}) or attention_mask (shape {})".format(
+                    input_shape, attention_mask.shape
+                )
+            )
+
+        # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
+        # masked positions, this operation will create a tensor which is 0.0 for
+        # positions we want to attend and -10000.0 for masked positions.
+        # Since we are adding it to the raw scores before the softmax, this is
+        # effectively the same as removing these entirely.
+        extended_attention_mask = (1.0 - extended_attention_mask) * finfo(dtype).min
+        return extended_attention_mask

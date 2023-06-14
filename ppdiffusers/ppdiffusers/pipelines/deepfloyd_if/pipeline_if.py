@@ -214,7 +214,6 @@ class IFPipeline(DiffusionPipeline):
             )
             text_input_ids = text_inputs.input_ids
             untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="pd").input_ids
-
             if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not paddle.equal_all(
                 text_input_ids, untruncated_ids
             ):

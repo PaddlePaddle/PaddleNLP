@@ -56,7 +56,7 @@ class ModelArgument:
     )
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
     num_prefix_tokens: int = field(default=64, metadata={"help": "Number of prefix tokens"})
-    prefix_projection: bool = field(default=True, metadata={"help": "Whether to project the prefix tokens"})
+    prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
     do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
     lora_all_linear: bool = field(default=False, metadata={"help": "Whether to use LoRA technique for all linear."})
 

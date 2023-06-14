@@ -20,7 +20,7 @@ from ...utils import (
 )
 
 try:
-    if not (is_paddlenlp_available() and is_paddle_available() and is_paddlenlp_version(">=", "2.5.3")):
+    if not (is_paddlenlp_available() and is_paddle_available() and is_paddlenlp_version(">=", "2.5.2")):
         raise OptionalDependencyNotAvailable()
 except OptionalDependencyNotAvailable:
     from ...utils.dummy_paddle_and_paddlenlp_objects import AudioLDMPipeline

@@ -205,12 +205,15 @@ class ControlNetModel(ModelMixin, ConfigMixin):
 
         # pre_temb_act_fun opt
         self.resnet_pre_temb_non_linearity = resnet_pre_temb_non_linearity
-        if act_fn == "swish":
-            self.down_resnet_temb_nonlinearity = lambda x: F.silu(x)
-        elif act_fn == "mish":
-            self.down_resnet_temb_nonlinearity = Mish()
-        elif act_fn == "silu":
-            self.down_resnet_temb_nonlinearity = nn.Silu()
+        if resnet_pre_temb_non_linearity:
+            if act_fn == "swish":
+                self.down_resnet_temb_nonlinearity = lambda x: F.silu(x)
+            elif act_fn == "mish":
+                self.down_resnet_temb_nonlinearity = nn.Mish()
+            elif act_fn == "silu":
+                self.down_resnet_temb_nonlinearity = nn.Silu()
+            elif act_fn == "gelu":
+                self.down_resnet_temb_nonlinearity = nn.GELU()
 
         # down
         output_channel = block_out_channels[0]
@@ -529,6 +532,9 @@ class ControlNetModel(ModelMixin, ConfigMixin):
             class_emb = self.class_embedding(class_labels).cast(self.dtype)
             emb = emb + class_emb
 
+        if self.resnet_pre_temb_non_linearity:
+            emb = self.down_resnet_temb_nonlinearity(emb)
+
         # 2. pre-process
         sample = self.conv_in(sample)
 
@@ -538,8 +544,6 @@ class ControlNetModel(ModelMixin, ConfigMixin):
 
         # 3. down
         down_block_res_samples = (sample,)
-        if self.resnet_pre_temb_non_linearity:
-            emb = self.down_resnet_temb_nonlinearity(emb)
 
         for downsample_block in self.down_blocks:
             if hasattr(downsample_block, "has_cross_attention") and downsample_block.has_cross_attention:

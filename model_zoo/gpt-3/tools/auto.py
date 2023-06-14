@@ -17,33 +17,40 @@ from __future__ import absolute_import, division, print_function
 import os
 import sys
 
+import paddle
 import paddle.distributed as dist
-from paddle.distributed import fleet
 
 __dir__ = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(__dir__, "../")))
 
 from ppfleetx.core import AutoEngine
 from ppfleetx.data import build_auto_dataset
+from ppfleetx.distributed.apis import auto_env
 from ppfleetx.models import build_module
-from ppfleetx.utils import config
-
-# init_logger()
+from ppfleetx.utils import auto_config
 
 if __name__ == "__main__":
-    args = config.parse_args()
-    cfg = config.get_auto_config(args.config, overrides=args.override, show=False)
+    args = auto_config.parse_args()
+    cfg = auto_config.get_config(args.config, overrides=args.override, show=False)
 
+    paddle.set_device(cfg["Global"]["device"])
     if dist.get_world_size() > 1:
-        fleet.init(is_collective=True)
+        auto_env.init_dist_env(cfg)
+
+    # TODO: set seed for auto_parallel
 
     module = build_module(cfg)
-    config.print_config(cfg)
+    auto_config.print_config(cfg)
 
     train_data = build_auto_dataset(cfg.Data, "Train")
     eval_data = build_auto_dataset(cfg.Data, "Eval")
 
-    cfg.Optimizer.lr.update({"epochs": cfg.Engine.num_train_epochs, "step_each_epoch": len(train_data)})
+    cfg.Optimizer.lr.update(
+        {
+            "epochs": cfg.Engine.num_train_epochs,
+            "step_each_epoch": len(train_data),
+        }
+    )
 
     engine = AutoEngine(configs=cfg, module=module)
 

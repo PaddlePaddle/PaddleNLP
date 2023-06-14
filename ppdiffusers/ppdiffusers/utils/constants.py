@@ -16,6 +16,22 @@ import os
 
 from huggingface_hub.constants import HUGGINGFACE_HUB_CACHE, hf_cache_home
 
+
+def str2bool(variable):
+    if isinstance(variable, bool):
+        return variable
+
+    if not isinstance(variable, str):
+        variable = str(variable)
+
+    if variable.lower() == "false":
+        return False
+    elif variable.lower() == "true":
+        return True
+    else:
+        raise ValueError("Not supported value: {}".format(variable))
+
+
 ppnlp_cache_home = os.path.expanduser(
     os.getenv("PPNLP_HOME", os.path.join(os.getenv("XDG_CACHE_HOME", "~/.cache"), "paddlenlp"))
 )
@@ -49,14 +65,15 @@ DOWNLOAD_SERVER = "https://bj.bcebos.com/paddlenlp/models/community"
 PPNLP_BOS_RESOLVE_ENDPOINT = os.getenv("PPNLP_ENDPOINT", "https://bj.bcebos.com/paddlenlp")
 DEPRECATED_REVISION_ARGS = ["fp16", "non-ema"]
 TEXT_ENCODER_TARGET_MODULES = ["q_proj", "v_proj", "k_proj", "out_proj"]
-LOW_CPU_MEM_USAGE_DEFAULT = os.getenv("LOW_CPU_MEM_USAGE_DEFAULT", False)
+LOW_CPU_MEM_USAGE_DEFAULT = str2bool(os.getenv("LOW_CPU_MEM_USAGE_DEFAULT", False))
+
 
 NEG_INF = -1e4
 
 get_map_location_default = lambda *args, **kwargs: os.getenv("MAP_LOCATION_DEFAULT", "cpu")
-FROM_HF_HUB = os.getenv("FROM_HF_HUB", False)
-FROM_DIFFUSERS = os.getenv("FROM_DIFFUSERS", False)
-TO_DIFFUSERS = os.getenv("TO_DIFFUSERS", False)
+FROM_HF_HUB = str2bool(os.getenv("FROM_HF_HUB", False))
+FROM_DIFFUSERS = str2bool(os.getenv("FROM_DIFFUSERS", False))
+TO_DIFFUSERS = str2bool(os.getenv("TO_DIFFUSERS", False))
 
 # FOR tests
 if bool(os.getenv("PATCH_ALLCLOSE", False)):

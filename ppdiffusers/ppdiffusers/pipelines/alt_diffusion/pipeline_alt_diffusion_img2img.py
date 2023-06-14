@@ -374,7 +374,7 @@ class AltDiffusionImg2ImgPipeline(DiffusionPipeline, TextualInversionLoaderMixin
     def decode_latents(self, latents):
         latents = 1 / self.vae.config.scaling_factor * latents
         image = self.vae.decode(latents).sample
-        image = (image / 2 + 0.5).clip(0, 1)
+        # image = (image / 2 + 0.5).clip(0, 1)
         return image
 
     def prepare_extra_step_kwargs(self, generator, eta):

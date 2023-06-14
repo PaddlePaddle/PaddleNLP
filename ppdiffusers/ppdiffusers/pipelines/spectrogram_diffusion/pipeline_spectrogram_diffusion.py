@@ -79,7 +79,7 @@ class SpectrogramDiffusionPipeline(DiffusionPipeline):
             encoder_input_tokens=input_tokens, encoder_inputs_mask=tokens_mask
         )
         continuous_encoded, continuous_mask = self.continuous_encoder(
-            encoder_inputs=continuous_inputs, encoder_inputs_mask=continuous_mask
+            encoder_inputs=continuous_inputs.cast(self.continuous_encoder.dtype), encoder_inputs_mask=continuous_mask
         )
         return [(tokens_encoded, tokens_mask), (continuous_encoded, continuous_mask)]
 
@@ -111,7 +111,7 @@ class SpectrogramDiffusionPipeline(DiffusionPipeline):
         generator: Optional[paddle.Generator] = None,
         num_inference_steps: int = 100,
         return_dict: bool = True,
-        output_type: str = "mel",
+        output_type: str = "numpy",
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: int = 1,
     ) -> Union[AudioPipelineOutput, Tuple]:
@@ -145,13 +145,10 @@ class SpectrogramDiffusionPipeline(DiffusionPipeline):
                 continuous_inputs=encoder_continuous_inputs,
                 continuous_mask=encoder_continuous_mask,
             )
-
             # Sample encoder_continuous_inputs shaped gaussian noise to begin loop
             x = randn_tensor(shape=encoder_continuous_inputs.shape, generator=generator, dtype=self.decoder.dtype)
-
             # set step values
             self.scheduler.set_timesteps(num_inference_steps)
-
             # Denoising diffusion loop
             for j, t in enumerate(self.progress_bar(self.scheduler.timesteps)):
                 output = self.decode(
@@ -172,7 +169,7 @@ class SpectrogramDiffusionPipeline(DiffusionPipeline):
                 callback(i, full_pred_mel)
             logger.info("Generated segment", i)
         if output_type == "numpy":
-            output = self.melgan(input_features=full_pred_mel.astype(np.float32))
+            output = self.melgan(input_features=full_pred_mel.astype(np.float32))[0]
         else:
             output = full_pred_mel
         if not return_dict:

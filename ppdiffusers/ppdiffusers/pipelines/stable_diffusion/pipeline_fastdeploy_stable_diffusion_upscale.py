@@ -12,47 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from logging import getLogger
 from typing import Any, Callable, List, Optional, Union
 
 import numpy as np
 import paddle
 import PIL
 
+from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import DDPMScheduler
-from ..fastdeploy_utils import FastDeployRuntimeModel
+from ...utils import logging
+from ..fastdeploy_utils import FastDeployDiffusionPipelineMixin, FastDeployRuntimeModel
 from ..pipeline_utils import ImagePipelineOutput
-from . import StableDiffusionUpscalePipeline
 
-logger = getLogger(__name__)
-
-NUM_LATENT_CHANNELS = 4
-NUM_UNET_INPUT_CHANNELS = 7
+logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 
-def preprocess(image):
-    if isinstance(image, paddle.Tensor):
-        return image
-    elif isinstance(image, PIL.Image.Image):
-        image = [image]
-
-    if isinstance(image[0], PIL.Image.Image):
-        w, h = image[0].size
-        w, h = (x - x % 64 for x in (w, h))  # resize to integer multiple of 32
-
-        image = [np.array(i.resize((w, h)))[None, :] for i in image]
-        image = np.concatenate(image, axis=0)
-        image = np.array(image).astype(np.float32) / 255.0
-        image = image.transpose(0, 3, 1, 2)
-        image = 2.0 * image - 1.0
-        image = paddle.to_tensor(image)
-    elif isinstance(image[0], paddle.Tensor):
-        image = paddle.concat(image, axis=0)
-
-    return image
-
-
-class FastDeployStableDiffusionUpscalePipeline(StableDiffusionUpscalePipeline):
+class FastDeployStableDiffusionUpscalePipeline(DiffusionPipeline, FastDeployDiffusionPipelineMixin):
     def __init__(
         self,
         vae: FastDeployRuntimeModel,
@@ -75,6 +50,48 @@ class FastDeployStableDiffusionUpscalePipeline(StableDiffusionUpscalePipeline):
             watermarker=None,
             max_noise_level=max_noise_level,
         )
+        self.post_init(vae_scaling_factor=0.08333)
+
+    def check_inputs(self, prompt, image, noise_level, callback_steps):
+        if not isinstance(prompt, str) and not isinstance(prompt, list):
+            raise ValueError(f"`prompt` has to be of type `str` or `list` but is {type(prompt)}")
+
+        if (
+            not isinstance(image, paddle.Tensor)
+            and not isinstance(image, PIL.Image.Image)
+            and not isinstance(image, list)
+        ):
+            raise ValueError(
+                f"`image` has to be of type `paddle.Tensor`, `PIL.Image.Image` or `list` but is {type(image)}"
+            )
+
+        # verify batch size of prompt and image are same if image is a list or tensor
+        if isinstance(image, list) or isinstance(image, paddle.Tensor):
+            if isinstance(prompt, str):
+                batch_size = 1
+            else:
+                batch_size = len(prompt)
+            if isinstance(image, list):
+                image_batch_size = len(image)
+            else:
+                image_batch_size = image.shape[0]
+            if batch_size != image_batch_size:
+                raise ValueError(
+                    f"`prompt` has batch size {batch_size} and `image` has batch size {image_batch_size}."
+                    " Please make sure that passed `prompt` matches the batch size of `image`."
+                )
+
+        # check noise level
+        if noise_level > self.config.max_noise_level:
+            raise ValueError(f"`noise_level` has to be <= {self.config.max_noise_level} but is {noise_level}")
+
+        if (callback_steps is None) or (
+            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
+        ):
+            raise ValueError(
+                f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
+                f" {type(callback_steps)}."
+            )
 
     def __call__(
         self,
@@ -183,11 +200,11 @@ class FastDeployStableDiffusionUpscalePipeline(StableDiffusionUpscalePipeline):
         )
 
         # 4. Preprocess image
-        image = preprocess(image)
+        image = self.image_processor.preprocess(image)
 
         # 5. set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
-        timesteps = self.scheduler.timesteps
+        timesteps, num_inference_steps = self.get_timesteps(num_inference_steps)
 
         # 5. Add noise to image
         noise_level = paddle.to_tensor([noise_level], dtype="int64")
@@ -195,20 +212,20 @@ class FastDeployStableDiffusionUpscalePipeline(StableDiffusionUpscalePipeline):
         image = self.low_res_scheduler.add_noise(image, noise, noise_level)
 
         batch_multiplier = 2 if do_classifier_free_guidance else 1
-        image = np.concatenate([image] * batch_multiplier * num_images_per_prompt)
-        noise_level = np.concatenate([noise_level] * image.shape[0])
+        image = paddle.concat([image] * batch_multiplier * num_images_per_prompt)
+        noise_level = paddle.concat([noise_level] * image.shape[0])
 
         # 6. Prepare latent variables
         height, width = image.shape[2:]
         latents = self.prepare_latents(
             batch_size * num_images_per_prompt,
-            NUM_LATENT_CHANNELS,
             height,
             width,
-            text_embeddings.dtype,
             generator,
             latents,
         )
+        NUM_UNET_INPUT_CHANNELS = self.unet_num_latent_channels
+        NUM_LATENT_CHANNELS = self.vae_decoder_num_latent_channels
 
         # 7. Check that sizes of image and latents match
         num_channels_image = image.shape[1]
@@ -224,163 +241,61 @@ class FastDeployStableDiffusionUpscalePipeline(StableDiffusionUpscalePipeline):
         # 8. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
 
+        unet_output_name = self.unet.model.get_output_info(0).name
+        unet_input_names = [self.unet.model.get_input_info(i).name for i in range(self.unet.model.num_inputs())]
         # 9. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
                 # expand the latents if we are doing classifier free guidance
-                latent_model_input = np.concatenate([latents] * 2) if do_classifier_free_guidance else latents
-
-                # concat latents, mask, masked_image_latents in the channel dimension
+                latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
-                latent_model_input = np.concatenate([latent_model_input, image], axis=1)
+                noise_pred_unet = paddle.zeros_like(latent_model_input)
+                # concat latents, image in the channel dimension
+                latent_model_input = paddle.concat([latent_model_input, image], axis=1)
 
-                # timestep to tensor
-                timestep = np.array([t], dtype=np.float32)
-
+                unet_inputs = {
+                    unet_input_names[0]: latent_model_input,
+                    unet_input_names[1]: t,
+                    unet_input_names[2]: prompt_embeds,
+                }
                 # predict the noise residual
-                noise_pred = self.unet(
-                    sample=latent_model_input,
-                    timestep=timestep,
-                    encoder_hidden_states=text_embeddings,
-                    class_labels=noise_level.astype(np.int64),
-                )[0]
-
+                self.unet.zero_copy_infer(
+                    prebinded_inputs=unet_inputs,
+                    prebinded_outputs={unet_output_name: noise_pred_unet},
+                    share_with_raw_ptr=True,
+                )
                 # perform guidance
                 if do_classifier_free_guidance:
-                    noise_pred_uncond, noise_pred_text = np.split(noise_pred, 2)
-                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+                    noise_pred_uncond, noise_pred_text = noise_pred_unet.chunk(2)
+                    noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+                else:
+                    noise_pred = noise_pred_unet
 
                 # compute the previous noisy sample x_t -> x_t-1
-                latents = self.scheduler.step(
-                    paddle.to_tensor(noise_pred), t, latents, **extra_step_kwargs
-                ).prev_sample
+                latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
 
                 # call the callback, if provided
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)
+                    if i == len(timesteps) - 1:
+                        # sync for accuracy it/s measure
+                        paddle.device.cuda.synchronize()
 
-        # 10. Post-processing
-        image = self.decode_latents(latents.float())
+        if not output_type == "latent":
+            image = self._decode_vae_latents(latents / self.vae_scaling_factor)
+        else:
+            image = latents
 
-        # 11. Convert to PIL
-        if output_type == "pil":
-            image = self.numpy_to_pil(image)
+        do_denormalize = [True] * image.shape[0]
+
+        image = self.image_processor.postprocess(image, output_type=output_type, do_denormalize=do_denormalize)
 
         if not return_dict:
             return (image,)
 
-        return ImagePipelineOutput(images=image)
-
-    def decode_latents(self, latents):
-        latents = 1 / 0.08333 * latents
-        image = self.vae(latent_sample=latents)[0]
-        image = np.clip(image / 2 + 0.5, 0, 1)
-        image = image.transpose((0, 2, 3, 1))
-        return image
-
-    def _encode_prompt(
-        self,
-        prompt: Union[str, List[str]],
-        num_images_per_prompt: Optional[int],
-        do_classifier_free_guidance: bool,
-        negative_prompt: Optional[str],
-        prompt_embeds: Optional[paddle.Tensor] = None,
-        negative_prompt_embeds: Optional[paddle.Tensor] = None,
-    ):
-        if prompt is not None and isinstance(prompt, str):
-            batch_size = 1
-        elif prompt is not None and isinstance(prompt, list):
-            batch_size = len(prompt)
-        else:
-            batch_size = prompt_embeds.shape[0]
-
-        if prompt_embeds is None:
-            text_inputs = self.tokenizer(
-                prompt,
-                padding="max_length",
-                max_length=self.tokenizer.model_max_length,
-                truncation=True,
-                return_tensors="pd",
-            )
-            text_input_ids = text_inputs.input_ids
-            untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="pd").input_ids
-
-            if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not paddle.equal_all(
-                text_input_ids, untruncated_ids
-            ):
-                removed_text = self.tokenizer.batch_decode(
-                    untruncated_ids[:, self.tokenizer.model_max_length - 1 : -1]
-                )
-                logger.warning(
-                    "The following part of your input was truncated because CLIP can only handle sequences up to"
-                    f" {self.tokenizer.model_max_length} tokens: {removed_text}"
-                )
-
-            # no positional arguments to text_encoder
-            prompt_embeds = self.text_encoder(
-                input_ids=text_input_ids,
-                # attention_mask=attention_mask,
-            )
-            prompt_embeds = prompt_embeds[0]
-
-        bs_embed, seq_len, _ = prompt_embeds.shape
-        # duplicate text embeddings for each generation per prompt, using mps friendly method
-        prompt_embeds = prompt_embeds.tile([1, num_images_per_prompt])
-        prompt_embeds = prompt_embeds.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
-
-        # get unconditional embeddings for classifier free guidance
-        if do_classifier_free_guidance and negative_prompt_embeds is None:
-            uncond_tokens: List[str]
-            if negative_prompt is None:
-                uncond_tokens = [""] * batch_size
-            elif type(prompt) is not type(negative_prompt):
-                raise TypeError(
-                    f"`negative_prompt` should be the same type to `prompt`, but got {type(negative_prompt)} !="
-                    f" {type(prompt)}."
-                )
-            elif isinstance(negative_prompt, str):
-                uncond_tokens = [negative_prompt]
-            elif batch_size != len(negative_prompt):
-                raise ValueError(
-                    f"`negative_prompt`: {negative_prompt} has batch size {len(negative_prompt)}, but `prompt`:"
-                    f" {prompt} has batch size {batch_size}. Please make sure that passed `negative_prompt` matches"
-                    " the batch size of `prompt`."
-                )
-            else:
-                uncond_tokens = negative_prompt
-
-            max_length = text_input_ids.shape[-1]
-            uncond_input = self.tokenizer(
-                uncond_tokens,
-                padding="max_length",
-                max_length=max_length,
-                truncation=True,
-                return_tensors="pd",
-            )
-
-            # if hasattr(uncond_input, "attention_mask"):
-            #     attention_mask = uncond_input.attention_mask
-            # else:
-            #     attention_mask = None
-
-            uncond_embeddings = self.text_encoder(
-                input_ids=uncond_input.input_ids,
-                # attention_mask=attention_mask,
-            )
-            uncond_embeddings = uncond_embeddings[0]
-
-        if do_classifier_free_guidance:
-            seq_len = uncond_embeddings.shape[1]
-            # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
-            uncond_embeddings = uncond_embeddings.tile([1, num_images_per_prompt])
-            uncond_embeddings = uncond_embeddings.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
-
-            # For classifier free guidance, we need to do two forward passes.
-            # Here we concatenate the unconditional and text embeddings into a single batch
-            # to avoid doing two forward passes
-            prompt_embeds = np.concatenate([uncond_embeddings, prompt_embeds])
-
-        return prompt_embeds
+        return ImagePipelineOutput(
+            images=image,
+        )

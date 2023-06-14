@@ -321,14 +321,16 @@ if is_paddle_available():
     nn.Layer.__init__ = __init__
 
 if is_paddle_available() and is_paddlenlp_available():
-    # set logger level warning
     import paddle
 
     import paddlenlp.transformers
     from paddlenlp import __version__
     from paddlenlp.transformers import PretrainedConfig, PretrainedModel
+    from paddlenlp.transformers.model_utils import no_init_weights
     from paddlenlp.utils.log import logger as ppnlp_logger
 
+    # set logger level warning
+    ppnlp_logger.set_level("WARNING")
     if is_ppxformers_available():
         from paddle.incubate.nn.memory_efficient_attention import (
             memory_efficient_attention,
@@ -346,7 +348,27 @@ if is_paddle_available() and is_paddlenlp_available():
             training=False,
             attention_op="cutlass",
         ):
-            if attention_op is None or attention_op == "cutlass" or training:
+            if attn_mask is not None or attention_op == "math":
+                if scale is None:
+                    scale = 1 / math.sqrt(query.shape[-1])
+                qt = paddle.transpose(query, [0, 2, 1, 3])
+                kt = paddle.transpose(key, [0, 2, 1, 3])
+                vt = paddle.transpose(value, [0, 2, 1, 3])
+                s = paddle.matmul(qt * scale, kt, transpose_y=True)
+                if is_causal:
+                    p = paddle.incubate.softmax_mask_fuse_upper_triangle(s)
+                else:
+                    if attn_mask is not None:
+                        attn_mask = paddle.transpose(attn_mask, [0, 2, 1, 3])
+                        if attn_mask.cast("float32").min() == 0 and attn_mask.cast("float32").max() == 1:
+                            attn_mask = (attn_mask.cast(s.dtype) - 1) * 10000.0
+                        s = s + attn_mask
+                    p = paddle.nn.functional.softmax(s)
+                if dropout_p > 0.0:
+                    p = paddle.nn.functional.dropout(p, dropout_p, training=training, mode="upscale_in_train")
+                o = paddle.matmul(p, vt)
+                return paddle.transpose(o, [0, 2, 1, 3])
+            elif attention_op is None or attention_op == "cutlass" or training:
                 if scale is None:
                     scale = 1 / math.sqrt(query.shape[-1])
                 # support fp32, fp16, bfp16
@@ -354,7 +376,7 @@ if is_paddle_available() and is_paddlenlp_available():
                     query,
                     key,
                     value,
-                    attn_mask,
+                    None,
                     p=dropout_p,
                     scale=scale,
                     training=training,
@@ -373,7 +395,7 @@ if is_paddle_available() and is_paddlenlp_available():
                 if raw_dtype == paddle.float32:
                     output = output.cast(raw_dtype)
             else:
-                raise ValueError("ppxformers's attention_op shoulde be in ['cutlass', 'flash']")
+                raise ValueError("ppxformers's attention_op shoulde be in ['cutlass', 'flash', 'math']")
             return output
 
         paddle.nn.functional.scaled_dot_product_attention_ = scaled_dot_product_attention_
@@ -383,14 +405,20 @@ if is_paddle_available() and is_paddlenlp_available():
         try:
             return next(parameter.named_parameters())[1].dtype
         except StopIteration:
-            return parameter._dtype
+            try:
+                return next(parameter.named_buffers())[1].dtype
+            except StopIteration:
+                return parameter._dtype
 
     @patch_to(PretrainedModel, as_prop=True)
     def device(self):
         try:
             return next(self.named_parameters())[1].place
         except StopIteration:
-            return paddle.get_device()
+            try:
+                return next(self.named_buffers())[1].place
+            except StopIteration:
+                return paddle.get_device()
 
     try:
         from paddlenlp.transformers import XLMRobertaTokenizer
@@ -673,7 +701,9 @@ if is_paddle_available() and is_paddlenlp_available():
         revision = kwargs.pop("revision", None)
         paddle_dtype = kwargs.pop("paddle_dtype", None)
         # do not use paddlenlp dtype
-        kwargs.pop("dtype", None)
+        _dtype = kwargs.pop("dtype", None)
+        if _dtype is not None and paddle_dtype is None:
+            paddle_dtype = _dtype
         subfolder = kwargs.pop("subfolder", None)
         variant = kwargs.pop("variant", None)
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", LOW_CPU_MEM_USAGE_DEFAULT)
@@ -718,6 +748,8 @@ if is_paddle_available() and is_paddlenlp_available():
         if not from_hf_hub and not os.path.exists(os.path.join(cache_dir, config_path, "config.json")):
             config.save_pretrained(os.path.join(cache_dir, config_path))
 
+        if paddle_dtype is None:
+            paddle_dtype = config.get("dtype", paddle.get_default_dtype())
         # This variable will flag if we're loading a sharded checkpoint. In this case the archive file is just the
         # Load model
         model_file = None
@@ -792,7 +824,7 @@ if is_paddle_available() and is_paddlenlp_available():
 
         if low_cpu_mem_usage:
             # Instantiate model.
-            init_contexts.append(paddle.no_init_weights(_enable=True))
+            init_contexts.append(no_init_weights(_enable=True))
             if hasattr(paddle, "LazyGuard"):
                 init_contexts.append(paddle.LazyGuard())
 
@@ -819,11 +851,11 @@ if is_paddle_available() and is_paddlenlp_available():
             "error_msgs": "",
         }
 
-        if paddle_dtype is not None and not isinstance(paddle_dtype, paddle.dtype):
-            raise ValueError(
-                f"{paddle_dtype} needs to be of type `paddle.dtype`, e.g. `paddle.float16`, but is {type(paddle_dtype)}."
-            )
-        elif paddle_dtype is not None:
+        # if paddle_dtype is not None and not isinstance(paddle_dtype, paddle.dtype):
+        #     raise ValueError(
+        #         f"{paddle_dtype} needs to be of type `paddle.dtype`, e.g. `paddle.float16`, but is {type(paddle_dtype)}."
+        #     )
+        if paddle_dtype is not None:
             model = model.to(dtype=paddle_dtype)
 
         if len(unexpected_keys) > 0:
@@ -1003,7 +1035,7 @@ if is_paddle_available() and is_paddlenlp_available():
         variant: Optional[str] = None,
         to_diffusers: Optional[bool] = None,
     ):
-        if self.constructed_from_pretrained_config() and hasattr(self, "paddle_torch_name_mapping"):
+        if self.constructed_from_pretrained_config() and hasattr(self, "smart_convert"):
             return save_pretrained_v3(
                 self,
                 save_dir,
@@ -1013,22 +1045,28 @@ if is_paddle_available() and is_paddlenlp_available():
                 variant=variant,
                 to_diffusers=to_diffusers,
             )
-        return raw_save_pretrained(self, save_dir)
+        return raw_save_pretrained(self, save_dir, variant=variant)
 
     PretrainedModel.save_pretrained = save_pretrained
 
     from paddlenlp.transformers import (
         BertModel,
         BitBackbone,
+        ClapTextModelWithProjection,
         CLIPTextModel,
         CLIPTextModelWithProjection,
         CLIPVisionModel,
         CLIPVisionModelWithProjection,
         DPTForDepthEstimation,
+        SpeechT5HifiGan,
+        T5EncoderModel,
     )
 
+    if not hasattr(T5EncoderModel, "_keep_in_fp32_modules"):
+        T5EncoderModel._keep_in_fp32_modules = ["wo"]
+
     from ..models.modeling_pytorch_paddle_utils import (
-        convert_pytorch_state_dict_to_paddle,
+        convert_pytorch_state_dict_to_paddle_class_method,
     )
     from ..pipelines.alt_diffusion.modeling_roberta_series import (
         RobertaSeriesModelWithTransformation,
@@ -1071,8 +1109,8 @@ if is_paddle_available() and is_paddlenlp_available():
             name_mapping_dict.update({".vision_model.": "."})
 
         donot_transpose = ["embeddings", "norm", "concept_embeds", "special_care_embeds"]
-
-        paddle_torch_name_mapping = {}
+        if not hasattr(cls, "paddle_torch_name_mapping"):
+            cls.paddle_torch_name_mapping = {}
         for name, value in state_dict.items():
             torch_name = name
             # step1: ignore position_ids
@@ -1092,12 +1130,11 @@ if is_paddle_available() and is_paddlenlp_available():
                 name = "clip." + name
             new_model_state[name] = value
 
-            paddle_torch_name_mapping[name] = torch_name
+            cls.paddle_torch_name_mapping[name] = torch_name
 
-        cls.paddle_torch_name_mapping = paddle_torch_name_mapping
         if cls in [PaintByExampleImageEncoder]:
             # convert mapper
-            mappersd = convert_pytorch_state_dict_to_paddle(state_dict, pd_model, sub_layer="mapper.")
+            mappersd = cls.smart_convert(state_dict, pd_model, sub_layer="mapper.")
             new_model_state.update(mappersd)
 
         return new_model_state
@@ -1130,8 +1167,8 @@ if is_paddle_available() and is_paddlenlp_available():
         }
         ignore_value = ["position_ids"]
         donot_transpose = ["embeddings", "norm"]
-        paddle_torch_name_mapping = {}
-
+        if not hasattr(cls, "paddle_torch_name_mapping"):
+            cls.paddle_torch_name_mapping = {}
         for name, value in state_dict.items():
             torch_name = name
             # step1: ignore position_ids
@@ -1144,9 +1181,7 @@ if is_paddle_available() and is_paddlenlp_available():
             for hf_name, ppnlp_name in name_mapping_dict.items():
                 name = name.replace(hf_name, ppnlp_name)
             new_model_state[name] = value
-            paddle_torch_name_mapping[name] = torch_name
-
-        cls.paddle_torch_name_mapping = paddle_torch_name_mapping
+            cls.paddle_torch_name_mapping[name] = torch_name
 
         return new_model_state
 
@@ -1165,7 +1200,8 @@ if is_paddle_available() and is_paddlenlp_available():
         ignore_value = ["to_logits"]
         donot_transpose = ["embed_tokens", "embed_positions", "norm"]
         new_model_state = {}
-        paddle_torch_name_mapping = {}
+        if not hasattr(cls, "paddle_torch_name_mapping"):
+            cls.paddle_torch_name_mapping = {}
         for name, value in state_dict.items():
             torch_name = name
             # step1: ignore to_logits
@@ -1178,9 +1214,7 @@ if is_paddle_available() and is_paddlenlp_available():
             for hf_name, ppnlp_name in transformers2ppnlp.items():
                 name = name.replace(hf_name, ppnlp_name)
             new_model_state[name] = value
-            paddle_torch_name_mapping[name] = torch_name
-
-        cls.paddle_torch_name_mapping = paddle_torch_name_mapping
+            cls.paddle_torch_name_mapping[name] = torch_name
 
         return new_model_state
 
@@ -1200,8 +1234,8 @@ if is_paddle_available() and is_paddlenlp_available():
     for cls_ in [BertModel, RobertaSeriesModelWithTransformation]:
         setattr(cls_, "smart_convert", bert_smart_convert)
 
-    for cls_ in [DPTForDepthEstimation, BitBackbone]:
-        setattr(cls_, "smart_convert", convert_pytorch_state_dict_to_paddle)
+    for cls_ in [DPTForDepthEstimation, BitBackbone, SpeechT5HifiGan, ClapTextModelWithProjection, T5EncoderModel]:
+        setattr(cls_, "smart_convert", convert_pytorch_state_dict_to_paddle_class_method)
 
     # TODO remove this when we updage ImageProcessingMixin
     # patch get_image_processor_dict support subfolder.
@@ -1258,3 +1292,15 @@ if is_paddle_available() and is_paddlenlp_available():
         return image_processor_dict, kwargs
 
     ImageProcessingMixin.get_image_processor_dict = get_image_processor_dict
+
+    # patch T5LayerFF, we will remove this in the near future.
+    from paddlenlp.transformers.t5.modeling import T5LayerFF
+
+    def new_forward(self, hidden_states):
+        forwarded_states = self.layer_norm(hidden_states)
+        forwarded_states = self.DenseReluDense(forwarded_states)
+        # make sure FP32 + FP16 = FP32
+        hidden_states = self.dropout(forwarded_states) + hidden_states
+        return hidden_states
+
+    T5LayerFF.forward = new_forward

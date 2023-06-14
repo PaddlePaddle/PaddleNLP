@@ -60,11 +60,37 @@ EXAMPLE_DOC_STRING = """
 """
 
 
+def is_power_of_two(n):
+    if n <= 0:
+        return False
+    else:
+        return n & (n - 1) == 0
+
+
+def resize(images: PIL.Image.Image, img_size: int) -> PIL.Image.Image:
+    w, h = images.size
+
+    coef = w / h
+
+    w, h = img_size, img_size
+
+    if coef >= 1:
+        w = int(round(img_size / 8 * coef) * 8)
+    else:
+        h = int(round(img_size / 8 / coef) * 8)
+
+    images = images.resize((w, h), resample=PIL_INTERPOLATION["bicubic"], reducing_gap=None)
+
+    return images
+
+
 def preprocess(image):
     if isinstance(image, paddle.Tensor):
         return image
     elif isinstance(image, PIL.Image.Image):
         image = [image]
+    else:
+        raise ValueError("Invalid image type!")
     if isinstance(image[0], PIL.Image.Image):
         w, h = image[0].size
         w, h = (x - x % 8 for x in (w, h))
@@ -83,6 +109,8 @@ def preprocess(image):
             raise ValueError(
                 f"Invalid image tensor! Expecting image tensor with 3 or 4 dimension, but recive: {image[0].ndim}"
             )
+    else:
+        raise ValueError("Invalid image type!")
     return image
 
 
@@ -478,6 +506,11 @@ class StableDiffusionAdapterPipeline(DiffusionPipeline):
             (nsfw) content, according to the `safety_checker`.
         """
         height, width = self._default_height_width(height, width, image)
+        if (not is_power_of_two(height)) or (not is_power_of_two(width)):
+            height = 512
+            width = 512
+            image = resize(image, 512)
+
         self.check_inputs(
             prompt, height, width, callback_steps, negative_prompt, prompt_embeds, negative_prompt_embeds
         )

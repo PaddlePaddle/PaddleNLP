@@ -142,16 +142,17 @@ class Attention(nn.Layer):
         is_custom_diffusion = hasattr(self, "processor") and isinstance(
             self.processor, (CustomDiffusionAttnProcessor, CustomDiffusionXFormersAttnProcessor)
         )
+        is_added_kv = self.added_kv_proj_dim is not None
         if use_memory_efficient_attention_xformers:
-            if self.added_kv_proj_dim is not None:
-                # TODO(Anton, Patrick, Suraj, William) - currently xformers doesn't work for UnCLIP
-                # which uses this type of cross attention ONLY because the attention mask of format
-                # [0, ..., -10.000, ..., 0, ...,] is not supported
-                raise NotImplementedError(
-                    "Memory efficient attention with `xformers` is currently not supported when"
-                    " `self.added_kv_proj_dim` is defined."
-                )
-            elif not is_ppxformers_available():
+            # if self.added_kv_proj_dim is not None:
+            #     # TODO(Anton, Patrick, Suraj, William) - currently xformers doesn't work for UnCLIP
+            #     # which uses this type of cross attention ONLY because the attention mask of format
+            #     # [0, ..., -10.000, ..., 0, ...,] is not supported
+            #     raise NotImplementedError(
+            #         "Memory efficient attention with `xformers` is currently not supported when"
+            #         " `self.added_kv_proj_dim` is defined."
+            #     )
+            if not is_ppxformers_available():
                 raise NotImplementedError(
                     "requires the scaled_dot_product_attention but your PaddlePaddle donot have this. Checkout the instructions on the installation page: https://www.paddlepaddle.org.cn/install/quick and follow the ones that match your environment."
                 )
@@ -189,6 +190,8 @@ class Attention(nn.Layer):
                 # we must cast dtype
                 processor.to(dtype=self.dtype)
                 processor.load_dict(self.processor.state_dict())
+            elif is_added_kv:
+                processor = XFormersAttnAddedKVProcessor(attention_op=attention_op)
             else:
                 processor = XFormersAttnProcessor(attention_op=attention_op)
         else:
@@ -211,6 +214,8 @@ class Attention(nn.Layer):
                 # we must cast dtype
                 processor.to(dtype=self.dtype)
                 processor.load_dict(self.processor.state_dict())
+            elif is_added_kv:
+                processor = AttnAddedKVProcessor(attention_op=attention_op)
             else:
                 processor = AttnProcessor()
 
@@ -274,7 +279,7 @@ class Attention(nn.Layer):
             query = query.cast(paddle.float32)
             key = key.cast(paddle.float32)
 
-        attention_scores = paddle.matmul(query * self.scale, key, transpose_y=True)
+        attention_scores = paddle.matmul(query, key, transpose_y=True) * self.scale
 
         if attention_mask is not None:
             attention_scores = attention_scores + attention_mask
@@ -313,7 +318,9 @@ class Attention(nn.Layer):
                 attention_mask = attention_mask.repeat_interleave(num_heads, axis=0)
         elif out_dim == 4:
             attention_mask = attention_mask.unsqueeze(1)
-            attention_mask = attention_mask.repeat_interleave(num_heads, axis=1)
+            if attention_mask.shape[0] < batch_size * num_heads:
+                attention_mask = attention_mask.repeat_interleave(num_heads, axis=1)
+            attention_mask = paddle.reshape(attention_mask, [batch_size, num_heads, -1, attention_mask.shape[-1]])
 
         if attention_mask.ndim == 4:
             if not transpose:

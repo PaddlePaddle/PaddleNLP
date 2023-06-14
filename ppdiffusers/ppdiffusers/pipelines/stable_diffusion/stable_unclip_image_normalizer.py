@@ -46,21 +46,21 @@ class StableUnCLIPImageNormalizer(ModelMixin, ConfigMixin):
 
     def to(
         self,
-        paddle_device: Optional[str] = None,
-        paddle_dtype: Optional[paddle.dtype] = None,
+        device: Optional[str] = None,
+        dtype: Optional[paddle.dtype] = None,
     ):
-        if paddle_dtype is not None:
+        if dtype is not None:
             self.mean = self.create_parameter(
                 self.mean.shape,
-                dtype=paddle_dtype,
+                dtype=dtype,
                 default_initializer=paddle.nn.initializer.Assign(self.mean.numpy()),
             )
             self.std = self.create_parameter(
-                self.std.shape, dtype=paddle_dtype, default_initializer=paddle.nn.initializer.Assign(self.std.numpy())
+                self.std.shape, dtype=dtype, default_initializer=paddle.nn.initializer.Assign(self.std.numpy())
             )
-        if paddle_device is not None:
-            self.mean._to(paddle_device)
-            self.std._to(paddle_device)
+        if device is not None:
+            self.mean._to(device)
+            self.std._to(device)
 
         return self
 

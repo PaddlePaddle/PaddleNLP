@@ -167,6 +167,7 @@ ALLOW_PATTERNS_MAPPING = {
         "config.json",
     ],
     "mel": ["mel_config.json"],
+    "melgan": ["model.onnx"],
     "others": [
         "model_state.pdparams",
         "model_config.json",
@@ -174,6 +175,7 @@ ALLOW_PATTERNS_MAPPING = {
         "model_config.json",
         "scheduler_config.json",
         "preprocessor_config.json",
+        "model.onnx",
         "pipeline.py",
     ],
 }
@@ -586,20 +588,40 @@ def ppdiffusers_bos_dir_download(
             allow_patterns = [ap for ap in allow_patterns if "pdparams" not in ap]
             allow_patterns.extend(["inference.pdiparams", "inference.pdmodel"])
         for filename in allow_patterns:
+            need_to_check_no_variant_file = False
+            raw_filename = filename
             if "pdparams" in filename:
                 filename = _add_variant(filename, variant)
+                need_to_check_no_variant_file = variant is not None
+
             url = ppdiffusers_bos_url(
                 repo_id,
                 filename=filename,
                 subfolder=subfolder,
             )
             if url_file_exists(url):
+                # exist file
                 filtered_repo_files.append(
                     [
                         filename,
                         subfolder,
                     ]
                 )
+            else:
+                if need_to_check_no_variant_file:
+                    url = ppdiffusers_bos_url(
+                        repo_id,
+                        filename=raw_filename,
+                        subfolder=subfolder,
+                    )
+                    if url_file_exists(url):
+                        # exist file
+                        filtered_repo_files.append(
+                            [
+                                raw_filename,
+                                subfolder,
+                            ]
+                        )
 
     def _inner_ppdiffusers_bos_download(repo_file_list):
         filename, _subfolder = repo_file_list

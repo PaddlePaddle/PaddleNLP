@@ -21,9 +21,9 @@ from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
-from diffusers.utils import BaseOutput, deprecate
 
 from ..configuration_utils import ConfigMixin, register_to_config
+from ..utils import BaseOutput, deprecate
 from .scheduling_utils import SchedulerMixin
 
 
