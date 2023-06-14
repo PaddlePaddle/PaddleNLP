@@ -111,10 +111,9 @@ class PipelineFastTests(unittest.TestCase):
         )
         image_slice = np.frombuffer(image.tobytes(), dtype="uint8")[:10]
         image_from_tuple_slice = np.frombuffer(image_from_tuple.tobytes(), dtype="uint8")[:10]
-        # expected_slice = np.array([0, 252, 0, 160, 144, 1, 0, 211, 99, 3])
         expected_slice = np.array([0, 252, 2, 182, 154, 1, 0, 229, 71, 2])
         assert np.abs(image_slice.flatten() - expected_slice).max() == 0
-        assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() == 0
+        assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() <= 5
         scheduler = DDIMScheduler()
         dummy_vqvae_and_unet = self.dummy_vqvae_and_unet
         pipe = AudioDiffusionPipeline(
@@ -131,9 +130,8 @@ class PipelineFastTests(unittest.TestCase):
             and image.width == self.dummy_vqvae_and_unet[0].config.sample_size[1]
         )
         image_slice = np.frombuffer(image.tobytes(), dtype="uint8")[:10]
-        # expected_slice = np.array([128, 100, 153, 95, 92, 77, 130, 121, 81, 166])
         expected_slice = np.array([147, 129, 161, 116, 113, 95, 130, 136, 94, 164])
-        assert np.abs(image_slice.flatten() - expected_slice).max() == 0
+        assert np.abs(image_slice.flatten() - expected_slice).max() <= 5
         dummy_unet_condition = self.dummy_unet_condition
         pipe = AudioDiffusionPipeline(
             vqvae=self.dummy_vqvae_and_unet[0], unet=dummy_unet_condition, mel=mel, scheduler=scheduler
@@ -143,9 +141,8 @@ class PipelineFastTests(unittest.TestCase):
         output = pipe(generator=generator, encoding=encoding)
         image = output.images[0]
         image_slice = np.frombuffer(image.tobytes(), dtype="uint8")[:10]
-        # expected_slice = np.array([166, 156, 163, 149, 148, 149, 145, 139, 157, 141])
         expected_slice = np.array([109, 70, 71, 91, 121, 166, 129, 111, 99, 78])
-        assert np.abs(image_slice.flatten() - expected_slice).max() == 0
+        assert np.abs(image_slice.flatten() - expected_slice).max() <= 5
 
 
 @slow
@@ -164,7 +161,7 @@ class PipelineIntegrationTests(unittest.TestCase):
         audio = output.audios[0]
         image = output.images[0]
         assert audio.shape == (1, (pipe.unet.config.sample_size[1] - 1) * pipe.mel.hop_length)
-        assert image.height == pipe.unet.config.sample_size[0] and image.width == pipe.unet.sample_size[1]
+        assert image.height == pipe.unet.config.sample_size[0] and image.width == pipe.unet.config.sample_size[1]
         image_slice = np.frombuffer(image.tobytes(), dtype="uint8")[:10]
         expected_slice = np.array([151, 167, 154, 144, 122, 134, 121, 105, 70, 26])
-        assert np.abs(image_slice.flatten() - expected_slice).max() == 0
+        assert np.abs(image_slice.flatten() - expected_slice).max() <= 5

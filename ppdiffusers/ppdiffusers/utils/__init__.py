@@ -106,6 +106,7 @@ if is_paddle_available():
         load_hf_numpy,
         load_image,
         load_numpy,
+        load_pd,
         load_ppnlp_numpy,
         nightly,
         paddle_all_close,

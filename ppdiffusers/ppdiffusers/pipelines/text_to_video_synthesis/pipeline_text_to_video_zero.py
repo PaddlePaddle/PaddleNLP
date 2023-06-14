@@ -84,6 +84,7 @@ class CrossFrameAttnProcessor:
 
             # rearrange keys to have batch and frames in the 1st and 2nd dims respectively
             key = rearrange_3(key, video_length)
+            breakpoint()
             key = key[:, (first_frame_index)]
             # rearrange values to have batch and frames in the 1st and 2nd dims respectively
             value = rearrange_3(value, video_length)
