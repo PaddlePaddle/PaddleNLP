@@ -329,8 +329,6 @@ if is_paddle_available() and is_paddlenlp_available():
     from paddlenlp.transformers.model_utils import no_init_weights
     from paddlenlp.utils.log import logger as ppnlp_logger
 
-    # set logger level warning
-    ppnlp_logger.set_level("WARNING")
     if is_ppxformers_available():
         from paddle.incubate.nn.memory_efficient_attention import (
             memory_efficient_attention,

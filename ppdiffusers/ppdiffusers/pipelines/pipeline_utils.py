@@ -1423,6 +1423,7 @@ class DiffusionPipeline(ConfigMixin):
                 pretrained_model_name,
                 cache_dir=cache_dir,
                 resume_download=resume_download,
+                force_download=force_download,  # new added force_download
                 proxies=proxies,
                 local_files_only=local_files_only,
                 use_auth_token=use_auth_token,
@@ -1441,6 +1442,7 @@ class DiffusionPipeline(ConfigMixin):
                 revision=revision,
                 cache_dir=cache_dir,
                 resume_download=resume_download,
+                force_download=force_download,  # new added force_download
                 folder_names=folder_names,
                 variant=variant,
                 is_fastdeploy_model=is_fastdeploy_model,

@@ -565,6 +565,7 @@ def ppdiffusers_bos_dir_download(
     revision: Optional[str] = None,
     repo_type: Optional[str] = None,
     cache_dir: Union[str, Path, None] = None,
+    force_download: bool = False,
     resume_download: bool = False,
     folder_names: Optional[Union[List[str], str]] = None,
     max_workers: int = 1,
@@ -633,6 +634,7 @@ def ppdiffusers_bos_dir_download(
             cache_dir=cache_dir,
             revision=revision,
             resume_download=resume_download,
+            force_download=force_download,
             file_lock_timeout=file_lock_timeout,
         )
 

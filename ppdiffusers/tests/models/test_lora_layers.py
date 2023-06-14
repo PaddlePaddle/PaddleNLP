@@ -28,7 +28,7 @@ from ppdiffusers import (
 )
 from ppdiffusers.loaders import AttnProcsLayers, LoraLoaderMixin
 from ppdiffusers.models.attention_processor import LoRAAttnProcessor
-from ppdiffusers.utils import TEXT_ENCODER_TARGET_MODULES, floats_tensor
+from ppdiffusers.utils import TEXT_ENCODER_ATTN_MODULE, floats_tensor
 
 
 def create_unet_lora_layers(unet: nn.Layer):
@@ -50,10 +50,12 @@ def create_unet_lora_layers(unet: nn.Layer):
 
 def create_text_encoder_lora_layers(text_encoder: nn.Layer):
     text_lora_attn_procs = {}
-    for name, module in text_encoder.named_sublayers():
-        if any(x in name for x in TEXT_ENCODER_TARGET_MODULES):
-            out_features = module.weight.shape[1]
-            text_lora_attn_procs[name] = LoRAAttnProcessor(hidden_size=out_features, cross_attention_dim=None)
+    for name, module in text_encoder.named_sublayers(include_self=True):
+        if name.endswith(TEXT_ENCODER_ATTN_MODULE):
+            text_lora_attn_procs[name] = LoRAAttnProcessor(
+                hidden_size=module.out_proj.weight.shape[1], cross_attention_dim=None
+            )
+
     text_encoder_lora_layers = AttnProcsLayers(text_lora_attn_procs)
     return text_encoder_lora_layers
 

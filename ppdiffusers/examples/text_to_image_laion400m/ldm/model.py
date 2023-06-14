@@ -137,6 +137,7 @@ class LatentDiffusionModel(nn.Layer):
             self.eval_scheduler.set_timesteps(model_args.num_inference_steps)
         self.init_weights()
         self.use_ema = model_args.use_ema
+        self.noise_offset = model_args.noise_offset
         if self.use_ema:
             self.model_ema = LitEma(self.unet)
 
@@ -236,6 +237,11 @@ class LatentDiffusionModel(nn.Layer):
             latents = self.vae.encode(pixel_values).latent_dist.sample()
             latents = latents * 0.18215
             noise = paddle.randn(latents.shape)
+            if self.noise_offset:
+                # https://www.crosslabs.org//blog/diffusion-with-offset-noise
+                noise += self.noise_offset * paddle.randn(
+                    (latents.shape[0], latents.shape[1], 1, 1), dtype=noise.dtype
+                )
             timesteps = paddle.randint(0, self.noise_scheduler.num_train_timesteps, (latents.shape[0],)).astype(
                 "int64"
             )

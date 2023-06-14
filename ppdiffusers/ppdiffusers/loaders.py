@@ -14,6 +14,7 @@
 # limitations under the License.
 import copy
 import os
+import warnings
 from collections import defaultdict
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Union
@@ -35,10 +36,9 @@ from .utils import (
     FROM_HF_HUB,
     HF_HUB_OFFLINE,
     PPDIFFUSERS_CACHE,
-    TEXT_ENCODER_TARGET_MODULES,
+    TEXT_ENCODER_ATTN_MODULE,
     TO_DIFFUSERS,
     _get_model_file,
-    deprecate,
     is_paddlenlp_available,
     is_safetensors_available,
     is_torch_available,
@@ -60,6 +60,9 @@ if is_safetensors_available():
 if is_paddlenlp_available():
     from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
 
+TEXT_ENCODER_NAME = "text_encoder"
+UNET_NAME = "unet"
+
 TORCH_LORA_WEIGHT_NAME = "pytorch_lora_weights.bin"
 TORCH_LORA_WEIGHT_NAME_SAFE = "pytorch_lora_weights.safetensors"
 PADDLE_LORA_WEIGHT_NAME = "paddle_lora_weights.pdparams"
@@ -73,9 +76,12 @@ TORCH_CUSTOM_DIFFUSION_WEIGHT_NAME_SAFE = "pytorch_custom_diffusion_weights.safe
 PADDLE_CUSTOM_DIFFUSION_WEIGHT_NAME = "paddle_custom_diffusion_weights.pdparams"
 
 
-def transpose_state_dict(state_dict):
+def transpose_state_dict(state_dict, name_mapping=None):
     new_state_dict = {}
     for k, v in state_dict.items():
+        if name_mapping is not None:
+            for old_name, new_name in name_mapping.items():
+                k = k.replace(old_name, new_name)
         if v.ndim == 2:
             new_state_dict[k] = v.T.contiguous() if hasattr(v, "contiguous") else v.T
         else:
@@ -90,6 +96,9 @@ class AttnProcsLayers(nn.Layer):
         self.mapping = dict(enumerate(state_dict.keys()))
         self.rev_mapping = {v: k for k, v in enumerate(state_dict.keys())}
 
+        # .processor for unet, .self_attn for text encoder
+        self.split_keys = [".processor", ".self_attn"]
+
         # we add a hook to state_dict() and load_state_dict() so that the
         # naming fits with `unet.attn_processors`
         def map_to(state_dict, *args, **kwargs):
@@ -101,10 +110,19 @@ class AttnProcsLayers(nn.Layer):
 
             return new_state_dict
 
+        def remap_key(key, state_dict):
+            for k in self.split_keys:
+                if k in key:
+                    return key.split(k)[0] + k
+
+            raise ValueError(
+                f"There seems to be a problem with the state_dict: {set(state_dict.keys())}. {key} has to have one of {self.split_keys}."
+            )
+
         def map_from(module, state_dict, *args, **kwargs):
             all_keys = list(state_dict.keys())
             for key in all_keys:
-                replace_key = key.split(".processor")[0] + ".processor"
+                replace_key = remap_key(key, state_dict)
                 new_key = key.replace(replace_key, f"layers.{module.rev_mapping[replace_key]}")
                 state_dict[new_key] = state_dict[key]
                 del state_dict[key]
@@ -114,6 +132,9 @@ class AttnProcsLayers(nn.Layer):
 
 
 class UNet2DConditionLoadersMixin:
+    text_encoder_name = TEXT_ENCODER_NAME
+    unet_name = UNET_NAME
+
     def load_attn_procs(self, pretrained_model_name_or_path_or_dict: Union[str, Dict[str, paddle.Tensor]], **kwargs):
         r"""
         Load pretrained attention processor layers into `UNet2DConditionModel`. Attention processor layers have to be
@@ -186,6 +207,9 @@ class UNet2DConditionLoadersMixin:
         subfolder = kwargs.pop("subfolder", None)
         weight_name = kwargs.pop("weight_name", None)
         use_safetensors = kwargs.pop("use_safetensors", None)
+        # This value has the same meaning as the `--network_alpha` option in the kohya-ss trainer script.
+        # See https://github.com/darkstorm2150/sd-scripts/blob/main/docs/train_network_README-en.md#execute-learning
+        network_alpha = kwargs.pop("network_alpha", None)
 
         if from_diffusers and use_safetensors and not is_safetensors_available():
             raise ValueError(
@@ -200,7 +224,14 @@ class UNet2DConditionLoadersMixin:
         }
 
         model_file = None
-        if not isinstance(pretrained_model_name_or_path_or_dict, dict):
+
+        # maybe we load file
+        if isinstance(pretrained_model_name_or_path_or_dict, (str, Path)) and os.path.isfile(
+            pretrained_model_name_or_path_or_dict
+        ):
+            model_file = pretrained_model_name_or_path_or_dict
+            state_dict = smart_load(model_file)
+        elif not isinstance(pretrained_model_name_or_path_or_dict, dict):
             if from_diffusers:
                 # Let's first try to load .safetensors weights
                 if (use_safetensors and weight_name is None) or (
@@ -270,10 +301,24 @@ class UNet2DConditionLoadersMixin:
             state_dict = transpose_state_dict(state_dict)
 
         if is_lora:
+            is_new_lora_format = all(
+                key.startswith(self.unet_name) or key.startswith(self.text_encoder_name) for key in state_dict.keys()
+            )
+            if is_new_lora_format:
+                # Strip the `"unet"` prefix.
+                is_text_encoder_present = any(key.startswith(self.text_encoder_name) for key in state_dict.keys())
+                if is_text_encoder_present:
+                    warn_message = "The state_dict contains LoRA params corresponding to the text encoder which are not being used here. To use both UNet and text encoder related LoRA params, use [`pipe.load_lora_weights()`](https://huggingface.co/docs/diffusers/main/en/api/loaders#diffusers.loaders.LoraLoaderMixin.load_lora_weights)."
+                    warnings.warn(warn_message)
+                unet_keys = [k for k in state_dict.keys() if k.startswith(self.unet_name)]
+                state_dict = {k.replace(f"{self.unet_name}.", ""): v for k, v in state_dict.items() if k in unet_keys}
+
             lora_grouped_dict = defaultdict(dict)
             for key, value in state_dict.items():
                 attn_processor_key, sub_key = ".".join(key.split(".")[:-3]), ".".join(key.split(".")[-3:])
-                lora_grouped_dict[attn_processor_key][sub_key] = value
+                lora_grouped_dict[attn_processor_key][sub_key] = value.cast(
+                    dtype="float32"
+                )  # we must cast this to float32
 
             for key, value_dict in lora_grouped_dict.items():
                 rank = value_dict["to_k_lora.down.weight"].shape[1]  # 0 -> 1, torch vs paddle nn.Linear
@@ -281,7 +326,10 @@ class UNet2DConditionLoadersMixin:
                 hidden_size = value_dict["to_k_lora.up.weight"].shape[1]  # 0 -> 1, torch vs paddle nn.Linear
 
                 attn_processors[key] = LoRAAttnProcessor(
-                    hidden_size=hidden_size, cross_attention_dim=cross_attention_dim, rank=rank
+                    hidden_size=hidden_size,
+                    cross_attention_dim=cross_attention_dim,
+                    rank=rank,
+                    network_alpha=network_alpha,
                 )
                 attn_processors[key].load_dict(value_dict)
         elif is_custom_diffusion:
@@ -294,7 +342,9 @@ class UNet2DConditionLoadersMixin:
                         attn_processor_key, sub_key = ".".join(key.split(".")[:-3]), ".".join(key.split(".")[-3:])
                     else:
                         attn_processor_key, sub_key = ".".join(key.split(".")[:-2]), ".".join(key.split(".")[-2:])
-                    custom_diffusion_grouped_dict[attn_processor_key][sub_key] = value
+                    custom_diffusion_grouped_dict[attn_processor_key][sub_key] = value.cast(
+                        dtype="float32"
+                    )  # we must cast this to float32
 
             for key, value_dict in custom_diffusion_grouped_dict.items():
                 if len(value_dict) == 0:
@@ -745,8 +795,8 @@ class LoraLoaderMixin:
     This function is experimental and might change in the future.
     </Tip>
     """
-    text_encoder_name = "text_encoder"
-    unet_name = "unet"
+    text_encoder_name = TEXT_ENCODER_NAME
+    unet_name = UNET_NAME
 
     def load_lora_weights(self, pretrained_model_name_or_path_or_dict: Union[str, Dict[str, paddle.Tensor]], **kwargs):
         r"""
@@ -814,6 +864,9 @@ class LoraLoaderMixin:
         weight_name = kwargs.pop("weight_name", None)
         use_safetensors = kwargs.pop("use_safetensors", None)
 
+        # set lora scale to a reasonable default
+        self._lora_scale = 1.0
+
         if from_diffusers and use_safetensors and not is_safetensors_available():
             raise ValueError(
                 "`use_safetensors`=True but safetensors is not installed. Please install safetensors with `pip install safetenstors"
@@ -827,7 +880,15 @@ class LoraLoaderMixin:
         }
 
         model_file = None
-        if not isinstance(pretrained_model_name_or_path_or_dict, dict):
+
+        # maybe we load file
+        if isinstance(pretrained_model_name_or_path_or_dict, (str, Path)) and os.path.exists(
+            pretrained_model_name_or_path_or_dict
+        ):
+            model_file = pretrained_model_name_or_path_or_dict
+            state_dict = smart_load(model_file)
+
+        elif not isinstance(pretrained_model_name_or_path_or_dict, dict):
             if from_diffusers:
                 # Let's first try to load .safetensors weights
                 if (use_safetensors and weight_name is None) or (
@@ -887,75 +948,134 @@ class LoraLoaderMixin:
         else:
             state_dict = pretrained_model_name_or_path_or_dict
 
+        if not from_diffusers:
+            from_diffusers = is_torch_file(model_file)
+
+        # Convert kohya-ss Style LoRA attn procs to ppdiffusers attn procs
+        network_alpha = None
+        if all((k.startswith("lora_te_") or k.startswith("lora_unet_")) for k in state_dict.keys()):
+            state_dict, network_alpha = self._convert_kohya_lora_to_diffusers(state_dict)
+            from_diffusers = True
+
         # If the serialization format is new (introduced in https://github.com/huggingface/diffusers/pull/2918),
         # then the `state_dict` keys should have `self.unet_name` and/or `self.text_encoder_name` as
         # their prefixes.
         keys = list(state_dict.keys())
-
-        # Load the layers corresponding to UNet.
-        if all(key.startswith(self.unet_name) for key in keys):
+        if all(key.startswith(self.unet_name) or key.startswith(self.text_encoder_name) for key in keys):
+            # Load the layers corresponding to UNet.
+            unet_keys = [k for k in keys if k.startswith(self.unet_name)]
             logger.info(f"Loading {self.unet_name}.")
-            unet_lora_state_dict = {k: v for k, v in state_dict.items() if k.startswith(self.unet_name)}
-            # add from_diffusers
-            self.unet.load_attn_procs(unet_lora_state_dict, from_diffusers=from_diffusers)
-
-        # Load the layers corresponding to text encoder and make necessary adjustments.
-        elif all(key.startswith(self.text_encoder_name) for key in keys):
-            logger.info(f"Loading {self.text_encoder_name}.")
-            text_encoder_lora_state_dict = {
-                k: v for k, v in state_dict.items() if k.startswith(self.text_encoder_name)
+            unet_lora_state_dict = {
+                k.replace(f"{self.unet_name}.", ""): v for k, v in state_dict.items() if k in unet_keys
             }
-            # add from_diffusers
-            attn_procs_text_encoder = self.load_attn_procs(text_encoder_lora_state_dict, from_diffusers=from_diffusers)
-            self._modify_text_encoder(attn_procs_text_encoder)
+            self.unet.load_attn_procs(unet_lora_state_dict, network_alpha=network_alpha, from_diffusers=from_diffusers)
+
+            # Load the layers corresponding to text encoder and make necessary adjustments.
+            text_encoder_keys = [k for k in keys if k.startswith(self.text_encoder_name)]
+            text_encoder_lora_state_dict = {
+                k.replace(f"{self.text_encoder_name}.", ""): v for k, v in state_dict.items() if k in text_encoder_keys
+            }
+            if len(text_encoder_lora_state_dict) > 0:
+                logger.info(f"Loading {self.text_encoder_name}.")
+                attn_procs_text_encoder = self._load_text_encoder_attn_procs(
+                    text_encoder_lora_state_dict,
+                    network_alpha=network_alpha,
+                    from_diffusers=from_diffusers,
+                )
+                self._modify_text_encoder(attn_procs_text_encoder)
+
+                # save lora attn procs of text encoder so that it can be easily retrieved
+                self._text_encoder_lora_attn_procs = attn_procs_text_encoder
 
         # Otherwise, we're dealing with the old format. This means the `state_dict` should only
         # contain the module names of the `unet` as its keys WITHOUT any prefix.
         elif not all(
             key.startswith(self.unet_name) or key.startswith(self.text_encoder_name) for key in state_dict.keys()
         ):
-            # add from_diffusers
-            self.unet.load_attn_procs(state_dict, from_diffusers=from_diffusers)
-            deprecation_message = "You have saved the LoRA weights using the old format. This will be"
-            " deprecated soon. To convert the old LoRA weights to the new format, you can first load them"
-            " in a dictionary and then create a new dictionary like the following:"
-            " `new_state_dict = {f'unet'.{module_name}: params for module_name, params in old_state_dict.items()}`."
-            deprecate("legacy LoRA weights", "1.0.0", deprecation_message, standard_warn=False)
+            self.unet.load_attn_procs(state_dict, network_alpha=network_alpha, from_diffusers=from_diffusers)
+            warn_message = "You have saved the LoRA weights using the old format. To convert the old LoRA weights to the new format, you can first load them in a dictionary and then create a new dictionary like the following: `new_state_dict = {f'unet'.{module_name}: params for module_name, params in old_state_dict.items()}`."
+            warnings.warn(warn_message)
+
+    @property
+    def lora_scale(self) -> float:
+        # property function that returns the lora scale which can be set at run time by the pipeline.
+        # if _lora_scale has not been set, return 1
+        return self._lora_scale if hasattr(self, "_lora_scale") else 1.0
+
+    @property
+    def text_encoder_lora_attn_procs(self):
+        if hasattr(self, "_text_encoder_lora_attn_procs"):
+            return self._text_encoder_lora_attn_procs
+        return
+
+    def _remove_text_encoder_monkey_patch(self):
+        # Loop over the nn.MultiHeadAttention module of text_encoder
+        for name, attn_module in self.text_encoder.named_sublayers(include_self=True):
+            if name.endswith(TEXT_ENCODER_ATTN_MODULE):
+                # Loop over the LoRA layers
+                for _, text_encoder_attr in self._lora_attn_processor_attr_to_text_encoder_attr.items():
+                    # Retrieve the q/k/v/out projection of nn.MultiHeadAttention
+                    module = attn_module.get_sublayer(text_encoder_attr)
+                    if hasattr(module, "old_forward"):
+                        # restore original `forward` to remove monkey-patch
+                        module.forward = module.old_forward
+                        delattr(module, "old_forward")
+
+                # new added by Junnyu, no exists in diffusers
+                if hasattr(attn_module, "processor"):
+                    # del processor
+                    delattr(attn_module, "processor")
 
     def _modify_text_encoder(self, attn_processors: Dict[str, LoRAAttnProcessor]):
         r"""
         Monkey-patches the forward passes of attention modules of the text encoder.
+
         Parameters:
             attn_processors: Dict[str, `LoRAAttnProcessor`]:
                 A dictionary mapping the module names and their corresponding [`~LoRAAttnProcessor`].
         """
-        # Loop over the original attention modules.
-        for name, _ in self.text_encoder.named_sublayers(include_self=True):
-            if any(x in name for x in TEXT_ENCODER_TARGET_MODULES):
-                # Retrieve the module and its corresponding LoRA processor.
-                module = self.text_encoder.get_sublayer(name)
-                # Construct a new function that performs the LoRA merging. We will monkey patch
-                # this forward pass.
-                lora_layer = getattr(attn_processors[name], self._get_lora_layer_attribute(name))
-                old_forward = module.forward
 
-                def new_forward(x):
-                    return old_forward(x) + lora_layer(x)
+        # First, remove any monkey-patch that might have been applied before
+        self._remove_text_encoder_monkey_patch()
 
-                # Monkey-patch.
-                module.forward = new_forward
+        # Loop over the nn.MultiHeadAttention module of text_encoder
+        for name, attn_module in self.text_encoder.named_sublayers(include_self=True):
+            if name.endswith(TEXT_ENCODER_ATTN_MODULE):
+                # Loop over the LoRA layers
+                for attn_proc_attr, text_encoder_attr in self._lora_attn_processor_attr_to_text_encoder_attr.items():
+                    # Retrieve the q/k/v/out projection of nn.MultiHeadAttention and its corresponding LoRA layer.
+                    module = attn_module.get_sublayer(text_encoder_attr)
+                    lora_layer = attn_processors[name].get_sublayer(attn_proc_attr)
+                    # save old_forward to module that can be used to remove monkey-patch
+                    old_forward = module.old_forward = module.forward
 
-    def _get_lora_layer_attribute(self, name: str) -> str:
-        if "q_proj" in name:
-            return "to_q_lora"
-        elif "v_proj" in name:
-            return "to_v_lora"
-        elif "k_proj" in name:
-            return "to_k_lora"
-        else:
-            return "to_out_lora"
+                    # create a new scope that locks in the old_forward, lora_layer value for each new_forward function
+                    # for more detail, see https://github.com/huggingface/diffusers/pull/3490#issuecomment-1555059060
+                    def make_new_forward(old_forward, lora_layer):
+                        def new_forward(x):
+                            result = old_forward(x) + self.lora_scale * lora_layer(x)
+                            return result
 
-    def load_attn_procs(self, pretrained_model_name_or_path_or_dict: Union[str, Dict[str, paddle.Tensor]], **kwargs):
+                        return new_forward
+
+                    # Monkey-patch.
+                    module.forward = make_new_forward(old_forward, lora_layer)
+
+                # new added by Junnyu, no exists in diffusers
+                attn_module.processor = attn_processors[name]
+
+    @property
+    def _lora_attn_processor_attr_to_text_encoder_attr(self):
+        return {
+            "to_q_lora": "q_proj",
+            "to_k_lora": "k_proj",
+            "to_v_lora": "v_proj",
+            "to_out_lora": "out_proj",
+        }
+
+    def _load_text_encoder_attn_procs(
+        self, pretrained_model_name_or_path_or_dict: Union[str, Dict[str, paddle.Tensor]], **kwargs
+    ):
         r"""
         Load pretrained attention processor layers for
         [`CLIPTextModel`](https://huggingface.co/docs/transformers/model_doc/clip#transformers.CLIPTextModel).
@@ -1022,6 +1142,7 @@ class LoraLoaderMixin:
         subfolder = kwargs.pop("subfolder", None)
         weight_name = kwargs.pop("weight_name", None)
         use_safetensors = kwargs.pop("use_safetensors", None)
+        network_alpha = kwargs.pop("network_alpha", None)
 
         if from_diffusers and use_safetensors and not is_safetensors_available():
             raise ValueError(
@@ -1101,13 +1222,15 @@ class LoraLoaderMixin:
         is_lora = all("lora" in k for k in state_dict.keys())
 
         if from_diffusers or is_torch_file(model_file):
-            state_dict = transpose_state_dict(state_dict)
+            state_dict = transpose_state_dict(state_dict, name_mapping={".encoder.": ".transformer."})
 
         if is_lora:
             lora_grouped_dict = defaultdict(dict)
             for key, value in state_dict.items():
                 attn_processor_key, sub_key = ".".join(key.split(".")[:-3]), ".".join(key.split(".")[-3:])
-                lora_grouped_dict[attn_processor_key][sub_key] = value
+                lora_grouped_dict[attn_processor_key][sub_key] = value.cast(
+                    dtype="float32"
+                )  # we must cast this to float32
 
             for key, value_dict in lora_grouped_dict.items():
                 rank = value_dict["to_k_lora.down.weight"].shape[1]  # 0 -> 1, torch vs paddle nn.Linear
@@ -1115,7 +1238,10 @@ class LoraLoaderMixin:
                 hidden_size = value_dict["to_k_lora.up.weight"].shape[1]  # 0 -> 1, torch vs paddle nn.Linear
 
                 attn_processors[key] = LoRAAttnProcessor(
-                    hidden_size=hidden_size, cross_attention_dim=cross_attention_dim, rank=rank
+                    hidden_size=hidden_size,
+                    cross_attention_dim=cross_attention_dim,
+                    rank=rank,
+                    network_alpha=network_alpha,
                 )
                 attn_processors[key].load_dict(value_dict)
 
@@ -1217,12 +1343,62 @@ class LoraLoaderMixin:
                         )
                     save_function = torch.save
                     state_dict = convert_state_dict(state_dict, framework="torch")
-                state_dict = transpose_state_dict(state_dict)
+                state_dict = transpose_state_dict(state_dict, name_mapping={".transformer.": ".encoder."})
             else:
                 save_function = paddle.save
 
         save_function(state_dict, os.path.join(save_directory, weight_name))
         logger.info(f"Model weights saved in {os.path.join(save_directory, weight_name)}")
+
+    def _convert_kohya_lora_to_diffusers(self, state_dict):
+        unet_state_dict = {}
+        te_state_dict = {}
+        network_alpha = None
+
+        for key, value in state_dict.items():
+            if "lora_down" in key:
+                lora_name = key.split(".")[0]
+                lora_name_up = lora_name + ".lora_up.weight"
+                lora_name_alpha = lora_name + ".alpha"
+                if lora_name_alpha in state_dict:
+                    alpha = state_dict[lora_name_alpha].cast("float32").item()
+                    if network_alpha is None:
+                        network_alpha = alpha
+                    elif network_alpha != alpha:
+                        raise ValueError("Network alpha is not consistent")
+
+                if lora_name.startswith("lora_unet_"):
+                    diffusers_name = key.replace("lora_unet_", "").replace("_", ".")
+                    diffusers_name = diffusers_name.replace("down.blocks", "down_blocks")
+                    diffusers_name = diffusers_name.replace("mid.block", "mid_block")
+                    diffusers_name = diffusers_name.replace("up.blocks", "up_blocks")
+                    diffusers_name = diffusers_name.replace("transformer.blocks", "transformer_blocks")
+                    diffusers_name = diffusers_name.replace("to.q.lora", "to_q_lora")
+                    diffusers_name = diffusers_name.replace("to.k.lora", "to_k_lora")
+                    diffusers_name = diffusers_name.replace("to.v.lora", "to_v_lora")
+                    diffusers_name = diffusers_name.replace("to.out.0.lora", "to_out_lora")
+                    if "transformer_blocks" in diffusers_name:
+                        if "attn1" in diffusers_name or "attn2" in diffusers_name:
+                            diffusers_name = diffusers_name.replace("attn1", "attn1.processor")
+                            diffusers_name = diffusers_name.replace("attn2", "attn2.processor")
+                            unet_state_dict[diffusers_name] = value
+                            unet_state_dict[diffusers_name.replace(".down.", ".up.")] = state_dict[lora_name_up]
+                elif lora_name.startswith("lora_te_"):
+                    diffusers_name = key.replace("lora_te_", "").replace("_", ".")
+                    diffusers_name = diffusers_name.replace("text.model", "text_model")
+                    diffusers_name = diffusers_name.replace("self.attn", "self_attn")
+                    diffusers_name = diffusers_name.replace("q.proj.lora", "to_q_lora")
+                    diffusers_name = diffusers_name.replace("k.proj.lora", "to_k_lora")
+                    diffusers_name = diffusers_name.replace("v.proj.lora", "to_v_lora")
+                    diffusers_name = diffusers_name.replace("out.proj.lora", "to_out_lora")
+                    if "self_attn" in diffusers_name:
+                        te_state_dict[diffusers_name] = value
+                        te_state_dict[diffusers_name.replace(".down.", ".up.")] = state_dict[lora_name_up]
+
+        unet_state_dict = {f"{UNET_NAME}.{module_name}": params for module_name, params in unet_state_dict.items()}
+        te_state_dict = {f"{TEXT_ENCODER_NAME}.{module_name}": params for module_name, params in te_state_dict.items()}
+        new_state_dict = {**unet_state_dict, **te_state_dict}
+        return new_state_dict, network_alpha
 
 
 class FromCkptMixin:

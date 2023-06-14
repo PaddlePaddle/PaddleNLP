@@ -42,7 +42,7 @@ from .constants import (
     PPDIFFUSERS_MODULES_CACHE,
     PPNLP_BOS_RESOLVE_ENDPOINT,
     TEST_DOWNLOAD_SERVER,
-    TEXT_ENCODER_TARGET_MODULES,
+    TEXT_ENCODER_ATTN_MODULE,
     TO_DIFFUSERS,
     TORCH_SAFETENSORS_WEIGHTS_NAME,
     TORCH_WEIGHTS_NAME,
@@ -59,11 +59,7 @@ from .download_utils import (
     ppdiffusers_url_download,
 )
 from .dynamic_modules_utils import get_class_from_dynamic_module
-from .hub_utils import (  # _add_variant, in download_utils.py; _get_model_file, in download_utils.py
-    HF_HUB_OFFLINE,
-    extract_commit_hash,
-    http_user_agent,
-)
+from .hub_utils import HF_HUB_OFFLINE, extract_commit_hash, http_user_agent
 from .import_utils import (
     BACKENDS_MAPPING,
     ENV_VARS_TRUE_AND_AUTO_VALUES,

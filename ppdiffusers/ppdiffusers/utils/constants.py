@@ -64,7 +64,7 @@ TEST_DOWNLOAD_SERVER = "https://paddlenlp.bj.bcebos.com/models/community/ppdiffu
 DOWNLOAD_SERVER = "https://bj.bcebos.com/paddlenlp/models/community"
 PPNLP_BOS_RESOLVE_ENDPOINT = os.getenv("PPNLP_ENDPOINT", "https://bj.bcebos.com/paddlenlp")
 DEPRECATED_REVISION_ARGS = ["fp16", "non-ema"]
-TEXT_ENCODER_TARGET_MODULES = ["q_proj", "v_proj", "k_proj", "out_proj"]
+TEXT_ENCODER_ATTN_MODULE = ".self_attn"
 LOW_CPU_MEM_USAGE_DEFAULT = str2bool(os.getenv("LOW_CPU_MEM_USAGE_DEFAULT", False))
 
 
