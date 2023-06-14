@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
 
 import paddle
 
@@ -180,11 +179,9 @@ class ChatGLMTask(Task):
         Run the task model from the outputs of the `_tokenize` function.
         """
         results = []
-        # breakpoint()
         if self._static_mode:
             with static_mode_guard():
                 for batch in inputs["data_loader"]:
-                    start = time.perf_counter()
                     input_ids = batch["input_ids"]
                     attention_mask = batch["attention_mask"]
                     position_ids = batch["position_ids"]
@@ -194,8 +191,6 @@ class ChatGLMTask(Task):
                     self.predictor.run()
                     output_names = self.predictor.get_output_names()
                     output_handle = self.predictor.get_output_handle(output_names[0])
-                    hf_cost = (time.perf_counter() - start) * 1000
-                    print("Speed Paddle:", hf_cost)
                     result = output_handle.copy_to_cpu().tolist()
                     results.extend(result)
         else:
