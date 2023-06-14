@@ -1352,6 +1352,7 @@ class LoraLoaderMixin:
                 lora_name_up = lora_name + ".lora_up.weight"
                 lora_name_alpha = lora_name + ".alpha"
                 if lora_name_alpha in state_dict:
+                    # we must cast this to float32, before get item
                     alpha = state_dict[lora_name_alpha].cast("float32").item()
                     if network_alpha is None:
                         network_alpha = alpha

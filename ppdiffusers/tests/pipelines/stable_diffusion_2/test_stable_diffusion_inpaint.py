@@ -20,11 +20,6 @@ import unittest
 import numpy as np
 import paddle
 from PIL import Image
-from ppdiffusers_test.pipeline_params import (
-    TEXT_GUIDED_IMAGE_INPAINTING_BATCH_PARAMS,
-    TEXT_GUIDED_IMAGE_INPAINTING_PARAMS,
-)
-from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
 
 from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
@@ -35,6 +30,12 @@ from ppdiffusers import (
 )
 from ppdiffusers.utils import floats_tensor, load_image
 from ppdiffusers.utils.testing_utils import require_paddle_gpu, slow
+
+from ..pipeline_params import (
+    TEXT_GUIDED_IMAGE_INPAINTING_BATCH_PARAMS,
+    TEXT_GUIDED_IMAGE_INPAINTING_PARAMS,
+)
+from ..test_pipelines_common import PipelineTesterMixin
 
 
 class StableDiffusion2InpaintPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
