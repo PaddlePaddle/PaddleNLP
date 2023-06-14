@@ -61,8 +61,11 @@ from paddlenlp.utils.env import (
     CONFIG_NAME,
     ENABLE_TORCH_CHECKPOINT,
     LEGACY_CONFIG_NAME,
-    PADDLE_WEIGHT_FILE_NAME,
-    PYTORCH_WEIGHT_FILE_NAME,
+    PADDLE_WEIGHTS_INDEX_NAME,
+    PADDLE_WEIGHTS_NAME,
+    PYTORCH_WEIGHTS_NAME,
+    SAFE_WEIGHTS_INDEX_NAME,
+    SAFE_WEIGHTS_NAME,
 )
 from paddlenlp.utils.log import logger
 
@@ -71,10 +74,6 @@ from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
 from .generation_utils import GenerationMixin
 from .utils import (
-    SAFE_WEIGHTS_INDEX_NAME,
-    SAFE_WEIGHTS_NAME,
-    WEIGHTS_INDEX_NAME,
-    WEIGHTS_NAME,
     ContextManagers,
     InitTrackerMeta,
     adapt_stale_fwd_patch,
@@ -344,7 +343,7 @@ def _find_weight_file_path(
         return os.path.join(cache_dir, weight_file_names[0])
 
     # 4. try to find pytorch model weight file under cache_dir
-    pytorch_model_weight_file = os.path.join(cache_dir, PYTORCH_WEIGHT_FILE_NAME)
+    pytorch_model_weight_file = os.path.join(cache_dir, PYTORCH_WEIGHTS_NAME)
     if os.path.isfile(pytorch_model_weight_file):
         return pytorch_model_weight_file
 
@@ -386,13 +385,13 @@ def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conver
     """
     if hf_file_exists(repo_id, "model_state.pdparams", subfolder=subfolder):
         file_name = "model_state.pdparams"
-    elif hf_file_exists(repo_id, PYTORCH_WEIGHT_FILE_NAME, subfolder=subfolder):
+    elif hf_file_exists(repo_id, PYTORCH_WEIGHTS_NAME, subfolder=subfolder):
         if not support_conversion:
             raise EntryNotFoundError(
                 f"can not download `model_state.pdparams from https://huggingface.co/{repo_id}` "
                 "and current model doesn't support conversion from pytorch weight file to paddle weight file"
             )
-        file_name = PYTORCH_WEIGHT_FILE_NAME
+        file_name = PYTORCH_WEIGHTS_NAME
     else:
         raise EntryNotFoundError(
             message=f"can not find the paddle/pytorch weight file from: https://huggingface.co/{repo_id}",
@@ -501,7 +500,7 @@ def _partion_for_pipeline_mode(keys):
 def shard_checkpoint(
     state_dict: Dict[str, paddle.Tensor],
     max_shard_size: Union[int, str] = "10GB",
-    weights_name: str = WEIGHTS_NAME,
+    weights_name: str = PADDLE_WEIGHTS_NAME,
     shard_format="naive",
 ):
     """
@@ -628,9 +627,9 @@ def load_sharded_checkpoint(model, folder, strict=True):
             - `unexpected_keys` is a list of str containing the unexpected keys
     """
     # Load the index
-    index_file = os.path.join(folder, WEIGHTS_INDEX_NAME)
+    index_file = os.path.join(folder, PADDLE_WEIGHTS_INDEX_NAME)
     if not os.path.isfile(index_file):
-        raise ValueError(f"Can't find a checkpoint index ({WEIGHTS_INDEX_NAME}) in {folder}.")
+        raise ValueError(f"Can't find a checkpoint index ({PADDLE_WEIGHTS_INDEX_NAME}) in {folder}.")
 
     with open(index_file, "r", encoding="utf-8") as f:
         index = json.load(f)
@@ -1633,24 +1632,26 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
                     is_sharded = True
                 elif os.path.isfile(
-                    os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(WEIGHTS_NAME, variant))
+                    os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(PADDLE_WEIGHTS_NAME, variant))
                 ):
                     # Load from a PyTorch checkpoint
                     archive_file = os.path.join(
-                        pretrained_model_name_or_path, subfolder, _add_variant(WEIGHTS_NAME, variant)
+                        pretrained_model_name_or_path, subfolder, _add_variant(PADDLE_WEIGHTS_NAME, variant)
                     )
                 elif os.path.isfile(
-                    os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(WEIGHTS_INDEX_NAME, variant))
+                    os.path.join(
+                        pretrained_model_name_or_path, subfolder, _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant)
+                    )
                 ):
                     # Load from a sharded PyTorch checkpoint
                     archive_file = os.path.join(
-                        pretrained_model_name_or_path, subfolder, _add_variant(WEIGHTS_INDEX_NAME, variant)
+                        pretrained_model_name_or_path, subfolder, _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant)
                     )
                     is_sharded = True
                 # At this stage we don't have a weight file so we will raise an error.
                 else:
                     raise EnvironmentError(
-                        f"Error no file named {_add_variant(WEIGHTS_NAME, variant)}, found in directory"
+                        f"Error no file named {_add_variant(PADDLE_WEIGHTS_NAME, variant)}, found in directory"
                         f" {pretrained_model_name_or_path}."
                     )
             # pretrained_model_name_or_path is file
@@ -1665,7 +1666,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 if is_safetensors_available():
                     filename = _add_variant(SAFE_WEIGHTS_NAME, variant)
                 else:
-                    filename = _add_variant(WEIGHTS_NAME, variant)
+                    filename = _add_variant(PADDLE_WEIGHTS_NAME, variant)
 
                 try:
                     # Load from URL or cache if already cached
@@ -1681,7 +1682,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                             pretrained_model_name_or_path
                         ]
                         resolved_archive_file = cached_file(
-                            resource_file_url, _add_variant(WEIGHTS_NAME, variant), **cached_file_kwargs
+                            resource_file_url, _add_variant(PADDLE_WEIGHTS_NAME, variant), **cached_file_kwargs
                         )
 
                     if resolved_archive_file is None:
@@ -1690,7 +1691,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         )
                     else:
                         # xxx.pdparams in pretrained_resource_files_map renamed model_state.pdparams
-                        filename = _add_variant(WEIGHTS_NAME, variant)
+                        filename = _add_variant(PADDLE_WEIGHTS_NAME, variant)
 
                     # Since we set _raise_exceptions_for_missing_entries=False, we don't get an exception but a None
                     # result when internet is up, the repo and revision exist, but the file does not.
@@ -1705,25 +1706,27 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                             is_sharded = True
                         else:
                             # This repo has no safetensors file of any kind, we switch to PyTorch.
-                            filename = _add_variant(WEIGHTS_NAME, variant)
+                            filename = _add_variant(PADDLE_WEIGHTS_NAME, variant)
                             resolved_archive_file = cached_file(
                                 pretrained_model_name_or_path, filename, **cached_file_kwargs
                             )
-                    if resolved_archive_file is None and filename == _add_variant(WEIGHTS_NAME, variant):
+                    if resolved_archive_file is None and filename == _add_variant(PADDLE_WEIGHTS_NAME, variant):
                         # Maybe the checkpoint is sharded, we try to grab the index name in this case.
                         resolved_archive_file = cached_file(
                             pretrained_model_name_or_path,
-                            _add_variant(WEIGHTS_INDEX_NAME, variant),
+                            _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant),
                             **cached_file_kwargs,
                         )
+                        # raise ValueError(resolved_archive_file)
                         if resolved_archive_file is not None:
                             is_sharded = True
+                    print(resolved_archive_file)
                     if resolved_archive_file is None:
                         # Otherwise, maybe there is a TF or Flax model file.  We try those to give a helpful error
                         # message.
                         raise EnvironmentError(
                             f"{pretrained_model_name_or_path} does not appear to have a file named"
-                            f" {_add_variant(WEIGHTS_NAME, variant)}."
+                            f" {_add_variant(PADDLE_WEIGHTS_NAME, variant)}."
                         )
                 except Exception:
                     # For any other exception, we throw a generic error.
@@ -1870,9 +1873,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         )
 
         if ENABLE_TORCH_CHECKPOINT:
-            msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> or <{PYTORCH_WEIGHT_FILE_NAME}> not found"
+            msg = f"weight file<{PADDLE_WEIGHTS_NAME}> or <{PYTORCH_WEIGHTS_NAME}> not found"
         else:
-            msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> not found"
+            msg = f"weight file<{PADDLE_WEIGHTS_NAME}> not found"
 
         raise FileNotFoundError(msg)
 
@@ -2163,16 +2166,17 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config = kwargs.pop("config", None)
         state_dict = kwargs.pop("state_dict", None)
         cache_dir = kwargs.pop("cache_dir", None)
-        load_state_as_np = kwargs.pop("load_state_as_np", False)
+        # load_state_as_np = kwargs.pop("load_state_as_np", False)
         force_download = kwargs.pop("force_download", False)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         dtype = kwargs.pop("dtype", None)
         subfolder = kwargs.pop("subfolder", "")
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
+        variant = kwargs.pop("variant", None)
 
         init_contexts = []
         if low_cpu_mem_usage:
-            load_state_as_np = True
+            # load_state_as_np = True
             # Instantiate model.
             init_contexts.append(no_init_weights(_enable=True))
             if is_paddle_support_lazy_init():
@@ -2209,6 +2213,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             from_hf_hub=from_hf_hub,
             config=config,
             support_conversion=support_conversion,
+            variant=variant,
         )
 
         if resolved_archive_file is None:
@@ -2225,17 +2230,17 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if not is_sharded and state_dict is None:
             # Time to load the checkpoint
             # state_dict = load_state_dict(resolved_archive_file)
-            if resolved_archive_file.endswith(PYTORCH_WEIGHT_FILE_NAME):
+            if resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME):
                 if support_conversion:
                     # try to get the name-mapping info
                     logger.info(
                         f"start to convert pytorch weight file<{resolved_archive_file}> to "
-                        f"paddle weight file<{os.path.join(cache_dir, PADDLE_WEIGHT_FILE_NAME)}> ..."
+                        f"paddle weight file<{os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)}> ..."
                     )
                     state_dict = cls.convert(resolved_archive_file, config, cache_dir)
                 else:
                     raise ValueError(
-                        f"download the {PYTORCH_WEIGHT_FILE_NAME} weight file, but model<{cls}> "
+                        f"download the {PYTORCH_WEIGHTS_NAME} weight file, but model<{cls}> "
                         "don't support conversion from pytorch weight file to paddle weight file "
                         "or conversion is been disabled by `ENABLE_TORCH_CHECKPOINT` environment variable"
                     )
@@ -2244,7 +2249,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
                     state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
                 else:
-                    state_dict = paddlenlp_load(resolved_archive_file, return_numpy=load_state_as_np)
+                    state_dict = load_state_dict(resolved_archive_file)
 
         if is_sharded:
             loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
@@ -2348,7 +2353,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
         # we currently don't use this setting automatically, but may start to use with v5
 
-        WEIGHTS_NAME = model_to_save.resource_files_names["model_state"]
+        PADDLE_WEIGHTS_NAME = model_to_save.resource_files_names["model_state"]
 
         dtype = get_parameter_dtype(model_to_save)
         # model_to_save.config.paddle_dtype = str(dtype).split(".")[1]
@@ -2368,7 +2373,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     return
             else:
                 if config_to_save.tensor_parallel_degree > 1:
-                    WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, f"tp{config_to_save.tensor_parallel_rank:0>2d}")
+                    PADDLE_WEIGHTS_NAME = _add_variant(
+                        PADDLE_WEIGHTS_NAME, f"tp{config_to_save.tensor_parallel_rank:0>2d}"
+                    )
 
                 state_dict_to_save = self.state_dict()
 
@@ -2381,7 +2388,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 model_to_save.generation_config.save_pretrained(save_directory)
 
         # Shard the model if it is too big.
-        weights_name = SAFE_WEIGHTS_NAME if safe_serialization else WEIGHTS_NAME
+        weights_name = SAFE_WEIGHTS_NAME if safe_serialization else PADDLE_WEIGHTS_NAME
         weights_name = _add_variant(weights_name, variant)
 
         # Save model
@@ -2419,11 +2426,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 save_function(shard, os.path.join(save_directory, shard_file))
 
         if index is None:
-            path_to_weights = os.path.join(save_directory, _add_variant(WEIGHTS_NAME, variant))
+            path_to_weights = os.path.join(save_directory, _add_variant(PADDLE_WEIGHTS_NAME, variant))
             logger.info(f"Model weights saved in {path_to_weights}")
 
         else:
-            save_index_file = SAFE_WEIGHTS_INDEX_NAME if safe_serialization else WEIGHTS_INDEX_NAME
+            save_index_file = SAFE_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_WEIGHTS_INDEX_NAME
             save_index_file = os.path.join(save_directory, _add_variant(save_index_file, variant))
             # Save the index as well
             with open(save_index_file, "w", encoding="utf-8") as f:

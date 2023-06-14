@@ -38,11 +38,7 @@ from paddle import Tensor
 from paddle.nn import Layer
 
 from paddlenlp.utils.distributed import distributed_gather
-from paddlenlp.utils.env import (
-    CONFIG_NAME,
-    PADDLE_WEIGHT_FILE_NAME,
-    PYTORCH_WEIGHT_FILE_NAME,
-)
+from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHTS_NAME, PYTORCH_WEIGHTS_NAME
 from paddlenlp.utils.import_utils import (
     is_package_available,
     is_torch_available,
@@ -884,7 +880,7 @@ class ConversionMixin:
             for layer_name in all_layer_names:
                 logger.warning(f"--- {layer_name}")
 
-        model_weight_file = os.path.join(cache_dir, PADDLE_WEIGHT_FILE_NAME)
+        model_weight_file = os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)
         paddle.save(state_dict, model_weight_file)
         return state_dict
 
@@ -1044,7 +1040,7 @@ class Converter(ConversionMixin, LogitComparer):
         os.makedirs(input_dir, exist_ok=True)
 
         # 1. get pytorch weight file
-        weight_file = os.path.join(input_dir, PYTORCH_WEIGHT_FILE_NAME)
+        weight_file = os.path.join(input_dir, PYTORCH_WEIGHTS_NAME)
         if not os.path.exists(weight_file):
             raise FileNotFoundError(f"pytorch weight file<{weight_file}> not found")
 
@@ -1077,6 +1073,6 @@ class Converter(ConversionMixin, LogitComparer):
             for layer_name in all_layer_names:
                 logger.warning(f"--- {layer_name}")
 
-        model_weight_file = os.path.join(input_dir, PADDLE_WEIGHT_FILE_NAME)
+        model_weight_file = os.path.join(input_dir, PADDLE_WEIGHTS_NAME)
         paddle.save(state_dict, model_weight_file)
         return state_dict

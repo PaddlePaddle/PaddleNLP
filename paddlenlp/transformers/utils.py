@@ -49,13 +49,6 @@ from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.import_utils import import_module
 from paddlenlp.utils.log import logger
 
-WEIGHTS_INDEX_NAME = "model_state.pdparams.index.json"
-PT_WEIGHTS_INDEX_NAME = "pytorch_model.bin.index.json"
-SAFE_WEIGHTS_INDEX_NAME = "model.safetensors.index.json"
-SAFE_WEIGHTS_NAME = "model.safetensors"
-WEIGHTS_NAME = "model_state.pdparams"
-
-
 HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
 
 
@@ -359,6 +352,7 @@ def paddlenlp_hub_download(
 
     # check in cache_dir
     weight_file_path = os.path.join(cache_dir, filename)
+
     if os.path.exists(weight_file_path):
         logger.info(f"Already cached {weight_file_path}")
         return weight_file_path
@@ -533,7 +527,7 @@ def get_checkpoint_shard_files(
     )
 
     show_progress_bar = last_shard is None
-    for shard_filename in tqdm(shard_filenames, desc="Downloading shards", disable=not show_progress_bar):
+    for shard_filename in tqdm.tqdm(shard_filenames, desc="Downloading shards", disable=not show_progress_bar):
         try:
             cached_filename = paddlenlp_hub_download(
                 pretrained_model_name_or_path,
