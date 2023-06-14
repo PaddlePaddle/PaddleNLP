@@ -25,12 +25,13 @@ parser.add_argument(
     default="ernie-code-base",
     type=str,
 )
+parser.add_argument("--input", default="BadZipFileのAliasは、古い Python バージョンとの互換性のために。", type=str)
 parser.add_argument("--source_lang", default="text", type=str)
 parser.add_argument("--target_lang", default="code", type=str)
 parser.add_argument("--source_prefix", default="translate Japanese to Python: \n", type=str)
 parser.add_argument("--max_length", type=int, default=1024)
 parser.add_argument("--num_beams", type=int, default=3)
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"])
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"])
 
 args = parser.parse_args()
 
@@ -68,7 +69,7 @@ def predict():
         model_inputs = tokenizer(inputs, max_length=args.max_length)
         return model_inputs
 
-    dev_dataset = ["BadZipFileのAliasは、古い Python バージョンとの互換性のために。"]
+    dev_dataset = [args.input]
     model_inputs = preprocess_function(dev_dataset, tokenizer)
 
     model.eval()
