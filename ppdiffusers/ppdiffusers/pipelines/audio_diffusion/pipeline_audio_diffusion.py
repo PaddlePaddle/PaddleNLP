@@ -67,7 +67,7 @@ class AudioDiffusionPipeline(DiffusionPipeline):
         # For backwards compatibility
         sample_size = (
             (input_module.config.sample_size, input_module.config.sample_size)
-            if type(input_module.sample_size) == int
+            if type(input_module.config.sample_size) == int
             else input_module.config.sample_size
         )
         return sample_size

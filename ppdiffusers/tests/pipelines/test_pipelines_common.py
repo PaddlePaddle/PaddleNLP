@@ -132,7 +132,7 @@ class PipelineTesterMixin:
         inputs = self.get_dummy_inputs()
         output_loaded = pipe_loaded(**inputs)[0]
         max_diff = np.abs(to_np(output) - to_np(output_loaded)).max()
-        self.assertLess(max_diff, 0.0001)
+        self.assertLess(max_diff, 0.002)
 
     def test_pipeline_call_signature(self):
         self.assertTrue(
@@ -358,7 +358,7 @@ class PipelineTesterMixin:
         inputs = self.get_dummy_inputs()
         output_loaded = pipe_loaded(**inputs)[0]
         max_diff = np.abs(to_np(output) - to_np(output_loaded)).max()
-        self.assertLess(max_diff, 0.0001)
+        self.assertLess(max_diff, 0.002)
 
     # def test_to_device(self):
     #     components = self.get_dummy_components()

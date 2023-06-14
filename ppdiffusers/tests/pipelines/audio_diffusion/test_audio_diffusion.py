@@ -161,7 +161,7 @@ class PipelineIntegrationTests(unittest.TestCase):
         audio = output.audios[0]
         image = output.images[0]
         assert audio.shape == (1, (pipe.unet.config.sample_size[1] - 1) * pipe.mel.hop_length)
-        assert image.height == pipe.unet.config.sample_size[0] and image.width == pipe.unet.sample_size[1]
+        assert image.height == pipe.unet.config.sample_size[0] and image.width == pipe.unet.config.sample_size[1]
         image_slice = np.frombuffer(image.tobytes(), dtype="uint8")[:10]
         expected_slice = np.array([151, 167, 154, 144, 122, 134, 121, 105, 70, 26])
         assert np.abs(image_slice.flatten() - expected_slice).max() <= 5
