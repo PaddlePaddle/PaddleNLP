@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
+
 import paddle
 
 from ..transformers import ChatGLMForConditionalGeneration, ChatGLMTokenizer
@@ -32,7 +34,7 @@ class ChatGLMTask(Task):
     def __init__(self, task, model, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         # Default to static mode
-        self._static_mode = False
+        self._static_mode = kwargs.get("static_mode", False)
         self._dtype = kwargs.get("dtype", "float16")
         self.kwargs["generation_task"] = task
         self._tgt_length = kwargs.get("tgt_length", 2048)
@@ -43,7 +45,6 @@ class ChatGLMTask(Task):
         self._temperature = kwargs.get("temperature", 1.0)
         self._decode_strategy = kwargs.get("decode_strategy", "sampling")
         self._num_return_sequences = kwargs.get("num_return_sequences", 1)
-
         self._construct_tokenizer(model)
         if self._static_mode:
             self._get_inference_model()
@@ -179,9 +180,11 @@ class ChatGLMTask(Task):
         Run the task model from the outputs of the `_tokenize` function.
         """
         results = []
+        # breakpoint()
         if self._static_mode:
             with static_mode_guard():
                 for batch in inputs["data_loader"]:
+                    start = time.perf_counter()
                     input_ids = batch["input_ids"]
                     attention_mask = batch["attention_mask"]
                     position_ids = batch["position_ids"]
@@ -189,7 +192,11 @@ class ChatGLMTask(Task):
                     self.input_handles[1].copy_from_cpu(attention_mask)
                     self.input_handles[2].copy_from_cpu(position_ids)
                     self.predictor.run()
-                    result = self.output_handle[0].copy_to_cpu().tolist()
+                    output_names = self.predictor.get_output_names()
+                    output_handle = self.predictor.get_output_handle(output_names[0])
+                    hf_cost = (time.perf_counter() - start) * 1000
+                    print("Speed Paddle:", hf_cost)
+                    result = output_handle.copy_to_cpu().tolist()
                     results.extend(result)
         else:
             for batch_inputs in inputs["data_loader"]:
