@@ -28,7 +28,7 @@ from transformers import (
 
 """
 单卡
-python train_nl2sql.py --model_name_or_path bigscience/bloomz-3b  \
+python train_nl2sql.py --model_name_or_path bigscience/bloomz-7b1-mt  \
     --train_file nl2sql/dev.jsonl --validation_file nl2sql/dev.jsonl \
     --num_train_epochs 1 --per_device_train_batch_size 4 \
     --evaluation_strategy epoch --save_strategy epoch \
