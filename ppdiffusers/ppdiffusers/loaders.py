@@ -225,13 +225,7 @@ class UNet2DConditionLoadersMixin:
 
         model_file = None
 
-        # maybe we load file
-        if isinstance(pretrained_model_name_or_path_or_dict, (str, Path)) and os.path.isfile(
-            pretrained_model_name_or_path_or_dict
-        ):
-            model_file = pretrained_model_name_or_path_or_dict
-            state_dict = smart_load(model_file)
-        elif not isinstance(pretrained_model_name_or_path_or_dict, dict):
+        if not isinstance(pretrained_model_name_or_path_or_dict, dict):
             if from_diffusers:
                 # Let's first try to load .safetensors weights
                 if (use_safetensors and weight_name is None) or (
@@ -352,8 +346,12 @@ class UNet2DConditionLoadersMixin:
                         train_kv=False, train_q_out=False, hidden_size=None, cross_attention_dim=None
                     )
                 else:
-                    cross_attention_dim = value_dict["to_k_custom_diffusion.weight"].shape[1]
-                    hidden_size = value_dict["to_k_custom_diffusion.weight"].shape[0]
+                    cross_attention_dim = value_dict["to_k_custom_diffusion.weight"].shape[
+                        0
+                    ]  # 1 -> 0, torch vs paddle nn.Linear
+                    hidden_size = value_dict["to_k_custom_diffusion.weight"].shape[
+                        1
+                    ]  # 0 -> 1, torch vs paddle nn.Linear
                     train_q_out = True if "to_q_custom_diffusion.weight" in value_dict else False
                     attn_processors[key] = CustomDiffusionAttnProcessor(
                         train_kv=True,
@@ -881,14 +879,7 @@ class LoraLoaderMixin:
 
         model_file = None
 
-        # maybe we load file
-        if isinstance(pretrained_model_name_or_path_or_dict, (str, Path)) and os.path.exists(
-            pretrained_model_name_or_path_or_dict
-        ):
-            model_file = pretrained_model_name_or_path_or_dict
-            state_dict = smart_load(model_file)
-
-        elif not isinstance(pretrained_model_name_or_path_or_dict, dict):
+        if not isinstance(pretrained_model_name_or_path_or_dict, dict):
             if from_diffusers:
                 # Let's first try to load .safetensors weights
                 if (use_safetensors and weight_name is None) or (

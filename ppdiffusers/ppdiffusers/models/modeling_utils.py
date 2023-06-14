@@ -629,17 +629,18 @@ class ModelMixin(nn.Layer):
             ignore_mismatched_sizes,
         ):
             mismatched_keys = []
-            if ignore_mismatched_sizes:
-                for checkpoint_key in loaded_keys:
-                    model_key = checkpoint_key
+            for checkpoint_key in loaded_keys:
+                model_key = checkpoint_key
 
-                    if model_key in model_state_dict and list(state_dict[checkpoint_key].shape) != list(
-                        model_state_dict[model_key].shape
-                    ):
-                        mismatched_keys.append(
-                            (checkpoint_key, state_dict[checkpoint_key].shape, model_state_dict[model_key].shape)
-                        )
-                        del state_dict[checkpoint_key]
+                if model_key in model_state_dict and list(state_dict[checkpoint_key].shape) != list(
+                    model_state_dict[model_key].shape
+                ):
+                    mismatched_keys.append(
+                        (checkpoint_key, state_dict[checkpoint_key].shape, model_state_dict[model_key].shape)
+                    )
+                    del state_dict[checkpoint_key]
+            if ignore_mismatched_sizes:
+                mismatched_keys = []
             return mismatched_keys
 
         if state_dict is not None:
@@ -650,7 +651,11 @@ class ModelMixin(nn.Layer):
                 original_loaded_keys,
                 ignore_mismatched_sizes,
             )
-            error_msgs = ""
+            error_msgs = []
+            for key_name, loaded_shape, model_shape in mismatched_keys:
+                error_msgs.append(
+                    f"Error size mismatch, {key_name} receives a shape {loaded_shape}, but the expected shape is {model_shape}."
+                )
             model_to_load.load_dict(state_dict)
 
         if len(error_msgs) > 0:

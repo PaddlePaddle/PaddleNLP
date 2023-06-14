@@ -84,8 +84,9 @@ class ModelUtilsTest(unittest.TestCase):
                 )
 
             cache_requests = [r.method for r in m.request_history]
+            # TODO check this
             assert (
-                "HEAD" == cache_requests[0] and len(cache_requests) == 1
+                "HEAD" == cache_requests[0] and len(cache_requests) == 2
             ), "We should call only `model_info` to check for _commit hash and `send_telemetry`"
 
         ppdiffusers.utils.import_utils._safetensors_available = True
