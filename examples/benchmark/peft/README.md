@@ -11,8 +11,8 @@
 |---------------|----------|----------|------------|--------------|------------------|-------------|-----------------|-------|
 | Bloomz-7b1-mt | LoRA     | 1        | 4          | fp16 O2      | 179              | fp16        | 219             | -18%  |
 | Bloomz-7b1-mt | LoRA     | 1        | 8          | FP16 O2      | 171              | fp16        | 197             | -13%  |
-| Bloomz-7b1-mt | Finetune | 4        | 8          | fp16 O2 MP 4 | 133              | fp16 ZeRO 3 | 313             | -58%  |
-| Bloomz-7b1-mt | Finetune | 4        | 16         | fp16 O2 MP 4 | 106              | fp16 ZeRO 3 | 170             | -38%  |
-| Bloomz-7b1-mt | Finetune | 4        | 32         | fp16 O2 MP 4 | 85               | fp16 ZeRO 3 | 107             | -21%  |
+| Bloomz-7b1-mt | Finetune | 4        | 8          | fp16 O2 MP 4 | 133              | fp16 ZeRO 3 | 288             | -54%  |
+| Bloomz-7b1-mt | Finetune | 4        | 16         | fp16 O2 MP 4 | 106              | fp16 ZeRO 3 | 150             | -29%  |
+| Bloomz-7b1-mt | Finetune | 4        | 32         | fp16 O2 MP 4 | 85               | fp16 ZeRO 3 | 94              | -10%  |
 
 * transformers默认的half_precision_backend是`torch.cuda.amp`, 不使用`fp16_opt_level`参数

@@ -34,6 +34,15 @@ python train_nl2sql.py --model_name_or_path bigscience/bloomz-7b1-mt  \
     --evaluation_strategy epoch --save_strategy epoch \
     --fp16 \
     --logging_steps 50 --output_dir outputs
+
+多卡 deepspeed zero3
+python -m torch.distributed.run --nproc_per_node=4 train_nl2sql.py --deepspeed ds_config.json \
+    --model_name_or_path bigscience/bloomz-7b1-mt  \
+    --train_file nl2sql/dev.jsonl --validation_file nl2sql/dev.jsonl \
+    --num_train_epochs 1 --per_device_train_batch_size 2 \
+    --evaluation_strategy epoch --save_strategy epoch \
+    --fp16 \
+    --logging_steps 50 --output_dir outputs
 """
 
 
