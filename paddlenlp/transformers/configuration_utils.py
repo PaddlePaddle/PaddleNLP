@@ -573,6 +573,7 @@ class PretrainedConfig:
             # Keys are always strings in JSON so convert ids to int here.
         else:
             self.num_labels = kwargs.pop("num_labels", 2)
+        self.num_choices = kwargs.pop("num_choices", None)
 
         self.classifier_dropout = kwargs.pop("classifier_dropout", None)
 
