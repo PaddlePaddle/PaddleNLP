@@ -655,10 +655,17 @@ class Trainer:
                 train_dataloader.batch_sampler.set_epoch(epoch)
 
             step = -1
-
+            epoch_iterator = iter(epoch_iterator)
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
-
-            for step, inputs in enumerate(epoch_iterator):
+            while True:
+                step += 1
+                self.callback_handler.on_load_data_begin(
+                    args,
+                    self.state,
+                    self.control,
+                )
+                inputs = next(epoch_iterator)
+                self.callback_handler.on_load_data_end(args, self.state, self.control, inputs)
                 # Skip past any already trained steps if resuming training
                 # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
                 # We use consumed_samples to reset the status
@@ -755,6 +762,7 @@ class Trainer:
                                 p.grad = p.grad.scale(1.0 / self.args.gradient_accumulation_steps)
 
                     # Optimizer step
+                    self.callback_handler.on_optimizer_begin(args, self.state, self.control, scaler=self.scaler)
                     optimizer_was_run = True
                     if self.do_grad_scaling:
                         scale_before = self.scaler._scale.numpy()
@@ -773,6 +781,7 @@ class Trainer:
                         self.lr_scheduler.step()
 
                     self.optimizer.clear_grad()
+                    self.callback_handler.on_optimizer_end(args, self.state, self.control, scaler=self.scaler)
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
