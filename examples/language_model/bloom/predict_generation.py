@@ -16,8 +16,9 @@ from __future__ import annotations
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.layers import LoRAModel
-from paddlenlp.transformers import AutoTokenizer, BloomForCausalLM
+from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.peft.prefix import bloom_postprocess_past_key_value
+from paddlenlp.transformers import AutoConfig, AutoTokenizer, BloomForCausalLM
 
 
 def parse_arguments():
@@ -27,18 +28,12 @@ def parse_arguments():
     parser.add_argument("--model_name_or_path", default="bigscience/bloom-560m", help="The directory of model.")
     parser.add_argument("--save_onepiece_model_path", default=None, help="The directory of model.")
     parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
-    parser.add_argument("--max_length", type=int, default=200, help="The batch size of data.")
+    parser.add_argument("--src_length", type=int, default=200, help="The batch size of data.")
+    parser.add_argument("--tgt_length", type=int, default=200, help="The batch size of data.")
     parser.add_argument("--seed", type=int, default=20, help="the seed of parameter initialization")
     parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     parser.add_argument(
-        "--fp16",
-        action="store_true",
-        help="Whether to use fp16 16-bit (mixed) precision training instead of 32-bit training.",
-    )
-    parser.add_argument(
-        "--bf16",
-        action="store_true",
-        help="Whether to use bf16 (mixed) precision instead of 32-bit. Requires Ampere or higher NVIDIA architecture or using CPU (no_cuda).",
+        "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
     )
     return parser.parse_args()
 
@@ -53,41 +48,59 @@ def batchfy_text(texts, batch_size):
 
 
 class Predictor(object):
-    def __init__(self, args):
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-        self.tokenizer.padding_side = "left"
-        self.batch_size = args.batch_size
-        self.args = args
-        tensor_parallel_degree = paddle.distributed.get_world_size()
-        tensor_parallel_rank = 0
-        if tensor_parallel_degree > 1:
-            strategy = fleet.DistributedStrategy()
-            strategy.hybrid_configs = {
-                "dp_degree": 1,
-                "mp_degree": tensor_parallel_degree,
-                "pp_degree": 1,
-                "sharding_degree": 1,
-            }
-            fleet.init(is_collective=True, strategy=strategy)
-            hcg = fleet.get_hybrid_communicate_group()
-            tensor_parallel_rank = hcg.get_model_parallel_rank()
-        if args.fp16:
-            dtype = "float16"
-        elif args.bf16:
-            dtype = "bfloat16"
+    def __init__(self, args=None, tokenizer=None, model=None, **kwargs):
+        if args is None:
+            self.tokenizer = tokenizer
+            self.model = model
+            self.src_length = kwargs["src_length"]
+            self.tgt_length = kwargs["tgt_length"]
         else:
-            dtype = "float32"
-        paddle.set_default_dtype(dtype)
-        self.model = BloomForCausalLM.from_pretrained(
-            args.model_name_or_path,
-            load_state_as_np=True,
-            low_cpu_mem_usage=True,
-            dtype=dtype,
-            tensor_parallel_degree=tensor_parallel_degree,
-            tensor_parallel_rank=tensor_parallel_rank,
-        )
-        if self.args.lora_path is not None:
-            self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
+            self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+            self.tokenizer.padding_side = "left"
+            self.batch_size = args.batch_size
+            self.args = args
+            self.src_length = self.args.src_length
+            self.tgt_length = self.args.tgt_length
+
+            tensor_parallel_degree = paddle.distributed.get_world_size()
+            tensor_parallel_rank = 0
+            if tensor_parallel_degree > 1:
+                strategy = fleet.DistributedStrategy()
+                strategy.hybrid_configs = {
+                    "dp_degree": 1,
+                    "mp_degree": tensor_parallel_degree,
+                    "pp_degree": 1,
+                    "sharding_degree": 1,
+                }
+                fleet.init(is_collective=True, strategy=strategy)
+                hcg = fleet.get_hybrid_communicate_group()
+                tensor_parallel_rank = hcg.get_model_parallel_rank()
+
+            if self.args.lora_path is not None:
+                lora_config = LoRAConfig.from_pretrained(self.args.lora_path)
+                dtype = lora_config.dtype
+            elif self.args.prefix_path is not None:
+                prefix_config = PrefixConfig.from_pretrained(self.args.prefix_path)
+                dtype = prefix_config.dtype
+            else:
+                config = AutoConfig.from_pretrained(args.model_name_or_path)
+                dtype = config.dtype if config.dtype is not None else "float16"
+
+            self.model = BloomForCausalLM.from_pretrained(
+                args.model_name_or_path,
+                load_state_as_np=True,
+                low_cpu_mem_usage=True,
+                dtype=dtype,
+                tensor_parallel_degree=tensor_parallel_degree,
+                tensor_parallel_rank=tensor_parallel_rank,
+            )
+            if self.args.lora_path is not None:
+                self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
+            if self.args.prefix_path is not None:
+                self.model = PrefixModelForCausalLM.from_pretrained(
+                    self.model, self.args.prefix_path, bloom_postprocess_past_key_value
+                )
+
         self.model.eval()
 
     def preprocess(self, input_text):
@@ -95,7 +108,7 @@ class Predictor(object):
             input_text,
             return_tensors="np",
             padding=True,
-            max_length="max_length",
+            max_length=self.src_length,
             return_attention_mask=False,
             return_token_type_ids=False,
         )
@@ -109,7 +122,7 @@ class Predictor(object):
             with paddle.no_grad():
                 result = self.model.generate(
                     **inputs,
-                    max_length=self.args.max_length,
+                    max_length=self.tgt_length,
                     bos_token_id=self.tokenizer.bos_token_id,
                     eos_token_id=self.tokenizer.eos_token_id,
                     pad_token_id=self.tokenizer.pad_token_id,
@@ -121,7 +134,7 @@ class Predictor(object):
                 with paddle.amp.auto_cast(False, level="O2", dtype=self.model.config.dtype):
                     result = self.model.generate(
                         **inputs,
-                        max_length=self.args.max_length,
+                        max_length=self.tgt_length,
                         bos_token_id=self.tokenizer.bos_token_id,
                         eos_token_id=self.tokenizer.eos_token_id,
                         pad_token_id=self.tokenizer.pad_token_id,

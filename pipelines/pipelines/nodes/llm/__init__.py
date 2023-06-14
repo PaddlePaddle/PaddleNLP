@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .chatglm import ChatGLMBot
 from .ernie_bot import ErnieBot
 from .history import TruncatedConversationHistory
 from .prompt_template import PromptTemplate

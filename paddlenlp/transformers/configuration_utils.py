@@ -572,8 +572,7 @@ class PretrainedConfig:
             self.id2label = dict((int(key), value) for key, value in self.id2label.items())
             # Keys are always strings in JSON so convert ids to int here.
         else:
-            num_labels = kwargs.pop("num_labels", 2)
-            self.num_labels = num_labels if num_labels is not None else 2
+            self.num_labels = kwargs.pop("num_labels", 2)
 
         self.classifier_dropout = kwargs.pop("classifier_dropout", None)
 
@@ -586,7 +585,6 @@ class PretrainedConfig:
         self.sep_token_id = kwargs.pop("sep_token_id", None)
 
         self.fp16_opt_level = kwargs.pop("fp16_opt_level", None)
-        self.dtype = kwargs.pop("dtype", None)
 
         self.decoder_start_token_id = kwargs.pop("decoder_start_token_id", None)
 

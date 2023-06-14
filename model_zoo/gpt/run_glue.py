@@ -19,7 +19,6 @@ from functools import partial
 import numpy as np
 import paddle
 from paddle.io import DataLoader
-from paddle.metric import Accuracy
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
@@ -38,13 +37,13 @@ logger = logging.getLogger(__name__)
 
 METRIC_CLASSES = {
     "cola": Mcc,
-    "sst-2": Accuracy,
+    "sst-2": AccuracyAndF1,
     "mrpc": AccuracyAndF1,
     "sts-b": PearsonAndSpearman,
     "qqp": AccuracyAndF1,
-    "mnli": Accuracy,
-    "qnli": Accuracy,
-    "rte": Accuracy,
+    "mnli": AccuracyAndF1,
+    "qnli": AccuracyAndF1,
+    "rte": AccuracyAndF1,
 }
 
 
@@ -64,44 +63,6 @@ class ModelArguments:
     max_seq_length: int = field(
         default=128, metadata={"help": "The maximum total input sequence length after tokenization"}
     )
-
-
-@paddle.no_grad()
-def evaluate(model, loss_fct, metric, data_loader):
-    model.eval()
-    metric.reset()
-    for batch in data_loader:
-        input_ids, labels = batch
-        logits = model(input_ids)
-        loss = loss_fct(logits, labels)
-        correct = metric.compute(logits, labels)
-        metric.update(correct)
-
-    res = metric.accumulate()
-    if isinstance(metric, AccuracyAndF1):
-        print(
-            "eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
-            % (
-                loss.numpy(),
-                res[0],
-                res[1],
-                res[2],
-                res[3],
-                res[4],
-            ),
-            end="",
-        )
-    elif isinstance(metric, Mcc):
-        print("eval loss: %f, mcc: %s, " % (loss.numpy(), res[0]), end="")
-    elif isinstance(metric, PearsonAndSpearman):
-        print(
-            "eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s, "
-            % (loss.numpy(), res[0], res[1], res[2]),
-            end="",
-        )
-    else:
-        print("eval loss: %f, acc: %s, " % (loss.numpy(), res), end="")
-    model.train()
 
 
 def convert_example(example, tokenizer, label_list, max_seq_length=512, is_test=False):
@@ -146,6 +107,26 @@ def do_train():
 
     model_args.task_name = model_args.task_name.lower()
     metric_class = METRIC_CLASSES[model_args.task_name]
+
+    def compute_metrics(p):
+        preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
+
+        preds = paddle.to_tensor(preds)
+        label = paddle.to_tensor(p.label_ids)
+
+        metric = metric_class()
+        result = metric.compute(preds, label)
+        metric.update(result)
+
+        if isinstance(metric, AccuracyAndF1):
+            acc, precision, recall, f1, _ = metric.accumulate()
+            return {"accuracy": acc, "precision": precision, "recall": recall, "f1": f1}
+        elif isinstance(metric, Mcc):
+            mcc = metric.accumulate()
+            return {"mcc": mcc[0]}
+        elif isinstance(metric, PearsonAndSpearman):
+            pearson, spearman, _ = metric.accumulate()
+            return {"pearson": pearson, "spearman": spearman}
 
     train_ds = load_dataset("glue", model_args.task_name, splits="train")
     tokenizer = GPTTokenizer.from_pretrained(model_args.model_name_or_path)
@@ -199,8 +180,6 @@ def do_train():
 
     loss_fct = paddle.nn.loss.CrossEntropyLoss() if train_ds.label_list else paddle.nn.loss.MSELoss()
 
-    metric = metric_class()
-
     # TODO(wj-Mcat): use amp
     trainer = Trainer(
         model=model,
@@ -210,7 +189,7 @@ def do_train():
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
-        compute_metrics=metric,
+        compute_metrics=compute_metrics,
         optimizers=[optimizer, lr_scheduler],
     )
 

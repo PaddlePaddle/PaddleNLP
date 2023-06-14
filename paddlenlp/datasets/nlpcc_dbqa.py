@@ -30,10 +30,10 @@ class NLPCC_DBQA(DatasetBuilder):
 
     Document-based QA (or DBQA) task
     When predicting answers to each question, a DBQA system built by each
-    participating team IS LIMITED TO select sentences as answersfrom the
+    participating team IS LIMITED TO select sentences as answers from the
     question’s given document.
 
-    For more imformation: http://tcci.ccf.org.cn/conference/2016/dldoc/evagline2.pdf
+    For more information: http://tcci.ccf.org.cn/conference/2016/dldoc/evagline2.pdf
     """
 
     URL = "https://bj.bcebos.com/paddlenlp/datasets/nlpcc-dbqa.zip"

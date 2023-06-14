@@ -24,7 +24,8 @@ __all__ = [
 
 CHATGLM_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
-        "THUDM/chatglm-6b": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/chatglm-6b/model_state.pdparams"
+        "THUDM/chatglm-6b": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/chatglm-6b/model_state.pdparams",
+        "THUDM/chatglm-6b-v1.1": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/chatglm-6b-v1.1/model_state.pdparams",
     }
 }
 

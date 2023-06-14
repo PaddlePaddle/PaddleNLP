@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -73,6 +73,7 @@ from .blip.image_processing import *
 from .chinesebert.configuration import *
 from .chinesebert.modeling import *
 from .chinesebert.tokenizer import *
+from .convbert.configuration import *
 from .convbert.modeling import *
 from .convbert.tokenizer import *
 from .ctrl.modeling import *
@@ -112,6 +113,7 @@ from .funnel.configuration import *
 from .llama.configuration import *
 from .llama.modeling import *
 from .llama.tokenizer import *
+from .layoutlm.configuration import *
 from .layoutlm.modeling import *
 from .layoutlm.tokenizer import *
 from .layoutlmv2.modeling import *
@@ -245,6 +247,19 @@ from .blip_2.processing import *
 from .chatglm.configuration import *
 from .chatglm.modeling import *
 from .chatglm.tokenizer import *
+from .speecht5.configuration import *
+from .speecht5.modeling import *
+from .speecht5.tokenizer import *
+from .speecht5.processing import *
+from .speecht5.feature_extraction import *
+from .minigpt4.modeling import *
+from .minigpt4.configuration import *
+from .minigpt4.processing import *
+from .minigpt4.image_processing import *
+from .clap.configuration import *
+from .clap.feature_extraction import *
+from .clap.modeling import *
+from .clap.processing import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available

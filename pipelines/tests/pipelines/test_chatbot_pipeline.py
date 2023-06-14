@@ -16,13 +16,14 @@ import json
 import unittest
 from unittest.mock import MagicMock, patch
 
-from pipelines.nodes.llm import ErnieBot, TruncatedConversationHistory
+from pipelines.nodes.llm import ChatGLMBot, ErnieBot, TruncatedConversationHistory
 from pipelines.pipelines import Pipeline
 
 
 class TestChatPipeline(unittest.TestCase):
-    def setUp(self):
-        self.eb = ErnieBot("your_access_token")
+    @patch("requests.request")
+    def setUp(self, mock_request):
+        self.eb = ErnieBot(api_key="api_key", secret_key="secret_key")
 
     def request_side_effect(*args, **kwargs):
         data = json.loads(kwargs["data"])
@@ -84,3 +85,14 @@ class TestChatPipeline(unittest.TestCase):
                 {"role": "assistant", "content": "3 messages received"},
             ],
         )
+
+
+class TestChatGLMPipeline(unittest.TestCase):
+    def setUp(self):
+        self.chat = ChatGLMBot(model="__internal_testing__/tiny-random-chatglm", dtype="float32", tgt_length=8)
+
+    def test_run_without_history(self):
+        pipeline = Pipeline()
+        pipeline.add_node(component=self.chat, name="ChatBot", inputs=["Query"])
+        response_round_1 = pipeline.run("hello")
+        self.assertEqual(response_round_1["result"], ["strained睡到睡到睡到睡到睡到睡到睡到"])

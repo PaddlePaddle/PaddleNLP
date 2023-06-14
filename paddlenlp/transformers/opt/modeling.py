@@ -796,9 +796,10 @@ class OPTModel(OPTPretrainedModel):
         if attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
             expanded_attn_mask = _expand_mask(attention_mask, tgt_length=input_shape[-1])
-            combined_attention_mask = (
-                expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
-            )
+            if input_shape[-1] > 1:
+                combined_attention_mask = combined_attention_mask + expanded_attn_mask
+            else:
+                combined_attention_mask = expanded_attn_mask
 
         return combined_attention_mask
 

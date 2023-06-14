@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
 import random
 import sys
@@ -39,11 +38,8 @@ from paddlenlp.transformers import (
     LinearDecayWithWarmup,
 )
 from paddlenlp.utils import profiler
+from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import TimeCostAverage
-
-FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
-logging.basicConfig(level=logging.INFO, format=FORMAT)
-logger = logging.getLogger(__name__)
 
 MODEL_CLASSES = {
     "bert": (BertModel, BertForPretraining, BertPretrainingCriterion, BertTokenizer),
@@ -105,6 +101,12 @@ def parse_args():
         type=int,
         help="Set total number of training steps to perform. ",
     )
+    parser.add_argument(
+        "--preprocessing_num_workers",
+        type=int,
+        default=0,
+        help="The number of processes to use for the preprocessing.",
+    )
     parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
 
     parser.add_argument("--logging_steps", type=int, default=500, help="Log every X updates steps.")
@@ -136,6 +138,12 @@ def parse_args():
         type=strtobool,
         default=False,
         help="Whether to use FusedTransformerEncoderLayer to replace a TransformerEncoderLayer or not.",
+    )
+    parser.add_argument(
+        "--cinn",
+        type=strtobool,
+        default=False,
+        help="If cinn is True, we will apply @to_static to model.bert.encoder, else we will apply it to the whole model.",
     )
     args = parser.parse_args()
     return args
@@ -195,7 +203,7 @@ def create_pretraining_dataset(input_file, max_pred_length, shared_list, args, w
         dataset=train_data,
         batch_sampler=train_batch_sampler,
         collate_fn=_collate_data,
-        num_workers=0,
+        num_workers=args.preprocessing_num_workers,
         worker_init_fn=worker_init,
         return_list=True,
     )
@@ -283,9 +291,13 @@ def do_train(args):
     criterion = criterion_class(getattr(model, model_class.base_model_prefix).config.vocab_size)
     # decorate @to_static for benchmark, skip it by default.
     if args.to_static:
-        specs = create_input_specs()
-        model = paddle.jit.to_static(model, input_spec=specs)
-        logger.info("Successfully to apply @to_static with specs: {}".format(specs))
+        if args.cinn:
+            model.bert.encoder = paddle.jit.to_static(model.bert.encoder)
+            logger.info("Successfully to apply @to_static to model.bert.encoder.")
+        else:
+            specs = create_input_specs()
+            model = paddle.jit.to_static(model, input_spec=specs)
+            logger.info("Successfully to apply @to_static to the whole model with specs: {}.".format(specs))
 
     # If use default last_epoch, lr of the first iteration is 0.
     # Use `last_epoch = 0` to be consistent with nv bert.

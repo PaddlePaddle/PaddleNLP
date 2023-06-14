@@ -66,6 +66,7 @@ from .utils import (
     ContextManagers,
     InitTrackerMeta,
     adapt_stale_fwd_patch,
+    convert_ndarray_dtype,
     fn_args_to_dict,
     is_paddle_support_lazy_init,
     resolve_cache_dir,
@@ -338,12 +339,12 @@ def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conver
         support_conversion (bool): whether support converting pytorch weight file to paddle weight file
         subfolder (str, optional) An optional value corresponding to a folder inside the repo.
     """
-    if hf_file_exists(repo_id, "model_state.pdparams", subfolder=subfolder):
-        file_name = "model_state.pdparams"
+    if hf_file_exists(repo_id, PADDLE_WEIGHT_FILE_NAME, subfolder=subfolder):
+        file_name = PADDLE_WEIGHT_FILE_NAME
     elif hf_file_exists(repo_id, PYTORCH_WEIGHT_FILE_NAME, subfolder=subfolder):
         if not support_conversion:
             raise EntryNotFoundError(
-                f"can not download `model_state.pdparams from https://huggingface.co/{repo_id}` "
+                f"can not download `{PADDLE_WEIGHT_FILE_NAME} from https://huggingface.co/{repo_id}` "
                 "and current model doesn't support conversion from pytorch weight file to paddle weight file"
             )
         file_name = PYTORCH_WEIGHT_FILE_NAME
@@ -448,7 +449,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
     # TODO: more flexible resource handle, namedtuple with fields as:
     # resource_name, saved_file, handle_name_for_load(None for used as __init__
     # arguments), handle_name_for_save
-    resource_files_names = {"model_state": "model_state.pdparams"}
+    resource_files_names = {"model_state": PADDLE_WEIGHT_FILE_NAME}
     pretrained_resource_files_map = {}
     base_model_prefix = ""
     main_input_name = "input_ids"
@@ -582,6 +583,22 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         """
         # Todo: return all model name
         return list(self.pretrained_init_configuration.keys())
+
+    def get_memory_footprint(self, return_buffers=True):
+        r"""
+        Get the memory footprint of a model. This will return the memory footprint of the current model in bytes.
+        Useful to benchmark the memory footprint of the current model and design some tests.
+
+        Arguments:
+            return_buffers (`bool`, *optional*, defaults to `True`):
+                Whether to return the size of the buffer tensors in the computation of the memory footprint. Buffers
+                are tensors that do not require gradients and not registered as parameters
+        """
+        mem = sum([param.numel().item() * param.element_size() for param in self.parameters()])
+        if return_buffers:
+            mem_bufs = sum([buf.numel().item() * buf.element_size() for buf in self.buffers()])
+            mem = mem + mem_bufs
+        return mem
 
     def get_input_embeddings(self) -> nn.Embedding:
         """get input embedding of model
@@ -975,6 +992,20 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         raise FileNotFoundError(msg)
 
     @classmethod
+    def keep_in_fp32_modules(cls, key: str, config: PretrainedConfig, dtype: str) -> bool:
+        """should keep parameter in fp32
+
+        Args:
+            key (str): key of state-dict
+            config (PretrainedConfig): the instance of current pretrianed model
+            dtype (str): the source dtype
+
+        Returns:
+            bool: whether keep parameter in fp32 dtype
+        """
+        return False
+
+    @classmethod
     def _load_pretrained_model(
         cls,
         model: PretrainedModel,
@@ -1110,10 +1141,28 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     f"the value of `dtype` should be one of [`float32`, `float16`, `bfloat16`], but received {dtype}"
                 )
             for key in state_dict.keys():
-                if isinstance(state_dict[key], np.ndarray) and issubclass(state_dict[key].dtype.type, np.floating):
-                    state_dict[key] = state_dict[key].astype(dtype=dtype)
-                if isinstance(state_dict[key], paddle.Tensor) and state_dict[key].is_floating_point():
-                    state_dict[key] = paddle.cast(state_dict[key], dtype=dtype)
+                target_dtype = dtype
+                if isinstance(state_dict[key], np.ndarray):
+                    if not issubclass(state_dict[key].dtype.type, np.floating):
+                        continue
+
+                    # TODO(wj-Mcat): add `keep_in_fp32` feature to enable hybrid fp32 state-dict
+                    # this is the temp hard code for fused-mt transformer
+                    if model.keep_in_fp32_modules(key, model.config, dtype):
+                        target_dtype = "float32"
+                    state_dict[key] = convert_ndarray_dtype(state_dict[key], target_dtype)
+
+                elif isinstance(state_dict[key], paddle.Tensor):
+                    if not state_dict[key].is_floating_point():
+                        continue
+
+                    # TODO(wj-Mcat): add `keep_in_fp32` feature to enable hybrid fp32 state-dict
+                    # this is the temp hard code for fused-mt transformer
+                    if model.keep_in_fp32_modules(key, model.config, dtype):
+                        target_dtype = "float32"
+                    state_dict[key] = paddle.cast(state_dict[key], dtype=target_dtype)
+                else:
+                    raise ValueError(f"the dtype<{state_dict[key].dtype}> of current state-dict[{key}] is not valid")
         else:
             dtype_prefix_len = len("paddle.")
             for k, v in model_to_load.state_dict().items():
@@ -1226,6 +1275,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         if dtype is None:
             dtype = config.dtype
+        else:
+            config.dtype = dtype
 
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
             config.save_pretrained(cache_dir)
@@ -1270,7 +1321,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         else:
             # 4. loading the state dict
-            if config.tensor_parallel_degree > 1 and model_weight_file.endswith("model_state.pdparams"):
+            if config.tensor_parallel_degree > 1 and model_weight_file.endswith(PADDLE_WEIGHT_FILE_NAME):
                 model_state_dict = cls.convert_tensor_parallel(model_weight_file, config)
             else:
                 model_state_dict = paddle.load(model_weight_file, return_numpy=load_state_as_np)

@@ -473,8 +473,12 @@ TASKS = {
                 "task_class": ChatGLMTask,
                 "task_flag": "text_generation-tiny-random-chatglm",
             },
+            "THUDM/chatglm-6b-v1.1": {
+                "task_class": ChatGLMTask,
+                "task_flag": "text_generation-THUDM/chatglm-6b-v1.1",
+            },
         },
-        "default": {"model": "THUDM/chatglm-6b"},
+        "default": {"model": "THUDM/chatglm-6b-v1.1"},
     },
     "zero_shot_text_classification": {
         "models": {
@@ -726,6 +730,8 @@ support_argument_list = [
     "uie-x-base",
     "__internal_testing__/tiny-random-uie-m",
     "__internal_testing__/tiny-random-uie-x",
+    "THUDM/chatglm-6b",
+    "THUDM/chatglm-6b-v1.1",
 ]
 
 

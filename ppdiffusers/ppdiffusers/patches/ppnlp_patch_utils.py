@@ -26,6 +26,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from ..utils import (
     DIFFUSERS_CACHE,
+    FROM_DIFFUSERS,
     FROM_HF_HUB,
     HF_HUB_OFFLINE,
     PPDIFFUSERS_CACHE,
@@ -639,7 +640,7 @@ if is_paddle_available() and is_paddlenlp_available():
         )
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", False)
         force_download = kwargs.pop("force_download", False)
-        from_diffusers = kwargs.pop("from_diffusers", False)
+        from_diffusers = kwargs.pop("from_diffusers", FROM_DIFFUSERS)
         resume_download = kwargs.pop("resume_download", False)
         proxies = kwargs.pop("proxies", None)
         output_loading_info = kwargs.pop("output_loading_info", False)

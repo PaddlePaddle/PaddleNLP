@@ -87,7 +87,6 @@ class VersatileDiffusionMegaPipelineIntegrationTests(unittest.TestCase):
         ).images
         image_slice = image[0, 253:256, 253:256, -1]
         assert image.shape == (1, 512, 512, 3)
-        # breakpoint()
         # expected_slice = np.array([0.1448, 0.1619, 0.1741, 0.1086, 0.1147, 0.1128, 0.1199, 0.1165, 0.1001])
         expected_slice = np.array(
             [

@@ -136,7 +136,6 @@ class VQDiffusionPipelineFastTests(unittest.TestCase):
         expected_slice = np.array(
             [0.828682, 0.9523265, 0.9386728, 1.0, 0.670735, 0.69808894, 0.57591987, 0.5695971, 0.6580568]
         )
-        # breakpoint()
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
         assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 0.01
 
@@ -169,7 +168,6 @@ class VQDiffusionPipelineFastTests(unittest.TestCase):
         image_slice = image[0, -3:, -3:, -1]
         image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
         assert image.shape == (1, 24, 24, 3)
-        # breakpoint()
         expected_slice = np.array(
             [0.51841056, 0.8037737, 0.71010727, 0.8259821, 0.6837207, 0.53903896, 0.80566585, 0.79730004, 0.7192132]
         )

@@ -14,16 +14,19 @@
 
 import contextlib
 import sys
+import time
 
 import paddle.amp.auto_cast as autocast
 from paddle.io import DataLoader
 
-from paddlenlp.trainer import Trainer
+from paddlenlp.trainer import PrinterCallback, ProgressCallback, Trainer
 from paddlenlp.trainer.integrations import (
     INTEGRATION_TO_CALLBACK,
+    TrainerCallback,
     VisualDLCallback,
     rewrite_logs,
 )
+from paddlenlp.utils import profiler
 from paddlenlp.utils.log import logger
 
 from .text_image_pair_dataset import TextImagePair, worker_init_fn
@@ -97,11 +100,108 @@ class VisualDLWithImageCallback(VisualDLCallback):
             self.vdl_writer.flush()
 
 
+class AverageStatistical(object):
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.total_cnt = 0
+        self.time = 0
+
+    def record(self, val, cnt=1):
+        self.time += val
+        self.total_cnt += cnt
+
+    def get_average(self):
+        if self.total_cnt == 0:
+            return 0
+
+        return self.time / self.total_cnt
+
+    def get_average_per_sec(self):
+        if self.time == 0.0:
+            return 0.0
+
+        return float(self.total_cnt) / self.time
+
+    def get_total_cnt(self):
+        return self.total_cnt
+
+    def get_total_time(self):
+        return self.time
+
+
+class BenchmarkCallback(TrainerCallback):
+    def __init__(self, benchmark=True, profiler_options=None):
+        self.benchmark = benchmark
+        self.profiler_options = profiler_options
+
+    def on_train_begin(self, args, state, control, **kwargs):
+        assert args.gradient_accumulation_steps == 1 and not args.do_eval and not args.do_predict
+        if self.benchmark:
+            self.reader_cost_avg = AverageStatistical()
+
+    def on_epoch_begin(self, args, state, control, **kwargs):
+        if self.benchmark:
+            self.epoch_start = time.time()
+            self.batch_start = time.time()
+
+    def on_step_begin(self, args, state, control, **kwargs):
+        if self.benchmark:
+            self.reader_cost_avg.record(time.time() - self.batch_start)
+
+    def on_step_end(self, args, state, control, **kwargs):
+        if self.profiler_options is not None:
+            profiler.add_profiler_step(self.profiler_options)
+
+        if self.benchmark:
+            self.batch_start = time.time()
+            if control.should_log:
+                self.maybe_log_save_evaluate_start = time.time()
+
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if self.benchmark:
+            if logs is not None and "interval_steps_per_second" in logs:
+                self.batch_start = self.batch_start + (time.time() - self.maybe_log_save_evaluate_start)
+                ips = logs["interval_steps_per_second"] * args.train_batch_size
+                avg_batch_cost = 1 / logs["interval_steps_per_second"]
+                logger.info(
+                    "global step %d / %d, loss: %f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sample/sec"
+                    % (
+                        state.global_step,
+                        state.max_steps,
+                        logs["loss"],
+                        self.reader_cost_avg.get_average(),
+                        avg_batch_cost,
+                        args.train_batch_size,
+                        ips,
+                    )
+                )
+                self.reader_cost_avg.reset()
+
+    def on_epoch_end(self, args, state, control, **kwargs):
+        if self.benchmark:
+            train_epoch_cost = time.time() - self.epoch_start
+            logger.info("train epoch: %d, epoch_cost: %.5f s" % (state.epoch, train_epoch_cost))
+
+
 # register visualdl_with_image
 INTEGRATION_TO_CALLBACK.update({"custom_visualdl": VisualDLWithImageCallback})
 
 
 class LatentDiffusionTrainer(Trainer):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if self.args.benchmark or self.args.profiler_options is not None:
+            self.add_callback(
+                BenchmarkCallback(benchmark=self.args.benchmark, profiler_options=self.args.profiler_options)
+            )
+            if self.args.benchmark:
+                if self.args.disable_tqdm:
+                    self.pop_callback(PrinterCallback)
+                else:
+                    self.pop_callback(ProgressCallback)
+
     def compute_loss(self, model, inputs, return_outputs=False):
         loss = model(**inputs)
         return loss

@@ -9,6 +9,8 @@
 |Stable Diffusion Mega|一个 Stable Diffusion 管道实现文生图、图生图、图像修复|[Stable Diffusion Mega](#stable-diffusion-mega)||
 |Long Prompt Weighting Stable Diffusion| 一个没有token数目限制的Stable Diffusion管道，支持在prompt中解析权重|[Long Prompt Weighting Stable Diffusion](#long-prompt-weighting-stable-diffusion)||
 |AUTOMATIC1111 WebUI Stable Diffusion| 与AUTOMATIC1111的WebUI基本一致的Pipeline |[AUTOMATIC1111 WebUI Stable Diffusion](#automatic1111-webui-stable-diffusion)||
+|Stable Diffusion with High Resolution Fixing| 使用高分辨率修复功能进行文图生成|[Stable Diffusion with High Resolution Fixing](#stable-diffusion-with-high-resolution-fixing)||
+|ControlNet Reference Only| 基于参考图片生成与图片相似的图片|[ControlNet Reference Only](#controlnet-reference-only)||
 
 
 ## Example usages
@@ -324,7 +326,7 @@ with paddle.amp.auto_cast(True, level="O2"):
 images[0].save("lpw.png")
 ```
 
-上述代码生成结果如下
+上述代码生成结果如下:
 
 <center><img src="https://user-images.githubusercontent.com/40912707/221503299-24055b14-0b07-4f94-b7f9-d4f84b492540.png" style="zoom:50%"/></center>
 
@@ -383,8 +385,74 @@ for enable_lora in [True, False]:
     else:
         image_grid(images, 2, 2).save(f"lora_disable.png")
 ```
-生成的图片如下所示：
 
+生成的图片如下所示：
 | lora_disable.png | lora_enable.png |
 |:----------:|:--------------:|
 |<center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832029-c06a1367-1f2c-4206-9666-99854fcee240.png" width=50%></center> | <center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832028-730ce442-dd34-4e36-afd0-81d40843359a.png" width=50%></center> |
+
+### Stable Diffusion with High Resolution Fixing
+`StableDiffusionHiresFixPipeline` 基于Stable Diffusion进行文图生成，同时启动高分辨率修复功能。该自定义Pipeline生成图像期间共包含两个阶段: 初始生成图像阶段和高清修复阶段。使用方式如下所示：
+
+```python
+import paddle
+from stable_diffusion_hires_fix import StableDiffusionHiresFixPipeline
+from ppdiffusers import EulerAncestralDiscreteScheduler
+
+pipe = StableDiffusionHiresFixPipeline.from_pretrained("stabilityai/stable-diffusion-2", paddle_dtype=paddle.float16)
+pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
+
+generator = paddle.Generator().manual_seed(5232132133)
+prompt = "1 real girl, long black hair, detailed face, light smile, chinese style, hanfu"
+image = pipe(prompt, guidance_scale=7.5, height=768, width=768, generator=generator, num_inference_steps=40, hires_ratio=0.5, hr_resize_width=768, hr_resize_height=1024, enable_hr=True).images[0]
+
+image.show()
+
+```
+生成的图片如下所示：
+<center><img src="https://github.com/PaddlePaddle/PaddleNLP/assets/35913314/1c96a219-0b5e-4e1a-b244-0c8cc7cb41f9" width=40%></center>
+
+
+### ControlNet Reference Only
+[Reference-Only Control](https://github.com/Mikubill/sd-webui-controlnet#reference-only-control) 是一种不需要任何控制模型就可以直接使用图像作为参考来引导生成图像的方法。它使用方式如下所示：
+
+```python
+import paddle
+from reference_only import ReferenceOnlyPipeline
+from ppdiffusers import DDIMScheduler
+from ppdiffusers.utils import load_image
+
+pipe = ReferenceOnlyPipeline.from_pretrained("TASUKU2023/Chilloutmix", safety_checker=None, paddle_dtype=paddle.float16)
+pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config, steps_offset=1, clip_sample=False, set_alpha_to_one=False,)
+
+prompt = "a dog running on grassland, best quality"
+input_image = load_image("https://raw.githubusercontent.com/Mikubill/sd-webui-controlnet/main/samples/dog_rel.png")
+
+for control_name in ["none", "reference_only", "reference_adain", "reference_adain+attn"]:
+    generator = paddle.Generator().manual_seed(42)
+    image = pipe(prompt,
+                 guidance_scale=7.,
+                 height=512,
+                 width=512,
+                 image=input_image,
+                 num_inference_steps=20,
+                 generator=generator,
+                 control_name=control_name, # "none", "reference_only", "reference_adain", "reference_adain+attn"
+                 attention_auto_machine_weight=1.0, # 0.0~1.0
+                 gn_auto_machine_weight=1.0, # 0.0~2.0
+                 current_style_fidelity=0.5, # 0.0~1.0
+                 resize_mode=0, # ["0 means Just resize", "1 means Crop and resize", "2 means Resize and fill", "-1 means Do nothing"]
+                ).images[0]
+    image.save(control_name + ".png")
+```
+生成的图片如下所示：
+
+
+|       none       |       reference_only       |       reference_adain       |       reference_adain+attn       |
+|:-------------------:|:-------------------:|:-------------------:|:-------------------:|
+|![][none]|![][reference_only]|![][reference_adain]|![][reference_adain+attn]|
+
+[none]: https://github.com/PaddlePaddle/PaddleNLP/assets/50394665/97db3779-9dd7-4d62-ae15-5d2fda68f311
+[reference_only]: https://github.com/PaddlePaddle/PaddleNLP/assets/50394665/4d67e752-cddc-40ab-9524-39e8d9b4a428
+[reference_adain]: https://github.com/PaddlePaddle/PaddleNLP/assets/50394665/266968c7-5065-4589-9bd8-47515d50c6de
+[reference_adain+attn]: https://github.com/PaddlePaddle/PaddleNLP/assets/50394665/73d53a4f-e601-4969-9cb8-e3fdf719ae0c

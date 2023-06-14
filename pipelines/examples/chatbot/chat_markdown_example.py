@@ -14,6 +14,7 @@
 
 import argparse
 import glob
+import time
 
 from pipelines.document_stores import FAISSDocumentStore
 from pipelines.nodes import (
@@ -79,7 +80,7 @@ def chat_markdown_tutorial():
     indexing_pipeline.add_node(component=text_splitter, name="Splitter", inputs=["MarkdownConverter"])
     indexing_pipeline.add_node(component=retriever, name="Retriever", inputs=["Splitter"])
     indexing_pipeline.add_node(component=document_store, name="DocumentStore", inputs=["Retriever"])
-    files = glob.glob(args.file_paths + "/*.md")
+    files = glob.glob(args.file_paths + "/**/*.md", recursive=True)
     indexing_pipeline.run(file_paths=files)
 
     # Query Markdowns
@@ -94,7 +95,10 @@ def chat_markdown_tutorial():
     )
     query_pipeline.add_node(component=ernie_bot, name="ErnieBot", inputs=["TruncateHistory"])
     query = "Jupyter 和 AI Studio Notebook 有什么区别？如何使用Jupyter？"
+    start_time = time.time()
     prediction = query_pipeline.run(query=query, params={"Retriever": {"top_k": 30}, "Ranker": {"top_k": 2}})
+    end_time = time.time()
+    print("Time cost for query markdown conversion:", end_time - start_time)
     print("user: {}".format(query))
     print("assistant: {}".format(prediction["result"]))
 

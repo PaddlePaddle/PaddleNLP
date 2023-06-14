@@ -22,7 +22,7 @@ from utils import GLMTrainer
 
 from paddlenlp.data import DefaultDataCollator
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import LoRAConfig, LoRAModel
+from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
 from paddlenlp.utils.log import logger
@@ -119,6 +119,7 @@ def main():
             merge_weights=True,
             enable_lora_list=[[True, False, True]],
             tensor_parallel_degree=training_args.tensor_parallel_degree,
+            dtype=dtype,
         )
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()

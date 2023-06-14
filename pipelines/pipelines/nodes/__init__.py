@@ -31,6 +31,7 @@ from pipelines.nodes.file_converter import (
     PDFToTextOCRConverter,
     TextConverter,
 )
+from pipelines.nodes.llm import ChatGLMBot
 from pipelines.nodes.llm.ernie_bot import ErnieBot
 from pipelines.nodes.llm.history import TruncatedConversationHistory
 from pipelines.nodes.llm.prompt_template import PromptTemplate
@@ -41,6 +42,7 @@ from pipelines.nodes.preprocessor import (
     PreProcessor,
     RecursiveCharacterTextSplitter,
 )
+from pipelines.nodes.prompt import PromptModel, PromptNode, Shaper
 from pipelines.nodes.question_generator import QuestionGenerator
 from pipelines.nodes.ranker import BaseRanker, ErnieRanker
 from pipelines.nodes.reader import BaseReader, ErnieReader
@@ -49,6 +51,7 @@ from pipelines.nodes.retriever import (
     BM25Retriever,
     DensePassageRetriever,
     MultiModalRetriever,
+    WebRetriever,
 )
 from pipelines.nodes.sentiment_analysis import (
     SentaProcessor,

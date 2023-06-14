@@ -18,7 +18,6 @@ import argparse
 import contextlib
 import gc
 import hashlib
-import itertools
 import math
 import os
 import sys
@@ -659,7 +658,7 @@ def main():
             text_encoder = paddle.DataParallel(text_encoder)
 
     params_to_optimize = (
-        itertools.chain(unet.parameters(), text_encoder.parameters()) if args.train_text_encoder else unet.parameters()
+        list(unet.parameters()) + list(text_encoder.parameters()) if args.train_text_encoder else unet.parameters()
     )
 
     if args.scale_lr:
