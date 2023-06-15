@@ -257,7 +257,11 @@ class Attention(nn.Layer):
             **cross_attention_kwargs,
         )
 
-    def batch_to_head_dim(self, tensor, transpose=True):
+    def batch_to_head_dim(self, tensor, transpose=True, in_dim=4):
+        if in_dim == 3:
+            head_size = self.heads
+            batch_size, seq_len, dim = tensor.shape
+            tensor = tensor.reshape([batch_size // head_size, head_size, seq_len, dim])
         if transpose:
             tensor = tensor.transpose([0, 2, 1, 3])
         tensor = tensor.reshape([0, 0, tensor.shape[2] * tensor.shape[3]])

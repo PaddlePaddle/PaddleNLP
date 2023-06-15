@@ -84,21 +84,20 @@ class CrossFrameAttnProcessor:
 
             # rearrange keys to have batch and frames in the 1st and 2nd dims respectively
             key = rearrange_3(key, video_length)
-            breakpoint()
-            key = key[:, (first_frame_index)]
+            key = key.index_select(paddle.to_tensor(first_frame_index), 1)
             # rearrange values to have batch and frames in the 1st and 2nd dims respectively
             value = rearrange_3(value, video_length)
-            value = value[:, (first_frame_index)]
+            value = value.index_select(paddle.to_tensor(first_frame_index), 1)
 
             # rearrange back to original shape
             key = rearrange_4(key)
             value = rearrange_4(value)
-        query = attn.head_to_batch_dim(query)
-        key = attn.head_to_batch_dim(key)
-        value = attn.head_to_batch_dim(value)
+        query = attn.head_to_batch_dim(query, out_dim=3)
+        key = attn.head_to_batch_dim(key, out_dim=3)
+        value = attn.head_to_batch_dim(value, out_dim=3)
         attention_probs = attn.get_attention_scores(query, key, attention_mask)
         hidden_states = paddle.bmm(x=attention_probs, y=value)
-        hidden_states = attn.batch_to_head_dim(hidden_states)
+        hidden_states = attn.batch_to_head_dim(hidden_states, in_dim=3)
         # linear proj
         hidden_states = attn.to_out[0](hidden_states)
         # dropout
