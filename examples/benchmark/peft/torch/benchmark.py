@@ -29,18 +29,16 @@ from transformers import (
 """
 单卡
 python train_nl2sql.py --model_name_or_path bigscience/bloomz-7b1-mt  \
-    --train_file nl2sql/dev.jsonl --validation_file nl2sql/dev.jsonl \
     --num_train_epochs 1 --per_device_train_batch_size 4 \
-    --evaluation_strategy epoch --save_strategy epoch \
-    --fp16 \
+    --evaluation_strategy no --save_strategy epoch \
+    --fp16 --lora \
     --logging_steps 50 --output_dir outputs
 
 多卡 deepspeed zero3
 python -m torch.distributed.run --nproc_per_node=4 train_nl2sql.py --deepspeed ds_config.json \
     --model_name_or_path bigscience/bloomz-7b1-mt  \
-    --train_file nl2sql/dev.jsonl --validation_file nl2sql/dev.jsonl \
     --num_train_epochs 1 --per_device_train_batch_size 2 \
-    --evaluation_strategy epoch --save_strategy epoch \
+    --evaluation_strategy no --save_strategy epoch \
     --fp16 \
     --logging_steps 50 --output_dir outputs
 """
@@ -70,7 +68,10 @@ def main():
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_args.model_name_or_path,
+        # low_cpu_mem_usage=True
+    )
 
     if model_args.lora:
         target_modules = ["query_key_value"]
@@ -81,8 +82,8 @@ def main():
         model.print_trainable_parameters()
 
     def preprocess_function(example, max_src_length=512, max_tgt_length=256):
-        inputs = example["src"][0]
-        targets = example["tgt"][0]
+        inputs = example["instruction"]
+        targets = example["output"]
         model_inputs = tokenizer(inputs, max_length=max_src_length, truncation=True, return_attention_mask=False)
         labels = tokenizer(targets, max_length=max_tgt_length, truncation=True, return_attention_mask=False)
         labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
@@ -91,18 +92,22 @@ def main():
 
         return model_inputs
 
-    dataset = load_dataset("json", data_files={"train": data_args.train_file, "dev": data_args.validation_file})
-    dataset = dataset.map(lambda example: preprocess_function(example))
+    dataset = load_dataset("BelleGroup/school_math_0.25M")
+    # select first 10k examples for benchmarking
+    dataset = dataset["train"].select(range(10000))
+    dataset = dataset.map(
+        lambda example: preprocess_function(example), remove_columns=["instruction", "input", "output"]
+    )
 
     trainer = Trainer(
         model=model,
-        train_dataset=dataset["train"],
-        eval_dataset=dataset["dev"],
+        train_dataset=dataset,
         args=training_args,
         data_collator=DataCollatorForSeq2Seq(return_tensors="pt", tokenizer=tokenizer),
     )
     model.config.use_cache = False  # silence the warnings. Please re-enable for inference!
-    trainer.train()
+    train_metrics = trainer.train()
+    print(train_metrics)
 
 
 if __name__ == "__main__":

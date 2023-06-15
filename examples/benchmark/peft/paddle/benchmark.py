@@ -25,25 +25,22 @@ from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 """
 单卡
 python train_nl2sql.py --model_name_or_path bigscience/bloomz-7b1-mt  \
-    --train_file nl2sql/dev.jsonl --validation_file nl2sql/dev.jsonl \
     --num_train_epochs 1 --per_device_train_batch_size 4 \
-    --evaluation_strategy epoch --save_strategy epoch \
-    --fp16 --fp16_opt_level O2 \
+    --evaluation_strategy no --save_strategy epoch \
+    --fp16 --fp16_opt_level O2 --lora \
     --logging_steps 50 --output_dir outputs
 
-多卡 mp
-python train_nl2sql.py --model_name_or_path bigscience/bloomz-7b1-mt  \
-    --train_file nl2sql/dev.jsonl --validation_file nl2sql/dev.jsonl \
-    --num_train_epochs 1 --per_device_train_batch_size 16 \
-    --evaluation_strategy epoch --save_strategy epoch \
-    --fp16 --fp16_opt_level O2 \
-    --logging_steps 50 --output_dir outputs
-
-多卡 sharding 3
+多卡mp
 python -m paddle.distributed.launch --gpus "0,1,2,3" train_nl2sql.py --model_name_or_path bigscience/bloomz-7b1-mt  \
-    --train_file nl2sql/dev.jsonl --validation_file nl2sql/dev.jsonl \
+    --num_train_epochs 1 --per_device_train_batch_size 8 \
+    --evaluation_strategy no --save_strategy epoch \
+    --fp16 --fp16_opt_level O2 --tensor_parallel_degree 4 \
+    --logging_steps 50 --output_dir outputs
+
+多卡sharding 3
+python -m paddle.distributed.launch --gpus "0,1,2,3" train_nl2sql.py --model_name_or_path bigscience/bloomz-7b1-mt  \
     --num_train_epochs 1 --per_device_train_batch_size 4 \
-    --evaluation_strategy epoch --save_strategy epoch \
+    --evaluation_strategy no --save_strategy epoch \
     --fp16 --fp16_opt_level O2 \
     --sharding "stage3" --sharding_parallel_degree 4 \
     --logging_steps 50 --output_dir outputs
@@ -60,19 +57,9 @@ class ModelArguments:
     lora: Optional[bool] = field(default=False, metadata={"help": "whether to use LoRA"})
 
 
-@dataclass
-class DataTrainingArguments:
-    """
-    Arguments pertaining to what data we are going to input our model for training and eval.
-    """
-
-    train_file: str = field(default=None, metadata={"help": "The input training data file (a text file)."})
-    validation_file: str = field(default=None, metadata={"help": "The input evaluation data file (a text file).e)."})
-
-
 def main():
-    parser = PdArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    parser = PdArgumentParser((ModelArguments, TrainingArguments))
+    model_args, training_args = parser.parse_args_into_dataclasses()
 
     # Set the dtype for loading model
     dtype = None
@@ -105,9 +92,9 @@ def main():
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
 
-    def preprocess_function(example, max_src_length=512, max_tgt_length=256):
-        inputs = example["src"][0]
-        targets = example["tgt"][0]
+    def preprocess_function(example, max_src_length=128, max_tgt_length=256):
+        inputs = example["instruction"]
+        targets = example["output"]
         model_inputs = tokenizer(inputs, max_length=max_src_length, truncation=True, return_attention_mask=False)
         labels = tokenizer(targets, max_length=max_tgt_length, truncation=True, return_attention_mask=False)
         labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
@@ -116,13 +103,16 @@ def main():
 
         return model_inputs
 
-    dataset = load_dataset("json", data_files={"train": data_args.train_file, "dev": data_args.validation_file})
-    dataset = dataset.map(lambda example: preprocess_function(example))
+    dataset = load_dataset("BelleGroup/school_math_0.25M", data_files="school_math_0.25M.json")
+    # select first 10k examples for benchmarking
+    dataset = dataset["train"].select(range(10000))
+    dataset = dataset.map(
+        lambda example: preprocess_function(example), remove_columns=["instruction", "input", "output"]
+    )
 
     trainer = Trainer(
         model=model,
-        train_dataset=dataset["train"],
-        eval_dataset=dataset["dev"],
+        train_dataset=dataset,
         args=training_args,
         data_collator=DataCollatorForSeq2Seq(return_tensors="pd", tokenizer=tokenizer),
     )
