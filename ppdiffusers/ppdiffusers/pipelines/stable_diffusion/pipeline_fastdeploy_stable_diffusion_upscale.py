@@ -200,7 +200,7 @@ class FastDeployStableDiffusionUpscalePipeline(DiffusionPipeline, FastDeployDiff
         )
 
         # 4. Preprocess image
-        image = self.image_processor.preprocess(image)
+        image = self.image_processor.preprocess(image, do_normalize=False)
 
         # 5. set timesteps
         self.scheduler.set_timesteps(num_inference_steps)

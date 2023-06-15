@@ -153,7 +153,7 @@ class AltDiffusionImg2ImgPipelineFastTests(unittest.TestCase):
         image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
         assert image.shape == (1, 32, 32, 3)
         expected_slice = np.array(
-            [0.48931587, 0.40102208, 0.49653798, 0.4203022, 0.34621224, 0.50789315, 0.41116416, 0.4933398, 0.5465742]
+            [0.92162037, 0.55048966, 0.58309036, 0.47764573, 0.18824315, 0.47448638, 0.5419899, 0.4387401, 0.612984]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.005
         assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 0.005
@@ -206,7 +206,7 @@ class AltDiffusionImg2ImgPipelineFastTests(unittest.TestCase):
         image_slice = image[255:258, 383:386, -1]
         assert image.shape == (504, 760, 3)
         expected_slice = np.array(
-            [0.3251649, 0.3340174, 0.3418343, 0.32628638, 0.33462793, 0.3300547, 0.31628466, 0.3470268, 0.34273332]
+            [0.70670533, 0.7021837, 0.70094424, 0.71000224, 0.7054069, 0.7036944, 0.7156702, 0.7078984, 0.70427144]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.005
 

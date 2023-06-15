@@ -215,7 +215,9 @@ class FastDeployDiffusionPipelineMixin:
         num_images_per_prompt,
         do_classifier_free_guidance=False,
     ):
-        control_image = self.image_processor.preprocess(controlnet_cond, height, width, do_normalize=False)
+        control_image = self.image_processor.preprocess(
+            controlnet_cond, height=height, width=width, do_normalize=False
+        )
         if isinstance(controlnet_conditioning_scale, (float, int)):
             controlnet_conditioning_scale = paddle.to_tensor([controlnet_conditioning_scale] * 13, dtype=self.dtype)
         elif isinstance(controlnet_conditioning_scale, (list, tuple)):

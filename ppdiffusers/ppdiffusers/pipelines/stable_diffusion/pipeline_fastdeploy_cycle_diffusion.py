@@ -258,7 +258,7 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPip
             (nsfw) content, according to the `safety_checker`.
         """
         # 0. Preprocess image
-        init_image = self.image_processor.preprocess(image, height, width)
+        init_image = self.image_processor.preprocess(image, height=height, width=width, do_normalize=False)
         height, width = init_image.shape[-2:]
 
         # 1. Check inputs
