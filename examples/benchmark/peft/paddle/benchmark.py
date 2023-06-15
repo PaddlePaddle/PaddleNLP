@@ -16,31 +16,32 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from datasets import load_dataset
+from utils import CustomTrainer
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.peft import LoRAConfig, LoRAModel
-from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 
 """
 单卡
-python train_nl2sql.py --model_name_or_path bigscience/bloomz-7b1-mt  \
+python benchmark.py --model_name_or_path bigscience/bloomz-7b1-mt  \
     --num_train_epochs 1 --per_device_train_batch_size 4 \
-    --evaluation_strategy no --save_strategy epoch \
+    --evaluation_strategy no --save_strategy no \
     --fp16 --fp16_opt_level O2 --lora \
     --logging_steps 50 --output_dir outputs
 
 多卡mp
-python -m paddle.distributed.launch --gpus "0,1,2,3" train_nl2sql.py --model_name_or_path bigscience/bloomz-7b1-mt  \
+python -m paddle.distributed.launch --gpus "0,1,2,3" benchmark.py --model_name_or_path bigscience/bloomz-7b1-mt  \
     --num_train_epochs 1 --per_device_train_batch_size 8 \
-    --evaluation_strategy no --save_strategy epoch \
+    --evaluation_strategy no --save_strategy no \
     --fp16 --fp16_opt_level O2 --tensor_parallel_degree 4 \
     --logging_steps 50 --output_dir outputs
 
 多卡sharding 3
-python -m paddle.distributed.launch --gpus "0,1,2,3" train_nl2sql.py --model_name_or_path bigscience/bloomz-7b1-mt  \
+python -m paddle.distributed.launch --gpus "0,1,2,3" benchmark.py --model_name_or_path bigscience/bloomz-7b1-mt  \
     --num_train_epochs 1 --per_device_train_batch_size 4 \
-    --evaluation_strategy no --save_strategy epoch \
+    --evaluation_strategy no --save_strategy no \
     --fp16 --fp16_opt_level O2 \
     --sharding "stage3" --sharding_parallel_degree 4 \
     --logging_steps 50 --output_dir outputs
@@ -68,12 +69,19 @@ def main():
             dtype = "float16"
         if training_args.bf16:
             dtype = "bfloat16"
+    import os
 
+    os.environ["http_proxy"] = "http://172.19.57.45:3128"
+    os.environ["https_proxy"] = "http://172.19.57.45:3128"
+    dataset = load_dataset("Chinese-Vicuna/guanaco_belle_merge_v1.0")
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    if "llama" in model_args.model_name_or_path:
+        tokenizer.pad_token = tokenizer.unk_token
     model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         load_state_as_np=True,
         low_cpu_mem_usage=True,
+        # use_flash_attention=True,
         dtype=dtype,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
@@ -92,7 +100,7 @@ def main():
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
 
-    def preprocess_function(example, max_src_length=128, max_tgt_length=256):
+    def preprocess_function(example, max_src_length=512, max_tgt_length=512):
         inputs = example["instruction"]
         targets = example["output"]
         model_inputs = tokenizer(inputs, max_length=max_src_length, truncation=True, return_attention_mask=False)
@@ -103,20 +111,24 @@ def main():
 
         return model_inputs
 
-    dataset = load_dataset("BelleGroup/school_math_0.25M", data_files="school_math_0.25M.json")
     # select first 10k examples for benchmarking
     dataset = dataset["train"].select(range(10000))
     dataset = dataset.map(
         lambda example: preprocess_function(example), remove_columns=["instruction", "input", "output"]
     )
+    total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
 
-    trainer = Trainer(
+    trainer = CustomTrainer(
         model=model,
         train_dataset=dataset,
         args=training_args,
         data_collator=DataCollatorForSeq2Seq(return_tensors="pd", tokenizer=tokenizer),
     )
-    trainer.train()
+    train_metrics = trainer.train()
+    tokens_per_second = trainer.total_observed_tokens / train_metrics.metrics["train_runtime"]
+    effective_tokens_per_second = total_effective_tokens / train_metrics.metrics["train_runtime"]
+    print(f"Tokens per second: {tokens_per_second:.2f}")
+    print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
 
 
 if __name__ == "__main__":
