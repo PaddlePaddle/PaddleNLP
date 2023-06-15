@@ -411,10 +411,9 @@ class ZeroShotTextClassificationTask(Task):
                     output["text_b"] = text["text_b"]
 
                 if self._single_label:
-                    scores = np_softmax(logits, axis=-1)
-                    labels = np.argmax(logits, axis=-1)
-                    for score, label in zip(scores, labels):
-                        output["predictions"] = [{"label": text["choices"][label], "score": score[label]}]
+                    score = np_softmax(logits, axis=-1)
+                    label = np.argmax(logits, axis=-1)
+                    output["predictions"] = [{"label": text["choices"][label], "score": score[label]}]
                 else:
                     scores = np_sigmoid(logits)
                     output["predictions"] = []
