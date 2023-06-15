@@ -752,7 +752,6 @@ class Taskflow(object):
     """
 
     def __init__(self, task, model=None, mode=None, device_id=0, from_hf_hub=False, **kwargs):
-        print("sssss", kwargs)
         assert task in TASKS, f"The task name:{task} is not in Taskflow list, please check your task name."
         self.task = task
         # Set the device for the task
@@ -787,7 +786,6 @@ class Taskflow(object):
         kwargs.update(config_kwargs)
         self.kwargs = kwargs
         task_class = TASKS[self.task][tag][self.model]["task_class"]
-        print(self.kwargs)
         self.task_instance = task_class(
             model=self.model, task=self.task, priority_path=self.priority_path, from_hf_hub=from_hf_hub, **self.kwargs
         )
