@@ -656,27 +656,19 @@ class AltDiffusionImg2ImgPipeline(DiffusionPipeline, TextualInversionLoaderMixin
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)
 
-        if output_type not in ["latent", "pd", "np", "pil"]:
-            deprecation_message = (
-                f"the output_type {output_type} is outdated. Please make sure to set it to one of these instead: "
-                "`pil`, `np`, `pd`, `latent`"
-            )
-            deprecate("Unsupported output_type", "1.0.0", deprecation_message, standard_warn=False)
-            output_type = "np"
-
-        if output_type == "latent":
+        if not output_type == "latent":
+            image = self.decode_latents(latents)
+            image, has_nsfw_concept = self.run_safety_checker(image, prompt_embeds.dtype)
+        else:
             image = latents
             has_nsfw_concept = None
 
+        if has_nsfw_concept is None:
+            do_denormalize = [True] * image.shape[0]
         else:
-            image = self.decode_latents(latents)
+            do_denormalize = [not has_nsfw for has_nsfw in has_nsfw_concept]
 
-            if self.safety_checker is not None:
-                image, has_nsfw_concept = self.run_safety_checker(image, prompt_embeds.dtype)
-            else:
-                has_nsfw_concept = False
-
-            image = self.image_processor.postprocess(image, output_type=output_type)
+        image = self.image_processor.postprocess(image, output_type=output_type, do_denormalize=do_denormalize)
 
         if not return_dict:
             return (image, has_nsfw_concept)

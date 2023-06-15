@@ -710,7 +710,7 @@ class DiffusionPipeline(ConfigMixin):
         self,
         paddle_device: Optional[str] = None,
         paddle_dtype: Optional[paddle.dtype] = None,
-        silence_dtype_warnings: bool = False,
+        silence_dtype_warnings: bool = True,
     ):
         if paddle_device is None and paddle_dtype is None:
             return self

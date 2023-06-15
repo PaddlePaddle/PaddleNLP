@@ -20,11 +20,6 @@ import unittest
 import numpy as np
 import paddle
 from PIL import Image
-from ..pipeline_params import (
-    TEXT_GUIDED_IMAGE_INPAINTING_BATCH_PARAMS,
-    TEXT_GUIDED_IMAGE_INPAINTING_PARAMS,
-)
-from ..test_pipelines_common import PipelineTesterMixin
 
 from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
@@ -40,6 +35,12 @@ from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_inpaint im
 )
 from ppdiffusers.utils import floats_tensor, load_image, load_numpy, nightly, slow
 from ppdiffusers.utils.testing_utils import require_paddle_gpu
+
+from ..pipeline_params import (
+    TEXT_GUIDED_IMAGE_INPAINTING_BATCH_PARAMS,
+    TEXT_GUIDED_IMAGE_INPAINTING_PARAMS,
+)
+from ..test_pipelines_common import PipelineTesterMixin
 
 
 class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
@@ -121,7 +122,7 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin, unittest.Test
         image_slice = image[0, -3:, -3:, -1]
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array(
-            [0.55786943, 0.628228  , 0.49147403, 0.3191774 , 0.39249492, 0.46521175, 0.29909956, 0.21160087, 0.42932406]
+            [0.55786943, 0.628228, 0.49147403, 0.3191774, 0.39249492, 0.46521175, 0.29909956, 0.21160087, 0.42932406]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
 
@@ -158,12 +159,8 @@ class StableDiffusionInpaintPipelineSlowTests(unittest.TestCase):
 
     def get_inputs(self, dtype="float32", seed=0):
         generator = paddle.Generator().manual_seed(seed)
-        init_image = load_image(
-            "https://paddlenlp.bj.bcebos.com/data/images/input_bench_image.png"
-        )
-        mask_image = load_image(
-            "https://paddlenlp.bj.bcebos.com/data/images/input_bench_mask.png"
-        )
+        init_image = load_image("https://paddlenlp.bj.bcebos.com/data/images/input_bench_image.png")
+        mask_image = load_image("https://paddlenlp.bj.bcebos.com/data/images/input_bench_mask.png")
         inputs = {
             "prompt": "Face of a yellow cat, high resolution, sitting on a park bench",
             "image": init_image,
@@ -198,11 +195,8 @@ class StableDiffusionInpaintPipelineSlowTests(unittest.TestCase):
         image = pipe(**inputs).images
         image_slice = image[0, 253:256, 253:256, -1].flatten()
         assert image.shape == (1, 512, 512, 3)
-        breakpoint()
         expected_slice = np.array(
-            [
-                0.9921875 , 0.9477539 , 0.90234375, 0.96484375, 0.9189453 , 0.875     , 0.9316406 , 0.9013672 , 0.875
-            ]
+            [0.9921875, 0.9477539, 0.90234375, 0.96484375, 0.9189453, 0.875, 0.9316406, 0.9013672, 0.875]
         )
         assert np.abs(expected_slice - image_slice).max() < 0.05
 
@@ -245,12 +239,8 @@ class StableDiffusionInpaintPipelineNightlyTests(unittest.TestCase):
 
     def get_inputs(self, dtype="float32", seed=0):
         generator = paddle.Generator().manual_seed(seed)
-        init_image = load_image(
-            "https://paddlenlp.bj.bcebos.com/data/images/input_bench_image.png"
-        )
-        mask_image = load_image(
-            "https://paddlenlp.bj.bcebos.com/data/images/input_bench_mask.png"
-        )
+        init_image = load_image("https://paddlenlp.bj.bcebos.com/data/images/input_bench_image.png")
+        mask_image = load_image("https://paddlenlp.bj.bcebos.com/data/images/input_bench_mask.png")
         inputs = {
             "prompt": "Face of a yellow cat, high resolution, sitting on a park bench",
             "image": init_image,
@@ -268,9 +258,7 @@ class StableDiffusionInpaintPipelineNightlyTests(unittest.TestCase):
         sd_pipe.set_progress_bar_config(disable=None)
         inputs = self.get_inputs()
         image = sd_pipe(**inputs).images[0]
-        expected_image = load_numpy(
-            "https://paddlenlp.bj.bcebos.com/data/images/stable_diffusion_inpaint_ddim.npy"
-        )
+        expected_image = load_numpy("https://paddlenlp.bj.bcebos.com/data/images/stable_diffusion_inpaint_ddim.npy")
         max_diff = np.abs(expected_image - image).max()
         assert max_diff < 0.001
 
@@ -281,9 +269,7 @@ class StableDiffusionInpaintPipelineNightlyTests(unittest.TestCase):
         sd_pipe.set_progress_bar_config(disable=None)
         inputs = self.get_inputs()
         image = sd_pipe(**inputs).images[0]
-        expected_image = load_numpy(
-            "https://paddlenlp.bj.bcebos.com/data/images/stable_diffusion_inpaint_pndm.npy"
-        )
+        expected_image = load_numpy("https://paddlenlp.bj.bcebos.com/data/images/stable_diffusion_inpaint_pndm.npy")
         max_diff = np.abs(expected_image - image).max()
         assert max_diff < 0.001
 
@@ -294,9 +280,7 @@ class StableDiffusionInpaintPipelineNightlyTests(unittest.TestCase):
         sd_pipe.set_progress_bar_config(disable=None)
         inputs = self.get_inputs()
         image = sd_pipe(**inputs).images[0]
-        expected_image = load_numpy(
-            "https://paddlenlp.bj.bcebos.com/data/images/stable_diffusion_inpaint_lms.npy"
-        )
+        expected_image = load_numpy("https://paddlenlp.bj.bcebos.com/data/images/stable_diffusion_inpaint_lms.npy")
         max_diff = np.abs(expected_image - image).max()
         assert max_diff < 0.001
 

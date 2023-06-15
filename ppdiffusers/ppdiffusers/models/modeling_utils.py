@@ -62,7 +62,10 @@ if is_torch_available():
     import torch
 
 if is_paddlenlp_available:
-    from paddlenlp.transformers.model_utils import no_init_weights
+    try:
+        from paddlenlp.transformers.model_utils import no_init_weights
+    except ImportError:
+        from ..utils.paddle_utils import no_init_weights
 
 
 def get_parameter_device(parameter: nn.Layer):
@@ -583,11 +586,11 @@ class ModelMixin(nn.Layer):
             "error_msgs": error_msgs,
         }
 
-        if paddle_dtype is not None and not isinstance(paddle_dtype, paddle.dtype):
-            raise ValueError(
-                f"{paddle_dtype} needs to be of type `paddle.dtype`, e.g. `paddle.float16`, but is {type(paddle_dtype)}."
-            )
-        elif paddle_dtype is not None:
+        # if paddle_dtype is not None and not isinstance(paddle_dtype, paddle.dtype):
+        #     raise ValueError(
+        #         f"{paddle_dtype} needs to be of type `paddle.dtype`, e.g. `paddle.float16`, but is {type(paddle_dtype)}."
+        #     )
+        if paddle_dtype is not None:
             model = model.to(dtype=paddle_dtype)
 
         model.register_to_config(_name_or_path=pretrained_model_name_or_path)

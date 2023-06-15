@@ -326,7 +326,12 @@ if is_paddle_available() and is_paddlenlp_available():
     import paddlenlp.transformers
     from paddlenlp import __version__
     from paddlenlp.transformers import PretrainedConfig, PretrainedModel
-    from paddlenlp.transformers.model_utils import no_init_weights
+
+    try:
+        from paddlenlp.transformers.model_utils import no_init_weights
+    except ImportError:
+        from ..utils.paddle_utils import no_init_weights
+
     from paddlenlp.utils.log import logger as ppnlp_logger
 
     if is_ppxformers_available():

@@ -192,4 +192,21 @@ if is_paddle_available():
             paddle.set_default_dtype(origin_dtype)
 
     paddle.dtype_guard = dtype_guard
+
     _init_weights = True
+
+    @contextmanager
+    def no_init_weights(_enable=True):
+        """
+        Context manager to globally disable weight initialization to speed up loading large models.
+
+        TODO(Patrick): Delete safety argument `_enable=True` at next major version. .
+        """
+        global _init_weights
+        old_init_weights = _init_weights
+        if _enable:
+            _init_weights = False
+        try:
+            yield
+        finally:
+            _init_weights = old_init_weights
