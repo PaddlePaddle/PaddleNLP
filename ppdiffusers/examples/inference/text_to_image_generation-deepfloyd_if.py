@@ -19,7 +19,7 @@ from ppdiffusers.utils import pd_to_pil
 
 # Stage 1: generate images
 pipe = IFPipeline.from_pretrained("DeepFloyd/IF-I-XL-v1.0", variant="fp16", paddle_dtype=paddle.float16)
-
+pipe.enable_xformers_memory_efficient_attention()
 prompt = 'a photo of a kangaroo wearing an orange hoodie and blue sunglasses standing in front of the eiffel tower holding a sign that says "very deep learning"'
 prompt_embeds, negative_embeds = pipe.encode_prompt(prompt)
 image = pipe(
@@ -38,6 +38,7 @@ pipe.to(paddle_device="cpu")
 super_res_1_pipe = IFSuperResolutionPipeline.from_pretrained(
     "DeepFloyd/IF-II-L-v1.0", text_encoder=None, variant="fp16", paddle_dtype=paddle.float16
 )
+super_res_1_pipe.enable_xformers_memory_efficient_attention()
 
 image = super_res_1_pipe(
     image=image,
@@ -55,6 +56,7 @@ super_res_1_pipe.to(paddle_device="cpu")
 super_res_2_pipe = DiffusionPipeline.from_pretrained(
     "stabilityai/stable-diffusion-x4-upscaler", paddle_dtype=paddle.float16
 )
+super_res_2_pipe.enable_xformers_memory_efficient_attention()
 
 image = super_res_2_pipe(
     prompt=prompt,

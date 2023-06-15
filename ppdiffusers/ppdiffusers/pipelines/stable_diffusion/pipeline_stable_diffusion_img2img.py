@@ -362,11 +362,17 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline, TextualInversionLoaderMi
         return prompt_embeds
 
     def run_safety_checker(self, image, dtype):
-        feature_extractor_input = self.image_processor.postprocess(image, output_type="pil")
-        safety_checker_input = self.feature_extractor(feature_extractor_input, return_tensors="pd")
-        image, has_nsfw_concept = self.safety_checker(
-            images=image, clip_input=paddle.cast(safety_checker_input.pixel_values, dtype)
-        )
+        if self.safety_checker is None:
+            has_nsfw_concept = None
+        else:
+            if paddle.is_tensor(image):
+                feature_extractor_input = self.image_processor.postprocess(image, output_type="pil")
+            else:
+                feature_extractor_input = self.image_processor.numpy_to_pil(image)
+            safety_checker_input = self.feature_extractor(feature_extractor_input, return_tensors="pd")
+            image, has_nsfw_concept = self.safety_checker(
+                images=image, clip_input=paddle.cast(safety_checker_input.pixel_values, dtype)
+            )
         return image, has_nsfw_concept
 
     def decode_latents(self, latents):
