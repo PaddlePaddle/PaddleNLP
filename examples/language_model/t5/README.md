@@ -10,6 +10,92 @@
 
 ## 快速开始
 
+### 预训练
+
+本项目致力于t5模型的预训练，从数据下载，数据转化，模型训练，流程开源开放，可复现。
+
+接下来将从下面几个方面，详细介绍整个数据制作全流程，从零开始，构建一个预训练模型。
+
+#### 1. 数据准备
+
+数据流是预训练的非常重要的，[预处理文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-1.0/preprocess/README.md)提供了整体的数据变动的流程示意，用户可以查看数据制作的细节文档。
+
+在数据ID化步骤中，我们需要配置tokenzer_name，选择t5模型对应的tokenizer；通过下面脚本转化，我们可以得到处理好的预训练数据，token ids:[`baike_sample_ids.npy`](https://paddlenlp.bj.bcebos.com/models/transformers/t5/data//baike_sample_ids.npy), 文章索引信息[`baike_sample_idx.npz`](https://paddlenlp.bj.bcebos.com/models/transformers/t5/data//baike_sample_idx.npz).（这里提供了一个处理好的预训练数据，可点击链接下载）
+
+```shell
+python -u  create_pretraining_data.py \
+    --model_name t5-small \
+    --tokenizer_name T5Tokenizer \
+    --input_path baike_sample.jsonl \
+    --split_sentences\
+    --output_prefix baike_sample  \
+    --workers 1 \
+    --log_interval 5
+```
+
+#### 2. 开始训练
+
+**路径配置**
+
+- 主要配置输入输出目录
+- 这里的`tokenizer_name_or_path`请设置为内置的tokenizer，如`t5-small`等。
+- 这里的 `input_dir` 设置输入数据集路径，例如配置`input_dir "./data"`即可。
+
+**启动训练**：这里启动的是单机8卡任务，整体全局的batch_size 512 (64*8)。如果指定ips参数，进行多机运行，如 `python3 -u  -m paddle.distributed.launch  --gpus "0,1,2,3,4,5,6,7" --ips 192.168.1.101,192.168.1.101 `
+
+```shell
+python -u  -m paddle.distributed.launch \
+    --gpus "0,1,2,3,4,5,6,7" \
+    --log_dir "./log" \
+    t5_run_pretrain_trainer.py \
+    --model_type "t5" \
+    --model_name_or_path "t5-small" \
+    --tokenizer_name_or_path "${vocab_dir}" \
+    --input_dir "${data_dir}" \
+    --output_dir "${base_dir}" \
+    --split 10,5,1 \
+    --max_seq_length 512 \
+    --max_seq_length_dec 128 \
+    --per_device_train_batch_size 64 \
+    --per_device_eval_batch_size 64 \
+    --learning_rate 0.0001 \
+    --min_learning_rate 0.00001 \
+    --max_steps 20000 \
+    --save_steps 5000 \
+    --weight_decay 0.01 \
+    --decay_steps 9900 \
+    --warmup_ratio 0.01 \
+    --max_grad_norm 1.0 \
+    --logging_steps 10\
+    --dataloader_num_workers 4 \
+    --eval_steps 100 \
+    --report_to "visualdl" \
+    --disable_tqdm true \
+    --do_train \
+    --do_eval \
+    --seed 1234\
+    --device "gpu"
+```
+
+其中参数释义如下：
+
+- `model_name_or_path` 要训练的模型或者之前训练的checkpoint。
+- `tokenizer_name_or_path` 模型词表文件所在的文件夹(对于ernie，词表文件名一般命名为vocab.txt)，或者PaddleNLP内置tokenizer的名字。
+- `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
+- `output_dir` 指定输出文件。
+- `split` 划分数据集为train、valid、test的比例。整个数据集会按照这个比例划分数据。默认`split=949,50,1`, 使用1/1000的数据为test，当样本数太少时，增大测试的样本数目。
+- `max_seq_len` 输入文本序列的长度，默认值`512`。
+- `fp16_opt_level` 混合精度策略，支持O1 自动混合精度，O2 pure fp16精度训练。
+- `max_steps` 最大训练步数。训练不支持通过`epoch`控制，第一次制造数据index时候，日志会显示数据会被计算的epoch数，请注意查看。
+- `save_steps` 保存模型间隔。默认保存地址格式为`output_dir/model_50000`(5w 步时的权重)。
+- `weight_decay` 权重衰减参数。
+- `warmup_rate` 学习率warmup参数。
+- `max_grad_norm` 梯度裁剪范围。
+- `logging_steps` 日志输出间隔。
+- `dataloader_num_workers` DataLoader采样进程，当数据输入为瓶颈时，可尝试提高采样进程数目。
+- `eval_steps` 模型评估间隔。
+- `device` 训练设备，默认为GPU。
+
 ### GLUE任务
 
 ### 执行Fine-tunning

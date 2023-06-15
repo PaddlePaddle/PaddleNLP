@@ -2,7 +2,7 @@
 model_name:ernie_text_matching
 python:python
 gpu_list:0|0,1
-null:null
+--device:gpu|gpu
 null:null
 --epoch:lite_train_lite_infer=1|lite_train_whole_infer=1|whole_train_whole_infer=3
 --save_dir:null

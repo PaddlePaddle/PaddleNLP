@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,14 +20,14 @@ import paddle.nn.functional as F
 
 from ppdiffusers.configuration_utils import ConfigMixin, register_to_config
 from ppdiffusers.initializer import reset_initialized_parameter
-from ppdiffusers.modeling_utils import ModelMixin
-from ppdiffusers.models.vae import (
+from ppdiffusers.models.autoencoder_kl import (
     AutoencoderKLOutput,
     Decoder,
     DecoderOutput,
     DiagonalGaussianDistribution,
     Encoder,
 )
+from ppdiffusers.models.modeling_utils import ModelMixin
 
 from .losses import LPIPSWithDiscriminator
 

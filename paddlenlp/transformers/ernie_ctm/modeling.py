@@ -161,7 +161,7 @@ class ErnieCtmPretrainedModel(PretrainedModel):
     pretrained_init_configuration = ERNIE_CTM_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = ERNIE_CTM_PRETRAINED_RESOURCE_FILES_MAP
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         # Initialize weights
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -273,8 +273,6 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
         if config.use_content_summary is True:
             self.feature_fuse = nn.Linear(config.hidden_size * 2, config.intermediate_size)
             self.feature_output = nn.Linear(config.intermediate_size, config.hidden_size)
-
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -492,8 +490,6 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
         self.crf_loss = LinearChainCrfLoss(self.crf)
         self.viterbi_decoder = ViterbiDecoder(self.crf.transitions, False)
 
-        self.apply(self.init_weights)
-
     def forward(
         self,
         input_ids=None,
@@ -642,8 +638,6 @@ class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
         self.ernie_ctm = ErnieCtmModel(config)
         self.predictions = ErnieCtmMLMHead(config)
 
-        self.apply(self.init_weights)
-
     def forward(
         self,
         input_ids=None,
@@ -753,7 +747,6 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,

@@ -192,8 +192,11 @@ class GLMModelTester:
         model = GLMForMultipleChoice(config=config)
         model.eval()
         choice_labels = ids_tensor([self.batch_size, self.num_choices], self.num_choices, dtype="int64")
-        choice_indices = [[x for x in batch] for batch in choice_labels]
-        choice_ids = [[x for x in batch] for batch in ids_tensor(choice_labels.shape, vocab_size=self.vocab_size)]
+        choice_indices = paddle.to_tensor([[x for x in batch] for batch in choice_labels], dtype="int64")
+        choice_ids = paddle.to_tensor(
+            [[x for x in batch] for batch in ids_tensor(choice_labels.shape, vocab_size=self.vocab_size)],
+            dtype="int64",
+        )
 
         result = model(
             input_ids,
@@ -275,7 +278,7 @@ class GLMModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
     def test_model_from_pretrained(self):
         for model_name in GLM_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
             model = GLMModel.from_pretrained(model_name)
-            tokenizer = GLMTokenizer.from_pretrained("model_name")
+            tokenizer = GLMTokenizer.from_pretrained(model_name)
             tokens = tokenizer._encode("hello world [MASK]")
             input_ids, _, _, position_ids, attention_mask, _, _ = tokenizer.build_input_from_ids(
                 text_a_ids=tokens, tokenizer=tokenizer

@@ -13,13 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
-import json
-import os
-
 import paddle
-from paddlenlp.trainer import Trainer
-from paddlenlp.trainer import PredictionOutput
+
+from paddlenlp.trainer import PredictionOutput, Trainer
 
 
 class QuestionAnsweringTrainer(Trainer):

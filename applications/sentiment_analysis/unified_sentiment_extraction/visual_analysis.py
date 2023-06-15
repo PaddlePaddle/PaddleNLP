@@ -251,7 +251,7 @@ class VisualSentiment(object):
     ):
         """
         generate image with aspect and opinion, that is, combining apsect with opinion to display the more specifical opinions of aspect.
-        this method can help you at two aspects: 1. mining custom's overall impression of products/services; 2. analyzing the quality of some aspect and improve it futher.
+        this method can help you at two aspects: 1. mining custom's overall impression of products/services; 2. analyzing the quality of some aspect and improve it further.
 
         Args:
             aspect_opinion (dict[dict] or dict): when sentiment set be "all", a expected dict containing aspect, opinion and its frequency, the key is aspect and its value is a dict containing the aspect's opinion and frequency. when sentiment set be "positive" or "netative", a expected dict containing aspect with opinion and frequency, the key is aspect with opinion and its value is frequency.

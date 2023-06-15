@@ -1,5 +1,5 @@
-# coding=utf-8
-# Copyright 2022 HuggingFace Inc.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,11 @@ import unittest
 
 import numpy as np
 import paddle
-from test_pipelines_common import PipelineTesterMixin
+from ppdiffusers_test.pipeline_params import (
+    TEXT_GUIDED_IMAGE_VARIATION_BATCH_PARAMS,
+    TEXT_GUIDED_IMAGE_VARIATION_PARAMS,
+)
+from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
 
 from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
@@ -31,18 +35,15 @@ from ppdiffusers import (
     StableDiffusionImg2ImgPipeline,
     UNet2DConditionModel,
 )
-from ppdiffusers.utils import (
-    TEST_DOWNLOAD_SERVER,
-    floats_tensor,
-    load_image,
-    load_numpy,
-    nightly,
-    slow,
-)
+from ppdiffusers.utils import floats_tensor, load_image, load_numpy, nightly, slow
+from ppdiffusers.utils.testing_utils import require_paddle_gpu
 
 
 class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
     pipeline_class = StableDiffusionImg2ImgPipeline
+    params = TEXT_GUIDED_IMAGE_VARIATION_PARAMS - {"height", "width"}
+    required_optional_params = PipelineTesterMixin.required_optional_params - {"latents"}
+    batch_params = TEXT_GUIDED_IMAGE_VARIATION_BATCH_PARAMS
 
     def get_dummy_components(self):
         paddle.seed(0)
@@ -57,7 +58,6 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.Test
             cross_attention_dim=32,
         )
         scheduler = PNDMScheduler(skip_prk_steps=True)
-
         paddle.seed(0)
         vae = AutoencoderKL(
             block_out_channels=[32, 64],
@@ -67,17 +67,19 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.Test
             up_block_types=["UpDecoderBlock2D", "UpDecoderBlock2D"],
             latent_channels=4,
         )
-
         paddle.seed(0)
-        text_encoder_config = dict(
-            text_embed_dim=32,
-            text_heads=4,
-            text_layers=5,
+        text_encoder_config = CLIPTextConfig(
+            bos_token_id=0,
+            eos_token_id=2,
+            hidden_size=32,
+            intermediate_size=37,
+            layer_norm_eps=1e-05,
+            num_attention_heads=4,
+            num_hidden_layers=5,
+            pad_token_id=1,
             vocab_size=1000,
         )
-        text_encoder_config = CLIPTextConfig.from_dict(text_encoder_config)
-        text_encoder = CLIPTextModel(text_encoder_config)
-        text_encoder.eval()
+        text_encoder = CLIPTextModel(text_encoder_config).eval()
         tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
         components = {
             "unet": unet,
@@ -93,6 +95,7 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.Test
     def get_dummy_inputs(self, seed=0):
         image = floats_tensor((1, 3, 32, 32), rng=random.Random(seed))
         generator = paddle.Generator().manual_seed(seed)
+
         inputs = {
             "prompt": "A painting of a squirrel eating a burger",
             "image": image,
@@ -107,80 +110,44 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.Test
         components = self.get_dummy_components()
         sd_pipe = StableDiffusionImg2ImgPipeline(**components)
         sd_pipe.set_progress_bar_config(disable=None)
-
         inputs = self.get_dummy_inputs()
         image = sd_pipe(**inputs).images
         image_slice = image[0, -3:, -3:, -1]
-
         assert image.shape == (1, 32, 32, 3)
         expected_slice = np.array(
-            [
-                0.6644147038459778,
-                0.4746779501438141,
-                0.40329617261886597,
-                0.5751277208328247,
-                0.5119695663452148,
-                0.5045669674873352,
-                0.45643243193626404,
-                0.4374881982803345,
-                0.5445119738578796,
-            ]
+            [0.65765685, 0.33105016, 0.30553353, 0.62215245, 0.3664353, 0.56206244, 0.43910763, 0.41746795, 0.5354696]
         )
-        assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-3
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.001
 
     def test_stable_diffusion_img2img_negative_prompt(self):
         components = self.get_dummy_components()
         sd_pipe = StableDiffusionImg2ImgPipeline(**components)
         sd_pipe.set_progress_bar_config(disable=None)
-
         inputs = self.get_dummy_inputs()
         negative_prompt = "french fries"
         output = sd_pipe(**inputs, negative_prompt=negative_prompt)
         image = output.images
         image_slice = image[0, -3:, -3:, -1]
-
         assert image.shape == (1, 32, 32, 3)
         expected_slice = np.array(
-            [
-                0.7663768529891968,
-                0.42991745471954346,
-                0.4016766846179962,
-                0.6222720742225647,
-                0.4062548279762268,
-                0.4925062954425812,
-                0.4996223449707031,
-                0.44043585658073425,
-                0.5554477572441101,
-            ]
+            [0.80471164, 0.46412903, 0.37454736, 0.4387825, 0.3394906, 0.5412611, 0.4721696, 0.49021164, 0.5914886]
         )
-        assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-3
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.001
 
-    def test_stable_diffusion_img2img_multiple_images(self):
+    def test_stable_diffusion_img2img_multiple_init_images(self):
         components = self.get_dummy_components()
         sd_pipe = StableDiffusionImg2ImgPipeline(**components)
         sd_pipe.set_progress_bar_config(disable=None)
-
         inputs = self.get_dummy_inputs()
         inputs["prompt"] = [inputs["prompt"]] * 2
-        inputs["image"] = inputs["image"].tile([2, 1, 1, 1])
+        inputs["image"] = inputs["image"].tile(repeat_times=[2, 1, 1, 1])
         image = sd_pipe(**inputs).images
         image_slice = image[-1, -3:, -3:, -1]
-
         assert image.shape == (2, 32, 32, 3)
         expected_slice = np.array(
-            [
-                0.4021262228488922,
-                0.19536930322647095,
-                0.3976094126701355,
-                0.7523422241210938,
-                0.33938348293304443,
-                0.47887665033340454,
-                0.6323817372322083,
-                0.40313106775283813,
-                0.47351086139678955,
-            ]
+            [0.25047868, 0.24038231, 0.40680486, 0.52044916, 0.08695492, 0.27611375, 0.5864357, 0.03654012, 0.24583888]
         )
-        assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-3
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.001
 
     def test_stable_diffusion_img2img_k_lms(self):
         components = self.get_dummy_components()
@@ -189,73 +156,51 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.Test
         )
         sd_pipe = StableDiffusionImg2ImgPipeline(**components)
         sd_pipe.set_progress_bar_config(disable=None)
-
         inputs = self.get_dummy_inputs()
         image = sd_pipe(**inputs).images
         image_slice = image[0, -3:, -3:, -1]
-
         assert image.shape == (1, 32, 32, 3)
         expected_slice = np.array(
-            [
-                0.055213481187820435,
-                0.7224215269088745,
-                0.6463539004325867,
-                0.21371740102767944,
-                0.8918260335922241,
-                0.49397602677345276,
-                0.4064573049545288,
-                0.6090186834335327,
-                0.45809662342071533,
-            ]
+            [0.0489203, 0.729686, 0.6543164, 0.1997531, 0.90586334, 0.51476943, 0.3933796, 0.620923, 0.45674747]
         )
-        assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-3
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.001
 
     def test_stable_diffusion_img2img_num_images_per_prompt(self):
         components = self.get_dummy_components()
         sd_pipe = StableDiffusionImg2ImgPipeline(**components)
         sd_pipe.set_progress_bar_config(disable=None)
-
-        # test num_images_per_prompt=1 (default)
         inputs = self.get_dummy_inputs()
         images = sd_pipe(**inputs).images
-
         assert images.shape == (1, 32, 32, 3)
-
-        # test num_images_per_prompt=1 (default) for batch of prompts
         batch_size = 2
         inputs = self.get_dummy_inputs()
         inputs["prompt"] = [inputs["prompt"]] * batch_size
         images = sd_pipe(**inputs).images
-
         assert images.shape == (batch_size, 32, 32, 3)
-
-        # test num_images_per_prompt for single prompt
         num_images_per_prompt = 2
         inputs = self.get_dummy_inputs()
         images = sd_pipe(**inputs, num_images_per_prompt=num_images_per_prompt).images
-
         assert images.shape == (num_images_per_prompt, 32, 32, 3)
-
-        # test num_images_per_prompt for batch of prompts
         batch_size = 2
         inputs = self.get_dummy_inputs()
         inputs["prompt"] = [inputs["prompt"]] * batch_size
         images = sd_pipe(**inputs, num_images_per_prompt=num_images_per_prompt).images
-
         assert images.shape == (batch_size * num_images_per_prompt, 32, 32, 3)
 
 
 @slow
+@require_paddle_gpu
 class StableDiffusionImg2ImgPipelineSlowTests(unittest.TestCase):
     def tearDown(self):
-        # clean up the VRAM after each test
         super().tearDown()
         gc.collect()
         paddle.device.cuda.empty_cache()
 
-    def get_inputs(self, dtype=paddle.float32, seed=0):
+    def get_inputs(self, dtype="float32", seed=0):
         generator = paddle.Generator().manual_seed(seed)
-        init_image = load_image(f"{TEST_DOWNLOAD_SERVER}/stable_diffusion_img2img/sketch-mountains-input.png")
+        init_image = load_image(
+            "https://huggingface.co/datasets/diffusers/test-arrays/resolve/main/stable_diffusion_img2img/sketch-mountains-input.png"
+        )
         inputs = {
             "prompt": "a fantasy landscape, concept art, high resolution",
             "image": init_image,
@@ -271,42 +216,36 @@ class StableDiffusionImg2ImgPipelineSlowTests(unittest.TestCase):
         pipe = StableDiffusionImg2ImgPipeline.from_pretrained("CompVis/stable-diffusion-v1-4", safety_checker=None)
         pipe.set_progress_bar_config(disable=None)
         pipe.enable_attention_slicing()
-
         inputs = self.get_inputs()
         image = pipe(**inputs).images
         image_slice = image[0, -3:, -3:, -1].flatten()
-
         assert image.shape == (1, 512, 768, 3)
         expected_slice = np.array([0.27150, 0.14849, 0.15605, 0.26740, 0.16954, 0.18204, 0.31470, 0.26311, 0.24525])
-        assert np.abs(expected_slice - image_slice).max() < 1e-3
+        assert np.abs(expected_slice - image_slice).max() < 0.001
 
     def test_stable_diffusion_img2img_k_lms(self):
         pipe = StableDiffusionImg2ImgPipeline.from_pretrained("CompVis/stable-diffusion-v1-4", safety_checker=None)
         pipe.scheduler = LMSDiscreteScheduler.from_config(pipe.scheduler.config)
         pipe.set_progress_bar_config(disable=None)
         pipe.enable_attention_slicing()
-
         inputs = self.get_inputs()
         image = pipe(**inputs).images
         image_slice = image[0, -3:, -3:, -1].flatten()
-
         assert image.shape == (1, 512, 768, 3)
         expected_slice = np.array([0.04890, 0.04862, 0.06422, 0.04655, 0.05108, 0.05307, 0.05926, 0.08759, 0.06852])
-        assert np.abs(expected_slice - image_slice).max() < 1e-3
+        assert np.abs(expected_slice - image_slice).max() < 0.001
 
     def test_stable_diffusion_img2img_ddim(self):
         pipe = StableDiffusionImg2ImgPipeline.from_pretrained("CompVis/stable-diffusion-v1-4", safety_checker=None)
         pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config)
         pipe.set_progress_bar_config(disable=None)
         pipe.enable_attention_slicing()
-
         inputs = self.get_inputs()
         image = pipe(**inputs).images
         image_slice = image[0, -3:, -3:, -1].flatten()
-
         assert image.shape == (1, 512, 768, 3)
         expected_slice = np.array([0.06069, 0.05703, 0.08054, 0.05797, 0.06286, 0.06234, 0.08438, 0.11151, 0.08068])
-        assert np.abs(expected_slice - image_slice).max() < 1e-3
+        assert np.abs(expected_slice - image_slice).max() < 0.001
 
     def test_stable_diffusion_img2img_intermediate_state(self):
         number_of_steps = 0
@@ -332,7 +271,7 @@ class StableDiffusionImg2ImgPipelineSlowTests(unittest.TestCase):
                         1.765011191368103,
                     ]
                 )
-                assert np.abs(latents_slice.flatten() - expected_slice).max() < 1e-3
+                assert np.abs(latents_slice.flatten() - expected_slice).max() < 0.05
             elif step == 2:
                 latents = latents.detach().cpu().numpy()
                 assert latents.shape == (1, 4, 64, 96)
@@ -350,33 +289,55 @@ class StableDiffusionImg2ImgPipelineSlowTests(unittest.TestCase):
                         1.761878490447998,
                     ]
                 )
-                assert np.abs(latents_slice.flatten() - expected_slice).max() < 1e-3
+                assert np.abs(latents_slice.flatten() - expected_slice).max() < 0.05
 
         callback_fn.has_been_called = False
-
         pipe = StableDiffusionImg2ImgPipeline.from_pretrained(
-            "CompVis/stable-diffusion-v1-4",
-            safety_checker=None,
+            "CompVis/stable-diffusion-v1-4", safety_checker=None, paddle_dtype=paddle.float16
         )
         pipe.set_progress_bar_config(disable=None)
         pipe.enable_attention_slicing()
-
-        inputs = self.get_inputs()
+        inputs = self.get_inputs(dtype="float16")
         pipe(**inputs, callback=callback_fn, callback_steps=1)
         assert callback_fn.has_been_called
         assert number_of_steps == 2
 
+    def test_stable_diffusion_img2img_pipeline_multiple_of_8(self):
+        init_image = load_image(
+            "https://huggingface.co/datasets/hf-internal-testing/diffusers-images/resolve/main/img2img/sketch-mountains-input.jpg"
+        )
+        init_image = init_image.resize((760, 504))
+        model_id = "CompVis/stable-diffusion-v1-4"
+        pipe = StableDiffusionImg2ImgPipeline.from_pretrained(model_id, safety_checker=None)
+        pipe.set_progress_bar_config(disable=None)
+        pipe.enable_attention_slicing()
+        prompt = "A fantasy landscape, trending on artstation"
+        generator = paddle.Generator().manual_seed(0)
+        output = pipe(
+            prompt=prompt, image=init_image, strength=0.75, guidance_scale=7.5, generator=generator, output_type="np"
+        )
+        image = output.images[0]
+        image_slice = image[255:258, 383:386, -1]
+        assert image.shape == (504, 760, 3)
+        expected_slice = np.array(
+            [0.71240354, 0.71053374, 0.69922864, 0.7139934, 0.7106118, 0.69451976, 0.71982634, 0.71717453, 0.70306426]
+        )
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.005
+
 
 @nightly
+@require_paddle_gpu
 class StableDiffusionImg2ImgPipelineNightlyTests(unittest.TestCase):
     def tearDown(self):
         super().tearDown()
         gc.collect()
         paddle.device.cuda.empty_cache()
 
-    def get_inputs(self, dtype=paddle.float32, seed=0):
+    def get_inputs(self, dtype="float32", seed=0):
         generator = paddle.Generator().manual_seed(seed)
-        init_image = load_image(f"{TEST_DOWNLOAD_SERVER}/stable_diffusion_img2img/sketch-mountains-input.png")
+        init_image = load_image(
+            "https://huggingface.co/datasets/diffusers/test-arrays/resolve/main/stable_diffusion_img2img/sketch-mountains-input.png"
+        )
         inputs = {
             "prompt": "a fantasy landscape, concept art, high resolution",
             "image": init_image,
@@ -390,48 +351,52 @@ class StableDiffusionImg2ImgPipelineNightlyTests(unittest.TestCase):
 
     def test_img2img_pndm(self):
         sd_pipe = StableDiffusionImg2ImgPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
+        sd_pipe
         sd_pipe.set_progress_bar_config(disable=None)
-
         inputs = self.get_inputs()
         image = sd_pipe(**inputs).images[0]
-
-        expected_image = load_numpy(f"{TEST_DOWNLOAD_SERVER}/stable_diffusion_img2img/stable_diffusion_1_5_pndm.npy")
+        expected_image = load_numpy(
+            "https://huggingface.co/datasets/diffusers/test-arrays/resolve/main/stable_diffusion_img2img/stable_diffusion_1_5_pndm.npy"
+        )
         max_diff = np.abs(expected_image - image).max()
-        assert max_diff < 1e-3
+        assert max_diff < 0.001
 
     def test_img2img_ddim(self):
         sd_pipe = StableDiffusionImg2ImgPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
         sd_pipe.scheduler = DDIMScheduler.from_config(sd_pipe.scheduler.config)
+        sd_pipe
         sd_pipe.set_progress_bar_config(disable=None)
-
         inputs = self.get_inputs()
         image = sd_pipe(**inputs).images[0]
-
-        expected_image = load_numpy(f"{TEST_DOWNLOAD_SERVER}/stable_diffusion_img2img/stable_diffusion_1_5_ddim.npy")
+        expected_image = load_numpy(
+            "https://huggingface.co/datasets/diffusers/test-arrays/resolve/main/stable_diffusion_img2img/stable_diffusion_1_5_ddim.npy"
+        )
         max_diff = np.abs(expected_image - image).max()
-        assert max_diff < 1e-3
+        assert max_diff < 0.001
 
     def test_img2img_lms(self):
         sd_pipe = StableDiffusionImg2ImgPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
         sd_pipe.scheduler = LMSDiscreteScheduler.from_config(sd_pipe.scheduler.config)
+        sd_pipe
         sd_pipe.set_progress_bar_config(disable=None)
-
         inputs = self.get_inputs()
         image = sd_pipe(**inputs).images[0]
-
-        expected_image = load_numpy(f"{TEST_DOWNLOAD_SERVER}/stable_diffusion_img2img/stable_diffusion_1_5_lms.npy")
+        expected_image = load_numpy(
+            "https://huggingface.co/datasets/diffusers/test-arrays/resolve/main/stable_diffusion_img2img/stable_diffusion_1_5_lms.npy"
+        )
         max_diff = np.abs(expected_image - image).max()
-        assert max_diff < 1e-3
+        assert max_diff < 0.001
 
     def test_img2img_dpm(self):
         sd_pipe = StableDiffusionImg2ImgPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
         sd_pipe.scheduler = DPMSolverMultistepScheduler.from_config(sd_pipe.scheduler.config)
+        sd_pipe
         sd_pipe.set_progress_bar_config(disable=None)
-
         inputs = self.get_inputs()
         inputs["num_inference_steps"] = 30
         image = sd_pipe(**inputs).images[0]
-
-        expected_image = load_numpy(f"{TEST_DOWNLOAD_SERVER}/stable_diffusion_img2img/stable_diffusion_1_5_dpm.npy")
+        expected_image = load_numpy(
+            "https://huggingface.co/datasets/diffusers/test-arrays/resolve/main/stable_diffusion_img2img/stable_diffusion_1_5_dpm.npy"
+        )
         max_diff = np.abs(expected_image - image).max()
-        assert max_diff < 1e-3
+        assert max_diff < 0.001

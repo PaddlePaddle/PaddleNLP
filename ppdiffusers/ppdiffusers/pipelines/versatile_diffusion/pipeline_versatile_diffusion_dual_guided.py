@@ -1,4 +1,5 @@
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,11 +27,15 @@ from paddlenlp.transformers import (
     CLIPVisionModelWithProjection,
 )
 
-from ...models import AutoencoderKL, UNet2DConditionModel
-from ...models.attention import DualTransformer2DModel, Transformer2DModel
-from ...pipeline_utils import DiffusionPipeline, ImagePipelineOutput
-from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
-from ...utils import logging
+from ...models import (
+    AutoencoderKL,
+    DualTransformer2DModel,
+    Transformer2DModel,
+    UNet2DConditionModel,
+)
+from ...schedulers import KarrasDiffusionSchedulers
+from ...utils import logging, randn_tensor
+from ..pipeline_utils import DiffusionPipeline, ImagePipelineOutput
 from .modeling_text_unet import UNetFlatConditionModel
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
@@ -72,7 +77,7 @@ class VersatileDiffusionDualGuidedPipeline(DiffusionPipeline):
     image_unet: UNet2DConditionModel
     text_unet: UNetFlatConditionModel
     vae: AutoencoderKL
-    scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler]
+    scheduler: KarrasDiffusionSchedulers
 
     _optional_components = ["text_unet"]
 
@@ -85,7 +90,7 @@ class VersatileDiffusionDualGuidedPipeline(DiffusionPipeline):
         image_unet: UNet2DConditionModel,
         text_unet: UNetFlatConditionModel,
         vae: AutoencoderKL,
-        scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
+        scheduler: KarrasDiffusionSchedulers,
     ):
         super().__init__()
         self.register_modules(
@@ -160,7 +165,7 @@ class VersatileDiffusionDualGuidedPipeline(DiffusionPipeline):
         Encodes the prompt into text encoder hidden states.
 
         Args:
-            prompt (`str` or `list(int)`):
+            prompt (`str` or `List[str]`):
                 prompt to be encoded
             num_images_per_prompt (`int`):
                 number of images that should be generated per prompt
@@ -195,23 +200,21 @@ class VersatileDiffusionDualGuidedPipeline(DiffusionPipeline):
                 f" {self.tokenizer.model_max_length} tokens: {removed_text}"
             )
 
-        config = (
-            self.text_encoder.config
-            if isinstance(self.text_encoder.config, dict)
-            else self.text_encoder.config.to_dict()
-        )
-        if config.get("use_attention_mask", None) is not None and config["use_attention_mask"]:
+        if hasattr(self.text_encoder.config, "use_attention_mask") and self.text_encoder.config.use_attention_mask:
             attention_mask = text_inputs.attention_mask
         else:
             attention_mask = None
 
-        text_embeddings = self.text_encoder(text_input_ids, attention_mask=attention_mask)
-        text_embeddings = normalize_embeddings(text_embeddings)
+        prompt_embeds = self.text_encoder(
+            text_input_ids,
+            attention_mask=attention_mask,
+        )
+        prompt_embeds = normalize_embeddings(prompt_embeds)
 
         # duplicate text embeddings for each generation per prompt, using mps friendly method
-        bs_embed, seq_len, _ = text_embeddings.shape
-        text_embeddings = text_embeddings.tile([1, num_images_per_prompt, 1])
-        text_embeddings = text_embeddings.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
+        bs_embed, seq_len, _ = prompt_embeds.shape
+        prompt_embeds = prompt_embeds.tile([1, num_images_per_prompt, 1])
+        prompt_embeds = prompt_embeds.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
 
         # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance:
@@ -225,32 +228,35 @@ class VersatileDiffusionDualGuidedPipeline(DiffusionPipeline):
                 return_tensors="pd",
             )
 
-            if config.get("use_attention_mask", None) is not None and config["use_attention_mask"]:
+            if hasattr(self.text_encoder.config, "use_attention_mask") and self.text_encoder.config.use_attention_mask:
                 attention_mask = uncond_input.attention_mask
             else:
                 attention_mask = None
 
-            uncond_embeddings = self.text_encoder(uncond_input.input_ids, attention_mask=attention_mask)
-            uncond_embeddings = normalize_embeddings(uncond_embeddings)
+            negative_prompt_embeds = self.text_encoder(
+                uncond_input.input_ids,
+                attention_mask=attention_mask,
+            )
+            negative_prompt_embeds = normalize_embeddings(negative_prompt_embeds)
 
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
-            seq_len = uncond_embeddings.shape[1]
-            uncond_embeddings = uncond_embeddings.tile([1, num_images_per_prompt, 1])
-            uncond_embeddings = uncond_embeddings.reshape([batch_size * num_images_per_prompt, seq_len, -1])
+            seq_len = negative_prompt_embeds.shape[1]
+            negative_prompt_embeds = negative_prompt_embeds.tile([1, num_images_per_prompt, 1])
+            negative_prompt_embeds = negative_prompt_embeds.reshape([batch_size * num_images_per_prompt, seq_len, -1])
 
             # For classifier free guidance, we need to do two forward passes.
             # Here we concatenate the unconditional and text embeddings into a single batch
             # to avoid doing two forward passes
-            text_embeddings = paddle.concat([uncond_embeddings, text_embeddings])
+            prompt_embeds = paddle.concat([negative_prompt_embeds, prompt_embeds])
 
-        return text_embeddings
+        return prompt_embeds
 
     def _encode_image_prompt(self, prompt, num_images_per_prompt, do_classifier_free_guidance):
         r"""
         Encodes the prompt into vision encoder hidden states.
 
         Args:
-            prompt (`str` or `list(int)`):
+            prompt (`str` or `List[str]`):
                 prompt to be encoded
             num_images_per_prompt (`int`):
                 number of images that should be generated per prompt
@@ -283,31 +289,31 @@ class VersatileDiffusionDualGuidedPipeline(DiffusionPipeline):
             uncond_images = [np.zeros((512, 512, 3)) + 0.5] * batch_size
             uncond_images = self.image_feature_extractor(images=uncond_images, return_tensors="pd")
             pixel_values = uncond_images.pixel_values.cast(self.image_encoder.dtype)
-            uncond_embeddings = self.image_encoder(pixel_values)
-            uncond_embeddings = normalize_embeddings(uncond_embeddings)
+            negative_prompt_embeds = self.image_encoder(pixel_values)
+            negative_prompt_embeds = normalize_embeddings(negative_prompt_embeds)
 
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
-            seq_len = uncond_embeddings.shape[1]
-            uncond_embeddings = uncond_embeddings.tile([1, num_images_per_prompt, 1])
-            uncond_embeddings = uncond_embeddings.reshape([batch_size * num_images_per_prompt, seq_len, -1])
+            seq_len = negative_prompt_embeds.shape[1]
+            negative_prompt_embeds = negative_prompt_embeds.tile([1, num_images_per_prompt, 1])
+            negative_prompt_embeds = negative_prompt_embeds.reshape([batch_size * num_images_per_prompt, seq_len, -1])
 
             # For classifier free guidance, we need to do two forward passes.
             # Here we concatenate the unconditional and conditional embeddings into a single batch
             # to avoid doing two forward passes
-            image_embeddings = paddle.concat([uncond_embeddings, image_embeddings])
+            image_embeddings = paddle.concat([negative_prompt_embeds, image_embeddings])
 
         return image_embeddings
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents
     def decode_latents(self, latents):
-        latents = 1 / 0.18215 * latents
+        latents = 1 / self.vae.config.scaling_factor * latents
         image = self.vae.decode(latents).sample
         image = (image / 2 + 0.5).clip(0, 1)
-        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloa16
+        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
         image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
         return image
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_extra_step_kwargs
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_extra_step_kwargs
     def prepare_extra_step_kwargs(self, generator, eta):
         # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
         # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
@@ -342,9 +348,9 @@ class VersatileDiffusionDualGuidedPipeline(DiffusionPipeline):
                 f" {type(callback_steps)}."
             )
 
-    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_latents
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_latents
     def prepare_latents(self, batch_size, num_channels_latents, height, width, dtype, generator, latents=None):
-        shape = [batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor]
+        shape = (batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor)
         if isinstance(generator, list) and len(generator) != batch_size:
             raise ValueError(
                 f"You have passed a list of generators of length {len(generator)}, but requested an effective batch"
@@ -352,17 +358,7 @@ class VersatileDiffusionDualGuidedPipeline(DiffusionPipeline):
             )
 
         if latents is None:
-            if isinstance(generator, list):
-                shape = [
-                    1,
-                ] + shape[1:]
-                latents = [paddle.randn(shape, generator=generator[i], dtype=dtype) for i in range(batch_size)]
-                latents = paddle.concat(latents, axis=0)
-            else:
-                latents = paddle.randn(shape, generator=generator, dtype=dtype)
-        else:
-            if latents.shape != shape:
-                raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {shape}")
+            latents = randn_tensor(shape, generator=generator, dtype=dtype)
 
         # scale the initial noise by the standard deviation required by the scheduler
         latents = latents * self.scheduler.init_noise_sigma
@@ -420,14 +416,16 @@ class VersatileDiffusionDualGuidedPipeline(DiffusionPipeline):
                 Paper](https://arxiv.org/pdf/2205.11487.pdf). Guidance scale is enabled by setting `guidance_scale >
                 1`. Higher guidance scale encourages to generate images that are closely linked to the text `prompt`,
                 usually at the expense of lower image quality.
+            negative_prompt (`str` or `List[str]`, *optional*):
+                The prompt or prompts not to guide the image generation. Ignored when not using guidance (i.e., ignored
+                if `guidance_scale` is less than `1`).
             num_images_per_prompt (`int`, *optional*, defaults to 1):
                 The number of images to generate per prompt.
             eta (`float`, *optional*, defaults to 0.0):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
             generator (`paddle.Generator`, *optional*):
-                A [paddle generator] to make generation
-                deterministic.
+                One or a list of paddle generator(s) to make generation deterministic.
             latents (`paddle.Tensor`, *optional*):
                 Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for image
                 generation. Can be used to tweak the same generation with different prompts. If not provided, a latents
@@ -462,11 +460,11 @@ class VersatileDiffusionDualGuidedPipeline(DiffusionPipeline):
         >>> text = "a red car in the sun"
 
         >>> pipe = VersatileDiffusionDualGuidedPipeline.from_pretrained(
-        ...     "shi-labs/versatile-diffusion"
+        ...     "shi-labs/versatile-diffusion", paddle_dtype=paddle.float16
         ... )
         >>> pipe.remove_unused_weights()
 
-        >>> generator = torch.Generator().manual_seed(0)
+        >>> generator = paddle.Generator().manual_seed(0)
         >>> text_to_image_strength = 0.75
 
         >>> image = pipe(
@@ -491,16 +489,15 @@ class VersatileDiffusionDualGuidedPipeline(DiffusionPipeline):
         prompt = [prompt] if not isinstance(prompt, list) else prompt
         image = [image] if not isinstance(image, list) else image
         batch_size = len(prompt)
-
         # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
         # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
         # corresponds to doing no classifier free guidance.
         do_classifier_free_guidance = guidance_scale > 1.0
 
         # 3. Encode input prompts
-        text_embeddings = self._encode_text_prompt(prompt, num_images_per_prompt, do_classifier_free_guidance)
+        prompt_embeds = self._encode_text_prompt(prompt, num_images_per_prompt, do_classifier_free_guidance)
         image_embeddings = self._encode_image_prompt(image, num_images_per_prompt, do_classifier_free_guidance)
-        dual_prompt_embeddings = paddle.concat([text_embeddings, image_embeddings], axis=1)
+        dual_prompt_embeddings = paddle.concat([prompt_embeds, image_embeddings], axis=1)
         prompt_types = ("text", "image")
 
         # 4. Prepare timesteps

@@ -21,4 +21,4 @@ pipe = DDPMPipeline.from_pretrained("google/ddpm-celebahq-256")
 image = pipe().images[0]
 
 # 保存图片
-image.save("ddpm_generated_image.png")
+image.save("unconditional_image_generation-ddpm-result.png")

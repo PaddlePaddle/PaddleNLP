@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,11 +20,11 @@ import paddle
 
 from ppdiffusers import (
     ControlNetModel,
+    FastDeployRuntimeModel,
     FastDeployStableDiffusionControlNetPipeline,
     StableDiffusionControlNetPipeline,
     UNet2DConditionModel,
 )
-from ppdiffusers.fastdeploy_utils import FastDeployRuntimeModel
 
 
 class ControlNetWithUnetModel(paddle.nn.Layer):
@@ -45,13 +45,9 @@ class ControlNetWithUnetModel(paddle.nn.Layer):
             timestep,
             encoder_hidden_states=encoder_hidden_states,
             controlnet_cond=controlnet_cond,
+            conditioning_scale=controlnet_conditioning_scale,
             return_dict=False,
         )
-        down_block_res_samples = [
-            down_block_res_sample * ccs
-            for down_block_res_sample, ccs in zip(down_block_res_samples, controlnet_conditioning_scale[:-1])
-        ]
-        mid_block_res_sample *= controlnet_conditioning_scale[-1]
 
         noise_pred = self.unet(
             sample,
@@ -65,12 +61,15 @@ class ControlNetWithUnetModel(paddle.nn.Layer):
 
 
 def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
-    model_path: str, output_path: str, sample: bool = False, height: int = None, width: int = None
+    model_path: str,
+    controlnet_model_path: str,
+    output_path: str,
+    sample: bool = False,
+    height: int = None,
+    width: int = None,
 ):
     unet_tmp = UNet2DConditionModel.from_pretrained(model_path, resnet_pre_temb_non_linearity=True, subfolder="unet")
-    controlnet_tmp = ControlNetModel.from_pretrained(
-        model_path, resnet_pre_temb_non_linearity=True, subfolder="controlnet"
-    )
+    controlnet_tmp = ControlNetModel.from_pretrained(controlnet_model_path, resnet_pre_temb_non_linearity=True)
 
     pipeline = StableDiffusionControlNetPipeline.from_pretrained(
         model_path,
@@ -153,7 +152,7 @@ def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
         vae_encoder,
         input_spec=[
             paddle.static.InputSpec(
-                shape=[None, vae_in_channels, latent_height, latent_width],
+                shape=[None, vae_in_channels, height, width],
                 dtype="float32",
                 name="sample",  # N, C, H, W
             ),  # latent
@@ -206,8 +205,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
-        default="takuma104/control_sd15_canny",
+        default="runwayml/stable-diffusion-v1-5",
         help="Path to the `ppdiffusers` checkpoint to convert (either a local directory or on the bos).",
+    )
+    parser.add_argument(
+        "--controlnet_pretrained_model_name_or_path",
+        type=str,
+        default="lllyasviel/sd-controlnet-canny",
+        help="Path to the `ppdiffusers` controlnet_pretrained_model_name_or_path  checkpoint to convert (either a local directory or on the bos).",
     )
     parser.add_argument("--output_path", type=str, required=True, help="Path to the output model.")
     parser.add_argument(
@@ -218,5 +223,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
-        args.pretrained_model_name_or_path, args.output_path, args.sample, args.height, args.width
+        args.pretrained_model_name_or_path,
+        args.controlnet_pretrained_model_name_or_path,
+        args.output_path,
+        args.sample,
+        args.height,
+        args.width,
     )

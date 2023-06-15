@@ -69,7 +69,7 @@ msgstr ""
 
 #: ../data_prepare/dataset_self_defined.rst:42
 msgid ""
-"自定义数据读取function中的参数可以直接以关键字参数的的方式传入 :func:`load_dataset` "
+"自定义数据读取function中的参数可以直接以关键字参数的方式传入 :func:`load_dataset` "
 "中。而且对于自定义数据集，:attr:`lazy` 参数是 **必须** 传入的。"
 msgstr ""
 

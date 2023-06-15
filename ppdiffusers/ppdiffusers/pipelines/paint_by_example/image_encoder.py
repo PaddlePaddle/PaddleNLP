@@ -1,4 +1,5 @@
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,12 +30,14 @@ logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 class PaintByExampleImageEncoder(CLIPPretrainedModel):
     config_class = CLIPVisionConfig
 
-    def __init__(self, config: CLIPVisionConfig):
+    def __init__(self, config: CLIPVisionConfig, proj_size=None):
         super().__init__(config)
-        self.projection_dim = config.projection_dim
+        if proj_size is not None:
+            self.projection_dim = proj_size
+        else:
+            self.projection_dim = config.projection_dim
 
         self.model = CLIPVisionModel(config)
-
         self.mapper = PaintByExampleMapper(config)
         self.final_layer_norm = nn.LayerNorm(config.hidden_size)
         self.proj_out = nn.Linear(config.hidden_size, self.projection_dim)
@@ -46,17 +49,20 @@ class PaintByExampleImageEncoder(CLIPPretrainedModel):
             default_initializer=nn.initializer.Assign(paddle.rand((1, 1, self.projection_dim))),
         )
 
-    def forward(self, pixel_values):
+    def forward(self, pixel_values, return_uncond_vector=False):
         clip_output = self.model(pixel_values=pixel_values)
         latent_states = clip_output.pooler_output
         latent_states = self.mapper(latent_states[:, None])
         latent_states = self.final_layer_norm(latent_states)
         latent_states = self.proj_out(latent_states)
+        if return_uncond_vector:
+            return latent_states, self.uncond_vector
+
         return latent_states
 
 
 class PaintByExampleMapper(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config: CLIPVisionConfig):
         super().__init__()
         num_layers = (config.num_hidden_layers + 1) // 5
         hid_size = config.hidden_size

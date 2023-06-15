@@ -20,7 +20,7 @@ import paddle.nn as nn
 from paddle import Tensor
 from paddle.common_ops_import import convert_dtype
 
-from ...utils.converter import StateDictNameMapping
+from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import PretrainedModel, register_base_model
 from ..activations import get_activation
 from ..model_outputs import (
@@ -259,12 +259,12 @@ class RoFormerPretrainedModel(PretrainedModel):
     def _get_name_mappings(cls, config: RoFormerConfig) -> List[StateDictNameMapping]:
         mappings: List[StateDictNameMapping] = []
         model_mappings = [
-            ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
-            ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
+            "embeddings.word_embeddings.weight",
+            "embeddings.token_type_embeddings.weight",
             ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
             ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
-            ["pooler.dense.weight", "pooler.dense.weight", "transpose"],
-            ["pooler.dense.bias", "pooler.dense.bias"],
+            ["pooler.dense.weight", None, "transpose"],
+            "pooler.dense.bias",
             # for TokenClassification
         ]
         for layer_index in range(config.num_hidden_layers):
@@ -330,6 +330,8 @@ class RoFormerPretrainedModel(PretrainedModel):
             ]
             model_mappings.extend(layer_mappings)
 
+        init_name_mappings(model_mappings)
+
         # base-model prefix "RoFormerModel"
         if "RoFormerModel" not in config.architectures:
             for mapping in model_mappings:
@@ -356,12 +358,13 @@ class RoFormerPretrainedModel(PretrainedModel):
             or "RoFormerForSequenceClassification" in config.architectures
             or "RoFormerForTokenClassification" in config.architectures
         ):
-            model_mappings.extend([["classifier.weight", "classifier.weight", "transpose"]])
+            model_mappings.extend([["classifier.weight", None, "transpose"]])
 
+        init_name_mappings(model_mappings)
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -425,8 +428,6 @@ class RoFormerModel(RoFormerPretrainedModel):
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
         self.pooler = RoFormerPooler(config.hidden_size, config.pool_act)
-
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -596,7 +597,6 @@ class RoFormerForQuestionAnswering(RoFormerPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -723,7 +723,6 @@ class RoFormerForSequenceClassification(RoFormerPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -750,8 +749,8 @@ class RoFormerForSequenceClassification(RoFormerPretrainedModel):
                 See :class:`RoFormerModel`.
             labels (Tensor of shape `(batch_size,)`, optional):
                 Labels for computing the sequence classification/regression loss.
-                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
-                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                Indices should be in `[0, ..., num_labels - 1]`. If `num_labels == 1`
+                a regression loss is computed (Mean-Square loss), If `num_labels > 1`
                 a classification loss is computed (Cross-Entropy).
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
@@ -797,13 +796,24 @@ class RoFormerForSequenceClassification(RoFormerPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_classes == 1:
+            if self.config.problem_type is None:
+                if self.num_labels == 1:
+                    self.config.problem_type = "regression"
+                elif self.num_labels > 1 and (labels.dtype == paddle.int64 or labels.dtype == paddle.int32):
+                    self.config.problem_type = "single_label_classification"
+                else:
+                    self.config.problem_type = "multi_label_classification"
+
+            if self.config.problem_type == "regression":
                 loss_fct = paddle.nn.MSELoss()
-                loss = loss_fct(logits, labels)
-            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                if self.num_labels == 1:
+                    loss = loss_fct(logits.squeeze(), labels.squeeze())
+                else:
+                    loss = loss_fct(logits, labels)
+            elif self.config.problem_type == "single_label_classification":
                 loss_fct = paddle.nn.CrossEntropyLoss()
-                loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
-            else:
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
+            elif self.config.problem_type == "multi_label_classification":
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
 
@@ -837,7 +847,6 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -863,7 +872,7 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
             inputs_embeds(Tensor, optional):
                 See :class:`RoFormerModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
-                Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
+                Labels for computing the token classification loss. Indices should be in `[0, ..., num_labels - 1]`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
                 Defaults to `False`.
@@ -910,7 +919,7 @@ class RoFormerForTokenClassification(RoFormerPretrainedModel):
         loss = None
         if labels is not None:
             loss_fct = paddle.nn.CrossEntropyLoss()
-            loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+            loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
 
         if not return_dict:
             output = (logits,) + outputs[2:]
@@ -942,7 +951,6 @@ class RoFormerForMultipleChoice(RoFormerPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 1)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1081,7 +1089,6 @@ class RoFormerForMaskedLM(RoFormerPretrainedModel):
             config.hidden_act,
             embedding_weights=self.roformer.embeddings.word_embeddings.weight,
         )
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1193,7 +1200,6 @@ class RoFormerForCausalLM(RoFormerPretrainedModel):
             config.hidden_act,
             embedding_weights=self.roformer.embeddings.word_embeddings.weight,
         )
-        self.apply(self.init_weights)
 
     def forward(
         self,

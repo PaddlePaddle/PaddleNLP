@@ -38,8 +38,6 @@ __all__ = [
     "DalleBartEncoder",
     "DalleBartDecoder",
     "DalleBartForConditionalGeneration",
-    "DalleBartForImageGeneration",
-    "VQGanDetokenizer",
 ]
 
 
@@ -98,7 +96,7 @@ class DalleBartPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = DALLEBART_PRETRAINED_RESOURCE_FILES_MAP
     config_class = DalleBartConfig
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding, DalleBartLearnedPositionalEmbedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -173,13 +171,13 @@ class DalleBartEncoderLayer(nn.Layer):
 
     def __init__(self, config: DalleBartConfig):
         super().__init__()
-        assert config.d_model > 0, "Expected d_model to be greater than 0, " "but recieved {}".format(config.d_model)
+        assert config.d_model > 0, "Expected d_model to be greater than 0, " "but received {}".format(config.d_model)
         assert (
             config.encoder_attention_heads > 0
-        ), "Expected encoder_attention_heads to be greater than 0, " "but recieved {}".format(
+        ), "Expected encoder_attention_heads to be greater than 0, " "but received {}".format(
             config.encoder_attention_heads
         )
-        assert config.encoder_ffn_dim > 0, "Expected encoder_ffn_dim to be greater than 0, " "but recieved {}".format(
+        assert config.encoder_ffn_dim > 0, "Expected encoder_ffn_dim to be greater than 0, " "but received {}".format(
             config.encoder_ffn_dim
         )
 
@@ -236,7 +234,6 @@ class DalleBartEncoder(DalleBartPretrainedModel):
         self.final_ln = nn.LayerNorm(config.d_model)
         self.embedding_dropout = nn.Dropout(config.dropout)
         self.text_pad_token_id = config.text_pad_token_id
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None, **kwargs):
         """
@@ -284,13 +281,13 @@ class DalleBartDecoderLayer(nn.Layer):
     def __init__(self, config: DalleBartConfig):
         super().__init__()
 
-        assert config.d_model > 0, "Expected d_model to be greater than 0, " "but recieved {}".format(config.d_model)
+        assert config.d_model > 0, "Expected d_model to be greater than 0, " "but received {}".format(config.d_model)
         assert (
             config.decoder_attention_heads > 0
-        ), "Expected decoder_attention_heads to be greater than 0, " "but recieved {}".format(
+        ), "Expected decoder_attention_heads to be greater than 0, " "but received {}".format(
             config.decoder_attention_heads
         )
-        assert config.decoder_ffn_dim > 0, "Expected decoder_ffn_dim to be greater than 0, " "but recieved {}".format(
+        assert config.decoder_ffn_dim > 0, "Expected decoder_ffn_dim to be greater than 0, " "but received {}".format(
             config.decoder_ffn_dim
         )
 
@@ -376,7 +373,6 @@ class DalleBartDecoder(DalleBartPretrainedModel):
         self.layernorm_embedding = nn.LayerNorm(config.d_model)
         self.dropout = nn.Dropout(config.dropout)
         self.final_ln = nn.LayerNorm(config.d_model)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -465,7 +461,6 @@ class DalleBartModel(DalleBartPretrainedModel):
         self.encoder = DalleBartEncoder(config)
 
         self.decoder = DalleBartDecoder(config)
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.encoder.embed_tokens
@@ -611,7 +606,6 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
             self.register_buffer(
                 "attention_mask_uncond", paddle.to_tensor([attention_mask_uncond], dtype="int64"), persistable=False
             )
-        self.apply(self.init_weights)
 
     def get_encoder(self):
         return self.dallebart.get_encoder()
@@ -1205,14 +1199,8 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
     def __getattr__(self, name):
         try:
             return super().__getattr__(name)
-        except AttributeError as e:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                try:
-                    return getattr(self, self.base_model_prefix).config.name
-                except KeyError:
-                    raise e
+        except AttributeError:
+            return getattr(getattr(self, self.base_model_prefix), name)
 
 
 class ResnetBlock(nn.Layer):
@@ -1360,128 +1348,3 @@ class Decoder(nn.Layer):
         z = F.swish(z)
         z = self.conv_out(z)
         return z
-
-
-class VQGanDetokenizer(nn.Layer):
-    def __init__(self, image_vocab_size=2**14, embed_count=256):
-        super().__init__()
-        self.image_vocab_size = image_vocab_size
-        self.embedding = nn.Embedding(image_vocab_size, embed_count)
-        self.post_quant_conv = nn.Conv2D(embed_count, embed_count, 1)
-        self.decoder = Decoder()
-
-    def forward(self, z):
-        z = paddle.clip(z, 0, self.image_vocab_size - 1)
-        z = self.embedding(z)
-        # nhwc->nchw
-        z = z.reshape(shape=[z.shape[0], 2**4, 2**4, 2**8])
-        z = z.transpose(perm=[0, 3, 1, 2])
-
-        z = self.post_quant_conv(z)
-        z = self.decoder(z)
-        # nchw->nhwc
-        z = z.transpose(perm=[0, 2, 3, 1])
-        return z
-
-
-class DalleBartForImageGeneration(DalleBartForConditionalGeneration):
-    r"""
-    DalleBart Model with a `language modeling` head and `VQGanTokenizer` on top.
-    Args:
-        dallebart (:class:`DalleBartModel`):
-            An instance of DalleBartModel.
-    """
-
-    def __init__(self, config: DalleBartConfig()):
-        super().__init__(config)
-        logger.warning(
-            f"'{__class__.__name__}' is now deprecated and will be removed after v2.6.0"
-            "Please Refer to PPDiffusers for Text-to-Image Capabilities"
-        )
-        self.vqgan_detokenizer = VQGanDetokenizer(2**14, 256)
-
-    @paddle.no_grad()
-    def generate(
-        self,
-        input_ids,
-        attention_mask=None,
-        top_k=0,
-        top_p=1.0,
-        temperature=1.0,
-        condition_scale=1.0,
-        num_return_sequences=1,
-        **kwargs
-    ):
-        r"""
-        The DalleBartForImageGeneration generate method.
-        Args:
-            input_ids (Tensor):
-                See :class:`DalleBartForConditionalGeneration`.
-            attention_mask (Tensor, optional):
-                See :class:`DalleBartForConditionalGeneration`.
-            top_k (int, optional): The number of highest probability tokens to
-                keep for top-k-filtering in the "sampling" strategy. Default to
-                0, which means no effect.
-            top_p (float, optional): The cumulative probability for
-                top-p-filtering in the "sampling" strategy. The value should
-                satisfy :math:`0 <= top\_p < 1`. Default to 1.0, which means no
-                effect.
-            temperature (float, optional): The value used to module the next
-                token probabilities in the "sampling" strategy. Default to 1.0,
-                which means no effect.
-            condition_scale (float, optional): The scale of super conditioning. See
-                `this twitter <https://twitter.com/RiversHaveWings/status/1478093658716966912>`__
-                Default to 1.0.
-            num_return_sequences (int, optional): The number of returned
-                sequences for each sequence in the batch. Default to 1.
-        Returns:
-            Tensor: Returns tensor `images`, which is the output of :class:`VQGanDetokenizer`.
-            Its data type should be uint8 and has a shape of [batch_size, num_return_sequences, 256, 256, 3].
-
-        Example:
-            .. code-block::
-                import paddle
-                from paddlenlp.transformers import AutoModelForImageGeneration, AutoTokenizer
-                from PIL import Image
-
-                # Initialize the model and tokenizer
-                model_name_or_path = 'dalle-mini'
-                model = AutoModelForImageGeneration.from_pretrained(model_name_or_path)
-                tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-                model.eval()
-
-                # Prepare the model inputs.
-                prompts = ["graphite sketch of Elon Musk", "Mohanlal graphite sketch"]
-                tokenized_inputs = tokenizer(prompts, return_tensors="pd")
-                top_k = 32
-                condition_scale = 16.0
-                num_return_sequences = 4
-                images = model.generate(**tokenized_inputs,
-                                      top_k=top_k,
-                                      condition_scale=condition_scale,
-                                      num_return_sequences=num_return_sequences)
-                print(images.shape) # [2, 4, 256, 256, 3]
-                # [2, 256, 4*256, 3]
-                images = images.numpy().transpose([0, 2, 1, 3,
-                                        4]).reshape([-1, images.shape[-3],
-                                                    num_return_sequences * images.shape[-2],
-                                                    images.shape[-1]])
-                for i, image in enumerate(images):
-                    image = Image.fromarray(image)
-                    image.save(f"figure_{i}.png")
-        """
-        image_tokens = super().generate(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            top_k=top_k,
-            top_p=top_p,
-            temperature=temperature,
-            condition_scale=condition_scale,
-            num_return_sequences=num_return_sequences,
-            **kwargs,
-        )[0]
-        images = self.vqgan_detokenizer(image_tokens)
-        # images shape [bs, num_return_sequences, 256, 256, 3]
-        images = images.reshape([-1, num_return_sequences, images.shape[1], images.shape[2], images.shape[3]])
-        images = (images.clip(0, 1) * 255).astype("uint8")
-        return images

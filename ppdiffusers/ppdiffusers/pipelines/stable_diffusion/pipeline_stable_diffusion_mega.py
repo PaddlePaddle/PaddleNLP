@@ -13,9 +13,9 @@
 # limitations under the License.
 
 import inspect
-from typing import Callable, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
-import numpy as np
+import paddle
 import PIL.Image
 
 from ...utils import logging
@@ -63,20 +63,23 @@ class StableDiffusionMegaPipeline(StableDiffusionPipeline):
 
     def text2img(
         self,
-        prompt: Union[str, List[str]],
-        height: Optional[int] = 512,
-        width: Optional[int] = 512,
-        num_inference_steps: Optional[int] = 50,
-        guidance_scale: Optional[float] = 7.5,
+        prompt: Union[str, List[str]] = None,
+        height: Optional[int] = None,
+        width: Optional[int] = None,
+        num_inference_steps: int = 50,
+        guidance_scale: float = 7.5,
         negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: Optional[int] = 1,
-        eta: Optional[float] = 0.0,
-        generator: Optional[np.random.RandomState] = None,
-        latents: Optional[np.ndarray] = None,
+        eta: float = 0.0,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
+        latents: Optional[paddle.Tensor] = None,
+        prompt_embeds: Optional[paddle.Tensor] = None,
+        negative_prompt_embeds: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
-        callback: Optional[Callable[[int, int, np.ndarray], None]] = None,
+        callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
+        cross_attention_kwargs: Optional[Dict[str, Any]] = None,
     ):
 
         expected_components = inspect.signature(StableDiffusionPipeline.__init__).parameters.keys()
@@ -95,28 +98,34 @@ class StableDiffusionMegaPipeline(StableDiffusionPipeline):
             eta=eta,
             generator=generator,
             latents=latents,
+            prompt_embeds=prompt_embeds,
+            negative_prompt_embeds=negative_prompt_embeds,
             output_type=output_type,
             return_dict=return_dict,
             callback=callback,
             callback_steps=callback_steps,
+            cross_attention_kwargs=cross_attention_kwargs,
         )
         return output
 
     def img2img(
         self,
-        prompt: Union[str, List[str]],
-        image: Union[np.ndarray, PIL.Image.Image],
+        prompt: Union[str, List[str]] = None,
+        image: Union[paddle.Tensor, PIL.Image.Image] = None,
         strength: float = 0.8,
         num_inference_steps: Optional[int] = 50,
         guidance_scale: Optional[float] = 7.5,
         negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: Optional[int] = 1,
         eta: Optional[float] = 0.0,
-        generator: Optional[np.random.RandomState] = None,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
+        prompt_embeds: Optional[paddle.Tensor] = None,
+        negative_prompt_embeds: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
-        callback: Optional[Callable[[int, int, np.ndarray], None]] = None,
+        callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
+        **kwargs,
     ):
         expected_components = inspect.signature(StableDiffusionImg2ImgPipeline.__init__).parameters.keys()
         components = {name: component for name, component in self.components.items() if name in expected_components}
@@ -133,10 +142,13 @@ class StableDiffusionMegaPipeline(StableDiffusionPipeline):
             num_images_per_prompt=num_images_per_prompt,
             eta=eta,
             generator=generator,
+            negative_prompt_embeds=negative_prompt_embeds,
+            prompt_embeds=prompt_embeds,
             output_type=output_type,
             return_dict=return_dict,
             callback=callback,
             callback_steps=callback_steps,
+            **kwargs,
         )
 
         return output
@@ -144,19 +156,23 @@ class StableDiffusionMegaPipeline(StableDiffusionPipeline):
     def inpaint_legacy(
         self,
         prompt: Union[str, List[str]],
-        image: Union[np.ndarray, PIL.Image.Image],
-        mask_image: Union[np.ndarray, PIL.Image.Image],
+        image: Union[paddle.Tensor, PIL.Image.Image] = None,
+        mask_image: Union[paddle.Tensor, PIL.Image.Image] = None,
         strength: float = 0.8,
         num_inference_steps: Optional[int] = 50,
         guidance_scale: Optional[float] = 7.5,
         negative_prompt: Optional[Union[str, List[str]]] = None,
         num_images_per_prompt: Optional[int] = 1,
+        add_predicted_noise: Optional[bool] = False,
         eta: Optional[float] = 0.0,
-        generator: Optional[np.random.RandomState] = None,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
+        prompt_embeds: Optional[paddle.Tensor] = None,
+        negative_prompt_embeds: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
-        callback: Optional[Callable[[int, int, np.ndarray], None]] = None,
+        callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
+        **kwargs,
     ):
         expected_components = inspect.signature(StableDiffusionInpaintPipelineLegacy.__init__).parameters.keys()
         components = {name: component for name, component in self.components.items() if name in expected_components}
@@ -172,12 +188,16 @@ class StableDiffusionMegaPipeline(StableDiffusionPipeline):
             guidance_scale=guidance_scale,
             negative_prompt=negative_prompt,
             num_images_per_prompt=num_images_per_prompt,
+            add_predicted_noise=add_predicted_noise,
             eta=eta,
             generator=generator,
+            prompt_embeds=prompt_embeds,
+            negative_prompt_embeds=negative_prompt_embeds,
             output_type=output_type,
             return_dict=return_dict,
             callback=callback,
             callback_steps=callback_steps,
+            **kwargs,
         )
 
         return output

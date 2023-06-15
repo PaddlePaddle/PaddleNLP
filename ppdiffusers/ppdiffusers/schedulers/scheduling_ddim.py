@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 Stanford University Team and The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,12 +24,12 @@ import numpy as np
 import paddle
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS, BaseOutput, deprecate
-from .scheduling_utils import SchedulerMixin
+from ..utils import BaseOutput, randn_tensor
+from .scheduling_utils import KarrasDiffusionSchedulers, SchedulerMixin
 
 
 @dataclass
-# Copied from diffusers.schedulers.scheduling_ddpm.DDPMSchedulerOutput with DDPM->DDIM
+# Copied from ppdiffusers.schedulers.scheduling_ddpm.DDPMSchedulerOutput with DDPM->DDIM
 class DDIMSchedulerOutput(BaseOutput):
     """
     Output class for the scheduler's step function output.
@@ -47,6 +47,7 @@ class DDIMSchedulerOutput(BaseOutput):
     pred_original_sample: Optional[paddle.Tensor] = None
 
 
+# Copied from ppdiffusers.schedulers.scheduling_ddpm.betas_for_alpha_bar
 def betas_for_alpha_bar(num_diffusion_timesteps, max_beta=0.999) -> paddle.Tensor:
     """
     Create a beta schedule that discretizes the given alpha_t_bar function, which defines the cumulative product of
@@ -113,8 +114,7 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
             https://imagen.research.google/video/paper.pdf)
     """
 
-    _compatibles = _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS.copy()
-    _deprecated_kwargs = ["predict_epsilon"]
+    _compatibles = [e.name for e in KarrasDiffusionSchedulers]
     order = 1
 
     @register_to_config
@@ -129,15 +129,7 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
         set_alpha_to_one: bool = True,
         steps_offset: int = 0,
         prediction_type: str = "epsilon",
-        **kwargs,
     ):
-        message = (
-            "Please make sure to instantiate your scheduler with `prediction_type` instead. E.g. `scheduler ="
-            " DDIMScheduler.from_pretrained(<model_id>, prediction_type='epsilon')`."
-        )
-        predict_epsilon = deprecate("predict_epsilon", "0.13.0", message, take_from=kwargs)
-        if predict_epsilon is not None:
-            self.register_to_config(prediction_type="epsilon" if predict_epsilon else "sample")
         if trained_betas is not None:
             self.betas = paddle.to_tensor(trained_betas, dtype="float32")
         elif beta_schedule == "linear":
@@ -199,6 +191,14 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
             num_inference_steps (`int`):
                 the number of diffusion steps used when generating samples with a pre-trained model.
         """
+
+        if num_inference_steps > self.config.num_train_timesteps:
+            raise ValueError(
+                f"`num_inference_steps`: {num_inference_steps} cannot be larger than `self.config.train_timesteps`:"
+                f" {self.config.num_train_timesteps} as the unet model trained with this scheduler can only handle"
+                f" maximal {self.config.num_train_timesteps} timesteps."
+            )
+
         self.num_inference_steps = num_inference_steps
         step_ratio = self.config.num_train_timesteps // self.num_inference_steps
         # creates integer timesteps by multiplying by ratio
@@ -305,7 +305,6 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
         prev_sample = alpha_prod_t_prev ** (0.5) * pred_original_sample + pred_sample_direction
 
         if eta > 0:
-            # randn_like does not support generator https://github.com/pytorch/pytorch/issues/27072
             if variance_noise is not None and generator is not None:
                 raise ValueError(
                     "Cannot pass both generator and variance_noise. Please make sure that either `generator` or"
@@ -313,8 +312,7 @@ class DDIMScheduler(SchedulerMixin, ConfigMixin):
                 )
 
             if variance_noise is None:
-                variance_noise = paddle.randn(model_output.shape, generator=generator, dtype=model_output.dtype)
-            # 0.13.1 update this
+                variance_noise = randn_tensor(model_output.shape, generator=generator, dtype=model_output.dtype)
             variance = std_dev_t * variance_noise
 
             prev_sample = prev_sample + variance

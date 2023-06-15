@@ -21,4 +21,4 @@ pipe = DDIMPipeline.from_pretrained("dboshardy/ddim-butterflies-128")
 image = pipe(num_inference_steps=25).images[0]
 
 # 保存图片
-image.save("ddim_generated_image.png")
+image.save("unconditional_image_generation-ddim-result.png")

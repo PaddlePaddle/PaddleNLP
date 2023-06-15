@@ -21,7 +21,8 @@ from functools import partial
 import numpy as np
 import paddle
 from args import parse_args
-from modeling import GPTLMHeadModel, GPTModel
+from configuration import GPTConfig
+from modeling import GPTLMHeadModel
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
     DygraphShardingOptimizer,
@@ -36,6 +37,8 @@ from utils import (
     convert_example,
     is_dp_group_support_in_group_sharded_parallel,
     left_padding,
+    optimizer_name_suffix,
+    weight_name_suffix,
     wrap_sharding_2_3,
 )
 from visualdl import LogWriter
@@ -52,6 +55,7 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     PretrainedModel,
 )
+from paddlenlp.transformers.model_utils import _add_variant
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
@@ -69,11 +73,14 @@ def set_hyrbid_parallel_seed(basic_seed, data_world_rank, mp_rank, pp_rank=0):
     paddle.seed(basic_seed + data_world_rank)
 
     # local_seed/ global_seed is used to control dropout in ModelParallel
-    local_seed = basic_seed + 123 + mp_rank * 10 + pp_rank * 1000
-    global_seed = basic_seed + data_world_rank
+    local_seed = basic_seed + 59999 + mp_rank * 10 + pp_rank * 1000
+    global_seed = basic_seed + 100003 + data_world_rank
     tracker = get_rng_state_tracker()
-    tracker.add("global_seed", global_seed)
-    tracker.add("local_seed", local_seed)
+
+    if "global_seed" not in tracker.states_:
+        tracker.add("global_seed", global_seed)
+    if "local_seed" not in tracker.states_:
+        tracker.add("local_seed", local_seed)
 
 
 @paddle.no_grad()
@@ -182,10 +189,16 @@ def do_train(args):
         log_writer = LogWriter(logdir=log_writer_path)
 
     WEIGHTS_NAME = "model_state.pdparams"
-    OPTIMIZER_NAME = "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".format(mp_rank, sharding_rank)
-    if args.mp_degree > 1:
-        WEIGHTS_NAME = "model_state_mp_{:0>2d}.pdparams".format(mp_rank)
-        GPTLMHeadModel.resource_files_names = {"model_state": WEIGHTS_NAME}
+    OPTIMIZER_NAME = "optimizer.pdopt"
+
+    if args.mp_degree > 1 or args.sharding_degree > 1:
+        WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, weight_name_suffix())
+        OPTIMIZER_NAME = _add_variant(OPTIMIZER_NAME, optimizer_name_suffix())
+        # GPTLMHeadModel using old style save_pretrained
+        # remove if CLASS using save_pretrained_v2
+        logger.info(f"{WEIGHTS_NAME}, {OPTIMIZER_NAME}, {optimizer_name_suffix()}")
+        if not GPTLMHeadModel.constructed_from_pretrained_config():
+            GPTLMHeadModel.resource_files_names = {"model_state": WEIGHTS_NAME}
 
     model_config = model_class.pretrained_init_configuration[args.model_name_or_path]
     model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
@@ -193,7 +206,7 @@ def do_train(args):
     model_config["num_partitions"] = args.mp_degree
     model_config["use_recompute"] = args.use_recompute
     model_config["enable_fuse_transformer"] = False
-    model = GPTLMHeadModel(GPTModel(**model_config), pad_token_id=tokenizer.pad_token_id)
+    model = GPTLMHeadModel(GPTConfig(**model_config))
     # Create the critrion for the gpt model
 
     # Create the learning_rate sheduler and optimizer
@@ -556,7 +569,7 @@ def do_export(args):
         # ret =  model.generate(input_ids = data["input_ids"])
         for out_ids, in_txt in zip(ret[0].tolist(), input_text):
             print("==" * 30)
-            print(input_text + tokenizer.convert_ids_to_string(out_ids))
+            print(in_txt + tokenizer.convert_ids_to_string(out_ids))
 
         model = paddle.jit.to_static(
             model,

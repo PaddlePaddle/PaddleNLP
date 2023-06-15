@@ -11,27 +11,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
-import io
 import copy
-import logging
-import six
+import io
 import json
+import os
 
 import paddle
+import six
 from paddle import nn
 from paddle.nn import functional as F
-from paddlenlp.utils.env import MODEL_HOME
 from paddle.utils.download import get_path_from_url
-from paddlenlp.utils.log import logger
+
 from paddlenlp.transformers import (
     BertPretrainedModel,
     ElectraPretrainedModel,
-    RobertaPretrainedModel,
     ErniePretrainedModel,
+    RobertaPretrainedModel,
 )
-from .. import PretrainedModel, register_base_model
+from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.log import logger
 
+from .. import PretrainedModel, register_base_model
 from ..utils import InitTrackerMeta, fn_args_to_dict
 
 __all__ = ["ErnieGenPretrainedModel", "ErnieForGeneration", "ErnieGenModel"]

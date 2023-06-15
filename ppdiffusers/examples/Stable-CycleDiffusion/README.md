@@ -5,7 +5,7 @@
 pip install -r requirements.txt
 
 # 如果paddlenlp 2.5.1还没有发布，那么需要安装develop版本的paddlenlp
-pip install paddlenlp>=2.5.1
+pip install "paddlenlp>=2.5.1"
 ```
 
 ## 准备images数据

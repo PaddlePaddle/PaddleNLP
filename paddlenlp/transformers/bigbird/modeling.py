@@ -274,7 +274,7 @@ class BigBirdPretrainedModel(PretrainedModel):
     model_config_file = CONFIG_NAME
     config_class = BigBirdConfig
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         # Initialization hook
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -285,7 +285,7 @@ class BigBirdPretrainedModel(PretrainedModel):
                         mean=0.0,
                         std=self.initializer_range
                         if hasattr(self, "initializer_range")
-                        else self.bigbird.config["initializer_range"],
+                        else self.config["initializer_range"],
                         shape=layer.weight.shape,
                     )
                 )
@@ -547,18 +547,17 @@ class BigBirdForSequenceClassification(BigBirdPretrainedModel):
     Args:
         bigbird (:class:`BigBirdModel`):
             An instance of :class:`BigBirdModel`.
-        num_classes (int, optional):
+        num_labels (int, optional):
             The number of classes. Defaults to `None`.
     """
 
     def __init__(self, config: BigBirdConfig):
         super(BigBirdForSequenceClassification, self).__init__(config)
-        self.num_classes = config.num_classes
+        self.num_labels = config.num_labels
         self.config = config
         self.bigbird = BigBirdModel(config)
-        self.linear = nn.Linear(config.hidden_size, self.num_classes)
+        self.linear = nn.Linear(config.hidden_size, self.num_labels)
         self.dropout = nn.Dropout(config.hidden_dropout_prob, mode="upscale_in_train")
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -603,7 +602,7 @@ class BigBirdForSequenceClassification(BigBirdPretrainedModel):
 
         Returns:
             Tensor: Returns tensor `output`, a tensor of the input text classification logits.
-            Its data type should be float32 and it has a shape of [batch_size, num_classes].
+            Its data type should be float32 and it has a shape of [batch_size, num_labels].
 
         Examples:
             .. code-block::
@@ -657,13 +656,24 @@ class BigBirdForSequenceClassification(BigBirdPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_labels == 1:
+            if self.config.problem_type is None:
+                if self.num_labels == 1:
+                    self.config.problem_type = "regression"
+                elif self.num_labels > 1 and (labels.dtype == paddle.int64 or labels.dtype == paddle.int32):
+                    self.config.problem_type = "single_label_classification"
+                else:
+                    self.config.problem_type = "multi_label_classification"
+
+            if self.config.problem_type == "regression":
                 loss_fct = paddle.nn.MSELoss()
-                loss = loss_fct(logits, labels)
-            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                if self.num_labels == 1:
+                    loss = loss_fct(logits.squeeze(), labels.squeeze())
+                else:
+                    loss = loss_fct(logits, labels)
+            elif self.config.problem_type == "single_label_classification":
                 loss_fct = paddle.nn.CrossEntropyLoss()
                 loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
-            else:
+            elif self.config.problem_type == "multi_label_classification":
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
 
@@ -685,7 +695,8 @@ class BigBirdLMPredictionHead(Layer):
         self.transform = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = getattr(nn.functional, config.activation)
         self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=1e-12)
-        self.decoder_weight = (
+        self.decoder = nn.Linear(config.vocab_size, config.hidden_size)
+        self.decoder.weight = (
             self.create_parameter(
                 shape=[config.vocab_size, config.hidden_size], dtype=self.transform.weight.dtype, is_bias=False
             )
@@ -693,7 +704,7 @@ class BigBirdLMPredictionHead(Layer):
             else config.embedding_weights
         )
         self.decoder_bias = self.create_parameter(
-            shape=[config.vocab_size], dtype=self.decoder_weight.dtype, is_bias=True
+            shape=[config.vocab_size], dtype=self.decoder.weight.dtype, is_bias=True
         )
 
     def forward(self, hidden_states, masked_positions=None):
@@ -704,7 +715,7 @@ class BigBirdLMPredictionHead(Layer):
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        hidden_states = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True) + self.decoder_bias
+        hidden_states = paddle.tensor.matmul(hidden_states, self.decoder.weight, transpose_y=True) + self.decoder_bias
         return hidden_states
 
 
@@ -815,8 +826,6 @@ class BigBirdForPretraining(BigBirdPretrainedModel):
         super(BigBirdForPretraining, self).__init__(config)
         self.bigbird = BigBirdModel(config)
         self.cls = BigBirdPretrainingHeads(config)
-
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1121,7 +1130,6 @@ class BigBirdForQuestionAnswering(BigBirdPretrainedModel):
             config.dropout if config.dropout is not None else self.bigbird.config["hidden_dropout_prob"]
         )
         self.classifier = nn.Linear(self.bigbird.config["hidden_size"], 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1233,7 +1241,7 @@ class BigBirdForQuestionAnswering(BigBirdPretrainedModel):
 
     @staticmethod
     def prepare_question_mask(q_lengths, maxlen):
-        mask = paddle.arange(0, maxlen).unsqueeze_(0)
+        mask = paddle.arange(0, maxlen, dtype="int64").unsqueeze_(0)
         mask = mask < q_lengths
         return mask
 
@@ -1246,7 +1254,7 @@ class BigBirdForTokenClassification(BigBirdPretrainedModel):
     Args:
         bigbird (:class:`BigBirdModel`):
             An instance of BigBirdModel.
-        num_classes (int, optional):
+        num_labels (int, optional):
             The number of classes. Defaults to `2`.
         dropout (float, optional):
             The dropout probability for output of BIGBIRD.
@@ -1256,13 +1264,10 @@ class BigBirdForTokenClassification(BigBirdPretrainedModel):
 
     def __init__(self, config: BigBirdConfig):
         super(BigBirdForTokenClassification, self).__init__(config)
-        self.num_classes = config.num_classes
-        self.bigbird = BigBirdModel(config)  # allow bigbird to be config
-        self.dropout = nn.Dropout(
-            self.dropout if self.dropout is not None else self.bigbird.config["hidden_dropout_prob"]
-        )
-        self.classifier = nn.Linear(self.bigbird.config["hidden_size"], self.num_classes)
-        self.apply(self.init_weights)
+        self.num_labels = config.num_labels
+        self.bigbird = BigBirdModel(config)
+        self.dropout = nn.Dropout(config.dropout if config.dropout is not None else config.hidden_dropout_prob)
+        self.classifier = nn.Linear(self.bigbird.config["hidden_size"], self.num_labels)
 
     def forward(
         self,
@@ -1382,7 +1387,6 @@ class BigBirdForMultipleChoice(BigBirdPretrainedModel):
             config.dropout if config.dropout is not None else self.bigbird.config["hidden_dropout_prob"]
         )
         self.classifier = nn.Linear(self.bigbird.config["hidden_size"], 1)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1500,15 +1504,16 @@ class BigBirdForMaskedLM(BigBirdPretrainedModel):
     Args:
         BigBird (:class:`BigBirdModel`):
             An instance of :class:`BigBirdModel`.
-
     """
 
     def __init__(self, config: BigBirdConfig):
         super(BigBirdForMaskedLM, self).__init__(config)
         self.bigbird = BigBirdModel(config)
         self.lm_head = BigBirdLMPredictionHead(config)
+        self.tie_weights()
 
-        self.apply(self.init_weights)
+    def get_output_embeddings(self):
+        return self.lm_head.decoder
 
     def forward(
         self,
@@ -1610,8 +1615,10 @@ class BigBirdForCausalLM(BigBirdPretrainedModel):
         super(BigBirdForCausalLM, self).__init__(config)
         self.bigbird = BigBirdModel(config)
         self.lm_head = BigBirdLMPredictionHead(config)
+        self.tie_weights()
 
-        self.apply(self.init_weights)
+    def get_output_embeddings(self):
+        return self.lm_head.decoder
 
     def forward(
         self,

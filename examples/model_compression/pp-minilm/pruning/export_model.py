@@ -19,11 +19,9 @@ import os
 import sys
 
 import paddle
-from paddle.common_ops_import import core
 from paddleslim.nas.ofa import OFA, utils
 from paddleslim.nas.ofa.convert_super import Convert, supernet
 
-from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import PPMiniLMModel
 
 sys.path.append("../")
@@ -32,13 +30,7 @@ from data import METRIC_CLASSES, MODEL_CLASSES  # noqa: E402
 
 def ppminilm_forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
     wtype = self.pooler.dense.fn.weight.dtype if hasattr(self.pooler.dense, "fn") else self.pooler.dense.weight.dtype
-    if self.use_faster_tokenizer:
-        input_ids, token_type_ids = self.tokenizer(
-            text=input_ids,
-            text_pair=token_type_ids,
-            max_seq_len=self.max_seq_len,
-            pad_to_max_seq_len=self.pad_to_max_seq_len,
-        )
+
     if attention_mask is None:
         attention_mask = paddle.unsqueeze((input_ids == self.pad_token_id).astype(wtype) * -1e9, axis=[1, 2])
     embedding_output = self.embeddings(input_ids=input_ids, position_ids=position_ids, token_type_ids=token_type_ids)
@@ -103,12 +95,6 @@ def parse_args():
     parser.add_argument("--n_gpu", type=int, default=1, help="number of gpus to use, 0 for cpu.")
     parser.add_argument("--width_mult", type=float, default=1.0, help="width mult you want to export")
     parser.add_argument("--depth_mult", type=float, default=1.0, help="depth mult you want to export")
-    parser.add_argument(
-        "--use_faster_tokenizer",
-        type=strtobool,
-        default=True,
-        help="Whether to use FasterTokenizer to accelerate training or further inference.",
-    )
     args = parser.parse_args()
     return args
 
@@ -118,7 +104,7 @@ def do_export(args):
     args.model_type = args.model_type.lower()
     args.task_name = args.task_name.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
-    config_path = os.path.join(args.model_name_or_path, "model_config.json")
+    config_path = os.path.join(args.model_name_or_path, "config.json")
     cfg_dict = dict(json.loads(open(config_path).read()))
 
     kept_layers_index = {}
@@ -132,12 +118,9 @@ def do_export(args):
     with open(config_path, "w", encoding="utf-8") as f:
         f.write(json.dumps(cfg_dict, ensure_ascii=False))
 
-    num_labels = cfg_dict["num_classes"]
+    model = model_class.from_pretrained(args.model_name_or_path)
 
-    model = model_class.from_pretrained(args.model_name_or_path, num_classes=num_labels)
-    model.use_faster_tokenizer = args.use_faster_tokenizer
-
-    origin_model = model_class.from_pretrained(args.model_name_or_path, num_classes=num_labels)
+    origin_model = model_class.from_pretrained(args.model_name_or_path)
 
     os.rename(config_path + "_bak", config_path)
 
@@ -164,30 +147,12 @@ def do_export(args):
         if isinstance(sublayer, paddle.nn.MultiHeadAttention):
             sublayer.num_heads = int(args.width_mult * sublayer.num_heads)
 
-    is_text_pair = True
-    if args.task_name in ("tnews", "iflytek", "cluewsc2020"):
-        is_text_pair = False
-
-    if args.use_faster_tokenizer:
-        ofa_model.model.add_faster_tokenizer_op()
-        if is_text_pair:
-            origin_model_new = ofa_model.export(
-                best_config,
-                input_shapes=[[1], [1]],
-                input_dtypes=[core.VarDesc.VarType.STRINGS, core.VarDesc.VarType.STRINGS],
-                origin_model=origin_model,
-            )
-        else:
-            origin_model_new = ofa_model.export(
-                best_config, input_shapes=[1], input_dtypes=core.VarDesc.VarType.STRINGS, origin_model=origin_model
-            )
-    else:
-        origin_model_new = ofa_model.export(
-            best_config,
-            input_shapes=[[1, args.max_seq_length], [1, args.max_seq_length]],
-            input_dtypes=["int64", "int64"],
-            origin_model=origin_model,
-        )
+    origin_model_new = ofa_model.export(
+        best_config,
+        input_shapes=[[1, args.max_seq_length], [1, args.max_seq_length]],
+        input_dtypes=["int64", "int64"],
+        origin_model=origin_model,
+    )
 
     for name, sublayer in origin_model_new.named_sublayers():
         if isinstance(sublayer, paddle.nn.MultiHeadAttention):
@@ -199,10 +164,13 @@ def do_export(args):
     model_to_save = origin_model_new
     model_to_save.save_pretrained(output_dir)
 
-    if args.static_sub_model is not None:
-        origin_model_new.to_static(
-            args.static_sub_model, use_faster_tokenizer=args.use_faster_tokenizer, is_text_pair=is_text_pair
-        )
+    input_spec = [
+        paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+        paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # token_type_ids
+    ]
+    origin_model_new = paddle.jit.to_static(origin_model_new, input_spec=input_spec)
+
+    paddle.jit.save(origin_model_new, args.static_sub_model)
 
 
 def print_arguments(args):

@@ -38,10 +38,12 @@ from paddlenlp.utils.downloader import (
 if TYPE_CHECKING:
     from paddlenlp.transformers import PretrainedModel
 
+import numpy as np
 import paddle
 import tqdm
 from huggingface_hub import try_to_load_from_cache
 from huggingface_hub.utils import EntryNotFoundError
+from paddle.common_ops_import import convert_dtype
 from paddle.nn import Layer
 from requests.exceptions import HTTPError
 
@@ -50,6 +52,58 @@ from paddlenlp.utils.import_utils import import_module
 from paddlenlp.utils.log import logger
 
 HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
+
+
+def convert_ndarray_dtype(np_array: np.ndarray, target_dtype: str) -> np.ndarray:
+    """convert ndarray
+
+    Args:
+        np_array (np.ndarray): numpy ndarray instance
+        target_dtype (str): the target dtype
+
+    Returns:
+        np.ndarray: converted numpy ndarray instance
+    """
+    source_dtype = convert_dtype(np_array.dtype)
+    if source_dtype == "uint16" or target_dtype == "bfloat16":
+        tensor = paddle.to_tensor(np_array)
+        tensor = paddle.cast(tensor, target_dtype)
+        return tensor.numpy()
+
+        # TODO(wj-Mcat): device_guard will slow the converting
+        # with device_guard("cpu"):
+        #     tensor = paddle.to_tensor(np_array)
+        #     tensor = paddle.cast(tensor, target_dtype)
+        # return tensor.numpy()
+
+    if target_dtype == "bfloat16":
+        target_dtype = "uint16"
+
+    return np_array.astype(target_dtype)
+
+
+def get_scale_by_dtype(dtype: str = None, return_positive: bool = True) -> float:
+    """get scale value by dtype
+
+    Args:
+        dtype (str): the string dtype value
+
+    Returns:
+        float: the scale value
+    """
+    if dtype is None:
+        dtype = paddle.get_default_dtype()
+
+    dtype = convert_dtype(dtype)
+    scale_value = 1e6
+
+    # TODO(wj-Mcaf): support int8, int4 dtypes later
+    if dtype == "float16":
+        scale_value = 1e4
+
+    if return_positive:
+        return scale_value
+    return -1 * scale_value
 
 
 def fn_args_to_dict(func, *args, **kwargs):
@@ -598,3 +652,42 @@ class ContextManagers:
 
     def __exit__(self, *args, **kwargs):
         self.stack.__exit__(*args, **kwargs)
+
+
+def use_hybrid_parallel():
+    try:
+        from paddle.distributed import fleet
+
+        hcg = fleet.get_hybrid_communicate_group()
+        return hcg
+    except:
+        return None
+
+
+def optimizer_name_suffix():
+    hcg = use_hybrid_parallel()
+    if hcg is not None:
+        name = []
+        if hcg.get_model_parallel_world_size() > 1:
+            name.append(f"tp{hcg.get_model_parallel_rank():0>2d}")
+        if hcg.get_pipe_parallel_world_size() > 1:
+            name.append(f"pp{hcg.get_stage_id():0>2d}")
+        if hcg.get_sharding_parallel_world_size() > 1:
+            name.append(f"shard{hcg.get_sharding_parallel_rank():0>2d}")
+
+        return "_".join(name)
+    else:
+        return None
+
+
+def weight_name_suffix():
+    hcg = use_hybrid_parallel()
+    if hcg is not None:
+        name = []
+        if hcg.get_model_parallel_world_size() > 1:
+            name.append(f"tp{hcg.get_model_parallel_rank():0>2d}")
+        if hcg.get_pipe_parallel_world_size() > 1:
+            name.append(f"pp{hcg.get_stage_id():0>2d}")
+        return "_".join(name)
+    else:
+        return None

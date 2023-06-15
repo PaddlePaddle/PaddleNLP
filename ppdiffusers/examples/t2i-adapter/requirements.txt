@@ -1,0 +1,5 @@
+paddlehub>=2.3.1
+paddleseg>=2.7.0
+paddlenlp>=2.5.1
+opencv-python
+pillow==9.4.0

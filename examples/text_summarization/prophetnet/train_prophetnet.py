@@ -12,34 +12,38 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
+from dataclasses import dataclass, field
+from typing import Optional
 
 import paddle
-from paddle.io import DataLoader
 from tqdm import tqdm
 
-from paddlenlp.data import Pad, Tuple
+from paddlenlp.data import Pad
 from paddlenlp.datasets import load_dataset
+from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments, set_seed
 from paddlenlp.transformers.prophetnet.modeling import (
     ProphetNetForConditionalGeneration,
 )
 from paddlenlp.transformers.prophetnet.tokenizer import ProphetNetTokenizer
 
-# fmt: off
-parser = argparse.ArgumentParser()
-parser.add_argument("--dataset", default="gigaword", choices=["cnndm", "gigaword"], type=str, help="Path to tokenizer vocab file.")
-parser.add_argument("--model_name_or_path", default="prophetnet-large-uncased", type=str, required=True, help="Path to pre-trained model.")
-parser.add_argument("--batch_size", default=24, type=int)
-parser.add_argument("--epochs", default=3, type=int)
-parser.add_argument("--lr", default=0.0001, type=float)
-parser.add_argument("--weight_decay", default=0.0, type=float)
-parser.add_argument("--warmup_init_lr", default=1e-07, type=float)
-parser.add_argument("--warmup_steps", default=1000, type=int)
-parser.add_argument("--clip_norm", default=0.1, type=float)
-parser.add_argument("--num_workers", default=4, type=int)
-parser.add_argument("--output_dir", default="./ckpt/gigaword", type=str)
-args = parser.parse_args()
-# fmt: on
+
+@dataclass
+class ModelArguments:
+    model_name_or_path: Optional[str] = field(
+        default="prophetnet-large-uncased",
+        metadata={"help": ("Path to pre-trained model.")},
+    )
+    warmup_init_lr: Optional[float] = field(
+        default=1e-07,
+    )
+
+
+@dataclass
+class DataArguments:
+    dataset: Optional[str] = field(
+        default="gigaword",
+        metadata={"help": ("Path to tokenizer vocab file.")},
+    )
 
 
 def read(data_path):
@@ -54,19 +58,6 @@ def read(data_path):
         with open(data_path_tgt, "r", encoding="utf-8") as f_d_t:
             for row_d_s, row_d_t in tqdm(zip(f_d_s, f_d_t), total=src_lines_length):
                 yield {"article": row_d_s, "highlights": row_d_t}
-
-
-train_data_src = "data/" + args.dataset + "_data/uncased_tok_data/train.src"
-train_data_tgt = "data/" + args.dataset + "_data/uncased_tok_data/train.tgt"
-
-dev_data_src = "data/" + args.dataset + "_data/uncased_tok_data/dev.src"
-dev_data_tgt = "data/" + args.dataset + "_data/uncased_tok_data/dev.tgt"
-
-train_dataset = load_dataset(read, data_path=[train_data_src, train_data_tgt], lazy=False)
-
-dev_dataset = load_dataset(read, data_path=[dev_data_src, dev_data_tgt], lazy=False)
-
-tokenizer = ProphetNetTokenizer.from_pretrained(args.model_name_or_path)
 
 
 class InverseSquareRootSchedule(paddle.optimizer.lr.LRScheduler):
@@ -107,67 +98,42 @@ def convert_example(is_test=False):
     return warpper
 
 
-trunc = convert_example()
+@dataclass
+class DataCollator:
+    tokenizer: ProphetNetTokenizer
 
-train_dataset = train_dataset.map(trunc)
-dev_dataset = dev_dataset.map(trunc)
+    def __call__(self, features):
+        src_ids = []
+        src_pids = []
+        tgt_ids = []
+        tgt_pids = []
+        labels = []
+        batch = {}
 
-batchify_fn = lambda samples, fn=Tuple(
-    Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
-    Pad(axis=0, pad_val=0),  # src_pids
-    Pad(axis=0, pad_val=tokenizer.pad_token_id),  # tgt_ids
-    Pad(axis=0, pad_val=0),  # tgt_pids
-    Pad(axis=0, pad_val=tokenizer.pad_token_id),  # label
-): fn(samples)
+        for feature in features:
+            src_idx, src_pid, tgt_idx, tgt_pid, label = feature
+            src_ids.append(src_idx)
+            src_pids.append(src_pid)
+            tgt_ids.append(tgt_idx)
+            tgt_pids.append(tgt_pid)
+            labels.append(label)
 
-batch_size = args.batch_size
+        src_ids = (Pad(axis=0, pad_val=self.tokenizer.pad_token_id)(src_ids),)
+        src_pids = (Pad(axis=0, pad_val=0)(src_pids),)
+        tgt_ids = (Pad(axis=0, pad_val=self.tokenizer.pad_token_id)(tgt_ids),)
+        tgt_pids = (Pad(axis=0, pad_val=0)(tgt_pids),)
+        labels = (Pad(axis=0, pad_val=self.tokenizer.pad_token_id)(labels),)
 
-train_data_loader = DataLoader(
-    dataset=train_dataset,
-    batch_size=batch_size,
-    shuffle=True,
-    collate_fn=batchify_fn,
-    use_shared_memory=False,
-    num_workers=args.num_workers,
-)
+        batch["src_ids"] = src_ids[0]
+        batch["src_pids"] = src_pids[0]
+        batch["tgt_ids"] = tgt_ids[0]
+        batch["tgt_pids"] = tgt_pids[0]
+        batch["labels"] = labels[0]
 
-dev_data_loader = DataLoader(
-    dataset=dev_dataset,
-    batch_size=batch_size * 2,
-    shuffle=True,
-    collate_fn=batchify_fn,
-    use_shared_memory=False,
-    num_workers=args.num_workers,
-)
-
-epochs = args.epochs
-lr = args.lr
-weight_decay = args.weight_decay
-warmup_init_lr = args.warmup_init_lr
-warmup_steps = args.warmup_steps
-clip_norm = args.clip_norm
-output_dir = args.output_dir
-
-best_valid_loss = None
-start_epoch = 0
-
-model = ProphetNetForConditionalGeneration.from_pretrained(args.model_name_or_path)
-
-lr_scheduler = InverseSquareRootSchedule(warmup_init_lr, lr, warmup_steps)
-
-optimizer = paddle.optimizer.Adam(
-    learning_rate=lr_scheduler,
-    parameters=model.parameters(),
-    weight_decay=weight_decay,
-    grad_clip=paddle.nn.ClipGradByNorm(clip_norm),
-)
-
-accumulate_batchs_num = int(32 * 16 / batch_size)
-
-scaler = paddle.amp.GradScaler(init_loss_scaling=1024)
+        return batch
 
 
-def compute_loss(model, logits, labels, ignore_index=-100):
+def loss_func(model, logits, labels, ignore_index=-100):
     expend_targets = paddle.cast(
         paddle.zeros((model.prophetnet.config["ngram"], labels.shape[0], labels.shape[1])).fill_(ignore_index),
         dtype=paddle.int32,
@@ -194,79 +160,93 @@ def compute_loss(model, logits, labels, ignore_index=-100):
     return loss
 
 
-@paddle.no_grad()
-def valid(data):
-    model.eval()
-    losses = 0
-    with tqdm(total=len(data)) as bar:
-        for step, batch in enumerate(data, start=1):
-            src_ids, src_attention_mask_ids, decoder_input_ids, decoder_input_attention_mask_ids, label_ids = batch
-            src_ids = src_ids.cast(dtype=paddle.int32)
-            src_attention_mask_ids = src_attention_mask_ids.cast(dtype=paddle.int32)
-            decoder_input_ids = decoder_input_ids.cast(dtype=paddle.int32)
-            decoder_input_attention_mask_ids = decoder_input_attention_mask_ids.cast(dtype=paddle.int32)
-            label_ids = label_ids.cast(dtype=paddle.int64)
-            _, _, logits = model(
-                input_ids=src_ids,
-                attention_mask=src_attention_mask_ids,
-                decoder_input_ids=decoder_input_ids,
-                decoder_attention_mask=decoder_input_attention_mask_ids,
-            )
-            loss = compute_loss(model, logits, label_ids, ignore_index=model.padding_idx)
-            losses += loss.detach().numpy()
-            bar.update(1)
-    return losses / step
+class ProphetnetTrainer(Trainer):
+    def compute_loss(self, model, inputs, return_outputs=False):
+        src_ids, src_attention_mask_ids, decoder_input_ids, decoder_input_attention_mask_ids, label_ids = inputs
+        src_ids = inputs["src_ids"]
+        src_attention_mask_ids = inputs["src_pids"]
+        decoder_input_ids = inputs["tgt_ids"]
+        decoder_input_attention_mask_ids = inputs["tgt_pids"]
+        label_ids = inputs["labels"]
+
+        src_ids = src_ids.cast(dtype=paddle.int32)
+        src_attention_mask_ids = src_attention_mask_ids.cast(dtype=paddle.int32)
+        decoder_input_ids = decoder_input_ids.cast(dtype=paddle.int32)
+        decoder_input_attention_mask_ids = decoder_input_attention_mask_ids.cast(dtype=paddle.int32)
+        label_ids = label_ids.cast(dtype=paddle.int64)
+
+        outputs = model(
+            input_ids=src_ids,
+            attention_mask=src_attention_mask_ids,
+            decoder_input_ids=decoder_input_ids,
+            decoder_attention_mask=decoder_input_attention_mask_ids,
+        )
+        loss = loss_func(model, outputs[2], label_ids, ignore_index=model.padding_idx)
+
+        return (loss, outputs) if return_outputs else loss
 
 
-def train():
-    global_step = 1
-    global best_valid_loss
-    model.train()
-    for epoch in range(start_epoch, epochs):
-        with tqdm(total=int(len(train_data_loader) / accumulate_batchs_num)) as train_bar:
-            for step, batch in enumerate(train_data_loader, start=1):
-                src_ids, src_attention_mask_ids, decoder_input_ids, decoder_input_attention_mask_ids, label_ids = batch
-                src_ids = src_ids.cast(dtype=paddle.int32)
-                src_attention_mask_ids = src_attention_mask_ids.cast(dtype=paddle.int32)
-                decoder_input_ids = decoder_input_ids.cast(dtype=paddle.int32)
-                decoder_input_attention_mask_ids = decoder_input_attention_mask_ids.cast(dtype=paddle.int32)
-                label_ids = label_ids.cast(dtype=paddle.int64)
-                with paddle.amp.auto_cast():
-                    _, _, logits = model(
-                        input_ids=src_ids,
-                        attention_mask=src_attention_mask_ids,
-                        decoder_input_ids=decoder_input_ids,
-                        decoder_attention_mask=decoder_input_attention_mask_ids,
-                    )
-                    loss = compute_loss(model, logits, label_ids, ignore_index=model.padding_idx)
+def do_train():
+    parser = PdArgumentParser((ModelArguments, DataArguments, TrainingArguments))
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-                scaled = scaler.scale(loss)
-                scaled.backward()
-                if (step + 1) % accumulate_batchs_num == 0:
-                    scaler.minimize(optimizer, scaled)
-                    lr_scheduler.step()
-                    optimizer.clear_grad()
-                    train_bar.update(1)
-                    train_bar.set_description(
-                        "global step %d, epoch: %d, batch: %d, loss: %f, lr: %.3e"
-                        % (global_step, epoch, step, loss, lr_scheduler.get_lr())
-                    )
-                global_step += 1
+    paddle.set_device(training_args.device)
+    if paddle.distributed.get_world_size() > 1:
+        paddle.distributed.init_parallel_env()
 
-        valid_loss = valid(dev_data_loader)
-        if best_valid_loss is None:
-            best_valid_loss = valid_loss
-            model.save_pretrained(output_dir)
-            tokenizer.save_pretrained(output_dir)
-        else:
-            if valid_loss < best_valid_loss:
-                best_valid_loss = valid_loss
-                model.save_pretrained(output_dir)
-            tokenizer.save_pretrained(output_dir)
-        print("valid loss: %f, best valid loss: %f" % (valid_loss, best_valid_loss))
-        model.save_pretrained(output_dir)
-        tokenizer.save_pretrained(output_dir)
+    set_seed(training_args.seed)
+
+    train_data_src = "data/" + data_args.dataset + "_data/uncased_tok_data/train.src"
+    train_data_tgt = "data/" + data_args.dataset + "_data/uncased_tok_data/train.tgt"
+
+    dev_data_src = "data/" + data_args.dataset + "_data/uncased_tok_data/dev.src"
+    dev_data_tgt = "data/" + data_args.dataset + "_data/uncased_tok_data/dev.tgt"
+
+    train_dataset = load_dataset(read, data_path=[train_data_src, train_data_tgt], lazy=False)
+    dev_dataset = load_dataset(read, data_path=[dev_data_src, dev_data_tgt], lazy=False)
+
+    tokenizer = ProphetNetTokenizer.from_pretrained(model_args.model_name_or_path)
+
+    trans_func = convert_example()
+
+    train_dataset = train_dataset.map(trans_func)
+    dev_dataset = dev_dataset.map(trans_func)
+    batchify_fn = DataCollator(tokenizer)
+
+    model = ProphetNetForConditionalGeneration.from_pretrained(model_args.model_name_or_path)
+
+    lr_scheduler = InverseSquareRootSchedule(
+        model_args.warmup_init_lr, training_args.learning_rate, training_args.warmup_steps
+    )
+    optimizer = paddle.optimizer.Adam(
+        learning_rate=lr_scheduler,
+        parameters=model.parameters(),
+        weight_decay=training_args.weight_decay,
+        grad_clip=paddle.nn.ClipGradByNorm(training_args.max_grad_norm),
+    )
+
+    trainer = ProphetnetTrainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_dataset if training_args.do_train else None,
+        eval_dataset=dev_dataset if training_args.do_eval else None,
+        tokenizer=tokenizer,
+        data_collator=batchify_fn,
+        optimizers=(optimizer, lr_scheduler),
+    )
+
+    if training_args.do_train:
+        train_results = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
+        metrics = train_results.metrics
+        trainer.save_model()
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
+
+    if training_args.do_eval:
+        eval_metrics = trainer.evaluate()
+        trainer.log_metrics("eval", eval_metrics)
 
 
 if __name__ == "__main__":
-    train()
+    do_train()

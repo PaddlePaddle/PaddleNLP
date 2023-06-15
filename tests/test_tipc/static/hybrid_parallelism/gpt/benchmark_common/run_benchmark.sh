@@ -1,4 +1,19 @@
 #!/usr/bin/env bash
+
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # Test training benchmark for a model.
 # Usage：bash benchmark/run_benchmark.sh ${model_item} ${fp_item} ${mp_degree} ${pp_degree} ${dp_degree} ${micro_batch_size} ${global_batch_size} ${run_mode} ${device_num} ${use_sharding}
 function _set_params(){
@@ -166,9 +181,14 @@ function _train(){
     fi
 }
 
+function _set_env(){
+    export FLAGS_sync_before_allreduce=1
+}
+
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
 
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@
+_set_env #设置环境变量
 #_train       # 如果只产出训练log,不解析,可取消注释
 _run     # 该函数在run_model.sh中,执行时会调用_train; 如果不联调只产出训练log可以注掉本行,提交时需打开

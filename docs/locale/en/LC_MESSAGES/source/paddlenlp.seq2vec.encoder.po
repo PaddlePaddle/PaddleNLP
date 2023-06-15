@@ -127,7 +127,7 @@ msgid ""
 "A `CNNEncoder` takes as input a sequence of vectors and returns a single "
 "vector, a combination of multiple convolution layers and max pooling "
 "layers. The input to this encoder is of shape `(batch_size, num_tokens, "
-"emb_dim)`, and the output is of shape `(batch_size, ouput_dim)` or "
+"emb_dim)`, and the output is of shape `(batch_size, output_dim)` or "
 "`(batch_size, len(ngram_filter_sizes) * num_filter)`."
 msgstr ""
 
@@ -309,7 +309,7 @@ msgstr ""
 
 #: of paddlenlp.seq2vec.encoder.GRUEncoder.forward:1
 msgid ""
-"GRUEncoder takes the a sequence of vectors and and returns a single "
+"GRUEncoder takes the a sequence of vectors and returns a single "
 "vector, which is a combination of multiple GRU layers. The input to this "
 "encoder is of shape `(batch_size, num_tokens, input_size)`, The output is"
 " of shape `(batch_size, hidden_size * 2)` if GRU is bidirection; If not, "
@@ -412,7 +412,7 @@ msgstr ""
 
 #: of paddlenlp.seq2vec.encoder.LSTMEncoder.forward:1
 msgid ""
-"LSTMEncoder takes the a sequence of vectors and and returns a single "
+"LSTMEncoder takes the a sequence of vectors and returns a single "
 "vector, which is a combination of multiple LSTM layers. The input to this"
 " encoder is of shape `(batch_size, num_tokens, input_size)`, The output "
 "is of shape `(batch_size, hidden_size * 2)` if LSTM is bidirection; If "
@@ -491,7 +491,7 @@ msgstr ""
 
 #: of paddlenlp.seq2vec.encoder.RNNEncoder.forward:1
 msgid ""
-"RNNEncoder takes the a sequence of vectors and and returns a single "
+"RNNEncoder takes the a sequence of vectors and returns a single "
 "vector, which is a combination of multiple RNN layers. The input to this "
 "encoder is of shape `(batch_size, num_tokens, input_size)`. The output is"
 " of shape `(batch_size, hidden_size * 2)` if RNN is bidirection; If not, "

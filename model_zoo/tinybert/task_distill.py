@@ -14,27 +14,28 @@
 
 import argparse
 import logging
+import math
 import os
-import sys
 import random
 import time
-import math
 from functools import partial
 
 import numpy as np
 import paddle
-from paddle.io import DataLoader
-import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.metric import Metric, Accuracy, Precision, Recall
+from paddle.io import DataLoader
+from paddle.metric import Accuracy
 
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad, Dict
-from paddlenlp.data.sampler import SamplerHelper
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import TinyBertForSequenceClassification, TinyBertTokenizer
+from paddlenlp.transformers import (
+    BertForSequenceClassification,
+    BertTokenizer,
+    LinearDecayWithWarmup,
+    TinyBertForSequenceClassification,
+    TinyBertTokenizer,
+)
 from paddlenlp.transformers.distill_utils import to_distill
 
 FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
@@ -297,7 +298,7 @@ def do_train(args):
             dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
         )
 
-    num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
+    num_classes = 1 if train_ds.label_list is None else len(train_ds.label_list)
     student = model_class.from_pretrained(args.student_model_name_or_path, num_classes=num_classes)
     teacher_model_class, _ = MODEL_CLASSES[args.teacher_model_type]
     teacher = teacher_model_class.from_pretrained(args.teacher_path, num_classes=num_classes)
@@ -337,7 +338,6 @@ def do_train(args):
 
     teacher = to_distill(teacher, return_attentions=True, return_qkv=False, return_layer_outputs=True)
     student = to_distill(student, return_attentions=True, return_qkv=False, return_layer_outputs=True)
-    pad_token_id = 0
     global_step = 0
     tic_train = time.time()
     best_res = 0.0

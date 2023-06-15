@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,15 +47,11 @@ from ppdiffusers import (
     DiffusionPipeline,
     DPMSolverMultistepScheduler,
     UNet2DConditionModel,
+    is_ppxformers_available,
 )
-from ppdiffusers.modeling_utils import freeze_params, unwrap_model
 from ppdiffusers.optimization import get_scheduler
+from ppdiffusers.training_utils import freeze_params, unfreeze_params, unwrap_model
 from ppdiffusers.utils import PIL_INTERPOLATION
-
-
-def unfreeze_params(params):
-    for param in params:
-        param.stop_gradient = False
 
 
 def url_or_path_join(*path_list):
@@ -100,10 +96,10 @@ def set_recompute(model, value=False):
         if hasattr(layer, "enable_recompute"):
             layer.enable_recompute = value
             print("Set", layer.__class__, "recompute", layer.enable_recompute)
-        # unet
-        if hasattr(layer, "gradient_checkpointing"):
-            layer.gradient_checkpointing = value
-            print("Set", layer.__class__, "recompute", layer.gradient_checkpointing)
+        # # unet
+        # if hasattr(layer, "gradient_checkpointing"):
+        #     layer.gradient_checkpointing = value
+        #     print("Set", layer.__class__, "recompute", layer.gradient_checkpointing)
 
     model.apply(fn)
 
@@ -321,6 +317,9 @@ def parse_args():
             " `args.validation_prompt` multiple times: `args.num_validation_images`"
             " and logging the images."
         ),
+    )
+    parser.add_argument(
+        "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
     )
     args = parser.parse_args()
 
@@ -633,8 +632,17 @@ def main():
     unfreeze_params(text_encoder.get_input_embeddings().parameters())
 
     if args.gradient_checkpointing:
-        unet.enable_gradient_checkpointing()
+        # unet.enable_gradient_checkpointing()
         set_recompute(text_encoder, True)
+
+    if args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
+        try:
+            unet.enable_xformers_memory_efficient_attention()
+        except Exception as e:
+            logger.warn(
+                "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
+                f" correctly and a GPU is available: {e}"
+            )
 
     train_dataset = TextualInversionDataset(
         data_root=args.train_data_dir,
@@ -731,6 +739,7 @@ def main():
 
     # keep original embeddings as reference
     orig_embeds_params = unwrap_model(text_encoder).get_input_embeddings().weight.clone()
+    index_no_updates = (paddle.arange(len(tokenizer)) != placeholder_token_id).cast(paddle.int64).sum()
 
     # Keep vae and unet in eval model as we don't train these
     vae.eval()
@@ -759,10 +768,10 @@ def main():
                 # grad acc, no_sync when (step + 1) % args.gradient_accumulation_steps != 0:
                 # gradient_checkpointing, no_sync every where
                 # gradient_checkpointing + grad_acc, no_sync every where
-                unet_ctx_manager = unet.no_sync()
+                # unet_ctx_manager = unet.no_sync()
                 text_encoder_ctx_manager = text_encoder.no_sync()
             else:
-                unet_ctx_manager = contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
+                # unet_ctx_manager = contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
                 text_encoder_ctx_manager = (
                     contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
                 )
@@ -775,34 +784,33 @@ def main():
                     attention_mask = None
                 encoder_hidden_states = text_encoder(batch["input_ids"], attention_mask=attention_mask)[0]
 
-                with unet_ctx_manager:
-                    # Predict the noise or sample
-                    model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
+                # with unet_ctx_manager:
+                # Predict the noise or sample
+                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
 
-                    # Get the target for loss depending on the prediction type
-                    if noise_scheduler.config.prediction_type == "epsilon":
-                        target = noise
-                    elif noise_scheduler.config.prediction_type == "v_prediction":
-                        target = noise_scheduler.get_velocity(latents, noise, timesteps)
-                    else:
-                        raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
-                    loss = F.mse_loss(model_pred, target, reduction="mean")
+                # Get the target for loss depending on the prediction type
+                if noise_scheduler.config.prediction_type == "epsilon":
+                    target = noise
+                elif noise_scheduler.config.prediction_type == "v_prediction":
+                    target = noise_scheduler.get_velocity(latents, noise, timesteps)
+                else:
+                    raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
+                loss = F.mse_loss(model_pred, target, reduction="mean")
 
-                    if args.gradient_accumulation_steps > 1:
-                        loss = loss / args.gradient_accumulation_steps
-                    loss.backward()
+                if args.gradient_accumulation_steps > 1:
+                    loss = loss / args.gradient_accumulation_steps
+                loss.backward()
 
             if (step + 1) % args.gradient_accumulation_steps == 0:
                 if num_processes > 1 and args.gradient_checkpointing:
-                    fused_allreduce_gradients(text_encoder.get_input_embeddings().parameters(), None)
+                    fused_allreduce_gradients(unwrap_model(text_encoder).get_input_embeddings().parameters(), None)
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
                 # Let's make sure we don't update any embedding weights besides the newly added token
                 with paddle.no_grad():
-                    index_no_updates = paddle.arange(len(tokenizer)) != placeholder_token_id
-                    unwrap_model(text_encoder).get_input_embeddings().weight[index_no_updates] = orig_embeds_params[
-                        index_no_updates
+                    unwrap_model(text_encoder).get_input_embeddings().weight[:index_no_updates] = orig_embeds_params[
+                        :index_no_updates
                     ]
 
                 progress_bar.update(1)
@@ -818,7 +826,7 @@ def main():
                     for name, val in logs.items():
                         if name == "epoch":
                             continue
-                        writer.add_scalar(f"train/{name}", val, step=global_step)
+                        writer.add_scalar(f"train/{name}", val, global_step)
 
                     if global_step % args.save_steps == 0:
                         save_path = os.path.join(args.output_dir, f"learned_embeds-steps-{global_step}.pdparams")

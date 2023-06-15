@@ -255,8 +255,6 @@ class BasePipeline:
                                              `_` sign must be used to specify nested hierarchical properties.
         """
         pipeline_config = read_pipeline_config_from_yaml(path)
-        print(pipeline_config)
-        print(pipeline_name)
         if pipeline_config["version"] != __version__:
             logger.warning(
                 f"YAML version ({pipeline_config['version']}) does not match with pipelines version ({__version__}). "
@@ -366,6 +364,7 @@ class Pipeline(BasePipeline):
     def run(  # type: ignore
         self,
         query: Optional[str] = None,
+        history: Optional[Dict[str, str]] = None,
         file_paths: Optional[List[str]] = None,
         labels: Optional[MultiLabel] = None,
         documents: Optional[List[Document]] = None,
@@ -415,6 +414,8 @@ class Pipeline(BasePipeline):
         }  # ordered dict with "node_id" -> "input" mapping that acts as a FIFO queue
         if query:
             queue[self.root_node]["query"] = query
+        if history:
+            queue[self.root_node]["history"] = history
         if file_paths:
             queue[self.root_node]["file_paths"] = file_paths
         if labels:
@@ -475,6 +476,8 @@ class Pipeline(BasePipeline):
                                     updated_input["documents"] = documents
                                 if meta:
                                     updated_input["meta"] = meta
+                                if history:
+                                    updated_input["history"] = history
                             else:
                                 existing_input["inputs"].append(node_output)
                                 updated_input = existing_input
@@ -751,13 +754,9 @@ class Pipeline(BasePipeline):
         )
 
         pipeline = cls()
-        print(pipeline_definition)
         components: dict = {}  # instances of component objects.
         for node in pipeline_definition["nodes"]:
-            print("node", node)
             name = node["name"]
-            if name == "QAFilterPostprocessor":
-                print("exit")
             component = cls._load_or_get_component(name=name, definitions=component_definitions, components=components)
             pipeline.add_node(component=component, name=name, inputs=node.get("inputs", []))
 

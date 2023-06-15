@@ -21,6 +21,7 @@ from functools import partial
 import numpy as np
 import paddle
 from args import parse_args
+from configuration import GPTConfig
 from modeling import GPTForSequenceClassification
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
@@ -35,6 +36,8 @@ from utils import (
     _rotate_checkpoints,
     all_gather,
     is_dp_group_support_in_group_sharded_parallel,
+    optimizer_name_suffix,
+    weight_name_suffix,
     wrap_sharding_2_3,
 )
 from visualdl import LogWriter
@@ -52,6 +55,7 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     PretrainedModel,
 )
+from paddlenlp.transformers.model_utils import _add_variant
 from paddlenlp.utils.log import logger
 
 METRIC_CLASSES = {
@@ -79,11 +83,14 @@ def set_hyrbid_parallel_seed(basic_seed, data_world_rank, mp_rank, pp_rank=0):
     paddle.seed(basic_seed + data_world_rank)
 
     # local_seed/ global_seed is used to control dropout in ModelParallel
-    local_seed = basic_seed + 123 + mp_rank * 10 + pp_rank * 1000
-    global_seed = basic_seed + data_world_rank
+    local_seed = basic_seed + 59999 + mp_rank * 10 + pp_rank * 1000
+    global_seed = basic_seed + 100003 + data_world_rank
     tracker = get_rng_state_tracker()
-    tracker.add("global_seed", global_seed)
-    tracker.add("local_seed", local_seed)
+
+    if "global_seed" not in tracker.states_:
+        tracker.add("global_seed", global_seed)
+    if "local_seed" not in tracker.states_:
+        tracker.add("local_seed", local_seed)
 
 
 def convert_example(example, tokenizer, label_list, max_seq_length=512, is_test=False):
@@ -285,21 +292,37 @@ def do_train(args):
         log_writer = LogWriter(log_writer_path)
 
     WEIGHTS_NAME = "model_state.pdparams"
-    OPTIMIZER_NAME = "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".format(mp_rank, sharding_rank)
+    OPTIMIZER_NAME = "optimizer.pdopt"
 
-    if args.mp_degree > 1:
-        WEIGHTS_NAME = "model_state_mp_{:0>2d}.pdparams".format(mp_rank)
-        GPTForSequenceClassification.resource_files_names = {"model_state": WEIGHTS_NAME}
+    if args.mp_degree > 1 or args.sharding_degree > 1:
+        WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, weight_name_suffix())
+        OPTIMIZER_NAME = _add_variant(OPTIMIZER_NAME, optimizer_name_suffix())
+        # GPTForSequenceClassification using old style save_pretrained
+        # remove if CLASS using save_pretrained_v2
+        logger.info(f"{WEIGHTS_NAME}, {OPTIMIZER_NAME}, {optimizer_name_suffix()}")
+        if not GPTForSequenceClassification.constructed_from_pretrained_config():
+            GPTForSequenceClassification.resource_files_names = {"model_state": WEIGHTS_NAME}
+    pretrained_models_list = list(model_class.pretrained_init_configuration.keys())
+    if args.model_name_or_path in pretrained_models_list:
+        model_config = model_class.pretrained_init_configuration[args.model_name_or_path]
+        model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
+        model_config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
 
-    model = GPTForSequenceClassification.from_pretrained(
-        args.model_name_or_path,
-        hidden_dropout_prob=args.hidden_dropout_prob,
-        attention_probs_dropout_prob=args.attention_probs_dropout_prob,
-        num_partitions=args.mp_degree,
-        use_recompute=args.use_recompute,
-        enable_fuse_transformer=False,
-        num_labels=num_classes,
-    )
+        model_config["num_partitions"] = args.mp_degree
+        model_config["use_recompute"] = args.use_recompute
+        model_config["enable_fuse_transformer"] = args.fuse_transformer
+        model = GPTForSequenceClassification(GPTConfig(**model_config))
+
+    else:
+        model = GPTForSequenceClassification.from_pretrained(
+            args.model_name_or_path,
+            hidden_dropout_prob=args.hidden_dropout_prob,
+            attention_probs_dropout_prob=args.attention_probs_dropout_prob,
+            num_partitions=args.mp_degree,
+            use_recompute=args.use_recompute,
+            enable_fuse_transformer=False,
+            num_labels=num_classes,
+        )
 
     metric = metric_class()
 

@@ -12,18 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import re
 import argparse
 import json
 import multiprocessing
+import os
+import shutil
 import sys
 import time
-import shutil
 from functools import partial
-
-import numpy as np
-from tqdm import tqdm
 
 
 def get_args():
@@ -126,7 +122,6 @@ def main():
     for i, (bytes_processed, out_path) in enumerate(encoded_files, start=1):
         total_bytes_processed += bytes_processed
         out_paths.append(out_path)
-        master_start = time.time()
 
         if i % args.log_interval == 0:
             current = time.time()

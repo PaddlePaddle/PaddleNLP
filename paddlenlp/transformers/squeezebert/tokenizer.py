@@ -15,7 +15,11 @@
 
 import os
 
-from paddlenlp.transformers import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
+from paddlenlp.transformers import (
+    BasicTokenizer,
+    PretrainedTokenizer,
+    WordpieceTokenizer,
+)
 
 __all__ = [
     "SqueezeBertTokenizer",
@@ -93,6 +97,9 @@ class SqueezeBertTokenizer(PretrainedTokenizer):
             int: the size of vocabulary.
         """
         return len(self.vocab)
+
+    def get_vocab(self):
+        return dict(self.vocab.token_to_idx, **self.added_tokens_encoder)
 
     def _tokenize(self, text):
         """

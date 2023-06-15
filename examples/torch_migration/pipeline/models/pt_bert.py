@@ -346,8 +346,6 @@ class BertModel(BertPreTrainedModel):
 
         self.pooler = BertPooler(config) if add_pooling_layer else None
 
-        self.apply(self._init_weights)
-
     def forward(
         self,
         input_ids: Optional[torch.Tensor] = None,
@@ -395,8 +393,6 @@ class BertForSequenceClassification(BertPreTrainedModel):
         self.bert = BertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-
-        self.apply(self._init_weights)
 
     def forward(
         self,

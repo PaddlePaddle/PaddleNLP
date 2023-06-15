@@ -17,7 +17,6 @@ import unittest
 from paddlenlp.transformers import (
     DalleBartConfig,
     DalleBartForConditionalGeneration,
-    DalleBartForImageGeneration,
     DalleBartModel,
 )
 
@@ -140,14 +139,6 @@ class DalleBartModelTester:
 
         self.parent.assertEqual(result[0].shape, [self.seq_length, self.image_vocab_size + 1])
 
-    def create_and_check_image_generation(self, config, input_ids, input_mask):
-
-        model = DalleBartForImageGeneration(config)
-        model.eval()
-        result = model(input_ids, attention_mask=input_mask)
-
-        self.parent.assertEqual(result[0].shape, [self.seq_length, self.image_vocab_size + 1])
-
 
 class DalleBartModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = DalleBartModel
@@ -155,7 +146,7 @@ class DalleBartModelTest(ModelTesterMixin, unittest.TestCase):
     use_labels: bool = False
     use_test_inputs_embeds: bool = True
 
-    all_model_classes = (DalleBartForConditionalGeneration, DalleBartModel, DalleBartForImageGeneration)
+    all_model_classes = (DalleBartForConditionalGeneration, DalleBartModel)
 
     def setUp(self):
         self.model_tester = DalleBartModelTester(self)
@@ -167,10 +158,6 @@ class DalleBartModelTest(ModelTesterMixin, unittest.TestCase):
     def test_conditional_generation(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_conditional_generation(*config_and_inputs)
-
-    def test_image_generation(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_image_generation(*config_and_inputs)
 
     def test_inputs_embeds(self):
         # Direct input embedding tokens is currently not supported

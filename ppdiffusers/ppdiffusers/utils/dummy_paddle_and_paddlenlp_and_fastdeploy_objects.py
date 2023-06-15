@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -80,6 +80,21 @@ class FastDeployStableDiffusionMegaPipeline(metaclass=DummyObject):
 
 
 class FastDeployStableDiffusionPipeline(metaclass=DummyObject):
+    _backends = ["paddle", "paddlenlp", "fastdeploy"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle", "paddlenlp", "fastdeploy"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp", "fastdeploy"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp", "fastdeploy"])
+
+
+class FastDeployCycleDiffusionPipeline(metaclass=DummyObject):
     _backends = ["paddle", "paddlenlp", "fastdeploy"]
 
     def __init__(self, *args, **kwargs):

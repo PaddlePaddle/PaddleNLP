@@ -82,7 +82,7 @@ python label_studio.py \
     --options ./data/label.txt
 ```
 
-For multi-task training, you can convert data with script seperately and move them to the same directory.
+For multi-task training, you can convert data with script separately and move them to the same directory.
 
 <a name="23"></a>
 

@@ -17,15 +17,14 @@ BERT采用掩码语言建模（MLM）进行预训练，是最成功的预训练�
 ##### （1）模型微调：
 ```shell
 unset CUDA_VISIBLE_DEVICES
-cd glue
 python -m paddle.distributed.launch --gpus "0" run_glue.py \
     --model_type mpnet \
     --model_name_or_path mpnet-base \
     --task_name qqp \
     --max_seq_length 128 \
-    --batch_size 32 \
+    --per_device_train_batch_size 32 \
     --learning_rate 1e-5 \
-    --scheduler_type linear \
+    --lr_scheduler_type linear \
     --weight_decay 0.1 \
     --warmup_steps 5666 \
     --max_steps 113272 \
@@ -33,6 +32,8 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
     --save_steps 2000 \
     --seed 42 \
     --output_dir qqp/ \
+    --do_train \
+    --do_eval \
     --device gpu
 ```
 其中参数释义如下：
@@ -40,14 +41,17 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
 - `model_name_or_path` 模型名称或者路径，其中mpnet模型当前仅支持mpnet-base几种规格。
 - `task_name` 表示 Fine-tuning 的任务，当前支持CoLA、SST-2、MRPC、STS-B、QQP、MNLI、QNLI、RTE和WNLI。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
-- `batch_size` 表示每次迭代**每张卡**上的样本数目。
+- `per_device_train_batch_size` 表示每次迭代**每张卡**上的样本数目。
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
-- `scheduler_type` scheduler类型，可选linear和cosine。
+- `lr_scheduler_type` scheduler类型，可选linear和cosine。
+- `weight_decay` 权重衰减比例。
 - `warmup_steps` warmup步数。
 - `max_steps` 表示最大训练步数。
 - `logging_steps` 表示日志打印间隔。
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
+- `do_train` 表示是否需要训练。
+- `do_eval` 表示是否需要评测。
 - `device` 表示使用的设备类型。默认为GPU，可以配置为CPU、GPU、XPU。若希望使用多GPU训练，将其设置为GPU，同时环境变量CUDA_VISIBLE_DEVICES配置要使用的GPU id。
 
 ##### （2）模型预测：
@@ -81,24 +85,23 @@ python run_predict.py --task_name qqp  --ckpt_path qqp/best-qqp_ft_model_106000.
 
 ```bash
 unset CUDA_VISIBLE_DEVICES
-cd squad
 python -m paddle.distributed.launch --gpus "0" run_squad.py \
     --model_type mpnet \
     --model_name_or_path mpnet-base \
     --max_seq_length 512 \
-    --batch_size 16 \
+    --per_device_train_batch_size 16 \
     --learning_rate 2e-5 \
     --num_train_epochs 4 \
-    --scheduler_type linear \
+    --lr_scheduler_type linear \
     --logging_steps 25 \
     --save_steps 25 \
-    --warmup_proportion 0.1 \
+    --warmup_ratio 0.1 \
     --weight_decay 0.1 \
     --output_dir squad1.1/ \
     --device gpu \
     --do_train \
-    --seed 42 \
-    --do_predict
+    --do_eval \
+    --seed 42
 ```
 
 训练过程中模型会自动对结果进行评估，其中最好的结果如下所示：
@@ -124,19 +127,19 @@ python -m paddle.distributed.launch --gpus "0" run_squad.py \
     --model_type mpnet \
     --model_name_or_path mpnet-base \
     --max_seq_length 512 \
-    --batch_size 16 \
+    --per_device_train_batch_size 16 \
     --learning_rate 2e-5 \
     --num_train_epochs 4 \
-    --scheduler_type linear \
+    --lr_scheduler_type linear \
     --logging_steps 200 \
     --save_steps 200 \
-    --warmup_proportion 0.1 \
+    --warmup_ratio 0.1 \
     --weight_decay 0.1 \
     --output_dir squad2/ \
     --device gpu \
     --do_train \
+    --do_eval \
     --seed 42 \
-    --do_predict \
     --version_2_with_negative
 ```
 

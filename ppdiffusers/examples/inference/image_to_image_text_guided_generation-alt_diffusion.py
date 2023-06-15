@@ -28,4 +28,4 @@ prompt = "奇幻的景观，以一种艺术的形式。"
 with paddle.amp.auto_cast(True):
     image = pipe(prompt=prompt, image=init_image, strength=0.75, guidance_scale=7.5).images[0]
 
-image.save("alt_diffusion_fantasy_landscape.png")
+image.save("image_to_image_text_guided_generation-alt_diffusion-result.png")

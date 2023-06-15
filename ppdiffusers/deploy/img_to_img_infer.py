@@ -61,7 +61,7 @@ def parse_arguments():
         type=str,
         default="paddle",
         # Note(zhoushunjie): Will support 'tensorrt' soon.
-        choices=["onnx_runtime", "paddle", "paddle-tensorrt", "tensorrt", "paddlelite"],
+        choices=["onnx_runtime", "paddle", "paddle_tensorrt", "tensorrt", "paddlelite"],
         help="The inference runtime backend of unet model and text encoder model.",
     )
     parser.add_argument(
@@ -85,7 +85,7 @@ def parse_arguments():
     parser.add_argument(
         "--scheduler",
         type=str,
-        default="euler_ancestral",
+        default="pndm",
         choices=["pndm", "euler_ancestral"],
         help="The scheduler type of stable diffusion.",
     )
@@ -123,7 +123,8 @@ def create_paddle_inference_runtime(
         option.use_cpu()
     else:
         option.use_gpu(device_id)
-    if paddle_stream is not None:
+    # (TODO, junnyu) remove use_trt
+    if use_trt and paddle_stream is not None:
         option.set_external_raw_stream(paddle_stream)
     for pass_name in disable_paddle_pass:
         option.paddle_infer_option.delete_pass(pass_name)
@@ -293,8 +294,8 @@ if __name__ == "__main__":
             args.model_dir, args.unet_model_prefix, args.model_format, device_id=device_id
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
-    elif args.backend == "paddle" or args.backend == "paddle-tensorrt":
-        use_trt = True if args.backend == "paddle-tensorrt" else False
+    elif args.backend == "paddle" or args.backend == "paddle_tensorrt":
+        use_trt = True if args.backend == "paddle_tensorrt" else False
         # Note(zhoushunjie): Will change to paddle runtime later
         text_encoder_runtime = create_ort_runtime(
             args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=device_id
@@ -387,7 +388,7 @@ if __name__ == "__main__":
 
     response = requests.get(url)
     init_image = Image.open(BytesIO(response.content)).convert("RGB")
-    init_image = init_image.resize((768, 512))
+    init_image = init_image.resize((512, 512))
 
     prompt = "A fantasy landscape, trending on artstation"
 

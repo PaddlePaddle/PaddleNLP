@@ -1,3 +1,4 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 TSAIL Team and The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,10 +22,10 @@ import numpy as np
 import paddle
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS
-from .scheduling_utils import SchedulerMixin, SchedulerOutput
+from .scheduling_utils import KarrasDiffusionSchedulers, SchedulerMixin, SchedulerOutput
 
 
+# Copied from ppdiffusers.schedulers.scheduling_ddpm.betas_for_alpha_bar
 def betas_for_alpha_bar(num_diffusion_timesteps, max_beta=0.999):
     """
     Create a beta schedule that discretizes the given alpha_t_bar function, which defines the cumulative product of
@@ -116,7 +117,7 @@ class DPMSolverSinglestepScheduler(SchedulerMixin, ConfigMixin):
 
     """
 
-    _compatibles = _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS.copy()
+    _compatibles = [e.name for e in KarrasDiffusionSchedulers]
     order = 1
 
     @register_to_config
@@ -163,9 +164,15 @@ class DPMSolverSinglestepScheduler(SchedulerMixin, ConfigMixin):
 
         # settings for DPM-Solver
         if algorithm_type not in ["dpmsolver", "dpmsolver++"]:
-            raise NotImplementedError(f"{algorithm_type} does is not implemented for {self.__class__}")
+            if algorithm_type == "deis":
+                algorithm_type = "dpmsolver++"
+            else:
+                raise NotImplementedError(f"{algorithm_type} does is not implemented for {self.__class__}")
         if solver_type not in ["midpoint", "heun"]:
-            raise NotImplementedError(f"{solver_type} does is not implemented for {self.__class__}")
+            if solver_type in ["logrho", "bh1", "bh2"]:
+                solver_type = "midpoint"
+            else:
+                raise NotImplementedError(f"{solver_type} does is not implemented for {self.__class__}")
 
         # setable values
         self.num_inference_steps = None
@@ -572,7 +579,7 @@ class DPMSolverSinglestepScheduler(SchedulerMixin, ConfigMixin):
         noise: paddle.Tensor,
         timesteps: paddle.Tensor,
     ) -> paddle.Tensor:
-        # Make sure alphas_cumprod and timestep have same device and dtype as original_samples
+        # Make sure alphas_cumprod and timestep have same dtype as original_samples
         self.alphas_cumprod = self.alphas_cumprod.cast(original_samples.dtype)
 
         sqrt_alpha_prod = self.alphas_cumprod[timesteps] ** 0.5

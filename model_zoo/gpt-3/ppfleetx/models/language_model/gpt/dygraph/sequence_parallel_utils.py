@@ -203,7 +203,7 @@ def register_sequence_parallel_allreduce_hooks(model, accumulation_steps, fuse_s
 
 
 def is_fused_matmul_bias_supported():
-    if paddle.is_compiled_with_cuda() and not paddle.is_compiled_with_rocm():
+    if paddle.is_compiled_with_cuda() and not paddle.is_compiled_with_rocm() or paddle.is_compiled_with_xpu():
         return hasattr(core.eager.ops.legacy, "fused_gemm_epilogue")
     else:
         return False
@@ -283,7 +283,7 @@ class ColumnSequenceParallelLinear(Layer):
                     "You set fuse_matmul_bias=True in ColumnSequenceParallelLinear, "
                     "however, the paddle you are using not support this operation. "
                     "Please set fuse_matmul_bias=False or use paddle compiled "
-                    "with cuda 11.6 or higher."
+                    "with cuda 11.6 or higher, or use xpu version."
                 )
             from paddle.incubate.nn.functional import fused_linear
 

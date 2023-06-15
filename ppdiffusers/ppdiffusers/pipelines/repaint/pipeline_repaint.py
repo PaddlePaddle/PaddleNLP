@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
@@ -20,14 +21,14 @@ import paddle
 import PIL
 
 from ...models import UNet2DModel
-from ...pipeline_utils import DiffusionPipeline, ImagePipelineOutput
 from ...schedulers import RePaintScheduler
-from ...utils import PIL_INTERPOLATION, logging
+from ...utils import PIL_INTERPOLATION, logging, randn_tensor
+from ..pipeline_utils import DiffusionPipeline, ImagePipelineOutput
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 
-# Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img.preprocess
+# Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img.preprocess
 def _preprocess_image(image: Union[List, PIL.Image.Image, paddle.Tensor]):
     if isinstance(image, paddle.Tensor):
         return image
@@ -36,7 +37,7 @@ def _preprocess_image(image: Union[List, PIL.Image.Image, paddle.Tensor]):
 
     if isinstance(image[0], PIL.Image.Image):
         w, h = image[0].size
-        w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
+        w, h = map(lambda x: x - x % 8, (w, h))  # resize to integer multiple of 8
 
         image = [np.array(i.resize((w, h), resample=PIL_INTERPOLATION["lanczos"]))[None, :] for i in image]
         image = np.concatenate(image, axis=0)
@@ -114,13 +115,13 @@ class RePaintPipeline(DiffusionPipeline):
                 The output format of the generate image. Choose between
                 [PIL](https://pillow.readthedocs.io/en/stable/): `PIL.Image.Image` or `np.array`.
             return_dict (`bool`, *optional*, defaults to `True`):
-                Whether or not to return a [`~pipeline_utils.ImagePipelineOutput`] instead of a plain tuple.
+                Whether or not to return a [`~pipelines.ImagePipelineOutput`] instead of a plain tuple.
 
         Returns:
-            [`~pipeline_utils.ImagePipelineOutput`] or `tuple`: [`~pipelines.utils.ImagePipelineOutput`] if
-            `return_dict` is True, otherwise a `tuple. When returning a tuple, the first element is a list with the
-            generated images.
+            [`~pipelines.ImagePipelineOutput`] or `tuple`: [`~pipelines.utils.ImagePipelineOutput`] if `return_dict` is
+            True, otherwise a `tuple. When returning a tuple, the first element is a list with the generated images.
         """
+
         original_image = _preprocess_image(image)
         original_image = original_image.cast(self.unet.dtype)
         mask_image = _preprocess_mask(mask_image)
@@ -136,12 +137,7 @@ class RePaintPipeline(DiffusionPipeline):
             )
 
         image_shape = original_image.shape
-        if isinstance(generator, list):
-            shape = (1,) + image_shape[1:]
-            image = [paddle.randn(shape, generator=generator[i], dtype=self.unet.dtype) for i in range(batch_size)]
-            image = paddle.concat(image, axis=0)
-        else:
-            image = paddle.randn(image_shape, generator=generator, dtype=self.unet.dtype)
+        image = randn_tensor(image_shape, generator=generator, dtype=self.unet.dtype)
 
         # set step values
         self.scheduler.set_timesteps(num_inference_steps, jump_length, jump_n_sample)
@@ -162,7 +158,7 @@ class RePaintPipeline(DiffusionPipeline):
             t_last = t
 
         image = (image / 2 + 0.5).clip(0, 1)
-        image = image.transpose([0, 2, 3, 1]).numpy()
+        image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
         if output_type == "pil":
             image = self.numpy_to_pil(image)
 

@@ -113,7 +113,7 @@ def create_dataloader(batch_size, max_encoder_length, tokenizer, config, pad_val
 
 
 def main():
-    # Initialization for the parallel enviroment
+    # Initialization for the parallel environment
     paddle.set_device(args.device)
     set_seed(args)
     # Define the model and metric

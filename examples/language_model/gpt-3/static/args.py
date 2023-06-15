@@ -129,7 +129,7 @@ def parse_args(MODEL_CLASSES):
         "--pp_degree",
         type=int,
         default=1,
-        help="Pipeline Parallelism degree.  Spliting the the model layers to different parts.",
+        help="Pipeline Parallelism degree.  Spliting the model layers to different parts.",
     )
     parser.add_argument(
         "--use_recompute", type=str2bool, nargs="?", const=False, help="Using the recompute to save the memory."

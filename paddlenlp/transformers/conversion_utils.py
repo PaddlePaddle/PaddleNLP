@@ -50,6 +50,7 @@ from paddlenlp.utils.serialization import load_torch
 if TYPE_CHECKING:
     from paddlenlp.transformers import PretrainedConfig, PretrainedModel
 
+from ..utils import device_guard
 
 # the type hinting for pytorch model & layer & tensor
 Module = TypeVar("Module")
@@ -115,6 +116,24 @@ def state_dict_contains_prefix(state_dict: Dict[str, ndarray], prefix: str) -> b
     """check whether state-dict contains `prefix`"""
     prefix_count = sum([1 for key in state_dict.keys() if key.startswith(prefix)])
     return prefix_count > 0
+
+
+def init_name_mappings(mappings: list[StateDictNameMapping]) -> list[StateDictNameMapping]:
+    """init name mapping which are simple mappings"""
+    for index in range(len(mappings)):
+        sub_mapping = mappings[index]
+
+        # if sub_mapping is `str`, so repeat it. eg: [ "word_embedding.weight", ["layer_norm", "LayerNorm"] ]
+        if isinstance(sub_mapping, str):
+            sub_mapping = [sub_mapping]
+
+        if len(sub_mapping) == 1:
+            sub_mapping = sub_mapping * 2
+
+        elif sub_mapping[1] is None:
+            sub_mapping[1] = sub_mapping[0]
+
+        mappings[index] = sub_mapping
 
 
 class StateDictKeysChecker:
@@ -389,12 +408,15 @@ class StateDictNameMapping:
     """NameMapping of StateDict between two models"""
 
     source_name: str
-    target_name: str
+    target_name: str = None
 
     action: Optional[str] = None  # the value can be: transpose, merge_last_two_dim
     index: Optional[int] = None
 
     slots: list[str] = None
+
+    def __post_init__(self):
+        self.target_name = self.target_name or self.source_name
 
     def should_transpose(self) -> bool:
         return self.action == "transpose"
@@ -900,7 +922,9 @@ class ConversionMixin:
         raise NotImplementedError
 
     @classmethod
-    def convert_tensor_parallel(cls, weight_file: str, config: PretrainedConfig) -> None:
+    def convert_tensor_parallel(
+        cls, weight_file: str, config: PretrainedConfig, state_dict=None, ignore_error=False
+    ) -> None:
         """the entry of converting config and converting model file
 
         Args:
@@ -908,19 +932,24 @@ class ConversionMixin:
             config (PretrainedConfig): the PretrainedConfig instance of model
         """
         name_action_mappings = cls._get_tensor_parallel_mappings(config)
-        state_dict = paddle.load(weight_file, return_numpy=True)
+        if state_dict is None:
+            with device_guard("cpu"):
+                state_dict = paddle.load(weight_file, return_numpy=False)
 
-        state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys())
+        state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys(), ignore_error)
 
         for k, v in state_keys_map.items():
             name_action_mappings[v] = name_action_mappings.pop(k)
 
         for name, action in name_action_mappings.items():
             if name not in state_dict:
-                logger.warning(f"key<{name}> not in the model state weight file.")
+                if not ignore_error:
+                    logger.warning(f"key<{name}> not in the model state weight file.")
                 continue
             tensor = state_dict.pop(name)
-            state_dict[name] = action(tensor)
+            new_tensor = action(tensor)
+            with device_guard("cpu"):
+                state_dict[name] = paddle.Tensor(new_tensor, zero_copy=True)
 
         return state_dict
 
@@ -977,7 +1006,7 @@ class ConversionMixin:
         raise NotImplementedError
 
     @staticmethod
-    def _resolve_prefix_keys(state_keys_base, state_keys_real):
+    def _resolve_prefix_keys(state_keys_base, state_keys_real, ignore_error=False):
         # state_keys_map base to real
         state_keys_map = {}
 
@@ -990,7 +1019,8 @@ class ConversionMixin:
                     state_keys_map[key] = x
                     break
             if key not in state_keys_map:
-                logger.error(f"could not find name {key} in loaded state dict!")
+                if not ignore_error:
+                    logger.error(f"could not find name {key} in loaded state dict!")
             else:
                 state_keys_real.remove(state_keys_map[key])
 

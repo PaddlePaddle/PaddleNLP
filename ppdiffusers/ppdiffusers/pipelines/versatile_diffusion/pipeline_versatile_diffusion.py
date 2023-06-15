@@ -1,4 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,9 +27,9 @@ from paddlenlp.transformers import (
 )
 
 from ...models import AutoencoderKL, UNet2DConditionModel
-from ...pipeline_utils import DiffusionPipeline
-from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
+from ...schedulers import KarrasDiffusionSchedulers
 from ...utils import logging
+from ..pipeline_utils import DiffusionPipeline
 from .modeling_text_unet import UNetFlatConditionModel
 from .pipeline_versatile_diffusion_dual_guided import (
     VersatileDiffusionDualGuidedPipeline,
@@ -80,7 +81,7 @@ class VersatileDiffusionPipeline(DiffusionPipeline):
     image_unet: UNet2DConditionModel
     text_unet: UNetFlatConditionModel
     vae: AutoencoderKL
-    scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler]
+    scheduler: KarrasDiffusionSchedulers
 
     def __init__(
         self,
@@ -89,9 +90,9 @@ class VersatileDiffusionPipeline(DiffusionPipeline):
         text_encoder: CLIPTextModelWithProjection,
         image_encoder: CLIPVisionModelWithProjection,
         image_unet: UNet2DConditionModel,
-        text_unet: UNetFlatConditionModel,
+        text_unet: UNet2DConditionModel,
         vae: AutoencoderKL,
-        scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
+        scheduler: KarrasDiffusionSchedulers,
     ):
         super().__init__()
 
@@ -129,7 +130,7 @@ class VersatileDiffusionPipeline(DiffusionPipeline):
         Function invoked when calling the pipeline for generation.
 
         Args:
-            image (`PIL.Image.Image`, `List[PIL.Image.Image]` or `torch.Tensor`):
+            image (`PIL.Image.Image`, `List[PIL.Image.Image]` or `paddle.Tensor`):
                 The image prompt or prompts to guide the image generation.
             height (`int`, *optional*, defaults to self.image_unet.config.sample_size * self.vae_scale_factor):
                 The height in pixels of the generated image.
@@ -153,8 +154,7 @@ class VersatileDiffusionPipeline(DiffusionPipeline):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
             generator (`paddle.Generator`, *optional*):
-                A [paddle generator] to make generation
-                deterministic.
+                One or a list of paddle generator(s) to make generation deterministic.
             latents (`paddle.Tensor`, *optional*):
                 Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for image
                 generation. Can be used to tweak the same generation with different prompts. If not provided, a latents
@@ -188,7 +188,7 @@ class VersatileDiffusionPipeline(DiffusionPipeline):
         >>> image = Image.open(BytesIO(response.content)).convert("RGB")
 
         >>> pipe = VersatileDiffusionPipeline.from_pretrained(
-        ...     "shi-labs/versatile-diffusion"
+        ...     "shi-labs/versatile-diffusion", paddle_dtype=paddle.float16
         ... )
 
         >>> generator = paddle.Generator().manual_seed(0)
@@ -268,8 +268,7 @@ class VersatileDiffusionPipeline(DiffusionPipeline):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
             generator (`paddle.Generator`, *optional*):
-                A [paddle generator] to make generation
-                deterministic.
+                One or a list of paddle generator(s) to make generation deterministic.
             latents (`paddle.Tensor`, *optional*):
                 Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for image
                 generation. Can be used to tweak the same generation with different prompts. If not provided, a latents
@@ -294,7 +293,7 @@ class VersatileDiffusionPipeline(DiffusionPipeline):
         >>> import paddle
 
         >>> pipe = VersatileDiffusionPipeline.from_pretrained(
-        ...     "shi-labs/versatile-diffusion"
+        ...     "shi-labs/versatile-diffusion", paddle_dtype=paddle.float16
         ... )
 
         >>> generator = paddle.Generator().manual_seed(0)
@@ -380,8 +379,7 @@ class VersatileDiffusionPipeline(DiffusionPipeline):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
             generator (`paddle.Generator`, *optional*):
-                A [paddle generator] to make generation
-                deterministic.
+                One or a list of paddle generator(s) to make generation deterministic.
             latents (`paddle.Tensor`, *optional*):
                 Pre-generated noisy latents, sampled from a Gaussian distribution, to be used as inputs for image
                 generation. Can be used to tweak the same generation with different prompts. If not provided, a latents
@@ -416,7 +414,7 @@ class VersatileDiffusionPipeline(DiffusionPipeline):
         >>> text = "a red car in the sun"
 
         >>> pipe = VersatileDiffusionPipeline.from_pretrained(
-        ...     "shi-labs/versatile-diffusion"
+        ...     "shi-labs/versatile-diffusion", paddle_dtype=paddle.float16
         ... )
 
         >>> generator = paddle.Generator().manual_seed(0)

@@ -88,7 +88,6 @@ def mha_ofa_forward(self, query, key, value, attn_mask=None, cache=None):
         outs.append(weights)
     if cache is not None:
         outs.append(cache)
-
     if hasattr(self.q_proj, "fn") and self.q_proj.fn.cur_config["expand_ratio"] is not None:
         self.num_heads = int(float(self.num_heads) / self.q_proj.fn.cur_config["expand_ratio"])
     return out if len(outs) == 1 else tuple(outs)
@@ -117,10 +116,8 @@ def encoder_ofa_forward(
             head_mask = paddle.unsqueeze(paddle.unsqueeze(paddle.unsqueeze(head_mask, 1), -1), -1)
     else:
         head_mask = [None] * self.num_layers
-
     for i, mod in enumerate(self.layers):
         output = mod(output, src_mask=[src_mask[0], head_mask[i]])
-
     if self.norm is not None:
         output = self.norm(output)
 
@@ -288,22 +285,26 @@ def compute_neuron_head_importance(
 
     for i, batch in enumerate(data_loader):
         labels = None
-        if label_names is not None:
-            labels = []
-            for label in label_names:
-                labels.append(batch.pop(label))
-            labels = tuple(labels)
-        elif "labels" in batch:
-            labels = batch.pop("labels")
-            # For token cls tasks
-            for key in ("length", "seq_len"):
-                if key in batch:
-                    batch.pop(key)
-        elif "start_positions" in batch and "end_positions" in batch:
-            labels = (batch.pop("start_positions"), batch.pop("end_positions"))
+        if isinstance(batch, list):
+            input_ids, segment_ids, labels = batch
+            logits = model(input_ids, segment_ids, attention_mask=[None, head_mask])
+        else:
+            if label_names is not None:
+                labels = []
+                for label in label_names:
+                    labels.append(batch.pop(label))
+                labels = tuple(labels)
+            elif "labels" in batch:
+                labels = batch.pop("labels")
+                # For token cls tasks
+                for key in ("length", "seq_len"):
+                    if key in batch:
+                        batch.pop(key)
+            elif "start_positions" in batch and "end_positions" in batch:
+                labels = (batch.pop("start_positions"), batch.pop("end_positions"))
 
-        batch["attention_mask"] = [None, head_mask]
-        logits = model(**batch)
+            batch["attention_mask"] = [None, head_mask]
+            logits = model(**batch)
 
         if loss_fct is not None:
             loss = loss_fct(logits, labels)

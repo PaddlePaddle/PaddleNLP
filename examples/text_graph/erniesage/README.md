@@ -40,7 +40,7 @@ NLPCC2016-DBQA 是由国际自然语言处理和中文计算会议 NLPCC 于 201
 python ./preprocessing/dump_graph.py --conf ./config/erniesage_link_prediction.yaml
 # GPU多卡或单卡模式ErnieSage
 python -m paddle.distributed.launch --gpus "0" link_prediction.py --conf ./config/erniesage_link_prediction.yaml
-# 对图节点的的embeding进行预测, 单卡或多卡
+# 对图节点的embeding进行预测, 单卡或多卡
 python -m paddle.distributed.launch --gpus "0" link_prediction.py --conf ./config/erniesage_link_prediction.yaml --do_predict
 ```
 

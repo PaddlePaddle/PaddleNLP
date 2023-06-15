@@ -107,7 +107,7 @@ class DataLoader(object):
         self._use_data_parallel = use_data_parallel
         self._use_multiprocess = use_multiprocess
 
-        self.dataloader = paddle.io.DataLoader.from_generator(
+        self.dataloader = paddle.fluid.reader.DataLoader.from_generator(
             capacity=1000, return_list=True, use_multiprocess=use_multiprocess
         )
         self.dataloader.set_batch_generator(self.create_generator())

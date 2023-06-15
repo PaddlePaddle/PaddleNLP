@@ -370,6 +370,7 @@ class BertModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = BertModel
     return_dict = False
     use_labels = False
+    test_tie_weights = True
 
     all_model_classes = (
         BertModel,

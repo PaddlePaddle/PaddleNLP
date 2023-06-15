@@ -130,8 +130,13 @@ class PromptTrainer(Trainer):
     def _prepare_input(self, inputs: Dict):
         return inputs
 
-    def _save(self, output_dir: Optional[str] = None, state_dict: Dict[str, Any] = None):
-        super(PromptTrainer, self)._save(output_dir, state_dict)
+    def _save(
+        self,
+        output_dir: Optional[str] = None,
+        state_dict: Dict[str, Any] = None,
+        merge_tensor_parallel: Optional[bool] = True,
+    ):
+        super(PromptTrainer, self)._save(output_dir, state_dict, merge_tensor_parallel)
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         if self.template:
             self.template.save(output_dir)

@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,16 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
+from typing import Optional
 
 import numpy as np
 import paddle
 import paddle.nn as nn
 
-from ..configuration_utils import ConfigMixin, register_to_config
-from ..modeling_utils import ModelMixin
-from ..utils import BaseOutput
+from ..utils import BaseOutput, randn_tensor
 from .unet_2d_blocks import UNetMidBlock2D, get_down_block, get_up_block
+
+try:
+    from paddle.amp.auto_cast import amp_state
+except ImportError:
+    from paddle.fluid.dygraph.amp.auto_cast import amp_state
+
+
+def finfo(dtype):
+    if dtype == paddle.float32:
+        return np.finfo(np.float32)
+    if dtype == paddle.float16:
+        return np.finfo(np.float16)
+    if dtype == paddle.float64:
+        return np.finfo(np.float64)
 
 
 @dataclass
@@ -36,33 +48,6 @@ class DecoderOutput(BaseOutput):
     """
 
     sample: paddle.Tensor
-
-
-@dataclass
-class VQEncoderOutput(BaseOutput):
-    """
-    Output of VQModel encoding method.
-
-    Args:
-        latents (`paddle.Tensor` of shape `(batch_size, num_channels, height, width)`):
-            Encoded output sample of the model. Output of the last layer of the model.
-    """
-
-    latents: paddle.Tensor
-
-
-@dataclass
-class AutoencoderKLOutput(BaseOutput):
-    """
-    Output of AutoencoderKL encoding method.
-
-    Args:
-        latent_dist (`DiagonalGaussianDistribution`):
-            Encoded outputs of `Encoder` represented as the mean and logvar of `DiagonalGaussianDistribution`.
-            `DiagonalGaussianDistribution` allows for sampling latents from the distribution.
-    """
-
-    latent_dist: "DiagonalGaussianDistribution"
 
 
 class Encoder(nn.Layer):
@@ -219,6 +204,12 @@ class Decoder(nn.Layer):
         for up_block in self.up_blocks:
             sample = up_block(sample)
 
+        # (TODO, junnyu) check nan
+        # clamp inf values to enable fp16 training
+        if (amp_state() or sample.dtype == paddle.float16) and paddle.isinf(sample).any():
+            clamp_value = finfo(sample.dtype).max - 1000
+            sample = paddle.clip(sample, min=-clamp_value, max=clamp_value)
+
         # post-process
         sample = self.conv_norm_out(sample)
         sample = self.conv_act(sample)
@@ -363,9 +354,8 @@ class DiagonalGaussianDistribution(object):
             self.var = self.std = paddle.zeros_like(self.mean, dtype=self.parameters.dtype)
 
     def sample(self, generator: Optional[paddle.Generator] = None) -> paddle.Tensor:
-        sample = paddle.randn(self.mean.shape, generator=generator)
-        # make sure sample is as the parameters and has same dtype
-        sample = sample.cast(self.parameters.dtype)
+        # make sure sample is on the same device as the parameters and has same dtype
+        sample = randn_tensor(self.mean.shape, generator=generator, dtype=self.parameters.dtype)
         x = self.mean + self.std * sample
         return x
 
@@ -393,237 +383,3 @@ class DiagonalGaussianDistribution(object):
 
     def mode(self):
         return self.mean
-
-
-class VQModel(ModelMixin, ConfigMixin):
-    r"""VQ-VAE model from the paper Neural Discrete Representation Learning by Aaron van den Oord, Oriol Vinyals and Koray
-    Kavukcuoglu.
-
-    This model inherits from [`ModelMixin`]. Check the superclass documentation for the generic methods the library
-    implements for all the model (such as downloading or saving, etc.)
-
-    Parameters:
-        in_channels (int, *optional*, defaults to 3): Number of channels in the input image.
-        out_channels (int,  *optional*, defaults to 3): Number of channels in the output.
-        down_block_types (`Tuple[str]`, *optional*, defaults to :
-            obj:`("DownEncoderBlock2D",)`): Tuple of downsample block types.
-        up_block_types (`Tuple[str]`, *optional*, defaults to :
-            obj:`("UpDecoderBlock2D",)`): Tuple of upsample block types.
-        block_out_channels (`Tuple[int]`, *optional*, defaults to :
-            obj:`(64,)`): Tuple of block output channels.
-        act_fn (`str`, *optional*, defaults to `"silu"`): The activation function to use.
-        latent_channels (`int`, *optional*, defaults to `3`): Number of channels in the latent space.
-        sample_size (`int`, *optional*, defaults to `32`): TODO
-        num_vq_embeddings (`int`, *optional*, defaults to `256`): Number of codebook vectors in the VQ-VAE.
-        vq_embed_dim (`int`, *optional*): Hidden dim of codebook vectors in the VQ-VAE.
-    """
-
-    @register_to_config
-    def __init__(
-        self,
-        in_channels: int = 3,
-        out_channels: int = 3,
-        down_block_types: Tuple[str] = ("DownEncoderBlock2D",),
-        up_block_types: Tuple[str] = ("UpDecoderBlock2D",),
-        block_out_channels: Tuple[int] = (64,),
-        layers_per_block: int = 1,
-        act_fn: str = "silu",
-        latent_channels: int = 3,
-        sample_size: int = 32,
-        num_vq_embeddings: int = 256,
-        norm_num_groups: int = 32,
-        vq_embed_dim: Optional[int] = None,
-    ):
-        super().__init__()
-
-        # pass init params to Encoder
-        self.encoder = Encoder(
-            in_channels=in_channels,
-            out_channels=latent_channels,
-            down_block_types=down_block_types,
-            block_out_channels=block_out_channels,
-            layers_per_block=layers_per_block,
-            act_fn=act_fn,
-            norm_num_groups=norm_num_groups,
-            double_z=False,
-        )
-
-        vq_embed_dim = vq_embed_dim if vq_embed_dim is not None else latent_channels
-
-        self.quant_conv = nn.Conv2D(latent_channels, vq_embed_dim, 1)
-        self.quantize = VectorQuantizer(num_vq_embeddings, vq_embed_dim, beta=0.25, remap=None, sane_index_shape=False)
-        self.post_quant_conv = nn.Conv2D(vq_embed_dim, latent_channels, 1)
-
-        # pass init params to Decoder
-        self.decoder = Decoder(
-            in_channels=latent_channels,
-            out_channels=out_channels,
-            up_block_types=up_block_types,
-            block_out_channels=block_out_channels,
-            layers_per_block=layers_per_block,
-            act_fn=act_fn,
-            norm_num_groups=norm_num_groups,
-        )
-
-    def encode(self, x: paddle.Tensor, return_dict: bool = True):
-        h = self.encoder(x)
-        h = self.quant_conv(h)
-
-        if not return_dict:
-            return (h,)
-
-        return VQEncoderOutput(latents=h)
-
-    def decode(self, h: paddle.Tensor, force_not_quantize: bool = False, return_dict: bool = True):
-        # also go through quantization layer
-        if not force_not_quantize:
-            quant, emb_loss, info = self.quantize(h)
-        else:
-            quant = h
-        quant = self.post_quant_conv(quant)
-        dec = self.decoder(quant)
-
-        if not return_dict:
-            return (dec,)
-
-        return DecoderOutput(sample=dec)
-
-    def forward(self, sample: paddle.Tensor, return_dict: bool = True):
-        r"""
-        Args:
-            sample (`paddle.Tensor`): Input sample.
-            return_dict (`bool`, *optional*, defaults to `True`):
-                Whether or not to return a [`DecoderOutput`] instead of a plain tuple.
-        """
-        x = sample
-        h = self.encode(x).latents
-        dec = self.decode(h).sample
-
-        if not return_dict:
-            return (dec,)
-
-        return DecoderOutput(sample=dec)
-
-
-class AutoencoderKL(ModelMixin, ConfigMixin):
-    r"""Variational Autoencoder (VAE) model with KL loss from the paper Auto-Encoding Variational Bayes by Diederik P. Kingma
-    and Max Welling.
-
-    This model inherits from [`ModelMixin`]. Check the superclass documentation for the generic methods the library
-    implements for all the model (such as downloading or saving, etc.)
-
-    Parameters:
-        in_channels (int, *optional*, defaults to 3): Number of channels in the input image.
-        out_channels (int,  *optional*, defaults to 3): Number of channels in the output.
-        down_block_types (`Tuple[str]`, *optional*, defaults to :
-            obj:`("DownEncoderBlock2D",)`): Tuple of downsample block types.
-        down_block_out_channels (`Tuple[int]`, *optional*, defaults to :
-            None: Tuple of down block output channels.
-        up_block_types (`Tuple[str]`, *optional*, defaults to :
-            obj:`("UpDecoderBlock2D",)`): Tuple of upsample block types.
-        up_block_out_channels (`Tuple[int]`, *optional*, defaults to :
-            None: Tuple of up block output channels.
-        block_out_channels (`Tuple[int]`, *optional*, defaults to :
-            obj:`(64,)`): Tuple of block output channels.
-        act_fn (`str`, *optional*, defaults to `"silu"`): The activation function to use.
-        latent_channels (`int`, *optional*, defaults to `4`): Number of channels in the latent space.
-        sample_size (`int`, *optional*, defaults to `32`): TODO
-    """
-
-    @register_to_config
-    def __init__(
-        self,
-        in_channels: int = 3,
-        out_channels: int = 3,
-        down_block_types: Tuple[str] = ("DownEncoderBlock2D",),
-        down_block_out_channels: Tuple[int] = None,
-        up_block_types: Tuple[str] = ("UpDecoderBlock2D",),
-        up_block_out_channels: Tuple[int] = None,
-        block_out_channels: Tuple[int] = (64,),
-        layers_per_block: int = 1,
-        act_fn: str = "silu",
-        latent_channels: int = 4,
-        norm_num_groups: int = 32,
-        sample_size: int = 32,
-    ):
-        super().__init__()
-
-        # pass init params to Encoder
-        self.encoder = Encoder(
-            in_channels=in_channels,
-            out_channels=latent_channels,
-            down_block_types=down_block_types,
-            block_out_channels=down_block_out_channels
-            if down_block_out_channels
-            is not None  # if down_block_out_channels not givien, we will use block_out_channels
-            else block_out_channels,
-            layers_per_block=layers_per_block,
-            act_fn=act_fn,
-            norm_num_groups=norm_num_groups,
-            double_z=True,
-        )
-
-        # pass init params to Decoder
-        self.decoder = Decoder(
-            in_channels=latent_channels,
-            out_channels=out_channels,
-            up_block_types=up_block_types,
-            block_out_channels=up_block_out_channels  # if up_block_out_channels not givien, we will use block_out_channels
-            if up_block_out_channels is not None
-            else block_out_channels,
-            layers_per_block=layers_per_block,
-            norm_num_groups=norm_num_groups,
-            act_fn=act_fn,
-        )
-
-        self.quant_conv = nn.Conv2D(2 * latent_channels, 2 * latent_channels, 1)
-        self.post_quant_conv = nn.Conv2D(latent_channels, latent_channels, 1)
-
-    def encode(self, x: paddle.Tensor, return_dict: bool = True):
-        h = self.encoder(x)
-        moments = self.quant_conv(h)
-        posterior = DiagonalGaussianDistribution(moments)
-
-        if not return_dict:
-            return (posterior,)
-
-        return AutoencoderKLOutput(latent_dist=posterior)
-
-    # (TODO junnyu) support vae slice
-    # https://github.com/huggingface/diffusers/commit/c28d3c82ce6f56c4b373a8260c56357d13db900a#diff-64804f08bc5e7a09947fb4eced462f15965acfa2d797354d85033e788f23b443
-    def decode(self, z: paddle.Tensor, return_dict: bool = True):
-        z = self.post_quant_conv(z)
-        dec = self.decoder(z)
-
-        if not return_dict:
-            return (dec,)
-
-        return DecoderOutput(sample=dec)
-
-    def forward(
-        self,
-        sample: paddle.Tensor,
-        sample_posterior: bool = False,
-        return_dict: bool = True,
-        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
-    ) -> Union[DecoderOutput, paddle.Tensor]:
-        r"""
-        Args:
-            sample (`paddle.Tensor`): Input sample.
-            sample_posterior (`bool`, *optional*, defaults to `False`):
-                Whether to sample from the posterior.
-            return_dict (`bool`, *optional*, defaults to `True`):
-                Whether or not to return a [`DecoderOutput`] instead of a plain tuple.
-        """
-        x = sample
-        posterior = self.encode(x).latent_dist
-        if sample_posterior:
-            z = posterior.sample(generator=generator)
-        else:
-            z = posterior.mode()
-        dec = self.decode(z).sample
-
-        if not return_dict:
-            return (dec,)
-
-        return DecoderOutput(sample=dec)

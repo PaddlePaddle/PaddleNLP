@@ -1976,55 +1976,6 @@ class ReformerPretrainedModel(PretrainedModel):
     pretrained_init_configuration = REFORMER_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = REFORMER_PRETRAINED_RESOURCE_FILES_MAP
 
-    def init_weights(self):
-        """
-        Initializes and tie weights if needed.
-        """
-        # Initialize weights
-        self.apply(self._init_weights)
-        # Tie weights if needed
-        self.tie_weights()
-
-    def tie_weights(self):
-        """
-        Tie the weights between the input embeddings and the output embeddings.
-        """
-        tie_word_embeddings = (
-            self.tie_word_embeddings
-            if hasattr(self, "tie_word_embeddings")
-            else self.config.get("tie_word_embeddings", False)
-        )
-        if hasattr(self, "get_output_embeddings") and hasattr(self, "get_input_embeddings") and tie_word_embeddings:
-            output_embeddings = self.get_output_embeddings()
-            if output_embeddings is not None:
-                self._tie_or_clone_weights(output_embeddings, self.get_input_embeddings())
-
-    def _tie_or_clone_weights(self, output_embeddings, input_embeddings):
-        """Tie or clone layer weights"""
-        if output_embeddings.weight.shape == input_embeddings.weight.shape:
-            output_embeddings.weight = input_embeddings.weight
-        elif output_embeddings.weight.shape == input_embeddings.weight.t().shape:
-            output_embeddings.weight.set_value(input_embeddings.weight.t())
-        else:
-            raise ValueError(
-                "when tie input/output embeddings, the shape of output embeddings: {}"
-                "should be equal to shape of input embeddings: {}"
-                "or should be equal to the shape of transpose input embeddings: {}".format(
-                    output_embeddings.weight.shape,
-                    input_embeddings.weight.shape,
-                    input_embeddings.weight.t().shape,
-                )
-            )
-        if getattr(output_embeddings, "bias", None) is not None:
-            if output_embeddings.weight.shape[-1] != output_embeddings.bias.shape[0]:
-                raise ValueError(
-                    "the weight lase shape: {} of output_embeddings is not equal to the bias shape: {}"
-                    "please check output_embeddings configuration".format(
-                        output_embeddings.weight.shape[-1],
-                        output_embeddings.bias.shape[0],
-                    )
-                )
-
     def _init_weights(self, layer):
         """Initialize the weights"""
         if isinstance(layer, AxialPositionEmbeddings):
@@ -2169,7 +2120,6 @@ class ReformerModel(ReformerPretrainedModel):
 
         self.embeddings = ReformerEmbeddings(config)
         self.encoder = ReformerEncoder(config)
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -2288,10 +2238,10 @@ class ReformerModel(ReformerPretrainedModel):
 
         # if needs padding
         least_common_mult_chunk_length = _get_least_common_mult_chunk_len(
-            self.attn_layers, self.lsh_attn_chunk_length, self.local_attn_chunk_length
+            self.config.attn_layers, self.config.lsh_attn_chunk_length, self.config.local_attn_chunk_length
         )
         min_chunk_length = _get_min_chunk_len(
-            self.attn_layers, self.lsh_attn_chunk_length, self.local_attn_chunk_length
+            self.config.attn_layers, self.config.lsh_attn_chunk_length, self.config.local_attn_chunk_length
         )
 
         must_pad_to_match_chunk_length = (
@@ -2459,8 +2409,6 @@ class ReformerModelWithLMHead(ReformerPretrainedModel):
         )"""
         self.lm_head = ReformerOnlyLMHead(config)
 
-        self.init_weights()
-
     def get_output_embeddings(self):
         return self.lm_head.decoder
 
@@ -2614,7 +2562,6 @@ class ReformerForMaskedLM(ReformerPretrainedModel):
             "is_decoder"
         ], "If you want to use `ReformerForMaskedLM` make sure `is_decoder=False` for bi-directional self-attention."
         self.lm_head = ReformerOnlyLMHead(config)
-        self.init_weights()
 
     def get_output_embeddings(self):
         return self.lm_head.decoder
@@ -2763,8 +2710,6 @@ class ReformerForSequenceClassification(ReformerPretrainedModel):
         if self.config.is_decoder:
             logger.warning("You might want to disable causal masking for sequence classification")
 
-        self.init_weights()
-
     def forward(
         self,
         input_ids: Optional[Tensor] = None,
@@ -2902,7 +2847,6 @@ class ReformerForQuestionAnswering(ReformerPretrainedModel):
         self.qa_outputs = nn.Linear(2 * self.config.hidden_size, 2)
         if self.config.is_decoder:
             logger.warning("You might want to disable causal masking for question answering task.")
-        self.init_weights()
 
     def forward(
         self,

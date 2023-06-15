@@ -292,6 +292,7 @@ class BigBirdModelTest(ModelTesterMixin, unittest.TestCase):
     return_dict: bool = False
     use_labels: bool = False
     use_test_inputs_embeds: bool = True
+    test_tie_weights = True
 
     all_model_classes = (
         BigBirdModel,

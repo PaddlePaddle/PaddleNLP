@@ -46,6 +46,24 @@ class ModelArguments:
         default=None, metadata={"help": "Path to pretrained model or model, when we want to resume training."}
     )
     image_logging_steps: Optional[int] = field(default=1000, metadata={"help": "Log image every X steps."})
+    enable_xformers_memory_efficient_attention: bool = field(
+        default=False, metadata={"help": "enable_xformers_memory_efficient_attention."}
+    )
+    to_static: Optional[bool] = field(default=False, metadata={"help": "Whether or not to_static"})
+    prediction_type: Optional[str] = field(
+        default="epsilon",
+        metadata={
+            "help": "prediction_type, prediction type of the scheduler function, one of `epsilon` (predicting the noise of the diffusion process), `sample` (directly predicting the noisy sample`) or `v_prediction` (see section 2.4 https://imagen.research.google/video/paper.pdf)"
+        },
+    )
+    benchmark: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether or not run benchmark."},
+    )
+    profiler_options: Optional[str] = field(
+        default=None,
+        metadata={"help": "profiler_options."},
+    )
 
 
 @dataclass

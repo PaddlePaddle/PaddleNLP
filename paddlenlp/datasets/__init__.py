@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .bellegroup import *
 from .cail2018_small import *
 from .cblue import *
 from .chnsenticorp import *

@@ -15,29 +15,27 @@
 import argparse
 import logging
 import os
-import sys
 import random
 import time
-import math
-from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import paddle
 from paddle.io import DataLoader
-import paddle.nn as nn
-import paddle.nn.functional as F
-from paddle.metric import Metric, Accuracy, Precision, Recall
+from paddle.metric import Accuracy
 
-from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad, Dict
-from paddlenlp.utils.tools import TimeCostAverage
-from paddlenlp.data.sampler import SamplerHelper
+from paddlenlp.data import Pad, Tuple
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import TinyBertModel, TinyBertForPretraining, TinyBertTokenizer
+from paddlenlp.transformers import (
+    BertForSequenceClassification,
+    BertTokenizer,
+    LinearDecayWithWarmup,
+    TinyBertForPretraining,
+    TinyBertModel,
+    TinyBertTokenizer,
+)
 from paddlenlp.transformers.distill_utils import to_distill
+from paddlenlp.utils.tools import TimeCostAverage
 
 FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -62,7 +60,6 @@ MODEL_CLASSES = {
 
 def parse_args():
     parser = argparse.ArgumentParser()
-
     # Required parameters
     parser.add_argument(
         "--model_type",
@@ -253,7 +250,6 @@ def do_train(args):
     teacher_model_class, tokenizer_class = MODEL_CLASSES[args.teacher_model_type]
     teacher = teacher_model_class.from_pretrained(args.teacher_model_name_or_path)
     tokenizer = tokenizer_class.from_pretrained(args.teacher_model_name_or_path)
-    pad_token_id = teacher.pretrained_init_configuration[args.teacher_model_name_or_path]["pad_token_id"]
     if paddle.distributed.get_world_size() > 1:
         student = paddle.DataParallel(student, find_unused_parameters=True)
         teacher = paddle.DataParallel(teacher, find_unused_parameters=True)
@@ -278,7 +274,6 @@ def do_train(args):
         grad_clip=clip,
     )
 
-    ce_loss_fct = paddle.nn.CrossEntropyLoss(soft_label=True)
     mse_loss_fct = paddle.nn.MSELoss()
 
     pool = ThreadPoolExecutor(1)
@@ -287,7 +282,6 @@ def do_train(args):
     student = to_distill(student, return_attentions=True, return_layer_outputs=True)
 
     global_step = 0
-    tic_train = time.time()
     for epoch in range(args.num_train_epochs):
         files = [
             os.path.join(args.input_dir, f)
@@ -316,9 +310,6 @@ def do_train(args):
             data_file = files[
                 (f_start_id * paddle.distributed.get_world_size() + paddle.distributed.get_rank()) % num_files
             ]
-
-        previous_file = data_file
-
         train_data_loader, _ = create_pretraining_dataset(data_file, shared_file_list, args, worker_init, tokenizer)
 
         # TODO(guosheng): better way to process single file
@@ -348,7 +339,6 @@ def do_train(args):
                 data_file = files[
                     (f_id * paddle.distributed.get_world_size() + paddle.distributed.get_rank()) % num_files
                 ]
-            previous_file = data_file
             dataset_future = pool.submit(
                 create_pretraining_dataset, data_file, shared_file_list, args, worker_init, tokenizer
             )
@@ -359,7 +349,7 @@ def do_train(args):
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
                 input_ids = batch[0]
-                attention_mask = paddle.unsqueeze((input_ids == pad_token_id).astype("int64") * -1e9, axis=[1, 2])
+
                 student(input_ids)
                 with paddle.no_grad():
                     teacher(input_ids)

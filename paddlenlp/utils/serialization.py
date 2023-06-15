@@ -149,7 +149,9 @@ def _rebuild_tensor_stage(storage, storage_offset, size, stride, requires_grad, 
     else:
         order = "C"
 
-    return storage.reshape(size, order=order)
+    # fix bug when load https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth
+    numel = int(np.prod(size))
+    return storage[storage_offset : storage_offset + numel].reshape(size, order=order)
 
 
 def _rebuild_parameter(data, requires_grad, backward_hooks):

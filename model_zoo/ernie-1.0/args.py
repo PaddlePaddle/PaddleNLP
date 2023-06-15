@@ -65,7 +65,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--sharding_degree", type=int, default=1, help="Sharding degree. Share the parameters to many cards.")
     parser.add_argument("--dp_degree", type=int, default=1, help="Data Parallelism degree.")
     parser.add_argument("--mp_degree", type=int, default=1, help="Model Parallelism degree. Spliting the linear layers to many cards.")
-    parser.add_argument("--pp_degree", type=int, default=1, help="Pipeline Parallelism degree. Spliting the the model layers to different parts.")
+    parser.add_argument("--pp_degree", type=int, default=1, help="Pipeline Parallelism degree. Spliting the model layers to different parts.")
     parser.add_argument("--use_recompute", type=strtobool, nargs='?', const=False, help="Using the recompute to save the memory.")
 
     # AMP config

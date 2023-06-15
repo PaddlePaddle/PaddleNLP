@@ -22,4 +22,4 @@ prompt = "黑暗精灵公主，非常详细，幻想，非常详细，数字绘�
 # prompt = "dark elf princess, highly detailed, d & d, fantasy, highly detailed, digital painting, trending on artstation, concept art, sharp focus, illustration, art by artgerm and greg rutkowski and fuji choko and viktoria gavrilenko and hoang lap"
 
 image = pipe(prompt, num_inference_steps=25).images[0]
-image.save("alt_text_to_image.png")
+image.save("text_to_image_generation-alt_diffusion-result.png")

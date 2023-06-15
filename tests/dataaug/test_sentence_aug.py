@@ -26,18 +26,21 @@ from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokeni
 
 class TestSentAug(unittest.TestCase):
     def setUp(self):
-        self.sequences = ["人类语言是抽象的信息符号，其中蕴含着丰富的语义信息，人类可以很轻松地理解其中的含义。", "而计算机只能处理数值化的信息，无法直接理解人类语言，所以需要将人类语言进行数值化转换。"]
+        self.sequences = ["人类语言是抽象的信息符号。", "而计算机只能处理数值化的信息。"]
+        self.max_length = 3
 
     def test_sent_generate(self):
-        aug = SentenceGenerate(model_name="__internal_testing__/tiny-random-roformer-sim")
+        aug = SentenceGenerate(model_name="__internal_testing__/tiny-random-roformer-sim", max_length=self.max_length)
         augmented = aug.augment(self.sequences)
         self.assertEqual(len(self.sequences), len(augmented))
         self.assertEqual(aug.create_n, len(augmented[0]))
         self.assertEqual(aug.create_n, len(augmented[1]))
 
     def test_sent_summarize(self):
-        model = AutoModelForConditionalGeneration.from_pretrained("__internal_testing__/tiny-random-pegasus")
-        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-pegasus")
+        model = AutoModelForConditionalGeneration.from_pretrained(
+            "__internal_testing__/tiny-random-mbart", max_length=self.max_length
+        )
+        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-mbart")
         model_path = os.path.join(TemporaryDirectory().name, "model")
         model.save_pretrained(model_path)
         tokenizer.save_pretrained(model_path)
@@ -52,6 +55,7 @@ class TestSentAug(unittest.TestCase):
         aug = SentenceBackTranslate(
             from_model_name="__internal_testing__/tiny-random-mbart",
             to_model_name="__internal_testing__/tiny-random-mbart",
+            max_length=self.max_length,
         )
         augmented = aug.augment(self.sequences)
         self.assertEqual(len(self.sequences), len(augmented))
@@ -59,7 +63,7 @@ class TestSentAug(unittest.TestCase):
         self.assertEqual(1, len(augmented[1]))
 
     def test_sent_continue(self):
-        aug = SentenceContinue(model_name="__internal_testing__/tiny-random-gpt")
+        aug = SentenceContinue(model_name="__internal_testing__/tiny-random-gpt", max_length=self.max_length)
         augmented = aug.augment(self.sequences)
         self.assertEqual(len(self.sequences), len(augmented))
         self.assertEqual(aug.create_n, len(augmented[0]))

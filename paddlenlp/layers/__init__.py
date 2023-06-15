@@ -18,6 +18,6 @@ from .globalpointer import (
     GPLinkerForEventExtraction,
     GPLinkerForRelationExtraction,
 )
-from .lora import *
+from .linear import Linear
 from .sequence import sequence_mask
 from .tcn import TCN, TemporalBlock

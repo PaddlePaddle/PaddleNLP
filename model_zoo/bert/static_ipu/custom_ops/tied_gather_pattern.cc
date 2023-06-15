@@ -247,7 +247,7 @@ public:
                 auto serial_name = name + "/" + std::to_string(i);
                 // Slice the Dictionary
                 auto data_slice = slice_op(i * slice_size, (i + 1) * slice_size, serial_name);
-                // Subtract the indicies
+                // Subtract the indices
                 auto indices_sub = subtract_with_constant(indices, i * slice_size, serial_name);
                 // Add the tied gather to the graph
                 auto next_id = replace_with_tied_gather(data_slice, indices_sub, i, serial_name);

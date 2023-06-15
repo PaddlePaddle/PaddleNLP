@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,12 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 from typing import List, Optional, Tuple, Union
 
 import paddle
 
-from ...pipeline_utils import AudioPipelineOutput, DiffusionPipeline
-from ...utils import logging
+from ...utils import logging, randn_tensor
+from ..pipeline_utils import AudioPipelineOutput, DiffusionPipeline
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -26,7 +27,7 @@ logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 class DanceDiffusionPipeline(DiffusionPipeline):
     r"""
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
-    library implements for all the pipelines (such as downloading or saving, running on a particular xxxx, etc.)
+    library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
 
     Parameters:
         unet ([`UNet1DModel`]): U-Net architecture to denoise the encoded image.
@@ -61,12 +62,11 @@ class DanceDiffusionPipeline(DiffusionPipeline):
                 The length of the generated audio sample in seconds. Note that the output of the pipeline, *i.e.*
                 `sample_size`, will be `audio_length_in_s` * `self.unet.sample_rate`.
             return_dict (`bool`, *optional*, defaults to `True`):
-                Whether or not to return a [`~pipeline_utils.AudioPipelineOutput`] instead of a plain tuple.
+                Whether or not to return a [`~pipelines.AudioPipelineOutput`] instead of a plain tuple.
 
         Returns:
-            [`~pipeline_utils.AudioPipelineOutput`] or `tuple`: [`~pipelines.utils.AudioPipelineOutput`] if
-            `return_dict` is True, otherwise a `tuple. When returning a tuple, the first element is a list with the
-            generated images.
+            [`~pipelines.AudioPipelineOutput`] or `tuple`: [`~pipelines.utils.AudioPipelineOutput`] if `return_dict` is
+            True, otherwise a `tuple. When returning a tuple, the first element is a list with the generated images.
         """
 
         if audio_length_in_s is None:
@@ -99,17 +99,12 @@ class DanceDiffusionPipeline(DiffusionPipeline):
                 f" size of {batch_size}. Make sure the batch size matches the length of the generators."
             )
 
-        if isinstance(generator, list):
-            shape = [
-                1,
-            ] + shape[1:]
-            audio = [paddle.randn(shape, generator=generator[i], dtype=self.unet.dtype) for i in range(batch_size)]
-            audio = paddle.concat(audio, axis=0)
-        else:
-            audio = paddle.randn(shape, generator=generator, dtype=dtype)
+        audio = randn_tensor(shape, generator=generator, dtype=dtype)
+
         # set step values
         self.scheduler.set_timesteps(num_inference_steps)
-        self.scheduler.timesteps = self.scheduler.timesteps.cast(dtype)
+        # TODO donot cast dtype here
+        # self.scheduler.timesteps = self.scheduler.timesteps.cast(dtype)
 
         for t in self.progress_bar(self.scheduler.timesteps):
             # 1. predict noise model_output

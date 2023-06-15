@@ -8,7 +8,7 @@ Paddle Serving 可以实现在服务器端部署推理模型，客户端远程�
 | electra-deploy.pdiparams      | 模型权重文件，供推理时加载使用            |
 | electra-deploy.pdmodel        | 模型结构文件，供推理时加载使用            |
 
-如何获得Inference模型？[可参考文档“导出推理模型”一节](../../README.md)，下面假设这2个文件已生成，并放在在当前目录下
+如何获得Inference模型？[可参考文档“导出推理模型”一节](../../README.md)，下面假设这2个文件已生成，并放在当前目录下
 
 ## 在服务器端和客户端启动Serving的docker容器
 建议在docker容器中运行服务器端和客户端以避免一些系统依赖库问题，启动docker镜像的命令参考：[Serving readme](https://github.com/PaddlePaddle/Serving/tree/v0.5.0)

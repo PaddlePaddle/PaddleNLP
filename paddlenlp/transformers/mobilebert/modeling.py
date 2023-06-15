@@ -83,7 +83,9 @@ class MobileBertEmbeddings(nn.Layer):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
-        self.register_buffer("position_ids", paddle.arange(config.max_position_embeddings).expand((1, -1)))
+        self.register_buffer(
+            "position_ids", paddle.arange(config.max_position_embeddings, dtype="int64").expand((1, -1))
+        )
 
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None, inputs_embeds=None):
         if input_ids is not None:
@@ -527,10 +529,6 @@ class MobileBertPretrainedModel(PretrainedModel):
     base_model_prefix = "mobilebert"
     config_class = MobileBertConfig
 
-    def init_weights(self):
-        # Initialize the weights.
-        self.apply(self._init_weights)
-
     def _init_weights(self, layer):
         # Initialize the weights.
         if isinstance(layer, nn.Linear):
@@ -594,7 +592,6 @@ class MobileBertForPreTraining(MobileBertPretrainedModel):
         super(MobileBertForPreTraining, self).__init__(config)
         self.mobilebert = MobileBertModel(config)
         self.cls = MobileBertPreTrainingHeads(config)
-        self.init_weights()
 
     def get_output_embeddings(self):
         return self.cls.predictions.decoder
@@ -767,8 +764,6 @@ class MobileBertModel(MobileBertPretrainedModel):
         self.encoder = MobileBertEncoder(config)
         self.num_hidden_layers = config.num_hidden_layers
         self.pooler = MobileBertPooler(config) if config.add_pooling_layer else None
-
-        self.init_weights()
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -969,8 +964,6 @@ class MobileBertForSequenceClassification(MobileBertPretrainedModel):
         self.dropout = nn.Dropout(classifier_dropout)
         self.classifier = nn.Linear(config.hidden_size, self.num_labels)
 
-        self.init_weights()
-
     def forward(
         self,
         input_ids,
@@ -1040,14 +1033,25 @@ class MobileBertForSequenceClassification(MobileBertPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_labels == 1:
-                loss_fct = nn.MSELoss()
-                loss = loss_fct(logits, labels)
-            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
-                loss_fct = nn.CrossEntropyLoss()
-                loss = loss_fct(logits.reshape([-1, self.num_labels]), labels.reshape([-1]))
-            else:
-                loss_fct = nn.BCEWithLogitsLoss()
+            if self.config.problem_type is None:
+                if self.num_labels == 1:
+                    self.config.problem_type = "regression"
+                elif self.num_labels > 1 and (labels.dtype == paddle.int64 or labels.dtype == paddle.int32):
+                    self.config.problem_type = "single_label_classification"
+                else:
+                    self.config.problem_type = "multi_label_classification"
+
+            if self.config.problem_type == "regression":
+                loss_fct = paddle.nn.MSELoss()
+                if self.num_labels == 1:
+                    loss = loss_fct(logits.squeeze(), labels.squeeze())
+                else:
+                    loss = loss_fct(logits, labels)
+            elif self.config.problem_type == "single_label_classification":
+                loss_fct = paddle.nn.CrossEntropyLoss()
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
+            elif self.config.problem_type == "multi_label_classification":
+                loss_fct = paddle.nn.BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
         if not return_dict:
             output = (logits,) + outputs[2:]
@@ -1076,8 +1080,6 @@ class MobileBertForQuestionAnswering(MobileBertPretrainedModel):
         self.num_labels = 2
         self.mobilebert = MobileBertModel(config)
         self.qa_outputs = nn.Linear(self.config.hidden_size, self.num_labels)
-
-        self.init_weights()
 
     def forward(
         self,

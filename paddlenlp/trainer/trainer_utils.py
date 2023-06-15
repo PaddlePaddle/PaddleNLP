@@ -51,15 +51,37 @@ __all__ = [
     "speed_metrics",
     "get_last_checkpoint",
     "get_scheduler",
+    "set_hyrbid_parallel_seed",
 ]
 
 
-def set_seed(seed: int):
-    import paddle
+def set_seed(seed: int = 1234, args=None):
+    if args is None:
+        random.seed(seed)
+        np.random.seed(seed)
+        paddle.seed(seed)
 
-    random.seed(seed)
-    np.random.seed(seed)
-    paddle.seed(seed)
+    if args is not None:
+        if args.use_hybrid_parallel:
+            from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+
+            random.seed(args.seed + args.dataset_rank)
+            np.random.seed(args.seed + args.dataset_rank)
+            paddle.seed(args.seed + args.dataset_rank)
+
+            # local_seed/ global_seed is used to control dropout in ModelParallel
+            local_seed = args.seed + 59999 + args.tensor_parallel_rank * 10 + args.pipeline_parallel_rank * 1000
+            global_seed = args.seed + 100003 + args.dataset_rank
+            tracker = get_rng_state_tracker()
+
+            if "global_seed" not in tracker.states_:
+                tracker.add("global_seed", global_seed)
+            if "local_seed" not in tracker.states_:
+                tracker.add("local_seed", local_seed)
+        else:
+            random.seed(args.seed)
+            np.random.seed(args.seed)
+            paddle.seed(args.seed)
 
 
 class ExplicitEnum(Enum):
@@ -880,3 +902,22 @@ class RemoveColumnsCollator:
     def __call__(self, features: List[dict]):
         features = [self._remove_columns(feature) for feature in features]
         return self.data_collator(features)
+
+
+def set_hyrbid_parallel_seed(basic_seed, dataset_rank, tp_rank, pp_rank=0):
+    from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+
+    random.seed(basic_seed + dataset_rank)
+    np.random.seed(basic_seed + dataset_rank)
+    paddle.seed(basic_seed + dataset_rank)
+
+    # local_seed/ global_seed is used to control dropout in ModelParallel
+    local_seed = basic_seed + 59999 + tp_rank * 10 + pp_rank * 1000
+    global_seed = basic_seed + 100003 + dataset_rank
+
+    tracker = get_rng_state_tracker()
+
+    if "global_seed" not in tracker.states_:
+        tracker.add("global_seed", global_seed)
+    if "local_seed" not in tracker.states_:
+        tracker.add("local_seed", local_seed)

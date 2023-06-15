@@ -351,6 +351,7 @@ class RobertaModelTest(ModelTesterMixin, unittest.TestCase):
     use_test_inputs_embeds: bool = True
     return_dict: bool = False
     use_labels: bool = False
+    test_tie_weights = True
 
     all_model_classes = (
         RobertaForCausalLM,

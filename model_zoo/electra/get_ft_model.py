@@ -12,17 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # from collections import namedtuple
-import os
-import hashlib
 import argparse
+import hashlib
+import os
 
 import paddle
-import paddle.nn as nn
-
-# from paddlenlp.transformers import ElectraForTotalPretraining, ElectraDiscriminator, ElectraGenerator, ElectraModel
-# from paddlenlp.transformers import ElectraTokenizer
-#
-# MODEL_CLASSES = {"electra": (ElectraForTotalPretraining, ElectraTokenizer), }
 
 
 def get_md5sum(file_path):
@@ -49,7 +43,6 @@ def main(args):
     total_pretraining_model = paddle.load(pretraining_model)
     generator_state_dict = {}
     discriminator_state_dict = {}
-    total_keys = []
     num_keys = 0
     for key in total_pretraining_model.keys():
         new_key = None

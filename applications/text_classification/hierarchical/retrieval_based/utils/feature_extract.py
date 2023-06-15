@@ -27,7 +27,7 @@ from paddlenlp.data import Pad, Tuple
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir", type=str, required=True, help="The directory to static model.")
 parser.add_argument("--corpus_file", type=str, required=True, help="The corpus_file path.")
-parser.add_argument("--output_dir", type=str, required=True, help="The ouput path.")
+parser.add_argument("--output_dir", type=str, required=True, help="The output path.")
 parser.add_argument("--max_seq_length", default=64, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu'], default="gpu", help="Select which device to train model, defaults to gpu.")

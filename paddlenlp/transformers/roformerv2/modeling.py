@@ -246,7 +246,7 @@ class RoFormerv2PretrainedModel(PretrainedModel):
     base_model_prefix = "roformerv2"
     config_class = RoFormerv2Config
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -335,7 +335,6 @@ class RoFormerv2Model(RoFormerv2PretrainedModel):
             max_position_embeddings=config.max_position_embeddings,
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None, output_hidden_states=False):
         r"""
@@ -455,7 +454,6 @@ class RoFormerv2ForQuestionAnswering(RoFormerv2PretrainedModel):
         self.roformerv2 = RoFormerv2Model(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
         r"""
@@ -528,7 +526,6 @@ class RoFormerv2ForSequenceClassification(RoFormerv2PretrainedModel):
         self.roformerv2 = RoFormerv2Model(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
         r"""
@@ -588,7 +585,6 @@ class RoFormerv2ForTokenClassification(RoFormerv2PretrainedModel):
         self.roformerv2 = RoFormerv2Model(config)  # allow roformerv2 to be config
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
         r"""
@@ -647,7 +643,6 @@ class RoFormerv2ForMultipleChoice(RoFormerv2PretrainedModel):
         self.roformerv2 = RoFormerv2Model(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, 1)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
         r"""
@@ -768,8 +763,6 @@ class RoFormerv2ForMaskedLM(RoFormerv2PretrainedModel):
         self.cls = RoFormerv2LMPredictionHead(
             config, embedding_weights=self.roformerv2.embeddings.word_embeddings.weight
         )
-
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
         r"""

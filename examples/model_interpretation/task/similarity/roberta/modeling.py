@@ -180,7 +180,7 @@ class RobertaPretrainedModel(PretrainedModel):
     }
     base_model_prefix = "roberta"
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # only support dygraph, use truncated_normal and make it inplace
@@ -287,7 +287,6 @@ class RobertaModel(RobertaPretrainedModel):
         )
         self.encoder = TransformerEncoder(encoder_layer, num_hidden_layers)
         self.pooler = RobertaPooler(hidden_size)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -414,7 +413,6 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
         super(RobertaForQuestionAnswering, self).__init__()
         self.roberta = roberta  # allow roberta to be config
         self.classifier = nn.Linear(self.roberta.config["hidden_size"], 2)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None):
         r"""
@@ -489,7 +487,6 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
         self.dropout = nn.Dropout(dropout if dropout is not None else self.roberta.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.roberta.config["hidden_size"], num_classes)
         self.softmax = nn.Softmax()
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
@@ -581,7 +578,6 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
         self.roberta = roberta  # allow roberta to be config
         self.dropout = nn.Dropout(dropout if dropout is not None else self.roberta.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.roberta.config["hidden_size"], num_classes)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""

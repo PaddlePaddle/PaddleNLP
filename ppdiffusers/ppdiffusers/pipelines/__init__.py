@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# flake8: noqa
 
 from ..utils import (
     OptionalDependencyNotAvailable,
+    is_einops_available,
     is_fastdeploy_available,
     is_k_diffusion_available,
     is_librosa_available,
@@ -32,13 +32,19 @@ else:
     from .dance_diffusion import DanceDiffusionPipeline
     from .ddim import DDIMPipeline
     from .ddpm import DDPMPipeline
+    from .dit import DiTPipeline
     from .latent_diffusion import LDMSuperResolutionPipeline
     from .latent_diffusion_uncond import LDMPipeline
+    from .pipeline_utils import (
+        AudioPipelineOutput,
+        DiffusionPipeline,
+        ImagePipelineOutput,
+        TextPipelineOutput,
+    )
     from .pndm import PNDMPipeline
     from .repaint import RePaintPipeline
     from .score_sde_ve import ScoreSdeVePipeline
     from .stochastic_karras_ve import KarrasVePipeline
-
 
 try:
     if not (is_paddle_available() and is_librosa_available()):
@@ -54,32 +60,35 @@ try:
 except OptionalDependencyNotAvailable:
     from ..utils.dummy_paddle_and_paddlenlp_objects import *  # noqa F403
 else:
-    from .alt_diffusion import (
-        AltDiffusionImg2ImgPipeline,
-        AltDiffusionPipeline,
-        RobertaSeriesModelWithTransformation,
-    )
-    from .latent_diffusion import (
-        LDMBertModel,
-        LDMSuperResolutionPipeline,
-        LDMTextToImagePipeline,
-    )
+    from .alt_diffusion import AltDiffusionImg2ImgPipeline, AltDiffusionPipeline
+    from .latent_diffusion import LDMTextToImagePipeline
     from .paint_by_example import PaintByExamplePipeline
+    from .semantic_stable_diffusion import SemanticStableDiffusionPipeline
     from .stable_diffusion import (
         CycleDiffusionPipeline,
+        StableDiffusionAdapterPipeline,
+        StableDiffusionAttendAndExcitePipeline,
         StableDiffusionControlNetPipeline,
         StableDiffusionDepth2ImgPipeline,
         StableDiffusionImageVariationPipeline,
         StableDiffusionImg2ImgPipeline,
         StableDiffusionInpaintPipeline,
         StableDiffusionInpaintPipelineLegacy,
+        StableDiffusionInstructPix2PixPipeline,
+        StableDiffusionLatentUpscalePipeline,
         StableDiffusionMegaPipeline,
+        StableDiffusionPanoramaPipeline,
         StableDiffusionPipeline,
         StableDiffusionPipelineAllinOne,
+        StableDiffusionPix2PixZeroPipeline,
+        StableDiffusionSAGPipeline,
         StableDiffusionUpscalePipeline,
+        StableUnCLIPImg2ImgPipeline,
+        StableUnCLIPPipeline,
     )
     from .stable_diffusion_safe import StableDiffusionPipelineSafe
-    from .unclip import UnCLIPPipeline
+    from .text_to_video_synthesis import TextToVideoSDPipeline
+    from .unclip import UnCLIPImageVariationPipeline, UnCLIPPipeline
     from .versatile_diffusion import (
         VersatileDiffusionDualGuidedPipeline,
         VersatileDiffusionImageVariationPipeline,
@@ -87,6 +96,14 @@ else:
         VersatileDiffusionTextToImagePipeline,
     )
     from .vq_diffusion import VQDiffusionPipeline
+
+try:
+    if not is_fastdeploy_available():
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from ..utils.dummy_fastdeploy_objects import *  # noqa F403
+else:
+    from .fastdeploy_utils import FastDeployRuntimeModel
 
 try:
     if not (is_paddle_available() and is_paddlenlp_available() and is_fastdeploy_available()):
@@ -103,6 +120,7 @@ else:
         FastDeployStableDiffusionMegaPipeline,
         FastDeployStableDiffusionPipeline,
     )
+
 try:
     if not (is_paddle_available() and is_paddlenlp_available() and is_k_diffusion_available()):
         raise OptionalDependencyNotAvailable()
@@ -110,3 +128,12 @@ except OptionalDependencyNotAvailable:
     from ..utils.dummy_paddle_and_paddlenlp_and_k_diffusion_objects import *  # noqa F403
 else:
     from .stable_diffusion import StableDiffusionKDiffusionPipeline
+
+
+try:
+    if not (is_paddle_available() and is_paddlenlp_available() and is_einops_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from ..utils.dummy_paddle_and_paddlenlp_and_einops_objects import *  # noqa F403
+else:
+    from .unidiffuser import UniDiffuserPipeline

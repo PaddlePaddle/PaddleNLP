@@ -356,7 +356,7 @@ class Milvus2DocumentStore(SQLDocumentStore):
         filters: Optional[Dict[str, Any]] = None,  # TODO: Adapt type once we allow extended filters in Milvus2DocStore
     ):
         """
-        Updates the embeddings in the the document store using the encoding model specified in the retriever.
+        Updates the embeddings in the document store using the encoding model specified in the retriever.
         This can be useful if want to add or change the embeddings for your documents (e.g. after changing the retriever config).
 
         :param retriever: Retriever to use to get embeddings for text

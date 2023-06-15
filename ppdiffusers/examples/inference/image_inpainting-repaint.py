@@ -26,7 +26,7 @@ scheduler = RePaintScheduler.from_pretrained("google/ddpm-ema-celebahq-256", sub
 pipe = RePaintPipeline.from_pretrained("google/ddpm-ema-celebahq-256", scheduler=scheduler)
 
 output = pipe(
-    original_image=original_image,
+    image=original_image,
     mask_image=mask_image,
     num_inference_steps=250,
     eta=0.0,
@@ -35,4 +35,4 @@ output = pipe(
 )
 inpainted_image = output.images[0]
 
-inpainted_image.save("repaint-image.png")
+inpainted_image.save("image_inpainting-repaint-result.png")

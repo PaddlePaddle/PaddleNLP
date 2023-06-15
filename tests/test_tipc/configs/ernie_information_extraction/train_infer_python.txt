@@ -2,7 +2,7 @@
 model_name:ernie_information_extraction
 python:python
 gpu_list:0|0,1
-null:null
+--device:gpu|gpu
 null:null
 --epoch:lite_train_lite_infer=10|lite_train_whole_infer=10|whole_train_whole_infer=10
 --save_dir:null

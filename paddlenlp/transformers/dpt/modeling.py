@@ -841,8 +841,6 @@ class DPTModel(DPTPretrainedModel):
         self.layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
         self.pooler = DPTViTPooler(config) if add_pooling_layer else None
 
-        self.apply(self._init_weights)
-
     def get_input_embeddings(self):
         if self.config.is_hybrid:
             return self.embeddings
@@ -1029,9 +1027,6 @@ class DPTForDepthEstimation(DPTPretrainedModel):
 
         # Depth estimation head
         self.head = DPTDepthEstimationHead(config)
-
-        # Initialize weights and apply final processing
-        self.apply(self._init_weights)
 
     def forward(
         self,
@@ -1222,9 +1217,6 @@ class DPTForSemanticSegmentation(DPTPretrainedModel):
         # Segmentation head(s)
         self.head = DPTSemanticSegmentationHead(config)
         self.auxiliary_head = DPTAuxiliaryHead(config) if config.use_auxiliary_head else None
-
-        # Initialize weights and apply final processing
-        self.apply(self._init_weights)
 
     def forward(
         self,

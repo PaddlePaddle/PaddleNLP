@@ -12,201 +12,199 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
-import os
-from functools import partial
+import copy
+import json
+from dataclasses import dataclass
+from typing import Dict, List
 
-from paddle.io import BatchSampler, DataLoader
-from utils import load_pickle, save_pickle
+import paddle
 
-from paddlenlp.data import Pad, Tuple
-from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 
-GLUE_PROCESSED = collections.OrderedDict(
-    [
-        ("cola", (["cola sentence: "], ["not_acceptable", "acceptable"])),
-        ("sst-2", (["sst2 sentence: "], ["negative", "positive"])),
-        (
-            "mrpc",
-            (["mrpc sentence1: ", " sentence2: "], ["not_equivalent", "equivalent"]),
-        ),
-        ("sts-b", (["stsb sentence1: ", " sentence2: "], None)),
-        ("qqp", (["qqp question1: ", " question2: "], ["not_duplicate", "duplicate"])),
-        (
-            "mnli",
-            (
-                ["mnli hypothesis: ", " premise: "],
-                ["contradiction", "entailment", "neutral"],
-            ),
-        ),
-        (
-            "qnli",
-            (["qnli question: ", " sentence: "], ["entailment", "not_entailment"]),
-        ),
-        (
-            "rte",
-            (["rte sentence1: ", " rte sentence2: "], ["entailment", "not_entailment"]),
-        ),
-    ]
-)
+IGNORE_INDEX = -100
+
+PROMPT_DICT = {
+    "prompt_input": (
+        "Below is an instruction that describes a task, paired with an input that provides further context. "
+        "Write a response that appropriately completes the request.\n\n"
+        "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:"
+    ),
+    "prompt_no_input": (
+        "Below is an instruction that describes a task. "
+        "Write a response that appropriately completes the request.\n\n"
+        "### Instruction:\n{instruction}\n\n### Response:"
+    ),
+}
 
 
-def trans_func(example, tokenizer, args):
-    task_name = args.task_name
-    processed, label = GLUE_PROCESSED[task_name]
-    if label:
-        id2label = dict(zip(range(len(label)), label))
-    else:
-        id2label = None
+def reader(data_path):
+    with open(data_path, "r", encoding="utf-8") as f:
+        for line in f:
+            json_line = json.loads(line)
+            yield json_line
 
-    if not args.is_test:
-        if id2label:
-            label_text = id2label[example["labels"]]
+
+def convert_example(example, tokenizer, data_args, is_test=False):
+    """
+    Convert an example into necessary features.
+    """
+    # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
+    # in one example possible giving several features when a context is long, each of those features having a
+    # context that overlaps a bit the context of the previous feature.
+    # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
+    # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
+    context = example["context"]
+    question = example["question"]
+    try:
+        answer = example["answers"][0]
+    except:
+        print(example["context"])
+        print(example["question"])
+        print(example["answers"])
+        print(example["answer_starts"])
+        print(example["is_impossible"])
+
+    input_seq = f"answer: {answer} context: {context} </s>"
+    output_seq = f"question: {question} </s>"
+
+    source_tokenized = tokenizer(
+        input_seq,
+        return_tensors="pd",
+        max_length=data_args.src_length,
+        truncation=True,
+    )
+
+    source_input_ids_len = (
+        source_tokenized["input_ids"].not_equal(paddle.to_tensor(tokenizer.pad_token_id)).sum().item()
+    )
+
+    example_tokenized = tokenizer(
+        input_seq + output_seq,
+        return_tensors="pd",
+        max_length=data_args.src_length + data_args.tgt_length,
+        padding=False,
+        truncation=True,
+    )
+
+    input_ids = example_tokenized["input_ids"][0]
+    labels = copy.deepcopy(input_ids)
+    labels[:source_input_ids_len] = IGNORE_INDEX
+
+    if is_test:
+        return dict(
+            input_ids=source_tokenized["input_ids"][0],
+            labels=labels,
+        )
+
+    return dict(
+        input_ids=input_ids,
+        labels=labels,
+    )
+
+
+def custom_instruction_convert_example(
+    example, tokenizer, data_args, is_test=False, benchmark=False, model_max_length=512
+):
+    """
+    Convert an example into necessary features.
+    """
+
+    if benchmark:
+        prompt_input, prompt_no_input = PROMPT_DICT["prompt_input"], PROMPT_DICT["prompt_no_input"]
+
+        if example.get("input", "") != "":
+            input_seq = prompt_input.format_map(example)
         else:
-            label_text = str(example["labels"])
-        target = tokenizer(label_text, return_token_type_ids=False, return_attention_mask=True)
+            input_seq = prompt_no_input.format_map(example)
 
-    if len(processed) == 1:
-        text = processed[0] + example["sentence"]
+        output_seq = example["output"]
     else:
-        text = processed[0] + example["sentence1"] + processed[1] + example["sentence2"]
+        instruction = ""
+        input = ""
+        output = ""
+        if "instruction" in example and "output" in example:
+            instruction = example["instruction"]
+            output = example["output"]
+        else:
+            assert False, "instruction and output are not in the input dictionary."
+        if "input" in example["input"]:
+            input = example["input"]
 
-    source = tokenizer(
-        text,
-        max_seq_len=args.max_seq_length,
-        return_token_type_ids=False,
-        return_attention_mask=True,
+        input_seq = instruction + input
+        output_seq = output
+
+    # To compatible with compile training mode in benchmark, input will be pad to fix length
+    source_tokenized = tokenizer(
+        input_seq,
+        return_tensors="pd",
+        padding="loggest" if not benchmark else "max_length",
+        max_length=data_args.src_length if not benchmark else model_max_length,
+        truncation=True,
     )
 
-    if not args.is_test:
-        return (
-            source["input_ids"],
-            source["attention_mask"],
-            target["input_ids"],
-            target["attention_mask"],
-        )
-    else:
-        return source["input_ids"], source["attention_mask"]
-
-
-def get_train_dataloader(tokenizer, args):
-    filename = os.path.join("caches", args.task_name + "_train" + ".pkl")
-
-    if os.path.exists(filename):
-        ds = load_pickle(filename)
-    else:
-        ds = load_dataset("glue", args.task_name, splits="train")
-        ds.map(
-            partial(trans_func, tokenizer=tokenizer, args=args),
-            batched=False,
-            lazy=False,
-        )
-        save_pickle(ds, filename)
-
-    batch_sampler = BatchSampler(ds, batch_size=args.train_batch_size, shuffle=True)
-
-    # batchify_fn = lambda samples, fn=Tuple(
-    #     Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-    #     Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
-    #     Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-    #     Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
-    # ): fn(samples)
-    def batchify_fn(
-        samples,
-        fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
-            Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
-        ),
-    ):
-        return fn(samples)
-
-    data_loader = DataLoader(
-        dataset=ds,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=args.num_workers,
-        return_list=True,
+    source_input_ids_len = (
+        source_tokenized["input_ids"].not_equal(paddle.to_tensor(tokenizer.pad_token_id)).sum().item()
     )
 
-    return data_loader
+    total_length = data_args.src_length + data_args.tgt_length
 
-
-def get_dev_dataloader(tokenizer, args):
-    filename = os.path.join("caches", args.task_name + "_dev" + ".pkl")
-
-    if os.path.exists(filename):
-        ds = load_pickle(filename)
-    else:
-        ds = load_dataset("glue", args.task_name, splits="dev")
-        ds.map(
-            partial(trans_func, tokenizer=tokenizer, args=args),
-            batched=False,
-            lazy=False,
-        )
-        save_pickle(ds, filename)
-
-    batch_sampler = BatchSampler(ds, batch_size=args.train_batch_size, shuffle=False)
-
-    def batchify_fn(
-        samples,
-        fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
-            Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
-        ),
-    ):
-        return fn(samples)
-
-    data_loader = DataLoader(
-        dataset=ds,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=args.num_workers,
-        return_list=True,
+    example_tokenized = tokenizer(
+        input_seq + output_seq,
+        return_tensors="pd",
+        padding="loggest" if not benchmark else "max_length",
+        max_length=total_length if not benchmark else model_max_length,
+        truncation=True,
     )
 
-    return data_loader
+    input_ids = example_tokenized["input_ids"][0]
+    labels = copy.deepcopy(input_ids)
+    labels[:source_input_ids_len] = IGNORE_INDEX
 
-
-def get_mnli_dev_dataloader(tokenizer, args, matched=True):
-    if matched:
-        split = "dev_matched"
-    else:
-        split = "dev_mismatched"
-    filename = os.path.join("caches", args.task_name + f"_{split}" + ".pkl")
-    if os.path.exists(filename):
-        ds = load_pickle(filename)
-    else:
-        ds = load_dataset("glue", args.task_name, splits=split)
-        ds.map(
-            partial(trans_func, tokenizer=tokenizer, args=args),
-            batched=False,
-            lazy=False,
+    if is_test:
+        return dict(
+            input_ids=source_tokenized["input_ids"][0],
+            labels=labels,
         )
-        save_pickle(ds, filename)
 
-    batch_sampler = BatchSampler(ds, batch_size=args.train_batch_size, shuffle=False)
-
-    def batchify_fn(
-        samples,
-        fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
-            Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
-        ),
-    ):
-        return fn(samples)
-
-    data_loader = DataLoader(
-        dataset=ds,
-        batch_sampler=batch_sampler,
-        collate_fn=batchify_fn,
-        num_workers=args.num_workers,
-        return_list=True,
+    return dict(
+        input_ids=input_ids,
+        labels=labels,
     )
 
-    return data_loader
+
+def left_padding(inputs, pad_id, max_length=-1):
+    for ids in inputs:
+        max_length = max(max_length, len(ids))
+
+    def extend_max_lenth(value, max_length, to_pad_id):
+        return [to_pad_id] * (max_length - len(value)) + value
+
+    def extend_filed(values, max_length, to_pad_id):
+        res = []
+        for value in values:
+            res.append(extend_max_lenth(value.tolist(), max_length, to_pad_id))
+        return res
+
+    res = extend_filed(inputs, max_length, pad_id)
+    return paddle.to_tensor(res)
+
+
+@dataclass
+class DataCollatorForSupervisedDataset(object):
+    """Collate examples for supervised fine-tuning."""
+
+    tokenizer: PretrainedTokenizerBase
+    max_length: -1
+
+    def __call__(self, features: List[Dict]) -> Dict[str, paddle.Tensor]:
+
+        input_ids, labels = tuple([feature[key] for feature in features] for key in ("input_ids", "labels"))
+        input_ids = left_padding(input_ids, pad_id=self.tokenizer.pad_token_id, max_length=self.max_length)
+        labels = left_padding(labels, pad_id=IGNORE_INDEX, max_length=self.max_length)
+        attention_mask = paddle.cast(input_ids.not_equal(paddle.to_tensor(self.tokenizer.pad_token_id)), "int")
+
+        return dict(
+            input_ids=input_ids,
+            labels=labels,
+            attention_mask=attention_mask,
+        )

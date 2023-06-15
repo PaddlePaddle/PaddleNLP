@@ -22,8 +22,8 @@ from utils import GLMTrainer
 
 from paddlenlp.data import DefaultDataCollator
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import LoRAConfig, get_lora_model, mark_only_lora_as_trainable
-from paddlenlp.metrics import Rouge1, Rouge2, RougeL
+from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
+from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
 from paddlenlp.utils.log import logger
@@ -64,6 +64,7 @@ class ModelArgument:
 def main():
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
     setattr(training_args, "label_smoothing", model_args.label_smoothing)
@@ -92,12 +93,12 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    # dtype = None
-    # if training_args.fp16_opt_level == "O2":
-    #     if training_args.fp16:
-    #         dtype = "float16"
-    #     if training_args.bf16:
-    #         dtype = "bfloat16"
+    dtype = None
+    if training_args.fp16_opt_level == "O2":
+        if training_args.fp16:
+            dtype = "float16"
+        if training_args.bf16:
+            dtype = "bfloat16"
 
     # Load the pretrained language model.
     model = AutoModelForConditionalGeneration.from_pretrained(
@@ -105,8 +106,7 @@ def main():
         output_predict=True,
         parallel_output=True,
         load_state_as_np=True,
-        # low_cpu_mem_usage=True, # todo enable low_cpu_mem_usage=True
-        # dtype=dtype,  # todo enable set dtype to avoid additional mem usage
+        dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
     )
@@ -117,28 +117,15 @@ def main():
             r=4,
             lora_alpha=8,
             merge_weights=True,
+            enable_lora_list=[[True, False, True]],
+            tensor_parallel_degree=training_args.tensor_parallel_degree,
+            dtype=dtype,
         )
-        model = get_lora_model(model, lora_config)
-        mark_only_lora_as_trainable(model)
+        model = LoRAModel(model, lora_config)
+        model.mark_only_lora_as_trainable()
+        model.print_trainable_parameters()
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    # model.generate = partial(
-    #    generate,
-    #    self=model,
-    #    out_seq_length=data_args.src_length + data_args.tgt_length,
-    #    tgt_length=data_args.tgt_length,
-    #    min_tgt_length=data_args.min_tgt_length,
-    #    num_beams=data_args.num_beams,
-    #    length_penalty=data_args.length_penalty,
-    #    no_repeat_ngram_size=data_args.no_repeat_ngram_size,
-    #    end_token_id=tokenizer.eop_token_id,
-    #    pad_token_id=tokenizer.pad_token_id,
-    #    mask_token_id=tokenizer.gmask_token_id,
-    #    no_block_position=data_args.no_block_position,
-    #    select_topk=data_args.select_topk,
-    #    top_k=data_args.top_k,
-    #    top_p=data_args.top_p,
-    # )
 
     # Load the dataset.
     train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train", "dev"])
@@ -152,6 +139,7 @@ def main():
         rouge1 = Rouge1()
         rouge2 = Rouge2()
         rougel = RougeL()
+        bleu4 = BLEU(n_size=4)
         predictions = [x[x != -100] for x in eval_preds.predictions]
         references = [x[x != -100] for x in eval_preds.label_ids]
 
@@ -161,10 +149,12 @@ def main():
         rouge2_score = rouge2.score(predictions, references)
         for pred, ref in zip(predictions, references):
             rougel.add_inst(pred, [ref])
+            bleu4.add_inst(pred, [ref])
         return {
             "rouge1": rouge1_score,
             "rouge2": rouge2_score,
             "rougel": rougel.score(),
+            "bleu4": bleu4.score(),
         }
 
     trainer = GLMTrainer(
@@ -177,10 +167,12 @@ def main():
         do_generation=True,
         data_collator=collate_fn,
     )
+    if training_args.fp16_opt_level == "O2":
+        trainer.disable_autocast_context_manager()
 
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
-        trainer.save_model()
+        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
         trainer.log_metrics("train", train_result.metrics)
         trainer.save_metrics("train", train_result.metrics)
         trainer.save_state()

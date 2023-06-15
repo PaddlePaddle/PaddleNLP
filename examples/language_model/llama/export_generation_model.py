@@ -16,17 +16,16 @@ import argparse
 import os
 
 import paddle
-from configuration import LlamaConfig
-from model_split_merge import merge_model_parallel
-from modeling import LlamaForCausalLM
-from tokenizer import LlamaTokenizer
+
+from paddlenlp.peft import LoRAConfig, LoRAModel
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaConfig
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model_path",
-        default="output/200/splits_mp_02_sharding_01/",
+        default="checkpoints",
         type=str,
         required=False,
         help="Path of the trained model to be exported.",
@@ -37,6 +36,9 @@ def parse_args():
         type=str,
         help="The output file prefix used to save the exported inference model.",
     )
+    parser.add_argument("--dtype", default=None, help="The data type of exported model")
+    parser.add_argument("--tgt_length", type=int, default=100, help="The batch size of data.")
+    parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     args = parser.parse_args()
     return args
 
@@ -45,44 +47,75 @@ def main():
     args = parse_args()
 
     paddle.seed(100)
-    paddle.set_default_dtype("float16")
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+    if args.lora_path is not None:
+        lora_config = LoRAConfig.from_pretrained(args.lora_path)
+        dtype = lora_config.dtype
+    elif args.dtype is not None:
+        dtype = args.dtype
+    else:
+        config = LlamaConfig.from_pretrained(args.model_name_or_path)
+        dtype = "float16" if config.dtype is None else config.dtype
 
-    tokenizer = LlamaTokenizer.from_pretrained(args.model_path)
-    config = LlamaConfig.from_pretrained(args.model_path)
-
-    # Set the generaiton the hyperparameter
-    config.max_length = 100
-    config.min_length = 0
-    config.decode_strategy = "sampling"
-    config.temperature = 1.0
-    config.top_k = 1
-    config.top_p = 1.0
-    config.repetition_penalty = 1.0
-    config.use_cache = True
-    config.use_recompute = False
-
-    # Merge the model splits to a total model
-    merge_model_path = merge_model_parallel(args.model_path, config)
-    # merge_model_path = args.model_path
-
-    # Load the model and parameter
-    config.mp_degree = 1
-    model = LlamaForCausalLM.from_pretrained(merge_model_path, config=config, load_state_as_np=True)
-
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_path,
+        load_state_as_np=True,
+        low_cpu_mem_usage=True,
+        use_recompute=False,
+        use_cache=True,
+        dtype=dtype,
+    )
+    model.config.fp16_opt_level = None  # For dygraph to static only
+    if args.lora_path is not None:
+        model = LoRAModel.from_pretrained(model, args.lora_path)
     model.eval()
     model = paddle.jit.to_static(
         model.generate,
         input_spec=[
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
-            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # position_ids
-            config.max_length,
-            config.min_length,
-            config.decode_strategy,
-            config.temperature,
-            config.top_k,
-            config.top_p,
-            config.repetition_penalty,
+            None,  # position_ids
+            args.tgt_length,  # max length
+            # min_length
+            0,
+            # decode_strategy
+            "sampling",
+            # temperature
+            1.0,
+            # top_k
+            1,
+            # top_p
+            1.0,
+            # repetition_penalty
+            1,
+            # num_beams
+            1,
+            # num_beam_groups
+            1,
+            # length_penalty
+            0.0,
+            # early_stopping
+            False,
+            # bos_token_id
+            tokenizer.bos_token_id,
+            # eos_token_id
+            tokenizer.eos_token_id,
+            # pad_token_id
+            tokenizer.pad_token_id,
+            # decoder_start_token_id
+            None,
+            # forced_bos_token_id
+            None,
+            # forced_eos_token_id
+            None,
+            # no_repeat_ngram_size
+            None,
+            # num_return_sequences
+            1,
+            # diversity_rate
+            0.0,
+            # use_cache
+            True,
         ],
     )
 

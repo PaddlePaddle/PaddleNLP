@@ -1,4 +1,5 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 # Copyright 2022 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,12 +24,8 @@ def register_attention_control(model, controller):
     def ca_forward(self, place_in_unet):
         def forward(hidden_states, encoder_hidden_states=None, attention_mask=None, **cross_attention_kwargs):
             batch_size, sequence_length, _ = hidden_states.shape
-            attention_mask = self.prepare_attention_mask(attention_mask, sequence_length)
-            attention_mask = (
-                attention_mask.reshape([batch_size, self.num_heads, -1, attention_mask.shape[-1]])
-                if attention_mask is not None
-                else None
-            )
+            attention_mask = self.prepare_attention_mask(attention_mask, sequence_length, batch_size)
+
             query = self.to_q(hidden_states)
             query = self.head_to_batch_dim(query)
 

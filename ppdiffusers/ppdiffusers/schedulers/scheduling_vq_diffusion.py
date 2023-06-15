@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 Microsoft and The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,7 +21,7 @@ import paddle
 import paddle.nn.functional as F
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import BaseOutput
+from ..utils import BaseOutput, rand_tensor
 from .scheduling_utils import SchedulerMixin
 
 
@@ -73,7 +73,7 @@ def gumbel_noised(logits: paddle.Tensor, generator: Optional[paddle.Generator]) 
     """
     Apply gumbel noise to `logits`
     """
-    uniform = paddle.rand(logits.shape, generator=generator)
+    uniform = rand_tensor(logits.shape, generator=generator)
     gumbel_noise = -paddle.log(-paddle.log(uniform + 1e-30) + 1e-30)
     noised = gumbel_noise + logits
     return noised
@@ -474,7 +474,8 @@ class VQDiffusionScheduler(SchedulerMixin, ConfigMixin):
         # The whole column of each masked pixel is `c`
         mask_class_mask = x_t == self.mask_class
         mask_class_mask = mask_class_mask.unsqueeze(1).expand([-1, self.num_embed - 1, -1])
-        log_Q_t[mask_class_mask] = c
+        # log_Q_t[mask_class_mask] = c
+        log_Q_t = paddle.where(mask_class_mask, c, log_Q_t)
 
         if not cumulative:
             log_Q_t = paddle.concat((log_Q_t, log_onehot_x_t_transitioning_from_masked), axis=1)

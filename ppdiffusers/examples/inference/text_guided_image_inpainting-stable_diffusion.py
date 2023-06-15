@@ -29,4 +29,4 @@ prompt = "a cat sitting on a bench"
 with paddle.amp.auto_cast(True):
     image = pipe(prompt=prompt, image=init_image, mask_image=mask_image, strength=0.75).images[0]
 
-image.save("cat_on_bench.png")
+image.save("text_guided_image_inpainting-stable_diffusion-result.png")

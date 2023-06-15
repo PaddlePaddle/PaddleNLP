@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2022 The HuggingFace Inc. team.
 # Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,31 +20,21 @@ import inspect
 import json
 import os
 import re
-import tempfile
 from collections import OrderedDict
-from typing import Any, Dict, Optional, Tuple, Union
+from pathlib import PosixPath
+from typing import Any, Dict, Tuple, Union
 
 import numpy as np
-from huggingface_hub import (
-    create_repo,
-    get_hf_file_metadata,
-    hf_hub_download,
-    hf_hub_url,
-    repo_type_and_id_from_hf_id,
-    upload_folder,
-)
-from huggingface_hub.utils import EntryNotFoundError
-from requests import HTTPError
 
-from .download_utils import ppdiffusers_bos_download
 from .utils import (
-    DOWNLOAD_SERVER,
-    HF_CACHE,
+    DIFFUSERS_CACHE,
     PPDIFFUSERS_CACHE,
     DummyObject,
+    bos_hf_download,
     deprecate,
     logging,
 )
+from .utils.constants import FROM_HF_HUB
 from .version import VERSION as __version__
 
 logger = logging.get_logger(__name__)
@@ -104,12 +94,12 @@ class ConfigMixin:
     config_name = None
     ignore_for_config = []
     has_compatibles = False
+
     _deprecated_kwargs = []
 
     def register_to_config(self, **kwargs):
         if self.config_name is None:
             raise NotImplementedError(f"Make sure that {self.__class__} has defined a class name `config_name`")
-
         # Special case for `kwargs` used in deprecation warning added to schedulers
         # TODO: remove this when we remove the deprecation warning, and the `kwargs` argument,
         # or solve in a more general way.
@@ -150,68 +140,6 @@ class ConfigMixin:
         self.to_json_file(output_config_file)
         logger.info(f"Configuration saved in {output_config_file}")
 
-    def save_to_hf_hub(
-        self,
-        repo_id: str,
-        private: Optional[bool] = None,
-        subfolder: Optional[str] = None,
-        commit_message: Optional[str] = None,
-        revision: Optional[str] = None,
-        create_pr: bool = False,
-    ):
-        """
-        Uploads all elements of this config to a new HuggingFace Hub repository.
-        Args:
-            repo_id (str): Repository name for your model/tokenizer in the Hub.
-            private (bool, optional): Whether the model/tokenizer is set to private
-            subfolder (str, optional): Push to a subfolder of the repo instead of the root
-            commit_message (str, optional): The summary / title / first line of the generated commit. Defaults to: f"Upload {path_in_repo} with huggingface_hub"
-            revision (str, optional): The git revision to commit from. Defaults to the head of the "main" branch.
-            create_pr (boolean, optional): Whether or not to create a Pull Request with that commit. Defaults to False.
-                If revision is not set, PR is opened against the "main" branch. If revision is set and is a branch, PR is opened against this branch.
-                If revision is set and is not a branch name (example: a commit oid), an RevisionNotFoundError is returned by the server.
-
-        Returns: The url of the commit of your model in the given repository.
-        """
-        repo_url = create_repo(repo_id, private=private, exist_ok=True)
-
-        # Infer complete repo_id from repo_url
-        # Can be different from the input `repo_id` if repo_owner was implicit
-        _, repo_owner, repo_name = repo_type_and_id_from_hf_id(repo_url)
-
-        repo_id = f"{repo_owner}/{repo_name}"
-
-        # Check if README file already exist in repo
-        try:
-            get_hf_file_metadata(hf_hub_url(repo_id=repo_id, filename="README.md", revision=revision))
-            has_readme = True
-        except EntryNotFoundError:
-            has_readme = False
-
-        with tempfile.TemporaryDirectory() as root_dir:
-            if subfolder is not None:
-                save_dir = os.path.join(root_dir, subfolder)
-            else:
-                save_dir = root_dir
-            # save config
-            self.save_config(save_dir)
-            # Add readme if does not exist
-            logger.info("README.md not found, adding the default README.md")
-            if not has_readme:
-                with open(os.path.join(root_dir, "README.md"), "w") as f:
-                    f.write(f"---\nlibrary_name: ppdiffusers\n---\n# {repo_id}")
-
-            # Upload model and return
-            logger.info(f"Pushing to the {repo_id}. This might take a while")
-            return upload_folder(
-                repo_id=repo_id,
-                repo_type="model",
-                folder_path=root_dir,
-                commit_message=commit_message,
-                revision=revision,
-                create_pr=create_pr,
-            )
-
     @classmethod
     def from_config(cls, config: Union[FrozenDict, Dict[str, Any]] = None, return_unused_kwargs=False, **kwargs):
         r"""
@@ -234,7 +162,7 @@ class ConfigMixin:
         ```python
         >>> from ppdiffusers import DDPMScheduler, DDIMScheduler, PNDMScheduler
 
-        >>> # Download scheduler from BOS and cache.
+        >>> # Download scheduler from huggingface.co and cache.
         >>> scheduler = DDPMScheduler.from_pretrained("google/ddpm-cifar10-32")
 
         >>> # Instantiate DDIM scheduler class with same config as DDPM
@@ -274,9 +202,7 @@ class ConfigMixin:
 
         # Allow dtype to be specified on initialization
         if "dtype" in unused_kwargs:
-            # (TODO junnyu, donot use dtype)
-            unused_kwargs.pop("dtype")
-            # init_dict["dtype"] = unused_kwargs.pop("dtype")
+            init_dict["dtype"] = unused_kwargs.pop("dtype")
 
         # add possible deprecated kwargs
         for deprecated_kwarg in cls._deprecated_kwargs:
@@ -325,20 +251,59 @@ class ConfigMixin:
             cache_dir (`Union[str, os.PathLike]`, *optional*):
                 Path to a directory in which a downloaded pretrained model configuration should be cached if the
                 standard cache should not be used.
+            force_download (`bool`, *optional*, defaults to `False`):
+                Whether or not to force the (re-)download of the model weights and configuration files, overriding the
+                cached versions if they exist.
+            resume_download (`bool`, *optional*, defaults to `False`):
+                Whether or not to delete incompletely received files. Will attempt to resume the download if such a
+                file exists.
+            proxies (`Dict[str, str]`, *optional*):
+                A dictionary of proxy servers to use by protocol or endpoint, e.g., `{'http': 'foo.bar:3128',
+                'http://hostname': 'foo.bar:4012'}`. The proxies are used on each request.
             output_loading_info(`bool`, *optional*, defaults to `False`):
                 Whether or not to also return a dictionary containing missing keys, unexpected keys and error messages.
+            local_files_only(`bool`, *optional*, defaults to `False`):
+                Whether or not to only look at local files (i.e., do not try to download the model).
+            use_auth_token (`str` or *bool*, *optional*):
+                The token to use as HTTP bearer authorization for remote files. If `True`, will use the token generated
+                when running `transformers-cli login` (stored in `~/.huggingface`).
+            revision (`str`, *optional*, defaults to `"main"`):
+                The specific model version to use. It can be a branch name, a tag name, or a commit id, since we use a
+                git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any
+                identifier allowed by git.
             subfolder (`str`, *optional*, defaults to `""`):
                 In case the relevant files are located inside a subfolder of the model repo (either remote in
                 huggingface.co or downloaded locally), you can specify the folder name here.
             from_hf_hub (bool, *optional*):
                 Whether to load from Hugging Face Hub. Defaults to False
+        <Tip>
+
+         It is required to be logged in (`huggingface-cli login`) when you want to use private or [gated
+         models](https://huggingface.co/docs/hub/models-gated#gated-models).
+
+        </Tip>
+
+        <Tip>
+
+        Activate the special ["offline-mode"](https://huggingface.co/transformers/installation.html#offline-mode) to
+        use this method in a firewalled environment.
+
+        </Tip>
         """
-        from_hf_hub = kwargs.pop("from_hf_hub", False)
-        if from_hf_hub:
-            cache_dir = kwargs.pop("cache_dir", HF_CACHE)
-        else:
-            cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
+        from_hf_hub = kwargs.pop("from_hf_hub", FROM_HF_HUB)
+        cache_dir = (
+            kwargs.pop("cache_dir", DIFFUSERS_CACHE) if from_hf_hub else kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
+        )
+        force_download = kwargs.pop("force_download", False)
+        resume_download = kwargs.pop("resume_download", False)
+        proxies = kwargs.pop("proxies", None)
+        use_auth_token = kwargs.pop("use_auth_token", None)
+        local_files_only = kwargs.pop("local_files_only", False)
+        revision = kwargs.pop("revision", None)
+        _ = kwargs.pop("mirror", None)
         subfolder = kwargs.pop("subfolder", None)
+
+        user_agent = {"file_type": "config"}
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
 
@@ -352,7 +317,7 @@ class ConfigMixin:
             config_file = pretrained_model_name_or_path
         elif os.path.isdir(pretrained_model_name_or_path):
             if os.path.isfile(os.path.join(pretrained_model_name_or_path, cls.config_name)):
-                # Load from a Paddle checkpoint
+                # Load from a PyTorch checkpoint
                 config_file = os.path.join(pretrained_model_name_or_path, cls.config_name)
             elif subfolder is not None and os.path.isfile(
                 os.path.join(pretrained_model_name_or_path, subfolder, cls.config_name)
@@ -362,43 +327,21 @@ class ConfigMixin:
                 raise EnvironmentError(
                     f"Error no file named {cls.config_name} found in directory {pretrained_model_name_or_path}."
                 )
-        elif from_hf_hub:
-            config_file = hf_hub_download(
-                repo_id=pretrained_model_name_or_path,
+        else:
+            config_file = bos_hf_download(
+                pretrained_model_name_or_path,
                 filename=cls.config_name,
                 cache_dir=cache_dir,
+                force_download=force_download,
+                proxies=proxies,
+                resume_download=resume_download,
+                local_files_only=local_files_only,
+                use_auth_token=use_auth_token,
+                user_agent=user_agent,
                 subfolder=subfolder,
-                library_name="PPDiffusers",
-                library_version=__version__,
+                revision=revision,
+                from_hf_hub=from_hf_hub,
             )
-        else:
-            try:
-                config_file = ppdiffusers_bos_download(
-                    pretrained_model_name_or_path,
-                    filename=cls.config_name,
-                    subfolder=subfolder,
-                    cache_dir=cache_dir,
-                )
-            except HTTPError as err:
-                raise EnvironmentError(
-                    "There was a specific connection error when trying to load"
-                    f" {pretrained_model_name_or_path}:\n{err}"
-                )
-            except ValueError:
-                raise EnvironmentError(
-                    f"We couldn't connect to '{DOWNLOAD_SERVER}' to load this model, couldn't find it"
-                    f" in the cached files and it looks like {pretrained_model_name_or_path} is not the path to a"
-                    f" directory containing a {cls.config_name} file.\nCheckout your internet connection or see how to"
-                    " run the library in offline mode at"
-                    " 'https://huggingface.co/docs/diffusers/installation#offline-mode'."
-                )
-            except EnvironmentError:
-                raise EnvironmentError(
-                    f"Can't load config for '{pretrained_model_name_or_path}'. If you were trying to load it from "
-                    "'https://huggingface.co/models', make sure you don't have a local directory with the same name. "
-                    f"Otherwise, make sure '{pretrained_model_name_or_path}' is the correct path to a directory "
-                    f"containing a {cls.config_name} file"
-                )
 
         try:
             # Load config dict
@@ -432,7 +375,7 @@ class ConfigMixin:
         if len(cls.ignore_for_config) > 0:
             expected_keys = expected_keys - set(cls.ignore_for_config)
 
-        # load ppdiffusers library to import compatible and original scheduler
+        # load diffusers library to import compatible and original scheduler
         ppdiffusers_library = importlib.import_module(__name__.split(".")[0])
 
         if cls.has_compatibles:
@@ -499,7 +442,17 @@ class ConfigMixin:
     def _dict_from_json_file(cls, json_file: Union[str, os.PathLike]):
         with open(json_file, "r", encoding="utf-8") as reader:
             text = reader.read()
-        return json.loads(text)
+        data = json.loads(text)
+        # TODO junnyu, support diffusers and ppdiffusers
+        if "_ppdiffusers_version" in data and "_diffusers_version" not in data:
+            data["_diffusers_version"] = data["_ppdiffusers_version"]
+        if "_diffusers_version" in data and "_ppdiffusers_version" not in data:
+            data["_ppdiffusers_version"] = data["_diffusers_version"]
+        if "_diffusers_version" not in data and "_ppdiffusers_version" not in data:
+            data["_diffusers_version"] = __version__
+            data["_ppdiffusers_version"] = __version__
+
+        return data
 
     def __repr__(self):
         return f"{self.__class__.__name__} {self.to_json_string()}"
@@ -523,11 +476,15 @@ class ConfigMixin:
         """
         config_dict = self._internal_dict if hasattr(self, "_internal_dict") else {}
         config_dict["_class_name"] = self.__class__.__name__
+        # TODO junnyu, support diffusers and ppdiffusers
+        config_dict["_diffusers_version"] = __version__
         config_dict["_ppdiffusers_version"] = __version__
 
         def to_json_saveable(value):
             if isinstance(value, np.ndarray):
                 value = value.tolist()
+            elif isinstance(value, PosixPath):
+                value = str(value)
             return value
 
         config_dict = {k: to_json_saveable(v) for k, v in config_dict.items()}
@@ -559,7 +516,6 @@ def register_to_config(init):
         # Ignore private kwargs in the init.
         init_kwargs = {k: v for k, v in kwargs.items() if not k.startswith("_")}
         config_init_kwargs = {k: v for k, v in kwargs.items() if k.startswith("_")}
-
         if not isinstance(self, ConfigMixin):
             raise RuntimeError(
                 f"`@register_for_config` was applied to {self.__class__.__name__} init method, but this class does "

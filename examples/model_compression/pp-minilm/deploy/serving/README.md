@@ -9,7 +9,7 @@ Paddle Serving 可以实现在服务器端部署推理模型，客户端远程�
 | ppminilm.pdiparams      | 模型权重文件，供推理时加载使用            |
 | ppminilm.pdmodel        | 模型结构文件，供推理时加载使用            |
 
-假设这 2 个文件已生成，并放在在目录 `$MODEL_DIR` 下。
+假设这 2 个文件已生成，并放在目录 `$MODEL_DIR` 下。
 
 ## 环境要求
 

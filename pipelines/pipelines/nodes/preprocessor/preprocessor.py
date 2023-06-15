@@ -98,9 +98,15 @@ class PreProcessor(BasePreProcessor):
         )
 
         try:
-            nltk.data.find("tokenizers/punkt")
+            if nltk:
+                nltk.data.find("tokenizers/punkt")
         except LookupError:
-            nltk.download("punkt")
+            try:
+                if nltk:
+                    nltk.download("punkt")
+            except FileExistsError as error:
+                logger.debug("NLTK punkt tokenizer seems to be already downloaded. Error message: %s", error)
+                pass
 
         self.clean_whitespace = clean_whitespace
         self.clean_header_footer = clean_header_footer
@@ -109,7 +115,7 @@ class PreProcessor(BasePreProcessor):
         self.split_length = split_length
         self.split_overlap = split_overlap
         self.split_respect_sentence_boundary = split_respect_sentence_boundary
-        self.language = iso639_to_nltk.get(language, language)
+        self.language = language
         self.print_log: Set[str] = set()
         self.split_answers = split_answers
 
@@ -260,12 +266,20 @@ class PreProcessor(BasePreProcessor):
 
         if split_respect_sentence_boundary and split_by == "word":
             # split by words ensuring no sub sentence splits
-            sentences = nltk.tokenize.sent_tokenize(text, language=self.language)
+            if self.language == "chinese":
+                sentences = text
+            else:
+                language_name = iso639_to_nltk.get(self.language)
+                sentences = nltk.tokenize.sent_tokenize(text, language=language_name)
+
             word_count = 0
             list_splits = []
             current_slice: List[str] = []
             for sen in sentences:
-                current_word_count = len(sen.split(" "))
+                if self.language == "chinese":
+                    current_word_count = len(sen)
+                else:
+                    current_word_count = len(sen.split(" "))
                 if current_word_count > split_length:
                     long_sentence_message = "One or more sentence found with word count higher than the split length."
                     if long_sentence_message not in self.print_log:
@@ -278,7 +292,10 @@ class PreProcessor(BasePreProcessor):
                         overlap = []
                         w_count = 0
                         for s in current_slice[::-1]:
-                            sen_len = len(s.split(" "))
+                            if self.language == "chinese":
+                                sen_len = len(s)
+                            else:
+                                sen_len = len(s.split(" "))
                             if w_count < split_overlap:
                                 overlap.append(s)
                                 w_count += sen_len
@@ -290,13 +307,19 @@ class PreProcessor(BasePreProcessor):
                         current_slice = []
                         word_count = 0
                 current_slice.append(sen)
-                word_count += len(sen.split(" "))
+                if self.language == "chinese":
+                    word_count += len(sen)
+                else:
+                    word_count += len(sen.split(" "))
             if current_slice:
                 list_splits.append(current_slice)
 
             text_splits = []
             for sl in list_splits:
-                txt = " ".join(sl)
+                if self.language == "chinese":
+                    txt = "".join(sl)
+                else:
+                    txt = " ".join(sl)
                 if len(txt) > 0:
                     text_splits.append(txt)
         else:
@@ -307,7 +330,8 @@ class PreProcessor(BasePreProcessor):
             elif split_by == "passage":
                 elements = text.split("\n\n")
             elif split_by == "sentence":
-                elements = nltk.tokenize.sent_tokenize(text, language=self.language)
+                language_name = iso639_to_nltk.get(self.language)
+                elements = nltk.tokenize.sent_tokenize(text, language=language_name)
             elif split_by == "word":
                 elements = text.split(" ")
             else:

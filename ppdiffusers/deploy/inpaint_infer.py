@@ -60,8 +60,8 @@ def parse_arguments():
         "--backend",
         type=str,
         default="paddle",
-        # Note(zhoushunjie): Will support 'tensorrt', 'paddle-tensorrt' soon.
-        choices=["onnx_runtime", "paddle", "paddle-tensorrt", "tensorrt", "paddlelite"],
+        # Note(zhoushunjie): Will support 'tensorrt', 'paddle_tensorrt' soon.
+        choices=["onnx_runtime", "paddle", "paddle_tensorrt", "tensorrt", "paddlelite"],
         help="The inference runtime backend of unet model and text encoder model.",
     )
     parser.add_argument(
@@ -121,7 +121,8 @@ def create_paddle_inference_runtime(
         option.use_cpu()
     else:
         option.use_gpu(device_id)
-    if paddle_stream is not None:
+    # (TODO, junnyu) remove use_trt
+    if use_trt and paddle_stream is not None:
         option.set_external_raw_stream(paddle_stream)
     for pass_name in disable_paddle_pass:
         option.paddle_infer_option.delete_pass(pass_name)
@@ -257,9 +258,9 @@ if __name__ == "__main__":
 
     unet_dynamic_shape = {
         "sample": {
-            "min_shape": [1, 4, 64, 64],
-            "max_shape": [2, 4, 64, 64],
-            "opt_shape": [2, 4, 64, 64],
+            "min_shape": [1, 9, 64, 64],
+            "max_shape": [2, 9, 64, 64],
+            "opt_shape": [2, 9, 64, 64],
         },
         "timestep": {
             "min_shape": [1],
@@ -289,8 +290,8 @@ if __name__ == "__main__":
             args.model_dir, args.unet_model_prefix, args.model_format, device_id=device_id
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
-    elif args.backend == "paddle" or args.backend == "paddle-tensorrt":
-        use_trt = True if args.backend == "paddle-tensorrt" else False
+    elif args.backend == "paddle" or args.backend == "paddle_tensorrt":
+        use_trt = True if args.backend == "paddle_tensorrt" else False
         # Note(zhoushunjie): Will change to paddle runtime later
         text_encoder_runtime = create_ort_runtime(
             args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=device_id
@@ -416,4 +417,5 @@ if __name__ == "__main__":
     )
 
     images[0].save(args.image_path)
+
     print(f"Image saved in {args.image_path}!")

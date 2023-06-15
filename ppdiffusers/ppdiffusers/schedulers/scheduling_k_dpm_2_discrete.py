@@ -1,3 +1,4 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 Katherine Crowson, The HuggingFace Team and hlky. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,14 +13,44 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS
-from .scheduling_utils import SchedulerMixin, SchedulerOutput
+from .scheduling_utils import KarrasDiffusionSchedulers, SchedulerMixin, SchedulerOutput
+
+
+# Copied from ppdiffusers.schedulers.scheduling_ddpm.betas_for_alpha_bar
+def betas_for_alpha_bar(num_diffusion_timesteps, max_beta=0.999) -> paddle.Tensor:
+    """
+    Create a beta schedule that discretizes the given alpha_t_bar function, which defines the cumulative product of
+    (1-beta) over time from t = [0,1].
+
+    Contains a function alpha_bar that takes an argument t and transforms it to the cumulative product of (1-beta) up
+    to that part of the diffusion process.
+
+
+    Args:
+        num_diffusion_timesteps (`int`): the number of betas to produce.
+        max_beta (`float`): the maximum beta to use; use values lower than 1 to
+                     prevent singularities.
+
+    Returns:
+        betas (`np.ndarray`): the betas used by the scheduler to step the model outputs
+    """
+
+    def alpha_bar(time_step):
+        return math.cos((time_step + 0.008) / 1.008 * math.pi / 2) ** 2
+
+    betas = []
+    for i in range(num_diffusion_timesteps):
+        t1 = i / num_diffusion_timesteps
+        t2 = (i + 1) / num_diffusion_timesteps
+        betas.append(min(1 - alpha_bar(t2) / alpha_bar(t1), max_beta))
+    return paddle.to_tensor(betas, dtype=paddle.float32)
 
 
 class KDPM2DiscreteScheduler(SchedulerMixin, ConfigMixin):
@@ -35,21 +66,21 @@ class KDPM2DiscreteScheduler(SchedulerMixin, ConfigMixin):
     [`~SchedulerMixin.from_pretrained`] functions.
 
     Args:
-        num_train_timesteps (`int`): number of diffusion steps used to train the model.
-        beta_start (`float`): the starting `beta` value of inference.
-        beta_end (`float`): the final `beta` value.
-        beta_schedule (`str`):
+        num_train_timesteps (`int`): number of diffusion steps used to train the model. beta_start (`float`): the
+        starting `beta` value of inference. beta_end (`float`): the final `beta` value. beta_schedule (`str`):
             the beta schedule, a mapping from a beta range to a sequence of betas for stepping the model. Choose from
             `linear` or `scaled_linear`.
         trained_betas (`np.ndarray`, optional):
             option to pass an array of betas directly to the constructor to bypass `beta_start`, `beta_end` etc.
+            options to clip the variance used when adding noise to the denoised sample. Choose from `fixed_small`,
+            `fixed_small_log`, `fixed_large`, `fixed_large_log`, `learned` or `learned_range`.
         prediction_type (`str`, default `epsilon`, optional):
             prediction type of the scheduler function, one of `epsilon` (predicting the noise of the diffusion
             process), `sample` (directly predicting the noisy sample`) or `v_prediction` (see section 2.4
             https://imagen.research.google/video/paper.pdf)
     """
 
-    _compatibles = _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS.copy()
+    _compatibles = [e.name for e in KarrasDiffusionSchedulers]
     order = 2
 
     @register_to_config
@@ -63,12 +94,17 @@ class KDPM2DiscreteScheduler(SchedulerMixin, ConfigMixin):
         prediction_type: str = "epsilon",
     ):
         if trained_betas is not None:
-            self.betas = paddle.to_tensor(trained_betas, dtype="float32")
+            self.betas = paddle.to_tensor(trained_betas, dtype=paddle.float32)
         elif beta_schedule == "linear":
-            self.betas = paddle.linspace(beta_start, beta_end, num_train_timesteps, dtype="float32")
+            self.betas = paddle.linspace(beta_start, beta_end, num_train_timesteps, dtype=paddle.float32)
         elif beta_schedule == "scaled_linear":
             # this schedule is very specific to the latent diffusion model.
-            self.betas = paddle.linspace(beta_start**0.5, beta_end**0.5, num_train_timesteps, dtype="float32") ** 2
+            self.betas = (
+                paddle.linspace(beta_start**0.5, beta_end**0.5, num_train_timesteps, dtype=paddle.float32) ** 2
+            )
+        elif beta_schedule == "squaredcos_cap_v2":
+            # Glide cosine schedule
+            self.betas = betas_for_alpha_bar(num_train_timesteps)
         else:
             raise NotImplementedError(f"{beta_schedule} does is not implemented for {self.__class__}")
 
@@ -125,10 +161,10 @@ class KDPM2DiscreteScheduler(SchedulerMixin, ConfigMixin):
 
         num_train_timesteps = num_train_timesteps or self.config.num_train_timesteps
 
-        timesteps = np.linspace(0, num_train_timesteps - 1, num_inference_steps, dtype=np.float32)[::-1].copy()
+        timesteps = np.linspace(0, num_train_timesteps - 1, num_inference_steps, dtype=float)[::-1].copy()
 
         sigmas = np.array(((1 - self.alphas_cumprod) / self.alphas_cumprod) ** 0.5)
-        self.log_sigmas = paddle.to_tensor(np.log(sigmas), dtype="float32")
+        self.log_sigmas = paddle.to_tensor(np.log(sigmas), dtype=paddle.float32)
 
         sigmas = np.interp(timesteps, np.arange(0, len(sigmas)), sigmas)
         sigmas = np.concatenate([sigmas, [0.0]]).astype(np.float32)
@@ -147,14 +183,12 @@ class KDPM2DiscreteScheduler(SchedulerMixin, ConfigMixin):
         # standard deviation of the initial noise distribution
         self.init_noise_sigma = self.sigmas.max()
 
-        timesteps = paddle.to_tensor(timesteps)
-
+        timesteps = paddle.to_tensor(timesteps, dtype=paddle.float32)
         # interpolate timesteps
         timesteps_interpol = self.sigma_to_t(sigmas_interpol)
         interleaved_timesteps = paddle.stack((timesteps_interpol[1:-1, None], timesteps[1:, None]), axis=-1).flatten()
-        timesteps = paddle.concat([timesteps[:1], interleaved_timesteps])
 
-        self.timesteps = timesteps
+        self.timesteps = paddle.concat([timesteps[:1], interleaved_timesteps])
 
         self.sample = None
 
@@ -167,7 +201,6 @@ class KDPM2DiscreteScheduler(SchedulerMixin, ConfigMixin):
 
         # get sigmas range
         low_idx = (dists >= 0).cast("int64").cumsum(axis=0).argmax(axis=0).clip(max=self.log_sigmas.shape[0] - 2)
-
         high_idx = low_idx + 1
 
         low = self.log_sigmas[low_idx]
@@ -233,6 +266,8 @@ class KDPM2DiscreteScheduler(SchedulerMixin, ConfigMixin):
             pred_original_sample = model_output * (-sigma_input / (sigma_input**2 + 1) ** 0.5) + (
                 sample / (sigma_input**2 + 1)
             )
+        elif self.config.prediction_type == "sample":
+            raise NotImplementedError("prediction_type not implemented yet: sample")
         else:
             raise ValueError(
                 f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, or `v_prediction`"

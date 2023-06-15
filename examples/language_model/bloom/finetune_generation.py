@@ -13,45 +13,62 @@
 # limitations under the License.
 
 import os
-import sys
-import time
+from dataclasses import dataclass, field
 from functools import partial
 
+import numpy as np
 import paddle
-from args import parse_args
-from configuration import BloomConfig
-from model_split_merge import split_model_parallel
-from modeling import BloomForCausalLM
-from paddle.distributed import fleet
-from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
-    DygraphShardingOptimizer,
-)
-from paddle.distributed.fleet.utils.hybrid_parallel_util import (
-    fused_allreduce_gradients,
-)
-from transformers import AutoTokenizer
-from utils import (
-    _rotate_checkpoints,
-    all_gather,
-    is_dp_group_support_in_group_sharded_parallel,
-    set_hyrbid_parallel_seed,
-    wrap_sharding_2_3,
-)
-from visualdl import LogWriter
+from sklearn.metrics import accuracy_score
+from utils import BloomTrainer, compute_metrics, save_infer_result
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import LoRAConfig, get_lora_model, mark_only_lora_as_trainable
-from paddlenlp.trainer import get_last_checkpoint
-from paddlenlp.trainer.trainer import paddlenlp_load
-from paddlenlp.trainer.training_args import default_logdir
-from paddlenlp.transformers import (
-    CosineAnnealingWithWarmupDecay,
-    LinearAnnealingWithWarmupDecay,
-    PretrainedModel,
-)
-from paddlenlp.utils.batch_sampler import DistributedBatchSampler
+from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.peft.prefix import bloom_postprocess_past_key_value
+from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
+from paddlenlp.transformers import AutoTokenizer, BloomForCausalLM
 from paddlenlp.utils.log import logger
+
+
+@dataclass
+class DataArgument:
+    task_name: str = field(default="dureader_qg", metadata={"help": "The name of task."})
+    src_length: int = field(default=512, metadata={"help": "The max length of source text."})
+    tgt_length: int = field(default=512, metadata={"help": "The max length of target text."})
+    min_tgt_length: int = field(default=0, metadata={"help": "The min length of target text."})
+    length_penalty: float = field(default=0.7, metadata={"help": "The length penalty."})
+    no_repeat_ngram_size: int = field(default=3, metadata={"help": "The no repeat ngram size."})
+    num_beams: int = field(default=5, metadata={"help": "The number of beams."})
+    select_topk: bool = field(default=True, metadata={"help": "Whether to select top k tokens for generation."})
+    top_p: float = field(
+        default=0.0, metadata={"help": "The cumulative probability for top-p-filtering in the 'sampling' strategy."}
+    )
+    top_k: int = field(
+        default=0,
+        metadata={
+            "help": "The number of highest probability tokens to keep for top-k-filtering in the 'sampling' strategy."
+        },
+    )
+    generate_num: int = field(default=0, metadata={"help": "Save first k examples generation result in dev dataset"})
+
+
+@dataclass
+class ModelArgument:
+    model_name_or_path: str = field(
+        default="bigscience/bloom-560m",
+        metadata={"help": "Build-in pretrained model name or the path to local model."},
+    )
+    label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
+    lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
+    lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
+    r: int = field(default=4, metadata={"help": "Lora attention dimension"})
+    merge_weights: bool = field(
+        default=True, metadata={"help": "Merge weights of the original model and the Lora model"}
+    )
+    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
+    num_prefix_tokens: int = field(default=10, metadata={"help": "Number of prefix tokens"})
+    prefix_projection: bool = field(default=True, metadata={"help": "Whether to project the prefix tokens"})
+    do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
 
 
 def convert_example(
@@ -80,113 +97,111 @@ def convert_example(
         target = example["target"]
     elif "question" in example.keys():
         target = example["question"]
-    source = "答案：" + title + "</s>" + "上下文：" + source + "</s>"
-    if target:
-        target = "在已知答案的前提下，问题：" + target + "</s>"
-    outputs = tokenizer(
+
+    # Add the eos token for the source and target
+    source = "答案：" + title + "，上下文：" + source + "在已知答案的前提下，问题："
+    target = target[: max_target_length - 1]
+    target = target + tokenizer.eos_token
+
+    target_tokenized = tokenizer(
         target,
         max_length=max_target_length,
-        truncation_strategy="longest_first",
-        return_attention_mask=True,
-        return_token_type_ids=False,
+        truncation=True,
     )
-    inputs = tokenizer(
+    target_input_ids_len = (np.array(target_tokenized["input_ids"]) != tokenizer.pad_token_id).sum()
+
+    source_tokenized = tokenizer(
         source,
-        max_length=max_source_length,
-        truncation_strategy="longest_first",
-        return_attention_mask=True,
-        return_length=False,
+        max_length=(max_source_length + max_target_length - target_input_ids_len - 1),
+        padding="max_length",
+        truncation=True,
     )
 
-    final = {}
-    for k in outputs.keys():
-        final[k] = inputs[k] + outputs[k]
-        if k == "input_ids":
-            final["labels"] = [tokenizer.pad_token_id] * len(inputs["input_ids"]) + outputs[k]
-    return final
+    input_ids = source_tokenized["input_ids"] + [tokenizer.eos_token_id] + target_tokenized["input_ids"]
+    labels = (len(input_ids) - target_input_ids_len) * [tokenizer.pad_token_id] + target_tokenized["input_ids"]
+    return dict(
+        input_ids=input_ids,
+        labels=labels,
+    )
 
 
-@paddle.no_grad()
-def run_evaluate(args, data_loader, model, iter_steps, log_writer, global_step, task_name="valid"):
-    model.eval()
-    all_loss = []
-    local_time = time.time()
-    iter_step = 0
-    iter_steps = sys.maxsize
-    for eval_step, batch in enumerate(data_loader):
-        with paddle.amp.auto_cast(
-            args.use_pure_fp16,
-            custom_black_list=["c_softmax_with_cross_entropy", "elementwise_div"],
-            custom_white_list=["fused_attention", "fused_feedforward"],
-            level="O2",
-        ):
-            loss, _ = model(**batch)
+def custom_instruction_convert_example(example, tokenizer, data_args, is_test=True):
+    instruction = ""
+    input = ""
+    response = ""
+    if "instruction" in example and "output" in example:
+        instruction = example["instruction"]
+        response = example["output"]
+    else:
+        assert False, "instruction and output are not in the input dictionary."
+    if "input" in example["input"]:
+        input = example["input"]
 
-        all_loss.append(float(loss))
-
-        if (eval_step + 1) % args.accumulate_steps == 0:
-            iter_step += 1
-        else:
-            continue
-
-        if iter_step >= iter_steps:
-            break
-
-    average_loss = sum(all_loss) / len(all_loss)
-    v = paddle.to_tensor(average_loss).detach()
-    average_loss = all_gather(v)
-
-    if log_writer is not None:
-        logger.info("--" * 30)
-        logger.info(
-            "%s step %d, batch: %d, loss: %f, speed: %.2f step/s"
-            % (task_name, global_step, iter_step, average_loss, iter_step / (time.time() - local_time))
+    prompt = instruction + input
+    # dataset for evaluation
+    if is_test:
+        inputs = {
+            **tokenizer(prompt, max_length=data_args.src_length, truncation=True, padding="max_length"),
+            "labels": tokenizer(response, max_length=data_args.tgt_length, truncation=True, padding="max_length")[
+                "input_ids"
+            ],
+        }
+    # dataset for training
+    else:
+        response = response[: data_args.tgt_length - 1]
+        target_tokenized = tokenizer(
+            response,
+            add_special_tokens=False,
+            max_length=data_args.tgt_length - 2,
+            truncation=True,
+            truncation_side="right",
         )
-        logger.info("--" * 30)
-        log_writer.add_scalar(task_name + "_loss", average_loss, global_step)
+        target_input_ids_len = (np.array(target_tokenized["input_ids"]) != tokenizer.pad_token_id).sum()
 
-    model.train()
+        source_tokenized = tokenizer(
+            prompt,
+            add_special_tokens=False,
+            max_length=data_args.src_length - 1,
+            truncation=True,
+            truncation_side="left",
+        )
+
+        input_ids = (
+            [tokenizer.bos_token_id]
+            + source_tokenized["input_ids"]
+            + [tokenizer.bos_token_id]
+            + target_tokenized["input_ids"]
+        )
+        labels = (len(input_ids) - target_input_ids_len) * [tokenizer.pad_token_id] + target_tokenized["input_ids"]
+
+        inputs = {
+            "input_ids": input_ids,
+            "labels": labels,
+        }
+    return inputs
 
 
-def do_train(args):
-    paddle.set_device(args.device)
-    nranks = paddle.distributed.get_world_size()
-    strategy = fleet.DistributedStrategy()
-    strategy.hybrid_configs = {
-        "dp_degree": args.dp_degree,
-        "mp_degree": args.mp_degree,
-        "pp_degree": 1,
-        "sharding_degree": args.sharding_degree,
-    }
+def main():
+    # Parse the model and data  arguements
+    parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    training_args.print_config(model_args, "Model")
+    training_args.print_config(data_args, "Data")
+    setattr(training_args, "label_smoothing", model_args.label_smoothing)
+    setattr(training_args, "lr_decay_ratio", model_args.lr_decay_ratio)
 
-    # Set control in tensor parallel
-    strategy.tensor_parallel_configs = {"tensor_init_seed": args.seed}
+    # Set the training device
+    paddle.set_device(training_args.device)
 
-    fleet.init(is_collective=True, strategy=strategy)
-
-    # Obtain rank message of hybrid parallel
-    hcg = fleet.get_hybrid_communicate_group()
-    mp_rank = hcg.get_model_parallel_rank()
-    dp_rank = hcg.get_data_parallel_rank()
-    sharding_rank = hcg.get_sharding_parallel_rank()
-
-    sharding_size = hcg.get_sharding_parallel_world_size()
-    data_world_rank = dp_rank * sharding_size + sharding_rank
-    data_world_size = args.dp_degree * args.sharding_degree
-
-    # Seed control in hybrid parallel
-    set_hyrbid_parallel_seed(args.seed, data_world_rank, mp_rank)
-
-    default_global_tokens_num = args.global_batch_size * args.max_seq_length
-
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    # Log on each process the small summary:
+    logger.warning(
+        f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: {training_args.world_size}, "
+        + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
+    )
 
     # Detecting last checkpoint.
     last_checkpoint = None
-    training_args = args
-    training_args.overwrite_output_dir = False
-    training_args.resume_from_checkpoint = True
-    if os.path.isdir(training_args.output_dir) and not training_args.overwrite_output_dir:
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
         if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 1:
             raise ValueError(
@@ -199,359 +214,147 @@ def do_train(args):
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    global_step = 0
-    if training_args.resume_from_checkpoint and last_checkpoint is not None:
-        global_step = int(str(last_checkpoint).split("-")[-1])
+    # Set the dtype for loading model
+    dtype = None
+    if training_args.fp16_opt_level == "O2":
+        if training_args.fp16:
+            dtype = "float16"
+        if training_args.bf16:
+            dtype = "bfloat16"
 
-    log_writer = None
-    if dp_rank == 0 and mp_rank == 0 and sharding_rank == 0:
-        log_writer_path = os.path.join(args.output_dir, default_logdir())
-        log_writer = LogWriter(logdir=log_writer_path)
-    # Load the model
-    config = BloomConfig.from_pretrained(args.model_name_or_path)
-    WEIGHTS_NAME = "model_state.pdparams"
-    OPTIMIZER_NAME = "model_state_mp_{:0>2d}_sharding_{:0>2d}.pdopt".format(mp_rank, sharding_rank)
-    if args.mp_degree > 1:
-        WEIGHTS_NAME = "model_state_mp_{:0>2d}.pdparams".format(mp_rank)
-        BloomForCausalLM.resource_files_names = {"model_state": WEIGHTS_NAME}
-        args.model_name_or_path = split_model_parallel(
-            args.model_name_or_path, config, args.mp_degree, args.sharding_degree
-        )
-    config.mp_rank = mp_rank
-    config.mp_degree = args.mp_degree
+    # Load the pretrained language model.
+    model = BloomForCausalLM.from_pretrained(
+        model_args.model_name_or_path,
+        load_state_as_np=True,
+        low_cpu_mem_usage=True,  # todo enable low_cpu_mem_usage=True
+        dtype=dtype,  # todo enable set dtype to avoid additional mem usage
+        tensor_parallel_degree=training_args.tensor_parallel_degree,
+        tensor_parallel_rank=training_args.tensor_parallel_rank,
+        use_recompute=training_args.recompute,
+    )
 
-    config["hidden_dropout_prob"] = args.hidden_dropout_prob
-    config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
-    config["use_recompute"] = args.use_recompute
-    config["use_pure_fp16"] = args.use_pure_fp16
-    config["enable_fuse_transformer"] = False
-    model = BloomForCausalLM.from_pretrained(args.model_name_or_path, config=config)
-
-    if args.lora:
-        # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
+    if model_args.lora:
+        # hardcode parameters for now
         lora_config = LoRAConfig(
             target_modules=[".*query_key_value.*"],
-            r=4,
-            lora_alpha=8,
-            merge_weights=True,
+            r=model_args.r,
+            lora_alpha=2 * model_args.r,
+            merge_weights=model_args.merge_weights,
+            enable_lora_list=[[True, False, True]],
+            tensor_parallel_degree=training_args.tensor_parallel_degree,
+            dtype=dtype,
         )
-        model = get_lora_model(model, lora_config)
-        mark_only_lora_as_trainable(model)
+        model = LoRAModel(model, lora_config)
+        model.mark_only_lora_as_trainable()
+        model.print_trainable_parameters()
 
-    # Create the learning_rate sheduler and optimizer
-    if args.decay_steps is None:
-        args.decay_steps = args.max_steps
-    assert args.warmup_rate <= 1.0 and args.warmup_rate >= 0.0, "warmup_rate should be in [0, 1]"
-    args.warmup_steps = args.warmup_rate * args.max_steps
-
-    lr_scheduler = None
-
-    if args.lr_decay_style == "none":
-        lr_scheduler = None
-    elif args.lr_decay_style == "cosine":
-        lr_scheduler = CosineAnnealingWithWarmupDecay(
-            max_lr=args.max_lr,
-            min_lr=args.min_lr,
-            warmup_step=args.warmup_steps,
-            decay_step=args.decay_steps,
-            last_epoch=0,
+    if model_args.prefix_tuning:
+        prefix_config = PrefixConfig(
+            num_prefix_tokens=model_args.num_prefix_tokens,
+            num_attention_heads=model.config.n_head,
+            num_hidden_layers=model.config.n_layer,
+            hidden_size=model.config.hidden_size,
+            prefix_projection=model_args.prefix_projection,
+            prefix_projection_hidden_size=model.config.hidden_size,
+            dtype=dtype,
         )
-    elif args.lr_decay_style == "linear":
-        lr_scheduler = LinearAnnealingWithWarmupDecay(
-            max_lr=args.max_lr,
-            min_lr=args.min_lr,
-            warmup_step=args.warmup_steps,
-            decay_step=args.decay_steps,
-            last_epoch=0,
+        model = PrefixModelForCausalLM(
+            model=model,
+            prefix_config=prefix_config,
+            postprocess_past_key_value=bloom_postprocess_past_key_value,
         )
+        model.mark_only_prefix_as_trainable()
+        model.print_trainable_parameters()
 
-    clip = None
-    if args.grad_clip > 0:
-        clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.grad_clip)
+    # Load the Tokenzier
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
-    # Generate parameter names needed to perform weight decay.
-    # All bias and LayerNorm parameters are excluded.
-    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
-
-    if args.sharding_stage == 1 and args.sharding_degree > 1:
-        optimizer = DygraphShardingOptimizer(
-            hcg=fleet.get_hybrid_communicate_group(),
-            user_defined_strategy=strategy,
-            params=model.parameters(),
-            inner_optimizer_class=paddle.optimizer.AdamW,
-            learning_rate=lr_scheduler if lr_scheduler is not None else args.max_lr,
-            beta1=args.adam_beta1,
-            beta2=args.adam_beta2,
-            epsilon=args.adam_epsilon,
-            weight_decay=args.weight_decay,
-            grad_clip=clip,
-            apply_decay_param_fun=lambda x: x in decay_params,
+    # Load the dataset.
+    if model_args.do_generation:
+        trans_func = partial(
+            convert_example,
+            tokenizer=tokenizer,
+            decoder_start_token_id=tokenizer.bos_token_id,
+            max_source_length=data_args.src_length,
+            max_target_length=data_args.tgt_length,
         )
+        train_ds, dev_ds = load_dataset("dureader_qg", splits=("train", "dev"))
+
+        train_ds = train_ds.map(trans_func, lazy=False)
+        dev_ds = dev_ds.map(trans_func, lazy=False)
     else:
-        optimizer = paddle.optimizer.AdamW(
-            learning_rate=lr_scheduler if lr_scheduler is not None else args.max_lr,
-            beta1=args.adam_beta1,
-            beta2=args.adam_beta2,
-            epsilon=args.adam_epsilon,
-            parameters=model.parameters(),
-            weight_decay=args.weight_decay,
-            grad_clip=clip,
-            apply_decay_param_fun=lambda x: x in decay_params,
-            # TODO: remove 'multi_precision' in definition of optimizer
-            # and add it to 'paddle.amp.decorate'
-            multi_precision=args.use_pure_fp16,
-        )
+        train_ds, dev_ds = load_dataset("bellegroup", "school_math_0.25M", splits=["train", "dev"])
+        trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
 
-    if args.use_pure_fp16:
-        scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
-        # level O2 means converting the network to FP16
-        if args.sharding_stage not in [2, 3]:
-            scaler = fleet.distributed_scaler(scaler)
-        model = paddle.amp.decorate(models=model, level="O2")
+        train_ds = train_ds.map(partial(trans_func, is_test=False))
+        dev_ds = dev_ds.map(partial(trans_func, is_test=False))
 
-    if training_args.resume_from_checkpoint and last_checkpoint is not None:
-        model.set_state_dict(
-            paddle.load(os.path.join(last_checkpoint, model.resource_files_names["model_state"]), return_numpy=True)
-        )
-    # wrap sharding stage2/3 and add collective group
-    # TODO(Baibaifan): combine ShardingStage1/2/3 and fleet.distributed_model in feature
-    if args.sharding_stage in [2, 3] and args.sharding_degree > 1:
-        scaler = scaler if args.use_pure_fp16 else None
-        model, optimizer, scaler = wrap_sharding_2_3(model, optimizer, scaler, args)
-
-    elif paddle.distributed.get_world_size() > 1:
-        model = fleet.distributed_model(model)
-        optimizer = fleet.distributed_optimizer(optimizer)
-
-    trans_func = partial(
-        convert_example,
+    collate_fn = DataCollatorForSeq2Seq(
         tokenizer=tokenizer,
-        # decoder_start_token_id=model.config.bos_token_id,
-        decoder_start_token_id=tokenizer.bos_token_id,
-        max_source_length=args.max_source_length,
-        max_target_length=args.max_target_length,
+        padding=True,
+        max_length=data_args.src_length + data_args.tgt_length,
+        label_pad_token_id=tokenizer.pad_token_id,
+        return_tensors="np",
     )
 
-    train_ds, dev_ds = load_dataset("dureader_qg", splits=("train", "dev"))
-    train_ds = train_ds.map(trans_func, lazy=True)
+    @paddle.no_grad()
+    def compute_metrics_trainer(eval_preds, tokenizer):
+        all_preds = []
+        all_labels = []
+        preds = [x[x != -100] for x in eval_preds.predictions]
+        all_preds.extend(tokenizer.batch_decode(preds, skip_special_tokens=True, clean_up_tokenization_spaces=False))
+        labels = [x[x != -100] for x in eval_preds.label_ids]
+        all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
+        eval_result = compute_metrics(all_preds, all_labels)
+        return eval_result
 
-    train_batch_sampler = DistributedBatchSampler(
-        train_ds,
-        batch_size=args.micro_batch_size,
-        shuffle=True,
-        drop_last=True,
-        num_replicas=data_world_size,
-        rank=data_world_rank,
+    compute_metrics_func = partial(
+        compute_metrics_trainer,
+        tokenizer=tokenizer,
     )
 
-    train_data_loader = paddle.io.DataLoader(
-        dataset=train_ds,
-        batch_sampler=train_batch_sampler,
-        num_workers=0,
-        collate_fn=DataCollatorForSeq2Seq(
-            tokenizer=tokenizer,
-            padding=True,
-            max_length=args.max_seq_length,
-            label_pad_token_id=tokenizer.pad_token_id,
-            return_tensors="np",
-        ),
-        return_list=True,
-    )
-    dev_ds = dev_ds.map(trans_func, lazy=True)
-    valid_batch_sampler = paddle.io.BatchSampler(dev_ds, batch_size=args.micro_batch_size, shuffle=False)
-    valid_data_loader = paddle.io.DataLoader(
-        dataset=dev_ds,
-        batch_sampler=valid_batch_sampler,
-        num_workers=0,
-        collate_fn=DataCollatorForSeq2Seq(
-            tokenizer=tokenizer,
-            padding=True,
-            max_length=args.max_seq_length,
-            label_pad_token_id=tokenizer.pad_token_id,
-            return_tensors="np",
-        ),
-        return_list=True,
+    def compute_metrics_not_do_generation(eval_preds):
+        flattened_preds = np.array(eval_preds.predictions).flatten()
+        flattened_labels = np.array(eval_preds.label_ids).flatten()
+        cleaned_labels = [True if x != -100 and x != tokenizer.pad_token_id else False for x in flattened_labels]
+        filtered_preds = flattened_preds[cleaned_labels]
+        filtered_labels = flattened_labels[cleaned_labels]
+        accuracy = accuracy_score(y_true=filtered_labels, y_pred=filtered_preds)
+        return {
+            "accuracy": accuracy,
+        }
+
+    trainer = BloomTrainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_ds,
+        eval_dataset=dev_ds,
+        tokenizer=tokenizer,
+        compute_metrics=compute_metrics_func if model_args.do_generation else compute_metrics_not_do_generation,
+        do_generation=model_args.do_generation,
+        data_collator=collate_fn,
+        data_args=data_args,
     )
 
-    global_step = 0
-    # time count
-    train_reader_cost = 0.0
-    train_run_cost = 0.0
-    reader_start = time.time()
+    if training_args.fp16_opt_level == "O2" and not training_args.bf16:
+        trainer.disable_autocast_context_manager()
 
-    if training_args.resume_from_checkpoint and last_checkpoint is not None:
-        optimizer.set_state_dict(
-            paddlenlp_load(
-                os.path.join(last_checkpoint, OPTIMIZER_NAME),
-                return_numpy=True,
-            )
+    if training_args.do_train:
+        train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
+        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
+        trainer.log_metrics("train", train_result.metrics)
+        trainer.save_metrics("train", train_result.metrics)
+        trainer.save_state()
+
+    if training_args.do_eval:
+        eval_result = trainer.evaluate(dev_ds)
+        trainer.log_metrics("test", eval_result)
+
+    if data_args.generate_num > 0:
+        save_infer_result(
+            trainer, dev_ds, k=data_args.generate_num, src_length=data_args.src_length, tgt_length=data_args.tgt_length
         )
-        global_step = int(str(last_checkpoint).split("-")[-1])
-
-    _globalstep_last_logged = global_step
-    if isinstance(train_data_loader.batch_sampler, DistributedBatchSampler):
-        _globalstep_last_logged = 0
-
-    tr_loss = paddle.to_tensor(0.0)
-    loss_global = paddle.to_tensor(0.0)
-
-    model_path = "splits_mp_{:0>2d}_sharding_{:0>2d}".format(args.mp_degree, args.sharding_degree)
-    for epoch in range(sys.maxsize):
-        for step, batch in enumerate(train_data_loader()):
-            train_reader_cost += time.time() - reader_start
-            train_start = time.time()
-
-            if global_step >= args.max_steps:
-                return
-
-            if _globalstep_last_logged > 0:
-                _globalstep_last_logged -= 1
-                continue
-
-            # In ParallelMode of DataParallel, 'no_sync' can be used for improving
-            # performance of model by gradient accumulation.
-
-            with paddle.amp.auto_cast(
-                args.use_pure_fp16,
-                custom_black_list=["c_softmax_with_cross_entropy", "elementwise_div"],
-                custom_white_list=["fused_attention", "fused_feedforward"],
-                level="O2",
-            ):
-                loss, _ = model(**batch)
-
-            if args.accumulate_steps > 1:
-                tr_loss_step = loss / args.accumulate_steps
-            else:
-                tr_loss_step = loss
-
-            if args.use_pure_fp16:
-                scaler.scale(tr_loss_step).backward()
-            else:
-                tr_loss_step.backward()
-
-            tr_loss_step = tr_loss_step.detach()
-
-            tr_loss += tr_loss_step
-            loss_global += loss.detach()
-
-            # Skip for accumulate_steps in global step
-            if (step + 1) % args.accumulate_steps != 0:
-                continue
-
-            if args.sharding_degree > 1 and args.sharding_stage in [2, 3]:
-                if args.dp_degree > 1 and not is_dp_group_support_in_group_sharded_parallel():
-                    fused_allreduce_gradients(model.parameters(), fleet.get_hybrid_communicate_group())
-
-            if args.use_pure_fp16:
-                # scaler.minimize(optimizer, tr_loss)
-                scaler.step(optimizer)
-                scaler.update()
-            else:
-                optimizer.step()
-
-            optimizer.clear_grad()
-            tr_loss.subtract_(tr_loss)
-
-            global_step += 1
-
-            # Sync for profile time, delete it may be a little faster
-            # paddle.device.cuda.synchronize()
-            train_run_cost += time.time() - train_start
-
-            if global_step % args.logging_freq == 0:
-                avg_loss = all_gather(loss_global) / args.logging_freq / args.accumulate_steps
-                loss_global.subtract_(loss_global)
-                speed = args.logging_freq / (train_reader_cost + train_run_cost)
-                avg_reader_cost = train_reader_cost / args.logging_freq
-
-                logger.info(
-                    "global step %d, epoch: %d, loss: %.9f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, speed: %.2f step/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
-                    % (
-                        global_step,
-                        epoch,
-                        avg_loss,
-                        avg_reader_cost,
-                        1.0 / speed,
-                        speed,
-                        speed * default_global_tokens_num,
-                        speed * default_global_tokens_num / nranks,
-                        optimizer.get_lr(),
-                    )
-                )
-                if log_writer is not None:
-                    log_writer.add_scalar("loss", float(loss), global_step)
-                    log_writer.add_scalar("learning_rate", optimizer.get_lr(), global_step)
-
-                # tic_train = time.time()
-                train_reader_cost = 0.0
-                train_run_cost = 0.0
-
-            if lr_scheduler is not None:
-                lr_scheduler.step()
-
-            if global_step % args.eval_freq == 0:
-                # Since the valid data broardcast to all devices, we do evaluate on all device.
-                run_evaluate(args, valid_data_loader, model, args.eval_iters, log_writer, global_step, "valid")
-
-            # TODO: 1. merge paramters while saving model. 2. ensure that the model is saved and loaded correctly
-            # only dp_rank = 0 save model
-            if (global_step % args.save_steps == 0 or global_step >= args.max_steps) and dp_rank == 0:
-
-                model_to_save = (
-                    model._layers
-                    if paddle.distributed.get_world_size() > 1 and args.sharding_stage not in [2, 3]
-                    else model
-                )
-
-                if args.sharding_stage == 3:
-                    # If parameter need to convert to cpu, please add convert2cpu=True
-                    model_to_save.get_all_parameters(convert2cpu=True)
-
-                while hasattr(model_to_save, "_layers") or hasattr(model_to_save, "_layer"):
-                    if hasattr(model_to_save, "_layers"):
-                        model_to_save = model_to_save._layers
-                    else:
-                        model_to_save = model_to_save._layer
-
-                if config.mp_degree == 1 and config.pp_degree == 1:
-                    output_dir = os.path.join(args.output_dir, str(global_step))
-                else:
-                    output_dir = os.path.join(args.output_dir, str(global_step), model_path)
-                os.makedirs(output_dir, exist_ok=True)
-                logger.info("Save model to %s" % output_dir)
-
-                # tokenizer only need to save on one node
-                if mp_rank == 0 and sharding_rank == 0 and dp_rank == 0:
-                    tokenizer.save_pretrained(output_dir)
-
-                # paramerters is the same in sharding group
-                if sharding_rank == 0 and dp_rank == 0:
-                    if isinstance(model_to_save, PretrainedModel):
-                        model_to_save.save_pretrained(output_dir)
-                    else:
-                        logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
-                        state_dict = model_to_save.state_dict()
-                        paddle.save(state_dict, os.path.join(output_dir, WEIGHTS_NAME))
-
-                # ckpt optimizer weight should save on echo sharding rank
-                if dp_rank == 0:
-                    paddle.save(
-                        optimizer.state_dict(),
-                        os.path.join(
-                            output_dir,
-                            OPTIMIZER_NAME,
-                        ),
-                    )
-
-                if mp_rank == 0 and sharding_rank == 0 and dp_rank == 0:
-                    _rotate_checkpoints(args.save_total_limit, output_dir=args.output_dir)
-
-            if global_step >= args.max_steps:
-                return
-
-            reader_start = time.time()
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    do_train(args)
+    main()

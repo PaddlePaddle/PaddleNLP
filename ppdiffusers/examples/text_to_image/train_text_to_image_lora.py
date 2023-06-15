@@ -1,5 +1,5 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2023 The HuggingFace Inc. team. All rights reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,12 +47,12 @@ from ppdiffusers import (
     DiffusionPipeline,
     DPMSolverMultistepScheduler,
     UNet2DConditionModel,
+    is_ppxformers_available,
 )
 from ppdiffusers.loaders import AttnProcsLayers
-from ppdiffusers.modeling_utils import freeze_params, unwrap_model
 from ppdiffusers.models.cross_attention import LoRACrossAttnProcessor
 from ppdiffusers.optimization import get_scheduler
-from ppdiffusers.training_utils import main_process_first
+from ppdiffusers.training_utils import freeze_params, main_process_first, unwrap_model
 from ppdiffusers.utils import PPDIFFUSERS_CACHE
 
 
@@ -372,6 +372,9 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--report_to", type=str, default="visualdl", choices=["tensorboard", "visualdl"], help="Log writer type."
     )
+    parser.add_argument(
+        "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
+    )
     if input_args is not None:
         args = parser.parse_args(input_args)
     else:
@@ -494,6 +497,15 @@ def main():
 
     unet.set_attn_processor(lora_attn_procs)
     lora_layers = AttnProcsLayers(unet.attn_processors)
+
+    if args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
+        try:
+            unet.enable_xformers_memory_efficient_attention()
+        except Exception as e:
+            logger.warn(
+                "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
+                f" correctly and a GPU is available: {e}"
+            )
 
     # Get the datasets: you can either provide your own training and evaluation files (see below)
     # or specify a Dataset from the hub (the dataset will be downloaded automatically from the datasets Hub).
@@ -750,7 +762,7 @@ def main():
                     for name, val in logs.items():
                         if name == "epoch":
                             continue
-                        writer.add_scalar(f"train/{name}", val, step=global_step)
+                        writer.add_scalar(f"train/{name}", val, global_step)
 
                     if global_step % args.checkpointing_steps == 0:
                         save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")

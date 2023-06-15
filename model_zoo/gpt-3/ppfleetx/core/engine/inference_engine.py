@@ -18,6 +18,10 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
+try:
+    from ppfleetx_ops import topp_sampling
+except Exception as e:
+    pass
 
 # TensorRT precisions
 TRT_PRECISIONS = {

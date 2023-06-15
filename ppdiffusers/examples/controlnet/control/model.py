@@ -29,10 +29,11 @@ from ppdiffusers import (
     DDPMScheduler,
     LDMBertModel,
     UNet2DConditionModel,
+    is_ppxformers_available,
 )
 from ppdiffusers.initializer import reset_initialized_parameter
-from ppdiffusers.modeling_utils import freeze_params
 from ppdiffusers.models.ema import LitEma
+from ppdiffusers.training_utils import freeze_params
 
 
 def read_json(file):
@@ -96,7 +97,7 @@ class ControlNet(nn.Layer):
         freeze_params(self.unet.parameters())
         logger.info("Freeze unet parameters!")
 
-        self.controlnet = ControlNetModel.from_pretrained(unet_name_or_path)
+        self.controlnet = ControlNetModel.from_unet(self.unet, load_weights_from_unet=True)
 
         if not model_args.use_paddle_conv_init:
             # use torch conv2d init
@@ -120,6 +121,16 @@ class ControlNet(nn.Layer):
             self.model_ema = LitEma(self.controlnet)
         self.control_scales = [1.0] * 13
         self.only_mid_control = model_args.only_mid_control
+
+        if model_args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
+            try:
+                self.unet.enable_xformers_memory_efficient_attention()
+                self.controlnet.enable_xformers_memory_efficient_attention()
+            except Exception as e:
+                logger.warn(
+                    "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
+                    f" correctly and a GPU is available: {e}"
+                )
 
     @contextlib.contextmanager
     def ema_scope(self, context=None):
@@ -160,15 +171,9 @@ class ControlNet(nn.Layer):
             timestep=timesteps,
             encoder_hidden_states=encoder_hidden_states,
             controlnet_cond=controlnet_cond,
+            conditioning_scale=self.control_scales,
             return_dict=False,
         )
-        down_block_res_samples = [
-            down_block_res_sample * controlnet_conditioning_scale
-            for down_block_res_sample, controlnet_conditioning_scale in zip(
-                down_block_res_samples, self.control_scales[:-1]
-            )
-        ]
-        mid_block_res_sample *= self.control_scales[-1]
 
         # predict the noise residual
         noise_pred = self.unet(
@@ -194,7 +199,7 @@ class ControlNet(nn.Layer):
 
     @paddle.no_grad()
     def decode_control_image(self, controlnet_cond=None, **kwargs):
-        return 255 * (controlnet_cond.transpose([0, 2, 3, 1]) * 2.0 - 1.0).cast("float32").numpy().round()
+        return (255 * controlnet_cond.transpose([0, 2, 3, 1])).cast("float32").numpy().round()
 
     @paddle.no_grad()
     def log_image(
@@ -248,15 +253,10 @@ class ControlNet(nn.Layer):
                     t,
                     encoder_hidden_states=text_embeddings,
                     controlnet_cond=controlnet_cond_input,
+                    conditioning_scale=self.control_scales,
                     return_dict=False,
                 )
-                down_block_res_samples = [
-                    down_block_res_sample * controlnet_conditioning_scale
-                    for down_block_res_sample, controlnet_conditioning_scale in zip(
-                        down_block_res_samples, self.control_scales[:-1]
-                    )
-                ]
-                mid_block_res_sample *= self.control_scales[-1]
+
                 # predict the noise residual
                 noise_pred = self.unet(
                     latent_model_input,

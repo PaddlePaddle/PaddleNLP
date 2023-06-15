@@ -237,7 +237,7 @@ class TextFeatureExtractionTask(Task):
                 )
             return tokenized_inputs
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         one_batch = []
         for example in data:
             one_batch.append(example)

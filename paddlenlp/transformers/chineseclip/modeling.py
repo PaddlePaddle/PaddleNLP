@@ -186,13 +186,6 @@ class ChineseCLIPPretrainedModel(PretrainedModel):
     supports_gradient_checkpointing = True
     _keys_to_ignore_on_load_missing = [r"position_ids"]
 
-    def init_weights(self):
-        """
-        A method executed at the end of each Transformer model initialization, to execute code that needs the model's
-        modules properly initialized (such as weight initialization).
-        """
-        self.apply(self._init_weights)
-
     def _set_gradient_checkpointing(self, module, value=False):
         if isinstance(module, nn.TransformerEncoder):
             module.enable_recompute = value
@@ -302,7 +295,6 @@ class ChineseCLIPTextModel(ChineseCLIPPretrainedModel):
         self.text_model = BertModel(config)
         if not add_pooling_layer:
             self.text_model.pooler = FirstTokenPooler()
-        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.text_model.embeddings.word_embeddings
@@ -408,8 +400,6 @@ class ChineseCLIPVisionModel(ChineseCLIPPretrainedModel):
         super().__init__(config)
 
         self.vision_model = ChineseCLIPVisionTransformer(config)
-
-        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.conv1
@@ -523,8 +513,6 @@ class ChineseCLIPModel(ChineseCLIPPretrainedModel):
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(config.logit_scale_init_value),
         )
-
-        self.init_weights()
 
     def get_text_features(
         self,
@@ -852,8 +840,6 @@ class ChineseCLIPTextModelWithProjection(ChineseCLIPPretrainedModel):
             (config.hidden_size, config.projection_dim), paddle.get_default_dtype()
         )
 
-        self.init_weights()
-
     def get_input_embeddings(self) -> nn.Layer:
         return self.text_model.embeddings.word_embeddings
 
@@ -974,8 +960,6 @@ class ChineseCLIPVisionModelWithProjection(ChineseCLIPPretrainedModel):
         self.vision_projection = paddle.create_parameter(
             (config.hidden_size, config.projection_dim), paddle.get_default_dtype()
         )
-
-        self.init_weights()
 
     def get_input_embeddings(self) -> nn.Layer:
         if isinstance(self.vision_model, ChineseCLIPVisionTransformer):

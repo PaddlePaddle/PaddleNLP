@@ -40,7 +40,6 @@ class JointErnie(ErniePretrainedModel):
             weight_attr=nn.initializer.KaimingNormal(),
             bias_attr=nn.initializer.KaimingNormal(),
         )
-        self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         sequence_output, pooled_output = self.ernie(

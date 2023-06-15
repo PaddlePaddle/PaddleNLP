@@ -13,14 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import pickle
-import six
-import shutil
-
-from paddle.utils import try_import
-from paddlenlp.utils.env import MODEL_HOME
-
 from ..ernie.tokenizer import ErnieTokenizer
 
 __all__ = ["ErnieGramTokenizer"]

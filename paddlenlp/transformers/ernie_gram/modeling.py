@@ -127,7 +127,7 @@ class ErnieGramPretrainedModel(PretrainedModel):
     model_config_file = CONFIG_NAME
     resource_files_names = {"model_state": "model_state.pdparams"}
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # only support dygraph, use truncated_normal and make it inplace
@@ -178,7 +178,6 @@ class ErnieGramModel(ErnieGramPretrainedModel):
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
         self.pooler = ErnieGramPooler(config)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -361,7 +360,6 @@ class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
             config.num_labels,
             weight_attr=paddle.ParamAttr(initializer=nn.initializer.TruncatedNormal(std=config.initializer_range)),
         )
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -463,7 +461,6 @@ class ErnieGramForQuestionAnswering(ErnieGramPretrainedModel):
         self.config = config
         self.ernie_gram = ErnieGramModel(config)
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -598,7 +595,6 @@ class ErnieGramForSequenceClassification(ErnieGramPretrainedModel):
         self.ernie_gram = ErnieGramModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -672,17 +668,26 @@ class ErnieGramForSequenceClassification(ErnieGramPretrainedModel):
         pooled_output = self.dropout(outputs[1])
         logits = self.classifier(pooled_output)
 
-        logits = self.classifier(pooled_output)
-
         loss = None
         if labels is not None:
-            if self.num_labels == 1:
+            if self.config.problem_type is None:
+                if self.num_labels == 1:
+                    self.config.problem_type = "regression"
+                elif self.num_labels > 1 and (labels.dtype == paddle.int64 or labels.dtype == paddle.int32):
+                    self.config.problem_type = "single_label_classification"
+                else:
+                    self.config.problem_type = "multi_label_classification"
+
+            if self.config.problem_type == "regression":
                 loss_fct = paddle.nn.MSELoss()
-                loss = loss_fct(logits, labels)
-            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                if self.num_labels == 1:
+                    loss = loss_fct(logits.squeeze(), labels.squeeze())
+                else:
+                    loss = loss_fct(logits, labels)
+            elif self.config.problem_type == "single_label_classification":
                 loss_fct = paddle.nn.CrossEntropyLoss()
                 loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
-            else:
+            elif self.config.problem_type == "multi_label_classification":
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
 

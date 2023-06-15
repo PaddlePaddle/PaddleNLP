@@ -373,7 +373,7 @@ cat ../data/train_dirty_rest.txt ../data/train_dirty.txt > ../data/train_clean.t
 
 **方案效果**
 
-我们在[2020语言与智能技术竞赛：事件抽取任务](https://aistudio.baidu.com/aistudio/competition/detail/32/0/introduction)抽取部分训练数据（训练集数据规模:2000）进行实验，取200条数据进行脏数据处理，也即200条训练数据为标签错误数据，选择不同`dirty_num`应用脏数据清洗策略进行评测：：
+我们在[2020语言与智能技术竞赛：事件抽取任务](https://aistudio.baidu.com/aistudio/competition/detail/32/0/introduction)抽取部分训练数据（训练集数据规模:2000）进行实验，取200条数据进行脏数据处理，也即200条训练数据为标签错误数据，选择不同`dirty_num`应用脏数据清洗策略进行评测：
 
 |  |Micro F1(%)   | Macro F1(%) |
 | ---------| ------------ |------------ |

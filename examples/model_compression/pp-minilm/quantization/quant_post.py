@@ -70,7 +70,7 @@ parser.add_argument(
 parser.add_argument(
     "--use_faster_tokenizer",
     type=strtobool,
-    default=True,
+    default=False,
     help="Whether to use FasterTokenizer to accelerate training or further inference.",
 )
 

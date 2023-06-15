@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ class StableDiffusionSafetyChecker(CLIPPretrainedModel):
 
     def __init__(self, config: CLIPVisionConfig):
         super().__init__(config)
+
         self.clip = CLIPVisionModel(config)
         self.vision_projection = paddle.create_parameter(
             (config.hidden_size, config.projection_dim), dtype=paddle.get_default_dtype()
@@ -55,7 +56,7 @@ class StableDiffusionSafetyChecker(CLIPPretrainedModel):
         pooled_output = self.clip(clip_input)[1]  # pooled_output
         image_embeds = paddle.matmul(pooled_output, self.vision_projection)
 
-        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloa16
+        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
         special_cos_dist = cosine_distance(image_embeds, self.special_care_embeds).astype("float32").numpy()
         cos_dist = cosine_distance(image_embeds, self.concept_embeds).astype("float32").numpy()
 

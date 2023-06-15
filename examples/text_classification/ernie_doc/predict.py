@@ -12,20 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import os
-import paddle
+from functools import partial
+
 import numpy as np
+import paddle
+import paddle.nn as nn
+from data import (
+    ClassifierIterator,
+    HYPTextPreprocessor,
+    ImdbTextPreprocessor,
+    to_json_file,
+)
+from modeling import ErnieDocForSequenceClassification
+from train import init_memory
+
+from paddlenlp.datasets import load_dataset
+from paddlenlp.taskflow.utils import dygraph_mode_guard
+from paddlenlp.transformers import ErnieDocBPETokenizer, ErnieDocTokenizer
 from paddlenlp.utils.env import PPNLP_HOME
 from paddlenlp.utils.log import logger
-from paddlenlp.taskflow.utils import dygraph_mode_guard
-from modeling import ErnieDocForSequenceClassification
-from paddlenlp.transformers import ErnieDocTokenizer, ErnieDocBPETokenizer
-from paddlenlp.datasets import load_dataset
-from data import ClassifierIterator, ImdbTextPreprocessor, HYPTextPreprocessor, to_json_file
-import paddle.nn as nn
-from train import init_memory
-from functools import partial
-import argparse
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -39,7 +46,7 @@ parser.add_argument("--memory_length", type=int, default=128, help="Length of th
 parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"],
                     help="Select cpu, gpu devices to train model.")
 parser.add_argument("--test_results_file", default="./test_restuls.json", type=str,
-                    help="The file path you would like to save the model ouputs on test dataset.")
+                    help="The file path you would like to save the model outputs on test dataset.")
 parser.add_argument("--static_mode", default=False, type=bool,
                     help="Whether you would like to perform predicting by static model or dynamic model.")
 parser.add_argument("--dataset", default="iflytek", choices=["imdb", "iflytek", "thucnews", "hyp"], type=str,
@@ -140,7 +147,7 @@ class LongDocClassifier:
             mode="eval",
             preprocess_text_fn=preprocess_text_fn,
         )
-        self.test_dataloader = paddle.io.DataLoader.from_generator(capacity=70, return_list=True)
+        self.test_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
         self.test_dataloader.set_batch_generator(self.test_ds_iter, paddle.get_device())
 
     def _construct_tokenizer(self, tokenizer_class):

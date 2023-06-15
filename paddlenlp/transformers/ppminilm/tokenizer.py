@@ -14,12 +14,6 @@
 # limitations under the License.
 
 import os
-import pickle
-import six
-import shutil
-
-from paddle.utils import try_import
-from paddlenlp.utils.env import MODEL_HOME
 
 from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
 
@@ -91,11 +85,15 @@ class PPMiniLMTokenizer(PretrainedTokenizer):
         self,
         vocab_file,
         do_lower_case=True,
+        do_basic_tokenize=True,
+        never_split=None,
         unk_token="[UNK]",
         sep_token="[SEP]",
         pad_token="[PAD]",
         cls_token="[CLS]",
         mask_token="[MASK]",
+        tokenize_chinese_chars=True,
+        strip_accents=None,
         **kwargs
     ):
 
@@ -107,7 +105,14 @@ class PPMiniLMTokenizer(PretrainedTokenizer):
             )
         self.do_lower_case = do_lower_case
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
-        self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
+        self.do_basic_tokenize = do_basic_tokenize
+        if do_basic_tokenize:
+            self.basic_tokenizer = BasicTokenizer(
+                do_lower_case=do_lower_case,
+                never_split=never_split,
+                tokenize_chinese_chars=tokenize_chinese_chars,
+                strip_accents=strip_accents,
+            )
         self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab, unk_token=unk_token)
 
     @property
@@ -120,6 +125,9 @@ class PPMiniLMTokenizer(PretrainedTokenizer):
         """
         return len(self.vocab)
 
+    def get_vocab(self):
+        return dict(self.vocab.token_to_idx, **self.added_tokens_encoder)
+
     def _tokenize(self, text):
         r"""
         End-to-end tokenization for PPMiniM models.
@@ -131,9 +139,15 @@ class PPMiniLMTokenizer(PretrainedTokenizer):
             List[str]: A list of string representing converted tokens.
         """
         split_tokens = []
-        for token in self.basic_tokenizer.tokenize(text):
-            for sub_token in self.wordpiece_tokenizer.tokenize(token):
-                split_tokens.append(sub_token)
+        if self.do_basic_tokenize:
+            for token in self.basic_tokenizer.tokenize(text, never_split=self.all_special_tokens):
+                # If the token is part of the never_split set
+                if token in self.basic_tokenizer.never_split:
+                    split_tokens.append(token)
+                else:
+                    split_tokens += self.wordpiece_tokenizer.tokenize(token)
+        else:
+            split_tokens = self.wordpiece_tokenizer.tokenize(text)
         return split_tokens
 
     def convert_tokens_to_string(self, tokens):
@@ -259,3 +273,36 @@ class PPMiniLMTokenizer(PretrainedTokenizer):
         if token_ids_1 is None:
             return len(_cls + token_ids_0 + _sep) * [0]
         return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 + _sep) * [1]
+
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
+        """
+        Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
+        special tokens using the tokenizer ``encode`` methods.
+
+        Args:
+            token_ids_0 (List[int]):
+                A list of `inputs_ids` for the first sequence.
+            token_ids_1 (List[int], optional):
+                Optional second list of IDs for sequence pairs. Defaults to None.
+            already_has_special_tokens (bool, optional): Whether or not the token list is already
+                formatted with special tokens for the model. Defaults to None.
+
+        Returns:
+            List[int]: The list of integers either be 0 or 1: 1 for a special token, 0 for a sequence token.
+        """
+
+        if already_has_special_tokens:
+            if token_ids_1 is not None:
+                raise ValueError(
+                    "You should not supply a second sequence if the provided sequence of "
+                    "ids is already formatted with special tokens for the model."
+                )
+            return list(map(lambda x: 1 if x in self.all_special_ids else 0, token_ids_0))
+
+        if token_ids_1 is not None:
+            return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def _convert_id_to_token(self, index):
+        """Converts an index (integer) in a token (str) using the vocab."""
+        return self.vocab._idx_to_token.get(index, self.unk_token)

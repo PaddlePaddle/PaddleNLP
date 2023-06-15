@@ -41,6 +41,9 @@ class ModelArguments:
     use_paddle_conv_init: bool = field(default=False, metadata={"help": "Whether or not use paddle conv2d init."})
     only_mid_control: bool = field(default=False, metadata={"help": "only_mid_control."})
     is_ldmbert: bool = field(default=False, metadata={"help": "Whether to use ldmbert."})
+    enable_xformers_memory_efficient_attention: bool = field(
+        default=False, metadata={"help": "enable_xformers_memory_efficient_attention."}
+    )
 
 
 @dataclass

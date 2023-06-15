@@ -654,7 +654,7 @@ python finetune.py  \
     --per_device_train_batch_size  16 \
     --num_train_epochs 20 \
     --learning_rate 1e-5 \
-    --label_names 'start_positions' 'end_positions' \
+    --label_names "start_positions" "end_positions" \
     --do_train \
     --do_eval \
     --do_export \
@@ -691,7 +691,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
     --do_eval \
     --do_export \
     --export_model_dir $finetuned_model \
-    --label_names 'start_positions' 'end_positions' \
+    --label_names "start_positions" "end_positions" \
     --overwrite_output_dir \
     --disable_tqdm True \
     --metric_for_best_model eval_f1 \

@@ -5,14 +5,14 @@
 ProphetNet（先知网络）是一种新型的 seq2seq 预训练模型。在训练时，Prophetnet 每一时刻将会学习同时预测未来的 N 个字符，这种自监督学习目标可以使得模型考虑未来更远的字符，防止模型对强局部相关（strong
 local correlation）过拟合。
 
-本项目是 Prophetnet 在 PaddlePaddle 2.2 上开源实现的文本摘要的例子，包含了在 CNN/DailyMail 数据集，Gigaword 数据集上微调和生成的代码。
+本项目是 Prophetnet 在 PaddlePaddle 2.4 上开源实现的文本摘要的例子，包含了在 CNN/DailyMail 数据集，Gigaword 数据集上微调和生成的代码。
 
 ### 项目依赖
 
 ```
 pip install -r requirements.txt
-python -m pip install paddlepaddle-gpu==2.2.2.post112 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
-pip install paddlenlp==2.2.3
+python -m pip install paddlepaddle-gpu==2.4.1.post117 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
+pip install paddlenlp==2.5.2
 ```
 
 ### 代码结构说明
@@ -64,32 +64,42 @@ bash run_train.sh <DATASET>
 - cnndm:
 
 ```
-python train_prophetnet.py \
+python -m paddle.distributed.launch --gpus 0 python train_prophetnet.py \
     --dataset=cnndm \
     --model_name_or_path=prophetnet-large-uncased \
-    --batch_size=4 \
-    --epochs=4 \
-    --lr=0.0001 \
+    --per_device_train_batch_size=4 \
+    --per_device_eval_batch_size=8 \
+    --num_train_epochs=4 \
+    --learning_rate=0.0001 \
     --warmup_init_lr=1e-07 \
     --warmup_steps=1000 \
-    --clip_norm=0.1 \
-    --num_workers=4 \
+    --max_grad_norm=0.1 \
+    --dataloader_num_workers=4 \
+    --logging_steps 10 \
+    --save_steps 100 \
+    --do_train \
+    --do_eval \
     --output_dir=./ckpt/cnndm
 ```
 
 - gigaword:
 
 ```
-python train_prophetnet.py \
+python -m paddle.distributed.launch --gpus 0 python train_prophetnet.py \
     --dataset=gigaword \
     --model_name_or_path=prophetnet-large-uncased \
-    --batch_size=16 \
-    --epochs=6 \
-    --lr=0.0001 \
+    --per_device_train_batch_size=16 \
+    --per_device_eval_batch_size=32 \
+    --num_train_epochs=6 \
+    --learning_rate=0.0001 \
     --warmup_init_lr=1e-07 \
     --warmup_steps=1000 \
-    --clip_norm=0.1 \
-    --num_workers=8 \
+    --max_grad_norm=0.1 \
+    --dataloader_num_workers=8 \
+    --logging_steps 10 \
+    --save_steps 100 \
+    --do_train \
+    --do_eval \
     --output_dir=./ckpt/gigaword
 ```
 
@@ -97,21 +107,31 @@ python train_prophetnet.py \
 
 - `dataset` 指定数据集，可选cnndm和gigaword
 
-- `model_name_or_path` 预训练模型名称或本地预训练模型初始化权重文件路径。
+- `model_name_or_path` 预训练模型名称或本地预训练模型初始化权重文件路径
 
-- `batch_size` 表示训练样本批大小。
+- `per_device_train_batch_size` 表示单卡训练样本批大小
 
-- `epochs` 表示训练轮数。
+- `per_device_eval_batch_size` 表示单卡验证样本批大小
 
-- `lr` 表示学习率
+- `num_train_epochs` 表示训练轮数
+
+- `learning_rate` 表示学习率
 
 - `warmup_init_lr` 表示预热学习率
 
 - `warmup_steps` 表示预热学习步数
 
-- `clip_norm` 表示梯度裁剪
+- `max_grad_norm` 表示梯度裁剪
 
-- `num_workers` 指定数据加载规模
+- `dataloader_num_workers` 指定数据加载规模
+
+- `logging_steps` 表示打印结果间隔
+
+- `save_steps`表示验证间隔
+
+- `do_train` 表示是否训练
+
+- `do_eval` 表示是否验证
 
 - `output_idr` 指定微调结果权重存放路径
 

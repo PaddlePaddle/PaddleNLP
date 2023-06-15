@@ -291,7 +291,7 @@ class NeZhaPretrainedModel(PretrainedModel):
     pretrained_init_configuration = NEZHA_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = NEZHA_PRETRAINED_RESOURCE_FILES_MAP
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -381,7 +381,6 @@ class NeZhaModel(NeZhaPretrainedModel):
         self.encoder = NeZhaEncoder(config)
 
         self.pooler = NeZhaPooler(config)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -630,8 +629,6 @@ class NeZhaForPretraining(NeZhaPretrainedModel):
             self.nezha.embeddings.word_embeddings.weight,
         )
 
-        self.apply(self.init_weights)
-
     def forward(
         self,
         input_ids: Optional[Tensor] = None,
@@ -730,7 +727,6 @@ class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
         super(NeZhaForQuestionAnswering, self).__init__(config)
         self.nezha = NeZhaModel(config)
         self.classifier = nn.Linear(config.hidden_size, 2)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -868,7 +864,6 @@ class NeZhaForSequenceClassification(NeZhaPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, self.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -944,16 +939,26 @@ class NeZhaForSequenceClassification(NeZhaPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_labels == 1:
+            if self.config.problem_type is None:
+                if self.num_labels == 1:
+                    self.config.problem_type = "regression"
+                elif self.num_labels > 1 and (labels.dtype == paddle.int64 or labels.dtype == paddle.int32):
+                    self.config.problem_type = "single_label_classification"
+                else:
+                    self.config.problem_type = "multi_label_classification"
+
+            if self.config.problem_type == "regression":
                 loss_fct = paddle.nn.MSELoss()
-                loss = loss_fct(logits, labels)
-            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                if self.num_labels == 1:
+                    loss = loss_fct(logits.squeeze(), labels.squeeze())
+                else:
+                    loss = loss_fct(logits, labels)
+            elif self.config.problem_type == "single_label_classification":
                 loss_fct = paddle.nn.CrossEntropyLoss()
                 loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
-            else:
+            elif self.config.problem_type == "multi_label_classification":
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
-
         if not return_dict:
             output = (logits,) + outputs[2:]
             return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)
@@ -984,7 +989,6 @@ class NeZhaForTokenClassification(NeZhaPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, self.num_labels)
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -1090,7 +1094,6 @@ class NeZhaForMultipleChoice(NeZhaPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.classifier = nn.Linear(config.hidden_size, 1)
-        self.apply(self.init_weights)
 
     def forward(
         self,

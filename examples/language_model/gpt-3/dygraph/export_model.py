@@ -102,7 +102,7 @@ def main():
     # ret =  model.generate(input_ids = data["input_ids"])
     for out_ids, in_txt in zip(ret[0].tolist(), input_text):
         print("==" * 30)
-        print(input_text + tokenizer.convert_ids_to_string(out_ids))
+        print(in_txt + tokenizer.convert_ids_to_string(out_ids))
 
     model = paddle.jit.to_static(
         model,

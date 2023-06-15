@@ -22,4 +22,4 @@ prompt = "a photo of an astronaut riding a horse on mars"
 image = pipe(prompt, guidance_scale=7.5).images[0]
 
 # 保存图片
-image.save("astronaut_rides_horse_ldm.png")
+image.save("text_to_image_generation-latent_diffusion-result.png")

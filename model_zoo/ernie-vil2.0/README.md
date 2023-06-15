@@ -232,7 +232,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" \
 * `weight_decay` 除了所有 bias 和 LayerNorm 权重之外，应用于所有层的权重衰减数值。可选；默认为 0.0。
 * `save_total_limit` 保存checkpoints的数目，默认-1，表示不设限制。
 * `seed` 随机种子，用于固定模型训练的随机因素。
-* `label_names`训练集中标签对应的的 key 名称。如果不传入，在训练时 Trainer 可能由于无法区分输入数据和标签造成错误。
+* `label_names`训练集中标签对应的 key 名称。如果不传入，在训练时 Trainer 可能由于无法区分输入数据和标签造成错误。
 * `data_root` 数据集的根目录路径。
 * `lr_scheduler_type` 学习率变化的类型，支持linear,cosine,constant等。
 * `recompute` 节省缓存的策略，是一种以时间换空间的技术。

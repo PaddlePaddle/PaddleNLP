@@ -44,11 +44,11 @@ filepath = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(filepath, "../"))
 # import lr  # noqa e402
 from args import parse_args  # noqa e402
+from configuration import GPTConfig
 from dataset import create_pretrained_dataset  # noqa e402
 from modeling import (  # noqa e402
     GPTForPretraining,
     GPTForPretrainingPipe,
-    GPTModel,
     GPTPretrainingCriterion,
 )
 
@@ -61,6 +61,7 @@ MODEL_CLASSES = {
 def set_hyrbid_parallel_seed(basic_seed, data_world_rank, mp_rank, pp_rank):
     assert args.device != "cpu"
 
+    basic_seed = basic_seed * 1000
     random.seed(basic_seed + data_world_rank)
     np.random.seed(basic_seed + data_world_rank)
     paddle.seed(basic_seed + data_world_rank)
@@ -199,10 +200,10 @@ def do_train(args):
         model_config["use_recompute"] = args.use_recompute
         model_config["enable_fuse_transformer"] = args.fuse_transformer
         if args.pp_degree == 1:
-            model = GPTForPretraining(GPTModel(**model_config))
+            model = GPTForPretraining(GPTConfig(**model_config))
         else:
-            model_config["topology"] = hcg.topology()
-            model = GPTForPretrainingPipe(**model_config)
+            topology = hcg.topology()
+            model = GPTForPretrainingPipe(GPTConfig(**model_config), topology)
     else:
         model = GPTForPretraining.from_pretrained(
             args.model_name_or_path,
@@ -280,6 +281,7 @@ def do_train(args):
     # decorate @to_static for benchmark, skip it by default.
     if args.to_static:
         specs = None
+        paddle.jit.ignore_module([os])
         model = paddle.jit.to_static(model, input_spec=specs)
         logger.info("Successfully to apply @to_static with specs: {}".format(specs))
 

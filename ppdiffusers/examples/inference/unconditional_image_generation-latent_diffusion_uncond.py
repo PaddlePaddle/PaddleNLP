@@ -21,4 +21,4 @@ pipe = LDMPipeline.from_pretrained("CompVis/ldm-celebahq-256")
 image = pipe(num_inference_steps=200).images[0]
 
 # 保存图片
-image.save("ldm_generated_image.png")
+image.save("unconditional_image_generation-latent_diffusion_uncond-result.png")

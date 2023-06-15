@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,10 +14,14 @@
 # limitations under the License.
 
 from functools import partial
+from typing import Optional
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+
+from ..initializer import zeros_
+from .attention import AdaGroupNorm
 
 
 class Upsample1D(nn.Layer):
@@ -375,7 +379,72 @@ class FirDownsample2D(nn.Layer):
         return hidden_states
 
 
+# downsample/upsample layer used in k-upscaler, might be able to use FirDownsample2D/DirUpsample2D instead
+class KDownsample2D(nn.Layer):
+    def __init__(self, pad_mode="reflect"):
+        super().__init__()
+        self.pad_mode = pad_mode
+        kernel_1d = paddle.to_tensor([[1 / 8, 3 / 8, 3 / 8, 1 / 8]])
+        self.pad = kernel_1d.shape[1] // 2 - 1
+        self.register_buffer("kernel", paddle.matmul(kernel_1d, kernel_1d, transpose_x=True), persistable=False)
+
+    def forward(self, x):
+        x = F.pad(x, (self.pad,) * 4, self.pad_mode)
+        weight = paddle.zeros([x.shape[1], x.shape[1], self.kernel.shape[0], self.kernel.shape[1]], dtype=x.dtype)
+        indices = paddle.arange(x.shape[1])
+        # TODO verify this method
+        weight[indices, indices] = self.kernel.cast(weight.dtype)
+        return F.conv2d(x, weight, stride=2)
+
+
+class KUpsample2D(nn.Layer):
+    def __init__(self, pad_mode="reflect"):
+        super().__init__()
+        self.pad_mode = pad_mode
+        kernel_1d = paddle.to_tensor([[1 / 8, 3 / 8, 3 / 8, 1 / 8]]) * 2
+        self.pad = kernel_1d.shape[1] // 2 - 1
+        self.register_buffer("kernel", paddle.matmul(kernel_1d, kernel_1d, transpose_x=True), persistable=False)
+
+    def forward(self, x):
+        x = F.pad(x, ((self.pad + 1) // 2,) * 4, self.pad_mode)
+        weight = paddle.zeros([x.shape[1], x.shape[1], self.kernel.shape[0], self.kernel.shape[1]], dtype=x.dtype)
+        indices = paddle.arange(x.shape[1])
+        # TODO verify this method
+        weight[indices, indices] = self.kernel.cast(weight.dtype)
+        return F.conv2d_transpose(x, weight, stride=2, padding=self.pad * 2 + 1)
+
+
 class ResnetBlock2D(nn.Layer):
+    r"""
+    A Resnet block.
+
+    Parameters:
+        in_channels (`int`): The number of channels in the input.
+        out_channels (`int`, *optional*, default to be `None`):
+            The number of output channels for the first conv2d layer. If None, same as `in_channels`.
+        dropout (`float`, *optional*, defaults to `0.0`): The dropout probability to use.
+        temb_channels (`int`, *optional*, default to `512`): the number of channels in timestep embedding.
+        groups (`int`, *optional*, default to `32`): The number of groups to use for the first normalization layer.
+        groups_out (`int`, *optional*, default to None):
+            The number of groups to use for the second normalization layer. if set to None, same as `groups`.
+        eps (`float`, *optional*, defaults to `1e-6`): The epsilon to use for the normalization.
+        non_linearity (`str`, *optional*, default to `"swish"`): the activation function to use.
+        time_embedding_norm (`str`, *optional*, default to `"default"` ): Time scale shift config.
+            By default, apply timestep embedding conditioning with a simple shift mechanism. Choose "scale_shift" or
+            "ada_group" for a stronger conditioning with scale and shift.
+        kernal (`paddle.Tensor`, optional, default to None): FIR filter, see
+            [`~models.resnet.FirUpsample2D`] and [`~models.resnet.FirDownsample2D`].
+        output_scale_factor (`float`, *optional*, default to be `1.0`): the scale factor to use for the output.
+        use_in_shortcut (`bool`, *optional*, default to `True`):
+            If `True`, add a 1x1 nn.conv2d layer for skip-connection.
+        up (`bool`, *optional*, default to `False`): If `True`, add an upsample layer.
+        down (`bool`, *optional*, default to `False`): If `True`, add a downsample layer.
+        conv_shortcut_bias (`bool`, *optional*, default to `True`):  If `True`, adds a learnable bias to the
+            `conv_shortcut` output.
+        conv_2d_out_channels (`int`, *optional*, default to `None`): the number of channels in the output.
+            If None, same as `out_channels`.
+    """
+
     def __init__(
         self,
         *,
@@ -389,13 +458,15 @@ class ResnetBlock2D(nn.Layer):
         pre_norm=True,
         eps=1e-6,
         non_linearity="swish",
-        time_embedding_norm="default",
+        time_embedding_norm="default",  # default, scale_shift, ada_group
         kernel=None,
         output_scale_factor=1.0,
         use_in_shortcut=None,
         up=False,
         down=False,
-        pre_temb_non_linearity=False,
+        conv_shortcut_bias: bool = True,
+        conv_2d_out_channels: Optional[int] = None,
+        pre_temb_non_linearity: bool = False,
     ):
         super().__init__()
         self.pre_temb_non_linearity = pre_temb_non_linearity
@@ -405,40 +476,50 @@ class ResnetBlock2D(nn.Layer):
         out_channels = in_channels if out_channels is None else out_channels
         self.out_channels = out_channels
         self.use_conv_shortcut = conv_shortcut
-        self.time_embedding_norm = time_embedding_norm
         self.up = up
         self.down = down
         self.output_scale_factor = output_scale_factor
+        self.time_embedding_norm = time_embedding_norm
 
         if groups_out is None:
             groups_out = groups
 
-        self.norm1 = nn.GroupNorm(num_groups=groups, num_channels=in_channels, epsilon=eps)
+        if self.time_embedding_norm == "ada_group":
+            self.norm1 = AdaGroupNorm(temb_channels, in_channels, groups, eps=eps)
+        else:
+            self.norm1 = nn.GroupNorm(num_groups=groups, num_channels=in_channels, epsilon=eps)
 
         self.conv1 = nn.Conv2D(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
 
         if temb_channels is not None:
             if self.time_embedding_norm == "default":
-                time_emb_proj_out_channels = out_channels
+                self.time_emb_proj = nn.Linear(temb_channels, out_channels)
             elif self.time_embedding_norm == "scale_shift":
-                time_emb_proj_out_channels = out_channels * 2
+                self.time_emb_proj = nn.Linear(temb_channels, 2 * out_channels)
+            elif self.time_embedding_norm == "ada_group":
+                self.time_emb_proj = None
             else:
                 raise ValueError(f"unknown time_embedding_norm : {self.time_embedding_norm} ")
-
-            self.time_emb_proj = nn.Linear(temb_channels, time_emb_proj_out_channels)
         else:
             self.time_emb_proj = None
 
-        self.norm2 = nn.GroupNorm(num_groups=groups_out, num_channels=out_channels, epsilon=eps)
+        if self.time_embedding_norm == "ada_group":
+            self.norm2 = AdaGroupNorm(temb_channels, out_channels, groups_out, eps=eps)
+        else:
+            self.norm2 = nn.GroupNorm(num_groups=groups_out, num_channels=out_channels, epsilon=eps)
+
         self.dropout = nn.Dropout(dropout)
-        self.conv2 = nn.Conv2D(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
+        conv_2d_out_channels = conv_2d_out_channels or out_channels
+        self.conv2 = nn.Conv2D(out_channels, conv_2d_out_channels, kernel_size=3, stride=1, padding=1)
 
         if non_linearity == "swish":
             self.nonlinearity = lambda x: F.silu(x)
         elif non_linearity == "mish":
-            self.nonlinearity = Mish()
+            self.nonlinearity = nn.Mish()
         elif non_linearity == "silu":
             self.nonlinearity = nn.Silu()
+        elif non_linearity == "gelu":
+            self.nonlinearity = nn.GELU()
 
         self.upsample = self.downsample = None
         if self.up:
@@ -458,16 +539,22 @@ class ResnetBlock2D(nn.Layer):
             else:
                 self.downsample = Downsample2D(in_channels, use_conv=False, padding=1, name="op")
 
-        self.use_in_shortcut = self.in_channels != self.out_channels if use_in_shortcut is None else use_in_shortcut
+        self.use_in_shortcut = self.in_channels != conv_2d_out_channels if use_in_shortcut is None else use_in_shortcut
 
         self.conv_shortcut = None
         if self.use_in_shortcut:
-            self.conv_shortcut = nn.Conv2D(in_channels, out_channels, kernel_size=1, stride=1, padding=0)
+            self.conv_shortcut = nn.Conv2D(
+                in_channels, conv_2d_out_channels, kernel_size=1, stride=1, padding=0, bias_attr=conv_shortcut_bias
+            )
 
     def forward(self, input_tensor, temb):
         hidden_states = input_tensor
 
-        hidden_states = self.norm1(hidden_states)
+        if self.time_embedding_norm == "ada_group":
+            hidden_states = self.norm1(hidden_states, temb)
+        else:
+            hidden_states = self.norm1(hidden_states)
+
         hidden_states = self.nonlinearity(hidden_states)
 
         if self.upsample is not None:
@@ -479,7 +566,7 @@ class ResnetBlock2D(nn.Layer):
 
         hidden_states = self.conv1(hidden_states)
 
-        if temb is not None:
+        if self.time_emb_proj is not None:
             if not self.pre_temb_non_linearity:
                 temb = self.time_emb_proj(self.nonlinearity(temb))[:, :, None, None]
             else:
@@ -488,10 +575,13 @@ class ResnetBlock2D(nn.Layer):
         if temb is not None and self.time_embedding_norm == "default":
             hidden_states = hidden_states + temb
 
-        hidden_states = self.norm2(hidden_states)
+        if self.time_embedding_norm == "ada_group":
+            hidden_states = self.norm2(hidden_states, temb)
+        else:
+            hidden_states = self.norm2(hidden_states)
 
         if temb is not None and self.time_embedding_norm == "scale_shift":
-            scale, shift = paddle.chunk(temb, 2, axis=1)
+            scale, shift = temb.chunk(2, axis=1)
             hidden_states = hidden_states * (1 + scale) + shift
 
         hidden_states = self.nonlinearity(hidden_states)
@@ -502,6 +592,7 @@ class ResnetBlock2D(nn.Layer):
         if self.conv_shortcut is not None:
             input_tensor = self.conv_shortcut(input_tensor)
 
+        # TODO this maybe result -inf, input_tensor's min value -57644  hidden_states's min value -10000
         output_tensor = (input_tensor + hidden_states) / self.output_scale_factor
 
         return output_tensor
@@ -596,15 +687,12 @@ def upsample_2d(hidden_states, kernel=None, factor=2, gain=1):
     if kernel is None:
         kernel = [1] * factor
 
-    kernel = paddle.to_tensor(kernel, dtype="float32")
+    kernel = paddle.to_tensor(kernel, dtype=paddle.float32)
     if kernel.ndim == 1:
         kernel = paddle.outer(kernel, kernel)
     kernel /= paddle.sum(kernel)
 
-    if gain != 1:
-        kernel = kernel * (gain * (factor**2))
-    else:
-        kernel = kernel * (factor**2)
+    kernel = kernel * (gain * (factor**2))
     pad_value = kernel.shape[0] - factor
     output = upfirdn2d_native(
         hidden_states,
@@ -637,7 +725,7 @@ def downsample_2d(hidden_states, kernel=None, factor=2, gain=1):
     if kernel is None:
         kernel = [1] * factor
 
-    kernel = paddle.to_tensor(kernel, dtype="float32")
+    kernel = paddle.to_tensor(kernel, dtype=paddle.float32)
     if kernel.ndim == 1:
         kernel = paddle.outer(kernel, kernel)
     kernel /= paddle.sum(kernel)
@@ -719,3 +807,58 @@ def upfirdn2d_native(tensor, kernel, up=1, down=1, pad=(0, 0)):
     out_w = (in_w * up_x + pad_x0 + pad_x1 - kernel_w) // down_x + 1
 
     return out.reshape([-1, channel, out_h, out_w])
+
+
+class TemporalConvLayer(nn.Layer):
+    """
+    Temporal convolutional layer that can be used for video (sequence of images) input Code mostly copied from:
+    https://github.com/modelscope/modelscope/blob/1509fdb973e5871f37148a4b5e5964cafd43e64d/modelscope/models/multi_modal/video_synthesis/unet_sd.py#L1016
+    """
+
+    def __init__(self, in_dim, out_dim=None, dropout=0.0):
+        super().__init__()
+        out_dim = out_dim or in_dim
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        self.conv1 = nn.Sequential(
+            nn.GroupNorm(num_groups=32, num_channels=in_dim),
+            nn.Silu(),
+            nn.Conv3D(in_channels=in_dim, out_channels=out_dim, kernel_size=(3, 1, 1), padding=(1, 0, 0)),
+        )
+        self.conv2 = nn.Sequential(
+            nn.GroupNorm(num_groups=32, num_channels=out_dim),
+            nn.Silu(),
+            nn.Dropout(p=dropout),
+            nn.Conv3D(in_channels=out_dim, out_channels=in_dim, kernel_size=(3, 1, 1), padding=(1, 0, 0)),
+        )
+        self.conv3 = nn.Sequential(
+            nn.GroupNorm(num_groups=32, num_channels=out_dim),
+            nn.Silu(),
+            nn.Dropout(p=dropout),
+            nn.Conv3D(in_channels=out_dim, out_channels=in_dim, kernel_size=(3, 1, 1), padding=(1, 0, 0)),
+        )
+        self.conv4 = nn.Sequential(
+            nn.GroupNorm(num_groups=32, num_channels=out_dim),
+            nn.Silu(),
+            nn.Dropout(p=dropout),
+            nn.Conv3D(in_channels=out_dim, out_channels=in_dim, kernel_size=(3, 1, 1), padding=(1, 0, 0)),
+        )
+        zeros_(self.conv4[-1].weight)
+        zeros_(self.conv4[-1].bias)
+
+    def forward(self, hidden_states, num_frames=1):
+        hidden_states = (
+            hidden_states[(None), :]
+            .reshape((-1, num_frames) + tuple(hidden_states.shape[1:]))
+            .transpose(perm=[0, 2, 1, 3, 4])
+        )
+        identity = hidden_states
+        hidden_states = self.conv1(hidden_states)
+        hidden_states = self.conv2(hidden_states)
+        hidden_states = self.conv3(hidden_states)
+        hidden_states = self.conv4(hidden_states)
+        hidden_states = identity + hidden_states
+        hidden_states = hidden_states.transpose(perm=[0, 2, 1, 3, 4]).reshape(
+            (hidden_states.shape[0] * hidden_states.shape[2], -1) + tuple(hidden_states.shape[3:])
+        )
+        return hidden_states

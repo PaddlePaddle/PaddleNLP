@@ -60,7 +60,7 @@ class MegatronBertPretrainedModel(PretrainedModel):
     base_model_prefix = "megatronbert"
     config_class = MegatronBertConfig
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # only support dygraph, use truncated_normal and make it inplace
@@ -332,9 +332,6 @@ class MegatronBertModel(MegatronBertPretrainedModel):
         self.encoder = MegatronBertEncoder(config)
         self.pooler = MegatronBertPooler(config)
 
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
-
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
 
@@ -443,9 +440,6 @@ class MegatronBertForQuestionAnswering(MegatronBertPretrainedModel):
         self.megatronbert = MegatronBertModel(config)
         self.qa_outputs = nn.Linear(config.hidden_size, 2)
 
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
-
     def forward(
         self,
         input_ids=None,
@@ -528,8 +522,6 @@ class MegatronBertForSequenceClassification(MegatronBertPretrainedModel):
         self.megatronbert = MegatronBertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-
-        self.apply(self.init_weights)
 
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
@@ -656,9 +648,6 @@ class MegatronBertForPreTraining(MegatronBertPretrainedModel):
         self.megatronbert = MegatronBertModel(config)
         self.cls = MegatronBertPreTrainingHeads(config)
 
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
-
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
         The MegatronBertForPreTraining forward method, overrides the __call__() special method.
@@ -726,9 +715,6 @@ class MegatronBertForCausalLM(MegatronBertPretrainedModel):
         self.megatronbert = MegatronBertModel(config)
         self.cls = MegatronBertOnlyMLMHead(config)
 
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
-
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
         The MegatronBertForCausalLM forward method, overrides the __call__() special method.
@@ -785,9 +771,6 @@ class MegatronBertForMaskedLM(MegatronBertPretrainedModel):
 
         self.megatronbert = MegatronBertModel(config)
         self.cls = MegatronBertOnlyMLMHead(config)
-
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -853,9 +836,6 @@ class MegatronBertForNextSentencePrediction(MegatronBertPretrainedModel):
         self.megatronbert = MegatronBertModel(config)
         self.cls = MegatronBertOnlyNSPHead(config)
 
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
-
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
         The MegatronBertForNextSentencePrediction forward method, overrides the __call__() special method.
@@ -913,9 +893,6 @@ class MegatronBertForMultipleChoice(MegatronBertPretrainedModel):
         self.megatronbert = MegatronBertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, 1)
-
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
 
     def forward(self, input_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
@@ -985,7 +962,6 @@ class MegatronBertForTokenClassification(MegatronBertPretrainedModel):
         self.megatronbert = MegatronBertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.num_labels)
-        self.apply(self.init_weights)
 
     def forward(self, input_ids=None, attention_mask=None, token_type_ids=None, position_ids=None):
         r"""

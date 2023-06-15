@@ -287,7 +287,7 @@ class CodeGenPreTrainedModel(PretrainedModel):
     config_class = CodeGenConfig
     base_model_prefix = "transformer"
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         """Initialize the weights."""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             if isinstance(layer.weight, paddle.Tensor) and paddle.get_default_dtype() == "float32":
@@ -334,9 +334,6 @@ class CodeGenModel(CodeGenPreTrainedModel):
         self.h = nn.LayerList([CodeGenBlock(config) for _ in range(config.n_layer)])
         self.ln_f = nn.LayerNorm(self.embed_dim, epsilon=config.layer_norm_epsilon)
         self.rotary_dim = min(config.rotary_dim, config.n_ctx // config.n_head)
-
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.wte
@@ -538,9 +535,6 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
         super().__init__(config)
         self.transformer = CodeGenModel(config)
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size)
-
-        # Initialize weights and apply final processing
-        self.apply(self.init_weights)
 
     def get_output_embeddings(self):
         return self.lm_head

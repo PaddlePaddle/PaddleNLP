@@ -12,18 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import math
 import os
-import random
 import sys
-import time
 
-import numpy as np
 import paddle
 import paddle.distributed as dist
-import yaml
-from paddle.distributed import fleet
 
 __dir__ = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(__dir__, "../../")))

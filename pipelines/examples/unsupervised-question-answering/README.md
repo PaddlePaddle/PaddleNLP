@@ -176,7 +176,7 @@ export PIPELINE_YAML_PATH=rest_api/pipeline/unsupervised_qa.yaml
 # 使用端口号8896启动模型服务
 python rest_api/application.py 8896
 ```
-Linux 用户推荐采用Shell脚本来启动服务：：
+Linux 用户推荐采用Shell脚本来启动服务：
 
 ```bash
 sh examples/unsupervised-question-answering/run_unsupervised_question_answering_server.sh
@@ -194,7 +194,7 @@ export API_ENDPOINT=http://127.0.0.1:8896
 # 在指定端口 8502 启动 WebUI
 python -m streamlit run ui/webapp_unsupervised_question_answering.py --server.port 8508
 ```
-Linux 用户推荐采用 Shell 脚本来启动服务：：
+Linux 用户推荐采用 Shell 脚本来启动服务：
 
 ```bash
 sh examples/unsupervised-question-answering/run_unsupervised_question_answering_web.sh

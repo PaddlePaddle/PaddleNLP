@@ -1,5 +1,5 @@
-# coding=utf-8
-# Copyright 2022 HuggingFace Inc.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import ppdiffusers
 from ppdiffusers import (
     DDIMScheduler,
     DDPMScheduler,
+    DEISMultistepScheduler,
     DPMSolverMultistepScheduler,
     DPMSolverSinglestepScheduler,
     EulerAncestralDiscreteScheduler,
@@ -39,12 +40,12 @@ from ppdiffusers import (
     PNDMScheduler,
     ScoreSdeVeScheduler,
     UnCLIPScheduler,
+    UniPCMultistepScheduler,
     VQDiffusionScheduler,
     logging,
 )
 from ppdiffusers.configuration_utils import ConfigMixin, register_to_config
 from ppdiffusers.schedulers.scheduling_utils import SchedulerMixin
-from ppdiffusers.utils import deprecate
 from ppdiffusers.utils.testing_utils import CaptureLogger
 
 
@@ -282,6 +283,11 @@ class SchedulerCommonTest(unittest.TestCase):
             elif num_inference_steps is not None and not hasattr(scheduler, "set_timesteps"):
                 kwargs["num_inference_steps"] = num_inference_steps
 
+            # Make sure `scale_model_input` is invoked to prevent a warning
+            if scheduler_class != VQDiffusionScheduler:
+                _ = scheduler.scale_model_input(sample, 0)
+                _ = new_scheduler.scale_model_input(sample, 0)
+
             # Set the seed before step() as some schedulers are stochastic like EulerAncestralDiscreteScheduler, EulerDiscreteScheduler
             if "generator" in set(inspect.signature(scheduler.step).parameters.keys()):
                 kwargs["generator"] = paddle.Generator().manual_seed(0)
@@ -451,7 +457,8 @@ class SchedulerCommonTest(unittest.TestCase):
 
     def test_scheduler_outputs_equivalence(self):
         def set_nan_tensor_to_zero(t):
-            t[t != t] = 0
+            zeros = paddle.zeros_like(t)
+            t = paddle.where(t == float("inf"), zeros, t)
             return t
 
         def recursive_check(tuple_object, dict_object):
@@ -535,8 +542,10 @@ class SchedulerCommonTest(unittest.TestCase):
                 )
                 self.assertTrue(
                     hasattr(scheduler, "scale_model_input"),
-                    f"{scheduler_class} does not implement a required class method `scale_model_input(sample,"
-                    " timestep)`",
+                    (
+                        f"{scheduler_class} does not implement a required class method `scale_model_input(sample,"
+                        " timestep)`"
+                    ),
                 )
             self.assertTrue(
                 hasattr(scheduler, "step"),
@@ -560,7 +569,7 @@ class SchedulerCommonTest(unittest.TestCase):
             scaled_sample = scheduler.scale_model_input(sample, 0.0)
             self.assertEqual(sample.shape, scaled_sample.shape)
 
-            noise = paddle.randn(scaled_sample.shape, dtype=scaled_sample.dtype)
+            noise = paddle.randn(scaled_sample.shape)
             t = scheduler.timesteps[5][None]
             noised = scheduler.add_noise(scaled_sample, noise, t)
             self.assertEqual(noised.shape, scaled_sample.shape)
@@ -592,7 +601,7 @@ class SchedulerCommonTest(unittest.TestCase):
                 continue
 
             scheduler_config = self.get_scheduler_config()
-            scheduler = scheduler_class(**scheduler_config, trained_betas=np.array([0.0, 0.1]))
+            scheduler = scheduler_class(**scheduler_config, trained_betas=np.array([0.1, 0.3]))
 
             with tempfile.TemporaryDirectory() as tmpdirname:
                 scheduler.save_pretrained(tmpdirname)
@@ -641,30 +650,6 @@ class DDPMSchedulerTest(SchedulerCommonTest):
         for prediction_type in ["epsilon", "sample", "v_prediction"]:
             self.check_over_configs(prediction_type=prediction_type)
 
-    def test_deprecated_predict_epsilon(self):
-        deprecate("remove this test", "0.13.0", "remove")
-        scheduler_class = self.scheduler_classes[0]
-        scheduler_config = self.get_scheduler_config()
-
-        sample = self.dummy_sample_deter
-        residual = 0.1 * self.dummy_sample_deter
-        time_step = 4
-
-        scheduler = scheduler_class(**scheduler_config)
-        scheduler_eps = scheduler_class(predict_epsilon=False, **scheduler_config)
-
-        kwargs = {}
-        if "generator" in set(inspect.signature(scheduler.step).parameters.keys()):
-            kwargs["generator"] = paddle.Generator().manual_seed(0)
-        output = scheduler.step(residual, time_step, sample, predict_epsilon=False, **kwargs).prev_sample
-
-        kwargs = {}
-        if "generator" in set(inspect.signature(scheduler.step).parameters.keys()):
-            kwargs["generator"] = paddle.Generator().manual_seed(0)
-        output_eps = scheduler_eps.step(residual, time_step, sample, predict_epsilon=False, **kwargs).prev_sample
-
-        assert (output - output_eps).abs().sum() < 1e-5
-
     def test_time_indices(self):
         for t in [0, 500, 999]:
             self.check_over_forward(time_step=t)
@@ -706,10 +691,9 @@ class DDPMSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert abs(result_sum.item() - 260.95678711) < 1e-2
-        assert abs(result_mean.item() - 0.33978748) < 1e-3
+        assert abs(result_sum.item() - 261.0068359375) < 1e-2
+        assert abs(result_mean.item() - 0.3407926857471466) < 1e-3
 
-    # TODO check
     def test_full_loop_with_v_prediction(self):
         scheduler_class = self.scheduler_classes[0]
         scheduler_config = self.get_scheduler_config(prediction_type="v_prediction")
@@ -738,8 +722,8 @@ class DDPMSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert abs(result_sum.item() - 202.75042724609375) < 1e-2
-        assert abs(result_mean.item() - 0.26399797201156616) < 1e-3
+        assert abs(result_sum.item() - 202.7893524169922) < 1e-2
+        assert abs(result_mean.item() - 0.26404863595962524) < 1e-3
 
 
 class DDIMSchedulerTest(SchedulerCommonTest):
@@ -1216,22 +1200,6 @@ class DPMSolverMultistepSchedulerTest(SchedulerCommonTest):
         result_mean = paddle.mean(paddle.abs(sample))
 
         assert abs(result_mean.item() - 0.2251) < 1e-3
-
-    # def test_fp16_support(self):
-    #     scheduler_class = self.scheduler_classes[0]
-    #     scheduler_config = self.get_scheduler_config(thresholding=True, dynamic_thresholding_ratio=0)
-    #     scheduler = scheduler_class(**scheduler_config)
-
-    #     num_inference_steps = 10
-    #     model = self.dummy_model()
-    #     sample = self.dummy_sample_deter.cast("float16")
-    #     scheduler.set_timesteps(num_inference_steps)
-
-    #     for i, t in enumerate(scheduler.timesteps):
-    #         residual = model(sample, t)
-    #         sample = scheduler.step(residual, t, sample).prev_sample
-
-    #     assert sample.dtype == paddle.float16
 
 
 class PNDMSchedulerTest(SchedulerCommonTest):
@@ -1742,6 +1710,30 @@ class LMSDiscreteSchedulerTest(SchedulerCommonTest):
         assert abs(result_sum.item() - 0.0017) < 1e-2
         assert abs(result_mean.item() - 2.2676e-06) < 1e-3
 
+    def test_full_loop_device(self):
+        scheduler_class = self.scheduler_classes[0]
+        scheduler_config = self.get_scheduler_config()
+        scheduler = scheduler_class(**scheduler_config)
+
+        scheduler.set_timesteps(self.num_inference_steps)
+
+        model = self.dummy_model()
+        sample = self.dummy_sample_deter * scheduler.init_noise_sigma
+
+        for i, t in enumerate(scheduler.timesteps):
+            sample = scheduler.scale_model_input(sample, t)
+
+            model_output = model(sample, t)
+
+            output = scheduler.step(model_output, t, sample)
+            sample = output.prev_sample
+
+        result_sum = paddle.sum(paddle.abs(sample))
+        result_mean = paddle.mean(paddle.abs(sample))
+
+        assert abs(result_sum.item() - 1006.388) < 1e-2
+        assert abs(result_mean.item() - 1.31) < 1e-3
+
 
 class EulerDiscreteSchedulerTest(SchedulerCommonTest):
     scheduler_classes = (EulerDiscreteScheduler,)
@@ -1826,6 +1818,32 @@ class EulerDiscreteSchedulerTest(SchedulerCommonTest):
         assert abs(result_sum.item() - 0.0002) < 1e-2
         assert abs(result_mean.item() - 2.2676e-06) < 1e-3
 
+    def test_full_loop_device(self):
+        scheduler_class = self.scheduler_classes[0]
+        scheduler_config = self.get_scheduler_config()
+        scheduler = scheduler_class(**scheduler_config)
+
+        scheduler.set_timesteps(self.num_inference_steps)
+
+        generator = paddle.Generator().manual_seed(0)
+
+        model = self.dummy_model()
+        sample = self.dummy_sample_deter * scheduler.init_noise_sigma
+
+        for t in scheduler.timesteps:
+            sample = scheduler.scale_model_input(sample, t)
+
+            model_output = model(sample, t)
+
+            output = scheduler.step(model_output, t, sample, generator=generator)
+            sample = output.prev_sample
+
+        result_sum = paddle.sum(paddle.abs(sample))
+        result_mean = paddle.mean(paddle.abs(sample))
+
+        assert abs(result_sum.item() - 10.0807) < 1e-2
+        assert abs(result_mean.item() - 0.0131) < 1e-3
+
 
 class EulerAncestralDiscreteSchedulerTest(SchedulerCommonTest):
     scheduler_classes = (EulerAncestralDiscreteScheduler,)
@@ -1881,8 +1899,8 @@ class EulerAncestralDiscreteSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert abs(result_sum.item() - 144.8084) < 1e-2
-        assert abs(result_mean.item() - 0.18855) < 1e-3
+        assert abs(result_sum.item() - 144.80836486816406) < 1e-2
+        assert abs(result_mean.item() - 0.18855257332324982) < 1e-3
 
     def test_full_loop_with_v_prediction(self):
         scheduler_class = self.scheduler_classes[0]
@@ -1907,8 +1925,33 @@ class EulerAncestralDiscreteSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert abs(result_sum.item() - 102.5807) < 1e-2
-        assert abs(result_mean.item() - 0.1335) < 1e-3
+        assert abs(result_sum.item() - 102.58072662353516) < 1e-2
+        assert abs(result_mean.item() - 0.133568674325943) < 1e-3
+
+    def test_full_loop_device(self):
+        scheduler_class = self.scheduler_classes[0]
+        scheduler_config = self.get_scheduler_config()
+        scheduler = scheduler_class(**scheduler_config)
+
+        scheduler.set_timesteps(self.num_inference_steps)
+        generator = paddle.Generator().manual_seed(0)
+
+        model = self.dummy_model()
+        sample = self.dummy_sample_deter * scheduler.init_noise_sigma
+
+        for t in scheduler.timesteps:
+            sample = scheduler.scale_model_input(sample, t)
+
+            model_output = model(sample, t)
+
+            output = scheduler.step(model_output, t, sample, generator=generator)
+            sample = output.prev_sample
+
+        result_sum = paddle.sum(paddle.abs(sample))
+        result_mean = paddle.mean(paddle.abs(sample))
+
+        assert abs(result_sum.item() - 144.80836486816406) < 1e-2
+        assert abs(result_mean.item() - 0.18855257332324982) < 1e-3
 
 
 class IPNDMSchedulerTest(SchedulerCommonTest):
@@ -2094,7 +2137,7 @@ class VQDiffusionSchedulerTest(SchedulerCommonTest):
         def model(sample, t, *args):
             batch_size, num_latent_pixels = sample.shape
             logits = paddle.rand((batch_size, num_vec_classes - 1, num_latent_pixels))
-            return_value = F.log_softmax(logits.cast("float64"), axis=1).cast("float32")
+            return_value = F.log_softmax(logits.double(), axis=1).cast("float32")
             return return_value
 
         return model
@@ -2142,6 +2185,10 @@ class HeunDiscreteSchedulerTest(SchedulerCommonTest):
         for schedule in ["linear", "scaled_linear"]:
             self.check_over_configs(beta_schedule=schedule)
 
+    def test_prediction_type(self):
+        for prediction_type in ["epsilon", "v_prediction"]:
+            self.check_over_configs(prediction_type=prediction_type)
+
     def test_full_loop_no_noise(self):
         scheduler_class = self.scheduler_classes[0]
         scheduler_config = self.get_scheduler_config()
@@ -2163,8 +2210,12 @@ class HeunDiscreteSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert abs(result_sum.item() - 0.0010020951740443707) < 1e-2
-        assert abs(result_mean.item() - 1.3048115761193912e-06) < 1e-3
+        assert abs(result_sum.item() - 0.1233) < 1e-2
+        assert abs(result_mean.item() - 0.0002) < 1e-3
+
+        # CUDA
+        # assert abs(result_sum.item() - 0.1233) < 1e-2
+        # assert abs(result_mean.item() - 0.0002) < 1e-3
 
     def test_full_loop_with_v_prediction(self):
         scheduler_class = self.scheduler_classes[0]
@@ -2187,8 +2238,40 @@ class HeunDiscreteSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert abs(result_sum.item() - 4.693428650170972e-07) < 1e-2
+        assert abs(result_sum.item() - 4.6934e-07) < 1e-2
+        assert abs(result_mean.item() - 6.1112e-10) < 1e-3
+        # # CUDA
+        # assert abs(result_sum.item() - 4.693428650170972e-07) < 1e-2
+        # assert abs(result_mean.item() - 0.0002) < 1e-3
+
+    def test_full_loop_device(self):
+        scheduler_class = self.scheduler_classes[0]
+        scheduler_config = self.get_scheduler_config()
+        scheduler = scheduler_class(**scheduler_config)
+
+        scheduler.set_timesteps(self.num_inference_steps)
+
+        model = self.dummy_model()
+        sample = self.dummy_sample_deter * scheduler.init_noise_sigma
+
+        for t in scheduler.timesteps:
+            sample = scheduler.scale_model_input(sample, t)
+
+            model_output = model(sample, t)
+
+            output = scheduler.step(model_output, t, sample)
+            sample = output.prev_sample
+
+        result_sum = paddle.sum(paddle.abs(sample))
+        result_mean = paddle.mean(paddle.abs(sample))
+
+        # The following sum varies between 148 and 156 on mps. Why?
+        assert abs(result_sum.item() - 0.1233) < 1e-2
         assert abs(result_mean.item() - 0.0002) < 1e-3
+
+        # # CUDA
+        # assert abs(result_sum.item() - 0.1233) < 1e-2
+        # assert abs(result_mean.item() - 0.0002) < 1e-3
 
 
 class KDPM2DiscreteSchedulerTest(SchedulerCommonTest):
@@ -2243,10 +2326,15 @@ class KDPM2DiscreteSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert abs(result_sum.item() - 4.693428650170972e-07) < 1e-2
-        assert abs(result_mean.item() - 0.0002) < 1e-3
+        assert abs(result_sum.item() - 4.6934e-07) < 1e-2
+        assert abs(result_mean.item() - 6.1112e-10) < 1e-3
+
+        # # CUDA
+        # assert abs(result_sum.item() - 4.693428650170972e-07) < 1e-2
+        # assert abs(result_mean.item() - 0.0002) < 1e-3
 
     def test_full_loop_no_noise(self):
+
         scheduler_class = self.scheduler_classes[0]
         scheduler_config = self.get_scheduler_config()
         scheduler = scheduler_class(**scheduler_config)
@@ -2269,6 +2357,404 @@ class KDPM2DiscreteSchedulerTest(SchedulerCommonTest):
 
         assert abs(result_sum.item() - 20.4125) < 1e-2
         assert abs(result_mean.item() - 0.0266) < 1e-3
+
+        # # CUDA
+        # assert abs(result_sum.item() - 20.4125) < 1e-2
+        # assert abs(result_mean.item() - 0.0266) < 1e-3
+
+    def test_full_loop_device(self):
+
+        scheduler_class = self.scheduler_classes[0]
+        scheduler_config = self.get_scheduler_config()
+        scheduler = scheduler_class(**scheduler_config)
+
+        scheduler.set_timesteps(self.num_inference_steps)
+
+        model = self.dummy_model()
+        sample = self.dummy_sample_deter * scheduler.init_noise_sigma
+
+        for t in scheduler.timesteps:
+            sample = scheduler.scale_model_input(sample, t)
+
+            model_output = model(sample, t)
+
+            output = scheduler.step(model_output, t, sample)
+            sample = output.prev_sample
+
+        result_sum = paddle.sum(paddle.abs(sample))
+        result_mean = paddle.mean(paddle.abs(sample))
+
+        # The following sum varies between 148 and 156 on mps. Why?
+        assert abs(result_sum.item() - 20.4125) < 1e-2
+        assert abs(result_mean.item() - 0.0266) < 1e-3
+
+        # # CUDA
+        # assert abs(result_sum.item() - 20.4125) < 1e-2
+        # assert abs(result_mean.item() - 0.0266) < 1e-3
+
+
+class DEISMultistepSchedulerTest(SchedulerCommonTest):
+    scheduler_classes = (DEISMultistepScheduler,)
+    forward_default_kwargs = (("num_inference_steps", 25),)
+
+    def get_scheduler_config(self, **kwargs):
+        config = {
+            "num_train_timesteps": 1000,
+            "beta_start": 0.0001,
+            "beta_end": 0.02,
+            "beta_schedule": "linear",
+            "solver_order": 2,
+        }
+
+        config.update(**kwargs)
+        return config
+
+    def check_over_configs(self, time_step=0, **config):
+        kwargs = dict(self.forward_default_kwargs)
+        num_inference_steps = kwargs.pop("num_inference_steps", None)
+        sample = self.dummy_sample
+        residual = 0.1 * sample
+        dummy_past_residuals = [residual + 0.2, residual + 0.15, residual + 0.10]
+
+        for scheduler_class in self.scheduler_classes:
+            scheduler_config = self.get_scheduler_config(**config)
+            scheduler = scheduler_class(**scheduler_config)
+            scheduler.set_timesteps(num_inference_steps)
+            # copy over dummy past residuals
+            scheduler.model_outputs = dummy_past_residuals[: scheduler.config.solver_order]
+
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                scheduler.save_config(tmpdirname)
+                new_scheduler = scheduler_class.from_pretrained(tmpdirname)
+                new_scheduler.set_timesteps(num_inference_steps)
+                # copy over dummy past residuals
+                new_scheduler.model_outputs = dummy_past_residuals[: new_scheduler.config.solver_order]
+
+            output, new_output = sample, sample
+            for t in range(time_step, time_step + scheduler.config.solver_order + 1):
+                output = scheduler.step(residual, t, output, **kwargs).prev_sample
+                new_output = new_scheduler.step(residual, t, new_output, **kwargs).prev_sample
+
+                assert paddle.sum(paddle.abs(output - new_output)) < 1e-5, "Scheduler outputs are not identical"
+
+    def test_from_save_pretrained(self):
+        pass
+
+    def check_over_forward(self, time_step=0, **forward_kwargs):
+        kwargs = dict(self.forward_default_kwargs)
+        num_inference_steps = kwargs.pop("num_inference_steps", None)
+        sample = self.dummy_sample
+        residual = 0.1 * sample
+        dummy_past_residuals = [residual + 0.2, residual + 0.15, residual + 0.10]
+
+        for scheduler_class in self.scheduler_classes:
+            scheduler_config = self.get_scheduler_config()
+            scheduler = scheduler_class(**scheduler_config)
+            scheduler.set_timesteps(num_inference_steps)
+
+            # copy over dummy past residuals (must be after setting timesteps)
+            scheduler.model_outputs = dummy_past_residuals[: scheduler.config.solver_order]
+
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                scheduler.save_config(tmpdirname)
+                new_scheduler = scheduler_class.from_pretrained(tmpdirname)
+                # copy over dummy past residuals
+                new_scheduler.set_timesteps(num_inference_steps)
+
+                # copy over dummy past residual (must be after setting timesteps)
+                new_scheduler.model_outputs = dummy_past_residuals[: new_scheduler.config.solver_order]
+
+            output = scheduler.step(residual, time_step, sample, **kwargs).prev_sample
+            new_output = new_scheduler.step(residual, time_step, sample, **kwargs).prev_sample
+
+            assert paddle.sum(paddle.abs(output - new_output)) < 1e-5, "Scheduler outputs are not identical"
+
+    def full_loop(self, **config):
+        scheduler_class = self.scheduler_classes[0]
+        scheduler_config = self.get_scheduler_config(**config)
+        scheduler = scheduler_class(**scheduler_config)
+
+        num_inference_steps = 10
+        model = self.dummy_model()
+        sample = self.dummy_sample_deter
+        scheduler.set_timesteps(num_inference_steps)
+
+        for i, t in enumerate(scheduler.timesteps):
+            residual = model(sample, t)
+            sample = scheduler.step(residual, t, sample).prev_sample
+
+        return sample
+
+    def test_step_shape(self):
+        kwargs = dict(self.forward_default_kwargs)
+
+        num_inference_steps = kwargs.pop("num_inference_steps", None)
+
+        for scheduler_class in self.scheduler_classes:
+            scheduler_config = self.get_scheduler_config()
+            scheduler = scheduler_class(**scheduler_config)
+
+            sample = self.dummy_sample
+            residual = 0.1 * sample
+
+            if num_inference_steps is not None and hasattr(scheduler, "set_timesteps"):
+                scheduler.set_timesteps(num_inference_steps)
+            elif num_inference_steps is not None and not hasattr(scheduler, "set_timesteps"):
+                kwargs["num_inference_steps"] = num_inference_steps
+
+            # copy over dummy past residuals (must be done after set_timesteps)
+            dummy_past_residuals = [residual + 0.2, residual + 0.15, residual + 0.10]
+            scheduler.model_outputs = dummy_past_residuals[: scheduler.config.solver_order]
+
+            time_step_0 = scheduler.timesteps[5]
+            time_step_1 = scheduler.timesteps[6]
+
+            output_0 = scheduler.step(residual, time_step_0, sample, **kwargs).prev_sample
+            output_1 = scheduler.step(residual, time_step_1, sample, **kwargs).prev_sample
+
+            self.assertEqual(output_0.shape, sample.shape)
+            self.assertEqual(output_0.shape, output_1.shape)
+
+    def test_timesteps(self):
+        for timesteps in [25, 50, 100, 999, 1000]:
+            self.check_over_configs(num_train_timesteps=timesteps)
+
+    def test_thresholding(self):
+        self.check_over_configs(thresholding=False)
+        for order in [1, 2, 3]:
+            for solver_type in ["logrho"]:
+                for threshold in [0.5, 1.0, 2.0]:
+                    for prediction_type in ["epsilon", "sample"]:
+                        self.check_over_configs(
+                            thresholding=True,
+                            prediction_type=prediction_type,
+                            sample_max_value=threshold,
+                            algorithm_type="deis",
+                            solver_order=order,
+                            solver_type=solver_type,
+                        )
+
+    def test_prediction_type(self):
+        for prediction_type in ["epsilon", "v_prediction"]:
+            self.check_over_configs(prediction_type=prediction_type)
+
+    def test_solver_order_and_type(self):
+        for algorithm_type in ["deis"]:
+            for solver_type in ["logrho"]:
+                for order in [1, 2, 3]:
+                    for prediction_type in ["epsilon", "sample"]:
+                        self.check_over_configs(
+                            solver_order=order,
+                            solver_type=solver_type,
+                            prediction_type=prediction_type,
+                            algorithm_type=algorithm_type,
+                        )
+                        sample = self.full_loop(
+                            solver_order=order,
+                            solver_type=solver_type,
+                            prediction_type=prediction_type,
+                            algorithm_type=algorithm_type,
+                        )
+                        assert not paddle.isnan(sample).any(), "Samples have nan numbers"
+
+    def test_lower_order_final(self):
+        self.check_over_configs(lower_order_final=True)
+        self.check_over_configs(lower_order_final=False)
+
+    def test_inference_steps(self):
+        for num_inference_steps in [1, 2, 3, 5, 10, 50, 100, 999, 1000]:
+            self.check_over_forward(num_inference_steps=num_inference_steps, time_step=0)
+
+    def test_full_loop_no_noise(self):
+        sample = self.full_loop()
+        result_mean = paddle.mean(paddle.abs(sample))
+
+        assert abs(result_mean.item() - 0.23916) < 1e-3
+
+    def test_full_loop_with_v_prediction(self):
+        sample = self.full_loop(prediction_type="v_prediction")
+        result_mean = paddle.mean(paddle.abs(sample))
+
+        assert abs(result_mean.item() - 0.091) < 1e-3
+
+
+class UniPCMultistepSchedulerTest(SchedulerCommonTest):
+    scheduler_classes = (UniPCMultistepScheduler,)
+    forward_default_kwargs = (("num_inference_steps", 25),)
+
+    def get_scheduler_config(self, **kwargs):
+        config = {
+            "num_train_timesteps": 1000,
+            "beta_start": 0.0001,
+            "beta_end": 0.02,
+            "beta_schedule": "linear",
+            "solver_order": 2,
+            "solver_type": "bh1",
+        }
+
+        config.update(**kwargs)
+        return config
+
+    def check_over_configs(self, time_step=0, **config):
+        kwargs = dict(self.forward_default_kwargs)
+        num_inference_steps = kwargs.pop("num_inference_steps", None)
+        sample = self.dummy_sample
+        residual = 0.1 * sample
+        dummy_past_residuals = [residual + 0.2, residual + 0.15, residual + 0.10]
+
+        for scheduler_class in self.scheduler_classes:
+            scheduler_config = self.get_scheduler_config(**config)
+            scheduler = scheduler_class(**scheduler_config)
+            scheduler.set_timesteps(num_inference_steps)
+            # copy over dummy past residuals
+            scheduler.model_outputs = dummy_past_residuals[: scheduler.config.solver_order]
+
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                scheduler.save_config(tmpdirname)
+                new_scheduler = scheduler_class.from_pretrained(tmpdirname)
+                new_scheduler.set_timesteps(num_inference_steps)
+                # copy over dummy past residuals
+                new_scheduler.model_outputs = dummy_past_residuals[: new_scheduler.config.solver_order]
+
+            output, new_output = sample, sample
+            for t in range(time_step, time_step + scheduler.config.solver_order + 1):
+                output = scheduler.step(residual, t, output, **kwargs).prev_sample
+                new_output = new_scheduler.step(residual, t, new_output, **kwargs).prev_sample
+
+                assert paddle.sum(paddle.abs(output - new_output)) < 1e-5, "Scheduler outputs are not identical"
+
+    def check_over_forward(self, time_step=0, **forward_kwargs):
+        kwargs = dict(self.forward_default_kwargs)
+        num_inference_steps = kwargs.pop("num_inference_steps", None)
+        sample = self.dummy_sample
+        residual = 0.1 * sample
+        dummy_past_residuals = [residual + 0.2, residual + 0.15, residual + 0.10]
+
+        for scheduler_class in self.scheduler_classes:
+            scheduler_config = self.get_scheduler_config()
+            scheduler = scheduler_class(**scheduler_config)
+            scheduler.set_timesteps(num_inference_steps)
+
+            # copy over dummy past residuals (must be after setting timesteps)
+            scheduler.model_outputs = dummy_past_residuals[: scheduler.config.solver_order]
+
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                scheduler.save_config(tmpdirname)
+                new_scheduler = scheduler_class.from_pretrained(tmpdirname)
+                # copy over dummy past residuals
+                new_scheduler.set_timesteps(num_inference_steps)
+
+                # copy over dummy past residual (must be after setting timesteps)
+                new_scheduler.model_outputs = dummy_past_residuals[: new_scheduler.config.solver_order]
+
+            output = scheduler.step(residual, time_step, sample, **kwargs).prev_sample
+            new_output = new_scheduler.step(residual, time_step, sample, **kwargs).prev_sample
+
+            assert paddle.sum(paddle.abs(output - new_output)) < 1e-5, "Scheduler outputs are not identical"
+
+    def full_loop(self, **config):
+        scheduler_class = self.scheduler_classes[0]
+        scheduler_config = self.get_scheduler_config(**config)
+        scheduler = scheduler_class(**scheduler_config)
+
+        num_inference_steps = 10
+        model = self.dummy_model()
+        sample = self.dummy_sample_deter
+        scheduler.set_timesteps(num_inference_steps)
+
+        for i, t in enumerate(scheduler.timesteps):
+            residual = model(sample, t)
+            sample = scheduler.step(residual, t, sample).prev_sample
+
+        return sample
+
+    def test_step_shape(self):
+        kwargs = dict(self.forward_default_kwargs)
+
+        num_inference_steps = kwargs.pop("num_inference_steps", None)
+
+        for scheduler_class in self.scheduler_classes:
+            scheduler_config = self.get_scheduler_config()
+            scheduler = scheduler_class(**scheduler_config)
+
+            sample = self.dummy_sample
+            residual = 0.1 * sample
+
+            if num_inference_steps is not None and hasattr(scheduler, "set_timesteps"):
+                scheduler.set_timesteps(num_inference_steps)
+            elif num_inference_steps is not None and not hasattr(scheduler, "set_timesteps"):
+                kwargs["num_inference_steps"] = num_inference_steps
+
+            # copy over dummy past residuals (must be done after set_timesteps)
+            dummy_past_residuals = [residual + 0.2, residual + 0.15, residual + 0.10]
+            scheduler.model_outputs = dummy_past_residuals[: scheduler.config.solver_order]
+
+            time_step_0 = scheduler.timesteps[5]
+            time_step_1 = scheduler.timesteps[6]
+
+            output_0 = scheduler.step(residual, time_step_0, sample, **kwargs).prev_sample
+            output_1 = scheduler.step(residual, time_step_1, sample, **kwargs).prev_sample
+
+            self.assertEqual(output_0.shape, sample.shape)
+            self.assertEqual(output_0.shape, output_1.shape)
+
+    def test_timesteps(self):
+        for timesteps in [25, 50, 100, 999, 1000]:
+            self.check_over_configs(num_train_timesteps=timesteps)
+
+    def test_thresholding(self):
+        self.check_over_configs(thresholding=False)
+        for order in [1, 2, 3]:
+            for solver_type in ["bh1", "bh2"]:
+                for threshold in [0.5, 1.0, 2.0]:
+                    for prediction_type in ["epsilon", "sample"]:
+                        self.check_over_configs(
+                            thresholding=True,
+                            prediction_type=prediction_type,
+                            sample_max_value=threshold,
+                            solver_order=order,
+                            solver_type=solver_type,
+                        )
+
+    def test_prediction_type(self):
+        for prediction_type in ["epsilon", "v_prediction"]:
+            self.check_over_configs(prediction_type=prediction_type)
+
+    def test_solver_order_and_type(self):
+        for solver_type in ["bh1", "bh2"]:
+            for order in [1, 2, 3]:
+                for prediction_type in ["epsilon", "sample"]:
+                    self.check_over_configs(
+                        solver_order=order,
+                        solver_type=solver_type,
+                        prediction_type=prediction_type,
+                    )
+                    sample = self.full_loop(
+                        solver_order=order,
+                        solver_type=solver_type,
+                        prediction_type=prediction_type,
+                    )
+                    assert not paddle.isnan(sample).any(), "Samples have nan numbers"
+
+    def test_lower_order_final(self):
+        self.check_over_configs(lower_order_final=True)
+        self.check_over_configs(lower_order_final=False)
+
+    def test_inference_steps(self):
+        for num_inference_steps in [1, 2, 3, 5, 10, 50, 100, 999, 1000]:
+            self.check_over_forward(num_inference_steps=num_inference_steps, time_step=0)
+
+    def test_full_loop_no_noise(self):
+        sample = self.full_loop()
+        result_mean = paddle.mean(paddle.abs(sample))
+
+        assert abs(result_mean.item() - 0.2521) < 1e-3
+
+    def test_full_loop_with_v_prediction(self):
+        sample = self.full_loop(prediction_type="v_prediction")
+        result_mean = paddle.mean(paddle.abs(sample))
+
+        assert abs(result_mean.item() - 0.1096) < 1e-3
 
 
 class KDPM2AncestralDiscreteSchedulerTest(SchedulerCommonTest):
@@ -2299,6 +2785,7 @@ class KDPM2AncestralDiscreteSchedulerTest(SchedulerCommonTest):
             self.check_over_configs(beta_schedule=schedule)
 
     def test_full_loop_no_noise(self):
+
         scheduler_class = self.scheduler_classes[0]
         scheduler_config = self.get_scheduler_config()
         scheduler = scheduler_class(**scheduler_config)
@@ -2321,8 +2808,8 @@ class KDPM2AncestralDiscreteSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert abs(result_sum.item() - 13913.0625) < 1e-2
-        assert abs(result_mean.item() - 18.115968704223633) < 5e-3
+        assert abs(result_sum.item() - 13913.0556640625) < 1e-2
+        assert abs(result_mean.item() - 18.11595916748047) < 5e-3
 
     def test_prediction_type(self):
         for prediction_type in ["epsilon", "v_prediction"]:
@@ -2351,8 +2838,34 @@ class KDPM2AncestralDiscreteSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert abs(result_sum.item() - 327.8027) < 1e-2
-        assert abs(result_mean.item() - 0.4268) < 1e-3
+        assert abs(result_sum.item() - 327.8027038574219) < 1e-2
+        assert abs(result_mean.item() - 0.4268264174461365) < 1e-3
+
+    def test_full_loop_device(self):
+
+        scheduler_class = self.scheduler_classes[0]
+        scheduler_config = self.get_scheduler_config()
+        scheduler = scheduler_class(**scheduler_config)
+
+        scheduler.set_timesteps(self.num_inference_steps)
+        generator = paddle.Generator().manual_seed(0)
+
+        model = self.dummy_model()
+        sample = self.dummy_sample_deter * scheduler.init_noise_sigma
+
+        for t in scheduler.timesteps:
+            sample = scheduler.scale_model_input(sample, t)
+
+            model_output = model(sample, t)
+
+            output = scheduler.step(model_output, t, sample, generator=generator)
+            sample = output.prev_sample
+
+        result_sum = paddle.sum(paddle.abs(sample))
+        result_mean = paddle.mean(paddle.abs(sample))
+
+        assert abs(result_sum.item() - 13913.0556640625) < 1e-1
+        assert abs(result_mean.item() - 18.11595916748047) < 1e-3
 
 
 # UnCLIPScheduler is a modified DDPMScheduler with a subset of the configuration.
@@ -2442,8 +2955,8 @@ class UnCLIPSchedulerTest(SchedulerCommonTest):
         result_sum = paddle.sum(paddle.abs(sample))
         result_mean = paddle.mean(paddle.abs(sample))
 
-        assert abs(result_sum.item() - 255.86758422851562) < 1e-2
-        assert abs(result_mean.item() - 0.333160936832428) < 1e-3
+        assert abs(result_sum.item() - 255.8675994873047) < 1e-2
+        assert abs(result_mean.item() - 0.33380165696144104) < 1e-3
 
     def test_full_loop_skip_timesteps(self):
         scheduler_class = self.scheduler_classes[0]

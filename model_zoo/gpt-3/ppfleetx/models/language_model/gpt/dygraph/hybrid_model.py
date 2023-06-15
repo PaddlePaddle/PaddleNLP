@@ -59,7 +59,10 @@ try:
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
-from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
+try:
+    from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
+except:
+    FusedDropoutAdd = None
 
 
 def get_attr(layer, name):
@@ -291,12 +294,14 @@ class MultiHeadAttention(nn.Layer):
             q = tensor.transpose(x=q, perm=perm)
             k = tensor.transpose(x=k, perm=perm)
             v = tensor.transpose(x=v, perm=perm)
-        out, weights = flash_attention(q, k, v, self.dropout, causal=True, return_softmax=self.need_weights)
+        out, weights = flash_attention(
+            q, k, v, self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
+        )
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
         if self.sequence_parallel:
             perm = [1, 0, 2]
             out = tensor.transpose(x=out, perm=perm)
-        return out, weights
+        return (out, weights) if self.need_weights else out
 
     def core_attn(self, q, k, v, attn_mask=None):
         perm = [1, 2, 0, 3] if self.sequence_parallel else [0, 2, 1, 3]
@@ -336,7 +341,7 @@ class MultiHeadAttention(nn.Layer):
         # else out shape is [b, s, h]
         out = tensor.reshape(x=out, shape=[0, 0, -1])
 
-        return out, weights
+        return (out, weights) if self.need_weights else out
 
     def forward(self, query, key, value, attn_mask=None, use_cache=False, cache=None):
         r"""
@@ -361,9 +366,12 @@ class MultiHeadAttention(nn.Layer):
             attn_func = self.core_attn
 
         if self.use_recompute and self.recompute_granularity == "core_attn" and self.do_recompute:
-            out, weights = recompute(attn_func, q, k, v, attn_mask)
+            out = recompute(attn_func, q, k, v, attn_mask)
         else:
-            out, weights = attn_func(q, k, v, attn_mask=attn_mask)
+            out = attn_func(q, k, v, attn_mask=attn_mask)
+
+        if self.need_weights:
+            out, weights = out
 
         # project to output
         # if sequence_parallel is true, out shape are [s/n, b, h],
@@ -493,6 +501,7 @@ class TransformerDecoderLayer(nn.Layer):
         do_recompute=True,
         skip_quant_tensors=[],
         use_flash_attn=False,
+        use_fused_dropout_add=True,
     ):
         self._config = locals()
         self._config.pop("self")
@@ -506,6 +515,10 @@ class TransformerDecoderLayer(nn.Layer):
         self.recompute_granularity = recompute_granularity
         self.sequence_parallel = sequence_parallel
         self.do_recompute = do_recompute
+        if not FusedDropoutAdd:
+            self.use_fused_dropout_add = False
+        else:
+            self.use_fused_dropout_add = use_fused_dropout_add
 
         if sequence_parallel:
             ColumnParallelLinear = ColumnSequenceParallelLinear
@@ -570,8 +583,12 @@ class TransformerDecoderLayer(nn.Layer):
             mark_as_sequence_parallel_parameter(self.norm1.bias)
             mark_as_sequence_parallel_parameter(self.norm2.weight)
             mark_as_sequence_parallel_parameter(self.norm2.bias)
-        self.fused_dropout_add1 = FusedDropoutAdd(dropout, mode="upscale_in_train")
-        self.fused_dropout_add2 = FusedDropoutAdd(act_dropout, mode="upscale_in_train")
+        if not self.use_fused_dropout_add:
+            self.dropout1 = nn.Dropout(dropout, mode="upscale_in_train")
+            self.dropout2 = nn.Dropout(act_dropout, mode="upscale_in_train")
+        else:
+            self.fused_dropout_add1 = FusedDropoutAdd(dropout, mode="upscale_in_train")
+            self.fused_dropout_add2 = FusedDropoutAdd(act_dropout, mode="upscale_in_train")
 
         self.activation = getattr(F, activation)
 
@@ -595,7 +612,10 @@ class TransformerDecoderLayer(nn.Layer):
         else:
             current_seed = "global_seed"
         with get_rng_state_tracker().rng_state(current_seed):
-            tgt = self.fused_dropout_add1(tgt, residual)
+            if not self.use_fused_dropout_add:
+                tgt = residual + self.dropout1(tgt)
+            else:
+                tgt = self.fused_dropout_add1(tgt, residual)
 
         if not self.normalize_before:
             tgt = self.norm1(tgt)
@@ -605,7 +625,10 @@ class TransformerDecoderLayer(nn.Layer):
             tgt = self.norm2(tgt)
 
         with get_rng_state_tracker().rng_state(current_seed):
-            tgt = self.fused_dropout_add2(self.linear2(F.gelu(self.linear1(tgt), approximate=True)), residual)
+            if not self.use_fused_dropout_add:
+                tgt = residual + self.linear2(F.gelu(self.linear1(tgt), approximate=True))
+            else:
+                tgt = self.fused_dropout_add2(self.linear2(F.gelu(self.linear1(tgt), approximate=True)), residual)
 
         if not self.normalize_before:
             tgt = self.norm2(tgt)
@@ -701,6 +724,7 @@ class GPTModelHybrid(nn.Layer):
         freeze_embedding=False,
         use_flash_attn=False,
         fused_softmax_with_triangular=False,
+        use_fused_dropout_add=True,
     ):
 
         super(GPTModelHybrid, self).__init__()
@@ -767,6 +791,7 @@ class GPTModelHybrid(nn.Layer):
                     do_recompute=i not in no_recompute_layers,
                     skip_quant_tensors=skip_tensor_map.get("block_{}".format(i), []),
                     use_flash_attn=use_flash_attn,
+                    use_fused_dropout_add=use_fused_dropout_add,
                 )
             )
 
@@ -902,7 +927,7 @@ class GPTPretrainingCriterionHybird(nn.Layer):
             loss_mask = loss_mask.transpose([1, 0])
 
         if mp_size > 1:
-            if paddle.is_compiled_with_cuda() and True:
+            if paddle.is_compiled_with_cuda() or paddle.is_compiled_with_xpu():
                 masked_lm_loss = self.parallel_loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
             else:
                 prediction_scores = ConcatSoftmaxInput.apply(
@@ -1004,6 +1029,7 @@ class GPTForPretrainingPipe(PipelineLayer):
         pp_recompute_interval=1,
         use_flash_attn=False,
         fused_softmax_with_triangular=False,
+        use_fused_dropout_add=True,
     ):
 
         # forward desc
@@ -1040,7 +1066,7 @@ class GPTForPretrainingPipe(PipelineLayer):
                 hidden_dropout_prob=hidden_dropout_prob,
                 max_position_embeddings=max_position_embeddings,
                 type_vocab_size=type_vocab_size,
-                initializer_range=0.02,
+                initializer_range=initializer_range,
                 sequence_parallel=sequence_parallel,
             )
         )
@@ -1072,6 +1098,7 @@ class GPTForPretrainingPipe(PipelineLayer):
                     sequence_parallel=sequence_parallel,
                     do_recompute=i not in no_recompute_layers,
                     use_flash_attn=use_flash_attn,
+                    use_fused_dropout_add=use_fused_dropout_add,
                 )
             )
 
@@ -1093,7 +1120,7 @@ class GPTForPretrainingPipe(PipelineLayer):
                 hidden_dropout_prob=hidden_dropout_prob,
                 max_position_embeddings=max_position_embeddings,
                 type_vocab_size=type_vocab_size,
-                initializer_range=0.02,
+                initializer_range=initializer_range,
             )
         )
 
@@ -1545,7 +1572,11 @@ class GPTForGenerationHybrid(nn.Layer):
 def get_triangle_upper_mask(x, mask):
     if mask is not None:
         return mask
-    mask = paddle.full_like(x, -np.inf)
+    if paddle.is_compiled_with_xpu():
+        # xpu does not support set constant to -np.inf
+        mask = paddle.full_like(x, -1e4)
+    else:
+        mask = paddle.full_like(x, -np.inf)
     mask.stop_gradient = True
     mask = paddle.triu(mask, diagonal=1)
     mask.stop_gradient = True

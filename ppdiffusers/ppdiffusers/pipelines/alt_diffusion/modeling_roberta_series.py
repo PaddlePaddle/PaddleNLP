@@ -1,5 +1,5 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Team. All rights reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,6 +45,7 @@ def create_position_ids_from_input_ids(input_ids, padding_idx, past_key_values_l
 class TransformationModelOutput(ModelOutput):
     """
     Base class for text model's outputs that also contains a pooling of the last hidden states.
+
     Args:
         text_embeds (`paddle.Tensor` of shape `(batch_size, output_dim)` *optional* returned when model is initialized with `with_projection=True`):
             The text embeddings obtained by applying the projection layer to the pooler_output.
@@ -53,10 +54,12 @@ class TransformationModelOutput(ModelOutput):
         hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
             Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
             one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
             Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
         attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
             Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
             sequence_length)`.
+
             Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
             heads.
     """
@@ -81,6 +84,7 @@ class RobertaSeriesConfig(XLMRobertaConfig):
         use_attention_mask=True,
         **kwargs,
     ):
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
         self.project_dim = project_dim
         self.pooler_fn = pooler_fn
@@ -97,6 +101,8 @@ class RobertaSeriesModelWithTransformation(RobertaPretrainedModel):
     def __init__(self, config: RobertaSeriesConfig):
         super().__init__(config)
         self.roberta = XLMRobertaModel(config)
+        # must reset _padding_idx
+        self.roberta.embeddings.word_embeddings._padding_idx = None
         self.transformation = nn.Linear(config.hidden_size, config.project_dim)
         self.apply(self.init_weights)
 

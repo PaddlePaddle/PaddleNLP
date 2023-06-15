@@ -25,7 +25,7 @@ from paddlenlp.trainer.integrations import (
     rewrite_logs,
 )
 from paddlenlp.utils.log import logger
-from ppdiffusers.modeling_utils import unwrap_model
+from ppdiffusers.training_utils import unwrap_model
 
 
 class VisualDLWithImageCallback(VisualDLCallback):
@@ -53,6 +53,8 @@ class VisualDLWithImageCallback(VisualDLCallback):
             control.should_log = True
 
     def on_log(self, args, state, control, logs=None, **kwargs):
+        if not state.is_world_process_zero:
+            return
         # log image on each node
         inputs = kwargs.get("inputs", None)
         model = kwargs.get("model", None)
@@ -73,9 +75,6 @@ class VisualDLWithImageCallback(VisualDLCallback):
                     height=args.resolution,
                     width=args.resolution,
                 )
-
-        if not state.is_world_process_zero:
-            return
 
         if self.vdl_writer is None:
             self._init_summary_writer(args)

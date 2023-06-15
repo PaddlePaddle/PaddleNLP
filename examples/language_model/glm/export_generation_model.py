@@ -17,24 +17,22 @@ import os
 
 import paddle
 
-from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
+from paddlenlp.peft import LoRAConfig, LoRAModel
+from paddlenlp.transformers import (
+    AutoConfig,
+    AutoModelForConditionalGeneration,
+    AutoTokenizer,
+)
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     # Required parameters
     parser.add_argument(
-        "--model_type",
+        "--model_name_or_path",
         default="THUDM/glm-large-chinese",
         type=str,
         # required=True,
-        help="Model type selected in the list",
-    )
-    parser.add_argument(
-        "--model_path",
-        default="output_generate/splits_mp_01_sharding_01_500/",
-        type=str,
-        required=False,
         help="Path of the trained model to be exported.",
     )
     parser.add_argument(
@@ -44,6 +42,8 @@ def parse_args():
         # required=True,
         help="The output file prefix used to save the exported inference model.",
     )
+    parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
+    parser.add_argument("--dtype", default=None, help="The data type of exported model")
     args = parser.parse_args()
     return args
 
@@ -51,8 +51,21 @@ def parse_args():
 def main():
     args = parse_args()
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
-    model = AutoModelForConditionalGeneration.from_pretrained(args.model_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    if args.lora_path is not None:
+        lora_config = LoRAConfig.from_pretrained(args.lora_path)
+        dtype = lora_config.dtype
+    elif args.dtype is not None:
+        dtype = args.dtype
+    else:
+        config = AutoConfig.from_pretrained(args.model_name_or_path)
+        dtype = config.dtype if config.dtype is not None else "float32"
+
+    model = AutoModelForConditionalGeneration.from_pretrained(
+        args.model_name_or_path, load_state_as_np=True, dtype=dtype
+    )
+    if args.lora_path is not None:
+        model = LoRAModel.from_pretrained(model, args.lora_path)
 
     model.eval()
     input_spec = [

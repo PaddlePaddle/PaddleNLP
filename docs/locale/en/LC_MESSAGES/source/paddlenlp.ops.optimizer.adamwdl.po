@@ -144,7 +144,7 @@ msgstr ""
 
 #: of paddlenlp.ops.optimizer.adamwdl.AdamWDL:66
 msgid ""
-"If it's not None, set_param_lr_fun() will set the the parameter learning "
+"If it's not None, set_param_lr_fun() will set the parameter learning "
 "rate before it executes Adam Operator. Defaults to "
 ":ref:`layerwise_lr_decay`."
 msgstr ""

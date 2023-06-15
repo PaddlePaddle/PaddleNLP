@@ -14,19 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import random
-import sys
-import os
-import unicodedata
-import re
-import logging
-import csv
 import argparse
+import csv
+import logging
+import os
+import random
+import re
+import unicodedata
 
 import numpy as np
 import paddle
 
-from paddlenlp.transformers import BertTokenizer, BertForPretraining
+from paddlenlp.transformers import BertForPretraining, BertTokenizer
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s", datefmt="%m/%d/%Y %H:%M:%S", level=logging.INFO
@@ -241,8 +240,6 @@ def _read_tsv(input_file, quotechar=None):
         reader = csv.reader(f, delimiter="\t", quotechar=quotechar)
         lines = []
         for line in reader:
-            if sys.version_info[0] == 2:
-                line = list(unicode(cell, "utf-8") for cell in line)
             lines.append(line)
         return lines
 
@@ -477,7 +474,6 @@ def main():
         "RTE": {"N": 30},
     }
 
-    device = paddle.set_device(args.device)
     if args.task_name in default_params:
         args.N = default_params[args.task_name]["N"]
 

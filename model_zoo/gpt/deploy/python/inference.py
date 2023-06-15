@@ -14,13 +14,15 @@
 
 import argparse
 import os
-from functools import partial
 
 import numpy as np
 import paddle
-from paddle import inference
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import GPTForGreedyGeneration, GPTChineseTokenizer, GPTTokenizer
+
+from paddlenlp.transformers import (
+    GPTChineseTokenizer,
+    GPTForGreedyGeneration,
+    GPTTokenizer,
+)
 
 MODEL_CLASSES = {
     "gpt-cn": (GPTForGreedyGeneration, GPTChineseTokenizer),

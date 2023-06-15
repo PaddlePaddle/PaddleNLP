@@ -110,7 +110,7 @@ def evaluate(model, metric, data_loader, memories0):
         preds = paddle.concat(preds_dict[qid], axis=0).unsqueeze(0)
         labels = paddle.concat(labels_dict[qid], axis=0).unsqueeze(0).squeeze(-1)
         length = paddle.concat(length_dict[qid], axis=0)
-        length = length.sum(axis=0)
+        length = length.sum(axis=0, keepdim=True)
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(length, preds, labels)
         metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(), num_correct_chunks.numpy())
     precision, recall, f1_score = metric.accumulate()
@@ -177,11 +177,11 @@ def do_train(args):
         no_entity_id=no_entity_id,
     )
 
-    train_dataloader = paddle.io.DataLoader.from_generator(capacity=70, return_list=True)
+    train_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
     train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
-    eval_dataloader = paddle.io.DataLoader.from_generator(capacity=70, return_list=True)
+    eval_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
     eval_dataloader.set_batch_generator(eval_ds_iter, paddle.get_device())
-    test_dataloader = paddle.io.DataLoader.from_generator(capacity=70, return_list=True)
+    test_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
     test_dataloader.set_batch_generator(test_ds_iter, paddle.get_device())
 
     num_training_examples = train_ds_iter.get_num_examples()

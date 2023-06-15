@@ -27,8 +27,7 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import set_seed
 from paddlenlp.utils.log import logger
-from ppdiffusers.modeling_utils import freeze_params, unwrap_model
-from ppdiffusers.training_utils import main_process_first
+from ppdiffusers.training_utils import freeze_params, main_process_first, unwrap_model
 
 
 def read_json(file):
@@ -63,9 +62,9 @@ def run_evaluate(vae, val_dataloader, writer, global_step):
         for k, v in log_dict_disc.items():
             log_dict_disc_all[k].append(v)
     for name, val in log_dict_ae_all.items():
-        writer.add_scalar(name, np.mean(val), step=global_step)
+        writer.add_scalar(name, np.mean(val), global_step)
     for name, val in log_dict_disc_all.items():
-        writer.add_scalar(name, np.mean(val), step=global_step)
+        writer.add_scalar(name, np.mean(val), global_step)
 
 
 def parse_args():
@@ -442,7 +441,7 @@ def main():
                     for name, val in logs.items():
                         if name == "epoch":
                             continue
-                        writer.add_scalar(name, val, step=global_step)
+                        writer.add_scalar(name, val, global_step)
 
                 if global_step % args.image_logging_steps == 0:
                     images_log = unwrap_model(vae).log_images(batch["image"])

@@ -750,7 +750,7 @@ public:
                     check_cuda_error(cudaGetLastError());
 #endif
 
-                    // reduce and concat the reuslt
+                    // reduce and concat the result
                     if(t_parallel_param_.world_size > 1)
                     {
                         PUSH_RANGE("After Transformer/all2all_gather")

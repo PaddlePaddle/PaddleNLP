@@ -17,8 +17,8 @@ export nlp_dir=${PWD}
 export log_path=${nlp_dir}/model_logs
 export cudaid1=$2
 export cudaid2=$3
-export PATH=${PATH}
-export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=/opt/_internal/cpython-3.7.0/lib/:${LD_LIBRARY_PATH}
+export PATH=/opt/_internal/cpython-3.7.0/bin/:${PATH}
 if [ ! -d "model_logs" ];then
     mkdir model_logs
 fi
@@ -1251,10 +1251,6 @@ ernie-1.0(){
     ernie
 }
 
-ernie-3.0(){
-    ernie
-}
-
 ernie_m(){
     ernie-m
 }
@@ -1277,5 +1273,10 @@ ernie_doc(){
 
 ernie_health(){
     ernie-health
+}
+
+gpt-3() {
+    bash ${nlp_dir}/scripts/regression/ci_gpt-3.sh
+    print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'`
 }
 $1

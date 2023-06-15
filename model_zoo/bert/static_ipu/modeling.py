@@ -13,15 +13,15 @@
 # limitations under the License.
 
 import logging
+from contextlib import ExitStack
+from typing import List, NamedTuple
 
 import numpy as np
 import paddle
+import paddle.fluid
 import paddle.nn as nn
 import paddle.static
-import paddle.fluid
 from paddle.nn import Layer
-from typing import List, NamedTuple, Optional
-from contextlib import ExitStack
 
 
 class DeviceScope(object):
@@ -266,7 +266,7 @@ class BertModel(Layer):
                     v = paddle.transpose(v, [0, 2, 1, 3])
 
                     # Attention calculation
-                    with paddle.static.name_scope(f"Z"):
+                    with paddle.static.name_scope("Z"):
                         if self.config.task == "PRETRAINING":
                             if attn_scope.index in self.masks:
                                 final_mask = self.masks[attn_scope.index]
@@ -339,11 +339,11 @@ class BertModel(Layer):
                 with paddle.static.name_scope(f"Layer{i}/FF"):
                     ff_linear1 = nn.Linear(self.config.hidden_size, 4 * self.config.hidden_size)
                     ff_linear2 = nn.Linear(4 * self.config.hidden_size, self.config.hidden_size)
-                    with paddle.static.name_scope(f"1"):
+                    with paddle.static.name_scope("1"):
                         ff = ff_linear1(attention)
                         ff.block.ops[-2]._set_attr("__available_memory", self.config.available_mem_proportion)
                     ff = paddle.fluid.layers.gelu(ff, approximate=True)
-                    with paddle.static.name_scope(f"2"):
+                    with paddle.static.name_scope("2"):
                         ff = ff_linear2(ff)
                         ff.block.ops[-2]._set_attr("__available_memory", self.config.available_mem_proportion)
                     ff = paddle.fluid.layers.dropout(

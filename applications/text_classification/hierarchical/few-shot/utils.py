@@ -20,7 +20,7 @@ from paddlenlp.datasets import load_dataset
 def load_local_dataset(data_path, splits, label_list):
     """
     Load dataset for hierachical classification from files, where
-    there is one example per line. Text and label are seperated
+    there is one example per line. Text and label are separated
     by '\t', and multiple labels are delimited by ','.
 
     Args:

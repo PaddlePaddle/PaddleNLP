@@ -21,4 +21,4 @@ image = load_image(url)
 pipe = VersatileDiffusionImageVariationPipeline.from_pretrained("shi-labs/versatile-diffusion")
 
 image = pipe(image).images[0]
-image.save("versatile-diffusion-car_variation.png")
+image.save("image_variation-versatile_diffusion-result.png")

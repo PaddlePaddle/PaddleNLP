@@ -482,7 +482,7 @@ python run_train.py \
 * `dev_path`：必须，验证集路径
 * `intent_label_path`：必须，意图标签文件路径。
 * `slot_label_path`：必须，槽位标签文件路径。
-* `label_names`：训练集中标签对应的的 key 名称。如果不传入，在训练时 Trainer 可能由于无法区分输入数据和标签造成错误。
+* `label_names`：训练集中标签对应的 key 名称。如果不传入，在训练时 Trainer 可能由于无法区分输入数据和标签造成错误。
 * `do_train`:是否进行微调训练，设置该参数表示进行微调训练。
 * `do_eval`:是否进行评估，设置该参数表示进行评估。
 * `do_export`：是否导出模型，设置该参数表示训练完成后导出预测模型。

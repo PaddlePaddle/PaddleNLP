@@ -26,8 +26,7 @@ from ppdiffusers import (
     LDMTextToImagePipeline,
     UNet2DConditionModel,
 )
-
-paddle.set_device("cpu")
+from ppdiffusers.pipelines.latent_diffusion import LDMBertConfig
 
 
 def parse_args():
@@ -130,7 +129,8 @@ def build_pipelines(
             f"The tokenizer's model_max_length {tokenizer.model_max_length}, while the text encoder's max_position_embeddings is {max_position_embeddings}, we will use {tokenizer.model_max_length} as max_position_embeddings!"
         )
         text_encoder_config["max_position_embeddings"] = tokenizer.model_max_length
-    text_encoder = LDMBertModel(**text_encoder_config)
+    cofnig = LDMBertConfig(**text_encoder_config)
+    text_encoder = LDMBertModel(cofnig)
     scheduler = DDIMScheduler(
         beta_start=0.00085,
         beta_end=0.012,

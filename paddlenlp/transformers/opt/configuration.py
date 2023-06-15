@@ -117,7 +117,12 @@ class OPTConfig(PretrainedConfig):
     >>> config = model.config
     ```"""
 
-    attribute_map: Dict[str, str] = {"dropout": "classifier_dropout", "num_classes": "num_labels"}
+    attribute_map: Dict[str, str] = {
+        "dropout": "classifier_dropout",
+        "num_classes": "num_labels",
+        "ffn_dim": "intermediate_size",
+        "activation_function": "hidden_act",
+    }
     pretrained_init_configuration = OPT_PRETRAINED_INIT_CONFIGURATION
     model_type = "opt"
 
@@ -139,6 +144,8 @@ class OPTConfig(PretrainedConfig):
         pad_token_id=1,
         bos_token_id=2,
         eos_token_id=2,
+        enable_bias: bool = True,
+        mp_degree: int = 1,
         **kwargs,
     ):
         super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
@@ -155,3 +162,6 @@ class OPTConfig(PretrainedConfig):
         self.attention_probs_dropout_prob = attention_probs_dropout_prob
         self.initializer_range = initializer_range
         self.type_vocab_size = type_vocab_size
+
+        self.enable_bias = enable_bias
+        self.mp_degree = mp_degree

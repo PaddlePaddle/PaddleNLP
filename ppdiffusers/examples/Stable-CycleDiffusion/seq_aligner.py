@@ -1,4 +1,5 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2023 The HuggingFace Team. All rights reserved.
 # Copyright 2022 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -123,7 +124,7 @@ def get_mapper(x: str, y: str, tokenizer, max_len=77):
         dtype=paddle.int64,
     )
     mapper[: mapper_base.shape[0]] = mapper_base[:, 1]
-    mapper[mapper_base.shape[0] :] = len(y_seq) + paddle.arange(max_len - len(y_seq))
+    mapper[mapper_base.shape[0] :] = len(y_seq) + paddle.arange(max_len - len(y_seq), dtype="int64")
     return mapper, alphas
 
 

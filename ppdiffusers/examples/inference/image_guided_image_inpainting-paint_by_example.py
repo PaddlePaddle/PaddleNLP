@@ -30,4 +30,4 @@ pipe = PaintByExamplePipeline.from_pretrained("Fantasy-Studio/Paint-by-Example")
 # 使用fp16加快生成速度
 with paddle.amp.auto_cast(True):
     image = pipe(image=init_image, mask_image=mask_image, example_image=example_image).images[0]
-image.save("paint_by_example_test.png")
+image.save("image_guided_image_inpainting-paint_by_example-result.png")

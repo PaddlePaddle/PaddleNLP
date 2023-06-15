@@ -14,10 +14,10 @@
 
 import h5py
 import numpy as np
-
 import paddle
 from paddle.io import DataLoader, Dataset
-from paddlenlp.data import Tuple, Stack
+
+from paddlenlp.data import Stack
 
 
 def create_pretraining_dataset(input_file, max_pred_length, args, data_holders, worker_init=None, places=None):
@@ -31,8 +31,8 @@ def create_pretraining_dataset(input_file, max_pred_length, args, data_holders, 
         # masked_lm_labels, next_sentence_labels, mask_token_num
         for i in (0, 1, 2, 5):
             out[i] = stack_fn([x[i] for x in data])
-        batch_size, seq_length = out[0].shape
-        size = num_mask = sum(len(x[3]) for x in data)
+        _, seq_length = out[0].shape
+        size = sum(len(x[3]) for x in data)
         # Padding for divisibility by 8 for fp16 or int8 usage
         if size % 8 != 0:
             size += 8 - (size % 8)
@@ -124,10 +124,10 @@ class PretrainingDataset(Dataset):
         padded_mask_indices = (masked_lm_positions == 0).nonzero()[0]
         if len(padded_mask_indices) != 0:
             index = padded_mask_indices[0].item()
-            mask_token_num = index
+            # mask_token_num = index
         else:
             index = self.max_pred_length
-            mask_token_num = self.max_pred_length
+            # mask_token_num = self.max_pred_length
         # masked_lm_labels = np.full(input_ids.shape, -1, dtype=np.int64)
         # masked_lm_labels[masked_lm_positions[:index]] = masked_lm_ids[:index]
         masked_lm_labels = masked_lm_ids[:index]

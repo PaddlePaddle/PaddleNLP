@@ -14,7 +14,7 @@
 
 import os
 from shutil import copyfile
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import sentencepiece as spm
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 ETH Zurich Computer Vision Lab and The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,7 +22,7 @@ import paddle
 import paddle.nn.functional as F
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import BaseOutput
+from ..utils import BaseOutput, randn_tensor
 from .scheduling_utils import SchedulerMixin
 
 
@@ -44,6 +44,7 @@ class RePaintSchedulerOutput(BaseOutput):
     pred_original_sample: paddle.Tensor
 
 
+# Copied from ppdiffusers.schedulers.scheduling_ddpm.betas_for_alpha_bar
 def betas_for_alpha_bar(num_diffusion_timesteps, max_beta=0.999):
     """
     Create a beta schedule that discretizes the given alpha_t_bar function, which defines the cumulative product of
@@ -70,7 +71,7 @@ def betas_for_alpha_bar(num_diffusion_timesteps, max_beta=0.999):
         t1 = i / num_diffusion_timesteps
         t2 = (i + 1) / num_diffusion_timesteps
         betas.append(min(1 - alpha_bar(t2) / alpha_bar(t1), max_beta))
-    return paddle.to_tensor(betas, dtype="float32")
+    return paddle.to_tensor(betas, dtype=paddle.float32)
 
 
 class RePaintScheduler(SchedulerMixin, ConfigMixin):
@@ -120,10 +121,12 @@ class RePaintScheduler(SchedulerMixin, ConfigMixin):
         if trained_betas is not None:
             self.betas = paddle.to_tensor(trained_betas)
         elif beta_schedule == "linear":
-            self.betas = paddle.linspace(beta_start, beta_end, num_train_timesteps, dtype="float32")
+            self.betas = paddle.linspace(beta_start, beta_end, num_train_timesteps, dtype=paddle.float32)
         elif beta_schedule == "scaled_linear":
             # this schedule is very specific to the latent diffusion model.
-            self.betas = paddle.linspace(beta_start**0.5, beta_end**0.5, num_train_timesteps, dtype="float32") ** 2
+            self.betas = (
+                paddle.linspace(beta_start**0.5, beta_end**0.5, num_train_timesteps, dtype=paddle.float32) ** 2
+            )
         elif beta_schedule == "squaredcos_cap_v2":
             # Glide cosine schedule
             self.betas = betas_for_alpha_bar(num_train_timesteps)
@@ -269,7 +272,7 @@ class RePaintScheduler(SchedulerMixin, ConfigMixin):
         # been observed.
 
         # 5. Add noise
-        noise = paddle.randn(model_output.shape, dtype=model_output.dtype, generator=generator)
+        noise = randn_tensor(model_output.shape, generator=generator, dtype=model_output.dtype)
         std_dev_t = self.eta * self._get_variance(timestep) ** 0.5
 
         variance = 0
@@ -302,7 +305,7 @@ class RePaintScheduler(SchedulerMixin, ConfigMixin):
 
         for i in range(n):
             beta = self.betas[timestep + i]
-            noise = paddle.randn(sample.shape, dtype=sample.dtype, generator=generator)
+            noise = randn_tensor(sample.shape, generator=generator, dtype=sample.dtype)
 
             # 10. Algorithm 1 Line 10 https://arxiv.org/pdf/2201.09865.pdf
             sample = (1 - beta) ** 0.5 * sample + beta**0.5 * noise

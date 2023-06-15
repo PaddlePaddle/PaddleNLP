@@ -19,7 +19,7 @@ import json
 import os
 from collections import OrderedDict
 
-from ...utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
+from ...utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
 from ...utils.import_utils import import_module
 from ...utils.log import logger
 from ..utils import resolve_cache_dir
@@ -34,6 +34,8 @@ PROCESSOR_MAPPING_NAMES = OrderedDict(
         ("CLIPProcessor", "clip"),
         ("ErnieViLProcessor", "ernie_vil"),
         ("CLIPSegProcessor", "clipseg"),
+        ("SpeechT5Processor", "speecht5"),
+        ("ClapProcessor", "clap"),
     ]
 )
 
@@ -160,7 +162,7 @@ class AutoProcessor:
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.processor_config_file]
             )
             try:
-                resolved_vocab_file = get_path_from_url(community_config_path, cache_dir)
+                resolved_vocab_file = get_path_from_url_with_filelock(community_config_path, cache_dir)
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(

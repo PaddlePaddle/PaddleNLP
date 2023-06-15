@@ -63,8 +63,6 @@ def generate_images(
             beta_start=beta_start,
             beta_end=beta_end,
             beta_schedule="scaled_linear",
-            # Make sure the scheduler compatible with DDIM
-            clip_sample=False,
             set_alpha_to_one=False,
             steps_offset=1,
             # Make sure the scheduler compatible with PNDM

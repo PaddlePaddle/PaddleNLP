@@ -53,7 +53,7 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
     config_class = UnifiedTransformerConfig
     base_model_prefix = "unified_transformer"
 
-    def init_weights(self, layer):
+    def _init_weights(self, layer):
         # Initialization hook
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -178,7 +178,6 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
         )
         encoder_norm = nn.LayerNorm(config.hidden_size)
         self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers, encoder_norm)
-        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -371,7 +370,6 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
             config.hidden_act,
             self.unified_transformer.embeddings.word_embeddings.weight,
         )
-        self.apply(self.init_weights)
 
     def forward(
         self,
@@ -576,10 +574,7 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
         try:
             return super().__getattr__(name)
         except AttributeError:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                return getattr(getattr(self, self.base_model_prefix).config, name)
+            return getattr(getattr(self, self.base_model_prefix), name)
 
 
 UnifiedTransformerForMaskedLM = UnifiedTransformerLMHeadModel

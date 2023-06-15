@@ -67,7 +67,7 @@ parser.add_argument("--layerwise_decay", default=1.0, type=float, help="Layerwis
 parser.add_argument("--max_steps", default=-1, type=int,
                     help="If > 0: set total number of training steps to perform. Override num_train_epochs.", )
 parser.add_argument("--test_results_file", default="./test_restuls.json", type=str,
-                    help="The file path you would like to save the model ouputs on test dataset.")
+                    help="The file path you would like to save the model outputs on test dataset.")
 
 args = parser.parse_args()
 # yapf: enable
@@ -217,11 +217,11 @@ def do_train(args):
         preprocess_text_fn=preprocess_text_fn,
     )
 
-    train_dataloader = paddle.io.DataLoader.from_generator(capacity=70, return_list=True)
+    train_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
     train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
-    eval_dataloader = paddle.io.DataLoader.from_generator(capacity=70, return_list=True)
+    eval_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
     eval_dataloader.set_batch_generator(eval_ds_iter, paddle.get_device())
-    test_dataloader = paddle.io.DataLoader.from_generator(capacity=70, return_list=True)
+    test_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
     test_dataloader.set_batch_generator(test_ds_iter, paddle.get_device())
 
     num_training_examples = train_ds_iter.get_num_examples()

@@ -83,7 +83,7 @@ def load_word_embeddings(input_vocabulary, output_vocabulary, output_vocabulary_
 
     if params.reload_embedding == 1:
         input_vocabulary_embeddings = np.load(params.data_directory + "/input_embeddings.npy")
-        output_vocabulary_embeddings = np.load(params.data_directory + "/ouput_embeddings.npy")
+        output_vocabulary_embeddings = np.load(params.data_directory + "/output_embeddings.npy")
         output_vocabulary_schema_embeddings = np.load(params.data_directory + "/output_schema_embeddings.npy")
         input_embedding_size = 300
         return (
@@ -143,7 +143,7 @@ def load_word_embeddings(input_vocabulary, output_vocabulary, output_vocabulary_
         output_vocabulary_schema_embeddings = create_word_embeddings(output_vocabulary_schema)
 
     np.save(params.data_directory + "/input_embeddings", input_vocabulary_embeddings)
-    np.save(params.data_directory + "/ouput_embeddings", output_vocabulary_embeddings)
+    np.save(params.data_directory + "/output_embeddings", output_vocabulary_embeddings)
     np.save(params.data_directory + "/output_schema_embeddings", output_vocabulary_schema_embeddings)
 
     return (
