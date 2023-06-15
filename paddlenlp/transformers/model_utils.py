@@ -1748,7 +1748,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 " to use it for predictions and inference."
             )
 
-        return model_to_load, missing_keys, unexpected_keys, mismatched_keys
+        return model, missing_keys, unexpected_keys, mismatched_keys
 
     @classmethod
     def from_pretrained(
