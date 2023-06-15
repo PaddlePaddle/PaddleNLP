@@ -19,14 +19,13 @@ import inspect
 import json
 import os
 import re
-import shutil
 import tempfile
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
 
 import numpy as np
 import paddle
-import paddle.distributed as dist
 import paddle.nn as nn
 import six
 
@@ -44,22 +43,19 @@ from paddle import Tensor
 from paddle.nn import Embedding, Layer
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
-from paddle.utils.download import is_url
 from paddle.utils.download import is_url as is_remote_url
 from tqdm.auto import tqdm
 
 from paddlenlp import __version__
 from paddlenlp.utils.downloader import (
-    COMMUNITY_MODEL_PREFIX,
     download_check,
     get_path_from_url_with_filelock,
     hf_file_exists,
-    url_file_exists,
 )
 from paddlenlp.utils.env import (
     CONFIG_NAME,
-    ENABLE_TORCH_CHECKPOINT,
     LEGACY_CONFIG_NAME,
+    MODEL_HOME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
     PYTORCH_WEIGHTS_NAME,
@@ -373,6 +369,59 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike]):
     return paddlenlp_load(checkpoint_file, return_numpy=True)
 
 
+def cached_file_for_hf_hub(
+    path_or_repo_id: Union[str, os.PathLike],
+    filename: str,
+    cache_dir: Optional[Union[str, os.PathLike]] = None,
+    subfolder: str = "",
+    _raise_exceptions_for_missing_entries: bool = True,
+):
+
+    if subfolder is None:
+        subfolder = ""
+
+    path_or_repo_id = str(path_or_repo_id)
+    full_filename = os.path.join(subfolder, filename)
+    if os.path.isdir(path_or_repo_id):
+        resolved_file = os.path.join(os.path.join(path_or_repo_id, subfolder), filename)
+        if not os.path.isfile(resolved_file):
+            if _raise_exceptions_for_missing_entries:
+                raise EnvironmentError(
+                    f"{path_or_repo_id} does not appear to have a file named {full_filename}. Checkout "
+                    f"'https://huggingface.co/{path_or_repo_id}' for available files."
+                )
+            else:
+                return None
+        return resolved_file
+
+    if cache_dir is None:
+        # cache_dir = TRANSFORMERS_CACHE
+        cache_dir = os.path.join(MODEL_HOME, ".cache")
+    if isinstance(cache_dir, Path):
+        cache_dir = str(cache_dir)
+
+    try:
+        # Load from URL or cache if already cached
+        download_check(path_or_repo_id, full_filename, addition="from_hf_hub")
+        resolved_file = hf_hub_download(
+            repo_id=path_or_repo_id,
+            filename=full_filename,
+            cache_dir=cache_dir,
+            subfolder=subfolder,
+            library_name="PaddleNLP",
+            library_version=__version__,
+        )
+        return resolved_file
+    except Exception as e:
+        print(e)
+        raise EnvironmentError(
+            f"{path_or_repo_id} is not a local folder and is not a valid model identifier "
+            "listed on 'https://huggingface.co/models'\nIf this is a private repository, make sure to "
+            "pass a token having permission to this repo with `use_auth_token` or log in with "
+            "`huggingface-cli login` and pass `use_auth_token=True`."
+        )
+
+
 def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conversion: bool, subfolder=None):
     """find the suitable weight file name
 
@@ -382,31 +431,30 @@ def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conver
         support_conversion (bool): whether support converting pytorch weight file to paddle weight file
         subfolder (str, optional) An optional value corresponding to a folder inside the repo.
     """
-
-    if hf_file_exists(repo_id, PADDLE_WEIGHTS_NAME, subfolder=subfolder):
-        file_name = PADDLE_WEIGHTS_NAME
-    elif hf_file_exists(repo_id, PYTORCH_WEIGHTS_NAME, subfolder=subfolder):
-        if not support_conversion:
+    is_local = os.path.isdir(repo_id)
+    if not is_local:
+        if hf_file_exists(repo_id, PADDLE_WEIGHTS_NAME, subfolder=subfolder):
+            file_name = PADDLE_WEIGHTS_NAME
+            assert (
+                support_conversion is False
+            ), "Please call set convert_from_torch for paddle weights on huggingface hub, eg. Model.from_pretrained(model_name, from_hf_hub=True, convert_from_torch=False)"
+        elif hf_file_exists(repo_id, PYTORCH_WEIGHTS_NAME, subfolder=subfolder):
+            if not support_conversion:
+                raise EntryNotFoundError(
+                    f"can not download `{PADDLE_WEIGHTS_NAME} from https://huggingface.co/{repo_id}` "
+                    "and current model doesn't support conversion from pytorch weight file to paddle weight file"
+                )
+            file_name = PYTORCH_WEIGHTS_NAME
+        else:
             raise EntryNotFoundError(
-                f"can not download `{PADDLE_WEIGHTS_NAME} from https://huggingface.co/{repo_id}` "
-                "and current model doesn't support conversion from pytorch weight file to paddle weight file"
+                message=f"can not find the paddle/pytorch weight file from: https://huggingface.co/{repo_id}",
+                response=None,
             )
-        file_name = PYTORCH_WEIGHTS_NAME
     else:
-        raise EntryNotFoundError(
-            message=f"can not find the paddle/pytorch weight file from: https://huggingface.co/{repo_id}",
-            response=None,
-        )
+        # for local file, we use support_conversion to select paddle or torch weight.
+        file_name = PYTORCH_WEIGHTS_NAME if support_conversion else PADDLE_WEIGHTS_NAME
 
-    download_check(repo_id, file_name, addition="from_hf_hub")
-    return hf_hub_download(
-        repo_id=repo_id,
-        filename=file_name,
-        cache_dir=cache_dir,
-        subfolder=subfolder,
-        library_name="PaddleNLP",
-        library_version=__version__,
-    )
+    return cached_file_for_hf_hub(repo_id, file_name, cache_dir, subfolder)
 
 
 def register_base_model(cls):
@@ -1264,14 +1312,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         return super(PretrainedModel, self).__setattr__(name, value)
 
     @classmethod
-    def _resolve_model_file_path_v2(
+    def _resolve_model_file_path(
         cls: Type[PretrainedModel],
         pretrained_model_name_or_path: str,
         from_hf_hub: bool = False,
         cache_dir: str | None = None,
         subfolder: str = "",
         config: PretrainedConfig = None,
-        support_conversion: bool = False,
+        convert_from_torch: bool = False,
         variant=None,
     ) -> str:
 
@@ -1291,7 +1339,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             cls (Type[PretrainedModel]): the inherited PretrainedModel class
             pretrained_model_name_or_path (str): the model-name/url/local_dir/local_dir
             cache_dir (Optional[str], optional): cache_dir is used when name_or_path is model-name/url. Defaults to None.
-            support_conversion (bool, optional): whether support convert pytorch model to paddle model
+            convert_from_torch (bool, optional): whether support convert pytorch model to paddle model
 
         Returns:
             str: the model weight file path
@@ -1300,11 +1348,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         sharded_metadata = None
 
         # -1. when it's from HF
-        if from_hf_hub:
+        if from_hf_hub or convert_from_torch:
             resolved_archive_file = resolve_weight_file_from_hf_hub(
                 pretrained_model_name_or_path,
                 cache_dir=cache_dir,
-                support_conversion=support_conversion,
+                support_conversion=convert_from_torch,
                 subfolder=subfolder,
             )
             return resolved_archive_file, sharded_metadata, is_sharded
@@ -1350,6 +1398,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
                     is_sharded = True
                 # At this stage we don't have a weight file so we will raise an error.
+                elif os.path.isfile(
+                    os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(PYTORCH_WEIGHTS_NAME, variant))
+                ):
+                    raise ValueError(
+                        f"Found {_add_variant(PYTORCH_WEIGHTS_NAME, variant)} in directory"
+                        f" {pretrained_model_name_or_path}. Please set convert_from_torch=True in from_pretrained. eg, Model.from_pretrained(model_name, convert_from_torch=True) "
+                    )
                 else:
                     raise EnvironmentError(
                         f"Error no file named {_add_variant(PADDLE_WEIGHTS_NAME, variant)}, found in directory"
@@ -1421,7 +1476,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         # raise ValueError(resolved_archive_file)
                         if resolved_archive_file is not None:
                             is_sharded = True
-                    print(resolved_archive_file)
                     if resolved_archive_file is None:
                         # Otherwise, maybe there is a TF or Flax model file.  We try those to give a helpful error
                         # message.
@@ -1453,131 +1507,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # import pdb;pdb.set_trace()
 
         return resolved_archive_file, sharded_metadata, is_sharded
-
-    @classmethod
-    def _resolve_model_file_path(
-        cls: Type[PretrainedModel],
-        pretrained_model_name_or_path: str,
-        from_hf_hub: bool = False,
-        cache_dir: str | None = None,
-        subfolder: str = "",
-        config: PretrainedConfig = None,
-        support_conversion: bool = False,
-        variant=None,
-    ) -> str:
-        """resolve model target file path from `` and `cache_dir`
-
-        0. when it is file path:
-            return the weight file
-
-        1. when it is model-name:
-            1.1 check default `MODEL_HOME` + `model-mame` + model_state.pdparams
-            1.2 get the url from `pretrained_resource_files_map`, and set it to `pretrained_model_name_or_path`
-
-        2. when it is url:
-            fetch the resouce into the `cache_dir` (cache_dir or `MODEL_HOME` + `model-name` or `HF_CACHE_HOME` + `model-mame`)
-
-        3. when it is local dir:
-            check whether the file<local_dir + weight_file> exist
-
-        Args:
-            cls (Type[PretrainedModel]): the inherited PretrainedModel class
-            pretrained_model_name_or_path (str): the model-name/url/local_dir/local_dir
-            cache_dir (Optional[str], optional): cache_dir is used when name_or_path is model-name/url. Defaults to None.
-            support_conversion (bool, optional): whether support convert pytorch model to paddle model
-
-        Returns:
-            str: the model weight file path
-        """
-
-        # -1. when it's from HF
-        if from_hf_hub:
-            return resolve_weight_file_from_hf_hub(
-                pretrained_model_name_or_path,
-                cache_dir=cache_dir,
-                support_conversion=support_conversion,
-                subfolder=subfolder,
-            )
-
-        # 0. when it is local file
-        if os.path.isfile(pretrained_model_name_or_path):
-            return pretrained_model_name_or_path
-
-        # 1. when it is model-name
-        if pretrained_model_name_or_path in cls.pretrained_init_configuration:
-            # check the cache_dir:
-            os.makedirs(cache_dir, exist_ok=True)
-
-            # check the state_dict file
-            weight_file_path = os.path.join(cache_dir, cls.resource_files_names["model_state"])
-            if os.path.exists(weight_file_path):
-                logger.info(f"Already cached {weight_file_path}")
-                return weight_file_path
-
-            # fetch the weight url from the `pretrained_resource_files_map`
-            pretrained_model_name_or_path = cls.pretrained_resource_files_map["model_state"][
-                pretrained_model_name_or_path
-            ]
-
-        # 2. when it is url
-        if is_url(pretrained_model_name_or_path):
-            weight_file_path = get_path_from_url_with_filelock(pretrained_model_name_or_path, cache_dir)
-            # # check the downloaded weight file and registered weight file name
-            download_check(pretrained_model_name_or_path, "from_pretrained_v2")
-
-            # make sure that
-            new_weight_file_path = os.path.join(
-                os.path.split(weight_file_path)[0], cls.resource_files_names["model_state"]
-            )
-
-            # if the weight file name of url is: `bert-base-uncased.pdparams`, the downloaded file is also of it.
-            # and we should convert it to the new weitht file: `model_state.pdparams`
-            if weight_file_path != new_weight_file_path:
-                # move the `model-name.pdparams` to `model_state.pdparams`
-                # get more details from: https://github.com/PaddlePaddle/PaddleNLP/pull/3843
-                if dist.ParallelEnv().local_rank % 8 == 0 and os.path.exists(weight_file_path):
-                    shutil.move(weight_file_path, new_weight_file_path)
-                weight_file_path = new_weight_file_path
-
-            # find the weight file with the above two branch: `bert-base-uncased.pdparams`, `model_state.pdparams`
-            weight_file_path = _find_weight_file_path(
-                cache_dir=cache_dir, model_class=cls, resource_uri=pretrained_model_name_or_path
-            )
-
-            return weight_file_path
-
-        # 3. when it is local dir
-        if os.path.isdir(pretrained_model_name_or_path):
-            # in-order to compatible with old style:
-            # file name in pretrained_resouce_file_maps is https://path/to/bert-base-uncased.pdparams, but the registered model-state file name in `resouce_file_maps` is `model_state.pdparams`
-
-            # deal with local files for shard files
-            return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls, config=config)
-
-        # 4. download from community or hf-hub
-        else:
-            # assume that the community-based models, name format: community/model-name
-            community_model_file_path = "/".join(
-                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.resource_files_names["model_state"]]
-            )
-            assert is_url(community_model_file_path)
-
-            # check wether the target file exist in the comunity bos server
-            if url_file_exists(community_model_file_path):
-                return cls._resolve_model_file_path(community_model_file_path, cache_dir=cache_dir)
-
-        # 6. final error entry, report FileNotFoundError
-        logger.warning(
-            f"can not find the model<{pretrained_model_name_or_path}> in the community server, "
-            f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."
-        )
-
-        if ENABLE_TORCH_CHECKPOINT:
-            msg = f"weight file<{PADDLE_WEIGHTS_NAME}> or <{PYTORCH_WEIGHTS_NAME}> not found"
-        else:
-            msg = f"weight file<{PADDLE_WEIGHTS_NAME}> not found"
-
-        raise FileNotFoundError(msg)
 
     @classmethod
     def keep_in_fp32_modules(cls, key: str, config: PretrainedConfig, dtype: str) -> bool:
@@ -1889,11 +1818,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         subfolder = kwargs.pop("subfolder", "")
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
         variant = kwargs.pop("variant", None)
-        cache_dir = kwargs.pop("cache_dir", None)
+        convert_from_torch = kwargs.pop("convert_from_torch", None)
+
+        if from_hf_hub:
+            # from_hf_hub defalut enable convert_from_torch
+            if convert_from_torch is None:
+                convert_from_torch = True
+
+        if convert_from_torch is None:
+            convert_from_torch = False
 
         init_contexts = []
         if low_cpu_mem_usage:
-            # load_state_as_np = True
             # Instantiate model.
             init_contexts.append(no_init_weights(_enable=True))
             if is_paddle_support_lazy_init():
@@ -1936,34 +1872,24 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             init_contexts.append(dtype_guard(dtype))
 
         # 2. resolve model_weight file
-        support_conversion = cls.support_conversion(config) and ENABLE_TORCH_CHECKPOINT
+        convert_from_torch = cls.support_conversion(config) and convert_from_torch
 
-        resolved_archive_file, sharded_metadata, is_sharded = cls._resolve_model_file_path_v2(
+        resolved_archive_file, sharded_metadata, is_sharded = cls._resolve_model_file_path(
             pretrained_model_name_or_path,
             cache_dir=cache_dir,
             subfolder=subfolder,
             from_hf_hub=from_hf_hub,
             config=config,
-            support_conversion=support_conversion,
+            convert_from_torch=convert_from_torch,
             variant=variant,
         )
-
-        if resolved_archive_file is None:
-            resolved_archive_file = cls._resolve_model_file_path(
-                pretrained_model_name_or_path,
-                cache_dir=cache_dir,
-                subfolder=subfolder,
-                from_hf_hub=from_hf_hub,
-                config=config,
-                support_conversion=support_conversion,
-            )
 
         # load pt weights early so that we know which dtype to init the model under
         if not is_sharded and state_dict is None:
             # Time to load the checkpoint
             # state_dict = load_state_dict(resolved_archive_file)
             if resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME):
-                if support_conversion:
+                if convert_from_torch:
                     # try to get the name-mapping info
                     logger.info(
                         f"start to convert pytorch weight file<{resolved_archive_file}> to "
@@ -1974,7 +1900,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     raise ValueError(
                         f"download the {PYTORCH_WEIGHTS_NAME} weight file, but model<{cls}> "
                         "don't support conversion from pytorch weight file to paddle weight file "
-                        "or conversion is been disabled by `ENABLE_TORCH_CHECKPOINT` environment variable"
                     )
             else:
                 # 4. loading the state dict
@@ -2131,7 +2056,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if is_main_process:
             config_to_save.save_pretrained(save_directory)
             if self.can_generate():
-                model_to_save.generation_config.save_pretrained(save_directory)
+                # to do support generation_config
+                pass
+                # model_to_save.generation_config.save_pretrained(save_directory)
 
         # Shard the model if it is too big.
         weights_name = SAFE_WEIGHTS_NAME if safe_serialization else PADDLE_WEIGHTS_NAME

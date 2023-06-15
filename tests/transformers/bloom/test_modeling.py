@@ -508,26 +508,6 @@ def test_pass():
 #        model = BloomModel.from_pretrained(cls.test_model_id)
 #        model.save_pretrained(cls.torch_model_path)
 #
-#    @require_package("transformers", "torch")
-#    def test_gpt_converter_from_local_dir_with_enable_torch(self):
-#        with tempfile.TemporaryDirectory() as tempdir:
-#
-#            # 2. forward the torch  model
-#            from transformers import BloomModel
-#
-#            torch_model = BloomModel.from_pretrained(self.test_model_id)
-#            torch_model.save_pretrained(tempdir)
-#
-#            # 2. forward the paddle model
-#            from paddlenlp.transformers import BloomModel, model_utils
-#
-#            model_utils.ENABLE_TORCH_CHECKPOINT = False
-#
-#            with self.assertRaises(ValueError) as error:
-#                BloomModel.from_pretrained(tempdir)
-#                self.assertIn("conversion is been disabled" in str(error.exception))
-#            model_utils.ENABLE_TORCH_CHECKPOINT = True
-#
 #    @parameterized.expand(
 #        [
 #            ("BloomModel", "BloomModel"),
@@ -559,7 +539,7 @@ def test_pass():
 #            from paddlenlp import transformers
 #
 #            paddle_model_class = getattr(transformers, paddle_class_name)
-#            paddle_model = paddle_model_class.from_pretrained(tempdir)
+#            paddle_model = paddle_model_class.from_pretrained(tempdir, convert_from_torch=True)
 #            paddle_model.eval()
 #
 #            paddle_logit = paddle_model(paddle.to_tensor(input_ids), return_dict=False)[0]

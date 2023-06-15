@@ -926,25 +926,6 @@ class BartModelCompatibilityTest(unittest.TestCase):
             )
 
     @require_package("transformers", "torch")
-    def test_bart_converter_from_local_dir_with_enable_torch(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            # 1. forward the torch  model
-            from transformers import BartModel
-
-            torch_model = BartModel.from_pretrained(self.model_id)
-            torch_model.save_pretrained(tempdir)
-
-            # 2. forward the paddle model
-            from paddlenlp.transformers import BartModel, model_utils
-
-            model_utils.ENABLE_TORCH_CHECKPOINT = False
-
-            with self.assertRaises(ValueError) as error:
-                BartModel.from_pretrained(tempdir)
-                self.assertIn("conversion is been disabled" in str(error.exception))
-            model_utils.ENABLE_TORCH_CHECKPOINT = True
-
-    @require_package("transformers", "torch")
     def test_bart_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
 
@@ -963,7 +944,7 @@ class BartModelCompatibilityTest(unittest.TestCase):
             # 2. forward the paddle model
             from paddlenlp.transformers import BartModel
 
-            paddle_model = BartModel.from_pretrained(tempdir)
+            paddle_model = BartModel.from_pretrained(tempdir, convert_from_torch=True)
             paddle_model.eval()
             paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
 
@@ -1007,7 +988,7 @@ class BartModelCompatibilityTest(unittest.TestCase):
             from paddlenlp import transformers
 
             paddle_model_class = getattr(transformers, class_name)
-            paddle_model = paddle_model_class.from_pretrained(tempdir)
+            paddle_model = paddle_model_class.from_pretrained(tempdir, convert_from_torch=True)
             paddle_model.eval()
 
             paddle_logit = paddle_model(paddle.to_tensor(input_ids), return_dict=False)[0]
