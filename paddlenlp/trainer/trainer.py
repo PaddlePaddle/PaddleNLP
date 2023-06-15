@@ -655,16 +655,9 @@ class Trainer:
                 train_dataloader.batch_sampler.set_epoch(epoch)
 
             step = -1
-            epoch_iterator = iter(epoch_iterator)
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
-            while True:
-                step += 1
-                self.callback_handler.on_load_data_begin(
-                    args,
-                    self.state,
-                    self.control,
-                )
-                inputs = next(epoch_iterator)
+
+            for step, inputs in enumerate(epoch_iterator):
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs)
                 # Skip past any already trained steps if resuming training
                 # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
