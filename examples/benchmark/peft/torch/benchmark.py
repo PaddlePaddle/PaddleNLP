@@ -68,10 +68,7 @@ def main():
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_args.model_name_or_path,
-        # low_cpu_mem_usage=True
-    )
+    model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
 
     if model_args.lora:
         target_modules = ["query_key_value"]
