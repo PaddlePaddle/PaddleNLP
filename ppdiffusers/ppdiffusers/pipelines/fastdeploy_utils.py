@@ -120,10 +120,14 @@ class FastDeployDiffusionPipelineMixin:
 
     @property
     def vae_encoder_num_channels(self):
+        if self.vae_encoder is None:
+            return 3
         return self.vae_encoder.model.get_input_info(0).shape[1]
 
     @property
     def vae_decoder_num_latent_channels(self):
+        if self.vae_decoder is None:
+            return 4
         return self.vae_decoder.model.get_input_info(0).shape[1]
 
     @property
