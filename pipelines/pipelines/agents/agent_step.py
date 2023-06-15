@@ -36,6 +36,8 @@ class AgentStep:
         final_answer_pattern: Optional[str] = None,
         prompt_node_response: str = "",
         transcript: str = "",
+        observation_prefix: str = "Observation: ",
+        llm_prefix: str = "Thought: ",
     ):
         """
         :param current_step: The current step in the execution of the agent.
@@ -50,6 +52,8 @@ class AgentStep:
         self.final_answer_pattern = final_answer_pattern or r"^([\s\S]+)$"
         self.prompt_node_response = prompt_node_response
         self.transcript = transcript
+        self.observation_prefix = observation_prefix
+        self.llm_prefix = llm_prefix
 
     def create_next_step(self, prompt_node_response: Any, current_step: Optional[int] = None) -> AgentStep:
         """
@@ -119,7 +123,7 @@ class AgentStep:
         :param observation: received observation from the Agent environment.
         """
         self.transcript += (
-            f"{self.prompt_node_response}\nObservation: {observation}\nThought:"
+            f"{self.prompt_node_response}\n{self.observation_prefix} {observation}\n{self.llm_prefix} "
             if observation
             else self.prompt_node_response
         )
@@ -149,7 +153,6 @@ class AgentStep:
         """
         # Search for a match with the final answer pattern in the prompt node response
         final_answer_match = re.search(self.final_answer_pattern, self.prompt_node_response)
-
         if final_answer_match:
             # If a match is found, get the first group (i.e., the content inside the parentheses of the regex pattern)
             final_answer = final_answer_match.group(1)

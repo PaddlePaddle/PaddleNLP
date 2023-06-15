@@ -31,6 +31,9 @@
 
 ## News 📢
 
+* **2023.6.12 发布 [PaddleNLP v2.6rc 预览版](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0rc)**
+  * 🔨 大模型全流程范例：全面支持主流开源大模型[Bloom](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/bloom), [ChatGLM](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/chatglm), [GLM](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/glm), [Llama](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/llama), [OPT](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/opt)的训练和推理；[Trainer API](./docs/trainer.md)新增张量训练能力, 简单配置即可开启分布式训练；新增低参数微调能力[PEFT](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/peft), 助力大模型高效微调
+
 * **2023.1.12 发布 [PaddleNLP v2.5](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.5.0)**
   * 🔨 NLP工具：发布 [PPDiffusers](./ppdiffusers) 国产化的扩散模型工具箱，集成多种 Diffusion 模型参数和模型组件，提供了 Diffusion 模型的完整训练流程，支持 Diffusion 模型的高性能  FastDeploy 推理加速 和 多硬件部署(可支持昇腾芯片、昆仑芯部署)
   * 💎 产业应用：信息抽取、文本分类、情感分析、智能问答 四大应用全新升级，发布文档信息抽取 [UIE-X](./applications/information_extraction/document) 、统一文本分类 [UTC](./applications/zero_shot_text_classification) 、统一情感分析 [UIE-Senta](./applications/sentiment_analysis/unified_sentiment_extraction) 、[无监督问答应用](./applications/question_answering/unsupervised_qa)；同时发布[ERNIE 3.0 Tiny v2](./model_zoo/ernie-tiny) 系列预训练小模型，在低资源和域外数据效果更强，开源 模型裁剪、模型量化、FastDeploy 推理加速、边缘端部署 端到端部署方案，降低预训练模型部署难度
@@ -52,7 +55,7 @@
   - 10G重磅NLP学习大礼包！
 
   <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/212060369-4642d16e-f0ad-4359-aa57-b8303042f9c1.jpg" width="150" height="150" />
+  <img src="https://user-images.githubusercontent.com/11987277/245085922-0aa68d24-00ff-442e-9c53-2f1e898151ce.png" width="150" height="150" />
   </div>
 
 ## 特性

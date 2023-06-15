@@ -199,6 +199,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     config_class = LlamaConfig
 
     _get_tensor_parallel_mappings = LlamaPretrainedModel._get_tensor_parallel_mappings
+    _init_weights = LlamaPretrainedModel._init_weights
 
     # NO base_model_prefix !!!!
 
@@ -258,5 +259,6 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             },
             num_virtual_pipeline_stages=virtual_pp_degree,
         )
+        self.apply(self._init_weights)
         # DON'T init PipelinePretrainedModel
         # PipelinePretrainedModel.__init__(self.super(), config=config)

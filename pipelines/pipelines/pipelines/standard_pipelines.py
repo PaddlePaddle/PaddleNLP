@@ -376,7 +376,7 @@ class WebQAPipeline(BaseStandardPipeline):
             # Documents returned by WebRetriever in mode "snippets" already have scores.
             # For other modes, we need to add a sampler if none is provided to compute the scores.
             # TODO(wugaosheng): Add topsampler into WebQAPipeline
-            sampler = ErnieRanker(top_p=0.95)
+            sampler = ErnieRanker("rocketqa-zh-dureader-cross-encoder", top_k=2)
 
         self.pipeline = Pipeline()
         self.pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])

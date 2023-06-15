@@ -46,6 +46,8 @@ def process_dist_configs(config):
     sharding_config = configs["sharding"]
     sharding_degree = sharding_config.setdefault("sharding_degree", 1)
     sharding_config.setdefault("sharding_stage", 2)
+    sharding_config.setdefault("reduce_overlap", False)
+    sharding_config.setdefault("broadcast_overlap", False)
 
     other_degree = mp_degree * pp_degree
 
@@ -184,6 +186,12 @@ def process_strategy(config):
     sharding.enable = sharding_cfg.get("sharding_degree", 1) > 1
     sharding.degree = sharding_cfg.get("sharding_degree", 1)
     sharding.stage = sharding_cfg.get("sharding_stage", 1)
+    sharding.enable_overlap = sharding_cfg.get("reduce_overlap", False) and sharding_cfg.get("broadcast_overlap", False)
+    sharding.param_comm_stream_num = sharding_cfg.get("param_comm_stream_num", 1)
+    sharding.grad_comm_stream_num = sharding_cfg.get("grad_comm_stream_num", 1)
+    sharding.param_bucket_size_numel = sharding_cfg.get("param_bucket_size_numel", 1)
+    sharding.grad_bucket_size_numel = sharding_cfg.get("grad_bucket_size_numel", 1)
+    sharding.enable_hierarchical_comm = sharding_cfg.get("enable_hierarchical_comm", False)
 
     pp_degree = config["Distributed"]["pp_degree"]
     accumulate_steps = config.Engine.get("accumulate_steps", 1)

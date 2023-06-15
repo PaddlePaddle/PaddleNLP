@@ -14,15 +14,15 @@
 
 import logging
 import os
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Union
 
-from pipelines.nodes.llm.chatglm import ChatGLMBot
+from pipelines.nodes.llm.ernie_bot import ErnieBot
 from pipelines.nodes.prompt.invocation_layer import PromptModelInvocationLayer
 
 logger = logging.getLogger(__name__)
 
 
-class ChatGLMInvocationLayer(ChatGLMBot, PromptModelInvocationLayer):
+class ErnieBotInvocationLayer(ErnieBot, PromptModelInvocationLayer):
     """
     A subclass of the PromptModelInvocationLayer class. It loads a pre-trained model from Taskflow and
     passes a prepared prompt into that model.
@@ -33,12 +33,8 @@ class ChatGLMInvocationLayer(ChatGLMBot, PromptModelInvocationLayer):
 
     def __init__(
         self,
-        model_name_or_path: str = "THUDM/chatglm-6b-v1.1",
-        tgt_length: int = 2048,
-        max_seq_length: int = 2048,
-        batch_size: int = 1,
-        use_gpu: Optional[bool] = True,
-        devices: Optional[List[str]] = None,
+        api_key=None,
+        secret_key=None,
         **kwargs,
     ):
         """
@@ -54,9 +50,7 @@ class ChatGLMInvocationLayer(ChatGLMBot, PromptModelInvocationLayer):
         kwargs. Only kwargs relevant to the ChatGLMInvocationLayer are considered.
         The model_max_length is used to specify the custom sequence length for the underlying pipeline.
         """
-        super().__init__(
-            model_name_or_path=model_name_or_path, max_seq_length=max_seq_length, tgt_length=tgt_length, **kwargs
-        )
+        super().__init__(api_key, secret_key)
 
         self.kwargs = kwargs
 
@@ -68,14 +62,13 @@ class ChatGLMInvocationLayer(ChatGLMBot, PromptModelInvocationLayer):
                 f"No prompt provided. Model {self.model_name_or_path} requires prompt."
                 f"Make sure to provide prompt in kwargs."
             )
-        # return a list
         output = self.predict(prompt)
         if "stop_words" in kwargs and kwargs["stop_words"] is not None:
             # split text by stop words
-            result = output["result"][0].split(kwargs["stop_words"][0])[0]
+            result = output["result"].split(kwargs["stop_words"][0])[0]
             generated_texts = [result]
         else:
-            generated_texts = output["result"]
+            generated_texts = [output["result"]]
         return generated_texts
 
     def _ensure_token_limit(self, prompt: Union[str, List[Dict[str, str]]]) -> Union[str, List[Dict[str, str]]]:
@@ -91,4 +84,4 @@ class ChatGLMInvocationLayer(ChatGLMBot, PromptModelInvocationLayer):
     def supports(cls, model_name_or_path: str, **kwargs) -> bool:
         if os.path.exists(model_name_or_path):
             return True
-        return model_name_or_path in ["THUDM/chatglm-6b", "THUDM/chatglm-6b-v1.1"]
+        return model_name_or_path in ["ernie-bot"]

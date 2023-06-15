@@ -134,6 +134,8 @@ class ToolsManager:
         self,
         tools: Optional[List[Tool]] = None,
         tool_pattern: str = r"Tool:\s*(\w+)\s*Tool Input:\s*(?:\"([\s\S]*?)\"|((?:.|\n)*))\s*",
+        observation_prefix: str = "Observation: ",
+        llm_prefix: str = "Thought: ",
     ):
         """
         :param tools: A list of tools to add to the ToolManager. Each tool must have a unique name.
@@ -143,6 +145,8 @@ class ToolsManager:
         self._tools: Dict[str, Tool] = {tool.name: tool for tool in tools} if tools else {}
         self.tool_pattern = tool_pattern
         self.callback_manager = Events(("on_tool_start", "on_tool_finish", "on_tool_error"))
+        self.observation_prefix = observation_prefix
+        self.llm_prefix = llm_prefix
 
     def add_tool(self, tool: Tool):
         """
@@ -193,8 +197,8 @@ class ToolsManager:
                     tool_result = tool.run(tool_input, params)
                     self.callback_manager.on_tool_finish(
                         tool_result,
-                        observation_prefix="Observation: ",
-                        llm_prefix="Thought: ",
+                        observation_prefix=f"{self.observation_prefix}",
+                        llm_prefix="{self.llm_prefix}",
                         color=tool.logging_color,
                     )
                 except Exception as e:
@@ -241,6 +245,8 @@ class Agent:
         prompt_parameters_resolver: Optional[Callable] = None,
         max_steps: int = 8,
         final_answer_pattern: str = r"Final Answer\s*:\s*(.*)",
+        observation_prefix: str = "Observation: ",
+        llm_prefix: str = "Thought: ",
     ):
         """
          Creates an Agent instance.
@@ -269,6 +275,8 @@ class Agent:
         self.prompt_node = prompt_node
         prompt_template = prompt_template or "zero-shot-react"
         resolved_prompt_template = prompt_node.get_prompt_template(prompt_template)
+        self.observation_prefix = observation_prefix
+        self.llm_prefix = llm_prefix
         if not resolved_prompt_template:
             raise ValueError(
                 f"Prompt template '{prompt_template}' not found. Please check the spelling of the template name."
@@ -394,18 +402,15 @@ class Agent:
     def _step(self, query: str, current_step: AgentStep, params: Optional[dict] = None):
         # plan next step using the LLM
         prompt_node_response = self._plan(query, current_step)
-
         # from the LLM response, create the next step
         next_step = current_step.create_next_step(prompt_node_response)
         self.callback_manager.on_agent_step(next_step)
-
         # run the tool selected by the LLM
         observation = self.tm.run_tool(next_step.prompt_node_response, params) if not next_step.is_last() else None
 
         # save the input, output and observation to memory (if memory is enabled)
         memory_data = self.prepare_data_for_memory(input=query, output=prompt_node_response, observation=observation)
         self.memory.save(data=memory_data)
-
         # update the next step with the observation
         next_step.completed(observation)
         return next_step
