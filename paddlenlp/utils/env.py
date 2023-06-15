@@ -71,9 +71,11 @@ TOKENIZER_CONFIG_NAME = "tokenizer_config.json"
 
 
 LORA_CONFIG_NAME = "lora_config.json"
+LORA_WEIGHTS_NAME = "lora_model_state.pdparams"
+
 PREFIX_CONFIG_NAME = "prefix_config.json"
-LORA_WEIGHT_FILE_NAME = "lora_model_state.pdparams"
-PREFIX_WEIGHT_FILE_NAME = "prefix_model_state.pdparams"
+PREFIX_WEIGHTS_NAME = "prefix_model_state.pdparams"
+
 PAST_KEY_VALUES_FILE_NAME = "pre_caches.npy"
 
 PADDLE_WEIGHTS_NAME = "model_state.pdparams"
@@ -84,6 +86,3 @@ PYTORCH_WEIGHTS_INDEX_NAME = "pytorch_model.bin.index.json"
 
 SAFE_WEIGHTS_NAME = "model.safetensors"
 SAFE_WEIGHTS_INDEX_NAME = "model.safetensors.index.json"
-
-# for conversion
-ENABLE_TORCH_CHECKPOINT = _get_bool_env("ENABLE_TORCH_CHECKPOINT", "true")

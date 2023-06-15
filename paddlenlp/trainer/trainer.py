@@ -50,11 +50,7 @@ from ..transformers.model_utils import PretrainedModel, _add_variant, unwrap_mod
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils import device_guard
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
-from ..utils.env import (
-    LORA_WEIGHT_FILE_NAME,
-    PADDLE_WEIGHTS_NAME,
-    PREFIX_WEIGHT_FILE_NAME,
-)
+from ..utils.env import LORA_WEIGHTS_NAME, PADDLE_WEIGHTS_NAME, PREFIX_WEIGHTS_NAME
 from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
@@ -413,9 +409,9 @@ class Trainer:
 
         if resume_from_checkpoint is not None:
             if isinstance(self.model, LoRAModel):
-                weight_name = LORA_WEIGHT_FILE_NAME
+                weight_name = LORA_WEIGHTS_NAME
             elif isinstance(self.model, PrefixModelForCausalLM):
-                weight_name = PREFIX_WEIGHT_FILE_NAME
+                weight_name = PREFIX_WEIGHTS_NAME
             else:
                 weight_name = PADDLE_WEIGHTS_NAME
 
@@ -469,9 +465,9 @@ class Trainer:
 
         if resume_from_checkpoint is not None:
             if isinstance(self.model, LoRAModel):
-                weight_name = LORA_WEIGHT_FILE_NAME
+                weight_name = LORA_WEIGHTS_NAME
             elif isinstance(self.model, PrefixModelForCausalLM):
-                weight_name = PREFIX_WEIGHT_FILE_NAME
+                weight_name = PREFIX_WEIGHTS_NAME
             else:
                 weight_name = PADDLE_WEIGHTS_NAME
             if not os.path.isfile(
@@ -812,9 +808,9 @@ class Trainer:
                 f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
             )
             if isinstance(self.model, LoRAModel):
-                weight_name = LORA_WEIGHT_FILE_NAME
+                weight_name = LORA_WEIGHTS_NAME
             elif isinstance(self.model, PrefixModelForCausalLM):
-                weight_name = PREFIX_WEIGHT_FILE_NAME
+                weight_name = PREFIX_WEIGHTS_NAME
             else:
                 weight_name = PADDLE_WEIGHTS_NAME
             best_model_path = os.path.join(
