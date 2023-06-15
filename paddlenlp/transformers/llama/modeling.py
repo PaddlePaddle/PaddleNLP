@@ -765,7 +765,9 @@ class LlamaModel(LlamaPretrainedModel):
 
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
-
+        
+        breakpoint() # from zkk
+        
         hidden_states = self.norm(hidden_states)
 
         # add hidden states from the last decoder layer

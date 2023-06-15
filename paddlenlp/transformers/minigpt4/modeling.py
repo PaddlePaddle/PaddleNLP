@@ -180,7 +180,7 @@ class MiniGPT4PretrainedModel(PretrainedModel):
             convert_weights_to_dtype(model, dtype=llama_dtype)
         else:
             raise TypeError("Not supported model type: {}.".format(type(model)))
-
+        logger.info("Trying to convert dtype for MiniGPT4 model done!!!!.")
         return model
 
 
@@ -1204,6 +1204,8 @@ class MiniGPT4Model(MiniGPT4PretrainedModel):
         self.qformer = MiniGPT4QFormerModel(config.qformer_config)
 
         self.language_projection = nn.Linear(config.qformer_config.hidden_size, config.text_config.hidden_size)
+        print("config.text_config")
+        print(config.text_config)
         self.language_model = LlamaForCausalLM(config.text_config)
 
     def get_input_embeddings(self) -> nn.Layer:
@@ -1617,6 +1619,7 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
         # step 1: forward the images through the vision encoder,
         # to get image embeddings of shape (batch_size, seq_len, hidden_size)
         pixel_values = paddle.cast(pixel_values, self.vision_model.embeddings.patch_embedding.weight.dtype)
+        
         vision_outputs = self.vision_model(pixel_values, return_dict=True)
         image_embeds = vision_outputs.last_hidden_state
         image_attention_mask = paddle.ones(image_embeds.shape[:-1], dtype="int64")
@@ -1634,8 +1637,20 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
         query_output = query_outputs.last_hidden_state
 
         # step 3: use the language model, conditioned on the text and image
+        # print(query_output.dtype)
+        # print(query_output.shape)
         language_model_inputs = self.language_projection(query_output)
         language_model_attention_mask = paddle.ones(language_model_inputs.shape[:-1], dtype="int64")
+        
+        # print("哈哈哈888")
+        # print(first_input_ids.dtype)
+        # print(first_input_ids.shape)
+        # print(second_input_ids.dtype)
+        # print(second_input_ids.shape)
+        # print(language_model_inputs.dtype)
+        # print(language_model_inputs.shape)
+        # print(language_model_attention_mask.dtype)
+        # print(language_model_attention_mask.shape)
 
         first_embeds = self.language_model.llama.embed_tokens(first_input_ids)
         second_embeds = self.language_model.llama.embed_tokens(second_input_ids)
@@ -1649,6 +1664,13 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
         attention_mask = paddle.concat(
             [first_attention_mask, language_model_attention_mask, second_attention_mask], axis=1
         )
+        
+        print("888888888888")
+
+        print(inputs_embeds.dtype)
+        print(inputs_embeds.shape)
+        print(attention_mask.dtype)
+        print(attention_mask.shape)
 
         outputs = self.language_model.generate(
             inputs_embeds=inputs_embeds, attention_mask=attention_mask, **generate_kwargs
@@ -1758,7 +1780,7 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
         second_embeds = self.language_model.llama.embed_tokens(second_input_ids)
         image_features = paddle.cast(image_features, dtype=first_embeds.dtype)
         inputs_embeds = paddle.concat([first_embeds, image_features, second_embeds], axis=1)
-
+         
         if first_attention_mask is None:
             first_attention_mask = paddle.ones(first_embeds.shape[:-1], dtype="int64")
         if second_attention_mask is None:
