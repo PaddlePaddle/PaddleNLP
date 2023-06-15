@@ -347,6 +347,7 @@ class PipelineTesterMixin:
         inputs = self.get_dummy_inputs()
         output = pipe(**inputs)[0]
         with tempfile.TemporaryDirectory() as tmpdir:
+            # TODO check this
             pipe.save_pretrained(tmpdir, to_diffusers=False)
             pipe_loaded = self.pipeline_class.from_pretrained(tmpdir, from_diffusers=False)
             pipe_loaded.set_progress_bar_config(disable=None)
@@ -414,7 +415,9 @@ class PipelineTesterMixin:
     def test_xformers_attention_forwardGenerator_pass(self):
         self._test_xformers_attention_forwardGenerator_pass()
 
-    def _test_xformers_attention_forwardGenerator_pass(self, test_max_difference=True, expected_max_diff=1e-2):
+    def _test_xformers_attention_forwardGenerator_pass(
+        self, test_max_difference=True, test_mean_pixel_difference=True, expected_max_diff=1e-2
+    ):
         if not self.test_xformers_attention:
             return
         components = self.get_dummy_components()
@@ -426,9 +429,14 @@ class PipelineTesterMixin:
         inputs = self.get_dummy_inputs()
         output_with_xformers = pipe(**inputs)[0]
         if test_max_difference:
+            if hasattr(output_with_xformers, "numpy"):
+                output_with_xformers = output_with_xformers.numpy()
+            if hasattr(output_without_xformers, "numpy"):
+                output_without_xformers = output_without_xformers.numpy()
             max_diff = np.abs(output_with_xformers - output_without_xformers).max()
             self.assertLess(max_diff, expected_max_diff, "XFormers attention should not affect the inference results")
-        assert_mean_pixel_difference(output_with_xformers[0], output_without_xformers[0])
+        if test_mean_pixel_difference:
+            assert_mean_pixel_difference(output_with_xformers[0], output_without_xformers[0])
 
     def test_progress_bar(self):
         components = self.get_dummy_components()

@@ -109,6 +109,8 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
             class conditioning with `class_embed_type` equal to `None`.
         time_embedding_type (`str`, *optional*, default to `positional`):
             The type of position embedding to use for timesteps. Choose from `positional` or `fourier`.
+        time_embedding_dim (`int`, *optional*, default to `None`):
+            An optional override for the dimension of the projected time embedding.
         time_embedding_act_fn (`str`, *optional*, default to `None`):
             Optional activation function to use on the time embeddings only one time before they as passed to the rest
             of the unet. Choose from `silu`, `mish`, `gelu`, and `swish`.
@@ -765,9 +767,8 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
 
                 if is_adapter and len(down_block_additional_residuals) > 0:
                     sample += down_block_additional_residuals.pop(0)
-
-                # westfish: add to align with torch features
-                res_samples = tuple(res_samples[:-1]) + (sample,)
+                    # westfish: add to align with torch features
+                    res_samples = tuple(res_samples[:-1]) + (sample,)
             down_block_res_samples += res_samples
 
         if is_controlnet:

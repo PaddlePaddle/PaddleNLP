@@ -653,9 +653,12 @@ class StableDiffusionControlNetPipeline(DiffusionPipeline, TextualInversionLoade
         save_directory: Union[str, os.PathLike],
         safe_serialization: bool = False,
         variant: Optional[str] = None,
+        to_diffusers: bool = None,
     ):
         if isinstance(self.controlnet, ControlNetModel):
-            super().save_pretrained(save_directory, safe_serialization, variant)
+            super().save_pretrained(
+                save_directory, safe_serialization=safe_serialization, variant=variant, to_diffusers=to_diffusers
+            )
         else:
             raise NotImplementedError("Currently, the `save_pretrained()` is not implemented for Multi-ControlNet.")
 

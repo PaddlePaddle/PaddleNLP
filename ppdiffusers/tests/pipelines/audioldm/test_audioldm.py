@@ -183,7 +183,7 @@ class AudioLDMPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
             truncation=True,
             return_tensors="pd",
         )
-        text_inputs = text_inputs["input_ids"]
+        text_inputs = text_inputs["input_ids"].cast("int32")
 
         prompt_embeds = audioldm_pipe.text_encoder(
             text_inputs,
@@ -227,7 +227,7 @@ class AudioLDMPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
                 return_attention_mask=True,
                 return_tensors="pd",
             )
-            text_inputs = text_inputs["input_ids"]
+            text_inputs = text_inputs["input_ids"].cast("int32")
 
             text_embeds = audioldm_pipe.text_encoder(
                 text_inputs,

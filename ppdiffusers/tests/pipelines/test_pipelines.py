@@ -219,7 +219,7 @@ class DownloadTests(unittest.TestCase):
                 from_diffusers=True,
                 safety_checker=None,
                 cache_dir=tmpdirname,
-                # use_safetensors=True,
+                use_safetensors=True,
             )
 
             all_root_files = [t[-1] for t in os.walk(os.path.join(tmpdirname))]
@@ -441,7 +441,7 @@ class DownloadTests(unittest.TestCase):
             ten = {"<*>": torch.ones((32,))}
             torch.save(ten, os.path.join(tmpdirname, "learned_embeds.bin"))
 
-            pipe.load_textual_inversion(tmpdirname)
+            pipe.load_textual_inversion(tmpdirname, from_diffusers=True)
 
             token = pipe.tokenizer.convert_tokens_to_ids("<*>")
             assert token == num_tokens, "Added token must be at spot `num_tokens`"
@@ -456,7 +456,7 @@ class DownloadTests(unittest.TestCase):
             ten = {"<**>": 2 * torch.ones((1, 32))}
             torch.save(ten, os.path.join(tmpdirname, "learned_embeds.bin"))
 
-            pipe.load_textual_inversion(tmpdirname, weight_name="learned_embeds.bin")
+            pipe.load_textual_inversion(tmpdirname, weight_name="learned_embeds.bin", from_diffusers=True)
 
             token = pipe.tokenizer.convert_tokens_to_ids("<**>")
             assert token == num_tokens + 1, "Added token must be at spot `num_tokens`"
@@ -471,7 +471,7 @@ class DownloadTests(unittest.TestCase):
             ten = {"<***>": torch.cat([3 * torch.ones((1, 32)), 4 * torch.ones((1, 32)), 5 * torch.ones((1, 32))])}
             torch.save(ten, os.path.join(tmpdirname, "learned_embeds.bin"))
 
-            pipe.load_textual_inversion(tmpdirname)
+            pipe.load_textual_inversion(tmpdirname, from_diffusers=True)
 
             token = pipe.tokenizer.convert_tokens_to_ids("<***>")
             token_1 = pipe.tokenizer.convert_tokens_to_ids("<***>_1")
@@ -498,7 +498,7 @@ class DownloadTests(unittest.TestCase):
             }
             torch.save(ten, os.path.join(tmpdirname, "a1111.bin"))
 
-            pipe.load_textual_inversion(tmpdirname, weight_name="a1111.bin")
+            pipe.load_textual_inversion(tmpdirname, weight_name="a1111.bin", from_diffusers=True)
 
             token = pipe.tokenizer.convert_tokens_to_ids("<****>")
             token_1 = pipe.tokenizer.convert_tokens_to_ids("<****>_1")
@@ -887,7 +887,9 @@ class PipelineFastTests(unittest.TestCase):
         assert dict(ddim_config) == dict(ddim_config_2)
 
     def test_save_safe_serialization(self):
-        pipeline = StableDiffusionPipeline.from_pretrained("hf-internal-testing/tiny-stable-diffusion-torch")
+        pipeline = StableDiffusionPipeline.from_pretrained(
+            "hf-internal-testing/tiny-stable-diffusion-torch", from_hf_hub=True, from_diffusers=True
+        )
         with tempfile.TemporaryDirectory() as tmpdirname:
             pipeline.save_pretrained(tmpdirname, safe_serialization=True, to_diffusers=True)
             vae_path = os.path.join(tmpdirname, "vae", "diffusion_pytorch_model.safetensors")
@@ -899,7 +901,7 @@ class PipelineFastTests(unittest.TestCase):
             text_encoder_path = os.path.join(tmpdirname, "text_encoder", "model.safetensors")
             assert os.path.exists(text_encoder_path), f"Could not find {text_encoder_path}"
             _ = safetensors.torch.load_file(text_encoder_path)
-            pipeline = StableDiffusionPipeline.from_pretrained(tmpdirname)
+            pipeline = StableDiffusionPipeline.from_pretrained(tmpdirname, from_diffusers=True)
             assert pipeline.unet is not None
             assert pipeline.vae is not None
             assert pipeline.text_encoder is not None

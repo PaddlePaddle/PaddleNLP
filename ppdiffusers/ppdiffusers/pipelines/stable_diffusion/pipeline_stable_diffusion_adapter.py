@@ -89,8 +89,6 @@ def preprocess(image):
         return image
     elif isinstance(image, PIL.Image.Image):
         image = [image]
-    else:
-        raise ValueError("Invalid image type!")
     if isinstance(image[0], PIL.Image.Image):
         w, h = image[0].size
         w, h = (x - x % 8 for x in (w, h))

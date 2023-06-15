@@ -18,11 +18,6 @@ import unittest
 
 import numpy as np
 import paddle
-from ..pipeline_params import (
-    TEXT_TO_IMAGE_BATCH_PARAMS,
-    TEXT_TO_IMAGE_PARAMS,
-)
-from ..test_pipelines_common import PipelineTesterMixin
 
 from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
@@ -36,6 +31,9 @@ from ppdiffusers import (
 )
 from ppdiffusers.utils import slow
 from ppdiffusers.utils.testing_utils import require_paddle_gpu
+
+from ..pipeline_params import TEXT_TO_IMAGE_BATCH_PARAMS, TEXT_TO_IMAGE_PARAMS
+from ..test_pipelines_common import PipelineTesterMixin
 
 
 class StableDiffusionPanoramaPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
@@ -112,10 +110,10 @@ class StableDiffusionPanoramaPipelineFastTests(PipelineTesterMixin, unittest.Tes
         image_slice = image[0, -3:, -3:, -1]
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array(
-            [0.28862977, 0.2441951 , 0.2683525, 0.33122095, 0.28755113, 0.46375293, 0.254181  , 0.30616608, 0.4785265 ]
+            [0.28862977, 0.2441951, 0.2683525, 0.33122095, 0.28755113, 0.46375293, 0.254181, 0.30616608, 0.4785265]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
-    
+
     # override to speed the overall test timing up.
     def test_inference_batch_consistent(self):
         super().test_inference_batch_consistent(batch_sizes=[1, 2])
@@ -134,9 +132,8 @@ class StableDiffusionPanoramaPipelineFastTests(PipelineTesterMixin, unittest.Tes
         image = output.images
         image_slice = image[0, -3:, -3:, -1]
         assert image.shape == (1, 64, 64, 3)
-        breakpoint()
         expected_slice = np.array(
-            [0.28995812, 0.24463832, 0.2682391, 0.33033937, 0.2868188 , 0.46267676, 0.25425047, 0.3066897 , 0.47881347]
+            [0.28995812, 0.24463832, 0.2682391, 0.33033937, 0.2868188, 0.46267676, 0.25425047, 0.3066897, 0.47881347]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
 
@@ -152,7 +149,7 @@ class StableDiffusionPanoramaPipelineFastTests(PipelineTesterMixin, unittest.Tes
         image_slice = image[0, -3:, -3:, -1]
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array(
-            [0.32409406, 0.2660764 , 0.41739762, 0.18994612, 0.32522476, 0.4869789, 0.13573006, 0.14128971, 0.32650158]
+            [0.32409406, 0.2660764, 0.41739762, 0.18994612, 0.32522476, 0.4869789, 0.13573006, 0.14128971, 0.32650158]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
 

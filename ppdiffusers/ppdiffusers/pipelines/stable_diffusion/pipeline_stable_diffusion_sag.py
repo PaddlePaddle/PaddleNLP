@@ -550,65 +550,66 @@ class StableDiffusionSAGPipeline(DiffusionPipeline, TextualInversionLoaderMixin)
             nonlocal map_size
             map_size = output.sample.shape[-2:]
 
-        with self.unet.mid_block.attentions[0].register_forward_hook(get_map_size):
-            with self.progress_bar(total=num_inference_steps) as progress_bar:
-                for i, t in enumerate(timesteps):
-                    # expand the latents if we are doing classifier free guidance
-                    latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
-                    latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+        forward_hook = self.unet.mid_block.attentions[0].register_forward_post_hook(get_map_size)
+        with self.progress_bar(total=num_inference_steps) as progress_bar:
+            for i, t in enumerate(timesteps):
+                # expand the latents if we are doing classifier free guidance
+                latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
+                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
-                    # predict the noise residual
-                    noise_pred = self.unet(
-                        latent_model_input,
-                        t,
-                        encoder_hidden_states=prompt_embeds,
-                        cross_attention_kwargs=cross_attention_kwargs,
-                    ).sample
+                # predict the noise residual
+                noise_pred = self.unet(
+                    latent_model_input,
+                    t,
+                    encoder_hidden_states=prompt_embeds,
+                    cross_attention_kwargs=cross_attention_kwargs,
+                ).sample
 
-                    # perform guidance
+                # perform guidance
+                if do_classifier_free_guidance:
+                    noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+                    noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+
+                # perform self-attention guidance with the stored self-attentnion map
+                if do_self_attention_guidance:
+                    # classifier-free guidance produces two chunks of attention map
+                    # and we only use unconditional one according to equation (25)
+                    # in https://arxiv.org/pdf/2210.00939.pdf
                     if do_classifier_free_guidance:
-                        noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                        noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+                        # DDIM-like prediction of x0
+                        pred_x0 = self.pred_x0(latents, noise_pred_uncond, t)
+                        # get the stored attention maps
+                        uncond_attn, cond_attn = store_processor.attention_probs.chunk(2)
+                        # self-attention-based degrading of latents
+                        degraded_latents = self.sag_masking(
+                            pred_x0, uncond_attn, map_size, t, self.pred_epsilon(latents, noise_pred_uncond, t)
+                        )
+                        uncond_emb, _ = prompt_embeds.chunk(2)
+                        # forward and give guidance
+                        degraded_pred = self.unet(degraded_latents, t, encoder_hidden_states=uncond_emb).sample
+                        noise_pred += sag_scale * (noise_pred_uncond - degraded_pred)
+                    else:
+                        # DDIM-like prediction of x0
+                        pred_x0 = self.pred_x0(latents, noise_pred, t)
+                        # get the stored attention maps
+                        cond_attn = store_processor.attention_probs
+                        # self-attention-based degrading of latents
+                        degraded_latents = self.sag_masking(
+                            pred_x0, cond_attn, map_size, t, self.pred_epsilon(latents, noise_pred, t)
+                        )
+                        # forward and give guidance
+                        degraded_pred = self.unet(degraded_latents, t, encoder_hidden_states=prompt_embeds).sample
+                        noise_pred += sag_scale * (noise_pred - degraded_pred)
 
-                    # perform self-attention guidance with the stored self-attentnion map
-                    if do_self_attention_guidance:
-                        # classifier-free guidance produces two chunks of attention map
-                        # and we only use unconditional one according to equation (25)
-                        # in https://arxiv.org/pdf/2210.00939.pdf
-                        if do_classifier_free_guidance:
-                            # DDIM-like prediction of x0
-                            pred_x0 = self.pred_x0(latents, noise_pred_uncond, t)
-                            # get the stored attention maps
-                            uncond_attn, cond_attn = store_processor.attention_probs.chunk(2)
-                            # self-attention-based degrading of latents
-                            degraded_latents = self.sag_masking(
-                                pred_x0, uncond_attn, map_size, t, self.pred_epsilon(latents, noise_pred_uncond, t)
-                            )
-                            uncond_emb, _ = prompt_embeds.chunk(2)
-                            # forward and give guidance
-                            degraded_pred = self.unet(degraded_latents, t, encoder_hidden_states=uncond_emb).sample
-                            noise_pred += sag_scale * (noise_pred_uncond - degraded_pred)
-                        else:
-                            # DDIM-like prediction of x0
-                            pred_x0 = self.pred_x0(latents, noise_pred, t)
-                            # get the stored attention maps
-                            cond_attn = store_processor.attention_probs
-                            # self-attention-based degrading of latents
-                            degraded_latents = self.sag_masking(
-                                pred_x0, cond_attn, map_size, t, self.pred_epsilon(latents, noise_pred, t)
-                            )
-                            # forward and give guidance
-                            degraded_pred = self.unet(degraded_latents, t, encoder_hidden_states=prompt_embeds).sample
-                            noise_pred += sag_scale * (noise_pred - degraded_pred)
+                # compute the previous noisy sample x_t -> x_t-1
+                latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
 
-                    # compute the previous noisy sample x_t -> x_t-1
-                    latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
-
-                    # call the callback, if provided
-                    if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
-                        progress_bar.update()
-                        if callback is not None and i % callback_steps == 0:
-                            callback(i, t, latents)
+                # call the callback, if provided
+                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
+                    progress_bar.update()
+                    if callback is not None and i % callback_steps == 0:
+                        callback(i, t, latents)
+        forward_hook.remove()
 
         # 8. Post-processing
         image = self.decode_latents(latents)

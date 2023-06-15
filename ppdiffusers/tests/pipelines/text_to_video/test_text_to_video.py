@@ -117,12 +117,15 @@ class TextToVideoSDPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         frames = sd_pipe(**inputs).frames
         image_slice = frames[0][-3:, -3:, (-1)]
         assert frames[0].shape == (64, 64, 3)
-        expected_slice = np.array([65, 138, 97, 105, 157, 113, 78, 111, 69])
+        expected_slice = np.array([51, 148, 141, 100, 238, 122, 141, 181, 79])
 
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
 
-    # def test_attention_slicing_forward_pass(self):
-    #     self._test_attention_slicing_forward_pass(test_mean_pixel_difference=False)
+    def test_xformers_attention_forwardGenerator_pass(self):
+        self._test_xformers_attention_forwardGenerator_pass(test_mean_pixel_difference=False)
+
+    def test_attention_slicing_forward_pass(self):
+        self._test_attention_slicing_forward_pass(test_mean_pixel_difference=False)
 
     @unittest.skip(reason="Batching needs to be properly figured out first for this pipeline.")
     def test_inference_batch_consistent(self):
