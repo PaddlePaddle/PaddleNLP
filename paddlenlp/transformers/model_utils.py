@@ -750,7 +750,7 @@ def _convert_state_dict_dtype(dtype, state_dict, model_to_load):
                     state_dict[key] = state_dict[key].astype(dtype=dtype)
                 if isinstance(state_dict[key].dtype, np.uint16):
                     # paddle.bfloat16 save as np.uint16.
-                    # so cast np to numpy, let paddle handle dtype casting
+                    # so cast numpy to paddle, let paddle handle dtype casting
                     with device_guard("cpu"):
                         state_dict[key] = paddle.to_tensor(state_dict[key])
 
@@ -1807,6 +1807,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 # Load from local directory path
                 model = BertForSequenceClassification.from_pretrained('./my_bert/')
         """
+        print(kwargs)
 
         config = kwargs.pop("config", None)
         state_dict = kwargs.pop("state_dict", None)
@@ -1820,11 +1821,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         variant = kwargs.pop("variant", None)
         convert_from_torch = kwargs.pop("convert_from_torch", None)
 
+        load_state_as_np = kwargs.pop("load_state_as_np", None)
+        if load_state_as_np is not None:
+            logger.warning("`load_state_as_np` is deprecated,  please delete it!")
+
         if from_hf_hub:
             # from_hf_hub defalut enable convert_from_torch
             if convert_from_torch is None:
+                logger.warning(
+                    "Your are trying to loading weights of huggingface hub, so it maybe pytorch weight. set `convert_from_torch=True`, if you don't wants, you can set `convert_from_torch=False` "
+                )
                 convert_from_torch = True
-
+        # convert_from_torch defalut is False
         if convert_from_torch is None:
             convert_from_torch = False
 

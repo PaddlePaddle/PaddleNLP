@@ -327,7 +327,7 @@ class LlamaCompatibilityTest(unittest.TestCase):
         # 2. forward the paddle model
         from paddlenlp.transformers import LlamaModel
 
-        paddle_model = LlamaModel.from_pretrained(self.torch_model_path)
+        paddle_model = LlamaModel.from_pretrained(self.torch_model_path, convert_from_torch=True)
         paddle_model.eval()
         paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
 
@@ -335,7 +335,7 @@ class LlamaCompatibilityTest(unittest.TestCase):
         import torch
         from transformers import LlamaModel
 
-        torch_model = LlamaModel.from_pretrained(self.torch_model_path, convert_from_torch=True)
+        torch_model = LlamaModel.from_pretrained(self.torch_model_path)
         torch_model.eval()
         torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
 
