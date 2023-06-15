@@ -69,11 +69,7 @@ def main():
             dtype = "float16"
         if training_args.bf16:
             dtype = "bfloat16"
-    import os
 
-    os.environ["http_proxy"] = "http://172.19.57.45:3128"
-    os.environ["https_proxy"] = "http://172.19.57.45:3128"
-    dataset = load_dataset("Chinese-Vicuna/guanaco_belle_merge_v1.0")
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     if "llama" in model_args.model_name_or_path:
         tokenizer.pad_token = tokenizer.unk_token
@@ -111,6 +107,7 @@ def main():
 
         return model_inputs
 
+    dataset = load_dataset("Chinese-Vicuna/guanaco_belle_merge_v1.0")
     # select first 10k examples for benchmarking
     dataset = dataset["train"].select(range(10000))
     dataset = dataset.map(

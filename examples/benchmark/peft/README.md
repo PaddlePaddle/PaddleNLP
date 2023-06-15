@@ -4,16 +4,12 @@
 
 - 硬件: A100-80G with NVLink, 具体卡数见表
 - Torch环境: 见torch/requirements.txt
-- 数据: 10k条[BelleGroup/school_math_0.25M](https://huggingface.co/datasets/BelleGroup/school_math_0.25M/tree/main)
+- 数据: 10k条[Chinese-Vicuna/guanaco_belle_merge_v1.0](https://huggingface.co/datasets/Chinese-Vicuna/guanaco_belle_merge_v1.0)
 
 ### Bloom
 
-| Model         | Method   | Num GPUs | Batch Size | Paddle Setup | Paddle (s/epoch) | Torch Setup | Torch (s/epoch) | Delta |
-|---------------|----------|----------|------------|--------------|------------------|-------------|-----------------|-------|
-| Bloomz-7b1-mt | LoRA     | 1        | 4          | fp16 O2      | 456              | fp16        | 602             | -24%  |
-| Bloomz-7b1-mt | LoRA     | 1        | 8          | fp16 O2      | 493              | fp16        | 596             | -18%  |
-| Bloomz-7b1-mt | Finetune | 4        | 8          | fp16 O2 MP 4 | 410              | fp16 ZeRO 3 | 709             | -42%  |
-| Bloomz-7b1-mt | Finetune | 4        | 16         | fp16 O2 MP 4 | 363              | fp16 ZeRO 3 | 421             | -14%  |
-| Bloomz-7b1-mt | Finetune | 4        | 32         | fp16 O2 MP 4 | OOM              | fp16 ZeRO 3 | 324             | N/A   |
-
-* transformers默认的half_precision_backend是`torch.cuda.amp`, 不使用`fp16_opt_level`参数
+| Model         | Method   | Num GPUs | Batch Size | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
+|---------------|----------|----------|------------|--------------|---------------------------|-------------|--------------------------|---------|
+| Bloomz-7b1-mt | LoRA     | 1        | 4          | fp16 O2      | 2293.46                   | fp16        | 1736.92                  | +32%    |
+| Bloomz-7b1-mt | Finetune | 4        | 8          | fp16 O2 MP 4 | 2873.13                   | fp16 ZeRO 3 | 1634.58                  | +76%    |
+| Bloomz-7b1-mt | Finetune | 4        | 16         | fp16 O2 MP 4 | 2853.83                   | fp16 ZeRO 3 | 2694.64                  | +6%     |
