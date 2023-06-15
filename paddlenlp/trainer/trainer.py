@@ -755,7 +755,9 @@ class Trainer:
                                 p.grad = p.grad.scale(1.0 / self.args.gradient_accumulation_steps)
 
                     # Optimizer step
-                    self.callback_handler.on_optimizer_begin(args, self.state, self.control, scaler=self.scaler)
+                    self.callback_handler.on_optimizer_begin(
+                        args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                    )
                     optimizer_was_run = True
                     if self.do_grad_scaling:
                         scale_before = self.scaler._scale.numpy()
@@ -774,7 +776,9 @@ class Trainer:
                         self.lr_scheduler.step()
 
                     self.optimizer.clear_grad()
-                    self.callback_handler.on_optimizer_end(args, self.state, self.control, scaler=self.scaler)
+                    self.callback_handler.on_optimizer_end(
+                        args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                    )
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
