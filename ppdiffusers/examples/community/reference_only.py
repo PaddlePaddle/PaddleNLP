@@ -276,6 +276,15 @@ def upsample_2d_forward(self, hidden_states, output_size=None):
     return output
 
 
+try:
+    # in ppdiffusers 0.16.1, we need patch `Attention`
+    from ppdiffusers.models.attention_processor import Attention
+
+    if not hasattr(Attention, "original_forward"):
+        Attention.original_forward = Attention.forward
+    Attention.forward = self_attn_forward
+except ImportError:
+    pass
 if not hasattr(CrossAttention, "original_forward"):
     CrossAttention.original_forward = CrossAttention.forward
 if not hasattr(Transformer2DModel, "original_forward"):
