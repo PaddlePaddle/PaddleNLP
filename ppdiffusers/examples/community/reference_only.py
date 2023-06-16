@@ -1049,7 +1049,7 @@ class ReferenceOnlyPipeline(DiffusionPipeline):
                     )
                     chunk_num = 2 if do_classifier_free_guidance else 1
                     noise_pred = self.unet(
-                        paddle.concat([latent_model_input, image_latent_model_input]),
+                        paddle.concat([latent_model_input, image_latent_model_input.cast(latent_model_input.dtype)]),
                         t,
                         encoder_hidden_states=prompt_embeds,
                         cross_attention_kwargs=cross_attention_kwargs,

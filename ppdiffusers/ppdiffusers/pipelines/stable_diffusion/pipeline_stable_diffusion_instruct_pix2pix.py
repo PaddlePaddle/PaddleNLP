@@ -329,7 +329,9 @@ class StableDiffusionInstructPix2PixPipeline(DiffusionPipeline, TextualInversion
 
                 # concat latents, image_latents in the channel dimension
                 scaled_latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
-                scaled_latent_model_input = paddle.concat([scaled_latent_model_input, image_latents], axis=1)
+                scaled_latent_model_input = paddle.concat(
+                    [scaled_latent_model_input, image_latents.cast(scaled_latent_model_input.dtype)], axis=1
+                )
 
                 # predict the noise residual
                 noise_pred = self.unet(scaled_latent_model_input, t, encoder_hidden_states=prompt_embeds).sample
