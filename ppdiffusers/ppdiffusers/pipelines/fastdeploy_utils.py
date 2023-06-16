@@ -97,7 +97,10 @@ class FastDeployDiffusionPipelineMixin:
         self.vae_scaling_factor = vae_scaling_factor
         self.vae_scale_factor = vae_scale_factor
 
-        self.image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor)
+        self.image_processor = VaeImageProcessor(vae_scale_factor=vae_scale_factor, do_convert_rgb=True)
+        self.control_image_processor = VaeImageProcessor(
+            vae_scale_factor=self.vae_scale_factor, do_convert_rgb=True, do_normalize=False
+        )
         self.dtype = dtype
         self.supported_scheduler = [
             "pndm",
@@ -215,8 +218,10 @@ class FastDeployDiffusionPipelineMixin:
         num_images_per_prompt,
         do_classifier_free_guidance=False,
     ):
-        control_image = self.image_processor.preprocess(
-            controlnet_cond, height=height, width=width, do_normalize=False
+        control_image = self.control_image_processor.preprocess(
+            controlnet_cond,
+            height=height,
+            width=width,
         )
         if isinstance(controlnet_conditioning_scale, (float, int)):
             controlnet_conditioning_scale = paddle.to_tensor([controlnet_conditioning_scale] * 13, dtype=self.dtype)

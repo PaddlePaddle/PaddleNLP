@@ -151,7 +151,7 @@ class VaeImageProcessor(ConfigMixin):
         image: Union[paddle.Tensor, PIL.Image.Image, np.ndarray],
         height: Optional[int] = None,
         width: Optional[int] = None,
-        do_normalize: Optional[bool] = None,
+        do_normalize: Optional[bool] = None,  # new added, not exists in diffusers
     ) -> paddle.Tensor:
         """
         Preprocess the image input, accepted formats are PIL images, numpy arrays or paddle tensors"
