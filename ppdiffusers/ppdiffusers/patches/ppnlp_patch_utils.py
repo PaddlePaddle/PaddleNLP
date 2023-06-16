@@ -332,8 +332,6 @@ if is_paddle_available() and is_paddlenlp_available():
     except ImportError:
         from ..utils.paddle_utils import no_init_weights
 
-    from paddlenlp.utils.log import logger as ppnlp_logger
-
     if is_ppxformers_available():
         from paddle.incubate.nn.memory_efficient_attention import (
             memory_efficient_attention,
@@ -1287,8 +1285,8 @@ if is_paddle_available() and is_paddlenlp_available():
             raise EnvironmentError(
                 f"It looks like the config file at '{resolved_image_processor_file}' is not a valid JSON file."
             )
-
-        ppnlp_logger.info(
+        # use ppdiffusers logger, not ppnlp_logger
+        logger.info(
             f"loading configuration file {resolved_image_processor_file} from cache at {resolved_image_processor_file}"
         )
 

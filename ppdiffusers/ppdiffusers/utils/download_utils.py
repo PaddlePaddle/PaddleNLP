@@ -169,14 +169,26 @@ ALLOW_PATTERNS_MAPPING = {
     "mel": ["mel_config.json"],
     "melgan": ["model.onnx"],
     "others": [
+        # models
         "model_state.pdparams",
         "model_config.json",
         "config.json",
-        "model_config.json",
+        # scheduler
         "scheduler_config.json",
+        # feature_extractor
         "preprocessor_config.json",
+        # onnx
         "model.onnx",
         "pipeline.py",
+        # tokenizer
+        "tokenizer_config.json",
+        "vocab.json",
+        "added_tokens.json",
+        "vocab.txt",
+        "special_tokens_map.json",
+        "spiece.model",
+        "merges.txt",
+        "sentencepiece.bpe.model",
     ],
 }
 
