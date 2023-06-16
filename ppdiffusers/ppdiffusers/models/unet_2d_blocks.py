@@ -928,8 +928,8 @@ class CrossAttnDownBlock2D(nn.Layer):
         if additional_residuals is not None:
             hidden_states += additional_residuals
 
-        # westfish: add to align with torch features
-        output_states = tuple(output_states[:-1]) + (hidden_states,)
+            # westfish: add to align with torch features
+            output_states = tuple(output_states[:-1]) + (hidden_states,)
 
         if self.downsamplers is not None:
             for downsampler in self.downsamplers:
