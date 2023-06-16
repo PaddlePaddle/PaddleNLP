@@ -589,7 +589,7 @@ class ControlNetModel(ModelMixin, ConfigMixin):
             mid_block_res_sample *= scales[-1]  # last one
         else:
             # add conditioning_scale https://github.com/huggingface/diffusers/pull/2627
-            if isinstance(conditioning_scale, float):
+            if isinstance(conditioning_scale, (float, int)):
                 down_block_res_samples = [sample * conditioning_scale for sample in down_block_res_samples]
                 mid_block_res_sample *= conditioning_scale
             else:
