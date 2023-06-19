@@ -857,7 +857,16 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             )
 
         # Build new embeddings
-        new_embeddings = nn.Embedding(new_num_tokens, old_embedding_dim)
+        new_embeddings = nn.Embedding(
+            new_num_tokens,
+            old_embedding_dim,
+            padding_idx=old_embeddings._padding_idx,
+            sparse=old_embeddings._sparse,
+        )
+
+        # make sure that new_embeddings's dtype is same as the old embeddings' dtype
+        if new_embeddings.weight.dtype != old_embeddings.weight.dtype:
+            new_embeddings.to(dtype=old_embeddings.weight.dtype)
 
         # numbers of tokens to copy
         n = min(old_num_tokens, new_num_tokens)
