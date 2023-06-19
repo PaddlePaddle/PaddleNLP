@@ -309,6 +309,8 @@ if is_paddle_available():
         if hasattr(self, "load_state_dict_pre_hooks"):
             for hook in self.load_state_dict_pre_hooks.values():
                 hook(state_dict)
+        # POP is_torch_weight
+        state_dict.pop("is_torch_weight", None)
         return raw_set_state_dict(self, state_dict, use_structured_name=use_structured_name)
 
     nn.Layer.set_state_dict = set_state_dict
@@ -805,7 +807,7 @@ if is_paddle_available() and is_paddlenlp_available():
         state_dict = smart_load(model_file)
         init_contexts = []
 
-        dtype = set(v.dtype for v in state_dict.values())
+        dtype = set(v.dtype for v in state_dict.values() if paddle.is_tensor(v))
         if len(dtype) > 1 and paddle.float32 not in dtype:
             raise ValueError(
                 f"The weights of the model file {model_file} have a mixture of incompatible dtypes {dtype}. Please"
@@ -915,7 +917,9 @@ if is_paddle_available() and is_paddlenlp_available():
         variant=None,
         **kwargs
     ):
-        if cls.constructed_from_pretrained_config() and hasattr(cls, "smart_convert"):
+        if cls.constructed_from_pretrained_config() and (
+            hasattr(cls, "smart_convert") or hasattr(cls, "register_load_torch_hook")
+        ):
             return from_pretrained_v3(
                 cls,
                 pretrained_model_name_or_path,
@@ -1230,7 +1234,26 @@ if is_paddle_available() and is_paddlenlp_available():
     for cls_ in [BertModel, RobertaSeriesModelWithTransformation]:
         setattr(cls_, "smart_convert", bert_smart_convert)
 
-    for cls_ in [DPTForDepthEstimation, BitBackbone, SpeechT5HifiGan, ClapTextModelWithProjection, T5EncoderModel]:
+    if bool(os.getenv("USE_TORCH_LINEAR", False)):
+        # NEW TRANSFORMERS CLIP MODEL
+        from ..pipelines.stable_diffusion import clip_model
+
+        TRANSFORMERS_CLIP_MODEL = [
+            clip_model.CLIPTextModel,
+            clip_model.CLIPVisionModel,
+            clip_model.CLIPModel,
+            clip_model.CLIPTextModelWithProjection,
+            clip_model.CLIPVisionModelWithProjection,
+        ]
+    else:
+        TRANSFORMERS_CLIP_MODEL = []
+    for cls_ in [
+        DPTForDepthEstimation,
+        BitBackbone,
+        SpeechT5HifiGan,
+        ClapTextModelWithProjection,
+        T5EncoderModel,
+    ] + TRANSFORMERS_CLIP_MODEL:
         setattr(cls_, "smart_convert", convert_pytorch_state_dict_to_paddle_class_method)
 
     # TODO remove this when we updage ImageProcessingMixin

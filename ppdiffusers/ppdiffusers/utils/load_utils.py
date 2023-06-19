@@ -311,7 +311,13 @@ def safetensors_load(path: str):
     return data
 
 
-def smart_load(path: str, map_location: str = None, return_numpy=False, return_global_step=False):
+def smart_load(
+    path: str,
+    map_location: str = None,
+    return_numpy: bool = False,
+    return_global_step: bool = False,
+    return_is_torch_weight: bool = False,
+):
     if map_location is None:
         map_location = get_map_location_default()
 
@@ -325,20 +331,28 @@ def smart_load(path: str, map_location: str = None, return_numpy=False, return_g
 
         if suffix in torch_suffix:
             state_dict = convert_to_paddle(torch_load(path), return_numpy, return_global_step)
+            if return_is_torch_weight:
+                state_dict["is_torch_weight"] = True
             return state_dict
 
         if suffix in safetensors_suffix:
             state_dict = convert_to_paddle(safetensors_load(path), return_numpy, return_global_step)
+            if return_is_torch_weight:
+                state_dict["is_torch_weight"] = True
             return state_dict
 
         # must use safetensors_load first
         try:
             state_dict = convert_to_paddle(safetensors_load(path), return_numpy, return_global_step)
+            if return_is_torch_weight:
+                state_dict["is_torch_weight"] = True
             return state_dict
         except Exception:
             logger.info(f"Cant load file {name} with safetensors!")
         try:
             state_dict = convert_to_paddle(torch_load(path), return_numpy, return_global_step)
+            if return_is_torch_weight:
+                state_dict["is_torch_weight"] = True
             return state_dict
         except Exception:
             logger.info(f"Cant load file {name} with torch! We will try to load this with safetensors!")

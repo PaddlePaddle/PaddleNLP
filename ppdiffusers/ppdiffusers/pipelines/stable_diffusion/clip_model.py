@@ -561,7 +561,7 @@ class CLIPPreTrainedModel(PreTrainedModel):
     def post_init(self):
         self.apply(self._init_weights)
         # register_load_torch_hook
-        self.register_load_torch_hook()
+        # self.register_load_torch_hook()
 
     def register_load_torch_hook(self, function=None):
         if hasattr(self, "load_torch_hook"):
