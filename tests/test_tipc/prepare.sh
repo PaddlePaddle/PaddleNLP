@@ -400,12 +400,18 @@ elif [ ${MODE} = "benchmark_train" ];then
         tar -zxvf laion400m_demo_data.tar.gz
     fi
 
+    if [[ ${model_name} =~ "llama" ]]; then
+        rm -rf llama_sft_demo_data.tar.gz
+        wget https://paddlenlp.bj.bcebos.com/models/community/facebook/llama_sft_demo_data.tar.gz
+        tar -xvf llama_sft_demo_data.tar.gz
+    fi
+
     export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
     python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
     python -m pip install setuptools_scm 
     python -m pip install Cython 
     python -m pip install -r ../requirements.txt  #-i https://pypi.tuna.tsinghua.edu.cn/simple
-    python -m pip install pybind11 regex sentencepiece tqdm visualdl attrdict pyyaml -i https://mirror.baidu.com/pypi/simple
+    python -m pip install pybind11 regex sentencepiece tqdm visualdl attrdict pyyaml rouge -i https://mirror.baidu.com/pypi/simple
 
     python -m pip install -e ../
     # python -m pip install paddlenlp    # PDC 镜像中安装失败

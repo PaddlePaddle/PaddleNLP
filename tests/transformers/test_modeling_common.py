@@ -42,6 +42,14 @@ from paddlenlp.utils.env import CONFIG_NAME, LEGACY_CONFIG_NAME, MODEL_HOME
 from ..testing_utils import slow
 
 
+def _config_zero_init(config):
+    configs_no_init = copy.deepcopy(config)
+    for key in configs_no_init.__dict__.keys():
+        if "_range" in key or "_std" in key or "initializer_factor" in key or "layer_scale" in key:
+            setattr(configs_no_init, key, 1e-10)
+    return configs_no_init
+
+
 def get_cluster_from_args(selected_gpus):
     cluster_node_ips = "127.0.0.1"
     node_ip = "127.0.0.1"

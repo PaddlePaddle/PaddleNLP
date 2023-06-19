@@ -35,14 +35,23 @@ class ChatGPTInvocationLayer(OpenAIInvocationLayer):
     PromptModelInvocationLayer implementation for OpenAI's GPT-3 ChatGPT API. Invocations are made using REST API.
     See [OpenAI ChatGPT API](https://platform.openai.com/docs/guides/chat) for more details.
 
-    Note: kwargs other than init parameter names are ignored to enable reflective construction of the class
-    as many variants of PromptModelInvocationLayer are possible and they may have different parameters.
+    :param model_name_or_path: The name or path of the underlying model.
+    :param max_length: The maximum number of tokens the output text can have.
+    :param api_key: The OpenAI API key.
+    :param api_base: The OpenAI API Base url, defaults to `https://api.openai.com/v1`.
+    :param kwargs: Additional keyword arguments passed to the underlying model.
+    [See OpenAI documentation](https://platform.openai.com/docs/api-reference/chat).
     """
 
     def __init__(
-        self, api_key: str, model_name_or_path: str = "gpt-3.5-turbo", max_length: Optional[int] = 500, **kwargs
+        self,
+        api_key: str,
+        model_name_or_path: str = "gpt-3.5-turbo",
+        max_length: Optional[int] = 500,
+        api_base: str = "https://api.openai.com/v1",
+        **kwargs
     ):
-        super().__init__(api_key, model_name_or_path, max_length, **kwargs)
+        super().__init__(api_key, model_name_or_path, max_length, api_base=api_base, **kwargs)
 
     def invoke(self, *args, **kwargs):
         """
@@ -111,7 +120,6 @@ class ChatGPTInvocationLayer(OpenAIInvocationLayer):
             for idx, _ in enumerate(assistant_response):
                 for stop_word in stop_words:
                     assistant_response[idx] = assistant_response[idx].replace(stop_word, "").strip()
-
         return assistant_response
 
     def _extract_token(self, event_data: Dict[str, Any]):
@@ -146,7 +154,7 @@ class ChatGPTInvocationLayer(OpenAIInvocationLayer):
 
     @property
     def url(self) -> str:
-        return "https://api.openai.com/v1/chat/completions"
+        return f"{self.api_base}/chat/completions"
 
     @classmethod
     def supports(cls, model_name_or_path: str, **kwargs) -> bool:

@@ -190,6 +190,7 @@ class LoRAMergedLinear(nn.Linear):
         self,
         in_features: int,
         out_features: int,
+        head_dim: int,
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
@@ -210,6 +211,8 @@ class LoRAMergedLinear(nn.Linear):
 
         self.out_features = out_features
         self.in_features = in_features
+        self.head_dim = head_dim
+        self.head_num = self.out_features // len(enable_lora) // self.head_dim
 
         # Optional dropout
         if lora_dropout > 0.0 and any:
@@ -243,33 +246,53 @@ class LoRAMergedLinear(nn.Linear):
             # Freezing the pre-trained weight matrix
             self.weight.stop_gradient = True
 
-    def zero_pad(self, x):
+    def zero_pad_and_reshape(self, x):
         # if enable_lora is all true, then there is no need to zero pad
         if all(self.enable_lora):
-            return x
+            output = x
         else:
             split_output = paddle.split(x, sum(self.enable_lora), axis=-1)
             for index in range(len(self.enable_lora)):
                 if self.enable_lora[index] is False:
                     split_output.insert(index, paddle.zeros_like(split_output[0]))
-            concat_output = paddle.concat(split_output, axis=-1)
-            return concat_output
+            output = paddle.concat(split_output, axis=-1)
+        if output.dim() == 2:
+            rank, out_features = output.shape
+            reshape_output = (
+                output.reshape([rank, len(self.enable_lora), self.head_num, self.head_dim])
+                .transpose([0, 2, 1, 3])
+                .reshape([rank, out_features])
+            )
+        else:
+            batch, seq_len, out_features = output.shape
+            reshape_output = (
+                output.reshape([batch, seq_len, len(self.enable_lora), self.head_num, self.head_dim])
+                .transpose([0, 1, 3, 2, 4])
+                .reshape([batch, seq_len, out_features])
+            )
+
+        return reshape_output
 
     def train(self):
         super().train()
         if self.merge_weights and self.merged:
             # Make sure that the weights are not merged
             if self.r > 0 and any(self.enable_lora):
+                reshape_lora_B = (
+                    self.lora_B.reshape([self.r, self.head_num, sum(self.enable_lora), self.head_dim])
+                    .transpose([0, 2, 1, 3])
+                    .reshape(self.lora_B.shape)
+                )
                 delta_weight = (
                     F.conv1d(
                         self.lora_A.T.unsqueeze(0),
-                        self.lora_B.T.unsqueeze(-1),
+                        reshape_lora_B.T.unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                     .squeeze(0)
                     .T
                 )
-                new_weight = self.weight - self.zero_pad(delta_weight * self.scaling)
+                new_weight = self.weight - self.zero_pad_and_reshape(delta_weight * self.scaling)
                 self.weight.set_value(new_weight)
             self.merged = False
 
@@ -278,16 +301,21 @@ class LoRAMergedLinear(nn.Linear):
         if self.merge_weights and not self.merged:
             # Merge the weights and mark it
             if self.r > 0 and any(self.enable_lora):
+                reshape_lora_B = (
+                    self.lora_B.reshape([self.r, self.head_num, sum(self.enable_lora), self.head_dim])
+                    .transpose([0, 2, 1, 3])
+                    .reshape(self.lora_B.shape)
+                )
                 delta_weight = (
                     F.conv1d(
                         self.lora_A.T.unsqueeze(0),
-                        self.lora_B.T.unsqueeze(-1),
+                        reshape_lora_B.T.unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                     .squeeze(0)
                     .T
                 )
-                new_weight = self.weight + self.zero_pad(delta_weight * self.scaling)
+                new_weight = self.weight + self.zero_pad_and_reshape(delta_weight * self.scaling)
                 self.weight.set_value(new_weight)
             self.merged = True
 
@@ -296,17 +324,22 @@ class LoRAMergedLinear(nn.Linear):
         if self.r > 0 and any(self.enable_lora) and not self.merged:
             input_a = self.lora_dropout(input) @ self.lora_A
             if input_a.dim() == 3:
+                reshape_lora_B = (
+                    self.lora_B.reshape([self.r, self.head_num, sum(self.enable_lora), self.head_dim])
+                    .transpose([0, 2, 1, 3])
+                    .reshape(self.lora_B.shape)
+                )
                 delta = (
                     F.conv1d(
                         input_a.transpose([0, 2, 1]),
-                        self.lora_B.T.unsqueeze(-1),
+                        reshape_lora_B.T.unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                 ).transpose([0, 2, 1])
             else:
                 raise NotImplementedError("LoRAMergedLinear only support 3D input features")
 
-            result += self.zero_pad(delta * self.scaling)
+            result += self.zero_pad_and_reshape(delta * self.scaling)
         return result
 
     def extra_repr(self):
@@ -320,6 +353,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         self,
         in_features: int,
         out_features: int,
+        head_dim: int,
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
@@ -341,6 +375,8 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
 
         self.out_features = out_features
         self.in_features = in_features
+        self.head_dim = head_dim
+        self.head_num = self.output_size_per_partition // len(enable_lora) // self.head_dim
 
         # Optional dropout
         if lora_dropout > 0.0 and any:
@@ -378,33 +414,53 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
             # Freezing the pre-trained weight matrix
             self.weight.stop_gradient = True
 
-    def zero_pad(self, x):
+    def zero_pad_and_reshape(self, x):
         # if enable_lora is all true, then there is no need to zero pad
         if all(self.enable_lora):
-            return x
+            output = x
         else:
             split_output = paddle.split(x, sum(self.enable_lora), axis=-1)
             for index in range(len(self.enable_lora)):
                 if self.enable_lora[index] is False:
                     split_output.insert(index, paddle.zeros_like(split_output[0]))
-            concat_output = paddle.concat(split_output, axis=-1)
-            return concat_output
+            output = paddle.concat(split_output, axis=-1)
+        if output.dim() == 2:
+            rank, out_features = output.shape
+            reshape_output = (
+                output.reshape([rank, len(self.enable_lora), self.head_num, self.head_dim])
+                .transpose([0, 2, 1, 3])
+                .reshape([rank, out_features])
+            )
+        else:
+            batch, seq_len, out_features = output.shape
+            reshape_output = (
+                output.reshape([batch, seq_len, len(self.enable_lora), self.head_num, self.head_dim])
+                .transpose([0, 1, 3, 2, 4])
+                .reshape([batch, seq_len, out_features])
+            )
+
+        return reshape_output
 
     def train(self):
         super().train()
         if self.merge_weights and self.merged:
             # Make sure that the weights are not merged
             if self.r > 0 and any(self.enable_lora):
+                reshape_lora_B = (
+                    self.lora_B.reshape([self.r, self.head_num, sum(self.enable_lora), self.head_dim])
+                    .transpose([0, 2, 1, 3])
+                    .reshape(self.lora_B.shape)
+                )
                 delta_weight = (
                     F.conv1d(
                         self.lora_A.T.unsqueeze(0),
-                        self.lora_B.T.unsqueeze(-1),
+                        reshape_lora_B.T.unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                     .squeeze(0)
                     .T
                 )
-                new_weight = self.weight - self.zero_pad(delta_weight * self.scaling)
+                new_weight = self.weight - self.zero_pad_and_reshape(delta_weight * self.scaling)
                 self.weight.set_value(new_weight)
             self.merged = False
 
@@ -413,16 +469,21 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         if self.merge_weights and not self.merged:
             # Merge the weights and mark it
             if self.r > 0 and any(self.enable_lora):
+                reshape_lora_B = (
+                    self.lora_B.reshape([self.r, self.head_num, sum(self.enable_lora), self.head_dim])
+                    .transpose([0, 2, 1, 3])
+                    .reshape(self.lora_B.shape)
+                )
                 delta_weight = (
                     F.conv1d(
                         self.lora_A.T.unsqueeze(0),
-                        self.lora_B.T.unsqueeze(-1),
+                        reshape_lora_B.T.unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                     .squeeze(0)
                     .T
                 )
-                new_weight = self.weight + self.zero_pad(delta_weight * self.scaling)
+                new_weight = self.weight + self.zero_pad_and_reshape(delta_weight * self.scaling)
                 self.weight.set_value(new_weight)
             self.merged = True
 
@@ -435,17 +496,22 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
             input_a = self.lora_dropout(input) @ self.lora_A
             input_a_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
             if input_a.dim() == 3:
+                reshape_lora_B = (
+                    self.lora_B.reshape([self.r, self.head_num, sum(self.enable_lora), self.head_dim])
+                    .transpose([0, 2, 1, 3])
+                    .reshape(self.lora_B.shape)
+                )
                 delta_mp = (
                     F.conv1d(
                         input_a_mp.transpose([0, 2, 1]),
-                        self.lora_B.T.unsqueeze(-1),
+                        reshape_lora_B.T.unsqueeze(-1),
                         groups=sum(self.enable_lora),
                     )
                 ).transpose([0, 2, 1])
             else:
                 raise NotImplementedError("LoRAMergedLinear only support 3D input features")
             # [batch_size, *, out_features_per_partition]
-            result_mp += self.zero_pad(delta_mp * self.scaling)
+            result_mp += self.zero_pad_and_reshape(delta_mp * self.scaling)
 
         if self.gather_output and self.is_mp:
             result_mp_list = paddle.split(result_mp, len(self.enable_lora), axis=-1)

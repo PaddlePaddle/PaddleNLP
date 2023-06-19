@@ -40,6 +40,7 @@ class WebSearch(BaseComponent):
         api_key: str,
         top_k: Optional[int] = 10,
         search_engine_provider: Union[str, SearchEngine] = "SerpAPI",
+        engine: Optional[str] = "google",
         search_engine_kwargs: Optional[Dict[str, Any]] = None,
     ):
         """
@@ -61,7 +62,7 @@ class WebSearch(BaseComponent):
                 )
             if not issubclass(klass, SearchEngine):
                 raise ValueError(f"Class {search_engine_provider} is not a subclass of SearchEngine.")
-            self.search_engine = klass(api_key=api_key, top_k=top_k, search_engine_kwargs=search_engine_kwargs)  # type: ignore
+            self.search_engine = klass(api_key=api_key, top_k=top_k, engine=engine, search_engine_kwargs=search_engine_kwargs)  # type: ignore
         elif isinstance(search_engine_provider, SearchEngine):
             self.search_engine = search_engine_provider
         else:
