@@ -935,6 +935,7 @@ class ConversionMixin:
         if state_dict is None:
             with device_guard("cpu"):
                 state_dict = paddle.load(weight_file, return_numpy=False)
+            logger.info("starting convert orignal state_dict to tensor parallel state_dict.")
 
         state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys(), ignore_error)
 

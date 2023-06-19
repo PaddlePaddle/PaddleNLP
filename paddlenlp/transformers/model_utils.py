@@ -28,8 +28,6 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 import six
-
-# import tqdm
 from huggingface_hub import (
     create_repo,
     get_hf_file_metadata,
@@ -92,8 +90,8 @@ __all__ = [
 if is_safetensors_available():
 
     from safetensors import safe_open
-    from safetensors.paddle import load_file as safe_load_file
-    from safetensors.paddle import save_file as safe_save_file
+    from safetensors.numpy import load_file as safe_load_file
+    from safetensors.numpy import save_file as safe_save_file
 
 
 def prune_linear_layer(layer: nn.Linear, index: paddle.Tensor, dim: int = 0) -> nn.Linear:
@@ -353,20 +351,43 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike]):
     """
     if checkpoint_file.endswith(".safetensors") and is_safetensors_available():
         # Check format of the archive
-        with safe_open(checkpoint_file, framework="pt") as f:
+        with safe_open(checkpoint_file, framework="np") as f:
             metadata = f.metadata()
-        if metadata.get("format") not in ["pt", "pd", "np"]:
+        if metadata.get("format") not in ["pd", "np"]:
             raise OSError(
                 f"The safetensors archive passed at {checkpoint_file} does not contain the valid metadata. Make sure "
                 "you save your model with the `save_pretrained` method."
             )
-        elif metadata["format"] != "pd":
-            raise NotImplementedError(
-                f"Conversion from a {metadata['format']} safetensors archive to PaddlePaddle is not implemented yet."
-            )
-        return safe_load_file(checkpoint_file)
+        if metadata["format"] == "pd":
+            raise ValueError("")
+            return safe_load_file(checkpoint_file)
+        if metadata["format"] == "np":
+            logger.warning("loading safe.")
+            state_dict = {}
+            with safe_open(checkpoint_file, framework="np") as f:
+                for key in f.keys():
+                    slice_ = f.get_slice(key)
+                    # size = slice_.get_shape()[0]
+                    # block_size = size // world_size
+                    # start = rank * block_size
+                    # stop = (rank + 1) * block_size
+                    # tensor = slice_[start:stop]
+                    state_dict[key] = slice_[:]
+                    # print(key, state_dict[key].shape)
 
-    return paddlenlp_load(checkpoint_file, return_numpy=True)
+            # state_dict = safe_load_file(checkpoint_file)
+            logger.warning("loading done.")
+            for k in list(state_dict.keys()):
+                with device_guard():
+                    state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+
+            logger.warning("copy paddle tensor done.")
+            return state_dict
+
+    logger.warning("loading pd.")
+    state_dict = paddlenlp_load(checkpoint_file, return_numpy=True)
+    logger.warning("loading done.")
+    return state_dict
 
 
 def cached_file_for_hf_hub(
@@ -519,7 +540,7 @@ _re_layer_prefix = re.compile(r"\.(\d+)\.")
 
 def _partion_for_pipeline_mode(keys):
     # the keys should be sort in networks order
-    # todo handle tie_weight
+    # TODO maybe handle tie_weight ?
     def layer_prefix(key):
         ret = _re_layer_prefix.search(key)
         if ret is not None:
@@ -710,6 +731,39 @@ def load_sharded_checkpoint(model, folder, strict=True):
     return paddle.nn.modules.module._IncompatibleKeys(missing_keys, unexpected_keys)
 
 
+def faster_set_state_dict(model, state_dict):
+    # the state_dict will be destroied.
+    with paddle.no_grad():
+        for k, v in model.state_dict().items():
+            if k in state_dict:
+                v_new = state_dict.pop(k)
+                if not isinstance(v_new, paddle.Tensor):
+                    raise ValueError(
+                        f"faster_set_state_dict need state dict with paddle.Tensor, but got {type(v_new)}"
+                    )
+                # 2. cast param / Tensor to dtype
+                if v.dtype != v_new.dtype:
+                    raise ValueError(f"for key: {k}, expect dtype {v.dtype}, but got {v_new.dtype}")
+                # check shape
+                if list(v.shape) != list(v_new.shape):
+                    raise ValueError(f"for key: {k}, expect shape {v.shape}, but got {v_new.shape}")
+
+                dst_tensor = v.value().get_tensor()
+                place = v.place
+
+                if not v_new.place._equals(place):
+                    # clear dst_tensor for save memory
+                    dst_tensor._clear()
+                    # v_new = v_new._copy_to(paddle.CUDAPinnedPlace(), False)
+                    new_t = v_new._copy_to(place, False)
+                else:
+                    new_t = v_new
+
+                # 4. share Tensor to origin param / Tensor
+                src_tensor = new_t.value().get_tensor()
+                dst_tensor._share_data_with(src_tensor)
+
+
 def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
     # Convert old format to new format if needed from a PyTorch state_dict
     error_msgs = []
@@ -719,8 +773,9 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
             if key.startswith(start_prefix):
                 state_dict[key.replace(start_prefix, "")] = state_dict.pop(key)
 
-    # todo add return status to state_dict
-    model_to_load.set_state_dict(state_dict)
+    # TODO: add return status to state_dict
+    # model_to_load.set_state_dict(state_dict)
+    faster_set_state_dict(model_to_load, state_dict)
 
     del state_dict
 
@@ -728,7 +783,9 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
 
 
 def _convert_state_dict_dtype(dtype, state_dict, model_to_load):
+    # for now, we suppose the state dict is in cpu tensor or numpy
     # convert the dtype of state dict
+    # TODO: (@zhui), remove unneed conpy for cast
     if dtype is not None:
         if isinstance(dtype, paddle.dtype):
             dtype = str(dtype)[7:]
@@ -737,7 +794,7 @@ def _convert_state_dict_dtype(dtype, state_dict, model_to_load):
             raise ValueError(
                 f"the value of `dtype` should be one of [`float32`, `float16`, `bfloat16`], but received {dtype}"
             )
-        for key in state_dict.keys():
+        for key in list(state_dict.keys()):
             if dtype == "bfloat16":
                 # fix fp32/fp16 cast to bfloat16
                 # so cast numpy to paddle, let paddle handle dtype casting
@@ -752,10 +809,12 @@ def _convert_state_dict_dtype(dtype, state_dict, model_to_load):
                     # paddle.bfloat16 save as np.uint16.
                     # so cast numpy to paddle, let paddle handle dtype casting
                     with device_guard("cpu"):
-                        state_dict[key] = paddle.to_tensor(state_dict[key])
+                        state_dict[key] = paddle.to_tensor(state_dict.pop(key))
 
             if isinstance(state_dict[key], paddle.Tensor) and state_dict[key].is_floating_point():
-                state_dict[key] = paddle.cast(state_dict[key], dtype=dtype)
+                v_dtype = str(state_dict[key].dtype)[7:]
+                if v_dtype != dtype:
+                    state_dict[key] = paddle.cast(state_dict.pop(key), dtype=dtype)
     else:
         dtype_prefix_len = len("paddle.")
         for k, v in model_to_load.state_dict().items():
@@ -797,19 +856,19 @@ def _load_state_dict_into_meta_model(
         if param_name.startswith(start_prefix):
             param_name = param_name[len(start_prefix) :]
 
-        set_module_kwargs = {}
+        # set_module_kwargs = {}
 
-        # We convert floating dtypes to the `dtype` passed. We want to keep the buffers/params
-        # in int/uint/bool and not cast them.
-        if dtype is not None and paddle.is_floating_point(param):
-            if (
-                keep_in_fp32_modules is not None
-                and any(module_to_keep_in_fp32 in param_name for module_to_keep_in_fp32 in keep_in_fp32_modules)
-                and dtype == paddle.float16
-            ):
-                param = param.astype(paddle.float32)
-            else:
-                param = param.astype(dtype)
+        # # We convert floating dtypes to the `dtype` passed. We want to keep the buffers/params
+        # # in int/uint/bool and not cast them.
+        # if dtype is not None and paddle.is_floating_point(param):
+        #     if (
+        #         keep_in_fp32_modules is not None
+        #         and any(module_to_keep_in_fp32 in param_name for module_to_keep_in_fp32 in keep_in_fp32_modules)
+        #         and dtype == paddle.float16
+        #     ):
+        #         param = param.astype(paddle.float32)
+        #     else:
+        #         param = param.astype(dtype)
 
         # For compatibility with PyTorch load_state_dict which converts state dict dtype to existing dtype in model
         if dtype is None:
@@ -823,11 +882,12 @@ def _load_state_dict_into_meta_model(
             if old_param is not None:
                 param = param.to(old_param.dtype)
 
-        set_module_kwargs["value"] = param
-
-        # param_device = "cpu"
         with paddle.no_grad():
-            model.state_dict()[param_name].set_value(param)
+            # model.state_dict()[param_name].set_value(param)
+            model.state_dict()[param_name].get_tensor()._share_data_with(param.value().get_tensor())
+            param.value().get_tensor()._clear()
+            # print(param)
+            # print(model.state_dict()[param_name])
 
     return error_msgs
 
@@ -1530,6 +1590,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         loaded_keys: List[str],
         resolved_archive_file,
         pretrained_model_name_or_path,
+        config=None,
         ignore_mismatched_sizes=False,
         low_cpu_mem_usage=False,
         dtype=None,
@@ -1647,9 +1708,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # To avoid recursive import temporarily.
             import paddlenlp.ops.fast_transformer.transformer.decoding as ft_decoding
 
-            state_to_load = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_dict)
-            if paddle.in_dynamic_mode():
-                model_to_load.set_state_dict(state_to_load)
+            state_dict = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_dict)
 
             mismatched_keys = _find_mismatched_keys(
                 state_dict,
@@ -1672,7 +1731,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             mismatched_keys = []
 
             if len(resolved_archive_file) > 1:
-                # resolved_archive_file = logging.tqdm(resolved_archive_file, desc="Loading checkpoint shards")
                 resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
 
             for shard_file in resolved_archive_file:
@@ -1688,7 +1746,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     remove_prefix_from_model,
                     ignore_mismatched_sizes,
                 )
-
+                logger.warning("set state dict to model")
                 if low_cpu_mem_usage:
                     new_error_msgs = _load_state_dict_into_meta_model(
                         model_to_load,
@@ -1702,8 +1760,19 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
                     error_msgs += new_error_msgs
                 else:
+                    logger.info("convert dtype")
+                    _convert_state_dict_dtype(dtype, state_dict, model_to_load)
+                    if config.tensor_parallel_degree > 1 and ".tp" not in shard_file:
+                        logger.info("convert tp")
+                        # ignore error for multi shard, since only parts of data
+                        state_dict = cls.convert_tensor_parallel(
+                            None, config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
+                        )
+                        logger.info("conver tp over!")
+
                     error_msgs += _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
 
+                logger.warning("done, set state dict to model")
                 # force memory release
                 del state_dict
                 gc.collect()
@@ -1807,8 +1876,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 # Load from local directory path
                 model = BertForSequenceClassification.from_pretrained('./my_bert/')
         """
-        print(kwargs)
-
         config = kwargs.pop("config", None)
         state_dict = kwargs.pop("state_dict", None)
         cache_dir = kwargs.pop("cache_dir", None)
@@ -1825,6 +1892,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if load_state_as_np is not None:
             logger.warning("`load_state_as_np` is deprecated,  please delete it!")
 
+        model_kwargs = kwargs
+
         if from_hf_hub:
             # from_hf_hub defalut enable convert_from_torch
             if convert_from_torch is None:
@@ -1837,6 +1906,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             convert_from_torch = False
 
         init_contexts = []
+        init_contexts.append(no_init_weights(_enable=True))
         if low_cpu_mem_usage:
             # Instantiate model.
             init_contexts.append(no_init_weights(_enable=True))
@@ -1910,11 +1980,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         "don't support conversion from pytorch weight file to paddle weight file "
                     )
             else:
-                # 4. loading the state dict
-                if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
-                    state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
-                else:
-                    state_dict = load_state_dict(resolved_archive_file)
+                # 4. loading non-sharded ckpt from the state dict
+                if not low_cpu_mem_usage:
+                    if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
+                        state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
+                    else:
+                        state_dict = load_state_dict(resolved_archive_file)
+
+                    logger.info("loaded weights file from disk, setting weights to model.")
 
         if is_sharded:
             loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
@@ -1935,6 +2008,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             loaded_keys=loaded_state_dict_keys,
             resolved_archive_file=resolved_archive_file,
             pretrained_model_name_or_path=pretrained_model_name_or_path,
+            config=config,
             ignore_mismatched_sizes=ignore_mismatched_sizes,
             low_cpu_mem_usage=low_cpu_mem_usage,
             dtype=dtype,
@@ -1989,19 +2063,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # variant = kwargs.get("variant", None)
         # is_main_process = kwargs.get("is_main_process", True)
 
-        # 1. retrieve the model related config
-
-        # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
-        # we currently don't use this setting automatically, but may start to use with v5
-        # model_to_save = unwrap_model(self)
-        # dtype = get_parameter_dtype(model_to_save)
-        # model_to_save.config.dtype = str(dtype).split(".")[1]
-
-        # # Attach architecture to the config
-        # model_to_save.config.architectures = [model_to_save.__class__.__name__]
-
-        # model_to_save.config.save_pretrained(save_dir)
-
         save_directory = save_dir
 
         if safe_serialization and not is_safetensors_available():
@@ -2026,26 +2087,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # model_to_save.config.paddle_dtype = str(dtype).split(".")[1]
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
-        state_dict_to_save = None
         config_to_save = copy.deepcopy(model_to_save.config)
-        if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
-            state_dict_to_save = model_to_save.merge_tensor_parallel(model_to_save.state_dict(), config_to_save)
-            config_to_save.tensor_parallel_degree = 1
-            # set variant to None for merge_tensor_parallel, but there should no relationship with variant setting
-            variant = None
-            if config_to_save.tensor_parallel_rank != 0:
-                logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
-                return
-        else:
-            if config_to_save.tensor_parallel_degree > 1:
-                if variant is None:
-                    variant = f"tp{config_to_save.tensor_parallel_rank:0>2d}"
-                # WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, variant)
 
         # Save the model
-        if state_dict_to_save is None:
+        if state_dict is None:
             if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
-                state_dict_to_save = model_to_save.merge_tensor_parallel(model_to_save.state_dict(), config_to_save)
+                state_dict = model_to_save.merge_tensor_parallel(model_to_save.state_dict(), config_to_save)
                 config_to_save.tensor_parallel_degree = 1
                 if config_to_save.tensor_parallel_rank != 0:
                     logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
@@ -2056,7 +2103,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         PADDLE_WEIGHTS_NAME, f"tp{config_to_save.tensor_parallel_rank:0>2d}"
                     )
 
-                state_dict_to_save = self.state_dict()
+                state_dict = self.state_dict()
 
         # Attach architecture to the config
         config_to_save.architectures = [model_to_save.__class__.__name__]
@@ -2074,7 +2121,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # Save model
         shards, index = shard_checkpoint(
-            state_dict_to_save, max_shard_size=max_shard_size, weights_name=weights_name, shard_format=shard_format
+            state_dict, max_shard_size=max_shard_size, weights_name=weights_name, shard_format=shard_format
         )
 
         # Clean the folder from a previous save
@@ -2102,7 +2149,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if safe_serialization:
                 # At some point we will need to deal better with save_function (used for TPU and other distributed
                 # joyfulness), but for now this enough.
-                safe_save_file(shard, os.path.join(save_directory, shard_file), metadata={"format": "pd"})
+                for k in list(shard.keys()):
+                    if isinstance(shard[k], paddle.Tensor):
+                        shard[k] = shard.pop(k).numpy()
+                safe_save_file(shard, os.path.join(save_directory, shard_file), metadata={"format": "np"})
             else:
                 save_function(shard, os.path.join(save_directory, shard_file))
 
