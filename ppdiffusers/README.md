@@ -22,11 +22,7 @@
 ## News 📢
 * 🔥 **2023.06.19 发布 0.16.1 版本，新增[T2I-Adapter](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/t2i-adapter)，支持训练与推理；ControlNet升级，支持[reference only推理](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/community#controlnet-reference-only)；新增[WebUIStableDiffusionPipeline](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/community#automatic1111-webui-stable-diffusion)，
 支持通过prompt的方式动态加载、切换lora权重；
-新增多种模态扩散模型Pipeline，包括视频生成（[Text-to-Video](#text_to_video_generation-synth)、Text-to-Video Zero）、音频生成（[AudioLDM](#unconditional_audio_generation-audio_diffusion
-)、Spectrogram Diffusion）；新增[IF模型](text_to_image_generation_deepfloyd_if)；
-**
-
-[IF模型](text_to_image_generation-deepfloyd_if)
+新增多种模态扩散模型Pipeline，包括视频生成（[Text-to-Video-Synth](#文本视频多模)、[Text-to-Video-Zero](#文本视频多模)）、音频生成（[AudioLDM](#文本音频多模)、[Spectrogram Diffusion](#音频)）；新增文图生成模型[Deepfloyd_IF](#文本图像多模)。**
 
 * 🔥 **2023.03.29 发布 0.14.0 版本，新增[LoRA](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/dreambooth)、[ControlNet](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/controlnet)，支持训练与推理；
 模型加载升级，[可直接加载HF Diffusers的权重](#加载HF-Diffusers权重)（safetensors和pt）或 [SD等原库的Lightning权重进行推理](#加载原库的Lightning权重)，[支持加载Civitai社区的LoRA权重](#加载Civitai社区的LoRA权重)；
@@ -91,8 +87,6 @@ image.save("astronaut_rides_horse_sd.png")
 
 #### text_to_image_generation-deepfloyd_if
 
-#### text_to_image_generation_deepfloyd_if
-
 ```python
 import paddle
 
@@ -133,26 +127,14 @@ pil_image = pd_to_pil(image)
 pil_image[0].save("text_to_image_generation-deepfloyd_if-result-if_stage_II.png")
 # save gpu memory
 super_res_1_pipe.to(paddle_device="cpu")
-
-# Stage 3: super resolution stage2
-super_res_2_pipe = DiffusionPipeline.from_pretrained(
-    "stabilityai/stable-diffusion-x4-upscaler", paddle_dtype=paddle.float16
-)
-super_res_2_pipe.enable_xformers_memory_efficient_attention()
-
-image = super_res_2_pipe(
-    prompt=prompt,
-    image=image,
-).images
-image[0].save("text_to_image_generation-deepfloyd_if-result-if_stage_III.png")
 ```
 <div align="center">
 <img alt="image" src="https://user-images.githubusercontent.com/20476674/246785766-700dfad9-159d-4bfb-bfc7-c18df938a052.png">
 <center>if_stage_I</center>
 <img alt="image" src="https://user-images.githubusercontent.com/20476674/246785773-3359ca5f-dadf-4cc8-b318-ff1f9d4a2d35.png">
 <center>if_stage_II</center>
-<img alt="image" src="https://user-images.githubusercontent.com/20476674/246785774-8870829a-354b-4a87-9d67-93af315f51e6.png">
-<center>if_stage_III</center>
+<!-- <img alt="image" src="https://user-images.githubusercontent.com/20476674/246785774-8870829a-354b-4a87-9d67-93af315f51e6.png">
+<center>if_stage_III</center> -->
 </div>
 </details>
 
@@ -269,7 +251,7 @@ image.save("versatile-diffusion-red_car.png")
 
 ### 文本视频多模
 
-<details>
+<details open>
 <summary>&emsp;文本条件的视频生成（Text-to-Video Generation）</summary>
 
 #### text_to_video_generation-synth
@@ -315,8 +297,7 @@ imageio.mimsave("text_to_video_generation-zero-result-panda.mp4", result, fps=4)
 </details>
 
 ### 文本音频多模
-
-<details>
+<details open>
 <summary>&emsp;文本条件的音频生成（Text-to-Audio Generation）</summary>
 
 #### text_to_audio_generation-audio_ldm
@@ -475,8 +456,8 @@ image.save("versatile-diffusion-car_variation.png")
 
 
 ### 音频
-
-<details><summary>&emsp;无条件音频生成（Unconditional Audio Generation）</summary>
+<details open>
+<summary>&emsp;无条件音频生成（Unconditional Audio Generation）</summary>
 
 #### unconditional_audio_generation-audio_diffusion
 
