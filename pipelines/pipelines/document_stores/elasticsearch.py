@@ -232,12 +232,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         self.scroll = scroll
         self.skip_missing_embeddings: bool = skip_missing_embeddings
         self.vector_type = vector_type
-        if similarity in ["cosine", "dot_product", "l2", "dot_prod"]:
-            self.similarity = similarity
-        else:
-            raise Exception(
-                f"Invalid value {similarity} for similarity in ElasticSearchDocumentStore constructor. Choose between 'cosine', 'l2' and 'dot_product'"
-            )
+
+        self.similarity_check(similarity)
         if index_type in ["flat", "hnsw"]:
             self.index_type = index_type
         else:
@@ -258,6 +254,14 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
 
         self.duplicate_documents = duplicate_documents
         self.refresh_type = refresh_type
+
+    def similarity_check(self, similarity):
+        if similarity in ["cosine", "dot_product", "l2"]:
+            self.similarity = similarity
+        else:
+            raise Exception(
+                f"Invalid value {similarity} for similarity in ElasticSearchDocumentStore constructor. Choose between 'cosine', 'l2' and 'dot_product'"
+            )
 
     @classmethod
     def _init_elastic_client(
@@ -2157,6 +2161,14 @@ class OpenDistroElasticsearchDocumentStore(OpenSearchDocumentStore):
 
 
 class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
+    def similarity_check(self, similarity):
+        if similarity in ["cosine", "dot_prod", "l2", "l1"]:
+            self.similarity = similarity
+        else:
+            raise Exception(
+                f"Invalid value {similarity} for similarity in BaiduElasticSearchDocumentStore constructor. Choose between 'cosine', 'l1', 'l2' and 'dot_prod'"
+            )
+
     def _get_vector_similarity_query(self, query_emb: np.ndarray, top_k: int):
         """
         Generate Elasticsearch query for vector similarity.
