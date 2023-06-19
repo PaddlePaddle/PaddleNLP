@@ -105,12 +105,14 @@ def main():
     def preprocess_function(example, max_src_length=256, max_tgt_length=384):
         inputs = example["instruction"]
         targets = example["output"]
+        if "input" in example:
+            inputs += example["input"]
         model_inputs = tokenizer(inputs, max_length=max_src_length, truncation=True, return_attention_mask=False)
         labels = tokenizer(targets, max_length=max_tgt_length, truncation=True, return_attention_mask=False)
         labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
         model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
-        del model_inputs["token_type_ids"]
+
         return model_inputs
 
     if model_args.english:
