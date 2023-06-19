@@ -1242,6 +1242,7 @@ if is_paddle_available() and is_paddlenlp_available():
     # patch get_image_processor_dict support subfolder.
 
     IMAGE_PROCESSOR_NAME = "preprocessor_config.json"
+    from paddlenlp.transformers.feature_extraction_utils import FeatureExtractionMixin
     from paddlenlp.transformers.image_processing_utils import ImageProcessingMixin
 
     @classmethod
@@ -1293,6 +1294,7 @@ if is_paddle_available() and is_paddlenlp_available():
         return image_processor_dict, kwargs
 
     ImageProcessingMixin.get_image_processor_dict = get_image_processor_dict
+    FeatureExtractionMixin.get_feature_extractor_dict = get_image_processor_dict
 
     # patch T5LayerFF, we will remove this in the near future.
     from paddlenlp.transformers.t5.modeling import T5LayerFF

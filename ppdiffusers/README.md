@@ -178,7 +178,7 @@ pipe.enable_xformers_memory_efficient_attention()
 ### ToME + ControlNet
 ```python
 # 安装develop的ppdiffusers
-# pip install --pre --upgrade ppdiffusers -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+# pip install "ppdiffusers>=0.16.1"
 import paddle
 from ppdiffusers import ControlNetModel, StableDiffusionControlNetPipeline
 from ppdiffusers.utils import load_image
