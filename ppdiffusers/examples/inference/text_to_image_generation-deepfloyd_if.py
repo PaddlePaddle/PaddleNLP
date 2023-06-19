@@ -30,7 +30,7 @@ image = pipe(
 
 # save intermediate image
 pil_image = pd_to_pil(image)
-pil_image[0].save("if_stage_I.png")
+pil_image[0].save("text_to_image_generation-deepfloyd_if-result-if_stage_I.png")
 # save gpu memory
 pipe.to(paddle_device="cpu")
 
@@ -48,7 +48,7 @@ image = super_res_1_pipe(
 ).images
 # save intermediate image
 pil_image = pd_to_pil(image)
-pil_image[0].save("if_stage_II.png")
+pil_image[0].save("text_to_image_generation-deepfloyd_if-result-if_stage_II.png")
 # save gpu memory
 super_res_1_pipe.to(paddle_device="cpu")
 
@@ -62,4 +62,4 @@ image = super_res_2_pipe(
     prompt=prompt,
     image=image,
 ).images
-image[0].save("if_stage_III.png")
+image[0].save("text_to_image_generation-deepfloyd_if-result-if_stage_III.png")

@@ -44,4 +44,4 @@ image = pipe(
     width=resolution,
     controlnet_conditioning_scale=1.0,
 ).images[0]
-image.save("bird_canny.png")
+image.save("text_to_image_generation-controlnet-result-bird_canny.png")

@@ -21,4 +21,4 @@ pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 
 prompt = "An astronaut riding a horse."
 video_frames = pipe(prompt, num_inference_steps=25).frames
-imageio.mimsave("astronaut_riding_a_horse.mp4", video_frames, fps=8)
+imageio.mimsave("text_to_video_generation-synth-result-astronaut_riding_a_horse.mp4", video_frames, fps=8)

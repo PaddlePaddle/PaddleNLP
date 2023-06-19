@@ -23,7 +23,7 @@ pipe = AudioLDMPipeline.from_pretrained("cvssp/audioldm", paddle_dtype=paddle.fl
 prompt = "Techno music with a strong, upbeat tempo and high melodic riffs"
 audio = pipe(prompt, num_inference_steps=10, audio_length_in_s=5.0).audios[0]
 
-output_path = "techno.wav"
+output_path = "text_to_audio_generation-audio_ldm-techno.wav"
 # save the audio sample as a .wav file
 scipy.io.wavfile.write(output_path, rate=16000, data=audio)
 

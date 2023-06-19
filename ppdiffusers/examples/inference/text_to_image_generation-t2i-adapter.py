@@ -32,4 +32,4 @@ image = pipe(
     prompt="At night, glowing cubes in front of the beach",
     image=color_palette,
 ).images[0]
-image.save("color_adapter.png")
+image.save("text_to_image_generation-t2i-adapter-result-color_adapter.png")

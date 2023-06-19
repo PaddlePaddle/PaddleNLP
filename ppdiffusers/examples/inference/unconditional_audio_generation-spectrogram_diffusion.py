@@ -28,7 +28,7 @@ processor = MidiProcessor()
 output = pipe(processor(mid_file_path))
 audio = output.audios[0]
 
-output_path = "beethoven_hammerklavier_2.wav"
+output_path = "unconditional_audio_generation-spectrogram_diffusion-result-beethoven_hammerklavier_2.wav"
 # save the audio sample as a .wav file
 scipy.io.wavfile.write(output_path, rate=16000, data=audio)
 

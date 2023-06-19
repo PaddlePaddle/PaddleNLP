@@ -25,4 +25,4 @@ pipe = TextToVideoZeroPipeline.from_pretrained(model_id, paddle_dtype=paddle.flo
 prompt = "A panda is playing guitar on times square"
 result = pipe(prompt=prompt).images
 result = [(r * 255).astype("uint8") for r in result]
-imageio.mimsave("panda.mp4", result, fps=4)
+imageio.mimsave("text_to_video_generation-zero-result-panda.mp4", result, fps=4)
