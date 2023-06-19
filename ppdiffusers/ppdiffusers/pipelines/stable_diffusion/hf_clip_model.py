@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Paddle CLIP model."""
+""" HF & Paddle CLIP model."""
 
 import os
 from dataclasses import dataclass
@@ -35,7 +35,7 @@ from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPooling,
     ModelOutput,
 )
-from paddlenlp.transformers.model_utils import PretrainedModel as PreTrainedModel
+from paddlenlp.transformers.model_utils import PretrainedModel
 from ppdiffusers.initializer import normal_, ones_
 
 CLIP_PRETRAINED_MODEL_ARCHIVE_LIST = [
@@ -155,7 +155,7 @@ def clip_loss(similarity: paddle.Tensor) -> paddle.Tensor:
 
 
 @dataclass
-class CLIPVisionModelOutput(ModelOutput):
+class HFCLIPVisionModelOutput(ModelOutput):
     """
     Base class for vision model's outputs that also contains image embeddings of the pooling of the last hidden states.
 
@@ -184,7 +184,7 @@ class CLIPVisionModelOutput(ModelOutput):
 
 
 @dataclass
-class CLIPTextModelOutput(ModelOutput):
+class HFCLIPTextModelOutput(ModelOutput):
     """
     Base class for text model's outputs that also contains a pooling of the last hidden states.
 
@@ -213,7 +213,7 @@ class CLIPTextModelOutput(ModelOutput):
 
 
 @dataclass
-class CLIPOutput(ModelOutput):
+class HFCLIPOutput(ModelOutput):
     """
     Args:
         loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `return_loss` is `True`):
@@ -249,7 +249,7 @@ class CLIPOutput(ModelOutput):
         )
 
 
-class CLIPVisionEmbeddings(nn.Layer):
+class HFCLIPVisionEmbeddings(nn.Layer):
     def __init__(self, config: CLIPVisionConfig):
         super().__init__()
         self.config = config
@@ -285,7 +285,7 @@ class CLIPVisionEmbeddings(nn.Layer):
         return embeddings
 
 
-class CLIPTextEmbeddings(nn.Layer):
+class HFCLIPTextEmbeddings(nn.Layer):
     def __init__(self, config: CLIPTextConfig):
         super().__init__()
         embed_dim = config.hidden_size
@@ -320,7 +320,7 @@ class CLIPTextEmbeddings(nn.Layer):
         return embeddings
 
 
-class CLIPAttention(nn.Layer):
+class HFCLIPAttention(nn.Layer):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
     def __init__(self, config):
@@ -424,7 +424,7 @@ class CLIPAttention(nn.Layer):
         return attn_output, attn_weights_reshaped
 
 
-class CLIPMLP(nn.Layer):
+class HFCLIPMLP(nn.Layer):
     def __init__(self, config: CLIPTextConfig):
         super().__init__()
         self.config = config
@@ -439,13 +439,13 @@ class CLIPMLP(nn.Layer):
         return hidden_states
 
 
-class CLIPEncoderLayer(nn.Layer):
+class HFCLIPEncoderLayer(nn.Layer):
     def __init__(self, config: CLIPTextConfig):
         super().__init__()
         self.embed_dim = config.hidden_size
-        self.self_attn = CLIPAttention(config)
+        self.self_attn = HFCLIPAttention(config)
         self.layer_norm1 = nn.LayerNorm(self.embed_dim, epsilon=config.layer_norm_eps)
-        self.mlp = CLIPMLP(config)
+        self.mlp = HFCLIPMLP(config)
         self.layer_norm2 = nn.LayerNorm(self.embed_dim, epsilon=config.layer_norm_eps)
 
     def forward(
@@ -489,7 +489,7 @@ class CLIPEncoderLayer(nn.Layer):
         return outputs
 
 
-class CLIPPreTrainedModel(PreTrainedModel):
+class HFCLIPPretrainedModel(PretrainedModel):
     """
     An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
     models.
@@ -504,15 +504,15 @@ class CLIPPreTrainedModel(PreTrainedModel):
     def _init_weights(self, module):
         """Initialize the weights"""
         factor = self.config.initializer_factor
-        if isinstance(module, CLIPTextEmbeddings):
+        if isinstance(module, HFCLIPTextEmbeddings):
             normal_(module.token_embedding.weight, mean=0.0, std=factor * 0.02)
             normal_(module.position_embedding.weight, mean=0.0, std=factor * 0.02)
-        elif isinstance(module, CLIPVisionEmbeddings):
+        elif isinstance(module, HFCLIPVisionEmbeddings):
             factor = self.config.initializer_factor
             normal_(module.class_embedding, mean=0.0, std=module.embed_dim**-0.5 * factor)
             normal_(module.patch_embedding.weight, std=module.config.initializer_range * factor)
             normal_(module.position_embedding.weight, std=module.config.initializer_range * factor)
-        elif isinstance(module, CLIPAttention):
+        elif isinstance(module, HFCLIPAttention):
             factor = self.config.initializer_factor
             in_proj_std = (module.embed_dim**-0.5) * ((2 * module.config.num_hidden_layers) ** -0.5) * factor
             out_proj_std = (module.embed_dim**-0.5) * factor
@@ -520,7 +520,7 @@ class CLIPPreTrainedModel(PreTrainedModel):
             normal_(module.k_proj.weight, std=in_proj_std)
             normal_(module.v_proj.weight, std=in_proj_std)
             normal_(module.out_proj.weight, std=out_proj_std)
-        elif isinstance(module, CLIPMLP):
+        elif isinstance(module, HFCLIPMLP):
             factor = self.config.initializer_factor
             in_proj_std = (
                 (module.config.hidden_size**-0.5) * ((2 * module.config.num_hidden_layers) ** -0.5) * factor
@@ -528,7 +528,7 @@ class CLIPPreTrainedModel(PreTrainedModel):
             fc_std = (2 * module.config.hidden_size) ** -0.5 * factor
             normal_(module.fc1.weight, std=fc_std)
             normal_(module.fc2.weight, std=in_proj_std)
-        elif isinstance(module, CLIPModel):
+        elif isinstance(module, HFCLIPModel):
             normal_(
                 module.text_projection.weight,
                 std=module.text_embed_dim**-0.5 * self.config.initializer_factor,
@@ -537,12 +537,12 @@ class CLIPPreTrainedModel(PreTrainedModel):
                 module.visual_projection.weight,
                 std=module.vision_embed_dim**-0.5 * self.config.initializer_factor,
             )
-        elif isinstance(module, CLIPVisionModelWithProjection):
+        elif isinstance(module, HFCLIPVisionModelWithProjection):
             normal_(
                 module.visual_projection.weight,
                 std=self.config.hidden_size**-0.5 * self.config.initializer_factor,
             )
-        elif isinstance(module, CLIPTextModelWithProjection):
+        elif isinstance(module, HFCLIPTextModelWithProjection):
             normal_(
                 module.text_projection.weight,
                 std=self.config.hidden_size**-0.5 * self.config.initializer_factor,
@@ -555,7 +555,7 @@ class CLIPPreTrainedModel(PreTrainedModel):
             module.bias.zero_()
 
     def _set_gradient_checkpointing(self, module, value=False):
-        if isinstance(module, CLIPEncoder):
+        if isinstance(module, HFCLIPEncoder):
             module.gradient_checkpointing = value
 
     def post_init(self):
@@ -597,7 +597,7 @@ class CLIPPreTrainedModel(PreTrainedModel):
         )
 
 
-class CLIPEncoder(nn.Layer):
+class HFCLIPEncoder(nn.Layer):
     """
     Transformer encoder consisting of `config.num_hidden_layers` self attention layers. Each layer is a
     [`CLIPEncoderLayer`].
@@ -609,7 +609,7 @@ class CLIPEncoder(nn.Layer):
     def __init__(self, config: CLIPConfig):
         super().__init__()
         self.config = config
-        self.layers = nn.LayerList([CLIPEncoderLayer(config) for _ in range(config.num_hidden_layers)])
+        self.layers = nn.LayerList([HFCLIPEncoderLayer(config) for _ in range(config.num_hidden_layers)])
         self.gradient_checkpointing = False
 
     def forward(
@@ -700,13 +700,13 @@ class CLIPEncoder(nn.Layer):
         )
 
 
-class CLIPTextTransformer(nn.Layer):
+class HFCLIPTextTransformer(nn.Layer):
     def __init__(self, config: CLIPTextConfig):
         super().__init__()
         self.config = config
         embed_dim = config.hidden_size
-        self.embeddings = CLIPTextEmbeddings(config)
-        self.encoder = CLIPEncoder(config)
+        self.embeddings = HFCLIPTextEmbeddings(config)
+        self.encoder = HFCLIPEncoder(config)
         self.final_layer_norm = nn.LayerNorm(embed_dim, epsilon=config.layer_norm_eps)
 
     def forward(
@@ -786,14 +786,14 @@ class CLIPTextTransformer(nn.Layer):
         return mask
 
 
-class CLIPTextModel(CLIPPreTrainedModel):
+class HFCLIPTextModel(HFCLIPPretrainedModel):
     config_class = CLIPTextConfig
 
-    _no_split_modules = ["CLIPEncoderLayer"]
+    _no_split_modules = ["HFCLIPEncoderLayer"]
 
     def __init__(self, config: CLIPTextConfig):
         super().__init__(config)
-        self.text_model = CLIPTextTransformer(config)
+        self.text_model = HFCLIPTextTransformer(config)
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -841,15 +841,15 @@ class CLIPTextModel(CLIPPreTrainedModel):
         )
 
 
-class CLIPVisionTransformer(nn.Layer):
+class HFCLIPVisionTransformer(nn.Layer):
     def __init__(self, config: CLIPVisionConfig):
         super().__init__()
         self.config = config
         embed_dim = config.hidden_size
 
-        self.embeddings = CLIPVisionEmbeddings(config)
+        self.embeddings = HFCLIPVisionEmbeddings(config)
         self.pre_layrnorm = nn.LayerNorm(embed_dim, epsilon=config.layer_norm_eps)
-        self.encoder = CLIPEncoder(config)
+        self.encoder = HFCLIPEncoder(config)
         self.post_layernorm = nn.LayerNorm(embed_dim, epsilon=config.layer_norm_eps)
 
     def forward(
@@ -897,13 +897,13 @@ class CLIPVisionTransformer(nn.Layer):
         )
 
 
-class CLIPVisionModel(CLIPPreTrainedModel):
+class HFCLIPVisionModel(HFCLIPPretrainedModel):
     config_class = CLIPVisionConfig
     main_input_name = "pixel_values"
 
     def __init__(self, config: CLIPVisionConfig):
         super().__init__(config)
-        self.vision_model = CLIPVisionTransformer(config)
+        self.vision_model = HFCLIPVisionTransformer(config)
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -949,7 +949,7 @@ class CLIPVisionModel(CLIPPreTrainedModel):
         )
 
 
-class CLIPModel(CLIPPreTrainedModel):
+class HFCLIPModel(HFCLIPPretrainedModel):
     config_class = CLIPConfig
 
     def __init__(self, config: CLIPConfig):
@@ -974,8 +974,8 @@ class CLIPModel(CLIPPreTrainedModel):
         self.text_embed_dim = text_config.hidden_size
         self.vision_embed_dim = vision_config.hidden_size
 
-        self.text_model = CLIPTextTransformer(text_config)
-        self.vision_model = CLIPVisionTransformer(vision_config)
+        self.text_model = HFCLIPTextTransformer(text_config)
+        self.vision_model = HFCLIPVisionTransformer(vision_config)
 
         self.visual_projection = LinearClass(self.vision_embed_dim, self.projection_dim, bias_attr=False)
         self.text_projection = LinearClass(self.text_embed_dim, self.projection_dim, bias_attr=False)
@@ -1088,7 +1088,7 @@ class CLIPModel(CLIPPreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ) -> Union[Tuple, CLIPOutput]:
+    ) -> Union[Tuple, HFCLIPOutput]:
         r"""
         Returns:
 
@@ -1160,7 +1160,7 @@ class CLIPModel(CLIPPreTrainedModel):
             output = (logits_per_image, logits_per_text, text_embeds, image_embeds, text_outputs, vision_outputs)
             return ((loss,) + output) if loss is not None else output
 
-        return CLIPOutput(
+        return HFCLIPOutput(
             loss=loss,
             logits_per_image=logits_per_image,
             logits_per_text=logits_per_text,
@@ -1171,15 +1171,15 @@ class CLIPModel(CLIPPreTrainedModel):
         )
 
 
-class CLIPTextModelWithProjection(CLIPPreTrainedModel):
+class HFCLIPTextModelWithProjection(HFCLIPPretrainedModel):
     config_class = CLIPTextConfig
 
-    _no_split_modules = ["CLIPEncoderLayer"]
+    _no_split_modules = ["HFCLIPEncoderLayer"]
 
     def __init__(self, config: CLIPTextConfig):
         super().__init__(config)
 
-        self.text_model = CLIPTextTransformer(config)
+        self.text_model = HFCLIPTextTransformer(config)
 
         self.text_projection = LinearClass(config.hidden_size, config.projection_dim, bias_attr=False)
 
@@ -1200,7 +1200,7 @@ class CLIPTextModelWithProjection(CLIPPreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ) -> Union[Tuple, CLIPTextModelOutput]:
+    ) -> Union[Tuple, HFCLIPTextModelOutput]:
         r"""
         Returns:
 
@@ -1236,7 +1236,7 @@ class CLIPTextModelWithProjection(CLIPPreTrainedModel):
             outputs = (text_embeds, text_outputs[0]) + text_outputs[2:]
             return tuple(output for output in outputs if output is not None)
 
-        return CLIPTextModelOutput(
+        return HFCLIPTextModelOutput(
             text_embeds=text_embeds,
             last_hidden_state=text_outputs.last_hidden_state,
             hidden_states=text_outputs.hidden_states,
@@ -1244,14 +1244,14 @@ class CLIPTextModelWithProjection(CLIPPreTrainedModel):
         )
 
 
-class CLIPVisionModelWithProjection(CLIPPreTrainedModel):
+class HFCLIPVisionModelWithProjection(HFCLIPPretrainedModel):
     config_class = CLIPVisionConfig
     main_input_name = "pixel_values"
 
     def __init__(self, config: CLIPVisionConfig):
         super().__init__(config)
 
-        self.vision_model = CLIPVisionTransformer(config)
+        self.vision_model = HFCLIPVisionTransformer(config)
 
         self.visual_projection = LinearClass(config.hidden_size, config.projection_dim, bias_attr=False)
 
@@ -1267,7 +1267,7 @@ class CLIPVisionModelWithProjection(CLIPPreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ) -> Union[Tuple, CLIPVisionModelOutput]:
+    ) -> Union[Tuple, HFCLIPVisionModelOutput]:
         r"""
         Returns:
 
@@ -1306,7 +1306,7 @@ class CLIPVisionModelWithProjection(CLIPPreTrainedModel):
             outputs = (image_embeds, vision_outputs[0]) + vision_outputs[2:]
             return tuple(output for output in outputs if output is not None)
 
-        return CLIPVisionModelOutput(
+        return HFCLIPVisionModelOutput(
             image_embeds=image_embeds,
             last_hidden_state=vision_outputs.last_hidden_state,
             hidden_states=vision_outputs.hidden_states,

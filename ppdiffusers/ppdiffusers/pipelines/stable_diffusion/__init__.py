@@ -54,6 +54,14 @@ try:
 except OptionalDependencyNotAvailable:
     from ...utils.dummy_paddle_and_paddlenlp_objects import *  # noqa F403
 else:
+    # new added
+    from .hf_clip_model import (
+        HFCLIPModel,
+        HFCLIPTextModel,
+        HFCLIPTextModelWithProjection,
+        HFCLIPVisionModel,
+        HFCLIPVisionModelWithProjection,
+    )
     from .pipeline_cycle_diffusion import CycleDiffusionPipeline
     from .pipeline_stable_diffusion import StableDiffusionPipeline
     from .pipeline_stable_diffusion_adapter import StableDiffusionAdapterPipeline

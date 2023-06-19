@@ -118,6 +118,18 @@ if is_paddle_available():
     import paddle
     import paddle.nn as nn
 
+    def is_floating_point(x):
+        if not isinstance(x, (paddle.Tensor, paddle.static.Variable)):
+            raise TypeError("Expected Tensor, but received type of x: {}".format(type(x)))
+        dtype = x.dtype
+        is_fp_dtype = (
+            dtype == paddle.float32 or dtype == paddle.float64 or dtype == paddle.float16 or dtype == paddle.bfloat16
+        )
+        return is_fp_dtype
+
+    if not hasattr(paddle, "is_floating_point"):
+        paddle.is_floating_point = is_floating_point
+
     # paddle.long = paddle.int64
     # paddle.int = paddle.int32
     # paddle.double = paddle.float64
@@ -807,13 +819,15 @@ if is_paddle_available() and is_paddlenlp_available():
         state_dict = smart_load(model_file)
         init_contexts = []
 
-        dtype = set(v.dtype for v in state_dict.values() if paddle.is_tensor(v))
+        dtype = set(v.dtype for v in state_dict.values() if paddle.is_tensor(v) and paddle.is_floating_point(v))
         if len(dtype) > 1 and paddle.float32 not in dtype:
             raise ValueError(
                 f"The weights of the model file {model_file} have a mixture of incompatible dtypes {dtype}. Please"
                 f" make sure that {model_file} weights have only one dtype."
             )
         elif len(dtype) > 1 and paddle.float32 in dtype:
+            dtype = paddle.float32
+        elif len(dtype) == 0:
             dtype = paddle.float32
         else:
             dtype = dtype.pop()
@@ -1236,14 +1250,20 @@ if is_paddle_available() and is_paddlenlp_available():
 
     if bool(os.getenv("USE_TORCH_LINEAR", False)):
         # NEW TRANSFORMERS CLIP MODEL
-        from ..pipelines.stable_diffusion import hf_clip_model
+        from ..pipelines.stable_diffusion.hf_clip_model import (
+            HFCLIPModel,
+            HFCLIPTextModel,
+            HFCLIPTextModelWithProjection,
+            HFCLIPVisionModel,
+            HFCLIPVisionModelWithProjection,
+        )
 
         TRANSFORMERS_CLIP_MODEL = [
-            hf_clip_model.CLIPTextModel,
-            hf_clip_model.CLIPVisionModel,
-            hf_clip_model.CLIPModel,
-            hf_clip_model.CLIPTextModelWithProjection,
-            hf_clip_model.CLIPVisionModelWithProjection,
+            HFCLIPModel,
+            HFCLIPTextModel,
+            HFCLIPTextModelWithProjection,
+            HFCLIPVisionModel,
+            HFCLIPVisionModelWithProjection,
         ]
     else:
         TRANSFORMERS_CLIP_MODEL = []
