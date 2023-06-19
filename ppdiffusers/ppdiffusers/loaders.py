@@ -1528,15 +1528,8 @@ class FromCkptMixin:
         elif pretrained_model_link_or_path.startswith("http://") or pretrained_model_link_or_path.startswith(
             "https://"
         ):
-            if "civitai.com" in pretrained_model_link_or_path:
-                checkpoint_path = ppdiffusers_url_download(
-                    pretrained_model_link_or_path,
-                    cache_dir=cache_dir,
-                    filename=http_file_name(pretrained_model_link_or_path).strip('"'),
-                    force_download=force_download,
-                    resume_download=resume_download,
-                )
-            else:
+            # HF Hub models
+            if any(p in pretrained_model_link_or_path for p in ["huggingface.co", "hf.co"]):
                 # remove huggingface url
                 for prefix in ["https://huggingface.co/", "huggingface.co/", "hf.co/", "https://hf.co/"]:
                     if pretrained_model_link_or_path.startswith(prefix):
@@ -1568,6 +1561,16 @@ class FromCkptMixin:
                     )
                 else:
                     checkpoint_path = ckpt_path
+            else:
+                checkpoint_path = ppdiffusers_url_download(
+                    pretrained_model_link_or_path,
+                    cache_dir=cache_dir,
+                    filename=http_file_name(pretrained_model_link_or_path).strip('"'),
+                    force_download=force_download,
+                    resume_download=resume_download,
+                )
+        else:
+            checkpoint_path = pretrained_model_link_or_path
 
         pipe = download_from_original_stable_diffusion_ckpt(
             checkpoint_path,
