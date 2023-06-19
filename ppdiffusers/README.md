@@ -132,10 +132,14 @@ super_res_1_pipe.to(paddle_device="cpu")
 ```
 <div align="center">
 <img alt="image" src="https://user-images.githubusercontent.com/20476674/246785766-700dfad9-159d-4bfb-bfc7-c18df938a052.png">
+</div>
+<div align="center">
 <center>if_stage_I</center>
 </div>
 <div align="center">
 <img alt="image" src="https://user-images.githubusercontent.com/20476674/246785773-3359ca5f-dadf-4cc8-b318-ff1f9d4a2d35.png">
+</div>
+<div align="center">
 <center>if_stage_II</center>
 <!-- <img alt="image" src="https://user-images.githubusercontent.com/20476674/246785774-8870829a-354b-4a87-9d67-93af315f51e6.png">
 <center>if_stage_III</center> -->
