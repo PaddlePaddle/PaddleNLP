@@ -345,10 +345,13 @@ def _find_weight_file_path(
     )
 
 
-def load_state_dict(checkpoint_file: Union[str, os.PathLike]):
+def load_state_dict(checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None):
     """
-    Reads a PyTorch checkpoint file, returning properly formatted errors if they arise.
+    Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
     """
+    if tensor_parallel_split_mapping is None:
+        tensor_parallel_split_mapping = {}
+
     if checkpoint_file.endswith(".safetensors") and is_safetensors_available():
         # Check format of the archive
         with safe_open(checkpoint_file, framework="np") as f:
@@ -366,14 +369,13 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike]):
             state_dict = {}
             with safe_open(checkpoint_file, framework="np") as f:
                 for key in f.keys():
-                    slice_ = f.get_slice(key)
-                    # size = slice_.get_shape()[0]
-                    # block_size = size // world_size
-                    # start = rank * block_size
-                    # stop = (rank + 1) * block_size
-                    # tensor = slice_[start:stop]
-                    state_dict[key] = slice_[:]
-                    # print(key, state_dict[key].shape)
+                    py_safe_slice_ = f.get_slice(key)
+                    if key in tensor_parallel_split_mapping:
+                        weight = tensor_parallel_split_mapping[key](py_safe_slice_)
+                    else:
+                        weight = py_safe_slice_[:]
+                    state_dict[key] = weight
+                    # print(key, key in tensor_parallel_split_mapping, weight.shape)
 
             # state_dict = safe_load_file(checkpoint_file)
             logger.warning("loading done.")
@@ -849,7 +851,7 @@ def _load_state_dict_into_meta_model(
     error_msgs = []
 
     for param_name, param in state_dict.items():
-        # First part of the test is always true as load_state_dict_keys always contains state_dict keys.
+        # First part of the test is always true as loaded_state_dict_keys always contains state_dict keys.
         if param_name not in loaded_state_dict_keys or param_name not in expected_keys:
             continue
 
@@ -1443,7 +1445,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 elif os.path.isfile(
                     os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(PADDLE_WEIGHTS_NAME, variant))
                 ):
-                    # Load from a PyTorch checkpoint
+                    # Load from a PaddlePaddle checkpoint
                     archive_file = os.path.join(
                         pretrained_model_name_or_path, subfolder, _add_variant(PADDLE_WEIGHTS_NAME, variant)
                     )
@@ -1452,7 +1454,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         pretrained_model_name_or_path, subfolder, _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant)
                     )
                 ):
-                    # Load from a sharded PyTorch checkpoint
+                    # Load from a sharded PaddlePaddle checkpoint
                     archive_file = os.path.join(
                         pretrained_model_name_or_path, subfolder, _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant)
                     )
@@ -1703,6 +1705,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         )
 
         if state_dict is not None:
+            # DONT Hold tensor parallel here, only hold afer load state dict.
             # Whole checkpoint
             # For model parallel if FastGeneration
             # To avoid recursive import temporarily.
@@ -1734,7 +1737,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
 
             for shard_file in resolved_archive_file:
-                state_dict = load_state_dict(shard_file)
+
+                pre_tensor_parallel_split = False
+                if shard_file.endswith(".safetensors") and config.tensor_parallel_degree > 1:
+                    pre_tensor_parallel_split = True
+                    assert loaded_keys is not None, "loaded_keys is not None."
+                    tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
+
+                state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None)
 
                 # Mistmatched keys contains tuples key/shape1/shape2 of weights in the checkpoint that have a shape not
                 # matching the weights in the model.
@@ -1747,6 +1757,17 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     ignore_mismatched_sizes,
                 )
                 logger.warning("set state dict to model")
+
+                logger.info("convert dtype")
+                _convert_state_dict_dtype(dtype, state_dict, model_to_load)
+                if config.tensor_parallel_degree > 1 and ".tp" not in shard_file and not pre_tensor_parallel_split:
+                    logger.info("convert tp")
+                    # ignore error for multi shard, since only parts of data
+                    state_dict = cls.convert_tensor_parallel(
+                        None, config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
+                    )
+                    logger.info("conver tp over!")
+
                 if low_cpu_mem_usage:
                     new_error_msgs = _load_state_dict_into_meta_model(
                         model_to_load,
@@ -1760,16 +1781,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
                     error_msgs += new_error_msgs
                 else:
-                    logger.info("convert dtype")
-                    _convert_state_dict_dtype(dtype, state_dict, model_to_load)
-                    if config.tensor_parallel_degree > 1 and ".tp" not in shard_file:
-                        logger.info("convert tp")
-                        # ignore error for multi shard, since only parts of data
-                        state_dict = cls.convert_tensor_parallel(
-                            None, config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
-                        )
-                        logger.info("conver tp over!")
-
                     error_msgs += _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
 
                 logger.warning("done, set state dict to model")
@@ -1965,7 +1976,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # load pt weights early so that we know which dtype to init the model under
         if not is_sharded and state_dict is None:
             # Time to load the checkpoint
-            # state_dict = load_state_dict(resolved_archive_file)
             if resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME):
                 if convert_from_torch:
                     # try to get the name-mapping info

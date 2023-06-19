@@ -284,6 +284,29 @@ def split_tensor_parallel_weight(weight, tensor_parallel_degree, tensor_parallel
     Returns:
         tensor (numpy.ndarray): splited weight.
     """
+    dim = 1 if is_column else 0
+    if "PySafeSlice" in str(type(weight)):
+        size = weight.get_shape()[dim]
+        block_size = size // tensor_parallel_degree
+        start = tensor_parallel_rank * block_size
+        stop = (tensor_parallel_rank + 1) * block_size
+        assert (
+            size % tensor_parallel_degree == 0
+        ), f"The choosen size {size} is not compatible with sharding on {tensor_parallel_degree} shards"
+
+        if dim == 0:
+            tensor = weight[start:stop]
+        elif dim == 1:
+            tensor = weight[:, start:stop]
+        else:
+            raise NotImplementedError("Let's make that generic when needed")
+        return tensor
+
+    size = weight.shape[dim]
+    assert (
+        size % tensor_parallel_degree == 0
+    ), f"The choosen size {size} is not compatible with sharding on {tensor_parallel_degree} shards. for tensor shape {weight.shape}"
+
     if is_column:
         splited_weights = np.split(weight, tensor_parallel_degree, axis=-1)
     else:
@@ -922,13 +945,21 @@ class ConversionMixin:
         raise NotImplementedError
 
     @classmethod
+    def get_tensor_parallel_convert_actions(cls, config: PretrainedConfig, loaded_state_dict_keys, ignore_error=False):
+        name_action_mappings = cls._get_tensor_parallel_mappings(config)
+        state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), loaded_state_dict_keys, ignore_error)
+        for k, v in state_keys_map.items():
+            name_action_mappings[v] = name_action_mappings.pop(k)
+        return name_action_mappings
+
+    @classmethod
     def convert_tensor_parallel(
         cls, weight_file: str, config: PretrainedConfig, state_dict=None, ignore_error=False
     ) -> None:
         """the entry of converting config and converting model file
 
         Args:
-            input_dir (str | None): the input dir which contains `pytorch_model.bin` and `config.json` file
+            weight_file (str | None): the weight file path of `model_state.pdparams` file
             config (PretrainedConfig): the PretrainedConfig instance of model
         """
         name_action_mappings = cls._get_tensor_parallel_mappings(config)
