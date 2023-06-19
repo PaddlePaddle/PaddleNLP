@@ -295,6 +295,8 @@ if is_paddle_available():
         from paddle.fluid.dygraph.layers import HookRemoveHelper
 
     def register_load_state_dict_pre_hook(self, hook, with_module=False):
+        if not hasattr(self, "load_state_dict_pre_hooks"):
+            self.load_state_dict_pre_hooks = OrderedDict()
         handle = HookRemoveHelper(self.load_state_dict_pre_hooks)
         self.load_state_dict_pre_hooks[handle._hook_id] = _WrappedHook(hook, self if with_module else None)
         return handle
@@ -304,21 +306,14 @@ if is_paddle_available():
     raw_set_state_dict = nn.Layer.set_state_dict
 
     def set_state_dict(self, state_dict, use_structured_name: bool = True):
-        for hook in self.load_state_dict_pre_hooks.values():
-            hook(state_dict)
+        if hasattr(self, "load_state_dict_pre_hooks"):
+            for hook in self.load_state_dict_pre_hooks.values():
+                hook(state_dict)
         return raw_set_state_dict(self, state_dict, use_structured_name=use_structured_name)
 
     nn.Layer.set_state_dict = set_state_dict
     nn.Layer.load_dict = nn.Layer.set_state_dict
     nn.Layer.set_dict = nn.Layer.set_state_dict
-
-    raw_init = nn.Layer.__init__
-
-    def __init__(self, name_scope=None, dtype="float32"):
-        raw_init(self, name_scope=name_scope, dtype=dtype)
-        self.load_state_dict_pre_hooks = OrderedDict()
-
-    nn.Layer.__init__ = __init__
 
 if is_paddle_available() and is_paddlenlp_available():
     import paddle
