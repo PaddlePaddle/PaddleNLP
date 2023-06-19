@@ -362,7 +362,7 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike], tensor_parallel_sp
                 "you save your model with the `save_pretrained` method."
             )
         if metadata["format"] == "pd":
-            raise ValueError("")
+            raise ValueError("Currently unsupport paddle weights file, use numpy instead.")
             return safe_load_file(checkpoint_file)
         if metadata["format"] == "np":
             logger.warning("loading safe.")
@@ -375,9 +375,7 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike], tensor_parallel_sp
                     else:
                         weight = py_safe_slice_[:]
                     state_dict[key] = weight
-                    # print(key, key in tensor_parallel_split_mapping, weight.shape)
 
-            # state_dict = safe_load_file(checkpoint_file)
             logger.warning("loading done.")
             for k in list(state_dict.keys()):
                 with device_guard():
@@ -1998,6 +1996,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         state_dict = load_state_dict(resolved_archive_file)
 
                     logger.info("loaded weights file from disk, setting weights to model.")
+                else:
+                    state_dict = None
 
         if is_sharded:
             loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
