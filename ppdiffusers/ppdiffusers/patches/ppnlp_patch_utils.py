@@ -1236,14 +1236,14 @@ if is_paddle_available() and is_paddlenlp_available():
 
     if bool(os.getenv("USE_TORCH_LINEAR", False)):
         # NEW TRANSFORMERS CLIP MODEL
-        from ..pipelines.stable_diffusion import clip_model
+        from ..pipelines.stable_diffusion import hf_clip_model
 
         TRANSFORMERS_CLIP_MODEL = [
-            clip_model.CLIPTextModel,
-            clip_model.CLIPVisionModel,
-            clip_model.CLIPModel,
-            clip_model.CLIPTextModelWithProjection,
-            clip_model.CLIPVisionModelWithProjection,
+            hf_clip_model.CLIPTextModel,
+            hf_clip_model.CLIPVisionModel,
+            hf_clip_model.CLIPModel,
+            hf_clip_model.CLIPTextModelWithProjection,
+            hf_clip_model.CLIPVisionModelWithProjection,
         ]
     else:
         TRANSFORMERS_CLIP_MODEL = []
