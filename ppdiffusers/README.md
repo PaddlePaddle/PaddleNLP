@@ -23,8 +23,10 @@
 * 🔥 **2023.06.19 发布 0.16.1 版本，新增[T2I-Adapter](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/t2i-adapter)，支持训练与推理；ControlNet升级，支持[reference only推理](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/community#controlnet-reference-only)；新增[WebUIStableDiffusionPipeline](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/community#automatic1111-webui-stable-diffusion)，
 支持通过prompt的方式动态加载、切换lora权重；
 新增多种模态扩散模型Pipeline，包括视频生成（[Text-to-Video](#text_to_video_generation-synth)、Text-to-Video Zero）、音频生成（[AudioLDM](#unconditional_audio_generation-audio_diffusion
-)、Spectrogram Diffusion）；新增IF模型；
+)、Spectrogram Diffusion）；新增[IF模型](text_to_image_generation_deepfloyd_if)；
 **
+
+[IF模型](text_to_image_generation-deepfloyd_if)
 
 * 🔥 **2023.03.29 发布 0.14.0 版本，新增[LoRA](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/dreambooth)、[ControlNet](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/controlnet)，支持训练与推理；
 模型加载升级，[可直接加载HF Diffusers的权重](#加载HF-Diffusers权重)（safetensors和pt）或 [SD等原库的Lightning权重进行推理](#加载原库的Lightning权重)，[支持加载Civitai社区的LoRA权重](#加载Civitai社区的LoRA权重)；
@@ -65,7 +67,7 @@ fd_pipe = FastDeployStableDiffusionPipeline.from_pretrained("runwayml/stable-dif
 ## 任务展示
 ### 文本图像多模
 
-<details>
+<details open>
 <summary>&emsp;文图生成（Text-to-Image Generation）</summary>
 
 #### text_to_image_generation-stable_diffusion
@@ -87,8 +89,9 @@ image.save("astronaut_rides_horse_sd.png")
 <img width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209322401-6ecfeaaa-6878-4302-b592-07a31de4e590.png">
 </div>
 
-
 #### text_to_image_generation-deepfloyd_if
+
+#### text_to_image_generation_deepfloyd_if
 
 ```python
 import paddle
