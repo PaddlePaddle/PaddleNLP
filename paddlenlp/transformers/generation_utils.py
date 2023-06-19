@@ -791,7 +791,7 @@ class GenerationMixin(object):
         ], "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
             decode_strategy
         )
-        breakpoint()
+
         # Whether to dynamic to static
         is_tracing = False
         if in_declarative_mode():
