@@ -21,6 +21,7 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     DataCollatorForSeq2Seq,
+    LlamaTokenizer,
     HfArgumentParser,
     TrainingArguments,
 )
@@ -52,24 +53,46 @@ class ModelArguments:
 
     model_name_or_path: str = field(default=None, metadata={"help": "model name or local path"})
     lora: Optional[bool] = field(default=False, metadata={"help": "whether to use LoRA"})
+    english: Optional[bool] = field(default=False, metadata={"help": "whether to english benchmark dataset"})
 
 
 def main():
     parser = HfArgumentParser((ModelArguments, TrainingArguments))
     model_args, training_args = parser.parse_args_into_dataclasses()
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    if "llama" in model_args.model_name_or_path:
+        tokenizer = LlamaTokenizer.from_pretrained(model_args.model_name_or_path)
+        tokenizer.pad_token_id = 0
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
 
     if model_args.lora:
-        target_modules = ["query_key_value"]
+        if "llama" in model_args.model_name_or_path:
+            target_modules = ["q_proj", "k_proj", "v_proj"]
+        else:
+            target_modules = ["query_key_value"]
         peft_config = LoraConfig(
             task_type=TaskType.CAUSAL_LM, target_modules=target_modules, r=8, lora_alpha=32, lora_dropout=0.0
         )
         model = get_peft_model(model, peft_config)
         model.print_trainable_parameters()
+    
+    if model_args.lora and training_args.gradient_checkpointing:
+        # For backward compatibility
+        if hasattr(model, "enable_input_require_grads"):
+            model.enable_input_require_grads()
+        else:
+            def make_inputs_require_grad(module, input, output):
+                output.requires_grad_(True)
+            model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
 
-    def preprocess_function(example, max_src_length=512, max_tgt_length=512):
+        # enable gradient checkpointing for memory efficiency
+        model.gradient_checkpointing_enable()
+
+    def preprocess_function(example, max_src_length=256, max_tgt_length=384):
         inputs = example["instruction"]
+        if "input" in example:
+            inputs += example["input"]
         targets = example["output"]
         model_inputs = tokenizer(inputs, max_length=max_src_length, truncation=True, return_attention_mask=False)
         labels = tokenizer(targets, max_length=max_tgt_length, truncation=True, return_attention_mask=False)
@@ -79,7 +102,11 @@ def main():
 
         return model_inputs
 
-    dataset = load_dataset("Chinese-Vicuna/guanaco_belle_merge_v1.0")
+    
+    if model_args.english:
+        dataset = load_dataset("tatsu-lab/alpaca")
+    else:
+        dataset = load_dataset("Chinese-Vicuna/guanaco_belle_merge_v1.0")
     # select first 10k examples for benchmarking
     dataset = dataset["train"].select(range(10000))
     dataset = dataset.map(
