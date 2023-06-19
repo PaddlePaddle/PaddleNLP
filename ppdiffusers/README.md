@@ -22,7 +22,7 @@
 ## News 📢
 * 🔥 **2023.06.19 发布 0.16.1 版本，新增[T2I-Adapter](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/t2i-adapter)，支持训练与推理；ControlNet升级，支持[reference only推理](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/community#controlnet-reference-only)；新增[WebUIStableDiffusionPipeline](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/community#automatic1111-webui-stable-diffusion)，
 支持通过prompt的方式动态加载、切换lora权重；
-新增多种模态扩散模型Pipeline，包括视频生成（[Text-to-Video](text_to_video_generation-synth)、Text-to-Video Zero）、音频生成（[AudioLDM](unconditional_audio_generation-audio_diffusion
+新增多种模态扩散模型Pipeline，包括视频生成（[Text-to-Video](#text_to_video_generation-synth)、Text-to-Video Zero）、音频生成（[AudioLDM](#unconditional_audio_generation-audio_diffusion
 )、Spectrogram Diffusion）；新增IF模型；
 **
 
