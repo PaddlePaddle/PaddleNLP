@@ -914,7 +914,6 @@ class PretrainedConfig:
         for key in to_remove:
             kwargs.pop(key, None)
 
-        logger.info(f"Model config {config}")
         if return_unused_kwargs:
             return config, kwargs
         else:

@@ -362,6 +362,7 @@ class ZeroShotTextClassificationTask(Task):
         batches = [
             tokenized_inputs[idx : idx + self._batch_size] for idx in range(0, len(tokenized_inputs), self._batch_size)
         ]
+        inputs = [inputs[idx : idx + self._batch_size] for idx in range(0, len(inputs), self._batch_size)]
         outputs = {}
         outputs["text"] = inputs
         outputs["batches"] = [self._collator(batch) for batch in batches]
@@ -401,26 +402,26 @@ class ZeroShotTextClassificationTask(Task):
         This function converts the model logits output to class score and predictions
         """
         outputs = []
-        for text, logits in zip(inputs["text"], inputs["batch_logits"]):
-            output = {}
-            if len(text["text_a"]) > 0:
-                output["text_a"] = text["text_a"]
-            if len(text["text_b"]) > 0:
-                output["text_b"] = text["text_b"]
+        for batch_text, batch_logits in zip(inputs["text"], inputs["batch_logits"]):
+            for text, logits in zip(batch_text, batch_logits):
+                output = {}
+                if len(text["text_a"]) > 0:
+                    output["text_a"] = text["text_a"]
+                if len(text["text_b"]) > 0:
+                    output["text_b"] = text["text_b"]
 
-            if self._single_label:
-                scores = np_softmax(logits, axis=-1)
-                labels = np.argmax(logits, axis=-1)
-                for score, label in zip(scores, labels):
+                if self._single_label:
+                    score = np_softmax(logits, axis=-1)
+                    label = np.argmax(logits, axis=-1)
                     output["predictions"] = [{"label": text["choices"][label], "score": score[label]}]
-            else:
-                scores = np_sigmoid(logits)
-                output["predictions"] = []
-                if scores.ndim == 2:
-                    scores = scores[0]
-                for i, class_score in enumerate(scores):
-                    if class_score > self._pred_threshold:
-                        output["predictions"].append({"label": text["choices"][i], "score": class_score})
-            outputs.append(output)
+                else:
+                    scores = np_sigmoid(logits)
+                    output["predictions"] = []
+                    if scores.ndim == 2:
+                        scores = scores[0]
+                    for i, class_score in enumerate(scores):
+                        if class_score > self._pred_threshold:
+                            output["predictions"].append({"label": text["choices"][i], "score": class_score})
+                outputs.append(output)
 
         return outputs
