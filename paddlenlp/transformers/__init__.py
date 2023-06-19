@@ -260,6 +260,10 @@ from .clap.configuration import *
 from .clap.feature_extraction import *
 from .clap.modeling import *
 from .clap.processing import *
+from .visualglm.modeling import *
+from .visualglm.configuration import *
+from .visualglm.processing import *
+from .visualglm.image_processing import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available
