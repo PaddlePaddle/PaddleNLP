@@ -21,7 +21,9 @@
 
 ## News 📢
 * 🔥 **2023.06.19 发布 0.16.1 版本，新增[T2I-Adapter](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/t2i-adapter)，支持训练与推理；ControlNet升级，支持[reference only推理](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/community#controlnet-reference-only)；新增[WebUIStableDiffusionPipeline](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/community#automatic1111-webui-stable-diffusion)，
-支持通过prompt的方式动态加载lora、textual_inversion权重；新增关键点控制生成任务评价指标[COCOeval](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/scripts/cocoeval_keypoints_score)；
+支持通过prompt的方式动态加载lora、textual_inversion权重；
+新增两阶段文图生成[StableDiffusionHiresFixPipeline](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/community#stable-diffusion-with-high-resolution-fixing)，支持高分辨率修复；
+新增关键点控制生成任务评价指标[COCOeval](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/scripts/cocoeval_keypoints_score)；
 新增多种模态扩散模型Pipeline，包括视频生成（[Text-to-Video-Synth](#文本视频多模)、[Text-to-Video-Zero](#文本视频多模)）、音频生成（[AudioLDM](#文本音频多模)、[Spectrogram Diffusion](#音频)）；新增文图生成模型[IF](#文本图像多模)。**
 
 * 🔥 **2023.03.29 发布 0.14.0 版本，新增[LoRA](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/dreambooth)、[ControlNet](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/controlnet)，支持训练与推理；
@@ -131,6 +133,8 @@ super_res_1_pipe.to(paddle_device="cpu")
 <div align="center">
 <img alt="image" src="https://user-images.githubusercontent.com/20476674/246785766-700dfad9-159d-4bfb-bfc7-c18df938a052.png">
 <center>if_stage_I</center>
+</div>
+<div align="center">
 <img alt="image" src="https://user-images.githubusercontent.com/20476674/246785773-3359ca5f-dadf-4cc8-b318-ff1f9d4a2d35.png">
 <center>if_stage_II</center>
 <!-- <img alt="image" src="https://user-images.githubusercontent.com/20476674/246785774-8870829a-354b-4a87-9d67-93af315f51e6.png">
