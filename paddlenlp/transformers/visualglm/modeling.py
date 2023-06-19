@@ -16,10 +16,10 @@ import math
 from dataclasses import dataclass
 from typing import Any, Optional, Tuple, Union
 
-import torch
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+import torch
 from paddle.distributed.fleet.utils import recompute
 from paddle.nn import CrossEntropyLoss
 
@@ -45,7 +45,11 @@ from ..model_utils import (
 
 VisualGLM_PRETRAINED_MODEL_ARCHIVE_LIST = []
 
-from .configuration import VisualGLMConfig, VisualGLMQFormerConfig, VisualGLMVisionConfig
+from .configuration import (
+    VisualGLMConfig,
+    VisualGLMQFormerConfig,
+    VisualGLMVisionConfig,
+)
 
 __all__ = [
     "VisualGLMModel",
@@ -197,7 +201,10 @@ class VisualGLMVisionEmbeddings(nn.Layer):
         self.class_embedding = Parameter(paddle.randn([1, 1, self.embed_dim]))
 
         self.patch_embedding = nn.Conv2D(
-            in_channels=self.in_channels, out_channels=self.embed_dim, kernel_size=self.patch_size, stride=self.patch_size
+            in_channels=self.in_channels,
+            out_channels=self.embed_dim,
+            kernel_size=self.patch_size,
+            stride=self.patch_size,
         )
 
         self.num_patches = (self.image_size // self.patch_size) ** 2

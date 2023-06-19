@@ -18,8 +18,8 @@ import os
 from typing import Union
 
 from ...utils.log import logger
-from ..configuration_utils import PretrainedConfig
 from ..chatglm.configuration import ChatGLMConfig
+from ..configuration_utils import PretrainedConfig
 
 __all__ = ["VisualGLMVisionConfig", "VisualGLMQFormerConfig", "VisualGLMConfig"]
 
