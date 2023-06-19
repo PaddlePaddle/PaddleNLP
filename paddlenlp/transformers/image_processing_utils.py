@@ -335,9 +335,7 @@ class ImageProcessingMixin(object):
         if is_local:
             logger.info(f"loading configuration file {resolved_image_processor_file}")
         else:
-            logger.info(
-                f"loading configuration file {image_processor_file} from cache at {resolved_image_processor_file}"
-            )
+            logger.info(f"loading configuration file from cache at {resolved_image_processor_file}")
 
         return image_processor_dict, kwargs
 

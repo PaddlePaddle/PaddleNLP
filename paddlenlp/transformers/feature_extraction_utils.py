@@ -260,10 +260,10 @@ class FeatureExtractionMixin(object):
             resolved_feature_extractor_file = pretrained_model_name_or_path
             is_local = True
         elif from_hf_hub:
-            image_processor_file = FEATURE_EXTRACTOR_NAME
+            feature_extractor_file = FEATURE_EXTRACTOR_NAME
             resolved_feature_extractor_file = hf_hub_download(
                 repo_id=pretrained_model_name_or_path,
-                filename=image_processor_file,
+                filename=feature_extractor_file,
                 cache_dir=cache_dir,
                 subfolder=subfolder,
                 library_name="PaddleNLP",
