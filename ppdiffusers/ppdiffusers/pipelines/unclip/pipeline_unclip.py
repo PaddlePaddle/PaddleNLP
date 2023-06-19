@@ -468,7 +468,9 @@ class UnCLIPPipeline(DiffusionPipeline):
             else:
                 unet = self.super_res_first
 
-            latent_model_input = paddle.concat([super_res_latents, image_upscaled], axis=1)
+            latent_model_input = paddle.concat(
+                [super_res_latents, image_upscaled.cast(super_res_latents.dtype)], axis=1
+            )
 
             noise_pred = unet(
                 sample=latent_model_input,
