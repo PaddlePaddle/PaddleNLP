@@ -14,6 +14,7 @@
 # limitations under the License.
 """ Paddle CLIP model."""
 
+import os
 from dataclasses import dataclass
 from typing import Any, Optional, Tuple, Union
 
@@ -68,7 +69,7 @@ def Parameter(data: paddle.Tensor, requires_grad=True):
     return tensor
 
 
-class Linear(nn.Linear):
+class TorchLinear(nn.Layer):
     """
     Same as paddle.layer.Linear, except weight matrix is stored as [out_features, in_features] (same as torch),
     instead of [in_features, out_features]
@@ -81,11 +82,16 @@ class Linear(nn.Linear):
         weight_attr=None,
         bias_attr=None,
         name=None,
+        bias=None,
     ):
-        super(nn.Linear, self).__init__()
+        super().__init__()
         self._dtype = self._helper.get_default_dtype()
         self._weight_attr = weight_attr
+        if bias is not None:
+            bias_attr = bias
         self._bias_attr = bias_attr
+        self.in_features = in_features
+        self.out_features = out_features
         self.weight = self.create_parameter(
             shape=[out_features, in_features],  # regular linear has shape [in_features, out_features]
             attr=self._weight_attr,
@@ -109,6 +115,12 @@ class Linear(nn.Linear):
         return "in_features={}, out_features={}, dtype={}{}".format(
             self.weight.shape[1], self.weight.shape[0], self._dtype, name_str
         )
+
+
+if bool(os.getenv("USE_TORCH_LINEAR", False)):
+    LinearClass = TorchLinear
+else:
+    LinearClass = nn.Linear
 
 
 def masked_fill(x, mask, value):
@@ -258,7 +270,9 @@ class CLIPVisionEmbeddings(nn.Layer):
         self.num_patches = (self.image_size // self.patch_size) ** 2
         self.num_positions = self.num_patches + 1
         self.position_embedding = nn.Embedding(self.num_positions, self.embed_dim)
-        self.register_buffer("position_ids", paddle.arange(self.num_positions).expand((1, -1)), persistable=False)
+        self.register_buffer(
+            "position_ids", paddle.arange(self.num_positions).expand((1, -1), dtype="int64"), persistable=True
+        )
 
     def forward(self, pixel_values: paddle.Tensor) -> paddle.Tensor:
         batch_size = pixel_values.shape[0]
@@ -281,7 +295,9 @@ class CLIPTextEmbeddings(nn.Layer):
 
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
         self.register_buffer(
-            "position_ids", paddle.arange(config.max_position_embeddings).expand((1, -1)), persistable=False
+            "position_ids",
+            paddle.arange(config.max_position_embeddings, dtype="int64").expand((1, -1)),
+            persistable=True,
         )
 
     def forward(
@@ -293,7 +309,7 @@ class CLIPTextEmbeddings(nn.Layer):
         seq_length = input_ids.shape[-1] if input_ids is not None else inputs_embeds.shape[-2]
 
         if position_ids is None:
-            position_ids = self.position_ids[:, :seq_length].cast(paddle.int64)
+            position_ids = self.position_ids[:, :seq_length]
 
         if inputs_embeds is None:
             inputs_embeds = self.token_embedding(input_ids)
@@ -321,10 +337,10 @@ class CLIPAttention(nn.Layer):
         self.scale = self.head_dim**-0.5
         self.dropout = config.attention_dropout
 
-        self.k_proj = Linear(self.embed_dim, self.embed_dim)
-        self.v_proj = Linear(self.embed_dim, self.embed_dim)
-        self.q_proj = Linear(self.embed_dim, self.embed_dim)
-        self.out_proj = Linear(self.embed_dim, self.embed_dim)
+        self.k_proj = LinearClass(self.embed_dim, self.embed_dim)
+        self.v_proj = LinearClass(self.embed_dim, self.embed_dim)
+        self.q_proj = LinearClass(self.embed_dim, self.embed_dim)
+        self.out_proj = LinearClass(self.embed_dim, self.embed_dim)
 
     def _shape(self, tensor: paddle.Tensor, seq_len: int, bsz: int):
         return tensor.reshape([bsz, seq_len, self.num_heads, self.head_dim]).transpose([0, 2, 1, 3])
@@ -413,8 +429,8 @@ class CLIPMLP(nn.Layer):
         super().__init__()
         self.config = config
         self.activation_fn = ACT2FN[config.hidden_act]
-        self.fc1 = Linear(config.hidden_size, config.intermediate_size)
-        self.fc2 = Linear(config.intermediate_size, config.hidden_size)
+        self.fc1 = LinearClass(config.hidden_size, config.intermediate_size)
+        self.fc2 = LinearClass(config.intermediate_size, config.hidden_size)
 
     def forward(self, hidden_states: paddle.Tensor) -> paddle.Tensor:
         hidden_states = self.fc1(hidden_states)
@@ -535,7 +551,7 @@ class CLIPPreTrainedModel(PreTrainedModel):
         if isinstance(module, nn.LayerNorm):
             module.bias.zero_()
             ones_(module.weight)
-        if isinstance(module, Linear) and module.bias is not None:
+        if isinstance(module, LinearClass) and module.bias is not None:
             module.bias.zero_()
 
     def _set_gradient_checkpointing(self, module, value=False):
@@ -544,6 +560,41 @@ class CLIPPreTrainedModel(PreTrainedModel):
 
     def post_init(self):
         self.apply(self._init_weights)
+        # register_load_torch_hook
+        self.register_load_torch_hook()
+
+    def register_load_torch_hook(self, function=None):
+        if hasattr(self, "load_torch_hook"):
+            self.load_torch_hook.remove()
+        if function is None:
+
+            def map_from(module, state_dict, *args, **kwargs):
+                if state_dict.pop("is_torch_weight", False):
+                    need_transposed = []
+                    for name, layer in module.named_sublayers(include_self=True):
+                        if isinstance(layer, nn.Linear):
+                            need_transposed.append(name + ".weight")
+                    module.need_transposed = need_transposed
+                    for key in need_transposed:
+                        state_dict[key] = state_dict[key].T
+
+        else:
+            map_from = function
+        self.load_torch_hook = self.register_load_state_dict_pre_hook(map_from, with_module=True)
+        return self.load_torch_hook
+
+    def remove_load_torch_hook(self):
+        if hasattr(self, "load_torch_hook"):
+            self.load_torch_hook.remove()
+
+    def to(self=None, device=None, dtype=None, blocking=None):
+        return self._to_impl(
+            device=device,
+            dtype=dtype,
+            blocking=blocking,
+            include_sublayers=True,
+            floating_only=True,
+        )
 
 
 class CLIPEncoder(nn.Layer):
@@ -926,8 +977,8 @@ class CLIPModel(CLIPPreTrainedModel):
         self.text_model = CLIPTextTransformer(text_config)
         self.vision_model = CLIPVisionTransformer(vision_config)
 
-        self.visual_projection = Linear(self.vision_embed_dim, self.projection_dim, bias_attr=False)
-        self.text_projection = Linear(self.text_embed_dim, self.projection_dim, bias_attr=False)
+        self.visual_projection = LinearClass(self.vision_embed_dim, self.projection_dim, bias_attr=False)
+        self.text_projection = LinearClass(self.text_embed_dim, self.projection_dim, bias_attr=False)
         self.logit_scale = Parameter(paddle.ones((1,)) * self.config.logit_scale_init_value)
 
         # Initialize weights and apply final processing
@@ -1130,7 +1181,7 @@ class CLIPTextModelWithProjection(CLIPPreTrainedModel):
 
         self.text_model = CLIPTextTransformer(config)
 
-        self.text_projection = Linear(config.hidden_size, config.projection_dim, bias_attr=False)
+        self.text_projection = LinearClass(config.hidden_size, config.projection_dim, bias_attr=False)
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -1202,7 +1253,7 @@ class CLIPVisionModelWithProjection(CLIPPreTrainedModel):
 
         self.vision_model = CLIPVisionTransformer(config)
 
-        self.visual_projection = Linear(config.hidden_size, config.projection_dim, bias_attr=False)
+        self.visual_projection = LinearClass(config.hidden_size, config.projection_dim, bias_attr=False)
 
         # Initialize weights and apply final processing
         self.post_init()
