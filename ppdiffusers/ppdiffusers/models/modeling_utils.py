@@ -531,13 +531,15 @@ class ModelMixin(nn.Layer):
 
         init_contexts = []
 
-        dtype = set(v.dtype for v in state_dict.values())
+        dtype = set(v.dtype for v in state_dict.values() if paddle.is_tensor(v) and paddle.is_floating_point(v))
         if len(dtype) > 1 and paddle.float32 not in dtype:
             raise ValueError(
                 f"The weights of the model file {model_file} have a mixture of incompatible dtypes {dtype}. Please"
                 f" make sure that {model_file} weights have only one dtype."
             )
         elif len(dtype) > 1 and paddle.float32 in dtype:
+            dtype = paddle.float32
+        elif len(dtype) == 0:
             dtype = paddle.float32
         else:
             dtype = dtype.pop()

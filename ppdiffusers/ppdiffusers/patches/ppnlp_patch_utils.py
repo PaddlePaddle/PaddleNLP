@@ -118,6 +118,18 @@ if is_paddle_available():
     import paddle
     import paddle.nn as nn
 
+    def is_floating_point(x):
+        if not isinstance(x, (paddle.Tensor, paddle.static.Variable)):
+            raise TypeError("Expected Tensor, but received type of x: {}".format(type(x)))
+        dtype = x.dtype
+        is_fp_dtype = (
+            dtype == paddle.float32 or dtype == paddle.float64 or dtype == paddle.float16 or dtype == paddle.bfloat16
+        )
+        return is_fp_dtype
+
+    if not hasattr(paddle, "is_floating_point"):
+        paddle.is_floating_point = is_floating_point
+
     # paddle.long = paddle.int64
     # paddle.int = paddle.int32
     # paddle.double = paddle.float64
@@ -295,6 +307,8 @@ if is_paddle_available():
         from paddle.fluid.dygraph.layers import HookRemoveHelper
 
     def register_load_state_dict_pre_hook(self, hook, with_module=False):
+        if not hasattr(self, "load_state_dict_pre_hooks"):
+            self.load_state_dict_pre_hooks = OrderedDict()
         handle = HookRemoveHelper(self.load_state_dict_pre_hooks)
         self.load_state_dict_pre_hooks[handle._hook_id] = _WrappedHook(hook, self if with_module else None)
         return handle
@@ -304,21 +318,16 @@ if is_paddle_available():
     raw_set_state_dict = nn.Layer.set_state_dict
 
     def set_state_dict(self, state_dict, use_structured_name: bool = True):
-        for hook in self.load_state_dict_pre_hooks.values():
-            hook(state_dict)
+        if hasattr(self, "load_state_dict_pre_hooks"):
+            for hook in self.load_state_dict_pre_hooks.values():
+                hook(state_dict)
+        # POP is_torch_weight
+        state_dict.pop("is_torch_weight", None)
         return raw_set_state_dict(self, state_dict, use_structured_name=use_structured_name)
 
     nn.Layer.set_state_dict = set_state_dict
     nn.Layer.load_dict = nn.Layer.set_state_dict
     nn.Layer.set_dict = nn.Layer.set_state_dict
-
-    raw_init = nn.Layer.__init__
-
-    def __init__(self, name_scope=None, dtype="float32"):
-        raw_init(self, name_scope=name_scope, dtype=dtype)
-        self.load_state_dict_pre_hooks = OrderedDict()
-
-    nn.Layer.__init__ = __init__
 
 if is_paddle_available() and is_paddlenlp_available():
     import paddle
@@ -810,13 +819,15 @@ if is_paddle_available() and is_paddlenlp_available():
         state_dict = smart_load(model_file)
         init_contexts = []
 
-        dtype = set(v.dtype for v in state_dict.values())
+        dtype = set(v.dtype for v in state_dict.values() if paddle.is_tensor(v) and paddle.is_floating_point(v))
         if len(dtype) > 1 and paddle.float32 not in dtype:
             raise ValueError(
                 f"The weights of the model file {model_file} have a mixture of incompatible dtypes {dtype}. Please"
                 f" make sure that {model_file} weights have only one dtype."
             )
         elif len(dtype) > 1 and paddle.float32 in dtype:
+            dtype = paddle.float32
+        elif len(dtype) == 0:
             dtype = paddle.float32
         else:
             dtype = dtype.pop()
@@ -920,7 +931,9 @@ if is_paddle_available() and is_paddlenlp_available():
         variant=None,
         **kwargs
     ):
-        if cls.constructed_from_pretrained_config() and hasattr(cls, "smart_convert"):
+        if cls.constructed_from_pretrained_config() and (
+            hasattr(cls, "smart_convert") or hasattr(cls, "register_load_torch_hook")
+        ):
             return from_pretrained_v3(
                 cls,
                 pretrained_model_name_or_path,
@@ -1235,7 +1248,32 @@ if is_paddle_available() and is_paddlenlp_available():
     for cls_ in [BertModel, RobertaSeriesModelWithTransformation]:
         setattr(cls_, "smart_convert", bert_smart_convert)
 
-    for cls_ in [DPTForDepthEstimation, BitBackbone, SpeechT5HifiGan, ClapTextModelWithProjection, T5EncoderModel]:
+    if bool(os.getenv("USE_TORCH_LINEAR", False)):
+        # NEW TRANSFORMERS CLIP MODEL
+        from ..pipelines.stable_diffusion.hf_clip_model import (
+            HFCLIPModel,
+            HFCLIPTextModel,
+            HFCLIPTextModelWithProjection,
+            HFCLIPVisionModel,
+            HFCLIPVisionModelWithProjection,
+        )
+
+        TRANSFORMERS_CLIP_MODEL = [
+            HFCLIPModel,
+            HFCLIPTextModel,
+            HFCLIPTextModelWithProjection,
+            HFCLIPVisionModel,
+            HFCLIPVisionModelWithProjection,
+        ]
+    else:
+        TRANSFORMERS_CLIP_MODEL = []
+    for cls_ in [
+        DPTForDepthEstimation,
+        BitBackbone,
+        SpeechT5HifiGan,
+        ClapTextModelWithProjection,
+        T5EncoderModel,
+    ] + TRANSFORMERS_CLIP_MODEL:
         setattr(cls_, "smart_convert", convert_pytorch_state_dict_to_paddle_class_method)
 
     # TODO remove this when we updage ImageProcessingMixin
