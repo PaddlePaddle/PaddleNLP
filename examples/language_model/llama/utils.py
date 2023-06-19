@@ -23,6 +23,7 @@ import paddle.nn as nn
 from paddle.optimizer.lr import LambdaDecay
 from predict_generation import Predictor, batchfy_text
 from rouge import Rouge
+from sklearn.metrics import accuracy_score
 
 from paddlenlp.metrics import BLEU
 from paddlenlp.trainer import PrinterCallback, ProgressCallback, Trainer
@@ -253,3 +254,14 @@ def compute_metrics(preds, targets):
         rougel=rougel,
         bleu4=bleu4,
     )
+
+
+def compute_metrics_not_do_generation(eval_preds):
+    flattened_preds = np.array(eval_preds.predictions).flatten()
+    flattened_labels = np.array(eval_preds.label_ids).flatten()
+    filtered_preds = flattened_preds[flattened_labels != -100]
+    filtered_labels = flattened_labels[flattened_labels != -100]
+    accuracy = accuracy_score(y_true=filtered_labels, y_pred=filtered_preds)
+    return {
+        "accuracy": accuracy,
+    }
