@@ -30,7 +30,7 @@ ToMe for SD 生成的图像有着如下优势：
 ## 使用例子
 安装develop版本的ppdiffusers
 ```sh
-pip install --pre --upgrade ppdiffusers -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+pip install "ppdiffusers>=0.16.1"
 ```
 
 下面是 StableDiffusion + ToME 技术的例子

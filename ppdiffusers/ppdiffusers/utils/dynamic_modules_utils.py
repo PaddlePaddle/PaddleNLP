@@ -237,7 +237,7 @@ def get_cached_module_file(
         use_auth_token (`str` or *bool*, *optional*):
             The token to use as HTTP bearer authorization for remote files. If `True`, will use the token generated
             when running `transformers-cli login` (stored in `~/.huggingface`).
-        revision (`str`, *optional*, defaults to `"main"`):
+        revision (`str`, *optional*, defaults to `"develop"`):
             The specific model version to use. It can be a branch name, a tag name, or a commit id, since we use a
             git-based system for storing models and other artifacts on huggingface.co, so `revision` can be any
             identifier allowed by git.
@@ -265,7 +265,7 @@ def get_cached_module_file(
     elif pretrained_model_name_or_path.count("/") == 0:
         # retrieve github version that matches
         if revision is None:
-            revision = "main"
+            revision = "develop"
             logger.info(f"Defaulting to main: {revision}.")
 
         # community pipeline on GitHub

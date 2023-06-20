@@ -1,5 +1,4 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +22,7 @@ from ..pipeline_utils import DiffusionPipeline, ImagePipelineOutput
 
 
 class DDIMPipeline(DiffusionPipeline):
-    r"""
+    """
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
     library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
 
@@ -36,7 +35,6 @@ class DDIMPipeline(DiffusionPipeline):
 
     def __init__(self, unet, scheduler):
         super().__init__()
-
         # make sure scheduler can always be converted to DDIM
         scheduler = DDIMScheduler.from_config(scheduler.config)
 
@@ -53,7 +51,7 @@ class DDIMPipeline(DiffusionPipeline):
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
     ) -> Union[ImagePipelineOutput, Tuple]:
-        r"""
+        """
         Args:
             batch_size (`int`, *optional*, defaults to 1):
                 The number of images to generate.
@@ -79,15 +77,18 @@ class DDIMPipeline(DiffusionPipeline):
         """
 
         # Sample gaussian noise to begin loop
-        if isinstance(self.unet.sample_size, int):
-            image_shape = (batch_size, self.unet.in_channels, self.unet.sample_size, self.unet.sample_size)
+        if isinstance(self.unet.config.sample_size, int):
+            image_shape = (
+                batch_size,
+                self.unet.config.in_channels,
+                self.unet.config.sample_size,
+                self.unet.config.sample_size,
+            )
         else:
-            image_shape = (batch_size, self.unet.in_channels, *self.unet.sample_size)
-
+            image_shape = (batch_size, self.unet.config.in_channels, *self.unet.config.sample_size)
         if isinstance(generator, list) and len(generator) != batch_size:
             raise ValueError(
-                f"You have passed a list of generators of length {len(generator)}, but requested an effective batch"
-                f" size of {batch_size}. Make sure the batch size matches the length of the generators."
+                f"You have passed a list of generators of length {len(generator)}, but requested an effective batch size of {batch_size}. Make sure the batch size matches the length of the generators."
             )
 
         image = randn_tensor(image_shape, generator=generator, dtype=self.unet.dtype)
@@ -105,13 +106,12 @@ class DDIMPipeline(DiffusionPipeline):
             image = self.scheduler.step(
                 model_output, t, image, eta=eta, use_clipped_model_output=use_clipped_model_output, generator=generator
             ).prev_sample
+        image = (image / 2 + 0.5).clip(min=0, max=1)
+        image = image.cpu().transpose(perm=[0, 2, 3, 1]).numpy()
 
-        image = (image / 2 + 0.5).clip(0, 1)
-        image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
         if output_type == "pil":
             image = self.numpy_to_pil(image)
 
         if not return_dict:
             return (image,)
-
         return ImagePipelineOutput(images=image)

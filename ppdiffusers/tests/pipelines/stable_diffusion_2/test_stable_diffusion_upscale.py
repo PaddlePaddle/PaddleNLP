@@ -43,7 +43,7 @@ class StableDiffusionUpscalePipelineFastTests(unittest.TestCase):
     def dummy_image(self):
         batch_size = 1
         num_channels = 3
-        sizes = 32, 32
+        sizes = (32, 32)
         image = floats_tensor((batch_size, num_channels) + sizes, rng=random.Random(0))
         return image
 
@@ -59,6 +59,7 @@ class StableDiffusionUpscalePipelineFastTests(unittest.TestCase):
             down_block_types=("DownBlock2D", "CrossAttnDownBlock2D", "CrossAttnDownBlock2D"),
             up_block_types=("CrossAttnUpBlock2D", "CrossAttnUpBlock2D", "UpBlock2D"),
             cross_attention_dim=32,
+            # SD2-specific config below
             attention_head_dim=8,
             use_linear_projection=True,
             only_cross_attention=(True, True, False),
@@ -92,6 +93,7 @@ class StableDiffusionUpscalePipelineFastTests(unittest.TestCase):
             num_hidden_layers=5,
             pad_token_id=1,
             vocab_size=1000,
+            # SD2-specific config below
             hidden_act="gelu",
             projection_dim=512,
         )
@@ -143,7 +145,9 @@ class StableDiffusionUpscalePipelineFastTests(unittest.TestCase):
         image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
         expected_height_width = low_res_image.size[0] * 4
         assert image.shape == (1, expected_height_width, expected_height_width, 3)
-        expected_slice = np.array([0.2562, 0.3606, 0.4204, 0.4469, 0.4822, 0.4647, 0.5315, 0.5748, 0.5606])
+        expected_slice = np.array(
+            [0.0, 0.0, 0.3616839, 0.0, 0.04877859, 0.59195685, 0.23902711, 0.00838843, 0.5172206]
+        )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
         assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 0.01
 

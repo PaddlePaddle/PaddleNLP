@@ -1,6 +1,6 @@
 paddlehub>=2.3.1
 paddleseg==2.7.0
-paddlenlp>=2.5.2
+paddlenlp>=2.6.0rc0
 opencv-python
-ppdiffusers>=0.14.0
+ppdiffusers>=0.16.1
 cchardet

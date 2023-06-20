@@ -15,16 +15,17 @@
 
 import random
 import unittest
+import numpy as np
 
 import paddle
-from ppdiffusers_test.pipeline_params import (
+from ..pipeline_params import (
     TEXT_GUIDED_IMAGE_VARIATION_BATCH_PARAMS,
     TEXT_GUIDED_IMAGE_VARIATION_PARAMS,
 )
-from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
+from ..test_pipelines_common import PipelineTesterMixin
 
 from paddlenlp.transformers import (
-    CLIPFeatureExtractor,
+    CLIPImageProcessor,
     CLIPTextConfig,
     CLIPTextModel,
     CLIPTokenizer,
@@ -54,7 +55,7 @@ class StableUnCLIPImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.TestCas
     def get_dummy_components(self):
         embedder_hidden_size = 32
         embedder_projection_dim = embedder_hidden_size
-        feature_extractor = CLIPFeatureExtractor(crop_size=32, size=32)
+        feature_extractor = CLIPImageProcessor(crop_size=32, size=32)
         image_encoder = CLIPVisionModelWithProjection(
             CLIPVisionConfig(
                 hidden_size=embedder_hidden_size,
@@ -115,16 +116,31 @@ class StableUnCLIPImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.TestCas
         vae = AutoencoderKL()
         components = {
             "feature_extractor": feature_extractor,
-            "image_encoder": image_encoder,
-            "image_normalizer": image_normalizer,
+            "image_encoder": image_encoder.eval(),
+            "image_normalizer": image_normalizer.eval(),
             "image_noising_scheduler": image_noising_scheduler,
             "tokenizer": tokenizer,
-            "text_encoder": text_encoder,
-            "unet": unet,
+            "text_encoder": text_encoder.eval(),
+            "unet": unet.eval(),
             "scheduler": scheduler,
-            "vae": vae,
+            "vae": vae.eval(),
         }
         return components
+
+    def test_image_embeds_none(self):
+        components = self.get_dummy_components()
+        sd_pipe = StableUnCLIPImg2ImgPipeline(**components)
+        sd_pipe.set_progress_bar_config(disable=None)
+
+        inputs = self.get_dummy_inputs()
+        inputs.update({"image_embeds": None})
+        image = sd_pipe(**inputs).images
+        image_slice = image[0, -3:, -3:, -1]
+
+        assert image.shape == (1, 32, 32, 3)
+        expected_slice = np.array([0.40317363, 1. , 0.5802471, 0.47334313, 0.39546987, 0.72409034, 0.15691131, 0.42981434, 0.72585064])
+
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-3
 
     def get_dummy_inputs(self, seed=0, pil_image=True):
         generator = paddle.Generator().manual_seed(seed)
@@ -133,7 +149,7 @@ class StableUnCLIPImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.TestCas
         if pil_image:
             input_image = input_image * 0.5 + 0.5
             input_image = input_image.clip(min=0, max=1)
-            input_image = input_image.cpu().transpose(perm=[0, 2, 3, 1]).float().numpy()
+            input_image = input_image.cpu().transpose(perm=[0, 2, 3, 1]).cast("float32").numpy()
             input_image = DiffusionPipeline.numpy_to_pil(input_image)[0]
         return {
             "prompt": "An anime racoon running a marathon",
@@ -179,8 +195,7 @@ class StableUnCLIPImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.TestCas
 #             'fusing/stable-unclip-2-1-l-img2img')
 #         pipe.set_progress_bar_config(disable=None)
 #         generator = paddle.Generator().manual_seed(0)
-#         output = pipe('anime turle', image=input_image, generator=generator,
-#             output_type='np')
+#         output = pipe(input_image, "anime turle", generator=generator, output_type="np")
 #         image = output.images[0]
 #         # breakpoint()
 #         assert image.shape == (768, 768, 3)
@@ -197,8 +212,7 @@ class StableUnCLIPImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.TestCas
 #             'fusing/stable-unclip-2-1-h-img2img')
 #         pipe.set_progress_bar_config(disable=None)
 #         generator = paddle.Generator().manual_seed(0)
-#         output = pipe('anime turle', image=input_image, generator=generator,
-#             output_type='np')
+#         output = pipe(input_image, "anime turle", generator=generator, output_type="np")
 #         image = output.images[0]
 #         assert image.shape == (768, 768, 3)
 #         assert_mean_pixel_difference(image, expected_image)

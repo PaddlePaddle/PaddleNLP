@@ -32,7 +32,7 @@ from paddlenlp.transformers.model_outputs import (
 
 from ...configuration_utils import FrozenDict
 from ...models import AutoencoderKL, UNet2DConditionModel, UNet2DModel, VQModel
-from ...schedulers import KarrasDiffusionSchedulers
+from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
 from ...utils import deprecate, logging, randn_tensor, replace_example_docstring
 from ...utils.initializer_utils import normal_, zeros_
 from ..pipeline_utils import DiffusionPipeline, ImagePipelineOutput
@@ -79,7 +79,7 @@ class LDMTextToImagePipeline(DiffusionPipeline):
         bert: PretrainedModel,
         tokenizer: PretrainedTokenizer,
         unet: Union[UNet2DModel, UNet2DConditionModel],
-        scheduler: KarrasDiffusionSchedulers,
+        scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
     ):
         super().__init__()
         if hasattr(scheduler.config, "steps_offset") and scheduler.config.steps_offset != 1:
@@ -403,7 +403,7 @@ class LDMTextToImagePipeline(DiffusionPipeline):
             cross_attention_kwargs (`dict`, *optional*):
                 A kwargs dictionary that if specified is passed along to the `AttnProcessor` as defined under
                 `self.processor` in
-                [diffusers.cross_attention](https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/cross_attention.py).
+                [ppdiffusers.cross_attention](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/cross_attention.py).
 
         Examples:
 

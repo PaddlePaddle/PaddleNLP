@@ -25,6 +25,7 @@ from pathlib import PosixPath
 from typing import Any, Dict, Tuple, Union
 
 import numpy as np
+import paddle
 
 from .utils import (
     DIFFUSERS_CACHE,
@@ -32,6 +33,8 @@ from .utils import (
     DummyObject,
     bos_hf_download,
     deprecate,
+    extract_commit_hash,
+    http_user_agent,
     logging,
 )
 from .utils.constants import FROM_HF_HUB
@@ -104,12 +107,6 @@ class ConfigMixin:
         # TODO: remove this when we remove the deprecation warning, and the `kwargs` argument,
         # or solve in a more general way.
         kwargs.pop("kwargs", None)
-        for key, value in kwargs.items():
-            try:
-                setattr(self, key, value)
-            except AttributeError as err:
-                logger.error(f"Can't set {key} with value {value} for {self}")
-                raise err
 
         if not hasattr(self, "_internal_dict"):
             internal_dict = kwargs
@@ -120,7 +117,26 @@ class ConfigMixin:
 
         self._internal_dict = FrozenDict(internal_dict)
 
-    def save_config(self, save_directory: Union[str, os.PathLike], push_to_hub: bool = False, **kwargs):
+    def __getattr__(self, name: str) -> Any:
+        """The only reason we overwrite `getattr` here is to gracefully deprecate accessing
+        config attributes directly. See https://github.com/huggingface/diffusers/pull/3129
+        Tihs funtion is mostly copied from PyTorch's __getattr__ overwrite:
+        https://pytorch.org/docs/stable/_modules/torch/nn/modules/module.html#Module
+        """
+
+        is_in_config = "_internal_dict" in self.__dict__ and hasattr(self.__dict__["_internal_dict"], name)
+        is_attribute = name in self.__dict__
+
+        if is_in_config and not is_attribute:
+            deprecation_message = f"Accessing config attribute `{name}` directly via '{type(self).__name__}' object attribute is deprecated. Please access '{name}' over '{type(self).__name__}'s config object instead, e.g. 'scheduler.config.{name}'."
+            deprecate("direct config name access", "1.0.0", deprecation_message, standard_warn=False)
+            return self._internal_dict[name]
+
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
+    def save_config(
+        self, save_directory: Union[str, os.PathLike], push_to_hub: bool = False, to_diffusers=False, **kwargs
+    ):
         """
         Save a configuration object to the directory `save_directory`, so that it can be re-loaded using the
         [`~ConfigMixin.from_config`] class method.
@@ -137,7 +153,7 @@ class ConfigMixin:
         # If we save using the predefined names, we can load using `from_config`
         output_config_file = os.path.join(save_directory, self.config_name)
 
-        self.to_json_file(output_config_file)
+        self.to_json_file(output_config_file, to_diffusers=to_diffusers)
         logger.info(f"Configuration saved in {output_config_file}")
 
     @classmethod
@@ -234,7 +250,11 @@ class ConfigMixin:
 
     @classmethod
     def load_config(
-        cls, pretrained_model_name_or_path: Union[str, os.PathLike], return_unused_kwargs=False, **kwargs
+        cls,
+        pretrained_model_name_or_path: Union[str, os.PathLike],
+        return_unused_kwargs=False,
+        return_commit_hash=False,
+        **kwargs,
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         r"""
         Instantiate a Python class from a config dictionary
@@ -274,6 +294,10 @@ class ConfigMixin:
             subfolder (`str`, *optional*, defaults to `""`):
                 In case the relevant files are located inside a subfolder of the model repo (either remote in
                 huggingface.co or downloaded locally), you can specify the folder name here.
+            return_unused_kwargs (`bool`, *optional*, defaults to `False):
+                Whether unused keyword arguments of the config shall be returned.
+            return_commit_hash (`bool`, *optional*, defaults to `False):
+                Whether the commit_hash of the loaded configuration shall be returned.
             from_hf_hub (bool, *optional*):
                 Whether to load from Hugging Face Hub. Defaults to False
         <Tip>
@@ -302,8 +326,11 @@ class ConfigMixin:
         revision = kwargs.pop("revision", None)
         _ = kwargs.pop("mirror", None)
         subfolder = kwargs.pop("subfolder", None)
-
-        user_agent = {"file_type": "config"}
+        user_agent = kwargs.pop("user_agent", {})
+        user_agent = {**user_agent, "file_type": "config"}
+        user_agent = http_user_agent(user_agent)
+        # new add return_config_file
+        return_config_file = kwargs.pop("return_config_file", False)
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
 
@@ -346,13 +373,25 @@ class ConfigMixin:
         try:
             # Load config dict
             config_dict = cls._dict_from_json_file(config_file)
+            commit_hash = extract_commit_hash(config_file)
+
         except (json.JSONDecodeError, UnicodeDecodeError):
             raise EnvironmentError(f"It looks like the config file at '{config_file}' is not a valid JSON file.")
 
-        if return_unused_kwargs:
-            return config_dict, kwargs
+        if not (return_unused_kwargs or return_commit_hash or return_config_file):
+            return config_dict
 
-        return config_dict
+        outputs = (config_dict,)
+        if return_unused_kwargs:
+            outputs += (kwargs,)
+
+        if return_commit_hash:
+            outputs += (commit_hash,)
+
+        if return_config_file:
+            outputs += (config_file,)
+
+        return outputs
 
     @staticmethod
     def _get_init_keys(cls):
@@ -361,7 +400,7 @@ class ConfigMixin:
     @classmethod
     def extract_init_dict(cls, config_dict, **kwargs):
         # 0. Copy origin config dict
-        original_dict = {k: v for k, v in config_dict.items()}
+        original_dict = dict(config_dict.items())
 
         # 1. Retrieve expected config attributes from __init__ signature
         expected_keys = cls._get_init_keys(cls)
@@ -443,14 +482,18 @@ class ConfigMixin:
         with open(json_file, "r", encoding="utf-8") as reader:
             text = reader.read()
         data = json.loads(text)
-        # TODO junnyu, support diffusers and ppdiffusers
-        if "_ppdiffusers_version" in data and "_diffusers_version" not in data:
-            data["_diffusers_version"] = data["_ppdiffusers_version"]
         if "_diffusers_version" in data and "_ppdiffusers_version" not in data:
-            data["_ppdiffusers_version"] = data["_diffusers_version"]
+            data["_ppdiffusers_version"] = data.pop("_diffusers_version", __version__)
         if "_diffusers_version" not in data and "_ppdiffusers_version" not in data:
-            data["_diffusers_version"] = __version__
             data["_ppdiffusers_version"] = __version__
+
+        # remove Onnx and Flax prefix
+        _class_name = data.get("_class_name", None)
+        if _class_name is not None:
+            if _class_name.startswith("Flax"):
+                data["_class_name"] = _class_name[4:]
+            elif _class_name.startswith("Onnx"):
+                data["_class_name"] = "FastDeploy" + _class_name[4:]
 
         return data
 
@@ -467,7 +510,7 @@ class ConfigMixin:
         """
         return self._internal_dict
 
-    def to_json_string(self) -> str:
+    def to_json_string(self, to_diffusers=False) -> str:
         """
         Serializes this instance to a JSON string.
 
@@ -476,9 +519,12 @@ class ConfigMixin:
         """
         config_dict = self._internal_dict if hasattr(self, "_internal_dict") else {}
         config_dict["_class_name"] = self.__class__.__name__
-        # TODO junnyu, support diffusers and ppdiffusers
-        config_dict["_diffusers_version"] = __version__
-        config_dict["_ppdiffusers_version"] = __version__
+
+        # json
+        if to_diffusers:
+            config_dict["_diffusers_version"] = __version__
+        else:
+            config_dict["_ppdiffusers_version"] = __version__
 
         def to_json_saveable(value):
             if isinstance(value, np.ndarray):
@@ -488,9 +534,20 @@ class ConfigMixin:
             return value
 
         config_dict = {k: to_json_saveable(v) for k, v in config_dict.items()}
-        return json.dumps(config_dict, indent=2, sort_keys=True) + "\n"
+        if to_diffusers:
+            config_dict.pop("_ppdiffusers_version", None)
+        else:
+            config_dict.pop("_diffusers_version", None)
+        # Don't save "_ignore_files"
+        config_dict.pop("_ignore_files", None)
+        json_string = json.dumps(config_dict, indent=2, sort_keys=True) + "\n"
+        if to_diffusers:
+            json_string = json_string.replace('"ppdiffusers"', '"diffusers"').replace(
+                '"paddlenlp.transformers"', '"transformers"'
+            )
+        return json_string
 
-    def to_json_file(self, json_file_path: Union[str, os.PathLike]):
+    def to_json_file(self, json_file_path: Union[str, os.PathLike], to_diffusers=False):
         """
         Save this instance to a JSON file.
 
@@ -499,7 +556,7 @@ class ConfigMixin:
                 Path to the JSON file in which this configuration instance's parameters will be saved.
         """
         with open(json_file_path, "w", encoding="utf-8") as writer:
-            writer.write(self.to_json_string())
+            writer.write(self.to_json_string(to_diffusers=to_diffusers))
 
 
 def register_to_config(init):
@@ -545,3 +602,65 @@ def register_to_config(init):
         init(self, *args, **init_kwargs)
 
     return inner_init
+
+
+def finfo(dtype: paddle.dtype = None):
+    if dtype is None:
+        dtype = paddle.get_default_dtype()
+
+    if dtype == paddle.bfloat16:
+        # Numpy do not support `np.finfo(np.uint16)`, so try to construct a finfo object to fetch min value
+        class BFloatFInfo:
+            min = -3.3895313892515355e38
+
+        return BFloatFInfo
+    if dtype == paddle.float32:
+        return np.finfo(np.float32)
+    if dtype == paddle.float16:
+        return np.finfo(np.float16)
+    if dtype == paddle.float64:
+        return np.finfo(np.float64)
+
+
+class ModuleUtilsMixin:
+    """
+    A few utilities for `torch.nn.Modules`, to be used as a mixin.
+    """
+
+    def get_extended_attention_mask(
+        self, attention_mask: paddle.Tensor, input_shape: Tuple[int], dtype: paddle.float32 = None
+    ) -> paddle.Tensor:
+        """
+        Makes broadcastable attention and causal masks so that future and masked tokens are ignored.
+        Arguments:
+            attention_mask (`paddle.Tensor`):
+                Mask with ones indicating tokens to attend to, zeros for tokens to ignore.
+            input_shape (`Tuple[int]`):
+                The shape of the input to the model.
+        Returns:
+            `paddle.Tensor` The extended attention mask, with a the same dtype as `attention_mask.dtype`.
+        """
+        if dtype is None:
+            dtype = self.dtype
+        # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
+        # ourselves in which case we just need to make it broadcastable to all heads.
+        if attention_mask.dim() == 3:
+            extended_attention_mask = attention_mask[:, None, :, :]
+        elif attention_mask.dim() == 2:
+            # Provided a padding mask of dimensions [batch_size, seq_length]
+            # - the model is an encoder, so make the mask broadcastable to [batch_size, num_heads, seq_length, seq_length]
+            extended_attention_mask = attention_mask[:, None, None, :]
+        else:
+            raise ValueError(
+                "Wrong shape for input_ids (shape {}) or attention_mask (shape {})".format(
+                    input_shape, attention_mask.shape
+                )
+            )
+
+        # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
+        # masked positions, this operation will create a tensor which is 0.0 for
+        # positions we want to attend and -10000.0 for masked positions.
+        # Since we are adding it to the raw scores before the softmax, this is
+        # effectively the same as removing these entirely.
+        extended_attention_mask = (1.0 - extended_attention_mask) * finfo(dtype).min
+        return extended_attention_mask

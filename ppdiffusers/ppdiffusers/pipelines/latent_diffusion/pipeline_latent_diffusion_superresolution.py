@@ -1,5 +1,4 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,16 +34,16 @@ from ..pipeline_utils import DiffusionPipeline, ImagePipelineOutput
 
 def preprocess(image):
     w, h = image.size
-    w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
+    w, h = (x - x % 32 for x in (w, h))
     image = image.resize((w, h), resample=PIL_INTERPOLATION["lanczos"])
     image = np.array(image).astype(np.float32) / 255.0
     image = image[None].transpose(0, 3, 1, 2)
-    image = paddle.to_tensor(image)
+    image = paddle.to_tensor(data=image)
     return 2.0 * image - 1.0
 
 
 class LDMSuperResolutionPipeline(DiffusionPipeline):
-    r"""
+    """
     A pipeline for image super-resolution using Latent
 
     This class inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
@@ -79,16 +78,15 @@ class LDMSuperResolutionPipeline(DiffusionPipeline):
     @paddle.no_grad()
     def __call__(
         self,
-        image: Union[paddle.Tensor, PIL.Image.Image],
+        image: Union[paddle.Tensor, PIL.Image.Image] = None,
         batch_size: Optional[int] = 1,
         num_inference_steps: Optional[int] = 100,
         eta: Optional[float] = 0.0,
         generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
-        **kwargs,
     ) -> Union[Tuple, ImagePipelineOutput]:
-        r"""
+        """
         Args:
             image (`paddle.Tensor` or `PIL.Image.Image`):
                 `Image`, or tensor representing an image batch, that will be used as the starting point for the
@@ -120,38 +118,25 @@ class LDMSuperResolutionPipeline(DiffusionPipeline):
             batch_size = image.shape[0]
         else:
             raise ValueError(f"`image` has to be of type `PIL.Image.Image` or `paddle.Tensor` but is {type(image)}")
-
         if isinstance(image, PIL.Image.Image):
             image = preprocess(image)
-
         height, width = image.shape[-2:]
-
         # in_channels should be 6: 3 for latents, 3 for low resolution image
-        latents_shape = (batch_size, self.unet.in_channels // 2, height, width)
+        latents_shape = (batch_size, self.unet.config.in_channels // 2, height, width)
         latents_dtype = self.unet.dtype
-
         latents = randn_tensor(latents_shape, generator=generator, dtype=latents_dtype)
-
         image = image.cast(latents_dtype)
-
         self.scheduler.set_timesteps(num_inference_steps)
         timesteps_tensor = self.scheduler.timesteps
-
         # scale the initial noise by the standard deviation required by the scheduler
         latents = latents * self.scheduler.init_noise_sigma
-
-        # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature.
-        # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
-        # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
-        # and should be between [0, 1]
         accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
         extra_kwargs = {}
         if accepts_eta:
             extra_kwargs["eta"] = eta
-
         for t in self.progress_bar(timesteps_tensor):
             # concat latents and low resolution image in the channel dimension.
-            latents_input = paddle.concat([latents, image], axis=1)
+            latents_input = paddle.concat(x=[latents, image], axis=1)
             latents_input = self.scheduler.scale_model_input(latents_input, t)
             # predict the noise residual
             noise_pred = self.unet(latents_input, t).sample
@@ -160,14 +145,11 @@ class LDMSuperResolutionPipeline(DiffusionPipeline):
 
         # decode the image latents with the VQVAE
         image = self.vqvae.decode(latents).sample
-        image = paddle.clip(image, -1.0, 1.0)
+        image = paddle.clip(x=image, min=-1.0, max=1.0)
         image = image / 2 + 0.5
-        image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
-
+        image = image.cpu().transpose(perm=[0, 2, 3, 1]).numpy()
         if output_type == "pil":
             image = self.numpy_to_pil(image)
-
         if not return_dict:
             return (image,)
-
         return ImagePipelineOutput(images=image)
