@@ -56,7 +56,7 @@ class QuantedLoRALinear(ConvertibleQuantedLayer):
         if self.activation_quanter is not None:
             quant_input = self.activation_quanter(input)
         if self.weight_quanter is not None:
-            quant_weight = self.weight_quanter(self.weight)
+            quant_weight = self.weight_quanter(quant_weight)
         return self._linear_forward(quant_input, quant_weight)
 
     def _linear_forward(self, input, weight):
