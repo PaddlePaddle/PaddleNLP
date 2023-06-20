@@ -1457,6 +1457,19 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         pretrained_model_name_or_path, subfolder, _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant)
                     )
                     is_sharded = True
+                elif os.path.isfile(
+                    os.path.join(
+                        pretrained_model_name_or_path,
+                        subfolder,
+                        _add_variant(PADDLE_WEIGHTS_NAME, weight_name_suffix()),
+                    )
+                ):
+                    # Load from a PaddlePaddle checkpoint for hybrid parallel model
+                    archive_file = os.path.join(
+                        pretrained_model_name_or_path,
+                        subfolder,
+                        _add_variant(PADDLE_WEIGHTS_NAME, weight_name_suffix()),
+                    )
                 # At this stage we don't have a weight file so we will raise an error.
                 elif os.path.isfile(
                     os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(PYTORCH_WEIGHTS_NAME, variant))
@@ -2113,7 +2126,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
                     return
             else:
-                variant = weight_name_suffix() if variant is None else None
+                variant = weight_name_suffix() if variant is None else variant
 
         if state_dict is None:
             state_dict = self.state_dict()
