@@ -86,9 +86,6 @@ class LoRALinear(nn.Linear):
             self.merged = True
 
     def forward(self, input: paddle.Tensor):
-        print("lora")
-        print(input)
-        # print(self.weight + self.lora_A @ self.lora_B * self.scaling)
         result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
         if self.r > 0 and not self.merged:
             result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
@@ -107,7 +104,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
-        merge_weights: bool = True,
+        merge_weights: bool = False,
         lora_A_weight_attr: Optional[paddle.ParamAttr] = None,
         **kwargs
     ):
@@ -197,7 +194,7 @@ class LoRAMergedLinear(nn.Linear):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
-        merge_weights: bool = True,
+        merge_weights: bool = False,
         enable_lora: List[bool] = [False],
         **kwargs
     ):
@@ -360,7 +357,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
-        merge_weights: bool = True,
+        merge_weights: bool = False,
         enable_lora: List[bool] = [False],
         lora_A_weight_attr: Optional[paddle.ParamAttr] = None,
         **kwargs

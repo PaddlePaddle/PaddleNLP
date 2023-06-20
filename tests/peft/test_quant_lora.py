@@ -30,7 +30,7 @@ from paddlenlp.transformers import AutoModel
 class TestQuantedLoraLayer(unittest.TestCase):
     def test_forward(self):
         quant_lora_layer = QuantedLoRALinear(
-            layer=LoRALinear(in_features=16, out_features=8, r=4, lora_alpha=8, merge_weights=False),
+            layer=LoRALinear(in_features=16, out_features=8, r=4, lora_alpha=8),
             q_config=SingleLayerConfig(weight=FakeQuanterWithAbsMaxObserver(moving_rate=0.9), activation=None),
         )
         x = paddle.randn([2, 4, 16], "float32")
