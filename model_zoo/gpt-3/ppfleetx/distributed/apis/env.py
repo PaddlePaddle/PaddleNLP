@@ -127,7 +127,7 @@ def init_dist_env(config):
     if config.Distributed.mp_degree == 1 and config.Distributed.sharding.sharding_degree == 1:
         order = ["pp", "dp", "sharding", "mp"]
     else:
-        order = ["dp", "pp", "sharding", "mp"]
+        order = ["dp", "sharding", "pp" "mp"]
 
     strategy.hybrid_configs = {
         "dp_degree": config.Distributed.dp_degree,

@@ -724,11 +724,14 @@ class TrainingArguments:
                 if tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
 
+                # to align dp and sharding(default is ["dp", "pp", "sharding", "mp"])
+                order = ["dp", "sharding", "pp" "mp"]
                 hybrid_configs = {
                     "dp_degree": self.data_parallel_degree,
                     "mp_degree": tensor_parallel_degree,
                     "pp_degree": pipeline_parallel_degree,
                     "sharding_degree": sharding_parallel_degree,
+                    "order": order
                 }
 
                 if pipeline_parallel_degree > 1:
