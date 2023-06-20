@@ -34,6 +34,7 @@ class QuantedLoRALinear(ConvertibleQuantedLayer):
         self.weight = layer.weight
         self.lora_A = layer.lora_A
         self.lora_B = layer.lora_B
+        self.lora_dropout = layer.lora_dropout
         self.bias = layer.bias
         self.name = layer.name
         # For FakeQuant
@@ -55,7 +56,7 @@ class QuantedLoRALinear(ConvertibleQuantedLayer):
         return self._linear_forward(quant_input, quant_weight)
 
     def _linear_forward(self, input, weight):
-        out = F.linear(x=input, weight=weight, bias=self.bias, name=self.name)
+        out = F.linear(x=self.lora_dropout(input), weight=weight, bias=self.bias, name=self.name)
         return out
 
     def weights_to_quanters(self):
