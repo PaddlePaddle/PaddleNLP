@@ -17,8 +17,13 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from multiprocessing import cpu_count
-from typing import Any, Dict, Iterator, List, Literal, Optional, Union
+from typing import Any, Dict, Iterator, List, Optional, Union
 from unicodedata import combining, normalize
+
+try:
+    from typing import Literal
+except ImportError:
+    from typing_extensions import Literal
 
 import requests
 from boilerpy3 import extractors
