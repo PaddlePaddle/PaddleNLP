@@ -2007,6 +2007,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if low_cpu_mem_usage:
             state_dict = None
 
+        # will only support load paddle.Tensor to model.
+        if state_dict is not None:
+            for k in list(state_dict.keys()):
+                if not isinstance(state_dict[k], paddle.Tensor):
+                    with device_guard():
+                        state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+
         # 3. init the model
         init_args = config["init_args"] or ()
         with ContextManagers(init_contexts):
