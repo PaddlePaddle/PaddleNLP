@@ -135,7 +135,7 @@ class ToolsManager:
         tools: Optional[List[Tool]] = None,
         tool_pattern: str = r"Tool:\s*(\w+)\s*Tool Input:\s*(?:\"([\s\S]*?)\"|((?:.|\n)*))\s*",
         observation_prefix: str = "Observation: ",
-        llm_prefix: str = "Thought: ",
+        llm_prefix: str = "Thought:",
     ):
         """
         :param tools: A list of tools to add to the ToolManager. Each tool must have a unique name.
@@ -245,8 +245,8 @@ class Agent:
         prompt_parameters_resolver: Optional[Callable] = None,
         max_steps: int = 8,
         final_answer_pattern: str = r"Final Answer\s*:\s*(.*)",
-        observation_prefix: str = "Observation: ",
-        llm_prefix: str = "Thought: ",
+        observation_prefix: str = "Observation:",
+        llm_prefix: str = "Thought:",
     ):
         """
          Creates an Agent instance.
