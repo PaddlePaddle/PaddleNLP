@@ -21,6 +21,7 @@ import paddle
 from paddle.quantization import QAT, QuantConfig
 from paddle.quantization.config import SingleLayerConfig
 from paddle.quantization.quanters import FakeQuanterWithAbsMaxObserver
+from paddle.quantization.quanters.abs_max import FakeQuanterWithAbsMaxObserverLayer
 
 from paddlenlp.peft.lora import LoRAConfig, LoRALinear, LoRAModel, QuantedLoRALinear
 from paddlenlp.transformers import AutoModel
@@ -28,9 +29,10 @@ from paddlenlp.transformers import AutoModel
 
 class TestQuantedLoraLayer(unittest.TestCase):
     def test_forward(self):
-        q_config = SingleLayerConfig(weight=FakeQuanterWithAbsMaxObserver(moving_rate=0.9), activation=None)
-        lora_layer = LoRALinear(in_features=16, out_features=8, r=4, lora_dropout=0.1, lora_alpha=8)
-        quant_lora_layer = QuantedLoRALinear(layer=lora_layer, q_config=q_config)
+        quant_lora_layer = QuantedLoRALinear(
+            layer=LoRALinear(in_features=16, out_features=8, r=4, lora_alpha=8, merge_weights=False),
+            q_config=SingleLayerConfig(weight=FakeQuanterWithAbsMaxObserver(moving_rate=0.9), activation=None),
+        )
         x = paddle.randn([2, 4, 16], "float32")
         quant_output = quant_lora_layer(x)
         self.assertFalse(quant_lora_layer.lora_A.stop_gradient)
@@ -38,6 +40,30 @@ class TestQuantedLoraLayer(unittest.TestCase):
         self.assertTrue(quant_lora_layer.weight.stop_gradient)
         self.assertFalse(quant_lora_layer.bias.stop_gradient)
         self.assertEqual(quant_output.shape, [2, 4, 8])
+
+    def test_forward_no_quant(self):
+        lora_layer = LoRALinear(in_features=16, out_features=8, r=4, lora_alpha=8)
+        quant_lora_layer = QuantedLoRALinear(
+            layer=lora_layer, q_config=SingleLayerConfig(weight=None, activation=None)
+        )
+        x = paddle.randn([2, 4, 16], "float32")
+        output = lora_layer(x)
+        quant_output = quant_lora_layer(x)
+        self.assertTrue(paddle.allclose(output, quant_output))
+
+    def test_dropout_raise_exception(self):
+        with self.assertRaises(ValueError):
+            QuantedLoRALinear(
+                layer=LoRALinear(in_features=16, out_features=8, r=4, lora_alpha=8, lora_dropout=0.1),
+                q_config=SingleLayerConfig(weight=None, activation=None),
+            )
+
+    def test_merge_weights_raise_exception(self):
+        with self.assertRaises(ValueError):
+            QuantedLoRALinear(
+                layer=LoRALinear(in_features=16, out_features=8, r=4, lora_alpha=8, merge_weights=True),
+                q_config=SingleLayerConfig(weight=None, activation=None),
+            )
 
     def test_save_load(self):
         with TemporaryDirectory() as tempdir:
@@ -57,20 +83,61 @@ class TestQuantedLoraLayer(unittest.TestCase):
 
 
 class TestQuantedLoRAModel(unittest.TestCase):
-    def test_quant_model_forward(self):
+    @classmethod
+    def setUpClass(cls):
         lora_config = LoRAConfig(
             target_modules=[".*q_proj.*", ".*v_proj.*"],
             r=4,
             lora_alpha=8,
         )
-        model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
-        lora_model = LoRAModel(model, lora_config)
+        cls.model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
+        cls.lora_model = LoRAModel(cls.model, lora_config)
+        # lora_B parameter is initalized to 0, therefore AB = 0 and W + AB = W
+        # Since we want to test W + AB logic, we set lora_B to random values.
+        lora_b_state_dict = {}
+        for name, state in cls.lora_model.state_dict().items():
+            if "lora_B" in name:
+                lora_b_state_dict[name] = paddle.randn(state.shape)
+        cls.lora_model.set_dict(lora_b_state_dict)
+        cls.lora_model.eval()
+
+    def _count_layers(self, model, layer_type):
+        count = 0
+        for _layer in model.sublayers(True):
+            print(_layer, layer_type, isinstance(_layer, layer_type))
+            if isinstance(_layer, layer_type):
+                count += 1
+        return count
+
+    def test_model_layers(self):
         q_config = QuantConfig(activation=None, weight=None)
         q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
         q_config.add_type_config(LoRALinear, weight=FakeQuanterWithAbsMaxObserver(moving_rate=0.9))
         qat = QAT(q_config)
-        quant_lora_model = qat.quantize(lora_model)
-        input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 20]))
-        original_model_outputs = lora_model(input_ids)[0]
+        quant_lora_model = qat.quantize(self.lora_model, inplace=False)
+        quantizer_cnt = self._count_layers(quant_lora_model, FakeQuanterWithAbsMaxObserverLayer)
+        # 2 LoRA layers (q_proj, v_proj) per transformer layer
+        self.assertEqual(quantizer_cnt, 2 * self.model.config.num_hidden_layers)
+
+    def test_forward_no_quant(self):
+        q_config = QuantConfig(activation=None, weight=None)
+        q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
+        q_config.add_type_config(LoRALinear, weight=None, activation=None)
+        qat = QAT(q_config)
+        quant_lora_model = qat.quantize(self.lora_model, inplace=False)
+        quant_lora_model.eval()
+        input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 5]))
+        original_model_outputs = self.lora_model(input_ids)[0]
+        quant_model_outputs = quant_lora_model(input_ids)[0]
+        self.assertTrue(paddle.allclose(original_model_outputs, quant_model_outputs))
+
+    def test_forward_weight_quant(self):
+        q_config = QuantConfig(activation=None, weight=None)
+        q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
+        q_config.add_type_config(LoRALinear, weight=FakeQuanterWithAbsMaxObserver(moving_rate=0.9))
+        qat = QAT(q_config)
+        quant_lora_model = qat.quantize(self.lora_model, inplace=False)
+        input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 5]))
+        original_model_outputs = self.lora_model(input_ids)[0]
         quant_model_outputs = quant_lora_model(input_ids)[0]
         self.assertEqual(original_model_outputs.shape, quant_model_outputs.shape)

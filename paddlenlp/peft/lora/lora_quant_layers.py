@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from paddle.nn import Layer
+from paddle import nn
 from paddle.nn import functional as F
 from paddle.nn.quant.format import ConvertibleQuantedLayer
 
@@ -28,13 +28,17 @@ class QuantedLoRALinear(ConvertibleQuantedLayer):
         The quanted logic is quant(W + AB)x
     """
 
-    def __init__(self, layer: Layer, q_config):
+    def __init__(self, layer: nn.Layer, q_config):
         super().__init__()
-        # For Linear
+        if layer.merge_weights:
+            raise ValueError("merged_weights is not supported for QuantedLoRALinear")
+        if isinstance(layer.lora_dropout, nn.Dropout):
+            raise ValueError("lora_dropout is not supported for QuantedLoRALinear")
+
         self.weight = layer.weight
         self.lora_A = layer.lora_A
         self.lora_B = layer.lora_B
-        self.lora_dropout = layer.lora_dropout
+        self.scaling = layer.scaling
         self.bias = layer.bias
         self.name = layer.name
         # For FakeQuant
@@ -48,7 +52,7 @@ class QuantedLoRALinear(ConvertibleQuantedLayer):
 
     def forward(self, input):
         quant_input = input
-        quant_weight = self.weight + self.lora_A @ self.lora_B
+        quant_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
         if self.activation_quanter is not None:
             quant_input = self.activation_quanter(input)
         if self.weight_quanter is not None:
@@ -56,7 +60,7 @@ class QuantedLoRALinear(ConvertibleQuantedLayer):
         return self._linear_forward(quant_input, quant_weight)
 
     def _linear_forward(self, input, weight):
-        out = F.linear(x=self.lora_dropout(input), weight=weight, bias=self.bias, name=self.name)
+        out = F.linear(x=input, weight=weight, bias=self.bias, name=self.name)
         return out
 
     def weights_to_quanters(self):
