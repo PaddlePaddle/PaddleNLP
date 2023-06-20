@@ -2098,8 +2098,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
         # we currently don't use this setting automatically, but may start to use with v5
 
-        PADDLE_WEIGHTS_NAME = model_to_save.resource_files_names["model_state"]
-
         dtype = get_parameter_dtype(model_to_save)
         # model_to_save.config.paddle_dtype = str(dtype).split(".")[1]
         model_to_save.config.dtype = str(dtype).split(".")[1]
@@ -2107,20 +2105,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config_to_save = copy.deepcopy(model_to_save.config)
 
         # Save the model
-        if state_dict is None:
-            if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
+        if state_dict is None and config_to_save.tensor_parallel_degree > 1:
+            if merge_tensor_parallel:
                 state_dict = model_to_save.merge_tensor_parallel(model_to_save.state_dict(), config_to_save)
                 config_to_save.tensor_parallel_degree = 1
                 if config_to_save.tensor_parallel_rank != 0:
                     logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
                     return
             else:
-                if config_to_save.tensor_parallel_degree > 1:
-                    PADDLE_WEIGHTS_NAME = _add_variant(
-                        PADDLE_WEIGHTS_NAME, f"tp{config_to_save.tensor_parallel_rank:0>2d}"
-                    )
+                variant = weight_name_suffix() if variant is None else None
 
-                state_dict = self.state_dict()
+        if state_dict is None:
+            state_dict = self.state_dict()
 
         # Attach architecture to the config
         config_to_save.architectures = [model_to_save.__class__.__name__]
