@@ -133,7 +133,6 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
     def unfreeze_unet(self):
         set_stop_gradient(self.unet, False)
 
-    @paddle.set_grad_enabled(True)
     def cond_fn(
         self,
         latents,
@@ -146,63 +145,65 @@ class CLIPGuidedStableDiffusion(DiffusionPipeline):
         num_cutouts,
         use_cutouts=True,
     ):
-        latents = latents.detach()
-        latents.stop_gradient = False
+        # https://github.com/PaddlePaddle/Paddle/issues/54306  in 2.5rc paddle.set_grad_enabled has bug
+        with paddle.set_grad_enabled(True):
+            latents = latents.detach()
+            latents.stop_gradient = False
 
-        if isinstance(self.scheduler, LMSDiscreteScheduler):
-            sigma = self.scheduler.sigmas[index]
-            # the model input needs to be scaled to match the continuous ODE formulation in K-LMS
-            latent_model_input = latents / ((sigma**2 + 1) ** 0.5)
-        else:
-            latent_model_input = latents
+            if isinstance(self.scheduler, LMSDiscreteScheduler):
+                sigma = self.scheduler.sigmas[index]
+                # the model input needs to be scaled to match the continuous ODE formulation in K-LMS
+                latent_model_input = latents / ((sigma**2 + 1) ** 0.5)
+            else:
+                latent_model_input = latents
 
-        # predict the noise residual
-        noise_pred = self.unet(latent_model_input, timestep, encoder_hidden_states=text_embeddings).sample
+            # predict the noise residual
+            noise_pred = self.unet(latent_model_input, timestep, encoder_hidden_states=text_embeddings).sample
 
-        if isinstance(self.scheduler, (PNDMScheduler, DDIMScheduler)):
-            alpha_prod_t = self.scheduler.alphas_cumprod[timestep]
-            beta_prod_t = 1 - alpha_prod_t
-            # compute predicted original sample from predicted noise also called
-            # "predicted x_0" of formula (12) from https://arxiv.org/pdf/2010.02502.pdf
-            pred_original_sample = (latents - beta_prod_t ** (0.5) * noise_pred) / alpha_prod_t ** (0.5)
+            if isinstance(self.scheduler, (PNDMScheduler, DDIMScheduler)):
+                alpha_prod_t = self.scheduler.alphas_cumprod[timestep]
+                beta_prod_t = 1 - alpha_prod_t
+                # compute predicted original sample from predicted noise also called
+                # "predicted x_0" of formula (12) from https://arxiv.org/pdf/2010.02502.pdf
+                pred_original_sample = (latents - beta_prod_t ** (0.5) * noise_pred) / alpha_prod_t ** (0.5)
 
-            fac = paddle.sqrt(beta_prod_t)
-            sample = pred_original_sample * (fac) + latents * (1 - fac)
-        elif isinstance(self.scheduler, LMSDiscreteScheduler):
-            sigma = self.scheduler.sigmas[index]
-            sample = latents - sigma * noise_pred
-        else:
-            raise ValueError(f"scheduler type {type(self.scheduler)} not supported")
+                fac = paddle.sqrt(beta_prod_t)
+                sample = pred_original_sample * (fac) + latents * (1 - fac)
+            elif isinstance(self.scheduler, LMSDiscreteScheduler):
+                sigma = self.scheduler.sigmas[index]
+                sample = latents - sigma * noise_pred
+            else:
+                raise ValueError(f"scheduler type {type(self.scheduler)} not supported")
 
-        sample = 1 / 0.18215 * sample
-        image = self.vae.decode(sample).sample
-        image = (image / 2 + 0.5).clip(0, 1)
+            sample = 1 / 0.18215 * sample
+            image = self.vae.decode(sample).sample
+            image = (image / 2 + 0.5).clip(0, 1)
 
-        if use_cutouts:
-            image = self.make_cutouts(image, num_cutouts)
-        else:
-            resize_transform = transforms.Resize(self.cut_out_size)
-            image = paddle.stack([resize_transform(img) for img in image], axis=0)
-        image = self.normalize(image).astype(latents.dtype)
+            if use_cutouts:
+                image = self.make_cutouts(image, num_cutouts)
+            else:
+                resize_transform = transforms.Resize(self.cut_out_size)
+                image = paddle.stack([resize_transform(img) for img in image], axis=0)
+            image = self.normalize(image).astype(latents.dtype)
 
-        image_embeddings_clip = self.clip_model.get_image_features(image)
-        image_embeddings_clip = image_embeddings_clip / image_embeddings_clip.norm(p=2, axis=-1, keepdim=True)
+            image_embeddings_clip = self.clip_model.get_image_features(image)
+            image_embeddings_clip = image_embeddings_clip / image_embeddings_clip.norm(p=2, axis=-1, keepdim=True)
 
-        if use_cutouts:
-            dists = spherical_dist_loss(image_embeddings_clip, text_embeddings_clip)
-            dists = dists.reshape([num_cutouts, sample.shape[0], -1])
-            loss = dists.sum(2).mean(0).sum() * clip_guidance_scale
-        else:
-            loss = spherical_dist_loss(image_embeddings_clip, text_embeddings_clip).mean() * clip_guidance_scale
+            if use_cutouts:
+                dists = spherical_dist_loss(image_embeddings_clip, text_embeddings_clip)
+                dists = dists.reshape([num_cutouts, sample.shape[0], -1])
+                loss = dists.sum(2).mean(0).sum() * clip_guidance_scale
+            else:
+                loss = spherical_dist_loss(image_embeddings_clip, text_embeddings_clip).mean() * clip_guidance_scale
 
-        grads = -paddle.autograd.grad(loss, latents)[0]
+            grads = -paddle.autograd.grad(loss, latents)[0]
 
-        if isinstance(self.scheduler, LMSDiscreteScheduler):
-            latents = latents.detach() + grads * (sigma**2)
-            noise_pred = noise_pred_original
-        else:
-            noise_pred = noise_pred_original - paddle.sqrt(beta_prod_t) * grads
-        return noise_pred, latents
+            if isinstance(self.scheduler, LMSDiscreteScheduler):
+                latents = latents.detach() + grads * (sigma**2)
+                noise_pred = noise_pred_original
+            else:
+                noise_pred = noise_pred_original - paddle.sqrt(beta_prod_t) * grads
+            return noise_pred, latents
 
     @paddle.no_grad()
     def __call__(

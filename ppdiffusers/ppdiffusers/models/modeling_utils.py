@@ -16,7 +16,7 @@
 
 import os
 from functools import partial
-from typing import Callable, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 import paddle
 import paddle.nn as nn
@@ -27,6 +27,7 @@ from ..utils import (
     FROM_DIFFUSERS,
     FROM_HF_HUB,
     HF_HUB_OFFLINE,
+    LOW_CPU_MEM_USAGE_DEFAULT,
     PADDLE_WEIGHTS_NAME,
     PPDIFFUSERS_CACHE,
     TO_DIFFUSERS,
@@ -34,8 +35,11 @@ from ..utils import (
     TORCH_WEIGHTS_NAME,
     _add_variant,
     _get_model_file,
+    deprecate,
+    is_paddlenlp_available,
     is_safetensors_available,
     is_torch_available,
+    is_torch_file,
     logging,
     smart_load,
 )
@@ -57,19 +61,33 @@ if is_safetensors_available():
 if is_torch_available():
     import torch
 
+if is_paddlenlp_available:
+    try:
+        from paddlenlp.transformers.model_utils import no_init_weights
+    except ImportError:
+        from ..utils.paddle_utils import no_init_weights
+
 
 def get_parameter_device(parameter: nn.Layer):
     try:
+        # TODO https://github.com/huggingface/diffusers/compare/v0.15.0...v0.16.0#diff-6a3b9a08c1d37dbc341131632415fea800af242a84fb31f1bcd40d725e2eeeebR64
         return next(parameter.named_parameters())[1].place
     except StopIteration:
-        return paddle.get_device()
+        try:
+            return next(parameter.named_buffers())[1].place
+        except StopIteration:
+            return paddle.get_device()
 
 
 def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
     try:
+        # TODO https://github.com/huggingface/diffusers/compare/v0.15.0...v0.16.0#diff-6a3b9a08c1d37dbc341131632415fea800af242a84fb31f1bcd40d725e2eeeebR80
         return next(parameter.named_parameters())[1].dtype
     except StopIteration:
-        return parameter._dtype
+        try:
+            return next(parameter.named_buffers())[1].dtype
+        except StopIteration:
+            return parameter._dtype
 
 
 def convert_state_dict(state_dict, framework="torch"):
@@ -93,6 +111,27 @@ def convert_state_dict(state_dict, framework="torch"):
         raise NotImplementedError(f"Not Implemented {framework} framework!")
 
 
+from contextlib import ExitStack
+
+
+class ContextManagers:
+    """
+    Wrapper for `contextlib.ExitStack` which enters a collection of context managers. Adaptation of `ContextManagers`
+    in the `fastcore` library.
+    """
+
+    def __init__(self, context_managers):
+        self.context_managers = context_managers
+        self.stack = ExitStack()
+
+    def __enter__(self):
+        for context_manager in self.context_managers:
+            self.stack.enter_context(context_manager)
+
+    def __exit__(self, *args, **kwargs):
+        self.stack.__exit__(*args, **kwargs)
+
+
 class ModelMixin(nn.Layer):
     r"""
     Base class for all models.
@@ -109,6 +148,24 @@ class ModelMixin(nn.Layer):
 
     def __init__(self):
         super().__init__()
+
+    def __getattr__(self, name: str) -> Any:
+        """The only reason we overwrite `getattr` here is to gracefully deprecate accessing
+        config attributes directly. See https://github.com/huggingface/diffusers/pull/3129 We need to overwrite
+        __getattr__ here in addition so that we don't trigger `nn.Layer`'s __getattr__':
+        https://pytorch.org/docs/stable/_modules/torch/nn/modules/module.html#Module
+        """
+
+        is_in_config = "_internal_dict" in self.__dict__ and hasattr(self.__dict__["_internal_dict"], name)
+        is_attribute = name in self.__dict__
+
+        if is_in_config and not is_attribute:
+            deprecation_message = f"Accessing config attribute `{name}` directly via '{type(self).__name__}' object attribute is deprecated. Please access '{name}' over '{type(self).__name__}'s config object instead, e.g. 'unet.config.{name}'."
+            deprecate("direct config name access", "1.0.0", deprecation_message, standard_warn=False, stacklevel=3)
+            return self._internal_dict[name]
+
+        # call PyTorch's https://pytorch.org/docs/stable/_modules/torch/nn/modules/module.html#Module
+        return super().__getattr__(name)
 
     @property
     def is_gradient_checkpointing(self) -> bool:
@@ -198,7 +255,7 @@ class ModelMixin(nn.Layer):
         save_directory: Union[str, os.PathLike],
         is_main_process: bool = True,
         save_function: Callable = None,
-        safe_serialization: bool = True,
+        safe_serialization: bool = False,
         variant: Optional[str] = None,
         to_diffusers: Optional[bool] = None,
     ):
@@ -221,7 +278,7 @@ class ModelMixin(nn.Layer):
                 If specified, weights are saved in the format pytorch_model.<variant>.bin.
             to_diffusers (`bool`, *optional*, defaults to `False`):
                 If specified, weights are saved in the format of torch. eg. linear need transpose.
-            safe_serialization (`bool`, *optional*, defaults to `True`):
+            safe_serialization (`bool`, *optional*, defaults to `False`):
                 Only when `to_diffusers` is True, Whether to save the model using `safetensors` or the traditional PyTorch way (that uses `pickle`).
         """
         if to_diffusers is None:
@@ -240,7 +297,7 @@ class ModelMixin(nn.Layer):
         # Attach architecture to the config
         # Save the config
         if is_main_process:
-            model_to_save.save_config(save_directory)
+            model_to_save.save_config(save_directory, to_diffusers=to_diffusers)
 
         # Save the model
         state_dict = model_to_save.state_dict()
@@ -342,6 +399,10 @@ class ModelMixin(nn.Layer):
             variant (`str`, *optional*):
                 If specified load weights from `variant` filename, *e.g.* pytorch_model.<variant>.bin.
                 model_state.<variant>.pdparams.
+            use_safetensors (`bool`, *optional* ):
+                If set to `True`, the pipeline will forcibly load the models from `safetensors` weights. If set to
+                `None` (the default). The pipeline will load using `safetensors` if safetensors weights are available
+                *and* if `safetensors` is installed. If the to `False` the pipeline will *not* use `safetensors`.
 
         <Tip>
 
@@ -367,20 +428,32 @@ class ModelMixin(nn.Layer):
         paddle_dtype = kwargs.pop("paddle_dtype", None)
         subfolder = kwargs.pop("subfolder", None)
         ignore_keys = kwargs.pop("ignore_keys", None)
+        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", LOW_CPU_MEM_USAGE_DEFAULT)
         variant = kwargs.pop("variant", None)
+        use_safetensors = kwargs.pop("use_safetensors", None)
+
+        if from_diffusers and use_safetensors and not is_safetensors_available():
+            raise ValueError(
+                "`use_safetensors`=True but safetensors is not installed. Please install safetensors with `pip install safetenstors"
+            )
+        if use_safetensors is None:
+            use_safetensors = is_safetensors_available()
+
+        # Load config if we don't provide a configuration
+        config_path = pretrained_model_name_or_path
 
         user_agent = {
             "ppdiffusers": __version__,
             "file_type": "model",
-            "framework": "paddle",
+            "framework": "pytorch" if from_diffusers else "paddle",
         }
 
-        # Load config if we don't provide a configuration
-        config_path = pretrained_model_name_or_path
-        config, unused_kwargs = cls.load_config(
+        # load config
+        config, unused_kwargs, commit_hash = cls.load_config(
             config_path,
             cache_dir=cache_dir,
             return_unused_kwargs=True,
+            return_commit_hash=True,
             force_download=force_download,
             resume_download=resume_download,
             proxies=proxies,
@@ -388,16 +461,16 @@ class ModelMixin(nn.Layer):
             use_auth_token=use_auth_token,
             revision=revision,
             subfolder=subfolder,
+            user_agent=user_agent,
             from_hf_hub=from_hf_hub,  # whether or not from_hf_hub
             **kwargs,
         )
-        model = cls.from_config(config, **unused_kwargs)
 
         # This variable will flag if we're loading a sharded checkpoint. In this case the archive file is just the
         # Load model
         model_file = None
         if from_diffusers:
-            if is_safetensors_available():
+            if use_safetensors:
                 try:
                     model_file = _get_model_file(
                         pretrained_model_name_or_path,
@@ -411,9 +484,13 @@ class ModelMixin(nn.Layer):
                         revision=revision,
                         subfolder=subfolder,
                         user_agent=user_agent,
+                        commit_hash=commit_hash,
                         from_hf_hub=from_hf_hub,
                     )
-                except Exception:  # noqa: E722
+                    # try load model_file with paddle / torch / safetensor
+                    state_dict = smart_load(model_file)
+                except Exception:
+                    model_file = None
                     pass
             if model_file is None:
                 model_file = _get_model_file(
@@ -428,8 +505,11 @@ class ModelMixin(nn.Layer):
                     revision=revision,
                     subfolder=subfolder,
                     user_agent=user_agent,
+                    commit_hash=commit_hash,
                     from_hf_hub=from_hf_hub,
                 )
+                # try load model_file with paddle / torch / safetensor
+                state_dict = smart_load(model_file)
         else:
             model_file = _get_model_file(
                 pretrained_model_name_or_path,
@@ -443,15 +523,45 @@ class ModelMixin(nn.Layer):
                 revision=revision,
                 subfolder=subfolder,
                 user_agent=user_agent,
+                commit_hash=commit_hash,
                 from_hf_hub=from_hf_hub,
             )
-        assert model_file is not None
+            # try load model_file with paddle / torch / safetensor
+            state_dict = smart_load(model_file)
 
-        # try load model_file with paddle / torch / safetensor
-        state_dict = smart_load(model_file)
+        init_contexts = []
+
+        dtype = set(v.dtype for v in state_dict.values() if paddle.is_tensor(v) and paddle.is_floating_point(v))
+        if len(dtype) > 1 and paddle.float32 not in dtype:
+            raise ValueError(
+                f"The weights of the model file {model_file} have a mixture of incompatible dtypes {dtype}. Please"
+                f" make sure that {model_file} weights have only one dtype."
+            )
+        elif len(dtype) > 1 and paddle.float32 in dtype:
+            dtype = paddle.float32
+        elif len(dtype) == 0:
+            dtype = paddle.float32
+        else:
+            dtype = dtype.pop()
+
+        # for
+        if "uint8" in str(dtype):
+            state_dict = {k: v.astype("float32") for k, v in state_dict.items()}
+            dtype = paddle.float32
+
+        init_contexts.append(paddle.dtype_guard(dtype))
+
+        if low_cpu_mem_usage:
+            # Instantiate model.
+            init_contexts.append(no_init_weights(_enable=True))
+            if hasattr(paddle, "LazyGuard"):
+                init_contexts.append(paddle.LazyGuard())
+
+        with ContextManagers(init_contexts):
+            model = cls.from_config(config, **unused_kwargs)
 
         # convert weights
-        if from_diffusers:
+        if from_diffusers or is_torch_file(model_file):
             state_dict = convert_pytorch_state_dict_to_paddle(state_dict, model)
 
         # remove keys
@@ -462,18 +572,6 @@ class ModelMixin(nn.Layer):
                     if k.startswith(ik):
                         logger.warning("Deleting key {} from state_dict.".format(k))
                         del state_dict[k]
-
-        dtype = set(v.dtype for v in state_dict.values())
-        if len(dtype) > 1 and paddle.float32 not in dtype:
-            raise ValueError(
-                f"The weights of the model file {model_file} have a mixture of incompatible dtypes {dtype}. Please"
-                f" make sure that {model_file} weights have only one dtype."
-            )
-        elif len(dtype) > 1 and paddle.float32 in dtype:
-            dtype = paddle.float32
-        else:
-            dtype = dtype.pop()
-        model = model.to(dtype=dtype)
 
         model, missing_keys, unexpected_keys, mismatched_keys, error_msgs = cls._load_pretrained_model(
             model,
@@ -490,11 +588,11 @@ class ModelMixin(nn.Layer):
             "error_msgs": error_msgs,
         }
 
-        if paddle_dtype is not None and not isinstance(paddle_dtype, paddle.dtype):
-            raise ValueError(
-                f"{paddle_dtype} needs to be of type `paddle.dtype`, e.g. `paddle.float16`, but is {type(paddle_dtype)}."
-            )
-        elif paddle_dtype is not None:
+        # if paddle_dtype is not None and not isinstance(paddle_dtype, paddle.dtype):
+        #     raise ValueError(
+        #         f"{paddle_dtype} needs to be of type `paddle.dtype`, e.g. `paddle.float16`, but is {type(paddle_dtype)}."
+        #     )
+        if paddle_dtype is not None:
             model = model.to(dtype=paddle_dtype)
 
         model.register_to_config(_name_or_path=pretrained_model_name_or_path)
@@ -517,7 +615,7 @@ class ModelMixin(nn.Layer):
     ):
         # Retrieve missing & unexpected_keys
         model_state_dict = model.state_dict()
-        loaded_keys = [k for k in state_dict.keys()]
+        loaded_keys = list(state_dict.keys())
 
         expected_keys = list(model_state_dict.keys())
 
@@ -536,17 +634,18 @@ class ModelMixin(nn.Layer):
             ignore_mismatched_sizes,
         ):
             mismatched_keys = []
-            if ignore_mismatched_sizes:
-                for checkpoint_key in loaded_keys:
-                    model_key = checkpoint_key
+            for checkpoint_key in loaded_keys:
+                model_key = checkpoint_key
 
-                    if model_key in model_state_dict and list(state_dict[checkpoint_key].shape) != list(
-                        model_state_dict[model_key].shape
-                    ):
-                        mismatched_keys.append(
-                            (checkpoint_key, state_dict[checkpoint_key].shape, model_state_dict[model_key].shape)
-                        )
-                        del state_dict[checkpoint_key]
+                if model_key in model_state_dict and list(state_dict[checkpoint_key].shape) != list(
+                    model_state_dict[model_key].shape
+                ):
+                    mismatched_keys.append(
+                        (checkpoint_key, state_dict[checkpoint_key].shape, model_state_dict[model_key].shape)
+                    )
+                    del state_dict[checkpoint_key]
+            if ignore_mismatched_sizes:
+                mismatched_keys = []
             return mismatched_keys
 
         if state_dict is not None:
@@ -557,7 +656,11 @@ class ModelMixin(nn.Layer):
                 original_loaded_keys,
                 ignore_mismatched_sizes,
             )
-            error_msgs = ""
+            error_msgs = []
+            for key_name, loaded_shape, model_shape in mismatched_keys:
+                error_msgs.append(
+                    f"Error size mismatch, {key_name} receives a shape {loaded_shape}, but the expected shape is {model_shape}."
+                )
             model_to_load.load_dict(state_dict)
 
         if len(error_msgs) > 0:

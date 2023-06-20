@@ -1,5 +1,6 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2023 The HuggingFace Team. All rights reserved.
+# Copyright 2023 Alibaba DAMO-VILAB and The HuggingFace Team. All rights reserved.
+# Copyright 2023 The ModelScope Team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -20,7 +20,9 @@ import paddle
 import paddle.nn as nn
 
 from ..configuration_utils import ConfigMixin, register_to_config
+from ..loaders import UNet2DConditionLoadersMixin
 from ..utils import BaseOutput, logging
+from .attention_processor import AttentionProcessor, AttnProcessor
 from .embeddings import TimestepEmbedding, Timesteps
 from .modeling_utils import ModelMixin
 from .transformer_temporal import TransformerTemporalModel
@@ -48,8 +50,8 @@ class UNet3DConditionOutput(BaseOutput):
     sample: paddle.Tensor
 
 
-class UNet3DConditionModel(ModelMixin, ConfigMixin):
-    """
+class UNet3DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin):
+    r"""
     UNet3DConditionModel is a conditional 2D UNet model that takes in a noisy sample, conditional state, and a timestep
     and returns sample shaped output.
 
@@ -105,6 +107,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
     ):
         super().__init__()
         self.sample_size = sample_size
+        # Check inputs
         if len(down_block_types) != len(up_block_types):
             raise ValueError(
                 f"Must provide the same number of `down_block_types` as `up_block_types`. `down_block_types`: {down_block_types}. `up_block_types`: {up_block_types}."
@@ -126,20 +129,28 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             kernel_size=conv_in_kernel,
             padding=conv_in_padding,
         )
+        # time
         time_embed_dim = block_out_channels[0] * 4
         self.time_proj = Timesteps(block_out_channels[0], True, 0)
         timestep_input_dim = block_out_channels[0]
-        self.time_embedding = TimestepEmbedding(timestep_input_dim, time_embed_dim, act_fn=act_fn)
+        self.time_embedding = TimestepEmbedding(
+            timestep_input_dim,
+            time_embed_dim,
+            act_fn=act_fn,
+        )
         self.transformer_in = TransformerTemporalModel(
             num_attention_heads=8,
             attention_head_dim=attention_head_dim,
             in_channels=block_out_channels[0],
             num_layers=1,
         )
+        # class embedding
         self.down_blocks = nn.LayerList(sublayers=[])
         self.up_blocks = nn.LayerList(sublayers=[])
         if isinstance(attention_head_dim, int):
             attention_head_dim = (attention_head_dim,) * len(down_block_types)
+
+        # down
         output_channel = block_out_channels[0]
         for i, down_block_type in enumerate(down_block_types):
             input_channel = output_channel
@@ -161,6 +172,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
                 dual_cross_attention=False,
             )
             self.down_blocks.append(down_block)
+        # mid
         self.mid_block = UNetMidBlock3DCrossAttn(
             in_channels=block_out_channels[-1],
             temb_channels=time_embed_dim,
@@ -172,7 +184,9 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             resnet_groups=norm_num_groups,
             dual_cross_attention=False,
         )
+        # count how many layers upsample the images
         self.num_upsamplers = 0
+        # up
         reversed_block_out_channels = list(reversed(block_out_channels))
         reversed_attention_head_dim = list(reversed(attention_head_dim))
         output_channel = reversed_block_out_channels[0]
@@ -181,6 +195,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             prev_output_channel = output_channel
             output_channel = reversed_block_out_channels[i]
             input_channel = reversed_block_out_channels[min(i + 1, len(block_out_channels) - 1)]
+            # add upsample block for all BUT final layer
             if not is_final_block:
                 add_upsample = True
                 self.num_upsamplers += 1
@@ -205,11 +220,9 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             prev_output_channel = output_channel
         if norm_num_groups is not None:
             self.conv_norm_out = nn.GroupNorm(
-                num_groups=norm_num_groups,
                 num_channels=block_out_channels[0],
+                num_groups=norm_num_groups,
                 epsilon=norm_eps,
-                weight_attr=None,
-                bias_attr=None,
             )
             self.conv_act = nn.Silu()
         else:
@@ -223,8 +236,34 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             padding=conv_out_padding,
         )
 
-    def set_attention_slice(self, slice_size):
+    @property
+    # Copied from ppdiffusers.models.unet_2d_condition.UNet2DConditionModel.attn_processors
+    def attn_processors(self) -> Dict[str, AttentionProcessor]:
+        r"""
+        Returns:
+            `dict` of attention processors: A dictionary containing all attention processors used in the model with
+            indexed by its weight name.
         """
+        # set recursively
+        processors = {}
+
+        def fn_recursive_add_processors(name: str, module: nn.Layer, processors: Dict[str, AttentionProcessor]):
+            if hasattr(module, "set_processor"):
+                processors[f"{name}.processor"] = module.processor
+
+            for sub_name, child in module.named_children():
+                fn_recursive_add_processors(f"{name}.{sub_name}", child, processors)
+
+            return processors
+
+        for name, module in self.named_children():
+            fn_recursive_add_processors(name, module, processors)
+
+        return processors
+
+    # Copied from ppdiffusers.models.unet_2d_condition.UNet2DConditionModel.set_attention_slice
+    def set_attention_slice(self, slice_size):
+        r"""
         Enable sliced attention computation.
 
         When this option is enabled, the attention module will split the input tensor in slices, to compute attention
@@ -233,45 +272,98 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
         Args:
             slice_size (`str` or `int` or `list(int)`, *optional*, defaults to `"auto"`):
                 When `"auto"`, halves the input to the attention heads, so attention will be computed in two steps. If
-                `"max"`, maxium amount of memory will be saved by running only one slice at a time. If a number is
+                `"max"`, maximum amount of memory will be saved by running only one slice at a time. If a number is
                 provided, uses as many slices as `attention_head_dim // slice_size`. In this case, `attention_head_dim`
                 must be a multiple of `slice_size`.
         """
         sliceable_head_dims = []
 
-        def fn_recursive_retrieve_slicable_dims(module: nn.Layer):
+        def fn_recursive_retrieve_sliceable_dims(module: nn.Layer):
             if hasattr(module, "set_attention_slice"):
                 sliceable_head_dims.append(module.sliceable_head_dim)
-            for child in module.children():
-                fn_recursive_retrieve_slicable_dims(child)
 
+            for child in module.children():
+                fn_recursive_retrieve_sliceable_dims(child)
+
+        # retrieve number of attention layers
         for module in self.children():
-            fn_recursive_retrieve_slicable_dims(module)
-        num_slicable_layers = len(sliceable_head_dims)
+            fn_recursive_retrieve_sliceable_dims(module)
+
+        num_sliceable_layers = len(sliceable_head_dims)
+
         if slice_size == "auto":
-            slice_size = [(dim // 2) for dim in sliceable_head_dims]
+            # half the attention head size is usually a good trade-off between
+            # speed and memory
+            slice_size = [dim // 2 for dim in sliceable_head_dims]
         elif slice_size == "max":
-            slice_size = num_slicable_layers * [1]
-        slice_size = num_slicable_layers * [slice_size] if not isinstance(slice_size, list) else slice_size
+            # make smallest slice possible
+            slice_size = num_sliceable_layers * [1]
+
+        slice_size = num_sliceable_layers * [slice_size] if not isinstance(slice_size, list) else slice_size
+
         if len(slice_size) != len(sliceable_head_dims):
             raise ValueError(
-                f"You have provided {len(slice_size)}, but {self.config} has {len(sliceable_head_dims)} different attention layers. Make sure to match `len(slice_size)` to be {len(sliceable_head_dims)}."
+                f"You have provided {len(slice_size)}, but {self.config} has {len(sliceable_head_dims)} different"
+                f" attention layers. Make sure to match `len(slice_size)` to be {len(sliceable_head_dims)}."
             )
+
         for i in range(len(slice_size)):
             size = slice_size[i]
             dim = sliceable_head_dims[i]
             if size is not None and size > dim:
                 raise ValueError(f"size {size} has to be smaller or equal to {dim}.")
 
+        # Recursively walk through all the children.
+        # Any children which exposes the set_attention_slice method
+        # gets the message
         def fn_recursive_set_attention_slice(module: nn.Layer, slice_size: List[int]):
             if hasattr(module, "set_attention_slice"):
                 module.set_attention_slice(slice_size.pop())
+
             for child in module.children():
                 fn_recursive_set_attention_slice(child, slice_size)
 
         reversed_slice_size = list(reversed(slice_size))
         for module in self.children():
             fn_recursive_set_attention_slice(module, reversed_slice_size)
+
+    # Copied from diffusers.models.unet_2d_condition.UNet2DConditionModel.set_attn_processor
+    def set_attn_processor(self, processor: Union[AttentionProcessor, Dict[str, AttentionProcessor]]):
+        r"""
+        Parameters:
+            `processor (`dict` of `AttentionProcessor` or `AttentionProcessor`):
+                The instantiated processor class or a dictionary of processor classes that will be set as the processor
+                of **all** `Attention` layers.
+            In case `processor` is a dict, the key needs to define the path to the corresponding cross attention processor. This is strongly recommended when setting trainable attention processors.:
+
+        """
+        count = len(self.attn_processors.keys())
+
+        if isinstance(processor, dict) and len(processor) != count:
+            raise ValueError(
+                f"A dict of processors was passed, but the number of processors {len(processor)} does not match the"
+                f" number of attention layers: {count}. Please make sure to pass {count} processor classes."
+            )
+
+        def fn_recursive_attn_processor(name: str, module: nn.Layer, processor):
+            if hasattr(module, "set_processor"):
+                if not isinstance(processor, dict):
+                    module.set_processor(processor)
+                else:
+                    module.set_processor(processor.pop(f"{name}.processor"))
+
+            for sub_name, child in module.named_children():
+                fn_recursive_attn_processor(f"{name}.{sub_name}", child, processor)
+
+        for name, module in self.named_children():
+            fn_recursive_attn_processor(name, module, processor)
+
+    # Copied from ppdiffusers.models.unet_2d_condition.UNet2DConditionModel.set_default_attn_processor
+    def set_default_attn_processor(self):
+        """
+        Disables custom attention processors and sets the default attention implementation.
+        """
+        self.set_attn_processor(AttnProcessor())
 
     def _set_gradient_checkpointing(self, module, value=False):
         if isinstance(module, (CrossAttnDownBlock3D, DownBlock3D, CrossAttnUpBlock3D, UpBlock3D)):
@@ -299,7 +391,8 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
                 Whether or not to return a [`models.unet_2d_condition.UNet3DConditionOutput`] instead of a plain tuple.
             cross_attention_kwargs (`dict`, *optional*):
                 A kwargs dictionary that if specified is passed along to the `AttentionProcessor` as defined under
-                `self.processor` in ppdiffusers.cross_attention.
+                `self.processor` in
+                [ppdiffusers.cross_attention](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/cross_attention.py).
 
         Returns:
             [`~models.unet_2d_condition.UNet3DConditionOutput`] or `tuple`:
@@ -308,17 +401,28 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
         """
         # TODO junnyu, add this to support pure fp16
         sample = sample.cast(self.dtype)
+
+        # By default samples have to be AT least a multiple of the overall upsampling factor.
+        # The overall upsampling factor is equal to 2 ** (# num of upsampling layears).
+        # However, the upsampling interpolation output size can be forced to fit any upsampling size
+        # on the fly if necessary.
         default_overall_up_factor = 2**self.num_upsamplers
+
+        # upsample size should be forwarded when sample is not a multiple of `default_overall_up_factor`
         forward_upsample_size = False
         upsample_size = None
+
         if any(s % default_overall_up_factor != 0 for s in sample.shape[-2:]):
             logger.info("Forward upsample size to force interpolation output size.")
             forward_upsample_size = True
+        # prepare attention_mask
         if attention_mask is not None:
-            attention_mask = (1 - attention_mask.astype(sample.dtype)) * -10000.0
-            attention_mask = attention_mask.unsqueeze(axis=1)
+            attention_mask = (1 - attention_mask.cast(sample.dtype)) * -10000.0
+            attention_mask = attention_mask.unsqueeze(1)
+
+        # 1. time
         timesteps = timestep
-        if not paddle.is_tensor(x=timesteps):
+        if not paddle.is_tensor(timesteps):
             if isinstance(timestep, float):
                 dtype = "float64"
             else:
@@ -333,15 +437,22 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             ]
         )
         t_emb = self.time_proj(timesteps)
-        t_emb = t_emb.astype(dtype=self.dtype)
+
+        # timesteps does not contain any weights and will always return f32 tensors
+        # but time_embedding might actually be running in fp16. so we need to cast here.
+        # there might be better ways to encapsulate this.
+        t_emb = t_emb.cast(dtype=self.dtype)
         emb = self.time_embedding(t_emb, timestep_cond)
         emb = emb.repeat_interleave(repeats=num_frames, axis=0)
         encoder_hidden_states = encoder_hidden_states.repeat_interleave(repeats=num_frames, axis=0)
-        sample = sample.transpose(perm=[0, 2, 1, 3, 4]).reshape(
+        sample = sample.transpose([0, 2, 1, 3, 4]).reshape(
             (sample.shape[0] * num_frames, -1) + tuple(sample.shape[3:])
         )
         sample = self.conv_in(sample)
-        sample = self.transformer_in(sample, num_frames=num_frames).sample
+        sample = self.transformer_in(
+            sample, num_frames=num_frames, cross_attention_kwargs=cross_attention_kwargs
+        ).sample
+        # 3. down
         down_block_res_samples = (sample,)
         for downsample_block in self.down_blocks:
             if hasattr(downsample_block, "has_cross_attention") and downsample_block.has_cross_attention:
@@ -364,6 +475,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
                 down_block_res_sample = down_block_res_sample + down_block_additional_residual
                 new_down_block_res_samples += (down_block_res_sample,)
             down_block_res_samples = new_down_block_res_samples
+        # 4. mid
         if self.mid_block is not None:
             sample = self.mid_block(
                 sample,
@@ -375,10 +487,13 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
             )
         if mid_block_additional_residual is not None:
             sample = sample + mid_block_additional_residual
+        # 5. up
         for i, upsample_block in enumerate(self.up_blocks):
             is_final_block = i == len(self.up_blocks) - 1
             res_samples = down_block_res_samples[-len(upsample_block.resnets) :]
             down_block_res_samples = down_block_res_samples[: -len(upsample_block.resnets)]
+            # if we have not reached the final block and need to forward the
+            # upsample size, we do it here
             if not is_final_block and forward_upsample_size:
                 upsample_size = down_block_res_samples[-1].shape[2:]
             if hasattr(upsample_block, "has_cross_attention") and upsample_block.has_cross_attention:
@@ -400,11 +515,13 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
                     upsample_size=upsample_size,
                     num_frames=num_frames,
                 )
+        # 6. post-process
         if self.conv_norm_out:
             sample = self.conv_norm_out(sample)
             sample = self.conv_act(sample)
         sample = self.conv_out(sample)
-        sample = sample[(None), :].reshape((-1, num_frames) + tuple(sample.shape[1:])).transpose(perm=[0, 2, 1, 3, 4])
+        # reshape to (batch, channel, framerate, width, height)
+        sample = sample[None, :].reshape((-1, num_frames) + tuple(sample.shape[1:])).transpose([0, 2, 1, 3, 4])
         if not return_dict:
             return (sample,)
         return UNet3DConditionOutput(sample=sample)

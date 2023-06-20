@@ -18,11 +18,6 @@ import unittest
 
 import numpy as np
 import paddle
-from ppdiffusers_test.pipeline_params import (
-    TEXT_TO_IMAGE_BATCH_PARAMS,
-    TEXT_TO_IMAGE_PARAMS,
-)
-from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
 
 from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
@@ -33,6 +28,9 @@ from ppdiffusers import (
 )
 from ppdiffusers.utils import load_numpy, slow
 from ppdiffusers.utils.testing_utils import require_paddle_gpu
+
+from ..pipeline_params import TEXT_TO_IMAGE_BATCH_PARAMS, TEXT_TO_IMAGE_PARAMS
+from ..test_pipelines_common import PipelineTesterMixin
 
 
 class StableDiffusionAttendAndExcitePipelineFastTests(PipelineTesterMixin, unittest.TestCase):
@@ -124,15 +122,15 @@ class StableDiffusionAttendAndExcitePipelineFastTests(PipelineTesterMixin, unitt
         self.assertEqual(image.shape, (1, 64, 64, 3))
         expected_slice = np.array(
             [
-                0.14484110474586487,
-                0.16710084676742554,
-                0.3591206669807434,
-                0.30512064695358276,
-                0.2687497138977051,
-                0.4805506765842438,
-                0.20869559049606323,
-                0.12253415584564209,
-                0.3426440954208374,
+                0.33271241188049316,
+                0.3123358190059662,
+                0.44427454471588135,
+                0.08615309000015259,
+                0.26107650995254517,
+                0.4551312029361725,
+                0.06545555591583252,
+                0.1626836657524109,
+                0.3982071578502655,
             ]
         )
         max_diff = np.abs(image_slice.flatten() - expected_slice).max()

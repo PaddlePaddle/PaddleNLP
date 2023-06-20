@@ -276,6 +276,15 @@ def upsample_2d_forward(self, hidden_states, output_size=None):
     return output
 
 
+try:
+    # in ppdiffusers 0.16.1, we need patch `Attention`
+    from ppdiffusers.models.attention_processor import Attention
+
+    if not hasattr(Attention, "original_forward"):
+        Attention.original_forward = Attention.forward
+    Attention.forward = self_attn_forward
+except ImportError:
+    pass
 if not hasattr(CrossAttention, "original_forward"):
     CrossAttention.original_forward = CrossAttention.forward
 if not hasattr(Transformer2DModel, "original_forward"):
@@ -1049,7 +1058,7 @@ class ReferenceOnlyPipeline(DiffusionPipeline):
                     )
                     chunk_num = 2 if do_classifier_free_guidance else 1
                     noise_pred = self.unet(
-                        paddle.concat([latent_model_input, image_latent_model_input]),
+                        paddle.concat([latent_model_input, image_latent_model_input.cast(latent_model_input.dtype)]),
                         t,
                         encoder_hidden_states=prompt_embeds,
                         cross_attention_kwargs=cross_attention_kwargs,

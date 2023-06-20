@@ -88,7 +88,7 @@ python gradio_shuffle2image.py
 
 作为案例，我们将使用 Fill50K 数据集，带领大家训练 ControlNet 模型。首先我们需要下载数据集。
 ```sh
-wget https://huggingface.co/lllyasviel/ControlNet/resolve/main/training/fill50k.zip
+wget https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/fill50k.zip
 unzip -o fill50k.zip
 ```
 注意：下面的代码需要在32G V100上才可以正常运行。
