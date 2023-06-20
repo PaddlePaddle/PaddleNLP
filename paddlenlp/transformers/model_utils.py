@@ -1380,6 +1380,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         subfolder: str = "",
         config: PretrainedConfig = None,
         convert_from_torch: bool = False,
+        use_safetensors: bool | None = None,
         variant=None,
     ) -> str:
 
@@ -1423,14 +1424,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             # pretrained_model_name_or_path is dir
             if is_local:
-                if is_safetensors_available() and os.path.isfile(
+                if use_safetensors is not False and os.path.isfile(
                     os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(SAFE_WEIGHTS_NAME, variant))
                 ):
                     # Load from a safetensors checkpoint
                     archive_file = os.path.join(
                         pretrained_model_name_or_path, subfolder, _add_variant(SAFE_WEIGHTS_NAME, variant)
                     )
-                elif is_safetensors_available() and os.path.isfile(
+                elif use_safetensors is not False and os.path.isfile(
                     os.path.join(
                         pretrained_model_name_or_path, subfolder, _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant)
                     )
@@ -1492,7 +1493,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 resolved_archive_file = get_path_from_url_with_filelock(pretrained_model_name_or_path)
             else:
                 # set correct filename
-                if is_safetensors_available():
+                if use_safetensors is not False:
                     filename = _add_variant(SAFE_WEIGHTS_NAME, variant)
                 else:
                     filename = _add_variant(PADDLE_WEIGHTS_NAME, variant)
@@ -1533,6 +1534,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         )
                         if resolved_archive_file is not None:
                             is_sharded = True
+                        elif use_safetensors:
+                            raise EnvironmentError(
+                                f" {_add_variant(SAFE_WEIGHTS_NAME, variant)} or {_add_variant(SAFE_WEIGHTS_INDEX_NAME, variant)} and thus cannot be loaded with `safetensors`. Please make sure that the model has been saved with `safe_serialization=True` or do not set `use_safetensors=True`."
+                            )
                         else:
                             # This repo has no safetensors file of any kind, we switch to PyTorch.
                             filename = _add_variant(PADDLE_WEIGHTS_NAME, variant)
@@ -1914,6 +1919,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if load_state_as_np is not None:
             logger.warning("`load_state_as_np` is deprecated,  please delete it!")
 
+        use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
+
         model_kwargs = kwargs
 
         if from_hf_hub:
@@ -1981,6 +1988,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             from_hf_hub=from_hf_hub,
             config=config,
             convert_from_torch=convert_from_torch,
+            use_safetensors=use_safetensors,
             variant=variant,
         )
 
