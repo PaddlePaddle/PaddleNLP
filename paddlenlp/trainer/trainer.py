@@ -570,9 +570,13 @@ class Trainer:
             # todo fix for pipeline_parallel_degree
             parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
             if parts_num > 1:
-                trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype="int64")
+                all_reduce_dtype = "int64"
+                if paddle.get_device().split(":")[0] == "npu":
+                    # TODO(duanyanhui): fix when NPU all_reduce supports int64
+                    all_reduce_dtype = "float32"
+                trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
                 paddle.distributed.all_reduce(trainable_numel_tensor)
-                trainable_numel = trainable_numel_tensor.item() // self.args.dataset_world_size
+                trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
                 # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
                 # so, the trainable numel is a little bigger than real.
                 logger.info(f"  Number of trainable parameters = {trainable_numel} (all devices, roughly)")
