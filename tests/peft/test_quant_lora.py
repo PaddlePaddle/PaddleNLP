@@ -66,6 +66,7 @@ class TestQuantedLoRAModel(unittest.TestCase):
         model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
         lora_model = LoRAModel(model, lora_config)
         q_config = QuantConfig(activation=None, weight=None)
+        q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
         q_config.add_type_config(LoRALinear, weight=FakeQuanterWithAbsMaxObserver(moving_rate=0.9))
         qat = QAT(q_config)
         quant_lora_model = qat.quantize(lora_model)
