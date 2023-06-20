@@ -36,8 +36,8 @@ class AgentStep:
         final_answer_pattern: Optional[str] = None,
         prompt_node_response: str = "",
         transcript: str = "",
-        observation_prefix: str = "Observation: ",
-        llm_prefix: str = "Thought: ",
+        observation_prefix: str = "Observation:",
+        llm_prefix: str = "Thought:",
     ):
         """
         :param current_step: The current step in the execution of the agent.
@@ -123,7 +123,7 @@ class AgentStep:
         :param observation: received observation from the Agent environment.
         """
         self.transcript += (
-            f"{self.prompt_node_response}\n{self.observation_prefix} {observation}\n{self.llm_prefix} "
+            f"{self.prompt_node_response}\n{self.observation_prefix} {observation}\n{self.llm_prefix}"
             if observation
             else self.prompt_node_response
         )
