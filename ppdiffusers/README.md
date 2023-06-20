@@ -20,7 +20,7 @@
 **PPDiffusers**是一款支持多种模态（如文本图像跨模态、图像、语音）扩散模型（Diffusion Model）训练和推理的国产化工具箱，依托于[**PaddlePaddle**](https://www.paddlepaddle.org.cn/)框架和[**PaddleNLP**](https://github.com/PaddlePaddle/PaddleNLP)自然语言处理开发库。
 
 ## News 📢
-* 🔥 **2023.06.19 发布 0.16.1 版本，新增[T2I-Adapter](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/t2i-adapter)，支持训练与推理；ControlNet升级，支持[reference only推理](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/community#controlnet-reference-only)；新增[WebUIStableDiffusionPipeline](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/community#automatic1111-webui-stable-diffusion)，
+* 🔥 **2023.06.20 发布 0.16.1 版本，新增[T2I-Adapter](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/t2i-adapter)，支持训练与推理；ControlNet升级，支持[reference only推理](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/community#controlnet-reference-only)；新增[WebUIStableDiffusionPipeline](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/community#automatic1111-webui-stable-diffusion)，
 支持通过prompt的方式动态加载lora、textual_inversion权重；
 新增[StableDiffusionHiresFixPipeline](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/community#stable-diffusion-with-high-resolution-fixing)，支持高分辨率修复；
 新增关键点控制生成任务评价指标[COCOeval](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/scripts/cocoeval_keypoints_score)；
