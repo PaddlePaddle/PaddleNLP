@@ -603,7 +603,7 @@ class SoftTemplate(Template):
             weight = self.soft_embeddings.weight.clone().detach()
             for soft_id, word_id in soft2word.items():
                 word_id = paddle.to_tensor(word_id)
-                weight[soft_id] = self.word_embeddings(word_id)[0]
+                weight[soft_id] = self.word_embeddings(word_id)
             self.soft_embeddings.weight.set_value(weight)
 
     def _create_soft_encoders(self, output_size: int = None, activation: nn.Layer = None):
