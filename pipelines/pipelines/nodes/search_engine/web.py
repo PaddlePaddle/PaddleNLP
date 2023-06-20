@@ -39,7 +39,7 @@ class WebSearch(BaseComponent):
         self,
         api_key: str,
         top_k: Optional[int] = 10,
-        search_engine_provider: Union[str, SearchEngine] = "SerperDev",
+        search_engine_provider: Union[str, SearchEngine] = "SerpAPI",
         engine: Optional[str] = "google",
         search_engine_kwargs: Optional[Dict[str, Any]] = None,
     ):
