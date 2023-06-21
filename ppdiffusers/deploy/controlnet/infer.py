@@ -26,7 +26,7 @@ from PIL import Image
 from tqdm.auto import trange
 
 from paddlenlp.trainer.argparser import strtobool
-from ppdiffusers import FastDeployStableDiffusionMegaPipeline
+from ppdiffusers import DiffusionPipeline, FastDeployStableDiffusionMegaPipeline
 from ppdiffusers.utils import load_image
 
 
@@ -110,6 +110,8 @@ def parse_arguments():
     )
     parser.add_argument("--height", type=int, default=512, help="Height of input image")
     parser.add_argument("--width", type=int, default=512, help="Width of input image")
+    parser.add_argument("--hr_resize_height", type=int, default=768, help="HR Height of input image")
+    parser.add_argument("--hr_resize_width", type=int, default=768, help="HR Width of input image")
     parser.add_argument("--is_sd2_0", type=strtobool, default=False, help="Is sd2_0 model?")
     parser.add_argument("--low_threshold", type=int, default=100, help="The value of Canny low threshold.")
     parser.add_argument("--high_threshold", type=int, default=200, help="The value of Canny high threshold.")
@@ -350,7 +352,8 @@ def main(args):
     pipe.change_scheduler(args.scheduler)
     width = args.width
     height = args.height
-
+    hr_resize_width = args.hr_resize_width
+    hr_resize_height = args.hr_resize_height
     if args.task_name in ["text2img_control", "all"]:
         init_image = load_image(
             "https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/control_bird_canny_demo.png"
@@ -475,6 +478,67 @@ def main(args):
         else:
             task_name = args.task_name
         images[0].save(f"{task_name}.png")
+
+    if args.task_name in ["hiresfix_control", "all"]:
+        hiresfix_pipe = DiffusionPipeline.from_pretrained(
+            args.model_dir,
+            vae_encoder=pipe.vae_encoder,
+            vae_decoder=pipe.vae_decoder,
+            text_encoder=pipe.text_encoder,
+            tokenizer=pipe.tokenizer,
+            unet=pipe.unet,
+            scheduler=pipe.scheduler,
+            safety_checker=pipe.safety_checker,
+            feature_extractor=pipe.feature_extractor,
+            requires_safety_checker=pipe.requires_safety_checker,
+            custom_pipeline="pipeline_fastdeploy_stable_diffusion_hires_fix",
+        )
+        # custom_pipeline
+        # https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/examples/community/pipeline_fastdeploy_stable_diffusion_hires_fix.py
+        hiresfix_pipe._progress_bar_config = pipe._progress_bar_config
+        pipe.change_scheduler(args.scheduler.replace("preconfig-", ""))
+        # hiresfix_control
+        init_image = load_image(
+            "https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/control_bird_canny_demo.png"
+        )
+        controlnet_cond = get_canny_image(init_image, args)
+        # hiresfix_control
+        prompt = "a red bird"
+        time_costs = []
+        # warmup
+        hiresfix_pipe(
+            prompt,
+            height=height,
+            width=width,
+            num_inference_steps=20,
+            hires_ratio=0.5,
+            hr_resize_width=hr_resize_width,
+            hr_resize_height=hr_resize_height,
+            enable_hr=True,
+            controlnet_cond=controlnet_cond,
+        )
+        print("==> Test hiresfix_control performance.")
+        for step in trange(args.benchmark_steps):
+            start = time.time()
+            images = hiresfix_pipe(
+                prompt,
+                height=height,
+                width=width,
+                num_inference_steps=args.inference_steps,
+                hires_ratio=0.5,
+                hr_resize_width=hr_resize_width,
+                hr_resize_height=hr_resize_height,
+                enable_hr=True,
+                controlnet_cond=controlnet_cond,
+            ).images
+            latency = time.time() - start
+            time_costs += [latency]
+            # print(f"No {step:3d} time cost: {latency:2f} s")
+        print(
+            f"Mean latency: {np.mean(time_costs):2f} s, p50 latency: {np.percentile(time_costs, 50):2f} s, "
+            f"p90 latency: {np.percentile(time_costs, 90):2f} s, p95 latency: {np.percentile(time_costs, 95):2f} s."
+        )
+        images[0].save("hiresfix_control.png")
 
 
 if __name__ == "__main__":

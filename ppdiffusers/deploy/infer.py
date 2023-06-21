@@ -477,6 +477,8 @@ def main(args):
             requires_safety_checker=pipe.requires_safety_checker,
             custom_pipeline="pipeline_fastdeploy_stable_diffusion_hires_fix",
         )
+        # custom_pipeline
+        # https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/examples/community/pipeline_fastdeploy_stable_diffusion_hires_fix.py
         hiresfix_pipe._progress_bar_config = pipe._progress_bar_config
         pipe.change_scheduler(args.scheduler.replace("preconfig-", ""))
         # hiresfix
