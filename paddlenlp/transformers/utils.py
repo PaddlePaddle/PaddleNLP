@@ -19,6 +19,7 @@ import hashlib
 import importlib
 import inspect
 import os
+import re
 import shutil
 import warnings
 from contextlib import ExitStack
@@ -27,6 +28,7 @@ from typing import TYPE_CHECKING, ContextManager, List, Optional, Type, Union
 
 from filelock import FileLock
 
+from paddlenlp import __version__
 from paddlenlp.utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     download_check,
@@ -41,7 +43,7 @@ if TYPE_CHECKING:
 import numpy as np
 import paddle
 import tqdm
-from huggingface_hub import try_to_load_from_cache
+from huggingface_hub import hf_hub_download, try_to_load_from_cache
 from huggingface_hub.utils import EntryNotFoundError
 from paddle.common_ops_import import convert_dtype
 from paddle.nn import Layer
@@ -415,7 +417,7 @@ def paddlenlp_hub_download(
     if is_url(repo_id):
         # check wether the target file exist in the comunity bos server
         if url_file_exists(repo_id):
-            print("Downloading {repo_id}")
+            logger.info(f"Downloading {repo_id}")
             weight_file_path = get_path_from_url_with_filelock(repo_id, cache_dir)
             # # check the downloaded weight file and registered weight file name
             download_check(repo_id, "paddlenlp_hub_download")
@@ -445,7 +447,7 @@ def paddlenlp_hub_download(
 
     # check wether the target file exist in the comunity bos server
     if url_file_exists(community_model_file_path):
-        print("Downloading {community_model_file_path}")
+        logger.info(f"Downloading {community_model_file_path}")
         weight_file_path = get_path_from_url_with_filelock(community_model_file_path, cache_dir)
         # # check the downloaded weight file and registered weight file name
         download_check(community_model_file_path, "paddlenlp_hub_download")
@@ -535,6 +537,59 @@ def cached_file(
         raise EnvironmentError(f"There was a specific connection error when trying to load {path_or_repo_id}:\n{err}")
 
     return resolved_file
+
+
+def cached_file_for_hf_hub(
+    path_or_repo_id: Union[str, os.PathLike],
+    filename: str,
+    cache_dir: Optional[Union[str, os.PathLike]] = None,
+    subfolder: str = "",
+    _raise_exceptions_for_missing_entries: bool = True,
+):
+
+    if subfolder is None:
+        subfolder = ""
+
+    path_or_repo_id = str(path_or_repo_id)
+    full_filename = os.path.join(subfolder, filename)
+    if os.path.isdir(path_or_repo_id):
+        resolved_file = os.path.join(os.path.join(path_or_repo_id, subfolder), filename)
+        if not os.path.isfile(resolved_file):
+            if _raise_exceptions_for_missing_entries:
+                raise EnvironmentError(
+                    f"{path_or_repo_id} does not appear to have a file named {full_filename}. Checkout "
+                    f"'https://huggingface.co/{path_or_repo_id}' for available files."
+                )
+            else:
+                return None
+        return resolved_file
+
+    if cache_dir is None:
+        # cache_dir = TRANSFORMERS_CACHE
+        cache_dir = os.path.join(MODEL_HOME, ".cache")
+    if isinstance(cache_dir, Path):
+        cache_dir = str(cache_dir)
+
+    try:
+        # Load from URL or cache if already cached
+        download_check(path_or_repo_id, full_filename, addition="from_hf_hub")
+        resolved_file = hf_hub_download(
+            repo_id=path_or_repo_id,
+            filename=full_filename,
+            cache_dir=cache_dir,
+            subfolder=subfolder,
+            library_name="PaddleNLP",
+            library_version=__version__,
+        )
+        return resolved_file
+    except Exception as e:
+        print(e)
+        raise EnvironmentError(
+            f"{path_or_repo_id} is not a local folder and is not a valid model identifier "
+            "listed on 'https://huggingface.co/models'\nIf this is a private repository, make sure to "
+            "pass a token having permission to this repo with `use_auth_token` or log in with "
+            "`huggingface-cli login` and pass `use_auth_token=True`."
+        )
 
 
 def get_checkpoint_shard_files(
@@ -691,3 +746,23 @@ def weight_name_suffix():
         return "_".join(name)
     else:
         return None
+
+
+def dtype_byte_size(dtype):
+    """
+    Returns the size (in bytes) occupied by one parameter of type `dtype`.
+
+    Example:
+
+    ```py
+    >>> dtype_byte_size(paddle.float32)
+    4
+    ```
+    """
+    if dtype == paddle.bool:
+        return 1 / 8
+    bit_search = re.search(r"[^\d](\d+)$", str(dtype))
+    if bit_search is None:
+        raise ValueError(f"`dtype` is not a valid dtype: {dtype}.")
+    bit_size = int(bit_search.groups()[0])
+    return bit_size // 8

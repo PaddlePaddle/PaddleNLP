@@ -21,7 +21,8 @@ import os
 import re
 import tempfile
 from contextlib import contextmanager
-from pathlib import Path
+
+# from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
 
 import numpy as np
@@ -31,7 +32,6 @@ import six
 from huggingface_hub import (
     create_repo,
     get_hf_file_metadata,
-    hf_hub_download,
     hf_hub_url,
     repo_type_and_id_from_hf_id,
     upload_folder,
@@ -44,16 +44,10 @@ from paddle.nn import Embedding, Layer
 from paddle.utils.download import is_url as is_remote_url
 from tqdm.auto import tqdm
 
-from paddlenlp import __version__
-from paddlenlp.utils.downloader import (
-    download_check,
-    get_path_from_url_with_filelock,
-    hf_file_exists,
-)
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock, hf_file_exists
 from paddlenlp.utils.env import (
     CONFIG_NAME,
     LEGACY_CONFIG_NAME,
-    MODEL_HOME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
     PYTORCH_WEIGHTS_NAME,
@@ -71,7 +65,9 @@ from .utils import (  # convert_ndarray_dtype,
     InitTrackerMeta,
     adapt_stale_fwd_patch,
     cached_file,
+    cached_file_for_hf_hub,
     convert_file_size_to_int,
+    dtype_byte_size,
     fn_args_to_dict,
     get_checkpoint_shard_files,
     is_paddle_support_lazy_init,
@@ -390,59 +386,6 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike], tensor_parallel_sp
     return state_dict
 
 
-def cached_file_for_hf_hub(
-    path_or_repo_id: Union[str, os.PathLike],
-    filename: str,
-    cache_dir: Optional[Union[str, os.PathLike]] = None,
-    subfolder: str = "",
-    _raise_exceptions_for_missing_entries: bool = True,
-):
-
-    if subfolder is None:
-        subfolder = ""
-
-    path_or_repo_id = str(path_or_repo_id)
-    full_filename = os.path.join(subfolder, filename)
-    if os.path.isdir(path_or_repo_id):
-        resolved_file = os.path.join(os.path.join(path_or_repo_id, subfolder), filename)
-        if not os.path.isfile(resolved_file):
-            if _raise_exceptions_for_missing_entries:
-                raise EnvironmentError(
-                    f"{path_or_repo_id} does not appear to have a file named {full_filename}. Checkout "
-                    f"'https://huggingface.co/{path_or_repo_id}' for available files."
-                )
-            else:
-                return None
-        return resolved_file
-
-    if cache_dir is None:
-        # cache_dir = TRANSFORMERS_CACHE
-        cache_dir = os.path.join(MODEL_HOME, ".cache")
-    if isinstance(cache_dir, Path):
-        cache_dir = str(cache_dir)
-
-    try:
-        # Load from URL or cache if already cached
-        download_check(path_or_repo_id, full_filename, addition="from_hf_hub")
-        resolved_file = hf_hub_download(
-            repo_id=path_or_repo_id,
-            filename=full_filename,
-            cache_dir=cache_dir,
-            subfolder=subfolder,
-            library_name="PaddleNLP",
-            library_version=__version__,
-        )
-        return resolved_file
-    except Exception as e:
-        print(e)
-        raise EnvironmentError(
-            f"{path_or_repo_id} is not a local folder and is not a valid model identifier "
-            "listed on 'https://huggingface.co/models'\nIf this is a private repository, make sure to "
-            "pass a token having permission to this repo with `use_auth_token` or log in with "
-            "`huggingface-cli login` and pass `use_auth_token=True`."
-        )
-
-
 def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conversion: bool, subfolder=None):
     """find the suitable weight file name
 
@@ -513,26 +456,6 @@ class BackboneMixin:
         filtered_kwargs = {k: v for k, v in kwargs.items() if k in signature}
 
         return self(*args, **filtered_kwargs)
-
-
-def dtype_byte_size(dtype):
-    """
-    Returns the size (in bytes) occupied by one parameter of type `dtype`.
-
-    Example:
-
-    ```py
-    >>> dtype_byte_size(paddle.float32)
-    4
-    ```
-    """
-    if dtype == paddle.bool:
-        return 1 / 8
-    bit_search = re.search(r"[^\d](\d+)$", str(dtype))
-    if bit_search is None:
-        raise ValueError(f"`dtype` is not a valid dtype: {dtype}.")
-    bit_size = int(bit_search.groups()[0])
-    return bit_size // 8
 
 
 _re_layer_prefix = re.compile(r"\.(\d+)\.")
@@ -783,48 +706,36 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
 
 
 def _convert_state_dict_dtype(dtype, state_dict, model_to_load):
-    # for now, we suppose the state dict is in cpu tensor or numpy
+    # for now, we suppose the state dict is in paddle.Tensor
     # convert the dtype of state dict
-    # TODO: (@zhui), remove unneed conpy for cast
+    dtype_prefix_len = len("paddle.")
     if dtype is not None:
         if isinstance(dtype, paddle.dtype):
-            dtype = str(dtype)[7:]
+            dtype = str(dtype)[dtype_prefix_len:]
 
         if dtype not in ["float32", "float16", "bfloat16"]:
             raise ValueError(
                 f"the value of `dtype` should be one of [`float32`, `float16`, `bfloat16`], but received {dtype}"
             )
         for key in list(state_dict.keys()):
-            if dtype == "bfloat16":
-                # fix fp32/fp16 cast to bfloat16
-                # so cast numpy to paddle, let paddle handle dtype casting
-                if isinstance(state_dict[key], np.ndarray):
-                    with device_guard("cpu"):
-                        state_dict[key] = paddle.to_tensor(state_dict[key])
-
             if isinstance(state_dict[key], np.ndarray):
-                if isinstance(state_dict[key].dtype.type, np.floating):
-                    state_dict[key] = state_dict[key].astype(dtype=dtype)
-                if isinstance(state_dict[key].dtype, np.uint16):
-                    # paddle.bfloat16 save as np.uint16.
-                    # so cast numpy to paddle, let paddle handle dtype casting
-                    with device_guard("cpu"):
-                        state_dict[key] = paddle.to_tensor(state_dict.pop(key))
+                raise ValueError(
+                    "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, plase convert numpy.ndarray to paddle.Tensor"
+                )
 
             if isinstance(state_dict[key], paddle.Tensor) and state_dict[key].is_floating_point():
-                v_dtype = str(state_dict[key].dtype)[7:]
+                v_dtype = str(state_dict[key].dtype)[dtype_prefix_len:]
                 if v_dtype != dtype:
                     state_dict[key] = paddle.cast(state_dict.pop(key), dtype=dtype)
     else:
-        dtype_prefix_len = len("paddle.")
         for k, v in model_to_load.state_dict().items():
-            if not isinstance(v, np.ndarray):
-                dtype = str(v.dtype)[dtype_prefix_len:]
             if k in state_dict:
-                if isinstance(state_dict[k], np.ndarray):
-                    state_dict[k] = state_dict[k].astype(dtype)
-                else:
-                    state_dict[k] = paddle.cast(state_dict[k], dtype)
+                if isinstance(state_dict[key], np.ndarray):
+                    raise ValueError(
+                        "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, plase convert numpy.ndarray to paddle.Tensor"
+                    )
+                if state_dict[k].dtype != v.dtype:
+                    state_dict[k] = paddle.cast(state_dict.pop(k), v.dtype)
 
 
 def _load_state_dict_into_meta_model(
@@ -1753,7 +1664,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
 
             for shard_file in resolved_archive_file:
-
                 pre_tensor_parallel_split = False
                 if shard_file.endswith(".safetensors") and config.tensor_parallel_degree > 1:
                     pre_tensor_parallel_split = True
