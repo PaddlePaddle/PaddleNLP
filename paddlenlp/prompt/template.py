@@ -602,7 +602,8 @@ class SoftTemplate(Template):
             self.soft_embeddings = nn.Embedding(self.num_soft_token, self.embed_size)
             weight = self.soft_embeddings.weight.clone().detach()
             for soft_id, word_id in soft2word.items():
-                word_id = paddle.to_tensor(word_id)
+                # squeeze() is used here to be backward compatible with 0-D tensor introduced in paddle 2.5
+                word_id = paddle.to_tensor(word_id).squeeze()
                 weight[soft_id] = self.word_embeddings(word_id)
             self.soft_embeddings.weight.set_value(weight)
 
