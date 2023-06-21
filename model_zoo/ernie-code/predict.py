@@ -11,6 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import sys
+
+sys.path.insert(0, "...")
+sys.path.append("/home/PaddleNLP")
 
 import argparse
 
@@ -37,32 +41,14 @@ args = parser.parse_args()
 
 
 def predict():
-    def clean_up_codem_spaces(s: str):
-        # post process
-        # ===========================
-        new_tokens = ["<pad>", "</s>", "<unk>", "\n", "\t", "<|space|>" * 4, "<|space|>" * 2, "<|space|>"]
-        for tok in new_tokens:
-            s = s.replace(f"{tok} ", tok)
-
-        cleaned_tokens = ["<pad>", "</s>", "<unk>"]
-        for tok in cleaned_tokens:
-            s = s.replace(tok, "")
-        s = s.replace("<|space|>", " ")
-        # ===========================
-        return s
-
-    def postprocess_text(preds):
-        preds = [pred.strip() for pred in preds]
-        return preds
-
-    def postprocess_code(preds):
-        preds = [clean_up_codem_spaces(pred).strip() for pred in preds]
-        return preds
 
     paddle.set_device(args.device)
     tokenizer = T5Tokenizer.from_pretrained(args.model_name_or_path)
     model = MT5ForConditionalGeneration.from_pretrained(args.model_name_or_path)
     prefix = args.source_prefix if args.source_prefix is not None else ""
+    import pdb
+
+    pdb.set_trace()
 
     def preprocess_function(inputs, tokenizer):
         inputs = [prefix + inp for inp in inputs]
@@ -87,12 +73,10 @@ def predict():
     )
     if args.target_lang == "text":
         decoded_preds = tokenizer.batch_decode(generated_tokens.numpy(), skip_special_tokens=True)
-        decoded_preds = postprocess_text(decoded_preds)
     elif args.target_lang == "code":
         decoded_preds = tokenizer.batch_decode(
             generated_tokens.numpy(), skip_special_tokens=False, clean_up_tokenization_spaces=False
         )
-        decoded_preds = postprocess_code(decoded_preds)
     print(decoded_preds)
 
 
