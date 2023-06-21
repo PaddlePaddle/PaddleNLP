@@ -271,10 +271,10 @@ class TrainingArguments:
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
         flatten_param_grads (`bool`, *optional*):
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
-        custom_black_list (`List[str]`, *optional*, defaults to `None`):
+        amp_custom_black_list (`List[str]`, *optional*, defaults to `None`):
             The custom black_list. The set of ops that support fp16/bf16 calculation and are considered numerically-dangerous
             and whose effects may also be observed in downstream ops. These ops will not be converted to fp16/bf16.
-        custom_white_list (`List[str]`, *optional*, defaults to `None`):
+        amp_custom_white_list (`List[str]`, *optional*, defaults to `None`):
             The custom white_list. It’s the set of ops that support fp16/bf16 calculation and are considered numerically-safe and
              performance-critical. These ops will be converted to fp16/bf16.
     """
@@ -562,13 +562,13 @@ class TrainingArguments:
         default=True,
         metadata={"help": "Whether use lazy data processing."},
     )
-    custom_black_list: Optional[List[str]] = field(
+    amp_custom_black_list: Optional[List[str]] = field(
         default=None,
         metadata={
             "help": "The set of ops that support fp16/bf16 calculation and are considered numerically-dangerous and whose effects may also be observed in downstream ops."
         },
     )
-    custom_white_list: Optional[List[str]] = field(
+    amp_custom_white_list: Optional[List[str]] = field(
         default=None,
         metadata={
             "help": "The the set of ops that support fp16/bf16 calculation and are considered numerically-safe and performance-critical. These ops will be converted to fp16/bf16."
