@@ -19,13 +19,25 @@ import time
 import paddle
 
 # isort: split
+import cv2
 import fastdeploy as fd
 import numpy as np
+from PIL import Image
 from tqdm.auto import trange
 
 from paddlenlp.trainer.argparser import strtobool
-from ppdiffusers import DiffusionPipeline, FastDeployStableDiffusionMegaPipeline
+from ppdiffusers import FastDeployStableDiffusionMegaPipeline
 from ppdiffusers.utils import load_image
+
+
+def get_canny_image(image, args):
+    if isinstance(image, Image.Image):
+        image = np.array(image)
+    image = cv2.Canny(image, args.low_threshold, args.high_threshold)
+    image = image[:, :, None]
+    image = np.concatenate([image, image, image], axis=2)
+    canny_image = Image.fromarray(image)
+    return canny_image
 
 
 def parse_arguments():
@@ -59,23 +71,20 @@ def parse_arguments():
         ],
         help="The inference runtime device of models.",
     )
-    parser.add_argument("--use_fp16", type=strtobool, default=True, help="Wheter to use FP16 mode")
-    parser.add_argument("--device_id", type=int, default=0, help="The selected gpu id. -1 means use cpu")
     parser.add_argument(
         "--task_name",
         type=str,
-        default="text2img",
+        default="text2img_control",
         choices=[
-            "text2img",
-            "img2img",
-            "inpaint",
-            "inpaint_legacy",
-            "cycle_diffusion",
-            "hiresfix",
+            "text2img_control",
+            "img2img_control",
+            "inpaint_legacy_control",
             "all",
         ],
-        help="The task can be one of [text2img, img2img, inpaint, inpaint_legacy, cycle_diffusion, hiresfix, all]. ",
+        help="The task can be one of [text2img, img2img, inpaint, inpaint_legacy, cycle_diffusion, all]. ",
     )
+    parser.add_argument("--use_fp16", type=strtobool, default=True, help="Wheter to use FP16 mode")
+    parser.add_argument("--device_id", type=int, default=0, help="The selected gpu id. -1 means use cpu")
     parser.add_argument(
         "--scheduler",
         type=str,
@@ -101,10 +110,9 @@ def parse_arguments():
     )
     parser.add_argument("--height", type=int, default=512, help="Height of input image")
     parser.add_argument("--width", type=int, default=512, help="Width of input image")
-    parser.add_argument("--hr_resize_height", type=int, default=768, help="HR Height of input image")
-    parser.add_argument("--hr_resize_width", type=int, default=768, help="HR Width of input image")
     parser.add_argument("--is_sd2_0", type=strtobool, default=False, help="Is sd2_0 model?")
-
+    parser.add_argument("--low_threshold", type=int, default=100, help="The value of Canny low threshold.")
+    parser.add_argument("--high_threshold", type=int, default=200, help="The value of Canny high threshold.")
     return parser.parse_args()
 
 
@@ -202,6 +210,8 @@ def create_trt_runtime(workspace=(1 << 31), dynamic_shape=None, use_fp16=False, 
                 opt_shape=shape_dict.get("opt_shape", None),
                 max_shape=shape_dict.get("max_shape", None),
             )
+    # cache_file = os.path.join(model_dir, model_prefix, "inference.trt")
+    # option.set_trt_cache_file(cache_file)
     return option
 
 
@@ -219,9 +229,9 @@ def main(args):
     max_image_size = 768
     max_image_size = max(min_image_size, max_image_size)
     hidden_states = 1024 if args.is_sd2_0 else 768
-    unet_in_channels = 9 if args.task_name == "inpaint" else 4
+    unet_in_channels = 4
 
-    text_encoder_dynamic_shape = {
+    text_encoder_shape = {
         "input_ids": {
             "min_shape": [1, max_length],
             "max_shape": [1, max_length],
@@ -242,11 +252,10 @@ def main(args):
             "opt_shape": [1, vae_in_channels, min_image_size // 8, min_image_size // 8],
         }
     }
-    bs = 4 if args.task_name == "cycle_diffusion" else 2
     unet_dynamic_shape = {
         "sample": {
             "min_shape": [1, unet_in_channels, min_image_size // 8, min_image_size // 8],
-            "max_shape": [bs, unet_in_channels, max_image_size // 8, max_image_size // 8],
+            "max_shape": [2, unet_in_channels, max_image_size // 8, max_image_size // 8],
             "opt_shape": [2, unet_in_channels, min_image_size // 8, min_image_size // 8],
         },
         "timestep": {
@@ -256,8 +265,18 @@ def main(args):
         },
         "encoder_hidden_states": {
             "min_shape": [1, max_length, hidden_states],
-            "max_shape": [bs, max_length, hidden_states],
+            "max_shape": [2, max_length, hidden_states],
             "opt_shape": [2, max_length, hidden_states],
+        },
+        "controlnet_cond": {
+            "min_shape": [1, 3, min_image_size, min_image_size],
+            "max_shape": [2, 3, max_image_size, max_image_size],
+            "opt_shape": [2, 3, min_image_size, min_image_size],
+        },
+        "controlnet_conditioning_scale": {
+            "min_shape": [13],
+            "max_shape": [13],
+            "opt_shape": [13],
         },
     }
     # 4. Init runtime
@@ -278,7 +297,7 @@ def main(args):
     elif args.backend == "tensorrt":
         runtime_options = dict(
             text_encoder=create_trt_runtime(
-                dynamic_shape=text_encoder_dynamic_shape, use_fp16=args.use_fp16, device_id=args.device_id
+                dynamic_shape=text_encoder_shape, use_fp16=args.use_fp16, device_id=args.device_id
             ),
             vae_encoder=create_trt_runtime(
                 dynamic_shape=vae_encoder_dynamic_shape, use_fp16=args.use_fp16, device_id=args.device_id
@@ -295,7 +314,7 @@ def main(args):
         runtime_options = dict(
             text_encoder=create_paddle_inference_runtime(
                 use_trt=args.use_trt,
-                dynamic_shape=text_encoder_dynamic_shape,
+                dynamic_shape=text_encoder_shape,
                 use_fp16=args.use_fp16,
                 device_id=args.device_id,
                 disable_paddle_trt_ops=["arg_max", "range", "lookup_table_v2"],
@@ -331,44 +350,34 @@ def main(args):
     pipe.change_scheduler(args.scheduler)
     width = args.width
     height = args.height
-    hr_resize_width = args.hr_resize_width
-    hr_resize_height = args.hr_resize_height
 
-    if args.task_name in ["text2img", "all"]:
+    if args.task_name in ["text2img_control", "all"]:
+        init_image = load_image(
+            "https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/control_bird_canny_demo.png"
+        )
+        controlnet_cond = get_canny_image(init_image, args)
         # text2img
-        prompt = "a photo of an astronaut riding a horse on mars"
+        prompt = "bird"
         time_costs = []
         # warmup
-        pipe.text2img(prompt, num_inference_steps=10, height=height, width=width)
-        print("==> Test text2img performance.")
+        pipe.text2img(
+            prompt,
+            num_inference_steps=10,
+            height=height,
+            width=width,
+            controlnet_cond=controlnet_cond,
+            controlnet_conditioning_scale=1.0,
+        )
+        print("==> Test text2img_control performance.")
         for step in trange(args.benchmark_steps):
             start = time.time()
-            images = pipe.text2img(prompt, num_inference_steps=args.inference_steps, height=height, width=width).images
-            latency = time.time() - start
-            time_costs += [latency]
-            # print(f"No {step:3d} time cost: {latency:2f} s")
-        print(
-            f"Mean latency: {np.mean(time_costs):2f} s, p50 latency: {np.percentile(time_costs, 50):2f} s, "
-            f"p90 latency: {np.percentile(time_costs, 90):2f} s, p95 latency: {np.percentile(time_costs, 95):2f} s."
-        )
-        images[0].save("text2img.png")
-
-    if args.task_name in ["img2img", "all"]:
-        pipe.change_scheduler(args.scheduler.replace("preconfig-", ""))
-        # img2img
-        img_url = (
-            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
-        )
-        init_image = load_image(img_url)
-        prompt = "A fantasy landscape, trending on artstation"
-        time_costs = []
-        # warmup
-        pipe.img2img(prompt, image=init_image, num_inference_steps=20, height=height, width=width)
-        print("==> Test img2img performance.")
-        for step in trange(args.benchmark_steps):
-            start = time.time()
-            images = pipe.img2img(
-                prompt, image=init_image, num_inference_steps=args.inference_steps, height=height, width=width
+            images = pipe.text2img(
+                prompt,
+                num_inference_steps=args.inference_steps,
+                height=height,
+                width=width,
+                controlnet_cond=controlnet_cond,
+                controlnet_conditioning_scale=1.0,
             ).images
             latency = time.time() - start
             time_costs += [latency]
@@ -377,9 +386,49 @@ def main(args):
             f"Mean latency: {np.mean(time_costs):2f} s, p50 latency: {np.percentile(time_costs, 50):2f} s, "
             f"p90 latency: {np.percentile(time_costs, 90):2f} s, p95 latency: {np.percentile(time_costs, 95):2f} s."
         )
-        images[0].save("img2img.png")
+        images[0].save("text2img_control.png")
 
-    if args.task_name in ["inpaint", "inpaint_legacy", "all"]:
+    if args.task_name in ["img2img_control", "all"]:
+        pipe.change_scheduler(args.scheduler.replace("preconfig-", ""))
+        img_url = (
+            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
+        )
+        init_image = load_image(img_url)
+        controlnet_cond = get_canny_image(init_image, args)
+        prompt = "A fantasy landscape, trending on artstation"
+        time_costs = []
+        # warmup
+        pipe.img2img(
+            prompt,
+            image=init_image,
+            num_inference_steps=20,
+            height=height,
+            width=width,
+            controlnet_cond=controlnet_cond,
+            controlnet_conditioning_scale=1.0,
+        )
+        print("==> Test img2img_control performance.")
+        for step in trange(args.benchmark_steps):
+            start = time.time()
+            images = pipe.img2img(
+                prompt,
+                image=init_image,
+                num_inference_steps=args.inference_steps,
+                height=height,
+                width=width,
+                controlnet_cond=controlnet_cond,
+                controlnet_conditioning_scale=1.0,
+            ).images
+            latency = time.time() - start
+            time_costs += [latency]
+            # print(f"No {step:3d} time cost: {latency:2f} s")
+        print(
+            f"Mean latency: {np.mean(time_costs):2f} s, p50 latency: {np.percentile(time_costs, 50):2f} s, "
+            f"p90 latency: {np.percentile(time_costs, 90):2f} s, p95 latency: {np.percentile(time_costs, 95):2f} s."
+        )
+        images[0].save("img2img_control.png")
+
+    if args.task_name in ["inpaint_legacy_control", "all"]:
         pipe.change_scheduler(args.scheduler.replace("preconfig-", ""))
         img_url = (
             "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
@@ -387,24 +436,32 @@ def main(args):
         mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
         init_image = load_image(img_url)
         mask_image = load_image(mask_url)
+        controlnet_cond = get_canny_image(init_image, args)
         prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
         time_costs = []
-        # warmup
-        if args.task_name in ["inpaint_legacy", "all"]:
-            call_fn = pipe.inpaint_legacy
-        else:
-            call_fn = pipe.inpaint
-        call_fn(prompt, image=init_image, mask_image=mask_image, num_inference_steps=20, height=height, width=width)
-        print("==> Test inpaint_legacy performance.")
+
+        pipe.inpaint_legacy(
+            prompt,
+            image=init_image,
+            mask_image=mask_image,
+            num_inference_steps=20,
+            height=height,
+            width=width,
+            controlnet_cond=controlnet_cond,
+            controlnet_conditioning_scale=1.0,
+        )
+        print("==> Test inpaint_legacy_control performance.")
         for step in trange(args.benchmark_steps):
             start = time.time()
-            images = call_fn(
+            images = pipe.inpaint_legacy(
                 prompt,
                 image=init_image,
                 mask_image=mask_image,
                 num_inference_steps=args.inference_steps,
                 height=height,
                 width=width,
+                controlnet_cond=controlnet_cond,
+                controlnet_conditioning_scale=1.0,
             ).images
             latency = time.time() - start
             time_costs += [latency]
@@ -414,106 +471,10 @@ def main(args):
             f"p90 latency: {np.percentile(time_costs, 90):2f} s, p95 latency: {np.percentile(time_costs, 95):2f} s."
         )
         if args.task_name == "all":
-            task_name = "inpaint_legacy"
+            task_name = "inpaint_legacy_control"
         else:
             task_name = args.task_name
         images[0].save(f"{task_name}.png")
-
-    if args.task_name in ["cycle_diffusion"]:
-        pipe.change_scheduler(args.scheduler.replace("preconfig-", ""))
-        image_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/ride_on_horse.png"
-        init_image = load_image(image_url)
-        source_prompt = "An astronaut riding a horse"
-        prompt = "An astronaut riding an elephant"
-        time_costs = []
-        # warmup
-        pipe.cycle_diffusion(
-            prompt=prompt,
-            source_prompt=source_prompt,
-            image=init_image,
-            num_inference_steps=10,
-            eta=0.1,
-            strength=0.8,
-            guidance_scale=2,
-            source_guidance_scale=1,
-            height=height,
-            width=width,
-        ).images[0]
-        print("==> Test cycle diffusion performance.")
-        for step in trange(args.benchmark_steps):
-            start = time.time()
-            images = pipe.cycle_diffusion(
-                prompt=prompt,
-                source_prompt=source_prompt,
-                image=init_image,
-                num_inference_steps=args.inference_steps,
-                eta=0.1,
-                strength=0.8,
-                guidance_scale=2,
-                source_guidance_scale=1,
-                height=height,
-                width=width,
-            ).images
-            latency = time.time() - start
-            time_costs += [latency]
-            # print(f"No {step:3d} time cost: {latency:2f} s")
-        print(
-            f"Mean latency: {np.mean(time_costs):2f} s, p50 latency: {np.percentile(time_costs, 50):2f} s, "
-            f"p90 latency: {np.percentile(time_costs, 90):2f} s, p95 latency: {np.percentile(time_costs, 95):2f} s."
-        )
-        images[0].save("cycle_diffusion.png")
-
-    if args.task_name in ["hiresfix", "all"]:
-        hiresfix_pipe = DiffusionPipeline.from_pretrained(
-            args.model_dir,
-            vae_encoder=pipe.vae_encoder,
-            vae_decoder=pipe.vae_decoder,
-            text_encoder=pipe.text_encoder,
-            tokenizer=pipe.tokenizer,
-            unet=pipe.unet,
-            scheduler=pipe.scheduler,
-            safety_checker=pipe.safety_checker,
-            feature_extractor=pipe.feature_extractor,
-            requires_safety_checker=pipe.requires_safety_checker,
-            custom_pipeline="pipeline_fastdeploy_stable_diffusion_hires_fix",
-        )
-        hiresfix_pipe._progress_bar_config = pipe._progress_bar_config
-        pipe.change_scheduler(args.scheduler.replace("preconfig-", ""))
-        # hiresfix
-        prompt = "a photo of an astronaut riding a horse on mars"
-        time_costs = []
-        # warmup
-        hiresfix_pipe(
-            prompt,
-            height=height,
-            width=width,
-            num_inference_steps=20,
-            hires_ratio=0.5,
-            hr_resize_width=hr_resize_width,
-            hr_resize_height=hr_resize_height,
-            enable_hr=True,
-        )
-        print("==> Test hiresfix performance.")
-        for step in trange(args.benchmark_steps):
-            start = time.time()
-            images = hiresfix_pipe(
-                prompt,
-                height=height,
-                width=width,
-                num_inference_steps=args.inference_steps,
-                hires_ratio=0.5,
-                hr_resize_width=hr_resize_width,
-                hr_resize_height=hr_resize_height,
-                enable_hr=True,
-            ).images
-            latency = time.time() - start
-            time_costs += [latency]
-            # print(f"No {step:3d} time cost: {latency:2f} s")
-        print(
-            f"Mean latency: {np.mean(time_costs):2f} s, p50 latency: {np.percentile(time_costs, 50):2f} s, "
-            f"p90 latency: {np.percentile(time_costs, 90):2f} s, p95 latency: {np.percentile(time_costs, 95):2f} s."
-        )
-        images[0].save("hiresfix.png")
 
 
 if __name__ == "__main__":
