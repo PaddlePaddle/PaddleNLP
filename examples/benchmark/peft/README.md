@@ -20,10 +20,29 @@
 | Model     | Method   | Num GPUs | Batch Size  | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
 |-----------|----------|----------|-------------|--------------|---------------------------|-------------|--------------------------|---------|
 | Llama-7b  | LoRA     | 1        | 4           | fp16 O2      |  1986.63                 | fp16        | 1589.27                  |  +25%  |
-| Llama-7b  | Finetune | 4        | 8           | fp16 O2 MP 4 |   2208.06                | fp16 ZeRO 3 |    1142.07          |  +93%   |
-| Llama-7b  | Finetune | 4        | 16          | fp16 O2, MP 4 <br> batch size 8 <br> grad accumulation 2 |   2559.84   | fp16 ZeRO 3 |     2171.99     |  +18%   |
 | Llama-13b | LoRA     | 1        | 8           | fp16 O2, recompute |  838.78             | fp16, gradient ckpt    |    674.51 | +24%   |
-| Llama-13b | Finetune | 4        | 8           | fp16 O2, MP 4 <br> batch size 4 <br> grad accumulation 2 | 1165.84  | fp16 ZeRO 3 |    706.70          | +65% |
+
+###### Distributed Training Experiments
+
+- Finetuning with 4 GPUs
+- FP16: torch cuda amp fp16, paddle fp16 O2 opt level
+
+| Model     | Framework | Setup         | Effective Tokens /s  |
+|-----------|-----------|---------------|----------------------|
+| LLaMA-7b  | torch     | bsz 8 ZeRO 3  | 1142.07              |
+| LLaMA-7b  | torch     | bsz 8 ZeRO 2  | 1331.96              |
+| LLaMA-7b  | torch     | bsz 16 ZeRO 3 | 2171.99              |
+| LLaMA-7b  | torch     | bsz 16 ZeRO 2 | 2211.25              |
+| LLaMA-13b | torch     | bsz 8 ZeRO 3  | 712.53               |
+| LLaMA-13b | torch     | bsz 8 ZeRO 2  | OOM                  |
+
+| Model     | Framework  | Setup         | Effective Tokens /s  |
+|-----------|------------|---------------|----------------------|
+| LLaMA-7b  | paddle     | bsz 8 MP 4  | 2208.06              |
+| LLaMA-7b  | paddle     | bsz 8 ZeRO 2  | 2978.36              |
+| LLaMA-7b  | paddle     | bsz 8 ZeRO 3  | 2265.16              |
+| LLaMA-7b  | paddle     | bsz 16 MP 4  | OOM              |
+| LLaMA-7b  | paddle     | bsz 16 ZeRO 2  | 4084.38              |
 
 ### TODOs
 
