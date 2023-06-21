@@ -99,7 +99,7 @@ python infer.py --model_dir ./control_sd15_canny --scheduler "euler-ancestral" -
 python infer.py ./control_sd15_canny --scheduler "euler-ancestral" --backend paddle_tensorrt --use_fp16 True --device gpu --task_name inpaint_legacy_control
 ```
 
-脚本输入的提示语为 **"Face of a yellow cat, high resolution, sitting on a park bench"**，运行得到的图像文件为 inpaint_legacy.png。生成的图片示例如下（每次生成的图片都不相同，示例仅作参考）：
+脚本输入的提示语为 **"Face of a yellow cat, high resolution, sitting on a park bench"**，运行得到的图像文件为 inpaint_legacy_control.png。生成的图片示例如下（每次生成的图片都不相同，示例仅作参考）：
 
 |       input image       |       mask image       |       output image
 |:-------------------:|:-------------------:|:-------------------:|
@@ -123,7 +123,7 @@ python infer.py ./control_sd15_canny --scheduler "euler-ancestral" --backend pad
 | --inference_steps | `UNet` 模型运行的次数，默认为 `50`。 |
 | --benchmark_steps | `Benchmark` 运行的次数，默认为 `1`。 |
 | --use_fp16 | 是否使用 `fp16` 精度。默认为 `False`。使用 `paddle_tensorrt` 后端时可以设为 `True` 开启。 |
-| --task_name | 任务类型，默认为`text2img`，可选列表：`['text2img_control', 'img2img_control', 'inpaint_legacy_control', 'all']`。|
+| --task_name | 任务类型，默认为`text2img`，可选列表：`['text2img_control', 'img2img_control', 'inpaint_legacy_control', 'hiresfix_control', 'all']`。|
 | --scheduler | 采样器类型。默认为 `'preconfig-euler-ancestral'`。可选列表：`['pndm', 'lms', 'preconfig-lms', 'euler', 'euler-ancestral', 'preconfig-euler-ancestral', 'dpm-multi', 'dpm-single', 'unipc-multi', 'ddim', 'ddpm', 'deis-multi', 'heun', 'kdpm2-ancestral', 'kdpm2']`。|
 | --low_threshold | Canny算法最后一步中，小于该阈值的像素直接置为0，默认值为 100。 |
 | --high_threshold | Canny算法最后一步中，大于该阈值的像素直接置为255，默认值为 200。 |

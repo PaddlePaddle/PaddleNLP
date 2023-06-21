@@ -79,6 +79,7 @@ def parse_arguments():
             "text2img_control",
             "img2img_control",
             "inpaint_legacy_control",
+            "hiresfix_control",
             "all",
         ],
         help="The task can be one of [text2img, img2img, inpaint, inpaint_legacy, cycle_diffusion, all]. ",
