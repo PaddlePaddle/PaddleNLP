@@ -113,7 +113,7 @@ Description of configurable parameters:
 - `encoder`: select the model base of the student model, the default is `ernie-3.0-mini-zh`.
 - `task_type`: Select the task type, optional are `entity_extraction`, `relation_extraction`, `event_extraction` and `opinion_extraction`. Because it is an evaluation of closed-domain information extraction, the task type needs to be specified.
 
-## Student model depoloyment
+## Student model deployment
 
 - Fast deployment of the closed-domain information extraction model through Taskflow, `task_path` is the path of the student model.
 

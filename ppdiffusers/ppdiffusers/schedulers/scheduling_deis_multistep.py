@@ -97,7 +97,7 @@ class DEISMultistepScheduler(SchedulerMixin, ConfigMixin):
             the ratio for the dynamic thresholding method. Default is `0.995`, the same as Imagen
             (https://arxiv.org/abs/2205.11487).
         sample_max_value (`float`, default `1.0`):
-            the threshold value for dynamic thresholding. Valid woks when `thresholding=True`
+            the threshold value for dynamic thresholding. Valid only when `thresholding=True`
         algorithm_type (`str`, default `deis`):
             the algorithm type for the solver. current we support multistep deis, we will add other variants of DEIS in
             the future
@@ -155,13 +155,13 @@ class DEISMultistepScheduler(SchedulerMixin, ConfigMixin):
         # settings for DEIS
         if algorithm_type not in ["deis"]:
             if algorithm_type in ["dpmsolver", "dpmsolver++"]:
-                algorithm_type = "deis"
+                self.register_to_config(algorithm_type="deis")
             else:
                 raise NotImplementedError(f"{algorithm_type} does is not implemented for {self.__class__}")
 
         if solver_type not in ["logrho"]:
             if solver_type in ["midpoint", "heun", "bh1", "bh2"]:
-                solver_type = "logrho"
+                self.register_to_config(solver_type="logrho")
             else:
                 raise NotImplementedError(f"solver type {solver_type} does is not implemented for {self.__class__}")
 
@@ -180,18 +180,64 @@ class DEISMultistepScheduler(SchedulerMixin, ConfigMixin):
             num_inference_steps (`int`):
                 the number of diffusion steps used when generating samples with a pre-trained model.
         """
-        self.num_inference_steps = num_inference_steps
         timesteps = (
-            np.linspace(0, self.num_train_timesteps - 1, num_inference_steps + 1)
+            np.linspace(0, self.config.num_train_timesteps - 1, num_inference_steps + 1)
             .round()[::-1][:-1]
             .copy()
             .astype(np.int64)
         )
+
+        # when num_inference_steps == num_train_timesteps, we can end up with
+        # duplicates in timesteps.
+        _, unique_indices = np.unique(timesteps, return_index=True)
+        timesteps = timesteps[np.sort(unique_indices)]
+
         self.timesteps = paddle.to_tensor(timesteps)
+
+        self.num_inference_steps = len(timesteps)
+
         self.model_outputs = [
             None,
         ] * self.config.solver_order
         self.lower_order_nums = 0
+
+    def _threshold_sample(self, sample: paddle.Tensor) -> paddle.Tensor:
+        """
+        "Dynamic thresholding: At each sampling step we set s to a certain percentile absolute pixel value in xt0 (the
+        prediction of x_0 at timestep t), and if s > 1, then we threshold xt0 to the range [-s, s] and then divide by
+        s. Dynamic thresholding pushes saturated pixels (those near -1 and 1) inwards, thereby actively preventing
+        pixels from saturation at each step. We find that dynamic thresholding results in significantly better
+        photorealism as well as better image-text alignment, especially when using very large guidance weights."
+        https://arxiv.org/abs/2205.11487
+        """
+        dtype = sample.dtype
+        batch_size, channels, height, width = sample.shape
+
+        if dtype not in (paddle.float32, paddle.float64):
+            sample = paddle.cast(
+                sample, "float32"
+            )  # upcast for quantile calculation, and clamp not implemented for cpu half
+
+        # Flatten sample for doing quantile calculation along each image
+        sample = paddle.reshape(sample, [batch_size, channels * height * width])
+
+        abs_sample = sample.abs()  # "a certain percentile absolute pixel value"
+
+        s = paddle.quantile(abs_sample, self.config.dynamic_thresholding_ratio, axis=1)
+        # paddle.clip donot support min > max
+        if self.config.sample_max_value < 1:
+            s = paddle.ones_like(s) * self.config.sample_max_value
+        else:
+            s = paddle.clip(
+                s, min=1, max=self.config.sample_max_value
+            )  # When clip to min=1, equivalent to standard clipping to [-1, 1]
+        s = s.unsqueeze(1)  # (batch_size, 1) because clip will broadcast along axis=0
+        sample = paddle.clip(sample, -s, s) / s  # "we threshold xt0 to the range [-s, s] and then divide by s"
+
+        sample = paddle.reshape(sample, [batch_size, channels, height, width])
+        sample = paddle.cast(sample, dtype)
+
+        return sample
 
     def convert_model_output(self, model_output: paddle.Tensor, timestep: int, sample: paddle.Tensor) -> paddle.Tensor:
         """
@@ -221,19 +267,7 @@ class DEISMultistepScheduler(SchedulerMixin, ConfigMixin):
             )
 
         if self.config.thresholding:
-            # Dynamic thresholding in https://arxiv.org/abs/2205.11487
-            orig_dtype = x0_pred.dtype
-            if orig_dtype not in [paddle.float32, paddle.float64]:
-                x0_pred = x0_pred.cast("float32")
-            dynamic_max_val = paddle.quantile(
-                paddle.abs(x0_pred).reshape((x0_pred.shape[0], -1)), self.config.dynamic_thresholding_ratio, axis=1
-            )
-            dynamic_max_val = paddle.maximum(
-                dynamic_max_val,
-                self.config.sample_max_value * paddle.ones_like(dynamic_max_val),
-            )[(...,) + (None,) * (x0_pred.ndim - 1)]
-            x0_pred = paddle.clip(x0_pred, -dynamic_max_val, dynamic_max_val) / dynamic_max_val
-            x0_pred = x0_pred.cast(orig_dtype)
+            x0_pred = self._threshold_sample(x0_pred)
 
         if self.config.algorithm_type == "deis":
             alpha_t, sigma_t = self.alpha_t[timestep], self.sigma_t[timestep]
@@ -456,14 +490,14 @@ class DEISMultistepScheduler(SchedulerMixin, ConfigMixin):
         timesteps: paddle.Tensor,
     ) -> paddle.Tensor:
         # Make sure alphas_cumprod and timestep have same dtype as original_samples
-        self.alphas_cumprod = self.alphas_cumprod.cast(original_samples.dtype)
+        alphas_cumprod = self.alphas_cumprod.cast(original_samples.dtype)
 
-        sqrt_alpha_prod = self.alphas_cumprod[timesteps] ** 0.5
+        sqrt_alpha_prod = alphas_cumprod[timesteps] ** 0.5
         sqrt_alpha_prod = sqrt_alpha_prod.flatten()
         while len(sqrt_alpha_prod.shape) < len(original_samples.shape):
             sqrt_alpha_prod = sqrt_alpha_prod.unsqueeze(-1)
 
-        sqrt_one_minus_alpha_prod = (1 - self.alphas_cumprod[timesteps]) ** 0.5
+        sqrt_one_minus_alpha_prod = (1 - alphas_cumprod[timesteps]) ** 0.5
         sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten()
         while len(sqrt_one_minus_alpha_prod.shape) < len(original_samples.shape):
             sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)

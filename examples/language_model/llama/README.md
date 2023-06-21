@@ -2,10 +2,77 @@
 
 **目录**
 
-- [1. 微调](#2)
-- [2. 动转静](#3)
-- [3. 模型预测](#4)
-- [4. 模型推理](#5)
+- [1. 预训练](#0)
+- [2. 微调](#1)
+- [3. 模型预测](#2)
+- [4. 动转静](#3)
+- [5. 模型推理](#4)
+
+## 协议
+
+Llama 模型的权重的使用则需要遵循[License](../../../paddlenlp/transformers/llama/LICENSE)。
+
+
+<a name="0"></a>
+
+## 预训练
+
+预训练数据制作参考[此处](../../../model_zoo/ernie-1.0/preprocess/docs/OpenWebText2.md)
+
+为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
+```shell
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
+```
+
+将所有预处理得到的文件统一放入一个文件夹中，以备训练使用：
+
+```
+mkdir data
+mv llama_openwebtext_100k_ids.npy ./data
+mv llama_openwebtext_100k_idx.npz ./data
+```
+
+使用下面脚本,即可在llama-7b的基础上,继续训练.
+```shell
+task_name="llama_hybid"
+python -u  -m paddle.distributed.launch \
+    --gpus "0,1,2,3,4,5,6,7" \
+    --log_dir "output/$task_name""_log" \
+    run_pretrain.py \
+    --model_type "llama" \
+    --model_name_or_path "facebook/llama-7b" \
+    --tokenizer_name_or_path "facebook/llama-7b" \
+    --input_dir "./data" \
+    --output_dir "output/$task_name" \
+    --split 949,50,1 \
+    --max_seq_length 2048 \
+    --per_device_train_batch_size 1 \
+    --per_device_eval_batch_size 1 \
+    --use_flash_attention 1 \
+    --use_fused_rms_norm 0 \
+    --fp16  \
+    --fp16_opt_level "O2"  \
+    --scale_loss 1024 \
+    --learning_rate 0.00001 \
+    --min_learning_rate 0.000005 \
+    --max_steps 10000 \
+    --save_steps 5000 \
+    --weight_decay 0.01 \
+    --warmup_ratio 0.01 \
+    --max_grad_norm 1.0 \
+    --logging_steps 20\
+    --dataloader_num_workers 1 \
+    --sharding "stage2" \
+    --eval_steps 1000 \
+    --report_to "visualdl" \
+    --disable_tqdm true \
+    --continue_training 1\
+    --recompute 1 \
+    --do_train \
+    --do_eval \
+    --device "gpu"
+```
 
 <a name="1"></a>
 
@@ -136,7 +203,7 @@ python -u  -m paddle.distributed.launch \
     --eval_with_do_generation 0 \
     --fp16 0\
     --fp16_opt_level O2 \
-    --recompute \
+    --recompute 0 \
     --learning_rate 3e-5 \
     --lr_scheduler_type linear \
     --max_grad_norm 1.0 \
@@ -147,10 +214,11 @@ python -u  -m paddle.distributed.launch \
 
 ```shell
 python -u  -m paddle.distributed.fleet.launch \
-    --gpus "0,1,2,3" finetune_instruction_generation.py \
+    --gpus "0,1,2,3" finetune_generation.py \
     --model_name_or_path facebook/llama-7b \
     --do_train \
     --do_eval \
+    --instruction_generation \
     --num_train_epochs 1 \
     --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
@@ -160,68 +228,13 @@ python -u  -m paddle.distributed.fleet.launch \
     --logging_steps 10 \
     --fp16 \
     --fp16_opt_level O2 \
+    --gradient_accumulation_steps 32 \
     --recompute \
     --learning_rate 3e-5 \
     --lr_scheduler_type linear \
     --max_grad_norm 1.0 \
-    --warmup_steps 20 \
-    --gradient_accumulation_steps 32 \
-    --logging_steps 1 \
-    --eval_steps 1000
+    --warmup_steps 20
 ```
-
-### 单卡LoRA微调
-
-```shell
-python finetune_instruction_generation.py \
-    --model_name_or_path facebook/llama-7b \
-    --do_train \
-    --do_eval \
-    --num_train_epochs 2 \
-    --per_device_train_batch_size 4 \
-    --per_device_eval_batch_size 4 \
-    --overwrite_output_dir \
-    --output_dir ./checkpoints/ \
-    --logging_steps 10 \
-    --fp16 \
-    --fp16_opt_level O2 \
-    --recompute \
-    --learning_rate 3e-4 \
-    --lr_scheduler_type linear \
-    --max_grad_norm 1.0 \
-    --warmup_steps 20 \
-    --gradient_accumulation_steps 4 \
-    --logging_steps 1 \
-    --eval_steps 1000 \
-    --lora True
-```
-
-### Prefix微调
-
-```shell
-python finetune_instruction_generation.py \
-    --model_name_or_path facebook/llama-7b \
-    --do_train \
-    --do_eval \
-    --num_train_epochs 2 \
-    --per_device_train_batch_size 4 \
-    --per_device_eval_batch_size 4 \
-    --overwrite_output_dir \
-    --output_dir ./checkpoints/ \
-    --logging_steps 10 \
-    --fp16 \
-    --fp16_opt_level O2 \
-    --recompute \
-    --learning_rate 3e-2 \
-    --lr_scheduler_type linear \
-    --max_grad_norm 1.0 \
-    --warmup_steps 20 \
-    --gradient_accumulation_steps 4 \
-    --logging_steps 1 \
-    --eval_steps 1000 \
-    --prefix_tuning True
-```
-
 
 <a name="2"></a>
 
@@ -268,7 +281,7 @@ python -m paddle.distributed.launch --gpus 0,1,2,3 predict_generation.py \
 
 <a name="3"></a>
 
-## 模型导出
+## 动转静
 
 ```shell
 python export_generation_model.py \

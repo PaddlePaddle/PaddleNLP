@@ -188,6 +188,11 @@ class TrainingArguments:
         amp_custom_white_list (`List[str]`, *optional*, defaults to `None`):
             The custom white_list. It’s the set of ops that support fp16/bf16 calculation and are considered numerically-safe and
              performance-critical. These ops will be converted to fp16/bf16.
+        amp_master_grad (`bool`, *optional*, defaults to `False`):
+            For amp opt level=’O2’, whether to use float32 weight gradients
+            for calculations such as gradient clipping, weight decay, and weight updates. If master_grad is enabled,
+            the weight gradients will be float32 dtype after the backpropagation. Default is False, there is only float16 weight gradients.
+            Note: only support model parallel and pipeline parallel for now !!!
         sharding (`str`, *optional*, defaults to ``):
             Whether or not to use Paddle Sharding Data Parallel training (in distributed training
             only). The base option should be `stage1`, `stage2` or `stage3` and you can add
@@ -201,6 +206,25 @@ class TrainingArguments:
             Sharding parameter in certain cards group. For example, aussume we use 2 machines each with 8 cards,
             then set sharding_parallel_degree=8, sharding will only communication inside machine.
             default -1 means sharding parameters between all workers.
+        tensor_parallel_degree (`int`, *optional*, defaults to `-1`)
+            Tensor parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.3 Tensor Model Parallelism).
+            This techique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts)
+            tensor_parallel_degree means split the transformer layer to how many parts.
+            default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better proformance.
+            Note, this need model support in source code, currently GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM is supported.
+        pipeline_parallel_degree (`int`, *optional*, defaults to `-1`)
+            Pipeline parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.2 Pipeline Model Parallelism).
+            Pipeline parallelism assigns multi-transformer layers to different cards, the micro batch data stream passed between cards like pipelines.
+            pipeline_parallel_degree means split all transformer layers to how many stages.
+            default -1 for not use pipeline parallel.
+            Note. this need model support in source code, see llama modeling_pp.py file
+        pipeline_parallel_config (`str`, *optional*)(
+            Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it.
+            following config is support:
+              disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape.
+              disable_partial_send_recv, optmize send speed for tensor parallel.
+              enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
+              enable_dp_comm_overlap, fuse data parallel gradient communication.
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -405,7 +429,7 @@ class TrainingArguments:
             "help": "amp_master_grad (bool, optional) – For amp opt level=’O2’, whether to use float32 weight gradients "
             " for calculations such as gradient clipping, weight decay, and weight updates. If master_grad is enabled,"
             " the weight gradients will be float32 dtype after the backpropagation. Default is False, there is only float16 weight gradients."
-            "Note: only support pipeline parallell for now !!!"
+            "Note: only support model parallel and pipeline parallel for now !!!"
         },
     )
     bf16_full_eval: bool = field(
@@ -448,14 +472,7 @@ class TrainingArguments:
     )
     sharding_degree: int = field(  # Alias for sharding_parallel_degree
         default=-1,
-        metadata={
-            "help": (
-                "@deprecated Please use sharding_parallel_degree. "
-                "Sharding parameter in certain cards group. For example, aussume we use 2 machines each with 8 cards, "
-                "then set sharding_degree=8, sharding will only communication inside machine. "
-                "default -1 means sharding parameters between all workers."
-            )
-        },
+        metadata={"help": ("@deprecated Please use sharding_parallel_degree. ")},
     )
     sharding_parallel_degree: int = field(
         default=-1,
@@ -467,9 +484,30 @@ class TrainingArguments:
             )
         },
     )
-    tensor_parallel_degree: int = field(default=-1, metadata={"help": ("-1 for not use tensor parallel")})
-    pipeline_parallel_degree: int = field(default=-1, metadata={"help": ("-1 for not use pipeline parallel")})
-
+    tensor_parallel_degree: int = field(
+        default=-1,
+        metadata={
+            "help": (
+                "Tensor parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.3 Tensor Model Parallelism). "
+                "This techique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts) "
+                "tensor_parallel_degree means split the transformer layer to how many parts."
+                "default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better proformance."
+                "Note, this need model support in source code, currently GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM is supported. "
+            )
+        },
+    )
+    pipeline_parallel_degree: int = field(
+        default=-1,
+        metadata={
+            "help": (
+                "Pipeline parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.2 Pipeline Model Parallelism). "
+                "Pipeline parallelism assigns multi-transformer layers to different cards, the micro batch data stream passed between cards like pipelines."
+                "pipeline_parallel_degree means split all transformer layers to how many stages."
+                "default -1 for not use pipeline parallel."
+                "Note. this need model support in source code, see llama modeling_pp.py file"
+            )
+        },
+    )
     pipeline_parallel_config: str = field(
         default="",
         metadata={
@@ -478,8 +516,8 @@ class TrainingArguments:
                 "following config is support:\n"
                 "disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape. \n"
                 "disable_partial_send_recv, optmize send speed for tensor parallel.\n"
-                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n",
-                "enable_dp_comm_overlap, fuse data parallel gradient communication. \n",
+                "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
+                "enable_dp_comm_overlap, fuse data parallel gradient communication. \n"
             )
         },
     )

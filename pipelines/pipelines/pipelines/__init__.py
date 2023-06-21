@@ -21,4 +21,5 @@ from pipelines.pipelines.standard_pipelines import (
     SemanticSearchPipeline,
     SentaPipeline,
     TextToImagePipeline,
+    WebQAPipeline,
 )

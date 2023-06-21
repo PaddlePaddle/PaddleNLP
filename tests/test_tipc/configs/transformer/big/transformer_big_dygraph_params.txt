@@ -2,7 +2,7 @@
 model_name:transformer_big
 python:python3.7
 gpu_list:0|0,1
-null:null
+--device:gpu|gpu
 null:null
 --max_iter:lite_train_lite_infer=100|lite_train_whole_infer=100
 null:null

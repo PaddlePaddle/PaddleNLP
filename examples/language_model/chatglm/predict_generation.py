@@ -15,9 +15,8 @@
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.layers import LoRAConfig, LoRAModel
-from paddlenlp.prompt import PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.prompt.prefix import (
+from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.peft.prefix import (
     chatglm_pad_attention_mask,
     chatglm_postprocess_past_key_value,
 )
@@ -104,6 +103,7 @@ class Predictor(object):
             )
             if self.args.lora_path is not None:
                 self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
+                self.model.mark_only_lora_as_trainable()
             if self.args.prefix_path is not None:
                 self.model = PrefixModelForCausalLM.from_pretrained(
                     self.model, self.args.prefix_path, chatglm_postprocess_past_key_value, chatglm_pad_attention_mask

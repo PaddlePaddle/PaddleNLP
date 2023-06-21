@@ -274,7 +274,12 @@ class ImageProcessingMixin(object):
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         is_local = os.path.isdir(pretrained_model_name_or_path)
         if os.path.isdir(pretrained_model_name_or_path):
-            resolved_image_processor_file = os.path.join(pretrained_model_name_or_path, IMAGE_PROCESSOR_NAME)
+            if subfolder is None:
+                resolved_image_processor_file = os.path.join(pretrained_model_name_or_path, IMAGE_PROCESSOR_NAME)
+            else:
+                resolved_image_processor_file = os.path.join(
+                    pretrained_model_name_or_path, subfolder, IMAGE_PROCESSOR_NAME
+                )
         elif os.path.isfile(pretrained_model_name_or_path):
             resolved_image_processor_file = pretrained_model_name_or_path
             is_local = True
@@ -290,9 +295,16 @@ class ImageProcessingMixin(object):
             )
         else:
             # Assuming from community-contributed pretrained models
-            image_processor_file = "/".join(
-                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, IMAGE_PROCESSOR_NAME]
-            )
+            if subfolder is None:
+                image_processor_file = "/".join(
+                    [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, IMAGE_PROCESSOR_NAME]
+                )
+            else:
+                image_processor_file = "/".join(
+                    [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, subfolder, IMAGE_PROCESSOR_NAME]
+                )
+                # update cache_dir
+                cache_dir = os.path.join(cache_dir, subfolder)
             try:
                 # Load from local folder or from cache or download from model Hub and cache
                 resolved_image_processor_file = get_path_from_url_with_filelock(image_processor_file, cache_dir)
@@ -323,9 +335,7 @@ class ImageProcessingMixin(object):
         if is_local:
             logger.info(f"loading configuration file {resolved_image_processor_file}")
         else:
-            logger.info(
-                f"loading configuration file {image_processor_file} from cache at {resolved_image_processor_file}"
-            )
+            logger.info(f"loading configuration file from cache at {resolved_image_processor_file}")
 
         return image_processor_dict, kwargs
 
@@ -359,7 +369,6 @@ class ImageProcessingMixin(object):
         for key in to_remove:
             kwargs.pop(key, None)
 
-        logger.info(f"Image processor {image_processor}")
         if return_unused_kwargs:
             return image_processor, kwargs
         else:

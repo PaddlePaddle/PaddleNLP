@@ -45,8 +45,7 @@ from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from tqdm.auto import tqdm
 
 from ..data import DataCollator, DataCollatorWithPadding, default_data_collator
-from ..layers.lora import LoRAModel
-from ..prompt import PrefixModelForCausalLM
+from ..peft import LoRAModel, PrefixModelForCausalLM
 from ..transformers.model_utils import PretrainedModel, _add_variant, unwrap_model
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils import device_guard
@@ -115,6 +114,11 @@ try:
     from paddle.distributed.fleet.utils import mix_precision_utils
 except:
     mix_precision_utils = None
+
+try:
+    from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
+except:
+    from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
 
 
 def paddlenlp_load(path, return_numpy=False):
@@ -265,7 +269,7 @@ class Trainer:
         self._signature_columns = None
         self.optimizer_grouped_parameters = None
 
-        if (self.sharding is not None) and (self.optimizer is not None or self.lr_scheduler is not None):
+        if self.sharding is not None and self.optimizer is not None:
             raise RuntimeError(
                 "Passing `optimizers` is not allowed if sharding is enabled."
                 "You should subclass `Trainer` and override the `create_optimizer_and_scheduler` method."
@@ -320,18 +324,11 @@ class Trainer:
                         self.scaler = fleet.distributed_scaler(self.scaler)
                     else:
                         # scaler for stage2 and stage3
-                        if paddle.framework.in_dygraph_mode():
-                            from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
-                                GroupShardedScaler,
-                            )
+                        from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
+                            GroupShardedScaler,
+                        )
 
-                            self.scaler = GroupShardedScaler(self.scaler)
-                        else:
-                            from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import (
-                                ShardingScaler,
-                            )
-
-                            self.scaler = ShardingScaler(self.scaler)
+                        self.scaler = GroupShardedScaler(self.scaler)
                 else:
                     self.do_grad_scaling = False
                     self.use_cuda_amp = False
@@ -573,9 +570,13 @@ class Trainer:
             # todo fix for pipeline_parallel_degree
             parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
             if parts_num > 1:
-                trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype="int64")
+                all_reduce_dtype = "int64"
+                if paddle.get_device().split(":")[0] == "npu":
+                    # TODO(duanyanhui): fix when NPU all_reduce supports int64
+                    all_reduce_dtype = "float32"
+                trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
                 paddle.distributed.all_reduce(trainable_numel_tensor)
-                trainable_numel = trainable_numel_tensor.item() // self.args.dataset_world_size
+                trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
                 # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
                 # so, the trainable numel is a little bigger than real.
                 logger.info(f"  Number of trainable parameters = {trainable_numel} (all devices, roughly)")
@@ -658,10 +659,10 @@ class Trainer:
                 train_dataloader.batch_sampler.set_epoch(epoch)
 
             step = -1
-
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
+                self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
                 # Skip past any already trained steps if resuming training
                 # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
                 # We use consumed_samples to reset the status
@@ -753,11 +754,14 @@ class Trainer:
                         for p in model._layers.parameters():
                             if hasattr(p, "main_grad") and p.main_grad is not None:
                                 assert p.grad is None
-                                p.main_grad = p.main_grad.scale(1.0 / model.accumulate_steps)
+                                p.main_grad = p.main_grad.scale(1.0 / self.args.gradient_accumulation_steps)
                             elif p.grad is not None:
-                                p.grad = p.grad.scale(1.0 / model.accumulate_steps)
+                                p.grad = p.grad.scale(1.0 / self.args.gradient_accumulation_steps)
 
                     # Optimizer step
+                    self.callback_handler.on_optimizer_begin(
+                        args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                    )
                     optimizer_was_run = True
                     if self.do_grad_scaling:
                         scale_before = self.scaler._scale.numpy()
@@ -776,6 +780,9 @@ class Trainer:
                         self.lr_scheduler.step()
 
                     self.optimizer.clear_grad()
+                    self.callback_handler.on_optimizer_end(
+                        args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                    )
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
@@ -1306,13 +1313,27 @@ class Trainer:
             else:
 
                 def _prepare_pipeline_inputs_func(inputs):
+                    first_stage_keys = ["input_ids", "attention_mask", "position_ids"]
+                    last_stage_keys = ["labels"]
+
+                    def get_expected_keys(inputs, keys):
+                        ret = tuple([inputs.pop(k) for k in keys if k in inputs])
+                        if len(ret) == 1:
+                            ret = ret[0]
+                        return ret
+
                     if type(inputs) is dict:
-                        return [inputs["input_ids"], inputs["labels"]]
+                        return [
+                            get_expected_keys(inputs, first_stage_keys),
+                            get_expected_keys(inputs, last_stage_keys),
+                        ]
 
                     keys = list(inputs[0].keys())
                     inputs_batch = {key: [data.pop(key) for data in inputs] for key in keys}
-
-                    return [inputs_batch["input_ids"], inputs_batch["labels"]]
+                    return [
+                        get_expected_keys(inputs_batch, first_stage_keys),
+                        get_expected_keys(inputs_batch, last_stage_keys),
+                    ]
 
                 logger.warning(
                     "Using default prepare pipeline inputs func, only support input_ids and labels as inputs."
@@ -1615,6 +1636,10 @@ class Trainer:
         run_dir = self.args.output_dir
 
         output_dir = os.path.join(run_dir, checkpoint_folder)
+
+        if ShardingOption.FULL_SHARD in self.args.sharding:
+            # TODO(ZHUI) fix it and set convert2cpu=True to save gpu memory
+            model.get_all_parameters(convert2cpu=False)
 
         self.save_model(output_dir)
 
@@ -1923,7 +1948,7 @@ class Trainer:
 
         if isinstance(dataloader, paddle.io.DataLoader):
             batch_size = dataloader.batch_sampler.batch_size
-        elif isinstance(dataloader, paddle.fluid.dataloader.dataloader_iter._DataLoaderIterBase):
+        elif isinstance(dataloader, _DataLoaderIterBase):
             # support for inner dataloader
             batch_size = dataloader._batch_sampler.batch_size
             # alias for inner dataloader
@@ -1935,7 +1960,7 @@ class Trainer:
         if max_eval_iters > 0:
             # on eval limit steps
             num_samples = batch_size * self.args.dataset_world_size * max_eval_iters
-            if isinstance(dataloader, paddle.fluid.dataloader.dataloader_iter._DataLoaderIterBase) and isinstance(
+            if isinstance(dataloader, _DataLoaderIterBase) and isinstance(
                 dataloader._batch_sampler, NlpDistributedBatchSampler
             ):
                 consumed_samples = (

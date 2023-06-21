@@ -25,3 +25,7 @@ markdown
 numba
 pymilvus>=2.1
 wordcloud==1.8.2.2
+boilerpy3
+events
+sseclient-py==1.7.2
+typing_extensions==4.5

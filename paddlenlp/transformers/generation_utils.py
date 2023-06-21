@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import inspect
 from abc import ABC
-from typing import List, Union
+from collections import OrderedDict
+from typing import Union
 
 import paddle
 import paddle.nn as nn
@@ -34,6 +35,14 @@ from paddle.fluid.dygraph.base import in_declarative_mode
 from paddlenlp.utils.log import logger
 
 from .model_outputs import ModelOutput
+from .utils import get_scale_by_dtype
+
+try:
+    from paddle import top_p_sampling
+
+    is_top_p_sampling_avaliable = True
+except:
+    is_top_p_sampling_avaliable = False
 
 __all__ = ["GenerationMixin"]
 
@@ -84,7 +93,7 @@ class BeamHypotheses:
         self.early_stopping = early_stopping
         self.num_beams = num_beams
         self.beams = []
-        self.worst_score = 1e9
+        self.worst_score = get_scale_by_dtype()
 
     def __len__(self):
         """
@@ -324,7 +333,9 @@ class GenerationMixin(object):
             (eos_token_id is not None) and (pad_token_id != eos_token_id)
         )
         if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
-            attention_mask = (input_ids == pad_token_id).astype(paddle.get_default_dtype()) * -1e9
+            attention_mask = (input_ids == pad_token_id).astype(paddle.get_default_dtype()) * get_scale_by_dtype(
+                return_positive=False
+            )
         else:
             attention_mask = paddle.zeros_like(input_ids, dtype=paddle.get_default_dtype())
         return paddle.unsqueeze(attention_mask, axis=[1, 2])
@@ -394,7 +405,9 @@ class GenerationMixin(object):
     @staticmethod
     def expand_inputs_for_generation(input_ids, expand_size, attention_mask=None, **model_kwargs):
 
-        index = paddle.tile(paddle.arange(paddle.shape(input_ids)[0]).unsqueeze(-1), [1, expand_size]).reshape([-1])
+        index = paddle.tile(
+            paddle.arange(paddle.shape(input_ids)[0], dtype="int64").unsqueeze(-1), [1, expand_size]
+        ).reshape([-1])
 
         input_ids = paddle.gather(input_ids, index)
 
@@ -434,9 +447,11 @@ class GenerationMixin(object):
         # update cache
         if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
             model_kwargs["cache"] = outputs[1]
+            model_kwargs["past_key_values"] = outputs[1]
 
         if isinstance(outputs, ModelOutput) and "past_key_values" in outputs:
             model_kwargs["cache"] = outputs.past_key_values
+            model_kwargs["past_key_values"] = outputs.past_key_values
 
         # update token_type_ids with last value
         if "token_type_ids" in model_kwargs and model_kwargs["token_type_ids"] is not None:
@@ -461,7 +476,9 @@ class GenerationMixin(object):
                     attention_mask = nn.Pad2D([0, 1, 0, 0], value=0)(attention_mask)
                 else:
                     attention_mask = nn.Pad2D([0, 0, 0, 1], mode="replicate")(attention_mask)
-                    attention_mask = nn.Pad2D([0, 1, 0, 0], value=-1e4)(attention_mask)
+                    attention_mask = nn.Pad2D([0, 1, 0, 0], value=get_scale_by_dtype(return_positive=False))(
+                        attention_mask
+                    )
 
                 dtype = convert_dtype(attention_mask.dtype)
                 if "int" in dtype:
@@ -856,6 +873,7 @@ class GenerationMixin(object):
             input_ids = self.prepare_input_ids_for_generation(
                 bos_token_id, encoder_output=model_kwargs["inputs_embeds"]
             )
+
         # Add to model_kwargs
         model_kwargs["attention_mask"] = attention_mask
         if position_ids is not None:
@@ -885,7 +903,7 @@ class GenerationMixin(object):
 
         model_kwargs["use_cache"] = use_cache
 
-        if is_tracing:
+        if is_tracing and not paddle.is_tensor(max_length):
             min_len = input_ids.shape[-1]
             max_len = input_ids.shape[-1]
             paddle.increment(min_len, min_length)
@@ -920,7 +938,6 @@ class GenerationMixin(object):
                     "`num_return_sequences` has to be 1, but is {} "
                     "when doing greedy search.".format(num_return_sequences)
                 )
-
             return self.greedy_search(
                 input_ids, logits_processors, max_len, pad_token_id, eos_token_id, **model_kwargs
             )
@@ -1023,7 +1040,6 @@ class GenerationMixin(object):
     def greedy_search(self, input_ids, logits_processors, max_length, pad_token_id, eos_token_id, **model_kwargs):
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
-
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
@@ -1304,7 +1320,8 @@ class GenerationMixin(object):
         )
 
         beam_scores = paddle.zeros((batch_size, num_beams), dtype=paddle.get_default_dtype())
-        beam_scores[:, 1:] = -1e9
+
+        beam_scores[:, 1:] = get_scale_by_dtype(return_positive=False)
         beam_scores = paddle.reshape(beam_scores, [-1])
 
         while cur_len < max_length:
@@ -1345,7 +1362,7 @@ class GenerationMixin(object):
             else:
                 next_scores, next_tokens = paddle.topk(next_scores, 2 * num_beams, axis=1)
 
-                sibling_score = paddle.arange(1, 2 * num_beams + 1).unsqueeze(0) * diversity_rate
+                sibling_score = paddle.arange(1, 2 * num_beams + 1, dtype="int64").unsqueeze(0) * diversity_rate
 
                 diversed_score = next_scores - sibling_score
 
@@ -1426,7 +1443,7 @@ class GenerationMixin(object):
             num_beams * batch_size, batch_beam_size
         )
 
-        beam_scores = paddle.full((batch_size, num_beams), -1e9, dtype="float32")
+        beam_scores = paddle.full((batch_size, num_beams), get_scale_by_dtype(return_positive=False), dtype="float32")
         # initialise score of first beam of each group with 0 and the rest with 1e-9. This ensures that the beams in
         # the same group don't produce same tokens everytime.
         beam_scores[:, ::num_sub_beams] = 0
@@ -1536,9 +1553,17 @@ class GenerationMixin(object):
         return pred_ids[:, origin_len:], scores
 
 
-class LogitsProcessorList(List):
+class LogitsProcessorList:
+    """use ordered dict to store processors"""
+
+    def __init__(self, processors: list[LogitsProcessor] = None) -> None:
+        self._processors = OrderedDict()
+        processors = processors or []
+        for processor in processors:
+            self.append(processor)
+
     def __call__(self, input_ids, logits, **kwargs):
-        for processor in self:
+        for processor in self._processors.values():
             processor_args = inspect.signature(processor.__call__).parameters
             if len(processor_args) > 2:
                 assert all(
@@ -1548,6 +1573,9 @@ class LogitsProcessorList(List):
             else:
                 logits = processor(input_ids, logits)
         return logits
+
+    def append(self, processor):
+        self._processors[len(self._processors)] = processor
 
 
 class LogitsProcessor(ABC):
@@ -1572,7 +1600,7 @@ class MinLengthLogitsProcessor(LogitsProcessor):
     """
 
     def __init__(self, min_length, eos_token_id):
-        if not isinstance(min_length, int) or min_length < 0:
+        if min_length < 0:
             raise ValueError("`min_length` should be a positive integer, but get {}".format(min_length))
 
         if not isinstance(eos_token_id, int) or eos_token_id < 0:
@@ -1599,7 +1627,7 @@ class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
     """
 
     def __init__(self, penalty: float):
-        if not isinstance(penalty, float) or not (penalty > 0):
+        if not (penalty > 0):
             raise ValueError(f"`penalty` has to be a strictly positive float, but is {penalty}")
 
         self.penalty = penalty
@@ -1607,7 +1635,7 @@ class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids, logits):
         score = paddle.index_sample(logits, input_ids)
         score = paddle.where(score < 0, score * self.penalty, score / self.penalty)
-        input_ids = input_ids + paddle.arange(logits.shape[0]).unsqueeze(-1) * logits.shape[-1]
+        input_ids = input_ids + paddle.arange(logits.shape[0], dtype="int64").unsqueeze(-1) * logits.shape[-1]
         outputs = paddle.scatter(logits.flatten(), input_ids.flatten(), score.flatten()).reshape(logits.shape)
         return outputs
 
@@ -1731,8 +1759,7 @@ class ForcedBOSTokenLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids, scores):
         cur_len = input_ids.shape[-1]
         if cur_len == 1:
-            num_tokens = scores.shape[1]
-            scores[:, [i for i in range(num_tokens) if i != self.forced_bos_token_id]] = -float("inf")
+            scores[:] = -float("inf")
             scores[:, self.forced_bos_token_id] = 0
         return scores
 
@@ -1753,10 +1780,7 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids, scores):
         cur_len = input_ids.shape[-1]
         if cur_len == self.max_length - 1:
-            num_tokens = scores.shape[1]
-            scores[
-                :, [i for i in range(num_tokens) if i != self.forced_eos_token_id]
-            ] = -1e9  # TODO change back to -inf after paddle.topk is fixed
+            scores[:] = -1e9  # TODO change back to -inf after paddle.topk is fixed
             scores[:, self.forced_eos_token_id] = 0
         return scores
 
@@ -1777,8 +1801,18 @@ def TopKProcess(probs, top_k, min_tokens_to_keep):
 
 
 def TopPProcess(probs, top_p, min_tokens_to_keep):
+    if is_top_p_sampling_avaliable:
+        top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
+        probs, _ = top_p_sampling(probs, top_ps_tensor)
+        return probs
+
     sorted_probs = paddle.sort(probs, descending=True)
     sorted_indices = paddle.argsort(probs, descending=True)
+    if isinstance(sorted_indices, tuple):
+        sorted_indices, sorted_probs = sorted_indices
+    else:
+        sorted_probs = paddle.sort(probs, descending=True)
+
     cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)
 
     # Remove tokens with cumulative probs above the top_p, But keep at
@@ -1793,7 +1827,7 @@ def TopPProcess(probs, top_p, min_tokens_to_keep):
     sorted_indices_to_remove[:, 0] = 0
 
     # Scatter sorted tensors to original indexing
-    sorted_indices = sorted_indices + paddle.arange(probs.shape[0]).unsqueeze(-1) * probs.shape[-1]
+    sorted_indices = sorted_indices + paddle.arange(probs.shape[0], dtype="int64").unsqueeze(-1) * probs.shape[-1]
     condition = paddle.scatter(
         sorted_indices_to_remove.flatten(), sorted_indices.flatten(), sorted_indices_to_remove.flatten()
     )

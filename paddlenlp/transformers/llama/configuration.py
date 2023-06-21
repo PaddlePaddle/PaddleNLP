@@ -189,7 +189,9 @@ class LlamaConfig(PretrainedConfig):
         rms_norm_eps=1e-6,
         use_cache=True,
         use_recompute=False,
+        recompute_granularity="full",
         use_flash_attention=False,
+        use_fused_rms_norm=False,
         tensor_parallel_output=True,
         lm_shift_labels=True,
         pad_token_id=0,
@@ -206,11 +208,15 @@ class LlamaConfig(PretrainedConfig):
         self.num_attention_heads = num_attention_heads
         self.initializer_range = initializer_range
         self.rms_norm_eps = rms_norm_eps
+
         self.use_cache = use_cache
         self.use_recompute = use_recompute
+        self.recompute_granularity = recompute_granularity
         self.use_flash_attention = use_flash_attention
+        self.use_fused_rms_norm = use_fused_rms_norm
         self.tensor_parallel_output = tensor_parallel_output
         self.lm_shift_labels = lm_shift_labels
+
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id

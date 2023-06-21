@@ -16,9 +16,8 @@ from __future__ import annotations
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.layers import LoRAConfig, LoRAModel
-from paddlenlp.prompt import PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.prompt.prefix import bloom_postprocess_past_key_value
+from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.peft.prefix import bloom_postprocess_past_key_value
 from paddlenlp.transformers import AutoConfig, AutoTokenizer, BloomForCausalLM
 
 

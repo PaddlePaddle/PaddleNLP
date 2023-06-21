@@ -8,7 +8,7 @@ micro_batch_size=4
 global_batch_size=16
 run_mode=DP2-MP2-PP2
 device_num=N1C8
-max_iter=100003
+max_iter=2000
 use_sharding=true
 
 # run

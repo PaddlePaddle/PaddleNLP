@@ -18,7 +18,7 @@ import os
 
 import paddle
 
-from paddlenlp.layers import LoRAConfig, LoRAModel
+from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.transformers import AutoTokenizer, BloomConfig, BloomForCausalLM
 
 

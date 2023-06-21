@@ -24,10 +24,9 @@ from utils import ChatGLMTrainer, save_infer_result
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import LoRAConfig, LoRAModel
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
-from paddlenlp.prompt import PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.prompt.prefix import (
+from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.peft.prefix import (
     chatglm_pad_attention_mask,
     chatglm_postprocess_past_key_value,
 )
@@ -57,7 +56,7 @@ class ModelArgument:
     )
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
     num_prefix_tokens: int = field(default=64, metadata={"help": "Number of prefix tokens"})
-    prefix_projection: bool = field(default=True, metadata={"help": "Whether to project the prefix tokens"})
+    prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
     do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
     lora_all_linear: bool = field(default=False, metadata={"help": "Whether to use LoRA technique for all linear."})
 
@@ -136,6 +135,7 @@ def main():
             enable_lora_list=enable_lora_list,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,
+            head_dim=model.config.hidden_size // model.config.num_attention_heads,
         )
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()

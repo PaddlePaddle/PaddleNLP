@@ -11,6 +11,10 @@ ChatGLM-6B 是一个开源的、支持中英双语问答的对话语言模型，
 python -m pip install paddlepaddle-gpu==0.0.0.post112 -f https://www.paddlepaddle.org.cn/whl/linux/gpu/develop.html
 ```
 
+## 协议
+
+ChatGLM-6B 模型的权重的使用则需要遵循[License](../../../paddlenlp/transformers/chatglm/LICENSE)。
+
 ## AdvertiseGen 广告生成任务
 
 本示例基于广告生成数据集 AdvertiseGen，输入为服装描述关键词，输出为相应的广告语，可从[这里](https://paddlenlp.bj.bcebos.com/datasets/examples/AdvertiseGen.tar.gz)下载。
@@ -39,6 +43,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 --recompute True \
 --do_train \
 --do_eval \
+--load_best_model_at_end True \
 --tensor_parallel_degree 4 \
 --do_generation True
 ```
@@ -90,6 +95,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir chatglm_log finet
 --do_train \
 --do_eval \
 --disable_tqdm True \
+--save_total_limit 1 \
 --metric_for_best_model accuracy \
 --load_best_model_at_end True \
 --do_generation False \
@@ -123,8 +129,10 @@ python finetune_generation.py \
 --metric_for_best_model accuracy \
 --load_best_model_at_end True \
 --do_generation False \
+--save_total_limit 1 \
 --lora True \
---r 8
+--lora_rank 8 \
+--lora_all_linear
 ```
 
 ### 单卡Prefix微调
@@ -155,6 +163,7 @@ python finetune_generation.py \
 --load_best_model_at_end True \
 --do_generation False \
 --prefix_tuning True \
+--save_total_limit 1 \
 --num_prefix_tokens 64
 ```
 

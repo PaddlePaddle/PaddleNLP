@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 import json
+import os
 import unittest
 
 from paddlenlp.transformers import (
@@ -41,3 +43,26 @@ def check_json_file_has_correct_format(file_path):
             json.load(f)
         except Exception as e:
             raise Exception(f"{e}: the json file should be a valid json")
+
+
+def get_tests_dir(append_path=None):
+    """
+    Args:
+        append_path: optional path to append to the tests dir path
+
+    Return:
+        The full path to the `tests` dir, so that the tests can be invoked from anywhere. Optionally `append_path` is
+        joined after the `tests` dir the former is provided.
+
+    """
+    # this function caller's __file__
+    caller__file__ = inspect.stack()[1][1]
+    tests_dir = os.path.abspath(os.path.dirname(caller__file__))
+
+    while not tests_dir.endswith("tests"):
+        tests_dir = os.path.dirname(tests_dir)
+
+    if append_path:
+        return os.path.join(tests_dir, append_path)
+    else:
+        return tests_dir
