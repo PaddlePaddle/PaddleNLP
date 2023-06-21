@@ -468,12 +468,6 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
 
                         Recompute the forward pass to calculate gradients. Used for saving memory (default: False)
 
-  --recompute_granularity
-                        recompute训练的粒度，可选 `full` `full_attn` `core_attn`，full即recompute全部transformer，full_attn表明只recompute所有self attention部分，core_attn表明只recompute `softmax(qkT)v` 部分。注：显存占用方面，`core_attn` > `full_attn` > `full`，若所选策略产生OOM错误，可以适当更改recompute_granularity
-                        (`str`, 可选, 默认为 `full`)
-
-                        The granularity of recompute training can be selected as `full` or `full_attn` or `core_attn`. `full` means complete all transformers, `full_attn` indicates only recompute all self attention parts, `core_attn` indicates that only the `softmax (qkT) v` part is recomputed. Note: In terms of memory usage, `core_attn` > `full_attn` > `full`, if the selected policy generates an OOM error, the recompute can be changed appropriately recompute_granularity. (default: "full")
-
   --minimum_eval_times
                         最少评估次数，如果当前设置的eval_steps，评估次数少于minimum_eval_times，
                         此选项会覆盖eval_steps参数。

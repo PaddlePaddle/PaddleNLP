@@ -198,11 +198,6 @@ class TrainingArguments:
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
-        recompute_granularity (`str`, *optional*, defaults to `full`):
-            The granularity of recompute training can be selected as `full` or `full_attn` or `core_attn`. `full` means complete
-            all transformers, `full_attn` indicates only recompute all self attention parts, `core_attn` indicates that only
-            the `softmax (qkT) v` part is recomputed. Note: In terms of memory usage, `core_attn` > `full_attn` > `full`, if
-            the selected policy generates an OOM error, the recompute can be changed appropriately recompute_granularity.
         scale_loss (`float`,  *optional*, defaults to 32768):
             The value of initial scale_loss for fp16. (default: 32768)
         local_rank (`int`, *optional*, defaults to -1):
@@ -480,13 +475,6 @@ class TrainingArguments:
         metadata={
             "help": "Recompute the forward pass to calculate gradients. Used for saving memory. "
             "Only support for networks with transformer blocks."
-        },
-    )
-
-    recompute_granularity: str = field(
-        default="full",
-        metadata={
-            "help": "The granularity of recompute training can be selected as `full` or `full_attn` or `core_attn`. "
         },
     )
 
