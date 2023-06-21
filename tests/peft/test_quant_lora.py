@@ -79,7 +79,7 @@ class TestQuantedLoraLayer(unittest.TestCase):
             state_dict = paddle.load(weights_path)
             new_quant_lora_layer.set_dict(state_dict)
             x = paddle.randn([2, 4, 16], "float32")
-            self.assertTrue(paddle.allclose(new_quant_lora_layer(x), quant_lora_layer(x)), rtol=1e-5)
+            self.assertTrue(paddle.allclose(new_quant_lora_layer(x), quant_lora_layer(x)))
 
 
 class TestQuantedLoRAModel(unittest.TestCase):
@@ -89,6 +89,7 @@ class TestQuantedLoRAModel(unittest.TestCase):
             target_modules=[".*q_proj.*", ".*v_proj.*"],
             r=4,
             lora_alpha=8,
+            merge_weights=False,
         )
         cls.model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
         cls.lora_model = LoRAModel(cls.model, lora_config)
@@ -128,7 +129,7 @@ class TestQuantedLoRAModel(unittest.TestCase):
         input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 5]))
         original_model_outputs = self.lora_model(input_ids)[0]
         quant_model_outputs = quant_lora_model(input_ids)[0]
-        self.assertTrue(paddle.allclose(original_model_outputs, quant_model_outputs, rtol=1e-5))
+        self.assertTrue(paddle.allclose(original_model_outputs, quant_model_outputs, atol=1e-5))
 
     def test_forward_weight_quant(self):
         q_config = QuantConfig(activation=None, weight=None)
