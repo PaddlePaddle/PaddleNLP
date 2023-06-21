@@ -422,6 +422,15 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         ['O0', 'O1', and 'O2']. See details at https://www.pad
                         dlepaddle.org.cn/documentation/docs/zh/develop/api/pad
                         dle/amp/auto_cast_cn.html (default: O1)
+  --amp_custom_black_list
+                       飞桨有默认的黑名单，可以根据模型特点设置自定义黑名单。自定义黑名单中的算子在计算时会被认为是数值危险的，它们的影响也可能会在下游算子中观察到。该名单中的算子不会转为 float16/bfloat16 计算。(可选，默认为None)
+
+                       The custom black_list. The set of ops that support fp16/bf16 calculation and are considered numerically-dangerous and whose effects may also be observed in downstream ops. These ops will not be converted to fp16/bf16. (default:None)
+
+  --amp_custom_white_list
+                       飞桨有默认的白名单，通常不需要设置自定义白名单。自定义白名单中的算子在计算时会被认为是数值安全的，并且对性能至关重要。如果设置了该名单，其中的算子会使用 float16/bfloat16 计算。(可选，默认为None)
+
+                       The custom white_list. It’s the set of ops that support fp16/bf16 calculation and are considered numerically-safe and performance-critical. These ops will be converted to fp16/bf16. (default:None)
 
   --scale_loss
                         fp16/bf16训练时，scale_loss的初始值。
@@ -578,15 +587,5 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                        是否在优化器中使用flatten_param_grads策略，该策略将素有参数摊平后输入Optimizer更新。目前该策略仅在NPU设备上生效。（可选，默认为False）
                        Whether use flatten_param_grads method in optimizer,
                        only used on NPU devices.(default:False)
-
-  --amp_custom_black_list
-                       飞桨有默认的黑名单，可以根据模型特点设置自定义黑名单。自定义黑名单中的算子在计算时会被认为是数值危险的，它们的影响也可能会在下游算子中观察到。该名单中的算子不会转为 float16/bfloat16 计算。(可选，默认为None)
-
-                       The custom black_list. The set of ops that support fp16/bf16 calculation and are considered numerically-dangerous and whose effects may also be observed in downstream ops. These ops will not be converted to fp16/bf16. (default:None)
-
-  --amp_custom_white_list
-                       飞桨有默认的白名单，通常不需要设置自定义白名单。自定义白名单中的算子在计算时会被认为是数值安全的，并且对性能至关重要。如果设置了该名单，其中的算子会使用 float16/bfloat16 计算。(可选，默认为None)
-
-                       The custom white_list. It’s the set of ops that support fp16/bf16 calculation and are considered numerically-safe and performance-critical. These ops will be converted to fp16/bf16. (default:None)
 
 ```

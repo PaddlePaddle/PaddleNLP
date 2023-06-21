@@ -182,6 +182,12 @@ class TrainingArguments:
         fp16_opt_level (`str`, *optional*, defaults to 'O1'):
             For `fp16` training,  AMP optimization level selected in ['O0', 'O1', 'O2']. See details at
             https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/amp/auto_cast_cn.html
+        amp_custom_black_list (`List[str]`, *optional*, defaults to `None`):
+            The custom black_list. The set of ops that support fp16/bf16 calculation and are considered numerically-dangerous
+            and whose effects may also be observed in downstream ops. These ops will not be converted to fp16/bf16.
+        amp_custom_white_list (`List[str]`, *optional*, defaults to `None`):
+            The custom white_list. It’s the set of ops that support fp16/bf16 calculation and are considered numerically-safe and
+             performance-critical. These ops will be converted to fp16/bf16.
         sharding (`str`, *optional*, defaults to ``):
             Whether or not to use Paddle Sharding Data Parallel training (in distributed training
             only). The base option should be `stage1`, `stage2` or `stage3` and you can add
@@ -271,12 +277,6 @@ class TrainingArguments:
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
         flatten_param_grads (`bool`, *optional*):
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
-        amp_custom_black_list (`List[str]`, *optional*, defaults to `None`):
-            The custom black_list. The set of ops that support fp16/bf16 calculation and are considered numerically-dangerous
-            and whose effects may also be observed in downstream ops. These ops will not be converted to fp16/bf16.
-        amp_custom_white_list (`List[str]`, *optional*, defaults to `None`):
-            The custom white_list. It’s the set of ops that support fp16/bf16 calculation and are considered numerically-safe and
-             performance-critical. These ops will be converted to fp16/bf16.
     """
 
     output_dir: str = field(
@@ -422,6 +422,19 @@ class TrainingArguments:
         metadata={"help": "Whether to use full float16 evaluation instead of 32-bit"},
     )
 
+    amp_custom_black_list: Optional[List[str]] = field(
+        default=None,
+        metadata={
+            "help": "The set of ops that support fp16/bf16 calculation and are considered numerically-dangerous and whose effects may also be observed in downstream ops."
+        },
+    )
+    amp_custom_white_list: Optional[List[str]] = field(
+        default=None,
+        metadata={
+            "help": "The the set of ops that support fp16/bf16 calculation and are considered numerically-safe and performance-critical. These ops will be converted to fp16/bf16."
+        },
+    )
+
     sharding: str = field(
         default="",
         metadata={
@@ -561,18 +574,6 @@ class TrainingArguments:
     lazy_data_processing: Optional[bool] = field(
         default=True,
         metadata={"help": "Whether use lazy data processing."},
-    )
-    amp_custom_black_list: Optional[List[str]] = field(
-        default=None,
-        metadata={
-            "help": "The set of ops that support fp16/bf16 calculation and are considered numerically-dangerous and whose effects may also be observed in downstream ops."
-        },
-    )
-    amp_custom_white_list: Optional[List[str]] = field(
-        default=None,
-        metadata={
-            "help": "The the set of ops that support fp16/bf16 calculation and are considered numerically-safe and performance-critical. These ops will be converted to fp16/bf16."
-        },
     )
 
     def __post_init__(self):
