@@ -59,7 +59,7 @@ python infer.py --model_dir stable-diffusion-v1-5/ --scheduler "preconfig-euler-
 |:-------------------:|:-------------------:|
 |![][without-hiresfix]|![][with-hiresfix]|
 
-[without-hiresfix]: https://github.com/PaddlePaddle/PaddleNLP/assets/50394665/30437632-7f8a-49fc-9306-945403a897bb
+[without-hiresfix]: https://github.com/PaddlePaddle/PaddleNLP/assets/50394665/38ab6032-b960-4b76-8d69-0e0f8b5e1f42
 [with-hiresfix]: https://github.com/PaddlePaddle/PaddleNLP/assets/50394665/a472cb31-d8a2-451d-bf80-cd84c9ef0d08
 
 在80G A100上，ppdiffusers==0.16.1、fastdeploy==1.0.7、develop paddle、cuda11.7 的环境下，我们测出了如下的速度。
