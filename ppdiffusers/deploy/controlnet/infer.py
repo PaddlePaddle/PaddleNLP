@@ -82,7 +82,7 @@ def parse_arguments():
             "hiresfix_control",
             "all",
         ],
-        help="The task can be one of [text2img, img2img, inpaint, inpaint_legacy, cycle_diffusion, all]. ",
+        help="The task can be one of [text2img_control, img2img_control, inpaint_legacy_control, hiresfix_control, all]. ",
     )
     parser.add_argument("--use_fp16", type=strtobool, default=True, help="Wheter to use FP16 mode")
     parser.add_argument("--device_id", type=int, default=0, help="The selected gpu id. -1 means use cpu")
