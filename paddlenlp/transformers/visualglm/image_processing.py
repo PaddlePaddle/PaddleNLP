@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Image processor class for MiniGPT4."""
+"""Image processor class for VisualGLM."""
 
 from typing import Dict, List, Optional, Union
 
@@ -39,13 +39,13 @@ from ..image_utils import (
 from ..tokenizer_utils_base import TensorType
 
 __all__ = [
-    "MiniGPT4ImageProcessor",
+    "VisualGLMImageProcessor",
 ]
 
 
-class MiniGPT4ImageProcessor(BaseImageProcessor):
+class VisualGLMImageProcessor(BaseImageProcessor):
     r"""
-    Constructs a MiniGPT4 image processor.
+    Constructs a VisualGLM image processor.
 
     Args:
         do_resize (`bool`, *optional*, defaults to `True`):

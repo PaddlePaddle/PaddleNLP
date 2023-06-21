@@ -19,15 +19,14 @@ from typing import Any, Optional, Tuple, Union
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import torch
 from paddle.distributed.fleet.utils import recompute
 from paddle.nn import CrossEntropyLoss
 
-from paddlenlp.ops import transfer_param
 from paddlenlp.utils.log import logger
 
 from ...utils.initializer import normal_, ones_, zeros_
 from ..activations import ACT2FN
+from ..chatglm.configuration import ChatGLMConfig
 from ..chatglm.modeling import ChatGLMForConditionalGeneration
 from ..model_outputs import (
     BaseModelOutput,
@@ -60,33 +59,9 @@ __all__ = [
 ]
 
 
-def Parameter(tensor):
+def Parameter(tensor, dtype="float16"):
+    tensor = paddle.cast(tensor, dtype)
     return paddle.create_parameter(tensor.shape, dtype=tensor.dtype, default_initializer=nn.initializer.Assign(tensor))
-
-
-# def convert_weights_to_dtype(model, dtype: str):
-#     # trying to convert model dtype if necessary
-#     if dtype not in ["float16", "float32", "float64"]:
-#         raise ValueError("Not supported dtype: {}., only [float16, float32, float64] supported.".format(dtype))
-#     dtype_mapping = {
-#         "float16": paddle.float16,
-#         "float32": paddle.float32,
-#         "float64": paddle.float64,
-#     }
-
-#     def convert_for_vit(layer):
-#         if isinstance(layer, (nn.Linear, nn.Conv1D, nn.Conv2D)):
-#             if layer.weight.dtype != dtype_mapping[dtype]:
-#                 layer.weight = transfer_param(layer.weight, restore_data=True, dtype=dtype)
-#             if layer.bias is not None and layer.bias.dtype != dtype_mapping[dtype]:
-#                 layer.bias = transfer_param(layer.bias, restore_data=True, dtype=dtype)
-
-#     if isinstance(model, VisualGLMVisionModel):
-#         model.apply(convert_for_vit)
-#     elif isinstance(model, (VisualGLMQFormerModel, LlamaForCausalLM)):
-#         model.to(dtype=dtype)
-#     else:
-#         raise TypeError("Not support model type: {}.".format(type(model)))
 
 
 @dataclass
@@ -160,34 +135,6 @@ class VisualGLMPretrainedModel(PretrainedModel):
         if isinstance(module, VisualGLMEncoder):
             module.gradient_checkpointing = value
 
-    # @classmethod
-    # def from_pretrained(
-    #     cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str = None, *args, **kwargs
-    # ):
-    #     vit_dtype = kwargs.pop("vit_dtype", "float16")
-    #     qformer_dtype = kwargs.pop("qformer_dtype", "float32")
-    #     llama_dtype = kwargs.pop("llama_dtype", "float16")
-
-    #     model = super().from_pretrained(
-    #         pretrained_model_name_or_path, from_hf_hub=from_hf_hub, subfolder=subfolder, *args, **kwargs
-    #     )
-
-    #     logger.info("Trying to convert dtype for VisualGLM model, it may take a while.")
-    #     if isinstance(model, (VisualGLMModel, VisualGLMForConditionalGeneration)):
-    #         convert_weights_to_dtype(model.vision_model, dtype=vit_dtype)
-    #         convert_weights_to_dtype(model.qformer, dtype=qformer_dtype)
-    #         convert_weights_to_dtype(model.language_model, dtype=llama_dtype)
-    #     elif isinstance(model, VisualGLMVisionModel):
-    #         convert_weights_to_dtype(model, dtype=vit_dtype)
-    #     elif isinstance(model, VisualGLMQFormerModel):
-    #         convert_weights_to_dtype(model, dtype=qformer_dtype)
-    #     elif isinstance(model, LlamaForCausalLM):
-    #         convert_weights_to_dtype(model, dtype=llama_dtype)
-    #     else:
-    #         raise TypeError("Not supported model type: {}.".format(type(model)))
-
-    #     return model
-
 
 class VisualGLMVisionEmbeddings(nn.Layer):
     def __init__(self, config: VisualGLMVisionConfig):
@@ -197,8 +144,6 @@ class VisualGLMVisionEmbeddings(nn.Layer):
         self.image_size = config.image_size
         self.patch_size = config.patch_size
         self.in_channels = config.num_channels
-
-        self.class_embedding = Parameter(paddle.randn([1, 1, self.embed_dim]))
 
         self.patch_embedding = nn.Conv2D(
             in_channels=self.in_channels,
@@ -210,10 +155,12 @@ class VisualGLMVisionEmbeddings(nn.Layer):
         self.num_patches = (self.image_size // self.patch_size) ** 2
         self.num_positions = self.num_patches + 1
 
-        self.position_embedding = Parameter(paddle.randn([1, self.num_positions, self.embed_dim]))
+        self.class_embedding = Parameter(paddle.randn([1, 1, self.embed_dim]), dtype=self.patch_embedding.weight.dtype)
+        self.position_embedding = Parameter(
+            paddle.randn([1, self.num_positions, self.embed_dim]), dtype=self.patch_embedding.weight.dtype
+        )
 
     def forward(self, pixel_values: paddle.Tensor) -> paddle.Tensor:
-        # breakpoint()
         batch_size = pixel_values.shape[0]
         target_dtype = self.patch_embedding.weight.dtype
         patch_embeds = self.patch_embedding(pixel_values)  # shape = [*, width, grid, grid]
@@ -246,15 +193,15 @@ class VisualGLMAttention(nn.Layer):
         self.qkv = nn.Linear(self.embed_dim, 3 * self.embed_dim, bias_attr=False)
 
         if config.qkv_bias:
-            q_bias = Parameter(paddle.zeros([self.embed_dim]))
-            v_bias = Parameter(paddle.zeros([self.embed_dim]))
+            q_bias = Parameter(paddle.zeros([self.embed_dim], dtype=self.qkv.weight.dtype))
+            v_bias = Parameter(paddle.zeros([self.embed_dim], dtype=self.qkv.weight.dtype))
         else:
             q_bias = None
             v_bias = None
 
         if q_bias is not None:
             qkv_bias = paddle.concat((q_bias, paddle.zeros_like(v_bias), v_bias))
-            self.qkv.bias = Parameter(qkv_bias)
+            self.qkv.bias = Parameter(qkv_bias, dtype=self.qkv.weight.dtype)
 
         self.projection = nn.Linear(self.embed_dim, self.embed_dim)
 
@@ -268,7 +215,6 @@ class VisualGLMAttention(nn.Layer):
         output_attentions: Optional[bool] = False,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
-        # breakpoint()
         bsz, tgt_len, embed_dim = hidden_states.shape
 
         mixed_qkv = self.qkv(hidden_states)
@@ -353,7 +299,7 @@ class VisualGLMEncoderLayer(nn.Layer):
                 returned tensors for more detail.
         """
         residual = hidden_states
-        # breakpoint()
+
         hidden_states = self.layer_norm1(hidden_states)
         hidden_states, attn_weights = self.self_attn(
             hidden_states=hidden_states,
@@ -419,7 +365,6 @@ class VisualGLMEncoder(nn.Layer):
             return_dict (`bool`, *optional*):
                 Whether or not to return a [`~utils.ModelOutput`] instead of a plain tuple.
         """
-        # breakpoint()
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -491,7 +436,6 @@ class VisualGLMVisionModel(VisualGLMPretrainedModel):
         r"""
         Returns:
         """
-        # breakpoint()
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -590,7 +534,6 @@ class VisualGLMQFormerMultiHeadAttention(nn.Layer):
         # and values come from an encoder; the attention mask needs to be
         # such that the encoder's padding tokens are not attended to.
         is_cross_attention = encoder_hidden_states is not None
-        breakpoint()
         if is_cross_attention:
             key_layer = self.transpose_for_scores(self.key(encoder_hidden_states))
             value_layer = self.transpose_for_scores(self.value(encoder_hidden_states))
@@ -713,7 +656,6 @@ class VisualGLMQFormerAttention(nn.Layer):
         past_key_value: Optional[Tuple[Tuple[paddle.Tensor]]] = None,
         output_attentions: Optional[bool] = False,
     ) -> Tuple[paddle.Tensor]:
-        # breakpoint()
         self_outputs = self.attention(
             hidden_states,
             attention_mask,
@@ -747,13 +689,14 @@ class VisualGLMQFormerOutput(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
-        self.LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        # self.LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states: paddle.Tensor, input_tensor: paddle.Tensor) -> paddle.Tensor:
         hidden_states = self.dense(hidden_states)
         hidden_states = self.dropout(hidden_states)
-        hidden_states = self.LayerNorm(hidden_states + input_tensor)
+        hidden_states = hidden_states + input_tensor
+        # hidden_states = self.LayerNorm()
         return hidden_states
 
 
@@ -762,6 +705,7 @@ class VisualGLMQFormerLayer(nn.Layer):
         super().__init__()
         self.chunk_size_feed_forward = config.chunk_size_feed_forward
         self.seq_len_dim = 1
+        self.input_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
         self.attention = VisualGLMQFormerAttention(config)
 
         self.layer_idx = layer_idx
@@ -788,8 +732,9 @@ class VisualGLMQFormerLayer(nn.Layer):
     ):
         # decoder uni-directional self-attention cached key/values tuple is at positions 1,2
         self_attn_past_key_value = past_key_value[:2] if past_key_value is not None else None
+        hidden_states = self.input_layernorm(hidden_states)
         self_attention_outputs = self.attention(
-            hidden_states,
+            hidden_states,  # 1, 32, 768
             attention_mask,
             head_mask,
             output_attentions=output_attentions,
@@ -880,7 +825,6 @@ class VisualGLMQFormerEncoder(nn.Layer):
         return_dict=True,
         query_length=0,
     ):
-        # breakpoint()
         all_hidden_states = () if output_hidden_states else None
         all_self_attentions = () if output_attentions else None
         all_cross_attentions = () if output_attentions else None
@@ -969,7 +913,7 @@ class VisualGLMQFormerModel(VisualGLMPretrainedModel):
         super().__init__(config)
         self.config = config
 
-        self.layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.final_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         self.encoder = VisualGLMQFormerEncoder(config)
@@ -1125,7 +1069,7 @@ class VisualGLMQFormerModel(VisualGLMPretrainedModel):
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-        breakpoint()
+
         # past_key_values_length
         past_key_values_length = (
             past_key_values[0][0].shape[2] - self.config.query_length if past_key_values is not None else 0
@@ -1133,8 +1077,7 @@ class VisualGLMQFormerModel(VisualGLMPretrainedModel):
 
         query_length = query_embeds.shape[1] if query_embeds is not None else 0
 
-        embedding_output = self.layernorm(query_embeds.cast(self.layernorm.weight.dtype))
-        embedding_output = self.dropout(embedding_output)
+        embedding_output = self.dropout(query_embeds)
 
         input_shape = embedding_output.shape[:-1]
         batch_size, seq_length = input_shape
@@ -1190,6 +1133,7 @@ class VisualGLMQFormerModel(VisualGLMPretrainedModel):
             query_length=query_length,
         )
         sequence_output = encoder_outputs[0]
+        sequence_output = self.final_layernorm(sequence_output)
         pooled_output = sequence_output[:, 0, :]
 
         if not return_dict:
@@ -1213,8 +1157,9 @@ class VisualGLMModel(VisualGLMPretrainedModel):
         super().__init__(config)
 
         self.vision_model = VisualGLMVisionModel(config.vision_config)
-
-        self.query_tokens = Parameter(paddle.zeros([1, config.num_query_tokens, config.qformer_config.hidden_size]))
+        self.query_tokens = Parameter(
+            paddle.zeros([1, config.num_query_tokens, config.qformer_config.hidden_size]), dtype=self.config.dtype
+        )
         self.qformer = VisualGLMQFormerModel(config.qformer_config)
 
         self.language_projection = nn.Linear(config.qformer_config.hidden_size, config.text_config.hidden_size)
@@ -1468,6 +1413,46 @@ class VisualGLMModel(VisualGLMPretrainedModel):
         )
 
 
+class ChatGLMForConditionalGenerationWithImage(ChatGLMForConditionalGeneration):
+    def __init__(self, config: ChatGLMConfig):
+        super(ChatGLMForConditionalGenerationWithImage, self).__init__(config)
+        self.config = config
+
+    def forward(
+        self,
+        image_features: paddle.Tensor,  # processed image
+        input_ids: paddle.Tensor,
+        position_ids: Optional[paddle.Tensor] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
+        pre_image_length: Optional[int] = None,
+        cache: Optional[Tuple[paddle.Tensor]] = None,
+        inputs_embeds: Optional[paddle.Tensor] = None,
+        labels: Optional[paddle.Tensor] = None,
+        use_cache: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        if inputs_embeds is None and cache is None and image_features is not None:
+            pre_ids, pad_ids, post_ids = paddle.split(input_ids, num_or_sections=[pre_image_length, 32, -1], axis=1)
+            pre_txt_emb = self.chatglm.transformer.word_embeddings(pre_ids)
+            post_txt_emb = self.chatglm.transformer.word_embeddings(post_ids)
+            inputs_embeds = paddle.concat([pre_txt_emb, image_features, post_txt_emb], axis=1)
+
+        outputs = super().forward(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            cache=cache,
+            inputs_embeds=inputs_embeds,
+            labels=labels,
+            use_cache=use_cache,
+            return_dict=return_dict,
+        )
+
+        return outputs
+
+
 class VisualGLMForConditionalGeneration(VisualGLMPretrainedModel):
     config_class = VisualGLMConfig
     main_input_name = "pixel_values"
@@ -1476,45 +1461,20 @@ class VisualGLMForConditionalGeneration(VisualGLMPretrainedModel):
         super().__init__(config)
         self.config = config
         self.vision_model = VisualGLMVisionModel(config.vision_config)
-
-        self.query_tokens = Parameter(paddle.zeros([1, config.num_query_tokens, config.qformer_config.hidden_size]))
+        self.query_tokens = Parameter(
+            paddle.zeros([1, config.num_query_tokens, config.qformer_config.hidden_size]), dtype=self.config.dtype
+        )
         self.qformer = VisualGLMQFormerModel(config.qformer_config)
         self.language_projection = nn.Linear(config.qformer_config.hidden_size, config.text_config.hidden_size)
-        # self.language_model = ChatGLMForConditionalGeneration(config.text_config)
+        self.language_model = ChatGLMForConditionalGenerationWithImage(config.text_config)
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.embeddings.patch_embedding
 
-    def forward(
+    def encode_images(
         self,
         pixel_values: paddle.Tensor,  # processed image
-        first_input_ids: paddle.Tensor,
-        second_input_ids: paddle.Tensor,
-        first_attention_mask: Optional[paddle.Tensor] = None,
-        second_attention_mask: Optional[paddle.Tensor] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        labels: Optional[paddle.Tensor] = None,
-        return_dict: Optional[bool] = None,
-    ) -> Union[Tuple, VisualGLMForConditionalGenerationModelOutput]:
-        r"""
-        Examples:
-        ```python
-        >>> from PIL import Image
-        >>> import requests
-        >>> import paddle
-        >>> from paddlenlp.transformers import VisualGLMProcessor, VisualGLMForConditionalGeneration
-        >>> processor = VisualGLMProcessor.from_pretrained("model_name")
-        >>> model = VisualGLMForConditionalGeneration.from_pretrained("model_name")
-        >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
-        >>> image = Image.open(requests.get(url, stream=True).raw)
-        >>> text = "describe this image"
-        >>> prompt = "###Human: <Img><ImageHere></Img> <TextHere>###Assistant:"
-        >>> inputs = processor(images=image, texts=text, prompts=prompt, return_tensors="pd")
-        >>> outputs = model(**inputs)
-        ```"""
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
+    ):
         # step 1: forward the images through the vision encoder,
         # to get image embeddings of shape (batch_size, seq_len, hidden_size)
         pixel_values = paddle.cast(pixel_values, self.vision_model.embeddings.patch_embedding.weight.dtype)
@@ -1524,8 +1484,8 @@ class VisualGLMForConditionalGeneration(VisualGLMPretrainedModel):
 
         # step 2: forward the query tokens through the QFormer, using the image embeddings for cross-attention
         query_tokens = self.query_tokens.expand([image_embeds.shape[0], -1, -1])
-        query_tokens = paddle.cast(query_tokens, self.qformer.layernorm.weight.dtype)
-        image_embeds = paddle.cast(image_embeds, self.qformer.layernorm.weight.dtype)
+        query_tokens = paddle.cast(query_tokens, self.qformer.final_layernorm.weight.dtype)
+        image_embeds = paddle.cast(image_embeds, self.qformer.final_layernorm.weight.dtype)
         query_outputs = self.qformer(
             query_embeds=query_tokens,
             encoder_hidden_states=image_embeds,
@@ -1534,65 +1494,19 @@ class VisualGLMForConditionalGeneration(VisualGLMPretrainedModel):
         )
         query_output = query_outputs.last_hidden_state
 
-        # step 3: use the language model, conditioned on the text and image
+        # step 3: mapping query_output into language_model space
         language_model_inputs = self.language_projection(query_output)
-        language_model_attention_mask = paddle.ones(language_model_inputs.shape[:-1], dtype="int64")
+        # language_model_attention_mask = paddle.ones(language_model_inputs.shape[:-1], dtype="int64")
 
-        first_embeds = self.language_model.chatglm.transformer.word_embeddings(first_input_ids)
-        second_embeds = self.language_model.chatglm.transformer.word_embeddings(second_input_ids)
-        language_model_inputs = paddle.cast(language_model_inputs, dtype=first_embeds.dtype)
-        inputs_embeds = paddle.concat([first_embeds, language_model_inputs, second_embeds], axis=1)
-
-        if first_attention_mask is None:
-            first_attention_mask = paddle.ones_like(first_embeds.shape[:-1], dtype="int64")
-        if second_attention_mask is None:
-            second_attention_mask = paddle.ones_like(second_embeds.shape[:-1], dtype="int64")
-        attention_mask = paddle.concat(
-            [first_attention_mask, language_model_attention_mask, second_attention_mask], axis=1
-        )
-
-        outputs = self.language_model(
-            inputs_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-        )
-
-        logits = outputs.logits if return_dict else outputs[0]
-        loss = None
-        # we compute the loss here since we need to take into account the sequence length of the query embeds
-        if labels is not None:
-            logits = logits[:, -labels.shape[1] :, :]
-            # Shift so that tokens < n predict n
-            shift_logits = logits[..., :-1, :]
-            shift_labels = labels[..., 1:]
-
-            # Flatten the tokens
-            loss_fct = CrossEntropyLoss(reduction="mean")
-
-            loss = loss_fct(shift_logits.reshape([-1, self.config.text_config.vocab_size]), shift_labels.reshape([-1]))
-
-        if not return_dict:
-            output = (logits, vision_outputs, query_outputs, outputs)
-            return ((loss,) + output) if loss is not None else output
-
-        return VisualGLMForConditionalGenerationModelOutput(
-            loss=loss,
-            logits=logits,
-            vision_outputs=vision_outputs,
-            qformer_outputs=query_outputs,
-            language_model_outputs=outputs,
-        )
+        return language_model_inputs  # , language_model_attention_mask
 
     @paddle.no_grad()
-    def generate(
+    def generate_with_image(
         self,
         pixel_values: paddle.Tensor,  # processed image
-        first_input_ids: paddle.Tensor,
-        second_input_ids: paddle.Tensor,
-        first_attention_mask: Optional[paddle.Tensor] = None,
-        second_attention_mask: Optional[paddle.Tensor] = None,
+        input_ids: paddle.Tensor,
+        pre_image_length: int,
+        attention_mask: Optional[paddle.Tensor] = None,
         **generate_kwargs,
     ) -> paddle.Tensor:
         """
@@ -1623,46 +1537,15 @@ class VisualGLMForConditionalGeneration(VisualGLMPretrainedModel):
         >>> generated_ids, scores= model.generate(**inputs)
         >>> generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
         """
-        # step 1: forward the images through the vision encoder,
-        # to get image embeddings of shape (batch_size, seq_len, hidden_size)
-        pixel_values = paddle.cast(pixel_values, self.vision_model.embeddings.patch_embedding.weight.dtype)
-        vision_outputs = self.vision_model(pixel_values, return_dict=True)
-        image_embeds = vision_outputs.last_hidden_state
-        image_attention_mask = paddle.ones(image_embeds.shape[:-1], dtype="int64")
 
-        breakpoint()
-        # step 2: forward the query tokens through the QFormer, using the image embeddings for cross-attention
-        query_tokens = self.query_tokens.expand([image_embeds.shape[0], -1, -1])
-        query_tokens = paddle.cast(query_tokens, self.qformer.layernorm.weight.dtype)
-        image_embeds = paddle.cast(image_embeds, self.qformer.layernorm.weight.dtype)
-        query_outputs = self.qformer(
-            query_embeds=query_tokens,
-            encoder_hidden_states=image_embeds,
-            encoder_attention_mask=image_attention_mask,
-            return_dict=True,
-        )
-        query_output = query_outputs.last_hidden_state
-
-        exit(0)
-        # step 3: use the language model, conditioned on the text and image
-        language_model_inputs = self.language_projection(query_output)
-        language_model_attention_mask = paddle.ones(language_model_inputs.shape[:-1], dtype="int64")
-
-        first_embeds = self.language_model.chatglm.transformer.word_embeddings(first_input_ids)
-        second_embeds = self.language_model.chatglm.transformer.word_embeddings(second_input_ids)
-        language_model_inputs = paddle.cast(language_model_inputs, dtype=first_embeds.dtype)
-        inputs_embeds = paddle.concat([first_embeds, language_model_inputs, second_embeds], axis=1)
-
-        if first_attention_mask is None:
-            first_attention_mask = paddle.ones_like(first_embeds.shape[:-1], dtype="int64")
-        if second_attention_mask is None:
-            second_attention_mask = paddle.ones_like(second_embeds.shape[:-1], dtype="int64")
-        attention_mask = paddle.concat(
-            [first_attention_mask, language_model_attention_mask, second_attention_mask], axis=1
-        )
+        image_features = self.encode_images(pixel_values)
 
         outputs = self.language_model.generate(
-            inputs_embeds=inputs_embeds, attention_mask=attention_mask, **generate_kwargs
+            input_ids=input_ids,
+            image_features=image_features,
+            pre_image_length=pre_image_length,
+            attention_mask=attention_mask,
+            **generate_kwargs,
         )
 
         return outputs
