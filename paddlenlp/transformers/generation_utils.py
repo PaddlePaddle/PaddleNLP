@@ -1759,8 +1759,7 @@ class ForcedBOSTokenLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids, scores):
         cur_len = input_ids.shape[-1]
         if cur_len == 1:
-            num_tokens = scores.shape[1]
-            scores[:, [i for i in range(num_tokens) if i != self.forced_bos_token_id]] = -float("inf")
+            scores[:] = -float("inf")
             scores[:, self.forced_bos_token_id] = 0
         return scores
 
