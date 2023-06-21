@@ -1457,10 +1457,15 @@ class Trainer:
                 # c_embedding not support bf16 yet
                 custom_black_list.append("c_embedding")
 
+            if self.args.amp_custom_white_list is not None:
+                custom_white_list.extend(self.args.amp_custom_white_list)
+            if self.args.amp_custom_black_list is not None:
+                custom_black_list.extend(self.args.amp_custom_black_list)
+
             ctx_manager = autocast(
                 True,
-                custom_black_list=custom_black_list,
-                custom_white_list=custom_white_list,
+                custom_black_list=set(custom_black_list),
+                custom_white_list=set(custom_white_list),
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
             )
@@ -1896,6 +1901,7 @@ class Trainer:
             prediction_loss_only=True if self.compute_metrics is None else None,
             ignore_keys=ignore_keys,
             metric_key_prefix=metric_key_prefix,
+            max_eval_iters=self.args.max_evaluate_steps,
         )
 
         total_batch_size = self.args.eval_batch_size * self.args.dataset_world_size
@@ -2142,7 +2148,11 @@ class Trainer:
 
         eval_loop = self.evaluation_loop
         output = eval_loop(
-            test_dataloader, description="Prediction", ignore_keys=ignore_keys, metric_key_prefix=metric_key_prefix
+            test_dataloader,
+            description="Prediction",
+            ignore_keys=ignore_keys,
+            metric_key_prefix=metric_key_prefix,
+            max_eval_iters=self.args.max_evaluate_steps,
         )
         total_batch_size = self.args.per_device_eval_batch_size * self.args.dataset_world_size
         output.metrics.update(
