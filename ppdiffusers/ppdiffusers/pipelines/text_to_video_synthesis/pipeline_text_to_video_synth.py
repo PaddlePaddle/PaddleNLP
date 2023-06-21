@@ -21,6 +21,7 @@ import paddle
 
 from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
 
+from ...loaders import TextualInversionLoaderMixin
 from ...models import AutoencoderKL, UNet3DConditionModel
 from ...schedulers import KarrasDiffusionSchedulers
 from ...utils import logging, randn_tensor, replace_example_docstring
@@ -48,6 +49,8 @@ EXAMPLE_DOC_STRING = """
 
 
 def tensor2vid(video: paddle.Tensor, mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]) -> List[np.ndarray]:
+    # This code is copied from https://github.com/modelscope/modelscope/blob/1509fdb973e5871f37148a4b5e5964cafd43e64d/modelscope/pipelines/multi_modal/text_to_video_synthesis_pipeline.py#L78
+    # reshape to ncfhw
     mean = paddle.to_tensor(mean).reshape((1, -1, 1, 1, 1))
     std = paddle.to_tensor(std).reshape((1, -1, 1, 1, 1))
     video = video.multiply(std)
@@ -55,13 +58,13 @@ def tensor2vid(video: paddle.Tensor, mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]) 
 
     video.clip_(min=0, max=1)
     i, c, f, h, w = video.shape
-    images = video.transpose(perm=[2, 3, 0, 4, 1]).reshape((f, h, i * w, c))
+    images = video.transpose([2, 3, 0, 4, 1]).reshape((f, h, i * w, c))
     images = images.unbind(axis=0)
     images = [(image.cpu().numpy() * 255).astype("uint8") for image in images]
     return images
 
 
-class TextToVideoSDPipeline(DiffusionPipeline):
+class TextToVideoSDPipeline(DiffusionPipeline, TextualInversionLoaderMixin):
     """
     Pipeline for text-to-video generation.
 
@@ -90,7 +93,13 @@ class TextToVideoSDPipeline(DiffusionPipeline):
         scheduler: KarrasDiffusionSchedulers,
     ):
         super().__init__()
-        self.register_modules(vae=vae, text_encoder=text_encoder, tokenizer=tokenizer, unet=unet, scheduler=scheduler)
+        self.register_modules(
+            vae=vae,
+            text_encoder=text_encoder,
+            tokenizer=tokenizer,
+            unet=unet,
+            scheduler=scheduler,
+        )
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
 
     def _encode_prompt(
@@ -114,8 +123,8 @@ class TextToVideoSDPipeline(DiffusionPipeline):
                 whether to use classifier free guidance or not
             negative_prompt (`str` or `List[str]`, *optional*):
                 The prompt or prompts not to guide the image generation. If not defined, one has to pass
-                `negative_prompt_embeds`. instead. If not defined, one has to pass `negative_prompt_embeds`. instead.
-                Ignored when not using guidance (i.e., ignored if `guidance_scale` is less than `1`).
+                `negative_prompt_embeds` instead. Ignored when not using guidance (i.e., ignored if `guidance_scale` is
+                less than `1`).
             prompt_embeds (`paddle.Tensor`, *optional*):
                 Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
                 provided, text embeddings will be generated from `prompt` input argument.
@@ -131,6 +140,9 @@ class TextToVideoSDPipeline(DiffusionPipeline):
         else:
             batch_size = prompt_embeds.shape[0]
         if prompt_embeds is None:
+            # textual inversion: procecss multi-vector tokens if necessary
+            if isinstance(self, TextualInversionLoaderMixin):
+                prompt = self.maybe_convert_prompt(prompt, self.tokenizer)
             text_inputs = self.tokenizer(
                 prompt,
                 padding="max_length",
@@ -155,10 +167,12 @@ class TextToVideoSDPipeline(DiffusionPipeline):
                 attention_mask = None
             prompt_embeds = self.text_encoder(text_input_ids, attention_mask=attention_mask)
             prompt_embeds = prompt_embeds[0]
-        prompt_embeds = prompt_embeds.astype(self.text_encoder.dtype)
+        prompt_embeds = prompt_embeds.cast(self.text_encoder.dtype)
         bs_embed, seq_len, _ = prompt_embeds.shape
-        prompt_embeds = prompt_embeds.tile(repeat_times=[1, num_images_per_prompt, 1])
+        # duplicate text embeddings for each generation per prompt, using mps friendly method
+        prompt_embeds = prompt_embeds.tile([1, num_images_per_prompt, 1])
         prompt_embeds = prompt_embeds.reshape((bs_embed * num_images_per_prompt, seq_len, -1))
+        # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance and negative_prompt_embeds is None:
             uncond_tokens: List[str]
             if negative_prompt is None:
@@ -175,6 +189,10 @@ class TextToVideoSDPipeline(DiffusionPipeline):
                 )
             else:
                 uncond_tokens = negative_prompt
+
+            # textual inversion: procecss multi-vector tokens if necessary
+            if isinstance(self, TextualInversionLoaderMixin):
+                uncond_tokens = self.maybe_convert_prompt(uncond_tokens, self.tokenizer)
             max_length = prompt_embeds.shape[1]
             uncond_input = self.tokenizer(
                 uncond_tokens, padding="max_length", max_length=max_length, truncation=True, return_tensors="pd"
@@ -186,31 +204,38 @@ class TextToVideoSDPipeline(DiffusionPipeline):
             negative_prompt_embeds = self.text_encoder(uncond_input.input_ids, attention_mask=attention_mask)
             negative_prompt_embeds = negative_prompt_embeds[0]
         if do_classifier_free_guidance:
+            # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
             seq_len = negative_prompt_embeds.shape[1]
-            negative_prompt_embeds = negative_prompt_embeds.astype(self.text_encoder.dtype)
-            negative_prompt_embeds = negative_prompt_embeds.tile(repeat_times=[1, num_images_per_prompt, 1])
+            negative_prompt_embeds = negative_prompt_embeds.cast(self.text_encoder.dtype)
+            negative_prompt_embeds = negative_prompt_embeds.tile([1, num_images_per_prompt, 1])
             negative_prompt_embeds = negative_prompt_embeds.reshape((batch_size * num_images_per_prompt, seq_len, -1))
-            prompt_embeds = paddle.concat(x=[negative_prompt_embeds, prompt_embeds])
+            # For classifier free guidance, we need to do two forward passes.
+            # Here we concatenate the unconditional and text embeddings into a single batch
+            # to avoid doing two forward passes
+            prompt_embeds = paddle.concat([negative_prompt_embeds, prompt_embeds])
         return prompt_embeds
 
     def decode_latents(self, latents):
         latents = 1 / self.vae.config.scaling_factor * latents
         batch_size, channels, num_frames, height, width = latents.shape
-        latents = latents.transpose(perm=[0, 2, 1, 3, 4]).reshape((batch_size * num_frames, channels, height, width))
+        latents = latents.transpose([0, 2, 1, 3, 4]).reshape((batch_size * num_frames, channels, height, width))
         image = self.vae.decode(latents).sample
         video = (
-            image[(None), :]
-            .reshape((batch_size, num_frames, -1) + tuple(image.shape[2:]))
-            .transpose(perm=[0, 2, 1, 3, 4])
+            image[None, :].reshape((batch_size, num_frames, -1) + tuple(image.shape[2:])).transpose([0, 2, 1, 3, 4])
         )
-        video = video.astype(dtype="float32")
+        video = video.cast("float32")
         return video
 
     def prepare_extra_step_kwargs(self, generator, eta):
+        # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
+        # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
+        # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
+        # and should be between [0, 1]
         accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
         extra_step_kwargs = {}
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
+        # check if the scheduler accepts generator
         accepts_generator = "generator" in set(inspect.signature(self.scheduler.step).parameters.keys())
         if accepts_generator:
             extra_step_kwargs["generator"] = generator
@@ -323,8 +348,8 @@ class TextToVideoSDPipeline(DiffusionPipeline):
                 usually at the expense of lower video quality.
             negative_prompt (`str` or `List[str]`, *optional*):
                 The prompt or prompts not to guide the video generation. If not defined, one has to pass
-                `negative_prompt_embeds`. instead. If not defined, one has to pass `negative_prompt_embeds`. instead.
-                Ignored when not using guidance (i.e., ignored if `guidance_scale` is less than `1`).
+                `negative_prompt_embeds` instead. Ignored when not using guidance (i.e., ignored if `guidance_scale` is
+                less than `1`).
             eta (`float`, *optional*, defaults to 0.0):
                 Corresponds to parameter eta (η) in the DDIM paper: https://arxiv.org/abs/2010.02502. Only applies to
                 [`schedulers.DDIMScheduler`], will be ignored for others.
@@ -356,7 +381,9 @@ class TextToVideoSDPipeline(DiffusionPipeline):
                 called at every step.
             cross_attention_kwargs (`dict`, *optional*):
                 A kwargs dictionary that if specified is passed along to the `AttentionProcessor` as defined under
-                `self.processor` in ppdiffusers.cross_attention.
+                `self.processor` in
+                [ppdiffusers.cross_attention](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/cross_attention.py).
+
 
         Examples:
 
@@ -365,19 +392,26 @@ class TextToVideoSDPipeline(DiffusionPipeline):
             [`~pipelines.stable_diffusion.TextToVideoSDPipelineOutput`] if `return_dict` is True, otherwise a `tuple.
             When returning a tuple, the first element is a list with the generated frames.
         """
+        # 0. Default height and width to unet
         height = height or self.unet.config.sample_size * self.vae_scale_factor
         width = width or self.unet.config.sample_size * self.vae_scale_factor
         num_images_per_prompt = 1
+        # 1. Check inputs. Raise error if not correct
         self.check_inputs(
             prompt, height, width, callback_steps, negative_prompt, prompt_embeds, negative_prompt_embeds
         )
+        # 2. Define call parameters
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
         elif prompt is not None and isinstance(prompt, list):
             batch_size = len(prompt)
         else:
             batch_size = prompt_embeds.shape[0]
+        # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
+        # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
+        # corresponds to doing no classifier free guidance.
         do_classifier_free_guidance = guidance_scale > 1.0
+        # 3. Encode input prompt
         prompt_embeds = self._encode_prompt(
             prompt,
             num_images_per_prompt,
@@ -386,9 +420,14 @@ class TextToVideoSDPipeline(DiffusionPipeline):
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
         )
+
+        # 4. Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps)
+
         timesteps = self.scheduler.timesteps
-        num_channels_latents = self.unet.in_channels
+
+        # 5. Prepare latent variables
+        num_channels_latents = self.unet.config.in_channels
         latents = self.prepare_latents(
             batch_size * num_images_per_prompt,
             num_channels_latents,
@@ -399,29 +438,36 @@ class TextToVideoSDPipeline(DiffusionPipeline):
             generator,
             latents,
         )
+
+        # 6. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
+        # 7. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
-                latent_model_input = paddle.concat(x=[latents] * 2) if do_classifier_free_guidance else latents
+                # expand the latents if we are doing classifier free guidance
+                latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+                # predict the noise residual
                 noise_pred = self.unet(
                     latent_model_input,
                     t,
                     encoder_hidden_states=prompt_embeds,
                     cross_attention_kwargs=cross_attention_kwargs,
                 ).sample
+                # perform guidance
                 if do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(chunks=2)
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+                # reshape latents
                 bsz, channel, frames, width, height = latents.shape
-                latents = latents.transpose(perm=[0, 2, 1, 3, 4]).reshape((bsz * frames, channel, width, height))
-                noise_pred = noise_pred.transpose(perm=[0, 2, 1, 3, 4]).reshape((bsz * frames, channel, width, height))
+                latents = latents.transpose([0, 2, 1, 3, 4]).reshape((bsz * frames, channel, width, height))
+                noise_pred = noise_pred.transpose([0, 2, 1, 3, 4]).reshape((bsz * frames, channel, width, height))
+                # compute the previous noisy sample x_t -> x_t-1
                 latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
-                latents = (
-                    latents[None, :].reshape((bsz, frames, channel, width, height)).transpose(perm=[0, 2, 1, 3, 4])
-                )
-                if i == len(timesteps) - 1 or i + 1 > num_warmup_steps and (i + 1) % self.scheduler.order == 0:
+                latents = latents[None, :].reshape((bsz, frames, channel, width, height)).transpose([0, 2, 1, 3, 4])
+                # call the callback, if provided
+                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)

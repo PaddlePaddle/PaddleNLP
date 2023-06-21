@@ -14,16 +14,18 @@
 # limitations under the License.
 
 import inspect
-from typing import Callable, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import paddle
 import PIL
 from packaging import version
 
-from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
+from paddlenlp.transformers import CLIPImageProcessor, CLIPTextModel, CLIPTokenizer
 
 from ...configuration_utils import FrozenDict
+from ...image_processor import VaeImageProcessor
+from ...loaders import FromCkptMixin, LoraLoaderMixin, TextualInversionLoaderMixin
 from ...models import AutoencoderKL, UNet2DConditionModel
 from ...schedulers import KarrasDiffusionSchedulers
 from ...utils import (
@@ -74,7 +76,7 @@ def preprocess(image):
 
     if isinstance(image[0], PIL.Image.Image):
         w, h = image[0].size
-        w, h = map(lambda x: x - x % 8, (w, h))  # resize to integer multiple of 8
+        w, h = (x - x % 8 for x in (w, h))  # resize to integer multiple of 8
 
         image = [np.array(i.resize((w, h), resample=PIL_INTERPOLATION["lanczos"]))[None, :] for i in image]
         image = np.concatenate(image, axis=0)
@@ -87,12 +89,19 @@ def preprocess(image):
     return image
 
 
-class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
+class StableDiffusionImg2ImgPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMixin, FromCkptMixin):
     r"""
     Pipeline for text-guided image to image generation using Stable Diffusion.
 
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
     library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
+
+    In addition the pipeline inherits the following loading methods:
+        - *Textual-Inversion*: [`loaders.TextualInversionLoaderMixin.load_textual_inversion`]
+        - *LoRA*: [`loaders.LoraLoaderMixin.load_lora_weights`]
+        - *Ckpt*: [`loaders.FromCkptMixin.from_ckpt`]
+    as well as the following saving methods:
+        - *LoRA*: [`loaders.LoraLoaderMixin.save_lora_weights`]
 
     Args:
         vae ([`AutoencoderKL`]):
@@ -112,7 +121,7 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
         safety_checker ([`StableDiffusionSafetyChecker`]):
             Classification module that estimates whether generated images could be considered offensive or harmful.
             Please, refer to the [model card](https://huggingface.co/runwayml/stable-diffusion-v1-5) for details.
-        feature_extractor ([`CLIPFeatureExtractor`]):
+        feature_extractor ([`CLIPImageProcessor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
     _optional_components = ["safety_checker", "feature_extractor"]
@@ -126,7 +135,7 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
         unet: UNet2DConditionModel,
         scheduler: KarrasDiffusionSchedulers,
         safety_checker: StableDiffusionSafetyChecker,
-        feature_extractor: CLIPFeatureExtractor,
+        feature_extractor: CLIPImageProcessor,
         requires_safety_checker: bool = True,
     ):
         super().__init__()
@@ -205,7 +214,10 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
             feature_extractor=feature_extractor,
         )
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
-        self.register_to_config(requires_safety_checker=requires_safety_checker)
+        self.image_processor = VaeImageProcessor(vae_scale_factor=self.vae_scale_factor, do_convert_rgb=True)
+        self.register_to_config(
+            requires_safety_checker=requires_safety_checker,
+        )
 
     # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline._encode_prompt
     def _encode_prompt(
@@ -229,8 +241,8 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
                 whether to use classifier free guidance or not
             negative_prompt (`str` or `List[str]`, *optional*):
                 The prompt or prompts not to guide the image generation. If not defined, one has to pass
-                `negative_prompt_embeds`. instead. If not defined, one has to pass `negative_prompt_embeds`. instead.
-                Ignored when not using guidance (i.e., ignored if `guidance_scale` is less than `1`).
+                `negative_prompt_embeds` instead. Ignored when not using guidance (i.e., ignored if `guidance_scale` is
+                less than `1`).
             prompt_embeds (`paddle.Tensor`, *optional*):
                 Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
                 provided, text embeddings will be generated from `prompt` input argument.
@@ -247,6 +259,10 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
             batch_size = prompt_embeds.shape[0]
 
         if prompt_embeds is None:
+            # textual inversion: procecss multi-vector tokens if necessary
+            if isinstance(self, TextualInversionLoaderMixin):
+                prompt = self.maybe_convert_prompt(prompt, self.tokenizer)
+
             text_inputs = self.tokenizer(
                 prompt,
                 padding="max_length",
@@ -305,6 +321,10 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
             else:
                 uncond_tokens = negative_prompt
 
+            # textual inversion: procecss multi-vector tokens if necessary
+            if isinstance(self, TextualInversionLoaderMixin):
+                uncond_tokens = self.maybe_convert_prompt(uncond_tokens, self.tokenizer)
+
             max_length = prompt_embeds.shape[1]
             uncond_input = self.tokenizer(
                 uncond_tokens,
@@ -341,24 +361,24 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
 
         return prompt_embeds
 
-    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.run_safety_checker
     def run_safety_checker(self, image, dtype):
-        if self.safety_checker is not None:
-            safety_checker_input = self.feature_extractor(self.numpy_to_pil(image), return_tensors="pd")
-            image, has_nsfw_concept = self.safety_checker(
-                images=image, clip_input=safety_checker_input.pixel_values.cast(dtype)
-            )
-        else:
+        if self.safety_checker is None:
             has_nsfw_concept = None
+        else:
+            if paddle.is_tensor(image):
+                feature_extractor_input = self.image_processor.postprocess(image, output_type="pil")
+            else:
+                feature_extractor_input = self.image_processor.numpy_to_pil(image)
+            safety_checker_input = self.feature_extractor(feature_extractor_input, return_tensors="pd")
+            image, has_nsfw_concept = self.safety_checker(
+                images=image, clip_input=paddle.cast(safety_checker_input.pixel_values, dtype)
+            )
         return image, has_nsfw_concept
 
-    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents
     def decode_latents(self, latents):
         latents = 1 / self.vae.config.scaling_factor * latents
         image = self.vae.decode(latents).sample
-        image = (image / 2 + 0.5).clip(0, 1)
-        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
-        image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
+        # image = (image / 2 + 0.5).clip(0, 1)
         return image
 
     # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_extra_step_kwargs
@@ -424,15 +444,13 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
         init_timestep = min(int(num_inference_steps * strength), num_inference_steps)
 
         t_start = max(num_inference_steps - init_timestep, 0)
-        timesteps = self.scheduler.timesteps[t_start:]
+        timesteps = self.scheduler.timesteps[t_start * self.scheduler.order :]
 
         return timesteps, num_inference_steps - t_start
 
     def prepare_latents(self, image, timestep, batch_size, num_images_per_prompt, dtype, generator=None):
-        if not isinstance(image, (paddle.Tensor, PIL.Image.Image, list)):
-            raise ValueError(
-                f"`image` has to be of type `paddle.Tensor`, `PIL.Image.Image` or list but is {type(image)}"
-            )
+        if not isinstance(image, (paddle.Tensor, list)):
+            raise ValueError(f"`image` has to be of type `paddle.Tensor` or list but is {type(image)}")
 
         image = image.cast(dtype)
 
@@ -499,6 +517,7 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
+        cross_attention_kwargs: Optional[Dict[str, Any]] = None,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -555,6 +574,10 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
             callback_steps (`int`, *optional*, defaults to 1):
                 The frequency at which the `callback` function will be called. If not specified, the callback will be
                 called at every step.
+            cross_attention_kwargs (`dict`, *optional*):
+                A kwargs dictionary that if specified is passed along to the `AttentionProcessor` as defined under
+                `self.processor` in
+                [diffusers.cross_attention](https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/cross_attention.py).
         Examples:
 
         Returns:
@@ -564,7 +587,6 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
             list of `bool`s denoting whether the corresponding generated image likely represents "not-safe-for-work"
             (nsfw) content, according to the `safety_checker`.
         """
-
         # 1. Check inputs. Raise error if not correct
         self.check_inputs(prompt, strength, callback_steps, negative_prompt, prompt_embeds, negative_prompt_embeds)
 
@@ -591,7 +613,7 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
         )
 
         # 4. Preprocess image
-        image = preprocess(image)
+        image = self.image_processor.preprocess(image)
 
         # 5. set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
@@ -615,7 +637,12 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                 # predict the noise residual
-                noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=prompt_embeds).sample
+                noise_pred = self.unet(
+                    latent_model_input,
+                    t,
+                    encoder_hidden_states=prompt_embeds,
+                    cross_attention_kwargs=cross_attention_kwargs,
+                ).sample
 
                 # perform guidance
                 if do_classifier_free_guidance:
@@ -631,15 +658,19 @@ class StableDiffusionImg2ImgPipeline(DiffusionPipeline):
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)
 
-        # 9. Post-processing
-        image = self.decode_latents(latents)
+        if not output_type == "latent":
+            image = self.decode_latents(latents)
+            image, has_nsfw_concept = self.run_safety_checker(image, prompt_embeds.dtype)
+        else:
+            image = latents
+            has_nsfw_concept = None
 
-        # 10. Run safety checker
-        image, has_nsfw_concept = self.run_safety_checker(image, prompt_embeds.dtype)
+        if has_nsfw_concept is None:
+            do_denormalize = [True] * image.shape[0]
+        else:
+            do_denormalize = [not has_nsfw for has_nsfw in has_nsfw_concept]
 
-        # 11. Convert to PIL
-        if output_type == "pil":
-            image = self.numpy_to_pil(image)
+        image = self.image_processor.postprocess(image, output_type=output_type, do_denormalize=do_denormalize)
 
         if not return_dict:
             return (image, has_nsfw_concept)

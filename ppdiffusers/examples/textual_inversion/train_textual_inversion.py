@@ -51,7 +51,9 @@ from ppdiffusers import (
 )
 from ppdiffusers.optimization import get_scheduler
 from ppdiffusers.training_utils import freeze_params, unfreeze_params, unwrap_model
-from ppdiffusers.utils import PIL_INTERPOLATION
+from ppdiffusers.utils import PIL_INTERPOLATION, check_min_version
+
+check_min_version("0.16.1")
 
 
 def url_or_path_join(*path_list):
@@ -118,9 +120,13 @@ def get_report_to(args):
     return writer
 
 
-def save_progress(text_encoder, placeholder_token_id, args, save_path):
+def save_progress(text_encoder, placeholder_token_ids, args, save_path):
     logger.info("Saving embeddings")
-    learned_embeds = unwrap_model(text_encoder).get_input_embeddings().weight[placeholder_token_id]
+    learned_embeds = (
+        unwrap_model(text_encoder)
+        .get_input_embeddings()
+        .weight[min(placeholder_token_ids) : max(placeholder_token_ids) + 1]
+    )
     learned_embeds_dict = {args.placeholder_token: learned_embeds.detach()}
     paddle.save(learned_embeds_dict, save_path)
 
@@ -136,8 +142,14 @@ def parse_args():
     parser.add_argument(
         "--only_save_embeds",
         action="store_true",
-        default=False,
+        default=True,
         help="Save only the embeddings for the new concept.",
+    )
+    parser.add_argument(
+        "--num_vectors",
+        type=int,
+        default=1,
+        help="How many textual inversion vectors shall be used to learn the concept.",
     )
     parser.add_argument(
         "--pretrained_model_name_or_path",
@@ -321,6 +333,8 @@ def parse_args():
     parser.add_argument(
         "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
     )
+    parser.add_argument("--noise_offset", type=float, default=0, help="The scale of noise offset.")
+
     args = parser.parse_args()
 
     if args.train_data_dir is None:
@@ -560,6 +574,8 @@ def main():
 
     # Handle the repository creation
     if is_main_process:
+        if args.output_dir is not None:
+            os.makedirs(args.output_dir, exist_ok=True)
         if args.push_to_hub:
             if args.hub_model_id is None:
                 repo_name = get_full_repo_name(Path(args.output_dir).name, token=args.hub_token)
@@ -573,8 +589,6 @@ def main():
                     gitignore.write("step_*\n")
                 if "epoch_*" not in gitignore:
                     gitignore.write("epoch_*\n")
-        elif args.output_dir is not None:
-            os.makedirs(args.output_dir, exist_ok=True)
 
     # Load tokenizer
     if args.tokenizer_name:
@@ -586,8 +600,18 @@ def main():
     noise_scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
 
     # Add the placeholder token in tokenizer
-    num_added_tokens = tokenizer.add_tokens(args.placeholder_token)
-    if num_added_tokens == 0:
+    placeholder_tokens = [args.placeholder_token]
+    if args.num_vectors < 1:
+        raise ValueError(f"--num_vectors has to be larger or equal to 1, but is {args.num_vectors}")
+
+    # add dummy tokens for multi-vector
+    additional_tokens = []
+    for i in range(1, args.num_vectors):
+        additional_tokens.append(f"{args.placeholder_token}_{i}")
+    placeholder_tokens += additional_tokens
+
+    num_added_tokens = tokenizer.add_tokens(placeholder_tokens)
+    if num_added_tokens != args.num_vectors:
         raise ValueError(
             f"The tokenizer already contains the token {args.placeholder_token}. Please pass a different"
             " `placeholder_token` that is not already in the tokenizer."
@@ -598,7 +622,7 @@ def main():
     if len(initializer_token_ids) < 1:
         raise ValueError("The initializer token must be a greater equal than one.")
 
-    placeholder_token_id = tokenizer.convert_tokens_to_ids(args.placeholder_token)
+    placeholder_token_ids = tokenizer.convert_tokens_to_ids(placeholder_tokens)
 
     text_encoder_cls = import_model_class_from_model_name_or_path(args.pretrained_model_name_or_path)
 
@@ -620,9 +644,10 @@ def main():
     with paddle.no_grad():
         token_embeds = text_encoder.get_input_embeddings()
         # we will compute mean
-        token_embeds.weight[placeholder_token_id] = paddle.stack(
-            [token_embeds.weight[each] for each in initializer_token_ids]
-        ).mean(0)
+        for token_id in placeholder_token_ids:
+            token_embeds.weight[token_id] = paddle.stack(
+                [token_embeds.weight[each] for each in initializer_token_ids]
+            ).mean(0)
 
     # Freeze vae and unet
     freeze_params(vae.parameters())
@@ -739,8 +764,10 @@ def main():
 
     # keep original embeddings as reference
     orig_embeds_params = unwrap_model(text_encoder).get_input_embeddings().weight.clone()
-    index_no_updates = (paddle.arange(len(tokenizer)) != placeholder_token_id).cast(paddle.int64).sum()
 
+    index_no_updates = paddle.ones((len(tokenizer),), dtype=paddle.bool)
+    index_no_updates[min(placeholder_token_ids) : max(placeholder_token_ids) + 1] = False
+    index_no_updates = index_no_updates.cast("int64").sum()
     # Keep vae and unet in eval model as we don't train these
     vae.eval()
     unet.train()
@@ -750,10 +777,15 @@ def main():
         for step, batch in enumerate(train_dataloader):
             # Convert images to latent space
             latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
-            latents = latents * 0.18215
+            latents = latents * vae.config.scaling_factor
 
             # Sample noise that we'll add to the latents
-            noise = paddle.randn(latents.shape)
+            noise = paddle.randn(latents.shape, dtype=latents.dtype)
+            if args.noise_offset:
+                # https://www.crosslabs.org//blog/diffusion-with-offset-noise
+                noise += args.noise_offset * paddle.randn(
+                    (latents.shape[0], latents.shape[1], 1, 1), dtype=latents.dtype
+                )
             batch_size = latents.shape[0]
             # Sample a random timestep for each image
             timesteps = paddle.randint(0, noise_scheduler.config.num_train_timesteps, (batch_size,)).cast("int64")
@@ -830,7 +862,7 @@ def main():
 
                     if global_step % args.save_steps == 0:
                         save_path = os.path.join(args.output_dir, f"learned_embeds-steps-{global_step}.pdparams")
-                        save_progress(text_encoder, placeholder_token_id, args, save_path)
+                        save_progress(text_encoder, placeholder_token_ids, args, save_path)
 
                 if global_step >= args.max_train_steps:
                     break
@@ -848,6 +880,7 @@ def main():
                     tokenizer=tokenizer,
                     paddle_dtype=paddle_dtype,
                     safety_checker=None,
+                    requires_safety_checker=False,
                 )
                 pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
                 pipeline.set_progress_bar_config(disable=True)
@@ -887,7 +920,7 @@ def main():
             pipeline.save_pretrained(args.output_dir)
         # Save the newly trained embeddings
         save_path = os.path.join(args.output_dir, "learned_embeds.pdparams")
-        save_progress(text_encoder, placeholder_token_id, args, save_path)
+        save_progress(text_encoder, placeholder_token_ids, args, save_path)
 
         if args.push_to_hub:
             repo.push_to_hub(commit_message="End of training", blocking=False, auto_lfs_prune=True)

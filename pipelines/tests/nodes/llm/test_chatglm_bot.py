@@ -19,7 +19,9 @@ from pipelines.nodes.llm import ChatGLMBot
 
 class TestChatGLMBot(unittest.TestCase):
     def setUp(self):
-        self.chatbot = ChatGLMBot(model="__internal_testing__/tiny-random-chatglm", dtype="float32", tgt_length=8)
+        self.chatbot = ChatGLMBot(
+            model_name_or_path="__internal_testing__/tiny-random-chatglm", dtype="float32", tgt_length=8
+        )
 
     def test_run(self):
         prompt_text = "很高兴认识你"

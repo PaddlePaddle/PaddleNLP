@@ -49,3 +49,4 @@ except OptionalDependencyNotAvailable:
     from ...utils.dummy_paddle_and_paddlenlp_objects import *
 else:
     from .pipeline_text_to_video_synth import TextToVideoSDPipeline
+    from .pipeline_text_to_video_zero import TextToVideoZeroPipeline
