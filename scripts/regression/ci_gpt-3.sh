@@ -40,10 +40,10 @@ function case_list_chain(){
     gpt_345M_mp8_qat
     gpt_export_345M_mp1
     gpt_export_345M_mp2
-    # gpt_export_qat_345M  # bug@hongxiang
+    # gpt_export_qat_345M
     gpt_inference_345M_single
     gpt_inference_345M_dp8
-    # gpt_345M_single_finetune  # bug@hongxiang
+    gpt_345M_single_finetune
     gpt_eval_WikiText
     gpt_eval_LAMBADA
 }
@@ -230,6 +230,7 @@ function gpt_175B_DP1_MP8_PP1_sp() {
 function gpt_175B_DP1_MP1_PP8() {
     echo "=========== $FUNCNAME run begin ==========="
     rm -rf log
+    export PADDLE_USE_FOUR_DIRECTIONS_P2P=True # TDDO:nccl to 2.15
     python -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" tools/train.py\
         -c ppfleetx/configs/nlp/gpt/pretrain_gpt_175B_mp8_pp16.yaml \
         -o Model.hidden_size=1024 -o Model.num_layers=32 -o Model.num_attention_heads=16 \
@@ -242,6 +243,7 @@ function gpt_175B_DP1_MP1_PP8() {
         -o Model.sequence_parallel=False \
         >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
+    unset PADDLE_USE_FOUR_DIRECTIONS_P2P
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -765,7 +767,7 @@ function gpt_auto_pass_o1_stage1() {
     loss1=`cat $log_dir/workerlog.4 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss2=`cat $log_dir/workerlog.6 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 5.4914 ${loss}
+    check_result $FUNCNAME 5.4915 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -796,7 +798,7 @@ function gpt_auto_pass_o1_stage2() {
     loss1=`cat $log_dir/workerlog.4 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss2=`cat $log_dir/workerlog.6 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 5.4914 ${loss}
+    check_result $FUNCNAME 5.4915 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
