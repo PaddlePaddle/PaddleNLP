@@ -79,7 +79,7 @@ class TestQuantedLoraLayer(unittest.TestCase):
             state_dict = paddle.load(weights_path)
             new_quant_lora_layer.set_dict(state_dict)
             x = paddle.randn([2, 4, 16], "float32")
-            self.assertTrue(paddle.allclose(new_quant_lora_layer(x), quant_lora_layer(x)))
+            self.assertTrue(paddle.allclose(new_quant_lora_layer(x), quant_lora_layer(x)), rtol=1e-5)
 
 
 class TestQuantedLoRAModel(unittest.TestCase):
@@ -104,12 +104,11 @@ class TestQuantedLoRAModel(unittest.TestCase):
     def _count_layers(self, model, layer_type):
         count = 0
         for _layer in model.sublayers(True):
-            print(_layer, layer_type, isinstance(_layer, layer_type))
             if isinstance(_layer, layer_type):
                 count += 1
         return count
 
-    def test_model_layers(self):
+    def test_count_model_layers(self):
         q_config = QuantConfig(activation=None, weight=None)
         q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
         q_config.add_type_config(LoRALinear, weight=FakeQuanterWithAbsMaxObserver(moving_rate=0.9))
@@ -129,7 +128,7 @@ class TestQuantedLoRAModel(unittest.TestCase):
         input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 5]))
         original_model_outputs = self.lora_model(input_ids)[0]
         quant_model_outputs = quant_lora_model(input_ids)[0]
-        self.assertTrue(paddle.allclose(original_model_outputs, quant_model_outputs))
+        self.assertTrue(paddle.allclose(original_model_outputs, quant_model_outputs, rtol=1e-5))
 
     def test_forward_weight_quant(self):
         q_config = QuantConfig(activation=None, weight=None)
