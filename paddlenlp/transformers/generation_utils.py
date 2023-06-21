@@ -1759,8 +1759,7 @@ class ForcedBOSTokenLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids, scores):
         cur_len = input_ids.shape[-1]
         if cur_len == 1:
-            num_tokens = scores.shape[1]
-            scores[:, [i for i in range(num_tokens) if i != self.forced_bos_token_id]] = -float("inf")
+            scores[:] = -float("inf")
             scores[:, self.forced_bos_token_id] = 0
         return scores
 
@@ -1781,10 +1780,7 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids, scores):
         cur_len = input_ids.shape[-1]
         if cur_len == self.max_length - 1:
-            num_tokens = scores.shape[1]
-            scores[
-                :, [i for i in range(num_tokens) if i != self.forced_eos_token_id]
-            ] = -1e9  # TODO change back to -inf after paddle.topk is fixed
+            scores[:] = -1e9  # TODO change back to -inf after paddle.topk is fixed
             scores[:, self.forced_eos_token_id] = 0
         return scores
 
