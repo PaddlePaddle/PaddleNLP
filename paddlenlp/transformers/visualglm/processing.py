@@ -25,6 +25,7 @@ import paddle
 from PIL import Image
 
 from ..image_processing_utils import BatchFeature
+from ..image_utils import ImageInput
 from ..processing_utils import ProcessorMixin
 from ..tokenizer_utils_base import BatchEncoding, TensorType, TextInput
 
@@ -72,18 +73,15 @@ class VisualGLMProcessor(ProcessorMixin):
     def __init__(self, image_processor, tokenizer):
         tokenizer.return_token_type_ids = False
         tokenizer.model_input_names = ["input_ids", "attention_mask"]
-        # tokenizer.padding_side = "right"
-        # tokenizer.pad_token = tokenizer.eos_token
         super().__init__(image_processor, tokenizer)
         self.current_processor = self.image_processor
         self.default_prompt = "<img><ImageHere></img>"
         self.image_tag = "<ImageHere>"
         self.num_query_tokens = 32
-        # self.history = []
 
     def process_images(
         self,
-        images,
+        images: ImageInput,
         return_tensors: Optional[Union[str, TensorType]] = TensorType.PADDLE,
         **kwargs,
     ) -> BatchFeature:
@@ -97,7 +95,6 @@ class VisualGLMProcessor(ProcessorMixin):
         if isinstance(images, (Image.Image, np.ndarray, paddle.Tensor)):
             images = [images]
 
-        # processing with image processor
         processed_images = self.image_processor(images, return_tensors=return_tensors)
 
         return processed_images
@@ -117,7 +114,12 @@ class VisualGLMProcessor(ProcessorMixin):
         processed_texts = self.tokenizer(text=texts, return_tensors=return_tensors, **kwargs)
         return BatchEncoding(processed_texts)
 
-    def build_inputs_with_image(self, image, query, history=None):
+    def build_inputs_with_image(
+        self,
+        image: Union[Image.Image, np.ndarray, paddle.Tensor],
+        query: str,
+        history: Optional[str] = None,
+    ):
         # construct prompt with inputs
         if image is not None:
             prompt = self.default_prompt
@@ -152,12 +154,23 @@ class VisualGLMProcessor(ProcessorMixin):
 
     def __call__(
         self,
-        image,
-        query,
-        history=None,
+        image: Union[Image.Image, np.ndarray, paddle.Tensor],
+        query: str,
+        history: Optional[str] = [],
         **kwargs,
     ):
-        # TODO parameter checking
+        if image is None:
+            raise ValueError("Image should not be None.")
+        if query is None:
+            raise ValueError("Query should not be None.")
+        if not isinstance(query, str):
+            raise TypeError("A string type of query is expected, but acceived {}.".format(type(query)))
+        if not isinstance(history, list):
+            raise TypeError(
+                "A list type of history is expected with each item [query, response] in it, but acceived {}.".format(
+                    type(history)
+                )
+            )
 
         inputs = self.build_inputs_with_image(image, query, history=history)
 
@@ -193,14 +206,15 @@ class VisualGLMProcessor(ProcessorMixin):
             response = re.sub(r"%s([\u4e00-\u9fff])" % item[0], r"%s\1" % item[1], response)
         return response
 
-    def decode_with_refine(self, *args, **kwargs):
+    def get_responses(self, *args, **kwargs):
+        processed_responses = []
+        responses = self.batch_decode(*args, **kwargs)
 
-        response = self.decode(*args, **kwargs)
-        response = self.process_response(response)
+        for response in responses:
+            response = self.process_response(response)
+            processed_responses.append(response)
 
-        # if "history" in kwargs:
-        #     kwargs["history"] +=  [(query, response)]
-        return response
+        return processed_responses
 
     @property
     def model_input_names(self):

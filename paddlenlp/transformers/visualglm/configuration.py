@@ -175,7 +175,7 @@ class VisualGLMQFormerConfig(PretrainedConfig):
     >>> # Accessing the model configuration
     >>> configuration = model.config
     ```"""
-    model_type = "visualglm_vision_model"
+    model_type = "visualglm_qformer_model"
 
     def __init__(
         self,

@@ -1420,7 +1420,7 @@ class ChatGLMForConditionalGenerationWithImage(ChatGLMForConditionalGeneration):
 
     def forward(
         self,
-        image_features: paddle.Tensor,  # processed image
+        image_features: paddle.Tensor,
         input_ids: paddle.Tensor,
         position_ids: Optional[paddle.Tensor] = None,
         attention_mask: Optional[paddle.Tensor] = None,
@@ -1496,14 +1496,13 @@ class VisualGLMForConditionalGeneration(VisualGLMPretrainedModel):
 
         # step 3: mapping query_output into language_model space
         language_model_inputs = self.language_projection(query_output)
-        # language_model_attention_mask = paddle.ones(language_model_inputs.shape[:-1], dtype="int64")
 
-        return language_model_inputs  # , language_model_attention_mask
+        return language_model_inputs
 
     @paddle.no_grad()
-    def generate_with_image(
+    def generate(
         self,
-        pixel_values: paddle.Tensor,  # processed image
+        pixel_values: paddle.Tensor,
         input_ids: paddle.Tensor,
         pre_image_length: int,
         attention_mask: Optional[paddle.Tensor] = None,
