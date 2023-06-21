@@ -1876,7 +1876,7 @@ class Trainer:
             prediction_loss_only=True if self.compute_metrics is None else None,
             ignore_keys=ignore_keys,
             metric_key_prefix=metric_key_prefix,
-            max_eval_iters=self.args.max_eval_iters,
+            max_eval_iters=self.args.max_evaluate_steps,
         )
 
         total_batch_size = self.args.eval_batch_size * self.args.dataset_world_size
@@ -2127,7 +2127,7 @@ class Trainer:
             description="Prediction",
             ignore_keys=ignore_keys,
             metric_key_prefix=metric_key_prefix,
-            max_eval_iters=self.args.max_eval_iters,
+            max_eval_iters=self.args.max_evaluate_steps,
         )
         total_batch_size = self.args.per_device_eval_batch_size * self.args.dataset_world_size
         output.metrics.update(

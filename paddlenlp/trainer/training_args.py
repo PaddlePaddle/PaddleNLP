@@ -213,7 +213,7 @@ class TrainingArguments:
         eval_steps (`int`, *optional*):
             Number of update steps between two evaluations if `evaluation_strategy="steps"`. Will default to the same
             value as `logging_steps` if not set.
-        max_eval_iters (`int`, *optional*, defaults to -1):
+        max_evaluate_steps (`int`, *optional*, defaults to -1):
             If set to a positive number, the total number of evaluation steps to perform.
         dataloader_num_workers (`int`, *optional*, defaults to 0):
             Number of subprocesses to use for data loading. 0 means that the data will be loaded in the
@@ -505,7 +505,7 @@ class TrainingArguments:
         default=False, metadata={"help": "Drop the last incomplete batch if it is not divisible by the batch size."}
     )
     eval_steps: int = field(default=None, metadata={"help": "Run an evaluation every X steps."})
-    max_eval_iters: int = field(
+    max_evaluate_steps: int = field(
         default=-1, metadata={"help": "If set to a positive number, the total number of evaluation steps to perform."}
     )
     dataloader_num_workers: int = field(
