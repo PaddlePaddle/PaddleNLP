@@ -1598,8 +1598,8 @@ class Trainer:
         if len(self._pp_data_buffer) != self.args.gradient_accumulation_steps:
             return paddle.zeros([])
 
-        for v in self._pp_data_buffer[0].values():
-            assert isinstance(v, paddle.Tensor), f"Only support tensor as pipeline mode input, got type {type(v)}"
+        # for v in self._pp_data_buffer[0].values():
+        #     assert isinstance(v, paddle.Tensor), f"Only support tensor as pipeline mode input, got type {type(v)}"
 
         inputs = model._prepare_pipeline_inputs_func(self._pp_data_buffer)
         self._pp_data_buffer = []
