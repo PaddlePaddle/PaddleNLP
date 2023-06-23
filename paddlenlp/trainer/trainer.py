@@ -38,8 +38,16 @@ import paddle.distributed as dist
 import paddle.nn as nn
 from packaging import version
 from paddle.distributed import fleet
+from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
+    DygraphShardingOptimizer,
+)
+from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
+    HybridParallelOptimizer,
+    _obtain_optimizer_parameters_list,
+)
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
+    sharding_reduce_gradients,
 )
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from tqdm.auto import tqdm
@@ -745,14 +753,29 @@ class Trainer:
                     elif args.recompute and availiable_no_sync:
                         fused_allreduce_gradients(list(model.parameters()), None)
 
+                    pipeline_parallel_config = set(args.pipeline_parallel_config.split(" "))
+                    enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
+                    enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
+
+                    if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
+                        parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
+
+                        if self.optimizer._sharding_enable:
+                            assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
+                            sharding_reduce_gradients(list(parameters_list), self.optimizer._hcg)
+
+                        if self.optimizer._dp_enable:
+                            assert not enable_dp_comm_overlap
+                            fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
+
                     # pipeline parallel mode,  handle gradient merge here
-                    if args.pipeline_parallel_degree > 1 and getattr(model, "_delay_scale_loss", False):
+                    if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
                         for p in model._layers.parameters():
                             if hasattr(p, "main_grad") and p.main_grad is not None:
                                 assert p.grad is None
-                                p.main_grad = p.main_grad.scale(1.0 / self.args.gradient_accumulation_steps)
+                                p.main_grad.scale_(1.0 / self.args.gradient_accumulation_steps)
                             elif p.grad is not None:
-                                p.grad = p.grad.scale(1.0 / self.args.gradient_accumulation_steps)
+                                p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
 
                     # Optimizer step
                     self.callback_handler.on_optimizer_begin(
@@ -769,6 +792,8 @@ class Trainer:
                             logger.warning(
                                 f"optimizer not run, scale_before: {scale_before[0]}, scale_after: {scale_after[0]}"
                             )
+                    elif isinstance(self.optimizer, HybridParallelOptimizer):
+                        self.optimizer._step(parameters_list)
                     else:
                         self.optimizer.step()
 
@@ -1597,6 +1622,10 @@ class Trainer:
         config_backup = model.micro_batch_size, model.accumulate_steps
         model.micro_batch_size = self.args.per_device_train_batch_size
         model.accumulate_steps = self.args.gradient_accumulation_steps
+
+        if model._dp_comm_overlap:
+            for comm_buffer in model._dp_comm_buffers:
+                comm_buffer._acc_steps = self.args.gradient_accumulation_steps
 
         inputs = _prepare_training(model, inputs)
 
