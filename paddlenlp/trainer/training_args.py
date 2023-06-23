@@ -786,7 +786,7 @@ class TrainingArguments:
                 if tensor_parallel_degree == 1 and sharding_parallel_degree == 1:
                     order = ["pp", "dp", "sharding", "mp"]
                 else:
-                    order = ["dp", "pp", "sharding", "mp"]
+                    order = ["dp", "sharding", "pp", "mp"]
 
                 hybrid_configs = {
                     "dp_degree": self.data_parallel_degree,

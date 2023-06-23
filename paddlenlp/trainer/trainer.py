@@ -43,11 +43,10 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding
 )
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
     HybridParallelOptimizer,
-    _obtain_optimizer_parameters_list,
 )
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
-    sharding_reduce_gradients,
+    obtain_optimizer_parameters_list,
 )
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from tqdm.auto import tqdm
@@ -758,11 +757,11 @@ class Trainer:
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
 
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
-                        parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
+                        parameters_list = obtain_optimizer_parameters_list(self.optimizer._inner_opt)
 
                         if self.optimizer._sharding_enable:
                             assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
-                            sharding_reduce_gradients(list(parameters_list), self.optimizer._hcg)
+                            self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
                         if self.optimizer._dp_enable:
                             assert not enable_dp_comm_overlap
