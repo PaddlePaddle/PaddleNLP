@@ -81,11 +81,11 @@ def code(dtype):
 
 
 def index_file_path(prefix_path):
-    return prefix_path + "_idx.idx"
+    return prefix_path + ".idx"
 
 
 def data_file_path(prefix_path):
-    return prefix_path + "_ids.bin"
+    return prefix_path + ".bin"
 
 
 class BlendableDataset(paddle.io.Dataset):
@@ -417,7 +417,6 @@ class MMapIndexedDatasetBuilder(object):
 
         with MMapIndexedDataset.Index.writer(index_file, self._dtype) as index:
             index.write(self._sizes, self._doc_idx)
-
         print("Total sentences num: %d" % len(self._sizes))
         print("Total documents num: %d" % (len(self._doc_idx) - 1))
         print("Total tokens num: %d" % sum(self._sizes))

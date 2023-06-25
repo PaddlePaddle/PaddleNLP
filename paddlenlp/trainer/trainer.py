@@ -655,10 +655,10 @@ class Trainer:
                 train_dataloader.batch_sampler.set_epoch(epoch)
 
             step = -1
+
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
-                self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
                 # Skip past any already trained steps if resuming training
                 # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
                 # We use consumed_samples to reset the status
@@ -755,9 +755,6 @@ class Trainer:
                                 p.grad = p.grad.scale(1.0 / self.args.gradient_accumulation_steps)
 
                     # Optimizer step
-                    self.callback_handler.on_optimizer_begin(
-                        args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
-                    )
                     optimizer_was_run = True
                     if self.do_grad_scaling:
                         scale_before = self.scaler._scale.numpy()
@@ -776,9 +773,6 @@ class Trainer:
                         self.lr_scheduler.step()
 
                     self.optimizer.clear_grad()
-                    self.callback_handler.on_optimizer_end(
-                        args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
-                    )
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
@@ -1497,7 +1491,12 @@ class Trainer:
             self._past = outputs[self.args.past_index]
 
         # We don't use .loss here since the model may return tuples instead of ModelOutput.
-        loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
+        if isinstance(outputs, dict):
+            loss = outputs["loss"]
+        elif isinstance(outputs, tuple):
+            loss = outputs[0]
+        else:
+            loss = outputs
 
         return (loss, outputs) if return_outputs else loss
 
@@ -1519,6 +1518,7 @@ class Trainer:
         Return:
             `paddle.Tensor`: The tensor with training loss on this batch.
         """
+        # import pdb; pdb.set_trace()
         if self.args.pipeline_parallel_degree > 1:
             return self.training_pipeline_step(model, inputs)
 

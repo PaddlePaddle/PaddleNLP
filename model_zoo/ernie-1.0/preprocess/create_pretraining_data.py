@@ -309,8 +309,8 @@ def main():
 
     pool = multiprocessing.Pool(args.workers, initializer=convert.initializer)
 
-    output_ids_files = args.output_prefix + "_ids.bin"
-    output_idx_files = args.output_prefix + "_idx.idx"
+    output_ids_files = args.output_prefix + ".bin"
+    output_idx_files = args.output_prefix + ".idx"
     builder = MMapIndexedDatasetBuilder(output_ids_files, save_dtype)
 
     file_paths.sort()
@@ -334,6 +334,7 @@ def main():
         encoded_docs = pool.imap(convert.encode, text, 256)
         print("Processing %s" % file_path)
         for i, (doc, bytes_processed) in enumerate(encoded_docs, start=1):
+
             step += 1
             total_bytes_processed += bytes_processed
             if len(doc) == 0:
