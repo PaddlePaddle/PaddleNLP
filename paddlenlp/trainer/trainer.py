@@ -1618,7 +1618,6 @@ class Trainer:
         self._pp_data_buffer = []
 
         model.train()
-
         # hack pipeline-layers
         # since the pipeline layer will check input is valid every iter.
         # in same case,  for example, batch size warmup, we need dynamic change gradient_accumulation_steps to implement.
@@ -1630,6 +1629,7 @@ class Trainer:
             for _, buffers in model._chunk_2_comm_buffers.items():
                 for buffer in buffers:
                     buffer._acc_steps = self.args.gradient_accumulation_steps
+
 
         inputs = model._prepare_training(
             inputs, self.optimizer, self.lr_scheduler

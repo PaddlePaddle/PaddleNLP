@@ -810,6 +810,7 @@ class TrainingArguments:
                                 "enable_delay_scale_loss",
                                 "enable_dp_comm_overlap",
                                 "enable_sharding_comm_overlap",
+                                "enable_timer",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -825,8 +826,11 @@ class TrainingArguments:
                     logger.info(f"PP configs:{strategy.pipeline_configs}, use master_grad: {self.amp_master_grad}")
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
-                        "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config,
-                        "sharding_comm_overlap": "enable_sharding_comm_overlap" in pipeline_parallel_config,
+                        "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config
+                        and self.data_parallel_degree > 1,
+                        "sharding_comm_overlap": "enable_sharding_comm_overlap" in pipeline_parallel_config
+                        and self.sharding_parallel_degree > 1,
+                        "enable_timer": "enable_timer" in pipeline_parallel_config,
                     }
 
                     if self.do_eval:
@@ -857,7 +861,7 @@ class TrainingArguments:
 
                 if pipeline_parallel_degree > 1:
                     hybrid_configs["pp_configs"] = dygraph_pp_configs
-                    logger.info(f"using pipline configs:{dygraph_pp_configs}")
+                    logger.info(f"using pipeline configs:{dygraph_pp_configs}")
 
                 # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
                 strategy.hybrid_configs = hybrid_configs
