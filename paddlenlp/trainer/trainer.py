@@ -1630,7 +1630,6 @@ class Trainer:
                 for buffer in buffers:
                     buffer._acc_steps = self.args.gradient_accumulation_steps
 
-
         inputs = model._prepare_training(
             inputs, self.optimizer, self.lr_scheduler
         )  # None, None => [optimizer, lr_scheduler]
