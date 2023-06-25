@@ -31,7 +31,7 @@ class LoRALinear(nn.Linear):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
-        merge_weights: bool = True,
+        merge_weights: bool = False,
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
@@ -104,7 +104,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
-        merge_weights: bool = True,
+        merge_weights: bool = False,
         lora_A_weight_attr: Optional[paddle.ParamAttr] = None,
         **kwargs
     ):
@@ -194,7 +194,7 @@ class LoRAMergedLinear(nn.Linear):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
-        merge_weights: bool = True,
+        merge_weights: bool = False,
         enable_lora: List[bool] = [False],
         **kwargs
     ):
@@ -357,7 +357,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
-        merge_weights: bool = True,
+        merge_weights: bool = False,
         enable_lora: List[bool] = [False],
         lora_A_weight_attr: Optional[paddle.ParamAttr] = None,
         **kwargs
