@@ -1152,7 +1152,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             for key in state_dict.keys():
                 target_dtype = dtype
                 if isinstance(state_dict[key], np.ndarray):
-                    if not issubclass(state_dict[key].dtype.type, np.floating):
+                    state_dict_dtype = state_dict[key].dtype
+                    if not issubclass(state_dict_dtype.type, np.floating) and state_dict_dtype != np.uint16:
                         continue
 
                     # TODO(wj-Mcat): add `keep_in_fp32` feature to enable hybrid fp32 state-dict
