@@ -1607,7 +1607,7 @@ class Trainer:
         model.micro_batch_size = self.args.per_device_train_batch_size
         model.accumulate_steps = self.args.gradient_accumulation_steps
 
-        if model._dp_comm_overlap:
+        if model._dp_comm_overlap or model._sharding_comm_overlap:
             for comm_buffer in model._comm_buffers:
                 comm_buffer._acc_steps = self.args.gradient_accumulation_steps
 
