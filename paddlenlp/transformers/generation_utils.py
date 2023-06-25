@@ -614,6 +614,7 @@ class GenerationMixin(object):
         use_cache=True,
         use_fast=False,
         use_fp16_decoding=False,
+        use_top_p=False,
         **model_kwargs
     ):
         r"""
@@ -958,6 +959,7 @@ class GenerationMixin(object):
                     top_k,
                     top_p,
                     temperature,
+                    use_top_p=use_top_p,
                     **model_kwargs,
                 )
             else:
@@ -970,6 +972,7 @@ class GenerationMixin(object):
                     top_k,
                     top_p,
                     temperature,
+                    use_top_p=use_top_p,
                     **model_kwargs,
                 )
 
@@ -1172,6 +1175,71 @@ class GenerationMixin(object):
             )
         return input_ids[:, origin_len:], scores
 
+    def to_static(self, path: str, bos_token_id: int, eos_token_id: int, pad_token_id: int, use_top_p: bool = False):
+        """ "export generation model to static
+
+        Args:
+            path (str): path of saved inference model
+            bos_token_id (int): token id of begin-of-sentence
+            eos_token_id (int): token id of end-of-sentence
+            pad_token_id (int): token id of pad token
+            use_top_p (bool): whether use top_p decoding strategy
+        """
+
+        top_k_spec = paddle.static.InputSpec(shape=[1], dtype="int64") if not use_top_p else 0
+
+        top_p_spec = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
+        temperature = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
+
+        input_spec = [
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
+            None,  # position_ids
+            paddle.static.InputSpec(shape=[1], dtype="int64"),  # max_length
+            0,  # min_length
+            "sampling",  # decode_strategy
+            temperature,  # temperature
+            top_k_spec,  # top_k
+            top_p_spec,  # top_p
+            1,  # repetition_penalty
+            # num_beams
+            1,
+            # num_beam_groups
+            1,
+            # length_penalty
+            0.0,
+            # early_stopping
+            False,
+            # bos_token_id
+            bos_token_id,
+            # eos_token_id
+            eos_token_id,
+            # pad_token_id
+            pad_token_id,
+            # decoder_start_token_id
+            None,
+            # forced_bos_token_id
+            None,
+            # forced_eos_token_id
+            None,
+            # no_repeat_ngram_size
+            None,
+            # num_return_sequences
+            1,
+            # diversity_rate
+            0.0,
+            # use_cache
+            True,
+            # use_fast=False,
+            False,
+            # use_fp16_decoding=False,
+            use_top_p,
+        ]
+
+        model = paddle.jit.to_static(self.generate, input_spec=input_spec)
+
+        paddle.jit.save(model, path)
+
     def sample_d2s(
         self,
         input_ids,
@@ -1188,9 +1256,15 @@ class GenerationMixin(object):
 
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
-        use_top_p = model_kwargs.get("use_top_p", False)
-        use_topp_sampling = model_kwargs.get("use_topp_sampling", False)
-        return_scores = model_kwargs.get("return_scores", False)
+        use_top_p = model_kwargs.get("use_top_p", True)
+        use_topp_sampling = is_top_p_sampling_avaliable or model_kwargs.get("use_topp_sampling", False)
+        return_scores = model_kwargs.get("return_scores", True)
+        simple_graph = model_kwargs.get("simple_graph", False)
+
+        if not simple_graph:
+            logger.warning(
+                "you are export generation model with input_specs, you suggest that using model.to_static() api to export generation models"
+            )
 
         batch_size, cur_len = paddle.shape(input_ids)
         # used for compute on gpu, avoid memcpy D2H
@@ -1231,7 +1305,8 @@ class GenerationMixin(object):
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
 
-            probs = logits_processors(input_ids, logits)
+            logits = logits_processors(input_ids, logits)
+            probs = F.softmax(logits)
 
             # sample
             if return_scores:
@@ -1818,10 +1893,9 @@ def TopPProcess(probs, top_p, min_tokens_to_keep):
         probs, _ = top_p_sampling(probs, top_ps_tensor)
         return probs
 
-    sorted_probs = paddle.sort(probs, descending=True)
     sorted_indices = paddle.argsort(probs, descending=True)
     if isinstance(sorted_indices, tuple):
-        sorted_indices, sorted_probs = sorted_indices
+        sorted_probs, sorted_indices = sorted_indices
     else:
         sorted_probs = paddle.sort(probs, descending=True)
 
