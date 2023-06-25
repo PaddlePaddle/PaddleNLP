@@ -29,6 +29,7 @@ from packaging import version
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from ...configuration_utils import FrozenDict
+from ...loaders import FromCkptMixin, LoraLoaderMixin, TextualInversionLoaderMixin
 from ...models import AutoencoderKL, UNet2DConditionModel
 from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import (
@@ -436,7 +437,7 @@ def preprocess_mask(mask, scale_factor=8):
     return mask
 
 
-class StableDiffusionPipelineAllinOne(DiffusionPipeline):
+class StableDiffusionPipelineAllinOne(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMixin, FromCkptMixin):
     r"""
     Pipeline for text-to-image image-to-image inpainting generation using Stable Diffusion.
 

@@ -182,6 +182,12 @@ class TrainingArguments:
         fp16_opt_level (`str`, *optional*, defaults to 'O1'):
             For `fp16` training,  AMP optimization level selected in ['O0', 'O1', 'O2']. See details at
             https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/amp/auto_cast_cn.html
+        amp_custom_black_list (`List[str]`, *optional*, defaults to `None`):
+            The custom black_list. The set of ops that support fp16/bf16 calculation and are considered numerically-dangerous
+            and whose effects may also be observed in downstream ops. These ops will not be converted to fp16/bf16.
+        amp_custom_white_list (`List[str]`, *optional*, defaults to `None`):
+            The custom white_list. It’s the set of ops that support fp16/bf16 calculation and are considered numerically-safe and
+             performance-critical. These ops will be converted to fp16/bf16.
         amp_master_grad (`bool`, *optional*, defaults to `False`):
             For amp opt level=’O2’, whether to use float32 weight gradients
             for calculations such as gradient clipping, weight decay, and weight updates. If master_grad is enabled,
@@ -232,6 +238,8 @@ class TrainingArguments:
         eval_steps (`int`, *optional*):
             Number of update steps between two evaluations if `evaluation_strategy="steps"`. Will default to the same
             value as `logging_steps` if not set.
+        max_evaluate_steps (`int`, *optional*, defaults to -1):
+            If set to a positive number, the total number of evaluation steps to perform.
         dataloader_num_workers (`int`, *optional*, defaults to 0):
             Number of subprocesses to use for data loading. 0 means that the data will be loaded in the
             main process.
@@ -438,6 +446,19 @@ class TrainingArguments:
         metadata={"help": "Whether to use full float16 evaluation instead of 32-bit"},
     )
 
+    amp_custom_black_list: Optional[List[str]] = field(
+        default=None,
+        metadata={
+            "help": "The set of ops that support fp16/bf16 calculation and are considered numerically-dangerous and whose effects may also be observed in downstream ops."
+        },
+    )
+    amp_custom_white_list: Optional[List[str]] = field(
+        default=None,
+        metadata={
+            "help": "The the set of ops that support fp16/bf16 calculation and are considered numerically-safe and performance-critical. These ops will be converted to fp16/bf16."
+        },
+    )
+
     sharding: str = field(
         default="",
         metadata={
@@ -523,6 +544,9 @@ class TrainingArguments:
         default=False, metadata={"help": "Drop the last incomplete batch if it is not divisible by the batch size."}
     )
     eval_steps: int = field(default=None, metadata={"help": "Run an evaluation every X steps."})
+    max_evaluate_steps: int = field(
+        default=-1, metadata={"help": "If set to a positive number, the total number of evaluation steps to perform."}
+    )
     dataloader_num_workers: int = field(
         default=0,
         metadata={

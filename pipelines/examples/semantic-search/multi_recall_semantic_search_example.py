@@ -14,7 +14,10 @@
 
 import argparse
 
-from pipelines.document_stores import ElasticsearchDocumentStore
+from pipelines.document_stores import (
+    BaiduElasticsearchDocumentStore,
+    ElasticsearchDocumentStore,
+)
 from pipelines.nodes import (
     BM25Retriever,
     DensePassageRetriever,
@@ -32,7 +35,9 @@ from pipelines.utils import (
 parser = argparse.ArgumentParser()
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to run dense_qa system, defaults to gpu.")
 parser.add_argument("--index_name", default='dureader_nano_query_encoder', type=str, help="The ann index name of ANN.")
-parser.add_argument("--search_engine", choices=['elastic'], default="elastic", help="The type of ANN search engine.")
+parser.add_argument('--username', type=str, default="", help='Username of ANN search engine')
+parser.add_argument('--password', type=str, default="", help='Password of ANN search engine')
+parser.add_argument("--search_engine", choices=['elastic', 'bes'], default="elastic", help="The type of ANN search engine.")
 parser.add_argument("--max_seq_len_query", default=64, type=int, help="The maximum total length of query after tokenization.")
 parser.add_argument("--max_seq_len_passage", default=384, type=int, help="The maximum total length of passage after tokenization.")
 parser.add_argument("--retriever_batch_size", default=16, type=int, help="The batch size of retriever to extract passage embedding for building ANN index.")
@@ -57,16 +62,30 @@ def get_retrievers(use_gpu):
 
     fetch_archive_from_http(url=dureader_data, output_dir=doc_dir)
     dicts = convert_files_to_dicts(dir_path=doc_dir, split_paragraphs=True, encoding="utf-8")
+    if args.search_engine == "elastic":
+        document_store_with_docs = ElasticsearchDocumentStore(
+            host=args.host,
+            port=args.port,
+            username=args.username,
+            password=args.password,
+            embedding_dim=312,
+            vector_type="dense_vector",
+            search_fields=["content", "meta"],
+            index=args.index_name,
+        )
+    else:
+        document_store_with_docs = BaiduElasticsearchDocumentStore(
+            host=args.host,
+            port=args.port,
+            username=args.username,
+            password=args.password,
+            embedding_dim=312,
+            similarity="dot_prod",
+            vector_type="bpack_vector",
+            search_fields=["content", "meta"],
+            index=args.index_name,
+        )
 
-    document_store_with_docs = ElasticsearchDocumentStore(
-        host=args.host,
-        port=args.port,
-        username="",
-        password="",
-        embedding_dim=312,
-        search_fields=["content", "meta"],
-        index=args.index_name,
-    )
     document_store_with_docs.write_documents(dicts)
 
     dpr_retriever = DensePassageRetriever(

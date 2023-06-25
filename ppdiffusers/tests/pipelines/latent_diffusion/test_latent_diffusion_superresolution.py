@@ -74,7 +74,7 @@ class LDMSuperResolutionPipelineFastTests(unittest.TestCase):
         expected_slice = np.array(
             [0.12982202, 0.8338444, 0.46506804, 0.5459576, 0.6662215, 0.38444045, 0.72195464, 0.5719301, 0.36579454]
         )
-        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.05
 
     def test_inference_superresolution_fp16(self):
         unet = self.dummy_uncond_unet

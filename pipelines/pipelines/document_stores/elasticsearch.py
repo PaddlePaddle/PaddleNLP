@@ -63,6 +63,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         name_field: str = "name",
         embedding_field: str = "embedding",
         embedding_dim: int = 768,
+        vector_type: str = "dense_vector",
         custom_mapping: Optional[dict] = None,
         excluded_meta_data: Optional[list] = None,
         analyzer: str = "standard",
@@ -185,6 +186,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
             timeout=timeout,
             return_embedding=return_embedding,
             index_type=index_type,
+            vector_type=vector_type,
             scroll=scroll,
             skip_missing_embeddings=skip_missing_embeddings,
             synonyms=synonyms,
@@ -229,12 +231,9 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         self.label_index: str = label_index
         self.scroll = scroll
         self.skip_missing_embeddings: bool = skip_missing_embeddings
-        if similarity in ["cosine", "dot_product", "l2"]:
-            self.similarity = similarity
-        else:
-            raise Exception(
-                f"Invalid value {similarity} for similarity in ElasticSearchDocumentStore constructor. Choose between 'cosine', 'l2' and 'dot_product'"
-            )
+        self.vector_type = vector_type
+
+        self.similarity_check(similarity)
         if index_type in ["flat", "hnsw"]:
             self.index_type = index_type
         else:
@@ -255,6 +254,14 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
 
         self.duplicate_documents = duplicate_documents
         self.refresh_type = refresh_type
+
+    def similarity_check(self, similarity):
+        if similarity in ["cosine", "dot_product", "l2"]:
+            self.similarity = similarity
+        else:
+            raise Exception(
+                f"Invalid value {similarity} for similarity in ElasticSearchDocumentStore constructor. Choose between 'cosine', 'l2' and 'dot_product'"
+            )
 
     @classmethod
     def _init_elastic_client(
@@ -378,14 +385,14 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
             if self.embedding_field:
                 if (
                     self.embedding_field in mapping["properties"]
-                    and mapping["properties"][self.embedding_field]["type"] != "dense_vector"
+                    and mapping["properties"][self.embedding_field]["type"] != self.vector_type
                 ):
                     raise Exception(
                         f"The '{index_name}' index in Elasticsearch already has a field called '{self.embedding_field}'"
                         f" with the type '{mapping['properties'][self.embedding_field]['type']}'. Please update the "
                         f"document_store to use a different name for the embedding_field parameter."
                     )
-                mapping["properties"][self.embedding_field] = {"type": "dense_vector", "dims": self.embedding_dim}
+                mapping["properties"][self.embedding_field] = {"type": self.vector_type, "dims": self.embedding_dim}
                 self.client.indices.put_mapping(index=index_name, body=mapping, headers=headers)
             return
 
@@ -435,7 +442,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
 
             if self.embedding_field:
                 mapping["mappings"]["properties"][self.embedding_field] = {
-                    "type": "dense_vector",
+                    "type": self.vector_type,
                     "dims": self.embedding_dim,
                 }
 
@@ -2151,3 +2158,68 @@ class OpenDistroElasticsearchDocumentStore(OpenSearchDocumentStore):
 
     def _prepare_hosts(self, host, port):
         return host
+
+
+class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
+    def similarity_check(self, similarity):
+        if similarity in ["cosine", "dot_prod", "l2", "l1"]:
+            self.similarity = similarity
+        else:
+            raise Exception(
+                f"Invalid value {similarity} for similarity in BaiduElasticSearchDocumentStore constructor. Choose between 'cosine', 'l1', 'l2' and 'dot_prod'"
+            )
+
+    def _get_vector_similarity_query(self, query_emb: np.ndarray, top_k: int):
+        """
+        Generate Elasticsearch query for vector similarity.
+        """
+        # To handle scenarios where embeddings may be missing
+        script_score_query: dict = {"match_all": {}}
+        if self.skip_missing_embeddings:
+            script_score_query = {
+                "bool": {"filter": {"bool": {"must": [{"exists": {"field": self.embedding_field}}]}}}
+            }
+
+        query = {
+            "script_score": {
+                "query": script_score_query,
+                "script": {
+                    # offset score to ensure a positive range as required by Elasticsearch
+                    "source": "bpack_knn_script",
+                    "lang": "knn",
+                    "params": {"space": self.similarity, "field": "embedding", "vector": query_emb.tolist()},
+                },
+            }
+        }
+        return query
+
+    def _create_label_index(self, index_name: str, headers: Optional[Dict[str, str]] = None):
+        if self.client.indices.exists(index=index_name, headers=headers):
+            return
+        mapping = {
+            "mappings": {
+                "properties": {
+                    "query": {"type": "text"},
+                    "answer": {"type": "text"},  # light-weight but less search options than full object
+                    "document": {"type": "text"},
+                    "is_correct_answer": {"type": "boolean"},
+                    "is_correct_document": {"type": "boolean"},
+                    "origin": {"type": "keyword"},  # e.g. user-feedback or gold-label
+                    "document_id": {"type": "keyword"},
+                    "no_answer": {"type": "boolean"},
+                    "pipeline_id": {"type": "keyword"},
+                    "created_at": {"type": "date", "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"},
+                    "updated_at": {"type": "date", "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"}
+                    # TODO add pipeline_hash and pipeline_name once we migrated the REST API to pipelines
+                }
+            }
+        }
+        try:
+            self.client.indices.create(index=index_name, body=mapping, headers=headers)
+        except RequestError as e:
+            # With multiple workers we need to avoid race conditions, where:
+            # - there's no index in the beginning
+            # - both want to create one
+            # - one fails as the other one already created it
+            if not self.client.indices.exists(index=index_name, headers=headers):
+                raise e

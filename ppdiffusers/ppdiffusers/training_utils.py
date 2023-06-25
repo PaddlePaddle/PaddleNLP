@@ -173,7 +173,8 @@ class EMAModel:
         """
         Compute the decay factor for the exponential moving average.
         """
-        step = max(0, optimization_step - self.update_after_step - 1)
+        # we donot -1!
+        step = max(0, optimization_step - self.update_after_step)
 
         if step <= 0:
             return 0.0
