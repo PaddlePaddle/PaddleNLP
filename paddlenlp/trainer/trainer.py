@@ -1599,23 +1599,7 @@ class Trainer:
         # hack _prepare_training, remove additional optimizer or scheduler check
         # https://github.com/PaddlePaddle/Paddle/blob/4695122492eee3cc9e9c585e33429c0f98dbdbb0/python/paddle/distributed/fleet/meta_parallel/pipeline_parallel.py#L241
 
-        def _prepare_training(self, data):
-            from paddle import framework
-
-            # reset the virtual pp rank for each run
-            self.set_virtual_pipeline_rank(0)
-            assert framework._dygraph_tracer()._has_grad, "Please enable the generation of gradients."
-            if self.is_pipeline_first_stage(ignore_virtual=True) or self.is_pipeline_last_stage(ignore_virtual=True):
-                assert data is not None, "For the first and the last stage, the data must be set."
-            else:
-                data = None
-
-            self._layers.train()
-
-            return data
-
         model.train()
-
         # hack pipeline-layers
         # since the pipeline layer will check input is valid every iter.
         # in same case,  for example, batch size warmup, we need dynamic change gradient_accumulation_steps to implement.
@@ -1624,10 +1608,14 @@ class Trainer:
         model.accumulate_steps = self.args.gradient_accumulation_steps
 
         if model._dp_comm_overlap:
-            for comm_buffer in model._dp_comm_buffers:
+            for comm_buffer in model._comm_buffers:
                 comm_buffer._acc_steps = self.args.gradient_accumulation_steps
 
-        inputs = _prepare_training(model, inputs)
+        inputs = model._prepare_training(
+            inputs, self.optimizer, self.lr_scheduler
+        )  # None, None => [optimizer, lr_scheduler]
+        model.optimizer = None  # we do not use `PipelineParallel` to handler optimizer step
+        model.lr_scheduler = None
 
         with self.autocast_smart_context_manager():
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
