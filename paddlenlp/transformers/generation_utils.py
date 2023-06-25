@@ -1263,7 +1263,7 @@ class GenerationMixin(object):
 
         if not simple_graph:
             logger.warning(
-                "you are export generation model with input_specs, you suggest that using model.to_static() api to export generation models"
+                "you are exporting generation model with `paddle.jit.to_static`, we suggest that using `model.to_static()` api to export generation models."
             )
 
         batch_size, cur_len = paddle.shape(input_ids)
