@@ -289,7 +289,7 @@ class LoRAModel(nn.Layer):
     def get_trainable_state_dict(self):
         trainable_state_dict = OrderedDict()
         for name, weight in self.model.state_dict().items():
-            if not weight.stop_gradient:
+            if not weight.stop_gradient or "scale" in name:
                 trainable_state_dict[name] = weight
         return trainable_state_dict
 
