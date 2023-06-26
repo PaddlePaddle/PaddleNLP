@@ -58,6 +58,7 @@ class ModelArguments:
 
 
 def do_train():
+    # import pdb;pdb.set_trace()
     parser = PdArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
@@ -91,6 +92,7 @@ def do_train():
         accu = metric.accumulate()
         return {"accuracy": accu}
 
+    # print("===")
     trainer = ErnieViLTrainer(
         model=model,
         criterion=None,

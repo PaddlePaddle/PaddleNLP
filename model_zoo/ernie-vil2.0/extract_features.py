@@ -64,6 +64,7 @@ def main():
                 for batch in tqdm(text_loader):
                     text_ids, texts = batch["text_id"], batch["input_ids"]
                     text_features = model.get_text_features(texts)
+                    # print(text_features.shape)
                     text_features /= text_features.norm(axis=-1, keepdim=True)
                     for text_id, text_feature in zip(text_ids.tolist(), text_features.tolist()):
                         fout.write("{}\n".format(json.dumps({"text_id": text_id, "feature": text_feature})))
@@ -74,6 +75,12 @@ def main():
     if args.extract_image_feats:
         image_eval_dataset = get_eval_img_dataset(args)
         image_loader = DataLoader(image_eval_dataset, batch_size=args.img_batch_size)
+        # print(image_loader)
+        # for i in image_loader:
+        #     print(len(i[0]))
+        #     print(i[1].shape)
+        #     break
+        # import pdb;pdb.set_trace()
         print("Make inference for images...")
         if args.image_feat_output_path is None:
             # by default, we store the image features under the same directory with the text features
@@ -83,10 +90,14 @@ def main():
             model.eval()
             with paddle.no_grad():
                 for batch in tqdm(image_loader):
+                    # import pdb;pdb.set_trace()
                     image_ids, images = batch
                     image_features = model.get_image_features(pixel_values=images)
                     image_features /= image_features.norm(axis=-1, keepdim=True)
-                    for image_id, image_feature in zip(image_ids.tolist(), image_features.tolist()):
+                    if type(image_ids) != list:
+                        image_ids = image_ids.tolist()
+
+                    for image_id, image_feature in zip(image_ids, image_features.tolist()):
                         fout.write("{}\n".format(json.dumps({"image_id": image_id, "feature": image_feature})))
                         write_cnt += 1
         print("{} image features are stored in {}".format(write_cnt, args.image_feat_output_path))
