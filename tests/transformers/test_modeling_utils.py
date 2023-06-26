@@ -14,13 +14,48 @@
 
 import os
 import shutil
+import tempfile
 import unittest
 from multiprocessing import Pool
 from tempfile import TemporaryDirectory
 
-from paddlenlp.transformers import BertModel, TinyBertModel
+import paddle
+import pytest
+
+from paddlenlp.transformers import (
+    BertModel,
+    PretrainedConfig,
+    PretrainedModel,
+    TinyBertModel,
+)
+from paddlenlp.transformers.model_utils import dtype_guard, register_base_model
 from paddlenlp.utils.env import CONFIG_NAME, MODEL_HOME, PADDLE_WEIGHT_FILE_NAME
 from tests.testing_utils import slow
+
+
+class FakeConfig(PretrainedConfig):
+    def __init__(self, use_fp32_norm: bool = True, **kwargs):
+        super().__init__(**kwargs)
+        self.use_fp32_norm = True
+
+
+class FakePretrainedModel(PretrainedModel):
+    config_class = FakeConfig
+
+    def keep_in_fp32_modules(cls, key: str, config: FakeConfig, dtype: str) -> bool:
+        if config.use_fp32_norm and "norm" in key:
+            return True
+        return False
+
+
+@register_base_model
+class FakeModel(FakePretrainedModel):
+    def __init__(self, config: FakeConfig):
+        super(FakeModel, self).__init__(config)
+        self.linear = paddle.nn.Linear(2, 3)
+
+        with dtype_guard("float32"):
+            self.norm = paddle.nn.LayerNorm(2)
 
 
 def download_bert_model(model_name: str):
@@ -100,3 +135,54 @@ class TestModeling(unittest.TestCase):
         # 2. downloaing tinybert modeling using multi-processing
         with Pool(num_process_in_pool) as pool:
             pool.starmap(download_bert_model, [(model_name,) for _ in range(num_jobs)])
+
+    def test_keep_in_fp32(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            with dtype_guard("float16"):
+                config = FakeConfig()
+                model = FakeModel(config)
+                model.config = config
+
+                model.save_pretrained(tempdir)
+
+                # check model_state.pdparams
+                state_dict = paddle.load(os.path.join(tempdir, "model_state.pdparams"))
+                self.assertEqual(state_dict["linear.weight"].dtype, paddle.float16)
+                self.assertEqual(state_dict["norm.weight"].dtype, paddle.float32)
+
+                # cast all to fp16
+                state_dict = {k: paddle.cast(v, "float16") for k, v in state_dict.items()}
+                paddle.save(state_dict, os.path.join(tempdir, "model_state.pdparams"))
+
+                model: FakeModel = FakeModel.from_pretrained(tempdir)
+
+                self.assertEqual(model.linear.weight.dtype, paddle.float16)
+                self.assertEqual(model.norm.weight.dtype, paddle.float32)
+
+    def test_keep_in_fp32_with_error(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            with dtype_guard("float16"):
+                config = FakeConfig()
+                config.use_fp32_norm = False
+                model = FakeModel(config)
+                model.config = config
+
+                model.save_pretrained(tempdir)
+
+                # check model_state.pdparams
+                state_dict = paddle.load(os.path.join(tempdir, "model_state.pdparams"))
+                self.assertEqual(state_dict["linear.weight"].dtype, paddle.float16)
+                self.assertEqual(state_dict["norm.weight"].dtype, paddle.float32)
+
+                # cast all to fp16
+                state_dict = {k: paddle.cast(v, "float16") for k, v in state_dict.items()}
+                paddle.save(state_dict, os.path.join(tempdir, "model_state.pdparams"))
+
+                with pytest.raises(AssertionError, match=r".*Variable dtype not match.*"):
+                    model: FakeModel = FakeModel.from_pretrained(tempdir, use_fp32_norm=False)
+
+                model: FakeModel = FakeModel.from_pretrained(tempdir, use_fp32_norm=True)
+                self.assertEqual(model.linear.weight.dtype, paddle.float16)
+                self.assertEqual(model.norm.weight.dtype, paddle.float32)
