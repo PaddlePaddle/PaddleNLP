@@ -23,7 +23,7 @@ import paddle
 import paddle.distributed as dist
 import paddle.distributed.fleet as fleet
 import yaml
-from attrdict import AttrDict
+from easydict import EasyDict as AttrDict
 
 from paddlenlp.transformers import CrossEntropyCriterion, TransformerModel
 from paddlenlp.utils import profiler
