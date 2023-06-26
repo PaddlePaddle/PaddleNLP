@@ -811,7 +811,6 @@ class TrainingArguments:
                 paddle.device.cuda.synchronize()
                 start_time = time.time()
                 fleet.init(is_collective=True, strategy=strategy)
-                fleet.init(is_collective=True, strategy=strategy)
                 paddle.device.cuda.synchronize()
                 elapsed = time.time() - start_time
                 logger.info("NCCL-Connection costs {:.2f} ms.".format(elapsed))
