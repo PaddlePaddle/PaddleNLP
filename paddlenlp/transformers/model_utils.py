@@ -1790,13 +1790,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         model_kwargs = kwargs
 
-        if from_hf_hub:
-            # from_hf_hub defalut enable convert_from_torch
-            if convert_from_torch is None:
-                logger.warning(
-                    "Your are trying to loading weights of huggingface hub, so it maybe pytorch weight. set `convert_from_torch=True`, if you don't wants, you can set `convert_from_torch=False` "
-                )
-                convert_from_torch = True
+        # from_hf_hub defalut enable convert_from_torch
+        if from_hf_hub and convert_from_torch is None:
+            logger.warning(
+                "If you are attempting to load weights from Hugging Face Hub and want to disable the default behavior of considering torch weights,"
+                " you can set ·convert_from_torch=False·. By default, `convert_from_torch` is set to `True`. "
+            )
+            convert_from_torch = True
         # convert_from_torch defalut is False
         if convert_from_torch is None:
             convert_from_torch = False
@@ -1987,7 +1987,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # we currently don't use this setting automatically, but may start to use with v5
 
         dtype = get_parameter_dtype(model_to_save)
-        # model_to_save.config.paddle_dtype = str(dtype).split(".")[1]
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
         config_to_save = copy.deepcopy(model_to_save.config)

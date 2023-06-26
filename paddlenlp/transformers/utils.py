@@ -511,7 +511,6 @@ def cached_file(
         return resolved_file
 
     if cache_dir is None:
-        # cache_dir = TRANSFORMERS_CACHE
         cache_dir = os.path.join(MODEL_HOME, ".cache")
     if isinstance(cache_dir, Path):
         cache_dir = str(cache_dir)
@@ -565,7 +564,6 @@ def cached_file_for_hf_hub(
         return resolved_file
 
     if cache_dir is None:
-        # cache_dir = TRANSFORMERS_CACHE
         cache_dir = os.path.join(MODEL_HOME, ".cache")
     if isinstance(cache_dir, Path):
         cache_dir = str(cache_dir)
