@@ -568,7 +568,7 @@ class ErnieCodePretrainedModel(PretrainedModel):
     loading pretrained models. See `PretrainedModel` for more details.
     """
 
-    base_model_prefix = "erniecode"
+    base_model_prefix = "ErnieCode"
     config_class = ErnieCodeConfig
 
     pretrained_init_configuration = ERNIECODE_PRETRAINED_INIT_CONFIGURATION

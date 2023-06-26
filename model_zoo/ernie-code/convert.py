@@ -42,7 +42,7 @@ def convert_pytorch_checkpoint_to_paddle(pytorch_checkpoint_path, paddle_dump_pa
         print(f"Converting: {k} | is_transpose {transpose}")
 
         if k != "lm_head.weight":
-            k = "mt5." + k
+            k = "ErnieCode." + k
         # The bf16 data of torch cannot be directly converted to paddle
         paddle_state_dict[k] = paddle.to_tensor(v.to(torch.float32).numpy()).cast(paddle.bfloat16).numpy()
 

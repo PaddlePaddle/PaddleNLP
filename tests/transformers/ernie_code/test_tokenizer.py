@@ -12,10 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
-
-# sys.path.insert(0, "..")
-sys.path.append("/home/PaddleNLP")
 
 import json
 import os
@@ -180,7 +176,6 @@ class ErnieCodeTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def test_outputs_not_longer_than_maxlen(self):
         tokenizer = self.erniecode_base_tokenizer()
-        # import pdb; pdb.set_trace()
         batch = tokenizer(
             ["I am a small frog" * 1000, "I am a small frog"],
             padding=True,
@@ -200,9 +195,6 @@ class ErnieCodeTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         tgt_text = ["Summary of the text. </s>"]
         expected_src_tokens = [298, 2952, 259, 90234, 332, 196098, 14534, 260, 1]
 
-        import pdb
-
-        pdb.set_trace()
         batch = tokenizer(src_text, text_target=tgt_text)
 
         self.assertEqual(expected_src_tokens, batch["input_ids"][0])

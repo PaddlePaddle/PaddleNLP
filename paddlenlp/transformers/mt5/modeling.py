@@ -36,11 +36,7 @@ from ..model_outputs import (
     convert_encoder_output,
 )
 from ..model_utils import PretrainedModel, register_base_model
-from .configuration import (
-    MT5_PRETRAINED_INIT_CONFIGURATION,
-    MT5_PRETRAINED_RESOURCE_FILES_MAP,
-    MT5Config,
-)
+from .configuration import MT5_PRETRAINED_INIT_CONFIGURATION, MT5Config
 
 __all__ = [
     "MT5Model",
@@ -56,8 +52,6 @@ MT5_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "google/mt5-large",
     "google/mt5-xl",
     "google/mt5-xxl",
-    "ernie-code-base",
-    "ernie-code-base-L512",
 ]
 
 DATA_TYPE_MAP = {
@@ -577,7 +571,6 @@ class MT5PretrainedModel(PretrainedModel):
     config_class = MT5Config
 
     pretrained_init_configuration = MT5_PRETRAINED_INIT_CONFIGURATION
-    pretrained_resource_files_map = MT5_PRETRAINED_RESOURCE_FILES_MAP
 
     # support AutoConverter after fix load_torch function
     @classmethod

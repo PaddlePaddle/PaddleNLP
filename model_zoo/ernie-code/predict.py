@@ -13,20 +13,20 @@
 # limitations under the License.
 import sys
 
-sys.path.insert(0, "...")
-sys.path.append("/home/PaddleNLP")
+sys.path.insert(0, "/home/PaddleNLP")
+# sys.path.append("/home/PaddleNLP")
 
 import argparse
 
 import numpy as np
 import paddle
 
-from paddlenlp.transformers import MT5ForConditionalGeneration, T5Tokenizer
+from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
 
 parser = argparse.ArgumentParser("ERNIE-CODE")
 parser.add_argument(
     "--model_name_or_path",
-    default="ernie-code-base",
+    default="/home/models/erine-code-512",
     type=str,
 )
 parser.add_argument("--input", default="BadZipFileのAliasは、古い Python バージョンとの互換性のために。", type=str)
@@ -43,21 +43,18 @@ args = parser.parse_args()
 def predict():
 
     paddle.set_device(args.device)
-    tokenizer = T5Tokenizer.from_pretrained(args.model_name_or_path)
-    model = MT5ForConditionalGeneration.from_pretrained(args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    model = AutoModelForConditionalGeneration.from_pretrained(args.model_name_or_path)
     prefix = args.source_prefix if args.source_prefix is not None else ""
-    import pdb
-
-    pdb.set_trace()
 
     def preprocess_function(inputs, tokenizer):
         inputs = [prefix + inp for inp in inputs]
+
         model_inputs = tokenizer(inputs, max_length=args.max_length)
         return model_inputs
 
     dev_dataset = [args.input]
     model_inputs = preprocess_function(dev_dataset, tokenizer)
-
     model.eval()
     gen_kwargs = {
         "max_length": args.max_length,
