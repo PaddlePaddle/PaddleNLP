@@ -30,8 +30,6 @@ class QuantedLoRALinear(ConvertibleQuantedLayer):
 
     def __init__(self, layer: nn.Layer, q_config):
         super().__init__()
-        if layer.merge_weights:
-            raise ValueError("merged_weights is not supported for QuantedLoRALinear")
         if isinstance(layer.lora_dropout, nn.Dropout):
             raise ValueError("lora_dropout is not supported for QuantedLoRALinear")
 
@@ -41,6 +39,11 @@ class QuantedLoRALinear(ConvertibleQuantedLayer):
         self.scaling = layer.scaling
         self.bias = layer.bias
         self.name = layer.name
+
+        # Mark the weight as unmerged
+        self.merged = False
+        self.merge_weights = layer.merge_weights
+
         # For FakeQuant
 
         self.weight_quanter = None
@@ -51,17 +54,36 @@ class QuantedLoRALinear(ConvertibleQuantedLayer):
             self.activation_quanter = q_config.activation._instance(layer)
 
     def forward(self, input):
-        quant_input = input
-        quant_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
-        if self.activation_quanter is not None:
-            quant_input = self.activation_quanter(input)
-        if self.weight_quanter is not None:
-            quant_weight = self.weight_quanter(quant_weight)
+
+        if self.merge_weights and self.merged:
+            weight = self.weight
+        else:
+            weight = self.weight + self.lora_A @ self.lora_B * self.scaling
+
+        quant_input = self.activation_quanter(input) if self.activation_quanter is not None else input
+        quant_weight = self.weight_quanter(weight) if self.weight_quanter is not None else weight
+
         return self._linear_forward(quant_input, quant_weight)
 
     def _linear_forward(self, input, weight):
         out = F.linear(x=input, weight=weight, bias=self.bias, name=self.name)
         return out
+
+    def train(self):
+        super().train()
+        if self.merge_weights and self.merged:
+            # Make sure that the weights are not merged
+            new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
+            self.weight.set_value(new_weight)
+            self.merged = False
+
+    def eval(self):
+        super().eval()
+        if self.merge_weights and not self.merged:
+            # Merge the weights and mark it
+            new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
+            self.weight.set_value(new_weight)
+            self.merged = True
 
     def weights_to_quanters(self):
         return [("weight", "weight_quanter")]

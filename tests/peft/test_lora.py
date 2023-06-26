@@ -27,6 +27,10 @@ from paddlenlp.transformers import AutoModel, BertModel
 
 
 class TestLoraLayer(unittest.TestCase):
+    def test_r_raise_exception(self):
+        with self.assertRaises(ValueError):
+            LoRALinear(in_features=16, out_features=8, r=0, lora_dropout=0.1, lora_alpha=8)
+
     def test_forward(self):
         lora_layer = LoRALinear(in_features=16, out_features=8, r=4, lora_dropout=0.1, lora_alpha=8)
         x = paddle.randn([2, 4, 16], "float32")
@@ -67,12 +71,12 @@ class TestLoraLayer(unittest.TestCase):
             paddle.save(regular_linear.state_dict(), weights_path)
             state_dict = paddle.load(weights_path)
             # should be identical to regular linear
-            lora_layer_r0 = LoRALinear(in_features=16, out_features=8, r=0)
+            lora_layer_r8 = LoRALinear(in_features=16, out_features=8, r=8)
             lora_layer_r4 = LoRALinear(in_features=16, out_features=8, r=4)
-            lora_layer_r0.set_dict(state_dict)
+            lora_layer_r8.set_dict(state_dict)
             lora_layer_r4.set_dict(state_dict)
             x = paddle.randn([2, 4, 16], "float32")
-            self.assertTrue(paddle.allclose(lora_layer_r0(x), regular_linear(x)))
+            self.assertTrue(paddle.allclose(lora_layer_r8(x), regular_linear(x)))
             self.assertTrue(paddle.allclose(lora_layer_r4(x), regular_linear(x)))
 
 
@@ -125,12 +129,12 @@ class TestLoRAMergedLayer(unittest.TestCase):
             paddle.save(regular_linear.state_dict(), weights_path)
             state_dict = paddle.load(weights_path)
             # should be identical to regular linear
-            lora_layer_r0 = LoRAMergedLinear(in_features=16, out_features=8, r=0, head_dim=2)
+            lora_layer_r8 = LoRAMergedLinear(in_features=16, out_features=8, r=8, head_dim=2)
             lora_layer_r4 = LoRAMergedLinear(in_features=16, out_features=8, r=4, head_dim=2)
-            lora_layer_r0.set_dict(state_dict)
+            lora_layer_r8.set_dict(state_dict)
             lora_layer_r4.set_dict(state_dict)
             x = paddle.randn([2, 4, 16], "float32")
-            self.assertTrue(paddle.allclose(lora_layer_r0(x), regular_linear(x)))
+            self.assertTrue(paddle.allclose(lora_layer_r8(x), regular_linear(x)))
             self.assertTrue(paddle.allclose(lora_layer_r4(x), regular_linear(x)))
 
 

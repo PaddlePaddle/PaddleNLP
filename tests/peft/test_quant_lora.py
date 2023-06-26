@@ -42,7 +42,13 @@ class TestQuantedLoraLayer(unittest.TestCase):
         self.assertEqual(quant_output.shape, [2, 4, 8])
 
     def test_forward_no_quant(self):
-        lora_layer = LoRALinear(in_features=16, out_features=8, r=4, lora_alpha=8)
+        lora_layer = LoRALinear(
+            in_features=16,
+            out_features=8,
+            r=4,
+            lora_alpha=8,
+            merge_weights=True,
+        )
         quant_lora_layer = QuantedLoRALinear(
             layer=lora_layer, q_config=SingleLayerConfig(weight=None, activation=None)
         )
@@ -55,13 +61,6 @@ class TestQuantedLoraLayer(unittest.TestCase):
         with self.assertRaises(ValueError):
             QuantedLoRALinear(
                 layer=LoRALinear(in_features=16, out_features=8, r=4, lora_alpha=8, lora_dropout=0.1),
-                q_config=SingleLayerConfig(weight=None, activation=None),
-            )
-
-    def test_merge_weights_raise_exception(self):
-        with self.assertRaises(ValueError):
-            QuantedLoRALinear(
-                layer=LoRALinear(in_features=16, out_features=8, r=4, lora_alpha=8, merge_weights=True),
                 q_config=SingleLayerConfig(weight=None, activation=None),
             )
 
@@ -81,6 +80,19 @@ class TestQuantedLoraLayer(unittest.TestCase):
             x = paddle.randn([2, 4, 16], "float32")
             self.assertTrue(paddle.allclose(new_quant_lora_layer(x), quant_lora_layer(x)))
 
+    def test_merge_weights(self):
+        lora_layer = LoRALinear(in_features=16, out_features=8, r=4, lora_alpha=8, merge_weights=True)
+        quant_lora_layer = QuantedLoRALinear(
+            layer=lora_layer, q_config=SingleLayerConfig(weight=None, activation=None)
+        )
+        x = paddle.randn([2, 4, 16], "float32")
+
+        quant_lora_layer.train()
+        train_output = lora_layer(x)
+        quant_lora_layer.eval()
+        eval_output = lora_layer(x)
+        self.assertTrue(paddle.allclose(train_output, eval_output))
+
 
 class TestQuantedLoRAModel(unittest.TestCase):
     @classmethod
@@ -89,10 +101,11 @@ class TestQuantedLoRAModel(unittest.TestCase):
             target_modules=[".*q_proj.*", ".*v_proj.*"],
             r=4,
             lora_alpha=8,
-            merge_weights=False,
+            merge_weights=True,
         )
         cls.model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
         cls.lora_model = LoRAModel(cls.model, lora_config)
+        cls.lora_model.mark_only_lora_as_trainable()
         # lora_B parameter is initalized to 0, therefore AB = 0 and W + AB = W
         # Since we want to test W + AB logic, we set lora_B to random values.
         lora_b_state_dict = {}
@@ -100,7 +113,6 @@ class TestQuantedLoRAModel(unittest.TestCase):
             if "lora_B" in name:
                 lora_b_state_dict[name] = paddle.randn(state.shape)
         cls.lora_model.set_dict(lora_b_state_dict)
-        cls.lora_model.eval()
 
     def _count_layers(self, model, layer_type):
         count = 0
@@ -126,6 +138,7 @@ class TestQuantedLoRAModel(unittest.TestCase):
         qat = QAT(q_config)
         quant_lora_model = qat.quantize(self.lora_model, inplace=False)
         quant_lora_model.eval()
+        self.lora_model.eval()
         input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 5]))
         original_model_outputs = self.lora_model(input_ids)[0]
         quant_model_outputs = quant_lora_model(input_ids)[0]
@@ -137,7 +150,20 @@ class TestQuantedLoRAModel(unittest.TestCase):
         q_config.add_type_config(LoRALinear, weight=FakeQuanterWithAbsMaxObserver(moving_rate=0.9))
         qat = QAT(q_config)
         quant_lora_model = qat.quantize(self.lora_model, inplace=False)
+        quant_lora_model.eval()
         input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 5]))
         original_model_outputs = self.lora_model(input_ids)[0]
         quant_model_outputs = quant_lora_model(input_ids)[0]
         self.assertEqual(original_model_outputs.shape, quant_model_outputs.shape)
+
+    def test_quant_lora_model_stop_gradient(self):
+        q_config = QuantConfig(activation=None, weight=None)
+        q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
+        q_config.add_type_config(LoRALinear, weight=FakeQuanterWithAbsMaxObserver(moving_rate=0.9))
+        qat = QAT(q_config)
+        quant_lora_model = qat.quantize(self.lora_model, inplace=False)
+        for name, weight in quant_lora_model.state_dict().items():
+            if "lora" in name:
+                self.assertFalse(weight.stop_gradient)
+            else:
+                self.assertTrue(weight.stop_gradient)
