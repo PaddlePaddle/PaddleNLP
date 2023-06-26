@@ -43,7 +43,6 @@ from .text_summarization import TextSummarizationTask
 from .word_segmentation import SegJiebaTask, SegLACTask, SegWordTagTask
 from .zero_shot_text_classification import ZeroShotTextClassificationTask
 
-
 TASKS = {
     "dependency_parsing": {
         "models": {
