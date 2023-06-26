@@ -81,9 +81,9 @@ class Attention(nn.Layer):
             else:
                 try:
                     _ = F.scaled_dot_product_attention_(
-                        paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
-                        paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
-                        paddle.randn((1, 1, 2, 40), dtype=paddle.float16),
+                        paddle.ones((1, 1, 2, 40), dtype=paddle.float16),
+                        paddle.ones((1, 1, 2, 40), dtype=paddle.float16),
+                        paddle.ones((1, 1, 2, 40), dtype=paddle.float16),
                         attention_op=attention_op,
                     )
                 except Exception as e:
@@ -120,7 +120,7 @@ class Attention(nn.Layer):
             )
         else:
             with paddle.amp.auto_cast(enable=False):
-                attention_scores = paddle.matmul(query_proj, key_proj, transpose_y=True) * self.scale
+                attention_scores = paddle.matmul(query_proj * self.scale, key_proj, transpose_y=True)
                 attention_probs = F.softmax(attention_scores, axis=-1)
                 hidden_states = paddle.matmul(attention_probs, value_proj).cast(x.dtype)
 

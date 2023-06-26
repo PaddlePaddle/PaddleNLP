@@ -81,9 +81,9 @@ class TransformerTemporalModel(ModelMixin, ConfigMixin):
         inner_dim = num_attention_heads * attention_head_dim
         self.in_channels = in_channels
         self.norm = nn.GroupNorm(num_groups=norm_num_groups, num_channels=in_channels, epsilon=1e-06)
-        self.proj_in = nn.Linear(in_features=in_channels, out_features=inner_dim)
+        self.proj_in = nn.Linear(in_channels, inner_dim)
         self.transformer_blocks = nn.LayerList(
-            sublayers=[
+            [
                 BasicTransformerBlock(
                     inner_dim,
                     num_attention_heads,
@@ -98,7 +98,7 @@ class TransformerTemporalModel(ModelMixin, ConfigMixin):
                 for d in range(num_layers)
             ]
         )
-        self.proj_out = nn.Linear(in_features=inner_dim, out_features=in_channels)
+        self.proj_out = nn.Linear(inner_dim, in_channels)
 
     def forward(
         self,
@@ -113,7 +113,7 @@ class TransformerTemporalModel(ModelMixin, ConfigMixin):
         """
         Args:
             hidden_states ( When discrete, `paddle.Tensor` of shape `(batch size, num latent pixels)`.
-                When continous, `paddle.Tensor` of shape `(batch size, channel, height, width)`): Input
+                When continuous, `paddle.Tensor` of shape `(batch size, channel, height, width)`): Input
                 hidden_states
             encoder_hidden_states ( `paddleTensor` of shape `(batch size, encoder_hidden_states dim)`, *optional*):
                 Conditional embeddings for cross attention layer. If not given, cross-attention defaults to
@@ -131,16 +131,18 @@ class TransformerTemporalModel(ModelMixin, ConfigMixin):
             [`~models.transformer_2d.TransformerTemporalModelOutput`] if `return_dict` is True, otherwise a `tuple`.
             When returning a tuple, the first element is the sample tensor.
         """
+        # 1. Input
         batch_frames, channel, height, width = hidden_states.shape
         batch_size = batch_frames // num_frames
         residual = hidden_states
-        hidden_states = hidden_states[(None), :].reshape((batch_size, num_frames, channel, height, width))
-        hidden_states = hidden_states.transpose(perm=[0, 2, 1, 3, 4])
+        hidden_states = hidden_states[None, :].reshape((batch_size, num_frames, channel, height, width))
+        hidden_states = hidden_states.transpose([0, 2, 1, 3, 4])
         hidden_states = self.norm(hidden_states)
-        hidden_states = hidden_states.transpose(perm=[0, 3, 4, 2, 1]).reshape(
+        hidden_states = hidden_states.transpose([0, 3, 4, 2, 1]).reshape(
             (batch_size * height * width, num_frames, channel)
         )
         hidden_states = self.proj_in(hidden_states)
+        # 2. Blocks
         for block in self.transformer_blocks:
             hidden_states = block(
                 hidden_states,
@@ -149,11 +151,12 @@ class TransformerTemporalModel(ModelMixin, ConfigMixin):
                 cross_attention_kwargs=cross_attention_kwargs,
                 class_labels=class_labels,
             )
+        # 3. Output
         hidden_states = self.proj_out(hidden_states)
         hidden_states = (
-            hidden_states[(None), (None), :]
+            hidden_states[None, None, :]
             .reshape((batch_size, height, width, channel, num_frames))
-            .transpose(perm=[0, 3, 4, 1, 2])
+            .transpose([0, 3, 4, 1, 2])
         )
         hidden_states = hidden_states.reshape((batch_frames, channel, height, width))
         output = hidden_states + residual

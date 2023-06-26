@@ -18,11 +18,6 @@ import unittest
 
 import numpy as np
 import paddle
-from ppdiffusers_test.pipeline_params import (
-    IMAGE_INPAINTING_BATCH_PARAMS,
-    IMAGE_INPAINTING_PARAMS,
-)
-from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
 
 from ppdiffusers import RePaintPipeline, RePaintScheduler, UNet2DModel
 from ppdiffusers.utils.testing_utils import (
@@ -31,6 +26,9 @@ from ppdiffusers.utils.testing_utils import (
     nightly,
     require_paddle_gpu,
 )
+
+from ..pipeline_params import IMAGE_INPAINTING_BATCH_PARAMS, IMAGE_INPAINTING_PARAMS
+from ..test_pipelines_common import PipelineTesterMixin
 
 
 class RepaintPipelineFastTests(PipelineTesterMixin, unittest.TestCase):

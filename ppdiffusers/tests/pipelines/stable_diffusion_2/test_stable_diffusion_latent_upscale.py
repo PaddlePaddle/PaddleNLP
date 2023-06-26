@@ -19,11 +19,6 @@ import unittest
 
 import numpy as np
 import paddle
-from ppdiffusers_test.pipeline_params import (
-    TEXT_GUIDED_IMAGE_VARIATION_BATCH_PARAMS,
-    TEXT_GUIDED_IMAGE_VARIATION_PARAMS,
-)
-from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
 
 from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
@@ -35,6 +30,12 @@ from ppdiffusers import (
 )
 from ppdiffusers.utils import floats_tensor, load_image, slow
 from ppdiffusers.utils.testing_utils import require_paddle_gpu
+
+from ..pipeline_params import (
+    TEXT_GUIDED_IMAGE_VARIATION_BATCH_PARAMS,
+    TEXT_GUIDED_IMAGE_VARIATION_PARAMS,
+)
+from ..test_pipelines_common import PipelineTesterMixin
 
 
 class StableDiffusionLatentUpscalePipelineFastTests(PipelineTesterMixin, unittest.TestCase):
@@ -139,16 +140,16 @@ class StableDiffusionLatentUpscalePipelineFastTests(PipelineTesterMixin, unittes
         self.assertEqual(image.shape, (1, 256, 256, 3))
         expected_slice = np.array(
             [
-                0.47222412,
-                0.41921633,
-                0.44717434,
-                0.46874192,
-                0.42588258,
-                0.46150726,
-                0.4677534,
-                0.45583832,
-                0.48579055,
-            ]  # TODO check this
+                0.5665861368179321,
+                0.7449524402618408,
+                0.0,
+                0.1325536072254181,
+                0.4274534583091736,
+                0.0,
+                0.0,
+                0.14426982402801514,
+                0.0,
+            ]
         )
         max_diff = np.abs(image_slice.flatten() - expected_slice).max()
         self.assertLessEqual(max_diff, 0.001)

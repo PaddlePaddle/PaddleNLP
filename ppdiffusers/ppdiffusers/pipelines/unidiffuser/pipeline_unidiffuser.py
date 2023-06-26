@@ -22,7 +22,7 @@ import PIL
 from PIL import Image
 
 from paddlenlp.transformers import (
-    CLIPFeatureExtractor,
+    CLIPImageProcessor,
     CLIPTextModel,
     CLIPTokenizer,
     CLIPVisionModelWithProjection,
@@ -57,7 +57,7 @@ def center_crop(width, height, img):
 class UniDiffuserPipeline(DiffusionPipeline):
 
     image_encoder: CLIPVisionModelWithProjection
-    image_feature_extractor: CLIPFeatureExtractor
+    image_feature_extractor: CLIPImageProcessor
     text_encoder: CLIPTextModel
     tokenizer: CLIPTokenizer
     unet: UViTModel
@@ -69,7 +69,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
     def __init__(
         self,
         image_encoder: CLIPVisionModelWithProjection,
-        image_feature_extractor: CLIPFeatureExtractor,
+        image_feature_extractor: CLIPImageProcessor,
         text_encoder: CLIPTextModel,
         tokenizer: CLIPTokenizer,
         unet: UViTModel,

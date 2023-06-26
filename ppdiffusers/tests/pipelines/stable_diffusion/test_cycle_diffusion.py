@@ -19,11 +19,11 @@ import unittest
 
 import numpy as np
 import paddle
-from ppdiffusers_test.pipeline_params import (
+from ..pipeline_params import (
     TEXT_GUIDED_IMAGE_VARIATION_BATCH_PARAMS,
     TEXT_GUIDED_IMAGE_VARIATION_PARAMS,
 )
-from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
+from ..test_pipelines_common import PipelineTesterMixin
 
 from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
@@ -45,7 +45,7 @@ class CycleDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         "negative_prompt_embeds",
     }
     required_optional_params = PipelineTesterMixin.required_optional_params - {"latents"}
-    batch_params = TEXT_GUIDED_IMAGE_VARIATION_BATCH_PARAMS
+    batch_params = TEXT_GUIDED_IMAGE_VARIATION_BATCH_PARAMS.union({"source_prompt"})
 
     def get_dummy_components(self):
         paddle.seed(0)
