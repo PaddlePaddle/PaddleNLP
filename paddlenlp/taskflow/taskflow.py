@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import threading
-import warnings
 
 import paddle
 
