@@ -314,6 +314,8 @@ class GenerationMixin(object):
     It's used as the base class of `paddlenlp.transformers.PretrainedModel
     <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.model_utils.html>`__.
     """
+    # enable `to_static` method for CausalLM Model
+    enable_to_static_method = False
 
     @staticmethod
     def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
@@ -614,7 +616,6 @@ class GenerationMixin(object):
         use_cache=True,
         use_fast=False,
         use_fp16_decoding=False,
-        use_top_p=False,
         **model_kwargs
     ):
         r"""
@@ -959,7 +960,6 @@ class GenerationMixin(object):
                     top_k,
                     top_p,
                     temperature,
-                    use_top_p=use_top_p,
                     **model_kwargs,
                 )
             else:
@@ -972,7 +972,6 @@ class GenerationMixin(object):
                     top_k,
                     top_p,
                     temperature,
-                    use_top_p=use_top_p,
                     **model_kwargs,
                 )
 
@@ -1175,16 +1174,19 @@ class GenerationMixin(object):
             )
         return input_ids[:, origin_len:], scores
 
-    def to_static(self, path: str, bos_token_id: int, eos_token_id: int, pad_token_id: int, use_top_p: bool = False):
-        """ "export generation model to static
+    def to_static(self, path: str, config: dict):
+        """export generation model to static
 
         Args:
             path (str): path of saved inference model
-            bos_token_id (int): token id of begin-of-sentence
-            eos_token_id (int): token id of end-of-sentence
-            pad_token_id (int): token id of pad token
-            use_top_p (bool): whether use top_p decoding strategy
+            config (dict): configuration for generation
+                bos_token_id (int): token id of begin-of-sentence
+                eos_token_id (int): token id of end-of-sentence
+                pad_token_id (int): token id of pad token
+                use_top_p (bool): whether use top_p decoding strategy
         """
+
+        use_top_p = config.get("use_top_p", True)
 
         top_k_spec = paddle.static.InputSpec(shape=[1], dtype="int64") if not use_top_p else 0
 
@@ -1211,11 +1213,11 @@ class GenerationMixin(object):
             # early_stopping
             False,
             # bos_token_id
-            bos_token_id,
+            config.get("bos_token_id", 0),
             # eos_token_id
-            eos_token_id,
+            config.get("eos_token_id", 0),
             # pad_token_id
-            pad_token_id,
+            config.get("pad_token_id", 0),
             # decoder_start_token_id
             None,
             # forced_bos_token_id
@@ -1233,7 +1235,7 @@ class GenerationMixin(object):
             # use_fast=False,
             False,
             # use_fp16_decoding=False,
-            use_top_p,
+            False,
         ]
 
         model = paddle.jit.to_static(self.generate, input_spec=input_spec)
@@ -1256,15 +1258,23 @@ class GenerationMixin(object):
 
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
-        use_top_p = model_kwargs.get("use_top_p", True)
-        use_topp_sampling = is_top_p_sampling_avaliable or model_kwargs.get("use_topp_sampling", False)
-        return_scores = model_kwargs.get("return_scores", True)
-        simple_graph = model_kwargs.get("simple_graph", False)
+        if paddle.is_tensor(top_k) and not paddle.is_tensor(top_p):
+            use_top_p = False
+        elif not paddle.is_tensor(top_k) and paddle.is_tensor(top_p):
+            use_top_p = True
 
-        if not simple_graph:
-            logger.warning(
-                "you are exporting generation model with `paddle.jit.to_static`, we suggest that using `model.to_static()` api to export generation models."
+        # top_k and top_p are the const value
+        elif isinstance(top_p, float) or isinstance(top_k, int):
+            use_top_p = True
+        else:
+            if top_p is None and top_k is None:
+                raise ValueError("top_k and top_p should not be None")
+            raise ValueError(
+                "you should not specify InputSpec for top_k and top_p parameters, one of InputSpec is expected"
             )
+
+        use_topp_sampling_op = is_top_p_sampling_avaliable or model_kwargs.get("use_topp_sampling", False)
+        return_scores = model_kwargs.get("return_scores", True)
 
         batch_size, cur_len = paddle.shape(input_ids)
         # used for compute on gpu, avoid memcpy D2H
@@ -1316,7 +1326,7 @@ class GenerationMixin(object):
             # compute next_tokens
             if use_top_p:
                 logits = logits / temperature
-                if use_topp_sampling:
+                if use_topp_sampling_op:
                     top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
                     _, next_tokens = paddle.top_p_sampling(probs, top_ps_tensor)
                 else:

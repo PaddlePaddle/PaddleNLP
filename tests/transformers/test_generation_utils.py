@@ -1163,7 +1163,10 @@ class GenerationD2STest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             path = os.path.join(tempdir, "model")
             model.to_static(
-                path, bos_token_id=bos_token_id, pad_token_id=pad_token_id, eos_token_id=eos_token_id, use_top_p=False
+                path,
+                config=dict(
+                    bos_token_id=bos_token_id, pad_token_id=pad_token_id, eos_token_id=eos_token_id, use_top_p=False
+                ),
             )
 
             model_path = os.path.join(tempdir, "model.pdmodel")
@@ -1226,7 +1229,10 @@ class GenerationD2STest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             path = os.path.join(tempdir, "model")
             model.to_static(
-                path, bos_token_id=bos_token_id, pad_token_id=pad_token_id, eos_token_id=eos_token_id, use_top_p=False
+                path,
+                config=dict(
+                    bos_token_id=bos_token_id, pad_token_id=pad_token_id, eos_token_id=eos_token_id, use_top_p=False
+                ),
             )
 
             model_path = os.path.join(tempdir, "model.pdmodel")
