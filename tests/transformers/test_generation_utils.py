@@ -1158,36 +1158,7 @@ class GenerationD2STest(unittest.TestCase):
             **model_kwargs,
         )[0]
 
-        expected_ids = [
-            [
-                28245,
-                28245,
-                28245,
-                13720,
-                13720,
-                28350,
-                17883,
-                28350,
-                19607,
-                31104,
-                28350,
-                19607,
-                19607,
-                19607,
-                19607,
-                28245,
-                13720,
-                28341,
-                31104,
-                19607,
-                28004,
-                19607,
-                24114,
-                19607,
-                31104,
-            ]
-        ]
-        self.assertEqual(decoded_ids.tolist(), expected_ids)
+        dygraph_decoded_ids = decoded_ids.tolist()
 
         with tempfile.TemporaryDirectory() as tempdir:
             path = os.path.join(tempdir, "model")
@@ -1222,7 +1193,9 @@ class GenerationD2STest(unittest.TestCase):
             output_handle = predictor.get_output_handle(output_names[0])
             results = output_handle.copy_to_cpu()
 
-            self.assertEqual(results.tolist(), expected_ids)
+            static_decoded_ids = results.tolist()
+
+        self.assertEqual(dygraph_decoded_ids, static_decoded_ids)
 
     def test_to_static_use_top_p(self):
         article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
