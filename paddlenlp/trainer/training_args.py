@@ -20,6 +20,7 @@ import contextlib
 import json
 import math
 import os
+import time
 import types
 import warnings
 from dataclasses import asdict, dataclass, field
@@ -807,7 +808,13 @@ class TrainingArguments:
 
                 # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
                 strategy.hybrid_configs = hybrid_configs
+                paddle.device.cuda.synchronize()
+                start_time = time.time()
                 fleet.init(is_collective=True, strategy=strategy)
+                fleet.init(is_collective=True, strategy=strategy)
+                paddle.device.cuda.synchronize()
+                elapsed = time.time() - start_time
+                logger.info("NCCL-Connection costs {:.2f} ms.".format(elapsed))
 
                 logger.info(strategy)
 
