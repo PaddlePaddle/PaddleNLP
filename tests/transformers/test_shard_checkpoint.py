@@ -20,7 +20,7 @@ import unittest
 import paddle
 
 from paddlenlp.transformers import AutoConfig, BertModel
-from paddlenlp.transformers.model_utils import shard_checkpoint
+from paddlenlp.transformers.model_utils import load_sharded_checkpoint, shard_checkpoint
 from paddlenlp.utils.env import (
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
@@ -32,6 +32,20 @@ from tests.testing_utils import require_package
 
 
 class TestFromPretrained(unittest.TestCase):
+    def test_load_sharded_checkpoint(self):
+        config = AutoConfig.from_pretrained("__internal_testing__/bert-shard")
+        model = BertModel.from_pretrained("__internal_testing__/bert-shard")
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            model.save_pretrained(tmp_dir, max_shard_size="200kiB")
+            model_load = BertModel._from_config(config)
+            missing_keys, unexpected_keys = load_sharded_checkpoint(model_load, tmp_dir)
+
+        self.assertEqual(missing_keys, [])
+        self.assertEqual(unexpected_keys, [])
+        for p1, p2 in zip(model.parameters(), model_load.parameters()):
+            self.assertTrue(paddle.allclose(p1, p2))
+
     @unittest.skipIf(not is_paddle_cuda_available(), "some op is missing in cpu mode")
     def test_load_from_torch_dtyp_cast(self):
         pass

@@ -205,7 +205,7 @@ class VerbalizerTest(unittest.TestCase):
     )
     def test_soft_initialization(self, model_name, head_name, head_class, head_params, non_head_params):
         tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForMaskedLM.from_pretrained(model_name)
+        model = AutoModelForMaskedLM.from_pretrained(model_name, ignore_mismatched_sizes=True)
         verb = SoftVerbalizer(self.default_label_words, tokenizer, model)
         self.assertEqual(verb.head_name, head_name)
         self.assertTrue(isinstance(verb.head, head_class))

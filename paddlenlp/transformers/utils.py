@@ -679,12 +679,13 @@ def device_guard(device="cpu", dev_id=0):
         paddle.set_device(origin_device)
 
 
-def paddlenlp_load(path, return_numpy=False):
-    if return_numpy:
-        with device_guard():
-            return paddle.load(path)
+def paddlenlp_load(path, map_location="cpu"):
+    assert map_location in ["cpu", "gpu", "xpu", "npu", "numpy", "np"]
+    if map_location in ["numpy", "np"]:
+        return paddle.load(path, return_numpy=True)
     else:
-        return paddle.load(path, return_numpy=return_numpy)
+        with device_guard(map_location):
+            return paddle.load(path)
 
 
 def is_paddle_support_lazy_init():

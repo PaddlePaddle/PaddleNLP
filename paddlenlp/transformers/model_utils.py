@@ -20,6 +20,7 @@ import json
 import os
 import re
 import tempfile
+import warnings
 from contextlib import contextmanager
 
 # from pathlib import Path
@@ -288,59 +289,6 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
     return last_dtype
 
 
-def _find_weight_file_path(
-    cache_dir: str,
-    model_class: Type[PretrainedModel],
-    resource_uri: Optional[str] = None,
-) -> str | None:
-    """find the target weight file under the cache dir, because there are some conflicts about weight file names.
-
-    Args:
-        cache_dir (str): the cache dir of pretrained weighted files
-        model_class (Type[PretrainedModel]): the class of pretrained model
-        resource_uri (Optional[str], optional): the weight file resource file uri to help find the target file name. Defaults to None.
-    """
-    # 1. if the weight file is the name of resource_uri, eg: 'bert-base-uncased.pdparams'
-    if resource_uri is not None:
-        resouce_uri_file_name = os.path.split(resource_uri)[-1]
-        weight_file_path = os.path.join(cache_dir, resouce_uri_file_name)
-        if os.path.isfile(weight_file_path):
-            return weight_file_path
-
-    # 2. find the target weight file name under the `resource_files_names` attribute of `PretrainedModel`
-    resource_weight_file_name = model_class.resource_files_names.get("model_state", None)
-    weight_file_path = os.path.join(cache_dir, resource_weight_file_name)
-    if os.path.isfile(weight_file_path):
-        return weight_file_path
-
-    # 3. find the target weight file name for splited tensor parallel
-    # fix for load hybrid parallel
-    hybrid_parallel_weight_file_path = os.path.join(
-        cache_dir, _add_variant(resource_weight_file_name, weight_name_suffix())
-    )
-    if os.path.isfile(hybrid_parallel_weight_file_path):
-        return hybrid_parallel_weight_file_path
-
-    # 4. find the target weight file if there is only one weight file
-    weight_file_names = [file for file in os.listdir(cache_dir) if file.endswith(".pdparams")]
-    if len(weight_file_names) == 1:
-        logger.warning(
-            f"there is no <{resource_weight_file_name}> which is the expected weight file name "
-            f"under dir<{cache_dir}>, but the file<{weight_file_names[0]}> is found, and it will "
-            f"be used to init model weights. We suggest that you rename it to <{resource_weight_file_name}>"
-        )
-        return os.path.join(cache_dir, weight_file_names[0])
-
-    # 4. try to find pytorch model weight file under cache_dir
-    pytorch_model_weight_file = os.path.join(cache_dir, PYTORCH_WEIGHTS_NAME)
-    if os.path.isfile(pytorch_model_weight_file):
-        return pytorch_model_weight_file
-
-    raise FileNotFoundError(
-        f"can not find paddle weight file<model_state.pdparams> and pytorch weight file<pytorch_model.bin> under <{cache_dir}>"
-    )
-
-
 def load_state_dict(checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None):
     """
     Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
@@ -381,7 +329,7 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike], tensor_parallel_sp
             return state_dict
 
     logger.warning("loading pd.")
-    state_dict = paddlenlp_load(checkpoint_file, return_numpy=True)
+    state_dict = paddlenlp_load(checkpoint_file, map_location="cpu")
     logger.warning("loading done.")
     return state_dict
 
@@ -600,7 +548,7 @@ def shard_checkpoint(
 
 def load_sharded_checkpoint(model, folder, strict=True):
     """
-    This is the same as
+    This is the same as [`paddle.nn.Layer.set_state_dict`]
     but for a sharded checkpoint.
 
     This load is performed efficiently: each checkpoint shard is loaded one by one in RAM and deleted after being
@@ -644,14 +592,17 @@ def load_sharded_checkpoint(model, folder, strict=True):
 
     for shard_file in shard_files:
         state_dict = paddlenlp_load(os.path.join(folder, shard_file), map_location="cpu")
-        model.load_state_dict(state_dict, strict=False)
+        with warnings.catch_warnings():
+            warnings.resetwarnings()
+            warnings.filterwarnings("ignore", message=r".*is not found in the provided dict.*")
+            model.set_state_dict(state_dict)
 
         # Make sure memory is fred before we load the next state dict.
         del state_dict
         gc.collect()
 
-    # Return the same thing as PyTorch load_state_dict function.
-    return paddle.nn.modules.module._IncompatibleKeys(missing_keys, unexpected_keys)
+    # Return the same thing as PaddlePaddle set_state_dict function.
+    return missing_keys, unexpected_keys
 
 
 def faster_set_state_dict(model, state_dict):
@@ -697,8 +648,16 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
                 state_dict[key.replace(start_prefix, "")] = state_dict.pop(key)
 
     # TODO: add return status to state_dict
-    # model_to_load.set_state_dict(state_dict)
-    faster_set_state_dict(model_to_load, state_dict)
+    with warnings.catch_warnings(record=True) as w:
+        warnings.resetwarnings()
+        # paddlenlp hold  missing_keys , just ignore not found warnings.
+        warnings.filterwarnings("ignore", message=r".*is not found in the provided dict.*")
+        ret = model_to_load.set_state_dict(state_dict)
+        error_msgs.extend([str(x.message) for x in w])
+        if ret is not None:
+            missing_keys, unexpected_keys = ret
+            if len(missing_keys) > 0:
+                logger.warning(f"missing_keys: {missing_keys}")
 
     del state_dict
 
@@ -1621,16 +1580,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         del state_dict[checkpoint_key]
             return mismatched_keys
 
-        # Whole checkpoint
-        mismatched_keys = _find_mismatched_keys(
-            state_dict,
-            model_state_dict,
-            loaded_keys,
-            add_prefix_to_model,
-            remove_prefix_from_model,
-            ignore_mismatched_sizes,
-        )
-
         if state_dict is not None:
             # DONT Hold tensor parallel here, only hold afer load state dict.
             # Whole checkpoint
@@ -1713,6 +1662,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 # force memory release
                 del state_dict
                 gc.collect()
+
+        if len(error_msgs) > 0:
+            error_msg = "\n\t".join(error_msgs)
+            if " but the expected shape is" in error_msg:
+                error_msg += (
+                    "\n\tYou may consider adding `ignore_mismatched_sizes=True` in the model `from_pretrained` method."
+                )
+            raise RuntimeError(f"Error(s) in loading state_dict for {model.__class__.__name__}:\n\t{error_msg}")
 
         if len(unexpected_keys) > 0:
             logger.warning(
@@ -1818,7 +1775,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         cache_dir = kwargs.pop("cache_dir", None)
         # load_state_as_np = kwargs.pop("load_state_as_np", False)
         force_download = kwargs.pop("force_download", False)
-        ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
+        ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", False)
         dtype = kwargs.pop("dtype", None)
         subfolder = kwargs.pop("subfolder", "")
         low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
