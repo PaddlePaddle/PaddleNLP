@@ -21,10 +21,10 @@
 | Model     | Method   | Num GPUs | Batch Size  | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
 |-----------|----------|----------|-------------|--------------|---------------------------|-------------|--------------------------|---------|
 | Llama-7b  | LoRA     | 1        | 4           |              |  1986.63                  |             | 1589.27                  |  +25%  |
-| Llama-13b | LoRA     | 1        | 8           | recompute    |  838.78                   | gradient ckpt |    674.51              | +24%   |
+| Llama-13b | LoRA     | 1        | 8           | recompute    |  838.78                   | gradient ckpt |    674.51              |  +24%  |
 | Llama-7b  | Finetune | 4        | 8           | MP4          |  2213.46                  | ZeRO 2      | 1331.96                  |  +66%  |
 | Llama-7b  | Finetune | 4        | 16          | sharding 2   |  2804.19                  | ZeRO 2      | 2211.25                  |  +27%  |
-| Llama-13b | Finetune | 4        | 8           |     |                     | gradient ckpt |    674.51 | +24%   |
+| Llama-13b | Finetune | 4        | 8           | MP4 recompute|  1651.50                  | ZeRO 3      | 712.53                   | +132%  |
 
 
 ###### 多卡分布式实验记录
@@ -33,13 +33,13 @@
 
 | Model     | Setup         | Paddle Effective Tokens /s | Torch Effective Tokens /s  |  Speedup  |
 |-----------|---------------|----------------------------|----------------------------|-----------|
-| LLaMA-7b  | bsz 8 MP4     | 2213.46                    |  N/A                       | N/A       |
+| LLaMA-7b  | bsz 8 MP4     | **2213.46**                |  N/A                       | N/A       |
 | LLaMA-7b  | bsz 8 ZeRO 3  | 1256.82                    |  1142.07                   | 10%       |
 | LLaMA-7b  | bsz 8 ZeRO 2  | 1781.27                    |  1331.96                   | 34%       |
 | LLaMA-7b  | bsz 16 (8*2) MP4 | 2630.30                 |  N/A                       | N/A       |
 | LLaMA-7b  | bsz 16 ZeRO 3 | 2115.58                    |  2171.99                   | -3%       |
-| LLaMA-7b  | bsz 16 ZeRO 2 | 2804.19                    |  2211.25                   | 27%       |
-| LLaMA-13b | bsz 8 MP4 recompute |                  |  N/A                       | N/A       |
+| LLaMA-7b  | bsz 16 ZeRO 2 | **2804.19**                |  2211.25                   | 27%       |
+| LLaMA-13b | bsz 8 MP4 recompute |  **1651.50**         |  N/A                       | N/A       |
 | LLaMA-13b | bsz 8 ZeRO 3  | 747.17                     |  712.53                    | 5%        |
 | LLaMA-13b | bsz 8 ZeRO 2  | OOM                        |  OOM                       | N/A       |
 
