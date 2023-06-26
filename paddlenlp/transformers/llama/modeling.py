@@ -932,11 +932,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         if isinstance(outputs, CausalLMOutputWithCrossAttentions) and "past_key_values" in outputs:
             model_kwargs["past_key_values"] = outputs.past_key_values
 
-        # update token_type_ids with last value
-        if "token_type_ids" in model_kwargs and model_kwargs["token_type_ids"] is not None:
-            token_type_ids = model_kwargs["token_type_ids"]
-            model_kwargs["token_type_ids"] = paddle.concat([token_type_ids, token_type_ids[:, -1:]], axis=-1)
-
         if not is_encoder_decoder and "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]
             model_kwargs["attention_mask"] = paddle.concat(

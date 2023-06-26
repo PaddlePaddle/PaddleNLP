@@ -93,7 +93,7 @@ class RobertaSeriesConfig(XLMRobertaConfig):
 
 
 class RobertaSeriesModelWithTransformation(RobertaPretrainedModel):
-    _keys_to_ignore_on_load_unexpected = [r"pooler"]
+    _keys_to_ignore_on_load_unexpected = [r"pooler", r"logit_scale"]
     _keys_to_ignore_on_load_missing = [r"position_ids", r"predictions.decoder.bias"]
     base_model_prefix = "roberta"
     config_class = RobertaSeriesConfig
@@ -104,7 +104,11 @@ class RobertaSeriesModelWithTransformation(RobertaPretrainedModel):
         # must reset _padding_idx
         self.roberta.embeddings.word_embeddings._padding_idx = None
         self.transformation = nn.Linear(config.hidden_size, config.project_dim)
-        self.apply(self.init_weights)
+        self.has_pre_transformation = getattr(config, "has_pre_transformation", False)
+        if self.has_pre_transformation:
+            self.transformation_pre = nn.Linear(config.hidden_size, config.project_dim)
+            self.pre_LN = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.init_weights()
 
     def forward(
         self,
@@ -126,15 +130,26 @@ class RobertaSeriesModelWithTransformation(RobertaPretrainedModel):
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
+            output_hidden_states=True if self.has_pre_transformation else output_hidden_states,
             return_dict=return_dict,
         )
 
-        projection_state = self.transformation(outputs.last_hidden_state)
+        if self.has_pre_transformation:
+            sequence_output2 = outputs["hidden_states"][-2]
+            sequence_output2 = self.pre_LN(sequence_output2)
+            projection_state2 = self.transformation_pre(sequence_output2)
 
-        return TransformationModelOutput(
-            projection_state=projection_state,
-            last_hidden_state=outputs.last_hidden_state,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
+            return TransformationModelOutput(
+                projection_state=projection_state2,
+                last_hidden_state=outputs.last_hidden_state,
+                hidden_states=outputs.hidden_states,
+                attentions=outputs.attentions,
+            )
+        else:
+            projection_state = self.transformation(outputs.last_hidden_state)
+            return TransformationModelOutput(
+                projection_state=projection_state,
+                last_hidden_state=outputs.last_hidden_state,
+                hidden_states=outputs.hidden_states,
+                attentions=outputs.attentions,
+            )

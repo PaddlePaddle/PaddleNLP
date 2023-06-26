@@ -108,8 +108,8 @@ class VerbalizerTest(unittest.TestCase):
 
     def test_normalize(self):
         outputs = paddle.rand([2, 1, 2, 3])
-        self.assertAlmostEqual(self.default_verb.normalize(outputs)[0].sum().tolist()[0], 1, 6)
-        self.assertAlmostEqual(self.default_verb.normalize(outputs)[1].sum().tolist()[0], 1, 6)
+        self.assertAlmostEqual(self.default_verb.normalize(outputs)[0].sum().item(), 1, 6)
+        self.assertAlmostEqual(self.default_verb.normalize(outputs)[1].sum().item(), 1, 6)
 
     def test_save_and_load(self):
         with tempfile.TemporaryDirectory() as tmpdirname:

@@ -20,12 +20,13 @@ import paddle
 import PIL
 
 from paddlenlp.transformers import (
-    CLIPFeatureExtractor,
+    CLIPImageProcessor,
     CLIPTextModel,
     CLIPTokenizer,
     CLIPVisionModelWithProjection,
 )
 
+from ...loaders import TextualInversionLoaderMixin
 from ...models import AutoencoderKL, UNet2DConditionModel
 from ...models.embeddings import get_timestep_embedding
 from ...schedulers import KarrasDiffusionSchedulers
@@ -63,7 +64,7 @@ EXAMPLE_DOC_STRING = """
 """
 
 
-class StableUnCLIPImg2ImgPipeline(DiffusionPipeline):
+class StableUnCLIPImg2ImgPipeline(DiffusionPipeline, TextualInversionLoaderMixin):
     """
     Pipeline for text-guided image to image generation using stable unCLIP.
 
@@ -71,7 +72,7 @@ class StableUnCLIPImg2ImgPipeline(DiffusionPipeline):
     library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
 
     Args:
-        feature_extractor ([`CLIPFeatureExtractor`]):
+        feature_extractor ([`CLIPImageProcessor`]):
             Feature extractor for image pre-processing before being encoded.
         image_encoder ([`CLIPVisionModelWithProjection`]):
             CLIP vision model for encoding images.
@@ -94,7 +95,7 @@ class StableUnCLIPImg2ImgPipeline(DiffusionPipeline):
     """
 
     # image encoding components
-    feature_extractor: CLIPFeatureExtractor
+    feature_extractor: CLIPImageProcessor
     image_encoder: CLIPVisionModelWithProjection
 
     # image noising components
@@ -112,7 +113,7 @@ class StableUnCLIPImg2ImgPipeline(DiffusionPipeline):
     def __init__(
         self,
         # image encoding components
-        feature_extractor: CLIPFeatureExtractor,
+        feature_extractor: CLIPImageProcessor,
         image_encoder: CLIPVisionModelWithProjection,
         # image noising components
         image_normalizer: StableUnCLIPImageNormalizer,
@@ -163,8 +164,8 @@ class StableUnCLIPImg2ImgPipeline(DiffusionPipeline):
                 whether to use classifier free guidance or not
             negative_prompt (`str` or `List[str]`, *optional*):
                 The prompt or prompts not to guide the image generation. If not defined, one has to pass
-                `negative_prompt_embeds`. instead. If not defined, one has to pass `negative_prompt_embeds`. instead.
-                Ignored when not using guidance (i.e., ignored if `guidance_scale` is less than `1`).
+                `negative_prompt_embeds` instead. Ignored when not using guidance (i.e., ignored if `guidance_scale` is
+                less than `1`).
             prompt_embeds (`paddle.Tensor`, *optional*):
                 Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
                 provided, text embeddings will be generated from `prompt` input argument.
@@ -181,6 +182,10 @@ class StableUnCLIPImg2ImgPipeline(DiffusionPipeline):
             batch_size = prompt_embeds.shape[0]
 
         if prompt_embeds is None:
+            # textual inversion: procecss multi-vector tokens if necessary
+            if isinstance(self, TextualInversionLoaderMixin):
+                prompt = self.maybe_convert_prompt(prompt, self.tokenizer)
+
             text_inputs = self.tokenizer(
                 prompt,
                 padding="max_length",
@@ -240,6 +245,10 @@ class StableUnCLIPImg2ImgPipeline(DiffusionPipeline):
                 )
             else:
                 uncond_tokens = negative_prompt
+
+            # textual inversion: procecss multi-vector tokens if necessary
+            if isinstance(self, TextualInversionLoaderMixin):
+                uncond_tokens = self.maybe_convert_prompt(uncond_tokens, self.tokenizer)
 
             max_length = prompt_embeds.shape[1]
             uncond_input = self.tokenizer(
@@ -301,7 +310,7 @@ class StableUnCLIPImg2ImgPipeline(DiffusionPipeline):
             # what the expected dimensions of inputs should be and how we handle the encoding.
             repeat_by = num_images_per_prompt
 
-        if not image_embeds:
+        if image_embeds is None:
             if not isinstance(image, paddle.Tensor):
                 image = self.feature_extractor(images=image, return_tensors="pd").pixel_values
 
@@ -503,8 +512,8 @@ class StableUnCLIPImg2ImgPipeline(DiffusionPipeline):
     @replace_example_docstring(EXAMPLE_DOC_STRING)
     def __call__(
         self,
-        prompt: Union[str, List[str]] = None,
         image: Union[paddle.Tensor, PIL.Image.Image] = None,
+        prompt: Union[str, List[str]] = None,
         height: Optional[int] = None,
         width: Optional[int] = None,
         num_inference_steps: int = 20,
@@ -529,8 +538,8 @@ class StableUnCLIPImg2ImgPipeline(DiffusionPipeline):
 
         Args:
             prompt (`str` or `List[str]`, *optional*):
-                The prompt or prompts to guide the image generation. If not defined, one has to pass `prompt_embeds`.
-                instead.
+                The prompt or prompts to guide the image generation. If not defined, either `prompt_embeds` will be
+                used or prompt is initialized to `""`.
             image (`paddle.Tensor` or `PIL.Image.Image`):
                 `Image`, or tensor representing an image batch. The image will be encoded to its CLIP embedding which
                 the unet will be conditioned on. Note that the image is _not_ encoded by the vae and then used as the
@@ -551,8 +560,8 @@ class StableUnCLIPImg2ImgPipeline(DiffusionPipeline):
                 usually at the expense of lower image quality.
             negative_prompt (`str` or `List[str]`, *optional*):
                 The prompt or prompts not to guide the image generation. If not defined, one has to pass
-                `negative_prompt_embeds`. instead. If not defined, one has to pass `negative_prompt_embeds`. instead.
-                Ignored when not using guidance (i.e., ignored if `guidance_scale` is less than `1`).
+                `negative_prompt_embeds` instead. Ignored when not using guidance (i.e., ignored if `guidance_scale` is
+                less than `1`).
             num_images_per_prompt (`int`, *optional*, defaults to 1):
                 The number of images to generate per prompt.
             eta (`float`, *optional*, defaults to 0.0):
@@ -584,9 +593,9 @@ class StableUnCLIPImg2ImgPipeline(DiffusionPipeline):
                 The frequency at which the `callback` function will be called. If not specified, the callback will be
                 called at every step.
             cross_attention_kwargs (`dict`, *optional*):
-                A kwargs dictionary that if specified is passed along to the `AttnProcessor` as defined under
+                A kwargs dictionary that if specified is passed along to the `AttentionProcessor` as defined under
                 `self.processor` in
-                [diffusers.cross_attention](https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/cross_attention.py).
+                [ppdiffusers.cross_attention](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/cross_attention.py).
             noise_level (`int`, *optional*, defaults to `0`):
                 The amount of noise to add to the image embeddings. A higher `noise_level` increases the variance in
                 the final un-noised images. See `StableUnCLIPPipeline.noise_image_embeddings` for details.
@@ -604,6 +613,9 @@ class StableUnCLIPImg2ImgPipeline(DiffusionPipeline):
         # 0. Default height and width to unet
         height = height or self.unet.config.sample_size * self.vae_scale_factor
         width = width or self.unet.config.sample_size * self.vae_scale_factor
+
+        if prompt is None and prompt_embeds is None:
+            prompt = len(image) * [""] if isinstance(image, list) else ""
 
         # 1. Check inputs. Raise error if not correct
         self.check_inputs(
@@ -661,7 +673,7 @@ class StableUnCLIPImg2ImgPipeline(DiffusionPipeline):
         timesteps = self.scheduler.timesteps
 
         # 6. Prepare latent variables
-        num_channels_latents = self.unet.in_channels
+        num_channels_latents = self.unet.config.in_channels
         latents = self.prepare_latents(
             batch_size=batch_size,
             num_channels_latents=num_channels_latents,

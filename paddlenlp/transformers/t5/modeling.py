@@ -212,7 +212,10 @@ class T5LayerFF(nn.Layer):
     def forward(self, hidden_states):
         forwarded_states = self.layer_norm(hidden_states)
         forwarded_states = self.DenseReluDense(forwarded_states)
-        hidden_states = hidden_states + self.dropout(forwarded_states)
+        # hidden_states maybe FP16
+        # self.dropout(forwarded_states) maybe FP32
+        # FP32 + FP16 = FP32, FP16 + FP32 = FP16
+        hidden_states = self.dropout(forwarded_states) + hidden_states
         return hidden_states
 
 

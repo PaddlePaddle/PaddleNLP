@@ -53,7 +53,9 @@ from ppdiffusers.training_utils import (
     main_process_first,
     unwrap_model,
 )
-from ppdiffusers.utils import PPDIFFUSERS_CACHE
+from ppdiffusers.utils import PPDIFFUSERS_CACHE, check_min_version
+
+check_min_version("0.16.1")
 
 
 def url_or_path_join(*path_list):
@@ -293,6 +295,13 @@ def parse_args(input_args=None):
         "--lr_warmup_steps", type=int, default=500, help="Number of steps for the warmup in the lr scheduler."
     )
     parser.add_argument(
+        "--snr_gamma",
+        type=float,
+        default=None,
+        help="SNR weighting gamma to be used if rebalancing the loss. Recommended value is 5.0. "
+        "More details here: https://arxiv.org/abs/2303.09556.",
+    )
+    parser.add_argument(
         "--lr_num_cycles",
         type=int,
         default=1,
@@ -343,7 +352,7 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
     )
-
+    parser.add_argument("--noise_offset", type=float, default=0, help="The scale of noise offset.")
     if input_args is not None:
         args = parser.parse_args(input_args)
     else:
@@ -388,6 +397,8 @@ def main():
 
     # Handle the repository creation
     if is_main_process:
+        if args.output_dir is not None:
+            os.makedirs(args.output_dir, exist_ok=True)
         if args.push_to_hub:
             if args.hub_model_id is None:
                 repo_name = get_full_repo_name(Path(args.output_dir).name, token=args.hub_token)
@@ -401,8 +412,6 @@ def main():
                     gitignore.write("step_*\n")
                 if "epoch_*" not in gitignore:
                     gitignore.write("epoch_*\n")
-        elif args.output_dir is not None:
-            os.makedirs(args.output_dir, exist_ok=True)
 
     # Load the tokenizer
     if args.tokenizer_name:
@@ -452,6 +461,30 @@ def main():
                 "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
                 f" correctly and a GPU is available: {e}"
             )
+
+    def compute_snr(timesteps):
+        """
+        Computes SNR as per https://github.com/TiankaiHang/Min-SNR-Diffusion-Training/blob/521b624bd70c67cee4bdf49225915f5945a872e3/guided_diffusion/gaussian_diffusion.py#L847-L849
+        """
+        alphas_cumprod = noise_scheduler.alphas_cumprod
+        sqrt_alphas_cumprod = alphas_cumprod**0.5
+        sqrt_one_minus_alphas_cumprod = (1.0 - alphas_cumprod) ** 0.5
+
+        # Expand the tensors.
+        # Adapted from https://github.com/TiankaiHang/Min-SNR-Diffusion-Training/blob/521b624bd70c67cee4bdf49225915f5945a872e3/guided_diffusion/gaussian_diffusion.py#L1026
+        sqrt_alphas_cumprod = sqrt_alphas_cumprod[timesteps].cast("float32")
+        while len(sqrt_alphas_cumprod.shape) < len(timesteps.shape):
+            sqrt_alphas_cumprod = sqrt_alphas_cumprod[..., None]
+        alpha = sqrt_alphas_cumprod.expand(timesteps.shape)
+
+        sqrt_one_minus_alphas_cumprod = sqrt_one_minus_alphas_cumprod[timesteps].cast("float32")
+        while len(sqrt_one_minus_alphas_cumprod.shape) < len(timesteps.shape):
+            sqrt_one_minus_alphas_cumprod = sqrt_one_minus_alphas_cumprod[..., None]
+        sigma = sqrt_one_minus_alphas_cumprod.expand(timesteps.shape)
+
+        # Compute SNR.
+        snr = (alpha / sigma) ** 2
+        return snr
 
     # Get the datasets: you can either provide your own training and evaluation files (see below)
     # or specify a Dataset from the hub (the dataset will be downloaded automatically from the datasets Hub).
@@ -652,10 +685,15 @@ def main():
         for step, batch in enumerate(train_dataloader):
             # Convert images to latent space
             latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
-            latents = latents * 0.18215
+            latents = latents * vae.config.scaling_factor
 
             # Sample noise that we'll add to the latents
-            noise = paddle.randn(latents.shape)
+            noise = paddle.randn(latents.shape, dtype=latents.dtype)
+            if args.noise_offset:
+                # https://www.crosslabs.org//blog/diffusion-with-offset-noise
+                noise += args.noise_offset * paddle.randn(
+                    (latents.shape[0], latents.shape[1], 1, 1), dtype=latents.dtype
+                )
             batch_size = latents.shape[0]
             # Sample a random timestep for each image
             timesteps = paddle.randint(0, noise_scheduler.config.num_train_timesteps, (batch_size,)).cast("int64")
@@ -703,7 +741,23 @@ def main():
                     else:
                         raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
 
-                    loss = F.mse_loss(model_pred, target, reduction="mean")
+                    if args.snr_gamma is None:
+                        loss = F.mse_loss(model_pred.cast("float32"), target.cast("float32"), reduction="mean")
+                    else:
+                        # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
+                        # Since we predict the noise instead of x_0, the original formulation is slightly changed.
+                        # This is discussed in Section 4.2 of the same paper.
+                        snr = compute_snr(timesteps)
+                        mse_loss_weights = (
+                            paddle.stack([snr, args.snr_gamma * paddle.ones_like(timesteps)], axis=1).min(1)[0] / snr
+                        )
+                        # We first calculate the original loss. Then we mean over the non-batch dimensions and
+                        # rebalance the sample-wise losses with their respective loss weights.
+                        # Finally, we take the mean of the rebalanced loss.
+                        loss = F.mse_loss(model_pred.cast("float32"), target.cast("float32"), reduction="none")
+                        loss = loss.mean(axis=list(range(1, len(loss.shape)))) * mse_loss_weights
+                        loss = loss.mean()
+
                     if args.gradient_accumulation_steps > 1:
                         loss = loss / args.gradient_accumulation_steps
                     loss.backward()

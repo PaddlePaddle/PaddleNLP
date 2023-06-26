@@ -49,7 +49,7 @@ class KarrasVePipelineFastTests(unittest.TestCase):
         image_slice = image[0, -3:, -3:, -1]
         image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
         assert image.shape == (1, 32, 32, 3)
-        expected_slice = np.array([0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
+        expected_slice = np.array([0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0])
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
         assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 0.01
 

@@ -39,7 +39,7 @@ def preprocess(image):
 
     if isinstance(image[0], PIL.Image.Image):
         w, h = image[0].size
-        w, h = map(lambda x: x - x % 64, (w, h))  # resize to integer multiple of 64
+        w, h = (x - x % 64 for x in (w, h))  # resize to integer multiple of 64
 
         image = [np.array(i.resize((w, h)))[None, :] for i in image]
         image = np.concatenate(image, axis=0)
@@ -433,10 +433,11 @@ class StableDiffusionLatentUpscalePipeline(DiffusionPipeline):
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
                 scaled_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
-                scaled_model_input = paddle.concat([scaled_model_input, image_cond], axis=1)
+                scaled_model_input = paddle.concat(
+                    [scaled_model_input, image_cond.cast(scaled_model_input.dtype)], axis=1
+                )
                 # preconditioning parameter based on  Karras et al. (2022) (table 1)
                 timestep = paddle.log(sigma) * 0.25
-
                 noise_pred = self.unet(
                     scaled_model_input,
                     timestep,

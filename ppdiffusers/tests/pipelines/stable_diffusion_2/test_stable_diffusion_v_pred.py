@@ -128,17 +128,7 @@ class StableDiffusion2VPredictionPipelineFastTests(unittest.TestCase):
         image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array(
-            [
-                0.12384933,
-                0.19702056,
-                0.25682122,
-                0.29907784,
-                0.18888032,
-                0.40307283,
-                0.28899065,
-                0.21834826,
-                0.41601387,
-            ]
+            [0.36126757, 0.40778637, 0.36956796, 0.14816678, 0.25735706, 0.36562037, 0.1229952, 0.22826642, 0.4154452]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
         assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 0.01
@@ -179,7 +169,7 @@ class StableDiffusion2VPredictionPipelineFastTests(unittest.TestCase):
         image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array(
-            [0.1817798, 0.16936094, 0.18231615, 0.33563924, 0.17667511, 0.34496182, 0.45114157, 0.37192938, 0.45209426]
+            [0.39991996, 0.45191997, 0.34044766, 0.2136086, 0.2758901, 0.31222183, 0.21658134, 0.34479994, 0.43742967]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
         assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 0.01

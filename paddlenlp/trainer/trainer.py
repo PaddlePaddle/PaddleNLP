@@ -562,9 +562,13 @@ class Trainer:
             # todo fix for pipeline_parallel_degree
             parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
             if parts_num > 1:
-                trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype="int64")
+                all_reduce_dtype = "int64"
+                if paddle.get_device().split(":")[0] == "npu":
+                    # TODO(duanyanhui): fix when NPU all_reduce supports int64
+                    all_reduce_dtype = "float32"
+                trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
                 paddle.distributed.all_reduce(trainable_numel_tensor)
-                trainable_numel = trainable_numel_tensor.item() // self.args.dataset_world_size
+                trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
                 # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
                 # so, the trainable numel is a little bigger than real.
                 logger.info(f"  Number of trainable parameters = {trainable_numel} (all devices, roughly)")
@@ -647,10 +651,10 @@ class Trainer:
                 train_dataloader.batch_sampler.set_epoch(epoch)
 
             step = -1
-
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
+                self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
                 # Skip past any already trained steps if resuming training
                 # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
                 # We use consumed_samples to reset the status
@@ -747,6 +751,9 @@ class Trainer:
                                 p.grad = p.grad.scale(1.0 / self.args.gradient_accumulation_steps)
 
                     # Optimizer step
+                    self.callback_handler.on_optimizer_begin(
+                        args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                    )
                     optimizer_was_run = True
                     if self.do_grad_scaling:
                         scale_before = self.scaler._scale.numpy()
@@ -765,6 +772,9 @@ class Trainer:
                         self.lr_scheduler.step()
 
                     self.optimizer.clear_grad()
+                    self.callback_handler.on_optimizer_end(
+                        args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                    )
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
@@ -1439,10 +1449,15 @@ class Trainer:
                 # c_embedding not support bf16 yet
                 custom_black_list.append("c_embedding")
 
+            if self.args.amp_custom_white_list is not None:
+                custom_white_list.extend(self.args.amp_custom_white_list)
+            if self.args.amp_custom_black_list is not None:
+                custom_black_list.extend(self.args.amp_custom_black_list)
+
             ctx_manager = autocast(
                 True,
-                custom_black_list=custom_black_list,
-                custom_white_list=custom_white_list,
+                custom_black_list=set(custom_black_list),
+                custom_white_list=set(custom_white_list),
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
             )
@@ -1878,6 +1893,7 @@ class Trainer:
             prediction_loss_only=True if self.compute_metrics is None else None,
             ignore_keys=ignore_keys,
             metric_key_prefix=metric_key_prefix,
+            max_eval_iters=self.args.max_evaluate_steps,
         )
 
         total_batch_size = self.args.eval_batch_size * self.args.dataset_world_size
@@ -2124,7 +2140,11 @@ class Trainer:
 
         eval_loop = self.evaluation_loop
         output = eval_loop(
-            test_dataloader, description="Prediction", ignore_keys=ignore_keys, metric_key_prefix=metric_key_prefix
+            test_dataloader,
+            description="Prediction",
+            ignore_keys=ignore_keys,
+            metric_key_prefix=metric_key_prefix,
+            max_eval_iters=self.args.max_evaluate_steps,
         )
         total_batch_size = self.args.per_device_eval_batch_size * self.args.dataset_world_size
         output.metrics.update(
