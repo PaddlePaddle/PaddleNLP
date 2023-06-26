@@ -19,7 +19,7 @@ import unittest
 
 import paddle
 
-from paddlenlp.transformers import BertModel
+from paddlenlp.transformers import AutoConfig, BertModel
 from paddlenlp.transformers.model_utils import shard_checkpoint
 from paddlenlp.utils.env import (
     PADDLE_WEIGHTS_INDEX_NAME,
@@ -27,10 +27,52 @@ from paddlenlp.utils.env import (
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
 )
+from paddlenlp.utils.import_utils import is_paddle_cuda_available
 from tests.testing_utils import require_package
 
 
-class TestCkptShard(unittest.TestCase):
+class TestFromPretrained(unittest.TestCase):
+    @unittest.skipIf(not is_paddle_cuda_available(), "some op is missing in cpu mode")
+    def test_load_from_torch_dtyp_cast(self):
+        pass
+
+    @unittest.skipIf(not is_paddle_cuda_available(), "some op is missing in cpu mode")
+    def test_load_dtype_cast(self):
+        dtype_prefix_len = len("paddle.")
+
+        def inner_convert_test(src_dtype, dst_dtype):
+            str_src_dtype = str(src_dtype)[dtype_prefix_len:]
+            str_dst_dtype = str(dst_dtype)[dtype_prefix_len:]
+
+            config = AutoConfig.from_pretrained("__internal_testing__/tiny-random-bert")
+            model = BertModel._from_config(config, dtype=str_src_dtype)
+
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                model.save_pretrained(tmp_dir)
+                new_model = BertModel.from_pretrained(tmp_dir, dtype=str_dst_dtype)
+
+            for k, v in model.state_dict().items():
+                if v.is_floating_point():
+                    self.assertEqual(v.dtype, src_dtype)
+            for k, v in new_model.state_dict().items():
+                if v.is_floating_point():
+                    self.assertEqual(v.dtype, dst_dtype)
+
+        with self.subTest("paddle.float32 to paddle.float16"):
+            inner_convert_test(paddle.float32, paddle.float16)
+        with self.subTest("paddle.float32 to paddle.bfloat16"):
+            inner_convert_test(paddle.float32, paddle.bfloat16)
+        with self.subTest("paddle.float16 to paddle.float32"):
+            inner_convert_test(paddle.float16, paddle.float32)
+        with self.subTest("paddle.float16 to paddle.bfloat16"):
+            inner_convert_test(paddle.float16, paddle.bfloat16)
+        with self.subTest("paddle.bfloat16 to paddle.float32"):
+            inner_convert_test(paddle.bfloat16, paddle.float32)
+        with self.subTest("paddle.bfloat16 to paddle.float16"):
+            inner_convert_test(paddle.bfloat16, paddle.float16)
+
+
+class TestShardCheckpoint(unittest.TestCase):
     def test_shard_checkpoint(self):
         # This is the model we will use, total size 340,000 bytes.
         model = paddle.nn.Sequential(
