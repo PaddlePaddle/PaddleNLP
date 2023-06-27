@@ -14,23 +14,25 @@
 from __future__ import annotations
 
 import copy
+import gc
 import inspect
+import json
 import os
 import re
-import shutil
 import tempfile
+import warnings
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type
+
+# from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
 
 import numpy as np
 import paddle
-import paddle.distributed as dist
 import paddle.nn as nn
 import six
 from huggingface_hub import (
     create_repo,
     get_hf_file_metadata,
-    hf_hub_download,
     hf_hub_url,
     repo_type_and_id_from_hf_id,
     upload_folder,
@@ -40,35 +42,38 @@ from paddle import Tensor
 from paddle.nn import Embedding, Layer
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
-from paddle.utils.download import is_url
+from paddle.utils.download import is_url as is_remote_url
+from tqdm.auto import tqdm
 
-from paddlenlp import __version__
-from paddlenlp.utils.downloader import (
-    COMMUNITY_MODEL_PREFIX,
-    download_check,
-    get_path_from_url_with_filelock,
-    hf_file_exists,
-    url_file_exists,
-)
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock, hf_file_exists
 from paddlenlp.utils.env import (
     CONFIG_NAME,
-    ENABLE_TORCH_CHECKPOINT,
     LEGACY_CONFIG_NAME,
-    PADDLE_WEIGHT_FILE_NAME,
-    PYTORCH_WEIGHT_FILE_NAME,
+    PADDLE_WEIGHTS_INDEX_NAME,
+    PADDLE_WEIGHTS_NAME,
+    PYTORCH_WEIGHTS_NAME,
+    SAFE_WEIGHTS_INDEX_NAME,
+    SAFE_WEIGHTS_NAME,
 )
 from paddlenlp.utils.log import logger
 
+from ..utils import device_guard
 from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
 from .generation_utils import GenerationMixin
-from .utils import (
+from .utils import (  # convert_ndarray_dtype,
     ContextManagers,
     InitTrackerMeta,
     adapt_stale_fwd_patch,
-    convert_ndarray_dtype,
+    cached_file,
+    cached_file_for_hf_hub,
+    convert_file_size_to_int,
+    dtype_byte_size,
     fn_args_to_dict,
+    get_checkpoint_shard_files,
     is_paddle_support_lazy_init,
+    is_safetensors_available,
+    paddlenlp_load,
     resolve_cache_dir,
     weight_name_suffix,
 )
@@ -77,6 +82,13 @@ __all__ = [
     "PretrainedModel",
     "register_base_model",
 ]
+
+
+if is_safetensors_available():
+
+    from safetensors import safe_open
+    from safetensors.numpy import load_file as safe_load_file
+    from safetensors.numpy import save_file as safe_save_file
 
 
 def prune_linear_layer(layer: nn.Linear, index: paddle.Tensor, dim: int = 0) -> nn.Linear:
@@ -277,57 +289,47 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
     return last_dtype
 
 
-def _find_weight_file_path(
-    cache_dir: str,
-    model_class: Type[PretrainedModel],
-    resource_uri: Optional[str] = None,
-) -> str | None:
-    """find the target weight file under the cache dir, because there are some conflicts about weight file names.
-
-    Args:
-        cache_dir (str): the cache dir of pretrained weighted files
-        model_class (Type[PretrainedModel]): the class of pretrained model
-        resource_uri (Optional[str], optional): the weight file resource file uri to help find the target file name. Defaults to None.
+def load_state_dict(checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None):
     """
-    # 1. if the weight file is the name of resource_uri, eg: 'bert-base-uncased.pdparams'
-    if resource_uri is not None:
-        resouce_uri_file_name = os.path.split(resource_uri)[-1]
-        weight_file_path = os.path.join(cache_dir, resouce_uri_file_name)
-        if os.path.isfile(weight_file_path):
-            return weight_file_path
+    Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
+    """
+    if tensor_parallel_split_mapping is None:
+        tensor_parallel_split_mapping = {}
 
-    # 2. find the target weight file name under the `resource_files_names` attribute of `PretrainedModel`
-    resource_weight_file_name = model_class.resource_files_names.get("model_state", None)
-    weight_file_path = os.path.join(cache_dir, resource_weight_file_name)
-    if os.path.isfile(weight_file_path):
-        return weight_file_path
+    if checkpoint_file.endswith(".safetensors") and is_safetensors_available():
+        # Check format of the archive
+        with safe_open(checkpoint_file, framework="np") as f:
+            metadata = f.metadata()
+        if metadata.get("format") not in ["pd", "np"]:
+            raise OSError(
+                f"The safetensors archive passed at {checkpoint_file} does not contain the valid metadata. Make sure "
+                "you save your model with the `save_pretrained` method."
+            )
+        if metadata["format"] == "pd":
+            raise ValueError("Currently unsupport paddle weights file, use numpy instead.")
+            return safe_load_file(checkpoint_file)
+        if metadata["format"] == "np":
+            logger.warning("loading safe.")
+            state_dict = {}
+            with safe_open(checkpoint_file, framework="np") as f:
+                for key in f.keys():
+                    py_safe_slice_ = f.get_slice(key)
+                    if key in tensor_parallel_split_mapping:
+                        weight = tensor_parallel_split_mapping[key](py_safe_slice_)
+                    else:
+                        weight = py_safe_slice_[:]
+                    state_dict[key] = weight
 
-    # 3. find the target weight file name for splited tensor parallel
-    # fix for load hybrid parallel
-    hybrid_parallel_weight_file_path = os.path.join(
-        cache_dir, _add_variant(resource_weight_file_name, weight_name_suffix())
-    )
-    if os.path.isfile(hybrid_parallel_weight_file_path):
-        return hybrid_parallel_weight_file_path
+            logger.warning("loading done.")
+            for k in list(state_dict.keys()):
+                with device_guard():
+                    state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
 
-    # 4. find the target weight file if there is only one weight file
-    weight_file_names = [file for file in os.listdir(cache_dir) if file.endswith(".pdparams")]
-    if len(weight_file_names) == 1:
-        logger.warning(
-            f"there is no <{resource_weight_file_name}> which is the expected weight file name "
-            f"under dir<{cache_dir}>, but the file<{weight_file_names[0]}> is found, and it will "
-            f"be used to init model weights. We suggest that you rename it to <{resource_weight_file_name}>"
-        )
-        return os.path.join(cache_dir, weight_file_names[0])
+            logger.warning("copy paddle tensor done.")
+            return state_dict
 
-    # 4. try to find pytorch model weight file under cache_dir
-    pytorch_model_weight_file = os.path.join(cache_dir, PYTORCH_WEIGHT_FILE_NAME)
-    if os.path.isfile(pytorch_model_weight_file):
-        return pytorch_model_weight_file
-
-    raise FileNotFoundError(
-        f"can not find paddle weight file<model_state.pdparams> and pytorch pytorch weight file<pytorch_model.bin> under <{cache_dir}>"
-    )
+    state_dict = paddlenlp_load(checkpoint_file, map_location="cpu")
+    return state_dict
 
 
 def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conversion: bool, subfolder=None):
@@ -339,30 +341,30 @@ def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conver
         support_conversion (bool): whether support converting pytorch weight file to paddle weight file
         subfolder (str, optional) An optional value corresponding to a folder inside the repo.
     """
-    if hf_file_exists(repo_id, PADDLE_WEIGHT_FILE_NAME, subfolder=subfolder):
-        file_name = PADDLE_WEIGHT_FILE_NAME
-    elif hf_file_exists(repo_id, PYTORCH_WEIGHT_FILE_NAME, subfolder=subfolder):
-        if not support_conversion:
+    is_local = os.path.isdir(repo_id)
+    if not is_local:
+        if hf_file_exists(repo_id, PADDLE_WEIGHTS_NAME, subfolder=subfolder):
+            file_name = PADDLE_WEIGHTS_NAME
+            assert (
+                support_conversion is False
+            ), "Please call set convert_from_torch for paddle weights on huggingface hub, eg. Model.from_pretrained(model_name, from_hf_hub=True, convert_from_torch=False)"
+        elif hf_file_exists(repo_id, PYTORCH_WEIGHTS_NAME, subfolder=subfolder):
+            if not support_conversion:
+                raise EntryNotFoundError(
+                    f"can not download `{PADDLE_WEIGHTS_NAME} from https://huggingface.co/{repo_id}` "
+                    "and current model doesn't support conversion from pytorch weight file to paddle weight file"
+                )
+            file_name = PYTORCH_WEIGHTS_NAME
+        else:
             raise EntryNotFoundError(
-                f"can not download `{PADDLE_WEIGHT_FILE_NAME} from https://huggingface.co/{repo_id}` "
-                "and current model doesn't support conversion from pytorch weight file to paddle weight file"
+                message=f"can not find the paddle/pytorch weight file from: https://huggingface.co/{repo_id}",
+                response=None,
             )
-        file_name = PYTORCH_WEIGHT_FILE_NAME
     else:
-        raise EntryNotFoundError(
-            message=f"can not find the paddle/pytorch weight file from: https://huggingface.co/{repo_id}",
-            response=None,
-        )
+        # for local file, we use support_conversion to select paddle or torch weight.
+        file_name = PYTORCH_WEIGHTS_NAME if support_conversion else PADDLE_WEIGHTS_NAME
 
-    download_check(repo_id, file_name, addition="from_hf_hub")
-    return hf_hub_download(
-        repo_id=repo_id,
-        filename=file_name,
-        cache_dir=cache_dir,
-        subfolder=subfolder,
-        library_name="PaddleNLP",
-        library_version=__version__,
-    )
+    return cached_file_for_hf_hub(repo_id, file_name, cache_dir, subfolder)
 
 
 def register_base_model(cls):
@@ -400,6 +402,344 @@ class BackboneMixin:
         filtered_kwargs = {k: v for k, v in kwargs.items() if k in signature}
 
         return self(*args, **filtered_kwargs)
+
+
+_re_layer_prefix = re.compile(r"\.(\d+)\.")
+
+
+def _partion_for_pipeline_mode(keys):
+    # the keys should be sort in networks order
+    # TODO maybe handle tie_weight ?
+    def layer_prefix(key):
+        ret = _re_layer_prefix.search(key)
+        if ret is not None:
+            return key[0 : ret.end()]
+        return ""
+
+    keys = list(keys)
+    start_idx = -1
+    prefix_str = None
+    parttion_map = {}
+    for k in keys:
+        prefix = layer_prefix(k)
+        if prefix != prefix_str:
+            prefix_str = prefix
+            start_idx += 1
+        parttion_map[k] = start_idx
+
+    # if only one parttion, we don't parttion it
+    if start_idx < 1:
+        return {keys[i]: i for i in range(len(keys))}
+
+    return parttion_map
+
+
+def shard_checkpoint(
+    state_dict: Dict[str, paddle.Tensor],
+    max_shard_size: Union[int, str] = "10GB",
+    weights_name: str = PADDLE_WEIGHTS_NAME,
+    shard_format="naive",
+):
+    """
+    Splits a model state dictionary in sub-checkpoints so that the final size of each sub-checkpoint does not exceed a
+    given size.
+
+    The sub-checkpoints are determined by iterating through the `state_dict` in the order of its keys, so there is no
+    optimization made to make each sub-checkpoint as close as possible to the maximum size passed. For example, if the
+    limit is 10GB and we have weights of sizes [6GB, 6GB, 2GB, 6GB, 2GB, 2GB] they will get sharded as [6GB], [6+2GB],
+    [6+2+2GB] and not [6+2+2GB], [6+2GB], [6GB].
+
+    <Tip warning={true}>
+
+    If one of the model's weight is bigger that `max_sahrd_size`, it will end up in its own sub-checkpoint which will
+    have a size greater than `max_shard_size`.
+
+    </Tip>
+
+    Args:
+        state_dict (`Dict[str, paddle.Tensor]`): The state dictionary of a model to save.
+        max_shard_size (`int` or `str`, *optional*, defaults to `"10GB"`):
+            The maximum size of each sub-checkpoint. If expressed as a string, needs to be digits followed by a unit
+            (like `"5MB"`).
+        weights_name (`str`, *optional*, defaults to `"model_state.pdparams"`):
+            The name of the model save file.
+        shard_format (`str`, *optional*, defaults to `"naive"`):
+            support naive or pipeline.
+    """
+    assert shard_format in [
+        "naive",
+        "pipeline",
+    ], f"Invalid shard_format: {shard_format}, it show be `naive` or `pipeline`."
+
+    max_shard_size = convert_file_size_to_int(max_shard_size)
+
+    sharded_state_dicts = []
+    current_block = {}
+    current_block_size = 0
+    total_size = 0
+
+    if shard_format == "naive":
+        for key, weight in state_dict.items():
+            weight_size = weight.numel().item() * dtype_byte_size(weight.dtype)
+            # If this weight is going to tip up over the maximal size, we split.
+            if current_block_size + weight_size > max_shard_size:
+                # fix if the first param is large than max_shard_size
+                if len(current_block) > 0:
+                    sharded_state_dicts.append(current_block)
+                current_block = {}
+                current_block_size = 0
+
+            current_block[key] = weight
+            current_block_size += weight_size
+            total_size += weight_size
+
+        # Add the last block
+        sharded_state_dicts.append(current_block)
+
+    if shard_format == "pipeline":
+        parttion_map = _partion_for_pipeline_mode(state_dict.keys())
+        partition_num = max(parttion_map.values())
+
+        for index in range(partition_num + 1):
+            weight_names = [k for k, v in parttion_map.items() if v == index]
+            weight_size = sum(
+                state_dict[key].numel().item() * dtype_byte_size(state_dict[key].dtype) for key in weight_names
+            )
+
+            # try to add new block
+            if current_block_size + weight_size > max_shard_size:
+                # fix if the first param is large than max_shard_size
+                if len(current_block) > 0:
+                    sharded_state_dicts.append(current_block)
+                current_block = {}
+                current_block_size = 0
+            for key in weight_names:
+                current_block[key] = state_dict[key]
+            current_block_size += weight_size
+            total_size += weight_size
+
+        # Add the last block
+        sharded_state_dicts.append(current_block)
+        logger.info(f"The average size of partition is around: {total_size//partition_num}")
+
+    # If we only have one shard, we return it
+    if len(sharded_state_dicts) == 1:
+        return {weights_name: sharded_state_dicts[0]}, None
+
+    # Otherwise, let's build the index
+    weight_map = {}
+    shards = {}
+    for idx, shard in enumerate(sharded_state_dicts):
+        shard_file = weights_name.replace(".pdparams", f"-{idx+1:05d}-of-{len(sharded_state_dicts):05d}.pdparams")
+        shard_file = shard_file.replace(
+            ".safetensors", f"-{idx + 1:05d}-of-{len(sharded_state_dicts):05d}.safetensors"
+        )
+        shards[shard_file] = shard
+        for key in shard.keys():
+            weight_map[key] = shard_file
+
+    # Add the metadata
+    metadata = {"total_size": total_size}
+    index = {"metadata": metadata, "weight_map": weight_map}
+    return shards, index
+
+
+def load_sharded_checkpoint(model, folder, strict=True):
+    """
+    This is the same as [`paddle.nn.Layer.set_state_dict`]
+    but for a sharded checkpoint.
+
+    This load is performed efficiently: each checkpoint shard is loaded one by one in RAM and deleted after being
+    loaded in the model.
+
+    Args:
+        model (`paddle.nn.Module`): The model in which to load the checkpoint.
+        folder (`str` or `os.PathLike`): A path to a folder containing the sharded checkpoint.
+        strict (`bool`, *optional`, defaults to `True`):
+            Whether to strictly enforce that the keys in the model state dict match the keys in the sharded checkpoint.
+
+    Returns:
+        `NamedTuple`: A named tuple with `missing_keys` and `unexpected_keys` fields
+            - `missing_keys` is a list of str containing the missing keys
+            - `unexpected_keys` is a list of str containing the unexpected keys
+    """
+    # Load the index
+    index_file = os.path.join(folder, PADDLE_WEIGHTS_INDEX_NAME)
+    if not os.path.isfile(index_file):
+        raise ValueError(f"Can't find a checkpoint index ({PADDLE_WEIGHTS_INDEX_NAME}) in {folder}.")
+
+    with open(index_file, "r", encoding="utf-8") as f:
+        index = json.load(f)
+
+    shard_files = list(set(index["weight_map"].values()))
+
+    # If strict=True, error before loading any of the state dicts.
+    loaded_keys = index["weight_map"].keys()
+    model_keys = model.state_dict().keys()
+    missing_keys = [key for key in model_keys if key not in loaded_keys]
+    unexpected_keys = [key for key in loaded_keys if key not in model_keys]
+    if strict and (len(missing_keys) > 0 or len(unexpected_keys) > 0):
+        error_message = f"Error(s) in loading state_dict for {model.__class__.__name__}"
+        if len(missing_keys) > 0:
+            str_missing_keys = ",".join([f'"{k}"' for k in missing_keys])
+            error_message += f"\nMissing key(s): {str_missing_keys}."
+        if len(unexpected_keys) > 0:
+            str_unexpected_keys = ",".join([f'"{k}"' for k in unexpected_keys])
+            error_message += f"\nMissing key(s): {str_unexpected_keys}."
+        raise RuntimeError(error_message)
+
+    for shard_file in shard_files:
+        state_dict = paddlenlp_load(os.path.join(folder, shard_file), map_location="cpu")
+        with warnings.catch_warnings():
+            warnings.resetwarnings()
+            warnings.filterwarnings("ignore", message=r".*is not found in the provided dict.*")
+            model.set_state_dict(state_dict)
+
+        # Make sure memory is fred before we load the next state dict.
+        del state_dict
+        gc.collect()
+
+    # Return the same thing as PaddlePaddle set_state_dict function.
+    return missing_keys, unexpected_keys
+
+
+def faster_set_state_dict(model, state_dict):
+    # the state_dict will be destroied.
+    with paddle.no_grad():
+        for k, v in model.state_dict().items():
+            if k in state_dict:
+                v_new = state_dict.pop(k)
+                if not isinstance(v_new, paddle.Tensor):
+                    raise ValueError(
+                        f"faster_set_state_dict need state dict with paddle.Tensor, but got {type(v_new)}"
+                    )
+                # 2. cast param / Tensor to dtype
+                if v.dtype != v_new.dtype:
+                    raise ValueError(f"for key: {k}, expect dtype {v.dtype}, but got {v_new.dtype}")
+                # check shape
+                if list(v.shape) != list(v_new.shape):
+                    raise ValueError(f"for key: {k}, expect shape {v.shape}, but got {v_new.shape}")
+
+                dst_tensor = v.value().get_tensor()
+                place = v.place
+
+                if not v_new.place._equals(place):
+                    # clear dst_tensor for save memory
+                    dst_tensor._clear()
+                    # v_new = v_new._copy_to(paddle.CUDAPinnedPlace(), False)
+                    new_t = v_new._copy_to(place, False)
+                else:
+                    new_t = v_new
+
+                # 4. share Tensor to origin param / Tensor
+                src_tensor = new_t.value().get_tensor()
+                dst_tensor._share_data_with(src_tensor)
+
+
+def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
+    # torch will cast dtype in load_state_dict, but paddle strictly check dtype
+    _convert_state_dict_dtype_and_shape(state_dict, model_to_load)
+
+    error_msgs = []
+
+    if len(start_prefix) > 0:
+        for key in list(state_dict.keys()):
+            if key.startswith(start_prefix):
+                state_dict[key.replace(start_prefix, "")] = state_dict.pop(key)
+
+    # TODO: add return status to state_dict
+    with warnings.catch_warnings(record=True) as w:
+        warnings.resetwarnings()
+        # paddlenlp hold  missing_keys , just ignore not found warnings.
+        warnings.filterwarnings("ignore", message=r".*is not found in the provided dict.*")
+        model_to_load.set_state_dict(state_dict)
+        error_msgs.extend([str(x.message) for x in w])
+
+    del state_dict
+
+    return error_msgs
+
+
+def _convert_state_dict_dtype_and_shape(state_dict, model_to_load):
+    # convert the dtype of state dict
+    def is_0d_or_1d(tensor):
+        return len(tensor.shape) == 0 or list(tensor.shape) == [1]
+
+    for key, value in model_to_load.state_dict().items():
+        if key in state_dict:
+            if isinstance(state_dict[key], np.ndarray):
+                raise ValueError(
+                    "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, plase convert numpy.ndarray to paddle.Tensor"
+                )
+            if state_dict[key].is_floating_point() and state_dict[key].dtype != value.dtype:
+                state_dict[key] = paddle.cast(state_dict.pop(key), value.dtype)
+
+            # unified 0d and 1d tensor
+            if is_0d_or_1d(value) and is_0d_or_1d(state_dict[key]):
+                if list(value.shape) != list(state_dict[key].shape):
+                    state_dict[key] = paddle.reshape(state_dict.pop(key), value.shape)
+
+
+def _load_state_dict_into_meta_model(
+    model,
+    state_dict,
+    loaded_state_dict_keys,  # left for now but could be removed, see below
+    start_prefix,
+    expected_keys,
+    dtype=None,
+    is_safetensors=False,
+    keep_in_fp32_modules=None,
+):
+    """
+    This is somewhat similar to `_load_state_dict_into_model`, but deals with a model that has some or all of its
+    params on a `meta` device. It replaces the model params with the data from the `state_dict`, while moving the
+    params back to the normal device, but only for `loaded_state_dict_keys`.
+
+    `start_prefix` is used for models which insert their name into model keys, e.g. `bert` in
+    `bert.pooler.dense.weight`
+
+    """
+    from paddle.fluid.framework import convert_np_dtype_to_dtype_
+
+    dtype = convert_np_dtype_to_dtype_(dtype)
+    error_msgs = []
+
+    for param_name, param in state_dict.items():
+        # First part of the test is always true as loaded_state_dict_keys always contains state_dict keys.
+        if param_name not in loaded_state_dict_keys or param_name not in expected_keys:
+            continue
+
+        if param_name.startswith(start_prefix):
+            param_name = param_name[len(start_prefix) :]
+
+        # # We convert floating dtypes to the `dtype` passed. We want to keep the buffers/params
+        # # in int/uint/bool and not cast them.
+        if dtype is not None and paddle.is_floating_point(param):
+            if (
+                keep_in_fp32_modules is not None
+                and any(module_to_keep_in_fp32 in param_name for module_to_keep_in_fp32 in keep_in_fp32_modules)
+                and dtype == paddle.float16
+            ):
+                param = param.astype(dtype=paddle.float32)
+            else:
+                param = param.astype(dtype=dtype)
+
+        if dtype is None:
+            old_param = model
+            splits = param_name.split(".")
+            for split in splits:
+                old_param = getattr(old_param, split)
+                if old_param is None:
+                    break
+
+            if old_param is not None:
+                param = param.to(dtype=old_param.dtype)
+
+        with paddle.no_grad():
+            model.state_dict()[param_name].get_tensor()._share_data_with(param.value().get_tensor())
+            param.value().get_tensor()._clear()
+
+    return error_msgs
 
 
 @six.add_metaclass(InitTrackerMeta)
@@ -449,11 +789,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
     # TODO: more flexible resource handle, namedtuple with fields as:
     # resource_name, saved_file, handle_name_for_load(None for used as __init__
     # arguments), handle_name_for_save
-    resource_files_names = {"model_state": PADDLE_WEIGHT_FILE_NAME}
+    resource_files_names = {"model_state": PADDLE_WEIGHTS_NAME}
     pretrained_resource_files_map = {}
     base_model_prefix = ""
     main_input_name = "input_ids"
     config_class = None
+    _keep_in_fp32_modules = None
 
     # a list of `re` patterns of `state_dict` keys that should be removed from the list of missing
     # keys we find (keys inside the model but not in the checkpoint) and avoid unnecessary warnings.
@@ -583,6 +924,17 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         """
         # Todo: return all model name
         return list(self.pretrained_init_configuration.keys())
+
+    def can_generate(self) -> bool:
+        """
+        Returns whether this model can generate sequences with `.generate()`.
+        Returns:
+            `bool`: Whether this model can generate sequences with `.generate()`.
+        """
+        # Detects whether `prepare_inputs_for_generation` has been overwritten, which is a requirement for generation
+        if "GenerationMixin" in str(self.prepare_inputs_for_generation):
+            return False
+        return True
 
     def get_memory_footprint(self, return_buffers=True):
         r"""
@@ -885,21 +1237,21 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         pretrained_model_name_or_path: str,
         from_hf_hub: bool = False,
         cache_dir: str | None = None,
-        subfolder: str | None = None,
+        subfolder: str = "",
         config: PretrainedConfig = None,
-        support_conversion: bool = False,
+        convert_from_torch: bool = False,
+        use_safetensors: bool | None = None,
+        variant=None,
     ) -> str:
+
         """resolve model target file path from `` and `cache_dir`
 
-        0. when it is file path:
+        1. when it is file path:
             return the weight file
 
-        1. when it is model-name:
-            1.1 check default `MODEL_HOME` + `model-mame` + model_state.pdparams
-            1.2 get the url from `pretrained_resource_files_map`, and set it to `pretrained_model_name_or_path`
-
-        2. when it is url:
-            fetch the resouce into the `cache_dir` (cache_dir or `MODEL_HOME` + `model-name` or `HF_CACHE_HOME` + `model-mame`)
+        2. when it is model-name:
+            2.1 check default `MODEL_HOME` + `model-mame` + model_state.pdparams
+            2.2 get the url from `pretrained_resource_files_map`, and set it to `pretrained_model_name_or_path`
 
         3. when it is local dir:
             check whether the file<local_dir + weight_file> exist
@@ -908,111 +1260,193 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             cls (Type[PretrainedModel]): the inherited PretrainedModel class
             pretrained_model_name_or_path (str): the model-name/url/local_dir/local_dir
             cache_dir (Optional[str], optional): cache_dir is used when name_or_path is model-name/url. Defaults to None.
-            support_conversion (bool, optional): whether support convert pytorch model to paddle model
+            convert_from_torch (bool, optional): whether support convert pytorch model to paddle model
 
         Returns:
             str: the model weight file path
         """
+        is_sharded = False
+        sharded_metadata = None
+
         # -1. when it's from HF
-        if from_hf_hub:
-            return resolve_weight_file_from_hf_hub(
+        if from_hf_hub or convert_from_torch:
+            resolved_archive_file = resolve_weight_file_from_hf_hub(
                 pretrained_model_name_or_path,
                 cache_dir=cache_dir,
-                support_conversion=support_conversion,
+                support_conversion=convert_from_torch,
+                subfolder=subfolder,
+            )
+            return resolved_archive_file, sharded_metadata, is_sharded
+
+        if pretrained_model_name_or_path is not None:
+            pretrained_model_name_or_path = str(pretrained_model_name_or_path)
+            is_local = os.path.isdir(pretrained_model_name_or_path)
+
+            # pretrained_model_name_or_path is dir
+            if is_local:
+                if use_safetensors is not False and os.path.isfile(
+                    os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(SAFE_WEIGHTS_NAME, variant))
+                ):
+                    # Load from a safetensors checkpoint
+                    archive_file = os.path.join(
+                        pretrained_model_name_or_path, subfolder, _add_variant(SAFE_WEIGHTS_NAME, variant)
+                    )
+                elif use_safetensors is not False and os.path.isfile(
+                    os.path.join(
+                        pretrained_model_name_or_path, subfolder, _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant)
+                    )
+                ):
+                    # Load from a sharded safetensors checkpoint
+                    archive_file = os.path.join(
+                        pretrained_model_name_or_path, subfolder, _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant)
+                    )
+                    is_sharded = True
+                elif os.path.isfile(
+                    os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(PADDLE_WEIGHTS_NAME, variant))
+                ):
+                    # Load from a PaddlePaddle checkpoint
+                    archive_file = os.path.join(
+                        pretrained_model_name_or_path, subfolder, _add_variant(PADDLE_WEIGHTS_NAME, variant)
+                    )
+                elif os.path.isfile(
+                    os.path.join(
+                        pretrained_model_name_or_path, subfolder, _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant)
+                    )
+                ):
+                    # Load from a sharded PaddlePaddle checkpoint
+                    archive_file = os.path.join(
+                        pretrained_model_name_or_path, subfolder, _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant)
+                    )
+                    is_sharded = True
+                elif os.path.isfile(
+                    os.path.join(
+                        pretrained_model_name_or_path,
+                        subfolder,
+                        _add_variant(PADDLE_WEIGHTS_NAME, weight_name_suffix()),
+                    )
+                ):
+                    # Load from a PaddlePaddle checkpoint for hybrid parallel model
+                    archive_file = os.path.join(
+                        pretrained_model_name_or_path,
+                        subfolder,
+                        _add_variant(PADDLE_WEIGHTS_NAME, weight_name_suffix()),
+                    )
+                # At this stage we don't have a weight file so we will raise an error.
+                elif os.path.isfile(
+                    os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(PYTORCH_WEIGHTS_NAME, variant))
+                ):
+                    raise ValueError(
+                        f"Found {_add_variant(PYTORCH_WEIGHTS_NAME, variant)} in directory"
+                        f" {pretrained_model_name_or_path}. Please set convert_from_torch=True in from_pretrained. eg, Model.from_pretrained(model_name, convert_from_torch=True) "
+                    )
+                else:
+                    raise EnvironmentError(
+                        f"Error no file named {_add_variant(PADDLE_WEIGHTS_NAME, variant)}, found in directory"
+                        f" {pretrained_model_name_or_path}."
+                    )
+            # pretrained_model_name_or_path is file
+            elif os.path.isfile(os.path.join(subfolder, pretrained_model_name_or_path)):
+                archive_file = pretrained_model_name_or_path
+                is_local = True
+            elif is_remote_url(pretrained_model_name_or_path):
+                filename = pretrained_model_name_or_path
+                resolved_archive_file = get_path_from_url_with_filelock(pretrained_model_name_or_path)
+            else:
+                # set correct filename
+                if use_safetensors is not False:
+                    filename = _add_variant(SAFE_WEIGHTS_NAME, variant)
+                else:
+                    filename = _add_variant(PADDLE_WEIGHTS_NAME, variant)
+
+                try:
+                    # Load from URL or cache if already cached
+                    cached_file_kwargs = dict(
+                        cache_dir=cache_dir,
+                        subfolder=subfolder,
+                        _raise_exceptions_for_missing_entries=False,
+                    )
+                    resolved_archive_file = None
+                    if pretrained_model_name_or_path in cls.pretrained_init_configuration:
+                        # fetch the weight url from the `pretrained_resource_files_map`
+                        resource_file_url = cls.pretrained_resource_files_map["model_state"][
+                            pretrained_model_name_or_path
+                        ]
+                        resolved_archive_file = cached_file(
+                            resource_file_url, _add_variant(PADDLE_WEIGHTS_NAME, variant), **cached_file_kwargs
+                        )
+
+                    if resolved_archive_file is None:
+                        resolved_archive_file = cached_file(
+                            pretrained_model_name_or_path, filename, **cached_file_kwargs
+                        )
+                    else:
+                        # xxx.pdparams in pretrained_resource_files_map renamed model_state.pdparams
+                        filename = _add_variant(PADDLE_WEIGHTS_NAME, variant)
+
+                    # Since we set _raise_exceptions_for_missing_entries=False, we don't get an exception but a None
+                    # result when internet is up, the repo and revision exist, but the file does not.
+                    if resolved_archive_file is None and filename == _add_variant(SAFE_WEIGHTS_NAME, variant):
+                        # Maybe the checkpoint is sharded, we try to grab the index name in this case.
+                        resolved_archive_file = cached_file(
+                            pretrained_model_name_or_path,
+                            _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant),
+                            **cached_file_kwargs,
+                        )
+                        if resolved_archive_file is not None:
+                            is_sharded = True
+                        elif use_safetensors:
+                            raise EnvironmentError(
+                                f" {_add_variant(SAFE_WEIGHTS_NAME, variant)} or {_add_variant(SAFE_WEIGHTS_INDEX_NAME, variant)} and thus cannot be loaded with `safetensors`. Please make sure that the model has been saved with `safe_serialization=True` or do not set `use_safetensors=True`."
+                            )
+                        else:
+                            # This repo has no safetensors file of any kind, we switch to PyTorch.
+                            filename = _add_variant(PADDLE_WEIGHTS_NAME, variant)
+                            resolved_archive_file = cached_file(
+                                pretrained_model_name_or_path, filename, **cached_file_kwargs
+                            )
+                    if resolved_archive_file is None and filename == _add_variant(PADDLE_WEIGHTS_NAME, variant):
+                        # Maybe the checkpoint is sharded, we try to grab the index name in this case.
+                        resolved_archive_file = cached_file(
+                            pretrained_model_name_or_path,
+                            _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant),
+                            **cached_file_kwargs,
+                        )
+                        # raise ValueError(resolved_archive_file)
+                        if resolved_archive_file is not None:
+                            is_sharded = True
+                    if resolved_archive_file is None:
+                        # Otherwise, maybe there is a TF or Flax model file.  We try those to give a helpful error
+                        # message.
+                        raise EnvironmentError(
+                            f"{pretrained_model_name_or_path} does not appear to have a file named"
+                            f" {_add_variant(PADDLE_WEIGHTS_NAME, variant)}."
+                        )
+                except Exception:
+                    # For any other exception, we throw a generic error.
+                    raise EnvironmentError(
+                        f"Can't load the model for '{pretrained_model_name_or_path}'. If you were trying to load it"
+                        " from 'https://paddlenlp.bj.bcebos.com'"
+                    )
+
+            if is_local:
+                logger.info(f"loading weights file {archive_file}")
+                resolved_archive_file = archive_file
+            else:
+                logger.info(f"loading weights file {filename} from cache at {resolved_archive_file}")
+        else:
+            resolved_archive_file = None
+
+        # We'll need to download and cache each checkpoint shard if the checkpoint is sharded.
+        if is_sharded:
+            # rsolved_archive_file becomes a list of files that point to the different checkpoint shards in this case.
+            resolved_archive_file, sharded_metadata = get_checkpoint_shard_files(
+                pretrained_model_name_or_path,
+                resolved_archive_file,
+                cache_dir=cache_dir,
                 subfolder=subfolder,
             )
 
-        # 0. when it is local file
-        if os.path.isfile(pretrained_model_name_or_path):
-            return pretrained_model_name_or_path
-
-        # 1. when it is model-name
-        if pretrained_model_name_or_path in cls.pretrained_init_configuration:
-            # check the cache_dir:
-            os.makedirs(cache_dir, exist_ok=True)
-
-            # check the state_dict file
-            weight_file_path = os.path.join(cache_dir, cls.resource_files_names["model_state"])
-            if os.path.exists(weight_file_path):
-                return weight_file_path
-
-            # fetch the weight url from the `pretrained_resource_files_map`
-            pretrained_model_name_or_path = cls.pretrained_resource_files_map["model_state"][
-                pretrained_model_name_or_path
-            ]
-
-        # 2. when it is url
-        if is_url(pretrained_model_name_or_path):
-            weight_file_path = get_path_from_url_with_filelock(pretrained_model_name_or_path, cache_dir)
-            # # check the downloaded weight file and registered weight file name
-            download_check(pretrained_model_name_or_path, "from_pretrained_v2")
-
-            # make sure that
-            new_weight_file_path = os.path.join(
-                os.path.split(weight_file_path)[0], cls.resource_files_names["model_state"]
-            )
-
-            # if the weight file name of url is: `bert-base-uncased.pdparams`, the downloaded file is also of it.
-            # and we should convert it to the new weitht file: `model_state.pdparams`
-            if weight_file_path != new_weight_file_path:
-                # move the `model-name.pdparams` to `model_state.pdparams`
-                # get more details from: https://github.com/PaddlePaddle/PaddleNLP/pull/3843
-                if dist.ParallelEnv().local_rank % 8 == 0 and os.path.exists(weight_file_path):
-                    shutil.move(weight_file_path, new_weight_file_path)
-                weight_file_path = new_weight_file_path
-
-            # find the weight file with the above two branch: `bert-base-uncased.pdparams`, `model_state.pdparams`
-            weight_file_path = _find_weight_file_path(
-                cache_dir=cache_dir, model_class=cls, resource_uri=pretrained_model_name_or_path
-            )
-
-            return weight_file_path
-
-        # 3. when it is local dir
-        if os.path.isdir(pretrained_model_name_or_path):
-            # in-order to compatible with old style:
-            # file name in pretrained_resouce_file_maps is https://path/to/bert-base-uncased.pdparams, but the registered model-state file name in `resouce_file_maps` is `model_state.pdparams`
-
-            return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls)
-
-        # 4. download from community or hf-hub
-        else:
-            # assume that the community-based models, name format: community/model-name
-            community_model_file_path = "/".join(
-                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.resource_files_names["model_state"]]
-            )
-            assert is_url(community_model_file_path)
-
-            # check wether the target file exist in the comunity bos server
-            if url_file_exists(community_model_file_path):
-                return cls._resolve_model_file_path(community_model_file_path, cache_dir=cache_dir)
-
-        # 5. Final ERROR
-        logger.warning(
-            f"can not find the model<{pretrained_model_name_or_path}> in the community server, "
-            f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."
-        )
-
-        if ENABLE_TORCH_CHECKPOINT:
-            msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> or <{PYTORCH_WEIGHT_FILE_NAME}> not found"
-        else:
-            msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> not found"
-
-        raise FileNotFoundError(msg)
-
-    @classmethod
-    def keep_in_fp32_modules(cls, key: str, config: PretrainedConfig, dtype: str) -> bool:
-        """should keep parameter in fp32
-
-        Args:
-            key (str): key of state-dict
-            config (PretrainedConfig): the instance of current pretrianed model
-            dtype (str): the source dtype
-
-        Returns:
-            bool: whether keep parameter in fp32 dtype
-        """
-        return False
+        return resolved_archive_file, sharded_metadata, is_sharded
 
     @classmethod
     def _load_pretrained_model(
@@ -1020,8 +1454,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         model: PretrainedModel,
         state_dict: Dict[str, Tensor],
         loaded_keys: List[str],
+        resolved_archive_file,
+        pretrained_model_name_or_path,
+        config=None,
         ignore_mismatched_sizes=False,
+        low_cpu_mem_usage=False,
         dtype=None,
+        keep_in_fp32_modules=None,
     ) -> Tuple[List[str]]:
         """load the state_dict into model, and do the following things:
 
@@ -1037,6 +1476,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         Returns:
             Tuple[List[str]]: _description_
         """
+        is_safetensors = False
+
         model_state_dict = model.state_dict()
 
         expected_keys = list(model_state_dict.keys())
@@ -1055,7 +1496,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         add_prefix_to_model = has_prefix_module and not expects_prefix_module
 
         if remove_prefix_from_model:
-            expected_keys = [".".join(s.split(".")[1:]) if s.startswith(prefix) else s for s in expected_keys]
+            _prefix = f"{prefix}."
+            expected_keys_not_prefixed = [s for s in expected_keys if not s.startswith(_prefix)]
+            expected_keys = [s[len(_prefix) :] if s.startswith(_prefix) else s for s in expected_keys]
         elif add_prefix_to_model:
             expected_keys = [".".join([prefix, s]) for s in expected_keys]
 
@@ -1072,11 +1515,25 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             for pat in cls._keys_to_ignore_on_load_unexpected:
                 unexpected_keys = [k for k in unexpected_keys if re.search(pat, k) is None]
 
+        # Set some modules to fp32 if any
+        if keep_in_fp32_modules is not None:
+            for name, param in model.named_parameters():
+                if any(module_to_keep_in_fp32 in name for module_to_keep_in_fp32 in keep_in_fp32_modules):
+                    param = param.to(dtype=paddle.float32)
+
         # Make sure we are able to load base models as well as derived models (with heads)
         start_prefix = ""
         model_to_load = model
         if len(cls.base_model_prefix) > 0 and not hasattr(model, cls.base_model_prefix) and has_prefix_module:
             start_prefix = cls.base_model_prefix + "."
+        if len(cls.base_model_prefix) > 0 and hasattr(model, cls.base_model_prefix) and not has_prefix_module:
+            model_to_load = getattr(model, cls.base_model_prefix)
+            base_model_expected_keys = list(model_to_load.state_dict().keys())
+            if any(key in expected_keys_not_prefixed and key not in base_model_expected_keys for key in loaded_keys):
+                raise ValueError(
+                    "The state dictionary of the model you are trying to load is corrupted. Are you sure it was "
+                    "properly saved?"
+                )
 
         def _find_mismatched_keys(
             state_dict,
@@ -1107,100 +1564,133 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         del state_dict[checkpoint_key]
             return mismatched_keys
 
-        # Whole checkpoint
-        mismatched_keys = _find_mismatched_keys(
-            state_dict,
-            model_state_dict,
-            loaded_keys,
-            add_prefix_to_model,
-            remove_prefix_from_model,
-            ignore_mismatched_sizes,
-        )
+        if state_dict is not None:
+            # DONT Hold tensor parallel here, only hold afer load state dict.
+            # Whole checkpoint
+            # For model parallel if FastGeneration
+            # To avoid recursive import temporarily.
+            import paddlenlp.ops.fast_transformer.transformer.decoding as ft_decoding
 
-        start_prefix = prefix + "."
+            state_dict = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_dict)
 
-        # `add_prefix_to_model` and `remove_prefix_from_model` are for different situation,
-        # you can check the following matrix, which means:
-        # the value of cell: (add_prefix_to_model, remove_prefix_from_model)
-        # the load/Init-Base is the state-dict which don't contain `prefix`.
-        # the load/Init-DownStream is the state-dict which contain the `prefix`
-        #
-        # |                 | load-Base | load-DownStream |
-        # |-----------------|-----------|-----------------|
-        # | Init-Base       | F,F       | T,F             |
-        # | Init-DonwStream | F,T       | F,F             |
-        #
-        # the above value matrix will help you understand the following code.
-        if add_prefix_to_model:
-            for key in list(state_dict.keys()):
-                if key.startswith(start_prefix):
-                    state_dict[key.replace(start_prefix, "")] = state_dict.pop(key)
-
-        if remove_prefix_from_model:
-            for key in list(state_dict.keys()):
-                state_dict[start_prefix + key] = state_dict.pop(key)
-
-        # convert the dtype of state dict
-        if dtype is not None:
-            if isinstance(dtype, paddle.dtype):
-                dtype = str(dtype)[7:]
-
-            if dtype not in ["float32", "float16", "bfloat16"]:
-                raise ValueError(
-                    f"the value of `dtype` should be one of [`float32`, `float16`, `bfloat16`], but received {dtype}"
-                )
-            for key in state_dict.keys():
-                target_dtype = dtype
-                if isinstance(state_dict[key], np.ndarray):
-                    state_dict_dtype = state_dict[key].dtype
-                    if not issubclass(state_dict_dtype.type, np.floating) and state_dict_dtype != np.uint16:
-                        continue
-
-                    # TODO(wj-Mcat): add `keep_in_fp32` feature to enable hybrid fp32 state-dict
-                    # this is the temp hard code for fused-mt transformer
-                    if model.keep_in_fp32_modules(key, model.config, dtype):
-                        target_dtype = "float32"
-                    state_dict[key] = convert_ndarray_dtype(state_dict[key], target_dtype)
-
-                elif isinstance(state_dict[key], paddle.Tensor):
-                    if not state_dict[key].is_floating_point():
-                        continue
-
-                    # TODO(wj-Mcat): add `keep_in_fp32` feature to enable hybrid fp32 state-dict
-                    # this is the temp hard code for fused-mt transformer
-                    if model.keep_in_fp32_modules(key, model.config, dtype):
-                        target_dtype = "float32"
-                    state_dict[key] = paddle.cast(state_dict[key], dtype=target_dtype)
-                else:
-                    raise ValueError(f"the dtype<{state_dict[key].dtype}> of current state-dict[{key}] is not valid")
+            mismatched_keys = _find_mismatched_keys(
+                state_dict,
+                model_state_dict,
+                loaded_keys,
+                add_prefix_to_model,
+                remove_prefix_from_model,
+                ignore_mismatched_sizes,
+            )
+            error_msgs = _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
         else:
-            dtype_prefix_len = len("paddle.")
-            for k, v in model_to_load.state_dict().items():
-                if not isinstance(v, np.ndarray):
-                    dtype = str(v.dtype)[dtype_prefix_len:]
-                if k in state_dict:
-                    if paddle.in_dynamic_mode():
-                        if isinstance(state_dict[k], np.ndarray):
-                            state_dict[k] = state_dict[k].astype(dtype)
-                        else:
-                            state_dict[k] = paddle.cast(state_dict[k], dtype)
-                    else:
-                        # there are some latent error when case dtype in static-mode, so let's:
-                        # 1. convert fluid.*.Tensor -> numpy.ndarray
-                        # 2. cast the dtype with numpy tools
-                        # 3. paddle works well with ndarray state-dict
-                        state_dict[k] = np.array(state_dict[k])
-                        state_dict[k] = state_dict[k].astype(dtype)
+            # Sharded checkpoint or whole but low_cpu_mem_usage==True
 
-        # For model parallel if FastGeneration
-        # To avoid recursive import temporarily.
-        import paddlenlp.ops.fast_transformer.transformer.decoding as ft_decoding
+            # This should always be a list but, just to be sure.
+            if not isinstance(resolved_archive_file, list):
+                resolved_archive_file = [resolved_archive_file]
 
-        state_to_load = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_dict)
-        if paddle.in_dynamic_mode():
-            model_to_load.set_state_dict(state_to_load)
+            error_msgs = []
+            mismatched_keys = []
 
-        return model_to_load, missing_keys, unexpected_keys, mismatched_keys
+            if len(resolved_archive_file) > 1:
+                resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
+
+            for shard_file in resolved_archive_file:
+                pre_tensor_parallel_split = False
+                if shard_file.endswith(".safetensors") and config.tensor_parallel_degree > 1:
+                    pre_tensor_parallel_split = True
+                    assert loaded_keys is not None, "loaded_keys is not None."
+                    tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
+
+                state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None)
+
+                # Mistmatched keys contains tuples key/shape1/shape2 of weights in the checkpoint that have a shape not
+                # matching the weights in the model.
+                mismatched_keys += _find_mismatched_keys(
+                    state_dict,
+                    model_state_dict,
+                    loaded_keys,
+                    add_prefix_to_model,
+                    remove_prefix_from_model,
+                    ignore_mismatched_sizes,
+                )
+
+                if config.tensor_parallel_degree > 1 and ".tp" not in shard_file and not pre_tensor_parallel_split:
+                    logger.info("convert tp")
+                    # ignore error for multi shard, since only parts of data
+                    state_dict = cls.convert_tensor_parallel(
+                        None, config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
+                    )
+                    logger.info("conver tp over!")
+
+                if low_cpu_mem_usage:
+                    new_error_msgs = _load_state_dict_into_meta_model(
+                        model_to_load,
+                        state_dict,
+                        loaded_keys,
+                        start_prefix,
+                        expected_keys,
+                        dtype=dtype,
+                        is_safetensors=is_safetensors,
+                        keep_in_fp32_modules=keep_in_fp32_modules,
+                    )
+                    error_msgs += new_error_msgs
+                else:
+                    error_msgs += _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
+
+                # force memory release
+                del state_dict
+                gc.collect()
+
+        if len(error_msgs) > 0:
+            error_msg = "\n\t".join(error_msgs)
+            if " but the expected shape is" in error_msg:
+                error_msg += (
+                    "\n\tYou may consider adding `ignore_mismatched_sizes=True` in the model `from_pretrained` method."
+                )
+            raise RuntimeError(f"Error(s) in loading state_dict for {model.__class__.__name__}:\n\t{error_msg}")
+
+        if len(unexpected_keys) > 0:
+            logger.warning(
+                f"Some weights of the model checkpoint at {pretrained_model_name_or_path} were not used when"
+                f" initializing {model.__class__.__name__}: {unexpected_keys}\n- This IS expected if you are"
+                f" initializing {model.__class__.__name__} from the checkpoint of a model trained on another task or"
+                " with another architecture (e.g. initializing a BertForSequenceClassification model from a"
+                " BertForPreTraining model).\n- This IS NOT expected if you are initializing"
+                f" {model.__class__.__name__} from the checkpoint of a model that you expect to be exactly identical"
+                " (initializing a BertForSequenceClassification model from a BertForSequenceClassification model)."
+            )
+        else:
+            logger.info(f"All model checkpoint weights were used when initializing {model.__class__.__name__}.\n")
+
+        if len(missing_keys) > 0:
+            logger.warning(
+                f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
+                f" {pretrained_model_name_or_path} and are newly initialized: {missing_keys}\nYou should probably"
+                " TRAIN this model on a down-stream task to be able to use it for predictions and inference."
+            )
+        elif len(mismatched_keys) == 0:
+            logger.info(
+                f"All the weights of {model.__class__.__name__} were initialized from the model checkpoint at"
+                f" {pretrained_model_name_or_path}.\nIf your task is similar to the task the model of the checkpoint"
+                f" was trained on, you can already use {model.__class__.__name__} for predictions without further"
+                " training."
+            )
+        if len(mismatched_keys) > 0:
+            mismatched_warning = "\n".join(
+                [
+                    f"- {key}: found shape {shape1} in the checkpoint and {shape2} in the model instantiated"
+                    for key, shape1, shape2 in mismatched_keys
+                ]
+            )
+            logger.warning(
+                f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
+                f" {pretrained_model_name_or_path} and are newly initialized because the shapes did not"
+                f" match:\n{mismatched_warning}\nYou should probably TRAIN this model on a down-stream task to be able"
+                " to use it for predictions and inference."
+            )
+
+        return model, missing_keys, unexpected_keys, mismatched_keys
 
     @classmethod
     def from_pretrained(
@@ -1257,19 +1747,38 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 model = BertForSequenceClassification.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned', num_labels=3)
 
                 # Load from local directory path
-                model = BertForSequenceClassification.from_pretrained('./my_bert/'
+                model = BertForSequenceClassification.from_pretrained('./my_bert/')
         """
-        load_state_as_np = kwargs.pop("load_state_as_np", False)
         config = kwargs.pop("config", None)
-        force_download = kwargs.pop("force_download", False)
-        ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
+        state_dict = kwargs.pop("state_dict", None)
         cache_dir = kwargs.pop("cache_dir", None)
-        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
+        force_download = kwargs.pop("force_download", False)
+        ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", False)
         dtype = kwargs.pop("dtype", None)
+        subfolder = kwargs.pop("subfolder", "")
+        variant = kwargs.pop("variant", None)
+        use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
 
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
+        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
+        convert_from_torch = kwargs.pop("convert_from_torch", None)
+        load_state_as_np = kwargs.pop("load_state_as_np", None)
+        if load_state_as_np is not None:
+            logger.warning("`load_state_as_np` is deprecated,  please delete it!")
 
         model_kwargs = kwargs
+
+        # from_hf_hub defalut enable convert_from_torch
+        if from_hf_hub and convert_from_torch is None:
+            logger.warning(
+                "If you are attempting to load weights from Hugging Face Hub and want to disable the default behavior of considering torch weights,"
+                " you can set ·convert_from_torch=False·. By default, `convert_from_torch` is set to `True`. "
+            )
+            convert_from_torch = True
+        # convert_from_torch defalut is False
+        if convert_from_torch is None:
+            convert_from_torch = False
+
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
         # 1. get the PretrainedConfig to init model
         if not isinstance(config, PretrainedConfig):
             config_path = config if config is not None else pretrained_model_name_or_path
@@ -1282,18 +1791,19 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 subfolder=subfolder,
                 **kwargs,
             )
+        if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
+            config.save_pretrained(cache_dir)
+
+        # refine options for config
+        convert_from_torch = cls.support_conversion(config) and convert_from_torch
 
         if dtype is None:
             dtype = config.dtype
         else:
             config.dtype = dtype
 
-        if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
-            config.save_pretrained(cache_dir)
-
         init_contexts = []
         if low_cpu_mem_usage:
-            load_state_as_np = True
             # Instantiate model.
             init_contexts.append(no_init_weights(_enable=True))
             if is_paddle_support_lazy_init():
@@ -1302,100 +1812,106 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if dtype:
             init_contexts.append(dtype_guard(dtype))
 
-        # 2. resolve model_weight file
-        support_conversion = cls.support_conversion(config) and ENABLE_TORCH_CHECKPOINT
+        # Keep in fp32 modules
+        keep_in_fp32_modules = None
+        use_keep_in_fp32_modules = False
 
-        model_weight_file = cls._resolve_model_file_path(
+        # resolve model_weight file
+        resolved_archive_file, sharded_metadata, is_sharded = cls._resolve_model_file_path(
             pretrained_model_name_or_path,
             cache_dir=cache_dir,
             subfolder=subfolder,
             from_hf_hub=from_hf_hub,
             config=config,
-            support_conversion=support_conversion,
+            convert_from_torch=convert_from_torch,
+            use_safetensors=use_safetensors,
+            variant=variant,
         )
 
-        if model_weight_file.endswith(PYTORCH_WEIGHT_FILE_NAME):
-            if support_conversion:
-                # try to get the name-mapping info
-                logger.info(
-                    f"start to convert pytorch weight file<{model_weight_file}> to "
-                    f"paddle weight file<{os.path.join(cache_dir, PADDLE_WEIGHT_FILE_NAME)}> ..."
-                )
-                model_state_dict = cls.convert(model_weight_file, config, cache_dir)
+        # load pt weights early so that we know which dtype to init the model under
+        if not is_sharded and state_dict is None:
+            # Time to load the checkpoint
+            if resolved_archive_file.endswith(PYTORCH_WEIGHTS_NAME):
+                if convert_from_torch:
+                    # try to get the name-mapping info
+                    logger.info(
+                        f"start to convert pytorch weight file<{resolved_archive_file}> to "
+                        f"paddle weight file<{os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)}> ..."
+                    )
+                    state_dict = cls.convert(resolved_archive_file, config, cache_dir)
+                else:
+                    raise ValueError(
+                        f"download the {PYTORCH_WEIGHTS_NAME} weight file, but model<{cls}> "
+                        "don't support conversion from pytorch weight file to paddle weight file "
+                    )
             else:
-                raise ValueError(
-                    f"download the {PYTORCH_WEIGHT_FILE_NAME} weight file, but model<{cls}> "
-                    "don't support conversion from pytorch weight file to paddle weight file "
-                    "or conversion is been disabled by `ENABLE_TORCH_CHECKPOINT` environment variable"
-                )
+                # 4. loading non-sharded ckpt from the state dict
+                if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
+                    state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
+                else:
+                    state_dict = load_state_dict(resolved_archive_file)
 
+                logger.info("loaded weights file from disk, setting weights to model.")
+
+        # Check if `_keep_in_fp32_modules` is not None
+        use_keep_in_fp32_modules = (cls._keep_in_fp32_modules is not None) and dtype == "float16"
+
+        if is_sharded:
+            loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
         else:
-            # 4. loading the state dict
-            if config.tensor_parallel_degree > 1 and model_weight_file.endswith(PADDLE_WEIGHT_FILE_NAME):
-                model_state_dict = cls.convert_tensor_parallel(model_weight_file, config)
-            else:
-                model_state_dict = paddle.load(model_weight_file, return_numpy=load_state_as_np)
+            loaded_state_dict_keys = [k for k in state_dict.keys()]
+
+        if low_cpu_mem_usage:  # or use_keep_in_fp32_modules:
+            state_dict = None
+
+        # will only support load paddle.Tensor to model.
+        if state_dict is not None:
+            for k in list(state_dict.keys()):
+                if not isinstance(state_dict[k], paddle.Tensor):
+                    with device_guard():
+                        state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
 
         # 3. init the model
         init_args = config["init_args"] or ()
         with ContextManagers(init_contexts):
             model = cls(config, *init_args, **model_kwargs)
 
-        loaded_state_dict_keys = list(model_state_dict.keys())
-        # TODO(wj-Mcat): load shard checkpoint weight file, refer to: https://github.com/huggingface/transformers/pull/16343
+        if use_keep_in_fp32_modules:
+            # low_cpu_mem_usage = True
+            keep_in_fp32_modules = model._keep_in_fp32_modules
+        else:
+            keep_in_fp32_modules = []
+
         model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
             model=model,
-            state_dict=model_state_dict,
+            state_dict=state_dict,
             loaded_keys=loaded_state_dict_keys,
+            resolved_archive_file=resolved_archive_file,
+            pretrained_model_name_or_path=pretrained_model_name_or_path,
+            config=config,
             ignore_mismatched_sizes=ignore_mismatched_sizes,
+            low_cpu_mem_usage=low_cpu_mem_usage,
             dtype=dtype,
+            keep_in_fp32_modules=keep_in_fp32_modules,
         )
 
-        if len(unexpected_keys) > 0:
-            logger.warning(
-                f"Some weights of the model checkpoint at {pretrained_model_name_or_path} were not used when"
-                f" initializing {model.__class__.__name__}: {unexpected_keys}\n- This IS expected if you are"
-                f" initializing {model.__class__.__name__} from the checkpoint of a model trained on another task or"
-                " with another architecture (e.g. initializing a BertForSequenceClassification model from a"
-                " BertForPreTraining model).\n- This IS NOT expected if you are initializing"
-                f" {model.__class__.__name__} from the checkpoint of a model that you expect to be exactly identical"
-                " (initializing a BertForSequenceClassification model from a BertForSequenceClassification model)."
-            )
-        else:
-            logger.info(f"All model checkpoint weights were used when initializing {model.__class__.__name__}.\n")
-
-        if len(missing_keys) > 0:
-            logger.warning(
-                f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
-                f" {pretrained_model_name_or_path} and are newly initialized: {missing_keys}\nYou should probably"
-                " TRAIN this model on a down-stream task to be able to use it for predictions and inference."
-            )
-        elif len(mismatched_keys) == 0:
-            logger.info(
-                f"All the weights of {model.__class__.__name__} were initialized from the model checkpoint at"
-                f" {pretrained_model_name_or_path}.\nIf your task is similar to the task the model of the checkpoint"
-                f" was trained on, you can already use {model.__class__.__name__} for predictions without further"
-                " training."
-            )
-        if len(mismatched_keys) > 0:
-            mismatched_warning = "\n".join(
-                [
-                    f"- {key}: found shape {shape1} in the checkpoint and {shape2} in the model instantiated"
-                    for key, shape1, shape2 in mismatched_keys
-                ]
-            )
-            logger.warning(
-                f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
-                f" {pretrained_model_name_or_path} and are newly initialized because the shapes did not"
-                f" match:\n{mismatched_warning}\nYou should probably TRAIN this model on a down-stream task to be able"
-                " to use it for predictions and inference."
-            )
         if paddle.in_dynamic_mode():
             return model
 
-        return model, model_state_dict
+        return model, state_dict
 
-    def save_pretrained(self, save_dir: str, **kwargs):
+    def save_pretrained(
+        self,
+        save_dir: Union[str, os.PathLike],
+        is_main_process: bool = True,
+        state_dict: Optional[dict] = None,
+        save_function: Callable = paddle.save,
+        max_shard_size: Union[int, str] = "10GB",
+        safe_serialization: bool = False,
+        variant: Optional[str] = None,
+        *args,
+        **kwargs,
+    ):
         """
         Saves model configuration and related resources (model state) as files
         under `save_dir`. The model configuration would be saved into a file named
@@ -1418,51 +1934,116 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 # reload from save_directory
                 model = BertForSequenceClassification.from_pretrained('./trained_model/')
         """
+
         assert not os.path.isfile(save_dir), "Saving directory ({}) should be a directory, not a file".format(save_dir)
         os.makedirs(save_dir, exist_ok=True)
 
         merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
-        variant = kwargs.get("variant", None)
-        is_main_process = kwargs.get("is_main_process", True)
+        shard_format = kwargs.get("shard_format", "naive")  # support naive pipeline
+        # variant = kwargs.get("variant", None)
+        # is_main_process = kwargs.get("is_main_process", True)
 
-        # 1. retrieve the model related config
+        save_directory = save_dir
+
+        if safe_serialization and not is_safetensors_available():
+            raise ImportError("`safe_serialization` requires the `safetensors library: `pip install safetensors`.")
+
+        if os.path.isfile(save_directory):
+            logger.error(f"Provided path ({save_directory}) should be a directory, not a file")
+            return
+
+        os.makedirs(save_directory, exist_ok=True)
+        # Save model config
+
+        # Only save the model itself if we are using distributed training
+        model_to_save = unwrap_model(self)
 
         # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
         # we currently don't use this setting automatically, but may start to use with v5
-        model_to_save = unwrap_model(self)
-
-        WEIGHTS_NAME = model_to_save.resource_files_names["model_state"]
 
         dtype = get_parameter_dtype(model_to_save)
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
-        state_dict_to_save = None
         config_to_save = copy.deepcopy(model_to_save.config)
-        if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
-            state_dict_to_save = model_to_save.merge_tensor_parallel(model_to_save.state_dict(), config_to_save)
-            config_to_save.tensor_parallel_degree = 1
-            # set variant to None for merge_tensor_parallel, but there should no relationship with variant setting
-            variant = None
-            if config_to_save.tensor_parallel_rank != 0:
-                logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
-                return
-        else:
-            if config_to_save.tensor_parallel_degree > 1:
-                if variant is None:
-                    variant = f"tp{config_to_save.tensor_parallel_rank:0>2d}"
-                # WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, variant)
 
-            state_dict_to_save = self.state_dict()
+        # Save the model
+        if state_dict is None and config_to_save.tensor_parallel_degree > 1:
+            if merge_tensor_parallel:
+                state_dict = model_to_save.merge_tensor_parallel(model_to_save.state_dict(), config_to_save)
+                config_to_save.tensor_parallel_degree = 1
+                if config_to_save.tensor_parallel_rank != 0:
+                    logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
+                    return
+            else:
+                variant = weight_name_suffix() if variant is None else variant
 
+        if state_dict is None:
+            state_dict = self.state_dict()
+
+        # Attach architecture to the config
+        config_to_save.architectures = [model_to_save.__class__.__name__]
+        # Save the config
         if is_main_process:
-            # Attach architecture to the config
-            config_to_save.architectures = [model_to_save.__class__.__name__]
-            config_to_save.save_pretrained(save_dir)
+            config_to_save.save_pretrained(save_directory)
+            if self.can_generate():
+                # to do support generation_config
+                pass
+                # model_to_save.generation_config.save_pretrained(save_directory)
+
+        # Shard the model if it is too big.
+        weights_name = SAFE_WEIGHTS_NAME if safe_serialization else PADDLE_WEIGHTS_NAME
+        weights_name = _add_variant(weights_name, variant)
 
         # Save model
-        if paddle.in_dynamic_mode():
-            file_name = os.path.join(save_dir, _add_variant(WEIGHTS_NAME, variant))
-            paddle.save(state_dict_to_save, file_name)
-            del model_to_save
+        shards, index = shard_checkpoint(
+            state_dict, max_shard_size=max_shard_size, weights_name=weights_name, shard_format=shard_format
+        )
+
+        # Clean the folder from a previous save
+        for filename in os.listdir(save_directory):
+            full_filename = os.path.join(save_directory, filename)
+            # If we have a shard file that is not going to be replaced, we delete it, but only from the main process
+            # in distributed settings to avoid race conditions.
+            weights_no_suffix = weights_name.replace(".pdparams", "").replace(".safetensors", "")
+
+            # make sure that file to be deleted matches format of sharded file, e.g. paddle_model-00001-of-00005
+            filename_no_suffix = filename.replace(".pdparams", "").replace(".safetensors", "")
+            reg = re.compile("(.*?)-\d{5}-of-\d{5}")
+
+            if (
+                filename.startswith(weights_no_suffix)
+                and os.path.isfile(full_filename)
+                and filename not in shards.keys()
+                and is_main_process
+                and reg.fullmatch(filename_no_suffix) is not None
+            ):
+                os.remove(full_filename)
+
+        # Save the model
+        for shard_file, shard in shards.items():
+            if safe_serialization:
+                # At some point we will need to deal better with save_function (used for TPU and other distributed
+                # joyfulness), but for now this enough.
+                for k in list(shard.keys()):
+                    if isinstance(shard[k], paddle.Tensor):
+                        shard[k] = shard.pop(k).numpy()
+                safe_save_file(shard, os.path.join(save_directory, shard_file), metadata={"format": "np"})
+            else:
+                save_function(shard, os.path.join(save_directory, shard_file))
+
+        if index is None:
+            path_to_weights = os.path.join(save_directory, _add_variant(PADDLE_WEIGHTS_NAME, variant))
+            logger.info(f"Model weights saved in {path_to_weights}")
+
         else:
-            logger.warning("Save pretrained model only supported dygraph mode for now!")
+            save_index_file = SAFE_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_WEIGHTS_INDEX_NAME
+            save_index_file = os.path.join(save_directory, _add_variant(save_index_file, variant))
+            # Save the index as well
+            with open(save_index_file, "w", encoding="utf-8") as f:
+                content = json.dumps(index, indent=2) + "\n"
+                f.write(content)
+            logger.info(
+                f"The model is bigger than the maximum size per checkpoint ({max_shard_size}) and is going to be "
+                f"split in {len(shards)} checkpoint shards. You can find where each parameters has been saved in the "
+                f"index located at {save_index_file}."
+            )
