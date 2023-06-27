@@ -219,7 +219,7 @@ def create_pretrained_dataset(
 
     from paddlenlp.data import Stack
 
-    def _collate_data(data, stack_fn=Stack()):  # TODO
+    def _collate_data(data, stack_fn=Stack()):
         num_fields = len(data[0])
         out = [None] * num_fields
         # 0:input_ids, 1:loss_mask, 2:attention_mask, 3:position_ids, 4:labels
