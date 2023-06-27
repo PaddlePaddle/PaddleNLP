@@ -4,10 +4,11 @@
 
 - 硬件: A100-80G with NVLink, 具体卡数见表
 - Torch环境: 见torch/requirements.txt
-- 数据: 中文模型使用10k条[Chinese-Vicuna/guanaco_belle_merge_v1.0](https://huggingface.co/datasets/Chinese-Vicuna/guanaco_belle_merge_v1.0), 英文模型使用10k条[tatsu-lab/alpaca](https://huggingface.co/datasets/tatsu-lab/alpaca)
 - FP16配置: torch 使用 cuda amp fp16, paddle 使用 fp16 O2 opt level
 
 ### Bloom
+
+- 数据: 10k条[Chinese-Vicuna/guanaco_belle_merge_v1.0](https://huggingface.co/datasets/Chinese-Vicuna/guanaco_belle_merge_v1.0)
 
 | Model         | Method   | Num GPUs | Batch Size | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
 |---------------|----------|----------|------------|--------------|---------------------------|-------------|--------------------------|---------|
@@ -17,6 +18,8 @@
 
 
 ### Llama
+
+- 数据: 使用10k条[tatsu-lab/alpaca](https://huggingface.co/datasets/tatsu-lab/alpaca)
 
 | Model     | Method   | Num GPUs | Batch Size  | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
 |-----------|----------|----------|-------------|--------------|---------------------------|-------------|--------------------------|---------|
