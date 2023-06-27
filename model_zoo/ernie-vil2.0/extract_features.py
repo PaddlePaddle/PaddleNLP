@@ -75,12 +75,6 @@ def main():
     if args.extract_image_feats:
         image_eval_dataset = get_eval_img_dataset(args)
         image_loader = DataLoader(image_eval_dataset, batch_size=args.img_batch_size)
-        # print(image_loader)
-        # for i in image_loader:
-        #     print(len(i[0]))
-        #     print(i[1].shape)
-        #     break
-        # import pdb;pdb.set_trace()
         print("Make inference for images...")
         if args.image_feat_output_path is None:
             # by default, we store the image features under the same directory with the text features
