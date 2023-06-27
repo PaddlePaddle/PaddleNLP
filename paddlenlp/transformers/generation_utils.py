@@ -314,6 +314,8 @@ class GenerationMixin(object):
     It's used as the base class of `paddlenlp.transformers.PretrainedModel
     <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.model_utils.html>`__.
     """
+    # enable `to_static` method for CausalLM Model
+    enable_to_static_method = False
 
     @staticmethod
     def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
@@ -1172,6 +1174,74 @@ class GenerationMixin(object):
             )
         return input_ids[:, origin_len:], scores
 
+    def to_static(self, path: str, config: dict):
+        """export generation model to static
+
+        Args:
+            path (str): path of saved inference model
+            config (dict): configuration for generation
+                bos_token_id (int): token id of begin-of-sentence
+                eos_token_id (int): token id of end-of-sentence
+                pad_token_id (int): token id of pad token
+                use_top_p (bool): whether use top_p decoding strategy
+        """
+
+        use_top_p = config.get("use_top_p", True)
+
+        top_k_spec = paddle.static.InputSpec(shape=[1], dtype="int64") if not use_top_p else 0
+
+        top_p_spec = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
+        temperature = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
+
+        input_spec = [
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
+            None,  # position_ids
+            paddle.static.InputSpec(shape=[1], dtype="int64"),  # max_length
+            0,  # min_length
+            "sampling",  # decode_strategy
+            temperature,  # temperature
+            top_k_spec,  # top_k
+            top_p_spec,  # top_p
+            1,  # repetition_penalty
+            # num_beams
+            1,
+            # num_beam_groups
+            1,
+            # length_penalty
+            0.0,
+            # early_stopping
+            False,
+            # bos_token_id
+            config.get("bos_token_id", 0),
+            # eos_token_id
+            config.get("eos_token_id", 0),
+            # pad_token_id
+            config.get("pad_token_id", 0),
+            # decoder_start_token_id
+            None,
+            # forced_bos_token_id
+            None,
+            # forced_eos_token_id
+            None,
+            # no_repeat_ngram_size
+            None,
+            # num_return_sequences
+            1,
+            # diversity_rate
+            0.0,
+            # use_cache
+            True,
+            # use_fast=False,
+            False,
+            # use_fp16_decoding=False,
+            False,
+        ]
+
+        model = paddle.jit.to_static(self.generate, input_spec=input_spec)
+
+        paddle.jit.save(model, path)
+
     def sample_d2s(
         self,
         input_ids,
@@ -1188,6 +1258,24 @@ class GenerationMixin(object):
 
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
+        if paddle.is_tensor(top_k) and not paddle.is_tensor(top_p):
+            use_top_p = False
+        elif not paddle.is_tensor(top_k) and paddle.is_tensor(top_p):
+            use_top_p = True
+
+        # top_k and top_p are the const value
+        elif isinstance(top_p, float) or isinstance(top_k, int):
+            use_top_p = True
+        else:
+            if top_p is None and top_k is None:
+                raise ValueError("top_k and top_p should not be None")
+            raise ValueError(
+                "you should not specify InputSpec for top_k and top_p parameters, one of InputSpec is expected"
+            )
+
+        use_topp_sampling_op = is_top_p_sampling_avaliable or model_kwargs.get("use_topp_sampling", False)
+        return_scores = model_kwargs.get("return_scores", True)
+
         batch_size, cur_len = paddle.shape(input_ids)
         # used for compute on gpu, avoid memcpy D2H
         cur_len_gpu = paddle.full([1], cur_len, dtype="int64")
@@ -1197,7 +1285,10 @@ class GenerationMixin(object):
         origin_len_gpu = paddle.full([1], origin_len, dtype="int64")
 
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
-        scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
+        if return_scores:
+            scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
+        else:
+            scores = None
 
         # use_cache is immutable, we split it off other mutable kwargs.
         assert "use_cache" in model_kwargs
@@ -1225,31 +1316,35 @@ class GenerationMixin(object):
             logits = self.adjust_logits_during_generation(logits)
 
             logits = logits_processors(input_ids, logits)
+            probs = F.softmax(logits)
 
             # sample
-            origin_probs = F.softmax(logits)
-            origin_probs = paddle.log(origin_probs)
+            if return_scores:
+                origin_probs = F.softmax(logits)
+                origin_probs = paddle.log(origin_probs)
 
-            if temperature is not None or temperature != 1.0:
+            # compute next_tokens
+            if use_top_p:
                 logits = logits / temperature
-
-            probs = F.softmax(logits)
-            if top_k is not None and top_k != 0:
+                if use_topp_sampling_op:
+                    top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
+                    _, next_tokens = paddle.top_p_sampling(probs, top_ps_tensor)
+                else:
+                    probs = TopPProcess(probs, top_p, min_tokens_to_keep)
+                    next_tokens = paddle.multinomial(probs)
+            else:
                 probs = TopKProcess(probs, top_k, min_tokens_to_keep)
-            if top_p is not None and top_p < 1.0:
-                probs = TopPProcess(probs, top_p, min_tokens_to_keep)
+                if top_k == 1:
+                    next_tokens = paddle.unsqueeze_(paddle.argmax(probs, axis=-1), -1)
+                else:
+                    next_tokens = paddle.multinomial(probs)
 
-            # multinomial not support fp16 and bf16 currently, issue: https://github.com/PaddlePaddle/Paddle/issues/51852
-            if paddle.get_default_dtype() not in ["float32", "float64"]:
-                probs = probs.astype("float32")
-            next_tokens = paddle.multinomial(probs)
-
-            next_scores = paddle.index_sample(origin_probs, next_tokens)
+            if return_scores:
+                next_scores = paddle.index_sample(origin_probs, next_tokens)
+                scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
 
             if eos_token_id is not None:
                 next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
-
-            scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
 
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
 
@@ -1259,6 +1354,7 @@ class GenerationMixin(object):
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
+
             return input_ids, scores, unfinished_flag, model_kwargs
 
         outputs = _forward_(**model_kwargs)
@@ -1275,7 +1371,7 @@ class GenerationMixin(object):
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
         max_length = paddle.full([1], max_length, dtype="int64")
 
-        while cur_len < max_length:
+        while cur_len < max_length and paddle.any(unfinished_flag):
             input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
                 _forward_(**model_kwargs),
                 input_ids,
@@ -1287,9 +1383,6 @@ class GenerationMixin(object):
             )
             paddle.increment(cur_len)
             paddle.increment(cur_len_gpu)
-
-            if not paddle.any(unfinished_flag):
-                break
 
         return input_ids[:, origin_len:], scores
 
@@ -1806,10 +1899,9 @@ def TopPProcess(probs, top_p, min_tokens_to_keep):
         probs, _ = top_p_sampling(probs, top_ps_tensor)
         return probs
 
-    sorted_probs = paddle.sort(probs, descending=True)
     sorted_indices = paddle.argsort(probs, descending=True)
     if isinstance(sorted_indices, tuple):
-        sorted_indices, sorted_probs = sorted_indices
+        sorted_probs, sorted_indices = sorted_indices
     else:
         sorted_probs = paddle.sort(probs, descending=True)
 
