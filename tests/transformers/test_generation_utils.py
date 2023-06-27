@@ -14,6 +14,8 @@
 # limitations under the License.
 from __future__ import annotations
 
+import os
+import tempfile
 import unittest
 
 import numpy as np
@@ -1119,3 +1121,145 @@ class GenerationUtilsTestCase(unittest.TestCase):
 
         decoded_ids = model.generate(paddle.to_tensor(input_ids), max_length=6, eos_token_id=[1800, 23410])[0].tolist()
         self.assertEqual(expected_output_ids, decoded_ids)
+
+
+class GenerationD2STest(unittest.TestCase):
+    def test_to_static_use_top_k(self):
+        article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
+
+        tokenizer = AutoTokenizer.from_pretrained("facebook/tiny-random-llama")
+        model = AutoModelForCausalLM.from_pretrained("facebook/tiny-random-llama")
+        input_ids = paddle.to_tensor(tokenizer(article)["input_ids"]).unsqueeze([0])
+
+        model.eval()
+
+        # Llama model do not contians ``
+        model.is_encoder_decoder = False
+
+        max_length = 25
+        input_ids = paddle.to_tensor([[i for i in range(100, 120)]])
+
+        bos_token_id = getattr(model, "bos_token_id", None)
+        eos_token_id = getattr(model, "eos_token_id", None)
+        pad_token_id = getattr(model, "pad_token_id", None)
+
+        model_kwargs = {}
+
+        model_kwargs["attention_mask"] = paddle.ones_like(input_ids)
+        model_kwargs["use_cache"] = True
+        model_kwargs["max_length"] = max_length + input_ids.shape[-1]
+        model_kwargs["input_ids"] = input_ids
+
+        decoded_ids = model.greedy_search(
+            bos_token_id=bos_token_id,
+            pad_token_id=pad_token_id,
+            eos_token_id=eos_token_id,
+            logits_processors=None,
+            **model_kwargs,
+        )[0]
+
+        dygraph_decoded_ids = decoded_ids.tolist()
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = os.path.join(tempdir, "model")
+            model.to_static(
+                path,
+                config=dict(
+                    bos_token_id=bos_token_id, pad_token_id=pad_token_id, eos_token_id=eos_token_id, use_top_p=False
+                ),
+            )
+
+            model_path = os.path.join(tempdir, "model.pdmodel")
+            params_path = os.path.join(tempdir, "model.pdiparams")
+            config = paddle.inference.Config(model_path, params_path)
+
+            config.disable_gpu()
+            config.disable_glog_info()
+            predictor = paddle.inference.create_predictor(config)
+
+            model_kwargs["top_k"] = 1
+            model_kwargs["max_length"] = 25
+            # create input
+            for key in model_kwargs.keys():
+                if paddle.is_tensor(model_kwargs[key]):
+                    model_kwargs[key] = model_kwargs[key].numpy()
+                else:
+                    model_kwargs[key] = np.array(model_kwargs[key])
+
+            input_handles = {}
+            for name in predictor.get_input_names():
+                input_handles[name] = predictor.get_input_handle(name)
+                input_handles[name].copy_from_cpu(model_kwargs[name])
+
+            predictor.run()
+            output_names = predictor.get_output_names()
+            output_handle = predictor.get_output_handle(output_names[0])
+            results = output_handle.copy_to_cpu()
+
+            static_decoded_ids = results.tolist()
+
+        self.assertEqual(dygraph_decoded_ids, static_decoded_ids)
+
+    def test_to_static_use_top_p(self):
+        article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
+
+        tokenizer = AutoTokenizer.from_pretrained("facebook/tiny-random-llama")
+        model = AutoModelForCausalLM.from_pretrained("facebook/tiny-random-llama")
+        input_ids = paddle.to_tensor(tokenizer(article)["input_ids"]).unsqueeze([0])
+
+        model.eval()
+
+        # Llama model do not contians ``
+        model.is_encoder_decoder = False
+
+        max_length = 25
+        input_ids = paddle.to_tensor([[i for i in range(100, 120)]])
+
+        bos_token_id = getattr(model, "bos_token_id", None)
+        eos_token_id = getattr(model, "eos_token_id", None)
+        pad_token_id = getattr(model, "pad_token_id", None)
+
+        model_kwargs = {}
+
+        model_kwargs["attention_mask"] = paddle.ones_like(input_ids)
+        model_kwargs["use_cache"] = True
+        model_kwargs["max_length"] = max_length + input_ids.shape[-1]
+        model_kwargs["input_ids"] = input_ids
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = os.path.join(tempdir, "model")
+            model.to_static(
+                path,
+                config=dict(
+                    bos_token_id=bos_token_id, pad_token_id=pad_token_id, eos_token_id=eos_token_id, use_top_p=False
+                ),
+            )
+
+            model_path = os.path.join(tempdir, "model.pdmodel")
+            params_path = os.path.join(tempdir, "model.pdiparams")
+            config = paddle.inference.Config(model_path, params_path)
+
+            config.disable_gpu()
+            config.disable_glog_info()
+            predictor = paddle.inference.create_predictor(config)
+
+            model_kwargs["top_k"] = 1
+            model_kwargs["max_length"] = 25
+            # create input
+            for key in model_kwargs.keys():
+                if paddle.is_tensor(model_kwargs[key]):
+                    model_kwargs[key] = model_kwargs[key].numpy()
+                else:
+                    model_kwargs[key] = np.array(model_kwargs[key])
+
+            input_handles = {}
+            for name in predictor.get_input_names():
+                input_handles[name] = predictor.get_input_handle(name)
+                input_handles[name].copy_from_cpu(model_kwargs[name])
+
+            predictor.run()
+            output_names = predictor.get_output_names()
+            output_handle = predictor.get_output_handle(output_names[0])
+            results = output_handle.copy_to_cpu()
+
+            self.assertIsNotNone(results)
