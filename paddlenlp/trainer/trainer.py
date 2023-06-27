@@ -680,7 +680,7 @@ class Trainer:
                             steps_trained_progress_bar.close()
                             steps_trained_progress_bar = None
                         self._load_rng_state(resume_from_checkpoint)
-                    step += steps_trained_in_current_epoch
+                    # step += steps_trained_in_current_epoch
                 elif steps_trained_in_current_epoch > 0:
                     steps_trained_in_current_epoch -= 1
                     if steps_trained_progress_bar is not None:
