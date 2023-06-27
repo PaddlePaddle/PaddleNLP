@@ -93,6 +93,7 @@ class ModelArguments:
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
     lora_rank: int = field(default=8, metadata={"help": "Lora rank"})
     lora_alpha: int = field(default=16, metadata={"help": "Lora alpha"})
+    qat: bool = field(default=False, metadata={"help": "Whether to use QAT technique"})
 
 
 def convert_example(example, tokenizer, label_list, max_seq_length=512, is_test=False):
@@ -191,15 +192,41 @@ def main():
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
         lora_config = LoRAConfig(
-            target_modules=[".*linear1.*", ".*linear2.*", ".*q_proj.*", ".*k_proj.*", ".*v_proj.*", ".*out_proj.*"],
-            r=model_args.rank,
-            lora_alpha=model_args.alpha,
-            merge_weights=model_args.merge_weights,
+            target_modules=[".*q_proj.*", ".*v_proj.*"],
+            trainable_modules=[".*classifier.*"],
+            r=model_args.lora_rank,
+            lora_alpha=model_args.lora_alpha,
+            merge_weights=True,
             dtype=dtype,
         )
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
+
+    if model_args.qat:
+        from paddle import nn
+        from paddle.quantization import QAT, QuantConfig
+        from paddle.quantization.quanters import (
+            FakeQuanterChannelWiseAbsMaxObserver,
+            FakeQuanterWithAbsMaxObserver,
+        )
+
+        from paddlenlp.peft.lora import LoRALinear, QuantedLoRALinear
+
+        q_config = QuantConfig(activation=None, weight=None)
+        q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
+        q_config.add_type_config(
+            LoRALinear,
+            weight=FakeQuanterChannelWiseAbsMaxObserver(),
+            activation=FakeQuanterWithAbsMaxObserver(moving_rate=0.9),
+        )
+        q_config.add_type_config(
+            nn.Linear,
+            weight=FakeQuanterChannelWiseAbsMaxObserver(),
+            activation=FakeQuanterWithAbsMaxObserver(moving_rate=0.9),
+        )
+        qat = QAT(q_config)
+        model = qat.quantize(model, inplace=True)
 
     # Define the metrics of tasks.
     def compute_metrics(p):
