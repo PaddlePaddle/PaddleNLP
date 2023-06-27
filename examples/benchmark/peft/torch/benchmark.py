@@ -29,7 +29,7 @@ from transformers import (
     AutoModel,
 )
 import numpy as np
-from utils import CustomTrainer, MyCallback
+from utils import CustomTrainer, ProfilerCallback
 
 """
 单卡
@@ -58,6 +58,7 @@ class ModelArguments:
     model_name_or_path: str = field(default=None, metadata={"help": "model name or local path"})
     lora: Optional[bool] = field(default=False, metadata={"help": "whether to use LoRA"})
     english: Optional[bool] = field(default=False, metadata={"help": "whether to english benchmark dataset"})
+    profiler: Optional[bool] = field(default=False, metadata={"help": "whether to use profiler"})
 
 
 def main():
@@ -124,24 +125,25 @@ def main():
     )
     total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
 
-    prof = profiler.profile(
-            activities=[
-                torch.profiler.ProfilerActivity.CPU,
-                torch.profiler.ProfilerActivity.CUDA,
-            ],
-            schedule=torch.profiler.schedule(
-                wait=1,
-                warmup=1,
-                active=2,
-                repeat=1),
-            on_trace_ready=torch.profiler.tensorboard_trace_handler('hf-training-trainer'),
-            profile_memory=True,
-            with_stack=True,
-        )
+    if model_args.profiler:
+        prof = profiler.profile(
+                activities=[
+                    torch.profiler.ProfilerActivity.CPU,
+                    torch.profiler.ProfilerActivity.CUDA,
+                ],
+                schedule=torch.profiler.schedule(
+                    wait=1,
+                    warmup=1,
+                    active=2,
+                    repeat=1),
+                on_trace_ready=torch.profiler.tensorboard_trace_handler('hf-training-trainer'),
+                profile_memory=True,
+                with_stack=True,
+            )
     trainer = CustomTrainer(
         model=model,
         train_dataset=dataset,
-        callbacks=[MyCallback(prof=prof)],
+        callbacks=[ProfilerCallback(prof=prof)] if model_args.profiler else [],
         args=training_args,
         data_collator=DataCollatorForSeq2Seq(return_tensors="pt", tokenizer=tokenizer),
     )

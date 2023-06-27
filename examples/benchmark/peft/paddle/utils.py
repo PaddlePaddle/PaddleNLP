@@ -24,7 +24,7 @@ class CustomTrainer(Trainer):
         return super().training_step(model, inputs)
 
 
-class MyCallback(TrainerCallback):
+class ProfilerCallback(TrainerCallback):
     "A callback that prints a message at the beginning of training"
     def __init__(self, prof):
         self.prof = prof

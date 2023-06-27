@@ -17,7 +17,7 @@ from typing import Optional
 
 import paddle.profiler as profiler
 from datasets import load_dataset
-from utils import CustomTrainer, MyCallback
+from utils import CustomTrainer, ProfilerCallback
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.peft import LoRAConfig, LoRAModel
@@ -58,6 +58,7 @@ class ModelArguments:
     model_name_or_path: str = field(default=None, metadata={"help": "model name or local path"})
     lora: Optional[bool] = field(default=False, metadata={"help": "whether to use LoRA"})
     english: Optional[bool] = field(default=False, metadata={"help": "whether to english benchmark dataset"})
+    profiler: Optional[bool] = field(default=False, metadata={"help": "whether to use profiler"})
 
 
 def main():
@@ -138,16 +139,17 @@ def main():
         lambda example: preprocess_function(example), remove_columns=["instruction", "input", "output"]
     )
     total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
-    prof = profiler.Profiler(
-        targets=[profiler.ProfilerTarget.CPU, profiler.ProfilerTarget.GPU],profile_memory=True,
-        scheduler = profiler.make_scheduler(closed=1, ready=2, record=1, repeat=1),
-        on_trace_ready = profiler.export_chrome_tracing('./log'),
-    )
+    if model_args.profiler:
+        prof = profiler.Profiler(
+            targets=[profiler.ProfilerTarget.CPU, profiler.ProfilerTarget.GPU],profile_memory=True,
+            scheduler = profiler.make_scheduler(closed=1, ready=2, record=1, repeat=1),
+            on_trace_ready = profiler.export_chrome_tracing('./log'),
+        )
     
     trainer = CustomTrainer(
         model=model,
         train_dataset=dataset,
-        callbacks=[MyCallback(prof)],
+        callbacks=[ProfilerCallback(prof)] if model_args.profiler else [],
         args=training_args,
         data_collator=DataCollatorForSeq2Seq(return_tensors="pd", tokenizer=tokenizer),
     )
