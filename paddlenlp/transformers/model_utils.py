@@ -639,7 +639,9 @@ def faster_set_state_dict(model, state_dict):
 
 
 def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
-    # Convert old format to new format if needed from a PyTorch state_dict
+    # torch will cast dtype in load_state_dict, but paddle strictly check dtype
+    _convert_state_dict_dtype_and_shape(state_dict, model_to_load)
+
     error_msgs = []
 
     if len(start_prefix) > 0:
@@ -652,49 +654,32 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
         warnings.resetwarnings()
         # paddlenlp hold  missing_keys , just ignore not found warnings.
         warnings.filterwarnings("ignore", message=r".*is not found in the provided dict.*")
-        ret = model_to_load.set_state_dict(state_dict)
+        model_to_load.set_state_dict(state_dict)
         error_msgs.extend([str(x.message) for x in w])
-        if ret is not None:
-            missing_keys, unexpected_keys = ret
-            if len(missing_keys) > 0:
-                logger.warning(f"missing_keys: {missing_keys}")
 
     del state_dict
 
     return error_msgs
 
 
-def _convert_state_dict_dtype(dtype, state_dict, model_to_load):
-    # for now, we suppose the state dict is in paddle.Tensor
+def _convert_state_dict_dtype_and_shape(state_dict, model_to_load):
     # convert the dtype of state dict
-    dtype_prefix_len = len("paddle.")
-    if dtype is not None:
-        if isinstance(dtype, paddle.dtype):
-            dtype = str(dtype)[dtype_prefix_len:]
+    def is_0d_or_1d(tensor):
+        return len(tensor.shape) == 0 or list(tensor.shape) == [1]
 
-        if dtype not in ["float32", "float16", "bfloat16"]:
-            raise ValueError(
-                f"the value of `dtype` should be one of [`float32`, `float16`, `bfloat16`], but received {dtype}"
-            )
-        for key in list(state_dict.keys()):
+    for key, value in model_to_load.state_dict().items():
+        if key in state_dict:
             if isinstance(state_dict[key], np.ndarray):
                 raise ValueError(
                     "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, plase convert numpy.ndarray to paddle.Tensor"
                 )
+            if state_dict[key].is_floating_point() and state_dict[key].dtype != value.dtype:
+                state_dict[key] = paddle.cast(state_dict.pop(key), value.dtype)
 
-            if isinstance(state_dict[key], paddle.Tensor) and state_dict[key].is_floating_point():
-                v_dtype = str(state_dict[key].dtype)[dtype_prefix_len:]
-                if v_dtype != dtype:
-                    state_dict[key] = paddle.cast(state_dict.pop(key), dtype=dtype)
-    else:
-        for k, v in model_to_load.state_dict().items():
-            if k in state_dict:
-                if isinstance(state_dict[key], np.ndarray):
-                    raise ValueError(
-                        "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, plase convert numpy.ndarray to paddle.Tensor"
-                    )
-                if state_dict[k].dtype != v.dtype:
-                    state_dict[k] = paddle.cast(state_dict.pop(k), v.dtype)
+            # unified 0d and 1d tensor
+            if is_0d_or_1d(value) and is_0d_or_1d(state_dict[key]):
+                if list(value.shape) != list(state_dict[key].shape):
+                    state_dict[key] = paddle.reshape(state_dict.pop(key), value.shape)
 
 
 def _load_state_dict_into_meta_model(
@@ -716,6 +701,8 @@ def _load_state_dict_into_meta_model(
     `bert.pooler.dense.weight`
 
     """
+    # _convert_state_dict_dtype_and_shape(state_dict, model)
+
     error_msgs = []
 
     for param_name, param in state_dict.items():
@@ -726,21 +713,18 @@ def _load_state_dict_into_meta_model(
         if param_name.startswith(start_prefix):
             param_name = param_name[len(start_prefix) :]
 
-        # set_module_kwargs = {}
-
         # # We convert floating dtypes to the `dtype` passed. We want to keep the buffers/params
         # # in int/uint/bool and not cast them.
-        # if dtype is not None and paddle.is_floating_point(param):
-        #     if (
-        #         keep_in_fp32_modules is not None
-        #         and any(module_to_keep_in_fp32 in param_name for module_to_keep_in_fp32 in keep_in_fp32_modules)
-        #         and dtype == paddle.float16
-        #     ):
-        #         param = param.astype(paddle.float32)
-        #     else:
-        #         param = param.astype(dtype)
+        if dtype is not None and paddle.is_floating_point(param):
+            if (
+                keep_in_fp32_modules is not None
+                and any(module_to_keep_in_fp32 in param_name for module_to_keep_in_fp32 in keep_in_fp32_modules)
+                and dtype == paddle.float16
+            ):
+                param = param.to(paddle.float32)
+            else:
+                param = param.to(dtype)
 
-        # For compatibility with PyTorch load_state_dict which converts state dict dtype to existing dtype in model
         if dtype is None:
             old_param = model
             splits = param_name.split(".")
@@ -753,11 +737,8 @@ def _load_state_dict_into_meta_model(
                 param = param.to(old_param.dtype)
 
         with paddle.no_grad():
-            # model.state_dict()[param_name].set_value(param)
             model.state_dict()[param_name].get_tensor()._share_data_with(param.value().get_tensor())
             param.value().get_tensor()._clear()
-            # print(param)
-            # print(model.state_dict()[param_name])
 
     return error_msgs
 
@@ -1546,6 +1527,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             for pat in cls._keys_to_ignore_on_load_unexpected:
                 unexpected_keys = [k for k in unexpected_keys if re.search(pat, k) is None]
 
+        # Set some modules to fp32 if any
+        if keep_in_fp32_modules is not None:
+            for name, param in model.named_parameters():
+                if any(module_to_keep_in_fp32 in name for module_to_keep_in_fp32 in keep_in_fp32_modules):
+                    param = param.to(paddle.float32)
+
         # Make sure we are able to load base models as well as derived models (with heads)
         start_prefix = ""
         model_to_load = model
@@ -1606,7 +1593,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 remove_prefix_from_model,
                 ignore_mismatched_sizes,
             )
-            _convert_state_dict_dtype(dtype, state_dict, model_to_load)
             error_msgs = _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
         else:
             # Sharded checkpoint or whole but low_cpu_mem_usage==True
@@ -1642,8 +1628,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
                 logger.warning("set state dict to model")
 
-                logger.info("convert dtype")
-                _convert_state_dict_dtype(dtype, state_dict, model_to_load)
                 if config.tensor_parallel_degree > 1 and ".tp" not in shard_file and not pre_tensor_parallel_split:
                     logger.info("convert tp")
                     # ignore error for multi shard, since only parts of data
