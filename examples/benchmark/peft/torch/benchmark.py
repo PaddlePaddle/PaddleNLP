@@ -17,6 +17,8 @@ from typing import Optional
 
 from datasets import load_dataset
 from peft import LoraConfig, TaskType, get_peft_model
+import torch
+import torch.profiler as profiler
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -24,8 +26,10 @@ from transformers import (
     LlamaTokenizer,
     HfArgumentParser,
     TrainingArguments,
+    AutoModel,
 )
-from utils import CustomTrainer
+import numpy as np
+from utils import CustomTrainer, MyCallback
 
 """
 单卡
@@ -62,9 +66,15 @@ def main():
     if "llama" in model_args.model_name_or_path:
         tokenizer = LlamaTokenizer.from_pretrained(model_args.model_name_or_path)
         tokenizer.pad_token_id = 0
+    elif "chatglm" in model_args.model_name_or_path:
+        tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
     else:
         tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
+
+    if 'chatglm' in model_args.model_name_or_path:
+        model = AutoModel.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
+    else:
+        model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
 
     if model_args.lora:
         if "llama" in model_args.model_name_or_path:
@@ -95,11 +105,11 @@ def main():
             inputs += example["input"]
         targets = example["output"]
         model_inputs = tokenizer(inputs, max_length=max_src_length, truncation=True, return_attention_mask=False)
+
         labels = tokenizer(targets, max_length=max_tgt_length, truncation=True, return_attention_mask=False)
         labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
         model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
-
         return model_inputs
 
     
@@ -114,9 +124,24 @@ def main():
     )
     total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
 
+    prof = profiler.profile(
+            activities=[
+                torch.profiler.ProfilerActivity.CPU,
+                torch.profiler.ProfilerActivity.CUDA,
+            ],
+            schedule=torch.profiler.schedule(
+                wait=1,
+                warmup=1,
+                active=2,
+                repeat=1),
+            on_trace_ready=torch.profiler.tensorboard_trace_handler('hf-training-trainer'),
+            profile_memory=True,
+            with_stack=True,
+        )
     trainer = CustomTrainer(
         model=model,
         train_dataset=dataset,
+        callbacks=[MyCallback(prof=prof)],
         args=training_args,
         data_collator=DataCollatorForSeq2Seq(return_tensors="pt", tokenizer=tokenizer),
     )
