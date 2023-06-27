@@ -721,9 +721,9 @@ def _load_state_dict_into_meta_model(
                 and any(module_to_keep_in_fp32 in param_name for module_to_keep_in_fp32 in keep_in_fp32_modules)
                 and dtype == paddle.float16
             ):
-                param = param.to(paddle.float32)
+                param = param.to(dtype=paddle.float32)
             else:
-                param = param.to(dtype)
+                param = param.to(dtype=dtype)
 
         if dtype is None:
             old_param = model
@@ -734,7 +734,7 @@ def _load_state_dict_into_meta_model(
                     break
 
             if old_param is not None:
-                param = param.to(old_param.dtype)
+                param = param.to(dtype=old_param.dtype)
 
         with paddle.no_grad():
             model.state_dict()[param_name].get_tensor()._share_data_with(param.value().get_tensor())
@@ -795,6 +795,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
     base_model_prefix = ""
     main_input_name = "input_ids"
     config_class = None
+    _keep_in_fp32_modules = None
 
     # a list of `re` patterns of `state_dict` keys that should be removed from the list of missing
     # keys we find (keys inside the model but not in the checkpoint) and avoid unnecessary warnings.
@@ -1423,7 +1424,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         )
                 except Exception:
                     # For any other exception, we throw a generic error.
-                    raise
+                    raise EnvironmentError(
+                        f"Can't load the model for '{pretrained_model_name_or_path}'. If you were trying to load it"
+                        " from 'https://paddlenlp.bj.bcebos.com'"
+                    )
 
             if is_local:
                 logger.info(f"loading weights file {archive_file}")
@@ -1442,23 +1446,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 cache_dir=cache_dir,
                 subfolder=subfolder,
             )
-        # import pdb;pdb.set_trace()
 
         return resolved_archive_file, sharded_metadata, is_sharded
-
-    @classmethod
-    def keep_in_fp32_modules(cls, key: str, config: PretrainedConfig, dtype: str) -> bool:
-        """should keep parameter in fp32
-
-        Args:
-            key (str): key of state-dict
-            config (PretrainedConfig): the instance of current pretrianed model
-            dtype (str): the source dtype
-
-        Returns:
-            bool: whether keep parameter in fp32 dtype
-        """
-        return False
 
     @classmethod
     def _load_pretrained_model(
@@ -1531,7 +1520,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if keep_in_fp32_modules is not None:
             for name, param in model.named_parameters():
                 if any(module_to_keep_in_fp32 in name for module_to_keep_in_fp32 in keep_in_fp32_modules):
-                    param = param.to(paddle.float32)
+                    param = param.to(dtype=paddle.float32)
 
         # Make sure we are able to load base models as well as derived models (with heads)
         start_prefix = ""
@@ -1766,20 +1755,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config = kwargs.pop("config", None)
         state_dict = kwargs.pop("state_dict", None)
         cache_dir = kwargs.pop("cache_dir", None)
-        # load_state_as_np = kwargs.pop("load_state_as_np", False)
         force_download = kwargs.pop("force_download", False)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", False)
         dtype = kwargs.pop("dtype", None)
         subfolder = kwargs.pop("subfolder", "")
-        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
         variant = kwargs.pop("variant", None)
-        convert_from_torch = kwargs.pop("convert_from_torch", None)
+        use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
 
+        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
+        convert_from_torch = kwargs.pop("convert_from_torch", None)
         load_state_as_np = kwargs.pop("load_state_as_np", None)
         if load_state_as_np is not None:
             logger.warning("`load_state_as_np` is deprecated,  please delete it!")
-
-        use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
 
         model_kwargs = kwargs
 
@@ -1794,18 +1781,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if convert_from_torch is None:
             convert_from_torch = False
 
-        init_contexts = []
-        init_contexts.append(no_init_weights(_enable=True))
-        if low_cpu_mem_usage:
-            # Instantiate model.
-            init_contexts.append(no_init_weights(_enable=True))
-            if is_paddle_support_lazy_init():
-                init_contexts.append(paddle.LazyGuard())
-            if dtype:
-                init_contexts.append(dtype_guard(dtype))
-
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
-
         # 1. get the PretrainedConfig to init model
         if not isinstance(config, PretrainedConfig):
             config_path = config if config is not None else pretrained_model_name_or_path
@@ -1818,18 +1794,19 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 subfolder=subfolder,
                 **kwargs,
             )
+        if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
+            config.save_pretrained(cache_dir)
+
+        # refine options for config
+        convert_from_torch = cls.support_conversion(config) and convert_from_torch
 
         if dtype is None:
             dtype = config.dtype
         else:
             config.dtype = dtype
 
-        if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
-            config.save_pretrained(cache_dir)
-
         init_contexts = []
         if low_cpu_mem_usage:
-            # load_state_as_np = True
             # Instantiate model.
             init_contexts.append(no_init_weights(_enable=True))
             if is_paddle_support_lazy_init():
@@ -1838,9 +1815,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if dtype:
             init_contexts.append(dtype_guard(dtype))
 
-        # 2. resolve model_weight file
-        convert_from_torch = cls.support_conversion(config) and convert_from_torch
+        # Keep in fp32 modules
+        keep_in_fp32_modules = None
+        use_keep_in_fp32_modules = False
 
+        # resolve model_weight file
         resolved_archive_file, sharded_metadata, is_sharded = cls._resolve_model_file_path(
             pretrained_model_name_or_path,
             cache_dir=cache_dir,
@@ -1880,12 +1859,15 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 else:
                     state_dict = None
 
+        # Check if `_keep_in_fp32_modules` is not None
+        use_keep_in_fp32_modules = (cls._keep_in_fp32_modules is not None) and dtype == "float16"
+
         if is_sharded:
             loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
         else:
             loaded_state_dict_keys = [k for k in state_dict.keys()]
 
-        if low_cpu_mem_usage:
+        if low_cpu_mem_usage:  # or use_keep_in_fp32_modules:
             state_dict = None
 
         # will only support load paddle.Tensor to model.
@@ -1900,6 +1882,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         with ContextManagers(init_contexts):
             model = cls(config, *init_args, **model_kwargs)
 
+        if use_keep_in_fp32_modules:
+            # low_cpu_mem_usage = True
+            keep_in_fp32_modules = model._keep_in_fp32_modules
+        else:
+            keep_in_fp32_modules = []
+
         model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
             model=model,
             state_dict=state_dict,
@@ -1910,7 +1898,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             ignore_mismatched_sizes=ignore_mismatched_sizes,
             low_cpu_mem_usage=low_cpu_mem_usage,
             dtype=dtype,
-            keep_in_fp32_modules=None,
+            keep_in_fp32_modules=keep_in_fp32_modules,
         )
 
         if paddle.in_dynamic_mode():

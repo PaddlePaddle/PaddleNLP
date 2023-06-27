@@ -19,7 +19,13 @@ import unittest
 
 import paddle
 
-from paddlenlp.transformers import AutoConfig, BertModel
+from paddlenlp.transformers import (
+    AutoConfig,
+    BertModel,
+    PretrainedConfig,
+    PretrainedModel,
+    register_base_model,
+)
 from paddlenlp.transformers.model_utils import load_sharded_checkpoint, shard_checkpoint
 from paddlenlp.utils.env import (
     PADDLE_WEIGHTS_INDEX_NAME,
@@ -31,7 +37,45 @@ from paddlenlp.utils.import_utils import is_paddle_cuda_available
 from tests.testing_utils import require_package
 
 
+class FakeConfig(PretrainedConfig):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
+class FakePretrainedModel(PretrainedModel):
+    config_class = FakeConfig
+
+    _keep_in_fp32_modules = ["norm."]
+
+
+@register_base_model
+class FakeModel(FakePretrainedModel):
+    def __init__(self, config):
+        super(FakeModel, self).__init__(config)
+        self.linear = paddle.nn.Linear(2, 3)
+        self.norm = paddle.nn.LayerNorm(2)
+
+
 class TestFromPretrained(unittest.TestCase):
+    @unittest.skipIf(not is_paddle_cuda_available(), "some op is missing in cpu mode")
+    def test_keep_in_fp32_modules(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            config = PretrainedConfig()
+            model = FakeModel._from_config(config, dtype="float16")
+            model.config = config
+            model.save_pretrained(tempdir)
+
+            # check model_state.pdparams
+            state_dict = paddle.load(os.path.join(tempdir, "model_state.pdparams"))
+
+            self.assertEqual(state_dict["linear.weight"].dtype, paddle.float16)
+            self.assertEqual(state_dict["norm.weight"].dtype, paddle.float16)
+
+            new_model = FakeModel.from_pretrained(tempdir)
+
+            self.assertEqual(new_model.linear.weight.dtype, paddle.float16)
+            self.assertEqual(new_model.norm.weight.dtype, paddle.float32)
+
     def test_load_sharded_checkpoint(self):
         config = AutoConfig.from_pretrained("__internal_testing__/bert-shard")
         model = BertModel.from_pretrained("__internal_testing__/bert-shard")
