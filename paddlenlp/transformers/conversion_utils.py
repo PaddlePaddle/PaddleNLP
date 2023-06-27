@@ -38,11 +38,7 @@ from paddle import Tensor
 from paddle.nn import Layer
 
 from paddlenlp.utils.distributed import distributed_gather
-from paddlenlp.utils.env import (
-    CONFIG_NAME,
-    PADDLE_WEIGHT_FILE_NAME,
-    PYTORCH_WEIGHT_FILE_NAME,
-)
+from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHTS_NAME, PYTORCH_WEIGHTS_NAME
 from paddlenlp.utils.import_utils import (
     is_package_available,
     is_torch_available,
@@ -288,6 +284,29 @@ def split_tensor_parallel_weight(weight, tensor_parallel_degree, tensor_parallel
     Returns:
         tensor (numpy.ndarray): splited weight.
     """
+    dim = 1 if is_column else 0
+    if "PySafeSlice" in str(type(weight)):
+        size = weight.get_shape()[dim]
+        block_size = size // tensor_parallel_degree
+        start = tensor_parallel_rank * block_size
+        stop = (tensor_parallel_rank + 1) * block_size
+        assert (
+            size % tensor_parallel_degree == 0
+        ), f"The choosen size {size} is not compatible with sharding on {tensor_parallel_degree} shards"
+
+        if dim == 0:
+            tensor = weight[start:stop]
+        elif dim == 1:
+            tensor = weight[:, start:stop]
+        else:
+            raise NotImplementedError("Let's make that generic when needed")
+        return tensor
+
+    size = weight.shape[dim]
+    assert (
+        size % tensor_parallel_degree == 0
+    ), f"The choosen size {size} is not compatible with sharding on {tensor_parallel_degree} shards. for tensor shape {weight.shape}"
+
     if is_column:
         splited_weights = np.split(weight, tensor_parallel_degree, axis=-1)
     else:
@@ -906,7 +925,7 @@ class ConversionMixin:
             for layer_name in all_layer_names:
                 logger.warning(f"--- {layer_name}")
 
-        model_weight_file = os.path.join(cache_dir, PADDLE_WEIGHT_FILE_NAME)
+        model_weight_file = os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)
         paddle.save(state_dict, model_weight_file)
         return state_dict
 
@@ -926,19 +945,28 @@ class ConversionMixin:
         raise NotImplementedError
 
     @classmethod
+    def get_tensor_parallel_convert_actions(cls, config: PretrainedConfig, loaded_state_dict_keys, ignore_error=False):
+        name_action_mappings = cls._get_tensor_parallel_mappings(config)
+        state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), loaded_state_dict_keys, ignore_error)
+        for k, v in state_keys_map.items():
+            name_action_mappings[v] = name_action_mappings.pop(k)
+        return name_action_mappings
+
+    @classmethod
     def convert_tensor_parallel(
         cls, weight_file: str, config: PretrainedConfig, state_dict=None, ignore_error=False
     ) -> None:
         """the entry of converting config and converting model file
 
         Args:
-            input_dir (str | None): the input dir which contains `pytorch_model.bin` and `config.json` file
+            weight_file (str | None): the weight file path of `model_state.pdparams` file
             config (PretrainedConfig): the PretrainedConfig instance of model
         """
         name_action_mappings = cls._get_tensor_parallel_mappings(config)
         if state_dict is None:
             with device_guard("cpu"):
                 state_dict = paddle.load(weight_file, return_numpy=False)
+            logger.info("starting convert orignal state_dict to tensor parallel state_dict.")
 
         state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys(), ignore_error)
 
@@ -1074,7 +1102,7 @@ class Converter(ConversionMixin, LogitComparer):
         os.makedirs(input_dir, exist_ok=True)
 
         # 1. get pytorch weight file
-        weight_file = os.path.join(input_dir, PYTORCH_WEIGHT_FILE_NAME)
+        weight_file = os.path.join(input_dir, PYTORCH_WEIGHTS_NAME)
         if not os.path.exists(weight_file):
             raise FileNotFoundError(f"pytorch weight file<{weight_file}> not found")
 
@@ -1107,6 +1135,6 @@ class Converter(ConversionMixin, LogitComparer):
             for layer_name in all_layer_names:
                 logger.warning(f"--- {layer_name}")
 
-        model_weight_file = os.path.join(input_dir, PADDLE_WEIGHT_FILE_NAME)
+        model_weight_file = os.path.join(input_dir, PADDLE_WEIGHTS_NAME)
         paddle.save(state_dict, model_weight_file)
         return state_dict

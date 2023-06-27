@@ -46,7 +46,6 @@ from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
 from paddlenlp.trainer import get_last_checkpoint
-from paddlenlp.trainer.trainer import paddlenlp_load
 from paddlenlp.trainer.training_args import default_logdir
 from paddlenlp.transformers import (
     CosineAnnealingWithWarmupDecay,
@@ -55,7 +54,7 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     PretrainedModel,
 )
-from paddlenlp.transformers.model_utils import _add_variant
+from paddlenlp.transformers.model_utils import _add_variant, paddlenlp_load
 from paddlenlp.utils.log import logger
 
 METRIC_CLASSES = {
@@ -420,7 +419,7 @@ def do_train(args):
         optimizer.set_state_dict(
             paddlenlp_load(
                 os.path.join(last_checkpoint, OPTIMIZER_NAME),
-                return_numpy=True,
+                map_location="cpu",
             )
         )
 

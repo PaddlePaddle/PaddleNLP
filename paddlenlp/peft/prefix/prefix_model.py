@@ -24,7 +24,7 @@ from paddle.distributed import fleet
 from ...prompt.prompt_utils import signature
 from ...transformers.model_utils import _add_variant, dtype_guard
 from ...utils.distributed import distributed_gather
-from ...utils.env import PAST_KEY_VALUES_FILE_NAME, PREFIX_WEIGHT_FILE_NAME
+from ...utils.env import PAST_KEY_VALUES_FILE_NAME, PREFIX_WEIGHTS_NAME
 from ...utils.log import logger
 from .prefix_config import PrefixConfig
 
@@ -254,9 +254,9 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
 
         # define prefix weight name
         if prefix_config_tensor_parallel_degree > 1:
-            prefix_weight_name = _add_variant(PREFIX_WEIGHT_FILE_NAME, f"tp{model.config.tensor_parallel_rank:0>2d}")
+            prefix_weight_name = _add_variant(PREFIX_WEIGHTS_NAME, f"tp{model.config.tensor_parallel_rank:0>2d}")
         else:
-            prefix_weight_name = PREFIX_WEIGHT_FILE_NAME
+            prefix_weight_name = PREFIX_WEIGHTS_NAME
 
         # load and set prefix weight parameter
         prefix_weight_path = os.path.join(prefix_path, prefix_weight_name)
@@ -323,7 +323,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
                     variant = f"tp{self.model.config.tensor_parallel_rank:0>2d}"
 
         # save prefix tuning weight
-        prefix_weight_name = _add_variant(PREFIX_WEIGHT_FILE_NAME, variant)
+        prefix_weight_name = _add_variant(PREFIX_WEIGHTS_NAME, variant)
         weight_filename = os.path.join(save_directory, prefix_weight_name)
         paddle.save(trainable_state_dict, weight_filename)
 

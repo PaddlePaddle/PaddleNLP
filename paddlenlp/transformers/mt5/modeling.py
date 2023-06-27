@@ -1699,10 +1699,6 @@ class MT5EncoderModel(MT5PretrainedModel):
         self.shared = nn.Embedding(encoder_config.vocab_size, encoder_config.d_model)
         self.encoder = MT5Stack(encoder_config, embed_tokens=self.shared)
 
-    @property
-    def mt5(self):
-        return self
-
     def get_input_embeddings(self) -> nn.Embedding:
         return self.shared
 

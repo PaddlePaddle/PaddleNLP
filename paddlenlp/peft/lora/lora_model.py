@@ -26,7 +26,7 @@ from paddle.distributed.fleet.meta_parallel import ColumnParallelLinear
 from ...transformers.conversion_utils import ConversionMixin
 from ...transformers.model_utils import PretrainedModel, _add_variant, dtype_guard
 from ...utils.distributed import distributed_gather
-from ...utils.env import LORA_WEIGHT_FILE_NAME
+from ...utils.env import LORA_WEIGHTS_NAME
 from ...utils.log import logger
 from .lora_config import LoRAConfig
 from .lora_layers import (
@@ -71,9 +71,9 @@ class LoRAModel(nn.Layer):
 
         # define lora weight name
         if lora_config_tensor_parallel_degree > 1:
-            lora_weight_name = _add_variant(LORA_WEIGHT_FILE_NAME, f"tp{model.config.tensor_parallel_rank:0>2d}")
+            lora_weight_name = _add_variant(LORA_WEIGHTS_NAME, f"tp{model.config.tensor_parallel_rank:0>2d}")
         else:
-            lora_weight_name = LORA_WEIGHT_FILE_NAME
+            lora_weight_name = LORA_WEIGHTS_NAME
 
         # load and set lora weight parameter
         lora_weight_path = os.path.join(lora_path, lora_weight_name)
@@ -193,7 +193,7 @@ class LoRAModel(nn.Layer):
                     variant = f"tp{self.model.config.tensor_parallel_rank:0>2d}"
 
         # save lora weight
-        lora_weight_name = _add_variant(LORA_WEIGHT_FILE_NAME, variant)
+        lora_weight_name = _add_variant(LORA_WEIGHTS_NAME, variant)
         weight_filename = os.path.join(save_directory, lora_weight_name)
         paddle.save(trainable_state_dict, weight_filename)
 
