@@ -240,7 +240,6 @@ def main():
             r=model_args.r,
             lora_alpha=2 * model_args.r,
             merge_weights=model_args.merge_weights,
-            enable_lora_list=[[True, False, True]],
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,
         )
