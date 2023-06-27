@@ -14,7 +14,6 @@
 """
 GPT/Llama pretraining scripts.
 """
-
 import math
 import os
 import random
@@ -35,22 +34,24 @@ from paddlenlp.trainer import (
 from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
-    GPTConfig,
-    GPTForPretraining,
     LinearAnnealingWithWarmupDecay,
+    LlamaConfig,
+    LlamaForCausalLM,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "gpt": (
-        GPTConfig,
-        GPTForPretraining,
+    "llama": (
+        LlamaConfig,
+        LlamaForCausalLM,
     ),
 }
 
+from llama_dataset import build_train_valid_test_datasets, print_rank_0
 
-from gpt_dataset import build_train_valid_test_datasets, print_rank_0
+# from dataset import GPTDataset, get_train_valid_test_split_
+from modeling_pp import LlamaForCausalLMPipe
 
 
 def add_start_docstrings(*docstr):
@@ -108,24 +109,29 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to pre-train from.
     """
 
-    model_type: Optional[str] = field(default="gpt", metadata={"help": "Only support for ernie pre-training for now."})
+    model_type: Optional[str] = field(
+        default="llama", metadata={"help": "Only support for llama pre-training for now."}
+    )
     model_name_or_path: str = field(
-        default="gpt2-meidum-en",
+        default="facebook/tiny-random-llama",
         metadata={
             "help": "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
         },
     )
-    hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
-    attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention probs dropout prob."})
-    config_name: Optional[str] = field(
-        default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
-    )
     tokenizer_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
+    )
+
+    config_name: Optional[str] = field(
+        default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
     )
     use_flash_attention: bool = field(
         default=False,
         metadata={"help": "use_flash_attention"},
+    )
+    use_fused_rms_norm: bool = field(
+        default=False,
+        metadata={"help": "llama, use_fused_rms_norm"},
     )
     fuse_attention_qkv: bool = field(
         default=True,
@@ -212,7 +218,7 @@ def create_pretrained_dataset(
             "input_ids": tokens,
             # "token_type_ids": out[1],
             # "attention_mask": out[2],
-            "loss_mask": loss_mask,
+            # "loss_mask": out[3],
             "labels": labels,
         }
 
@@ -374,11 +380,14 @@ def main():
 
     config.lm_shift_labels = False
     config.use_flash_attention = model_args.use_flash_attention
-    # config.use_fused_rms_norm = model_args.use_fused_rms_norm
+    config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
     config.use_recompute = training_args.recompute
+
+    config.tensor_parallel_degree = training_args.tensor_parallel_degree
+    config.tensor_parallel_rank = training_args.tensor_parallel_rank
 
     print("Final pre-training config:", config)
 
@@ -390,11 +399,15 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
+    if training_args.pipeline_parallel_degree > 1 and model_args.model_type == "llama":
+        model_class = LlamaForCausalLMPipe
+
     if model_args.continue_training:
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=config,
             dtype=dtype,
+            load_state_as_np=True,
         )
     else:
         model = model_class._from_config(config, dtype=dtype)
@@ -436,6 +449,7 @@ def main():
         optimizers=(None, lr_scheduler),
         tokenizer=tokenizer,
     )
+
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:
         checkpoint = training_args.resume_from_checkpoint

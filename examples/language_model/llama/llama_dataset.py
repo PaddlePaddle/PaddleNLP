@@ -8,23 +8,6 @@ import time
 
 import numpy as np
 import paddle
-from paddle.distributed import fleet
-
-try:
-    hcg = fleet.get_hybrid_communicate_group()
-except:
-
-    class FakeHCG:
-        def get_data_parallel_group(self):
-            return None
-
-        def get_pipe_parallel_group(self):
-            return None
-
-        def get_model_parallel_group(self):
-            return None
-
-    hcg = FakeHCG()
 
 # from megatron.core import mpu
 from data_tools.dataset_utils import BlendableDataset
@@ -33,6 +16,24 @@ from data_tools.dataset_utils import BlendableDataset
 from dataset import get_train_valid_test_split_
 
 from paddlenlp.data.indexed_dataset import make_dataset as make_indexed_dataset
+
+# from paddle.distributed import fleet
+# try:
+# hcg = fleet.get_hybrid_communicate_group()
+# print("#"*100)
+# except:
+
+#     class FakeHCG:
+#         def get_data_parallel_group(self):
+#             return None
+
+#         def get_pipe_parallel_group(self):
+#             return None
+
+#         def get_model_parallel_group(self):
+#             return None
+
+#     hcg = FakeHCG()
 
 
 def get_datasets_weights_and_num_samples(data_prefix, train_valid_test_num_samples):
@@ -68,6 +69,133 @@ def get_datasets_weights_and_num_samples(data_prefix, train_valid_test_num_sampl
 def print_rank_0(*args, **kwargs):
     if paddle.distributed.get_rank() == 0:
         print(*args, **kwargs)
+
+
+def build_train_valid_test_datasets(
+    data_prefix,
+    data_impl,
+    splits_string,
+    train_valid_test_num_samples,
+    seq_length,
+    seed,
+    skip_warmup,
+    train_data_prefix=None,
+    valid_data_prefix=None,
+    test_data_prefix=None,
+    return_doc_ids=False,
+    *,
+    data_cache_path=None
+):
+    """Build train, valid, and test datasets."""
+    if data_prefix:
+        print_rank_0("Single data path provided for train, valid & test")
+
+        # Single dataset.
+        if len(data_prefix) == 1:
+            return _build_train_valid_test_datasets(
+                data_prefix[0],
+                data_impl,
+                splits_string,
+                train_valid_test_num_samples,
+                seq_length,
+                seed,
+                skip_warmup,
+                data_cache_path=data_cache_path,
+            )
+
+        # Blending dataset.
+        # Parse the values.
+        output = get_datasets_weights_and_num_samples(data_prefix, train_valid_test_num_samples)
+        prefixes, weights, datasets_train_valid_test_num_samples = output
+        train_num_samples, valid_num_samples, test_num_samples = map(sum, zip(*datasets_train_valid_test_num_samples))
+
+        # Build individual datasets.
+        train_datasets = []
+        valid_datasets = []
+        test_datasets = []
+        for i in range(len(prefixes)):
+            train_ds, valid_ds, test_ds = _build_train_valid_test_datasets(
+                prefixes[i],
+                data_impl,
+                splits_string,
+                datasets_train_valid_test_num_samples[i],
+                seq_length,
+                seed,
+                skip_warmup,
+                return_doc_ids,
+                data_cache_path=data_cache_path,
+            )
+            if train_ds:
+                train_datasets.append(train_ds)
+            if valid_ds:
+                valid_datasets.append(valid_ds)
+            if test_ds:
+                test_datasets.append(test_ds)
+
+        # Blend.
+        blending_train_dataset = None
+        if train_datasets:
+            blending_train_dataset = BlendableDataset(
+                train_datasets, weights, train_num_samples, data_cache_path=data_cache_path
+            )
+        blending_valid_dataset = None
+        if valid_datasets:
+            blending_valid_dataset = BlendableDataset(
+                valid_datasets, weights, valid_num_samples, data_cache_path=data_cache_path
+            )
+        blending_test_dataset = None
+        if test_datasets:
+            blending_test_dataset = BlendableDataset(
+                test_datasets, weights, test_num_samples, data_cache_path=data_cache_path
+            )
+
+        return (blending_train_dataset, blending_valid_dataset, blending_test_dataset)
+
+    else:
+        print_rank_0("Separate data paths provided for train, valid & test. Split string will be ignored.")
+
+        train_dataset, valid_dataset, test_dataset = None, None, None
+        # Single dataset.
+        if train_data_prefix is not None:
+            train_dataset = build_dataset(
+                "train",
+                train_data_prefix,
+                data_impl,
+                splits_string,
+                train_valid_test_num_samples[0],
+                seq_length,
+                seed,
+                skip_warmup,
+                data_cache_path=data_cache_path,
+            )
+
+        if valid_data_prefix is not None:
+            valid_dataset = build_dataset(
+                "valid",
+                valid_data_prefix,
+                data_impl,
+                splits_string,
+                train_valid_test_num_samples[1],
+                seq_length,
+                seed,
+                False,
+                data_cache_path=data_cache_path,
+            )
+
+        if test_data_prefix is not None:
+            test_dataset = build_dataset(
+                "test",
+                test_data_prefix,
+                data_impl,
+                splits_string,
+                train_valid_test_num_samples[2],
+                seq_length,
+                seed,
+                False,
+                data_cache_path=data_cache_path,
+            )
+
+        return (train_dataset, valid_dataset, test_dataset)
 
 
 def _build_train_valid_test_datasets(
@@ -326,6 +454,7 @@ def _build_index_mappings(
        training sample.
     shuffle-idx: maps the sample index into a random index into sample-idx.
     """
+
     # Number of tokens in each epoch and number of required epochs.
     tokens_per_epoch = _num_tokens(documents, sizes)
     num_epochs = _num_epochs(tokens_per_epoch, seq_length, num_samples)
@@ -369,7 +498,7 @@ def _build_index_mappings(
             build_indices = False
             break
     data_cache_dir = os.path.dirname(idx_path["desc"])
-    data_cache_success = True
+    # data_cache_success = True
     # Build the indexed mapping if not exist.
     if build_indices and paddle.distributed.get_rank() == 0:
         print_rank_0(" > WARNING: could not find index map files, building " "the indices on rank 0 ...")
@@ -461,18 +590,24 @@ def _build_index_mappings(
             print("the data files are in and can be set with the --data-cache-path argument. Please")
             print("ensure you have write access to this directory or specify one that you do have")
             print("write access to.")
-            data_cache_success = False
+            # data_cache_success = False
+    # counts = paddle.to_tensor([data_cache_success], dtype="int64")
+    # print(f"{paddle.distributed.get_rank()}: count:{counts}")
+    # if paddle.distributed.get_world_size() > 1:
+    #     paddle.distributed.all_reduce(counts, group=hcg.get_data_parallel_group())
+    #     print(f"{paddle.distributed.get_rank()}: reduce 1 count:{counts}")
+    #     paddle.distributed.all_reduce(counts, group=hcg.get_pipe_parallel_group())
+    #     print(f"{paddle.distributed.get_rank()}: reduce 2 count:{counts}")
+    # print(f"{paddle.distributed.get_rank()}: counts[0].item():{counts[0].item()}")
+    # print(f"{paddle.distributed.get_rank()}: get_world_size:{ paddle.distributed.get_world_size()}")
+    # print(f"hcg:{hcg.get_model_parallel_group()}")
+    # print(f"{paddle.distributed.get_rank()}: group:{paddle.distributed.get_world_size(group=hcg.get_model_parallel_group())}")
 
-    counts = paddle.to_tensor([data_cache_success], dtype="int64")
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.all_reduce(counts, group=hcg.get_data_parallel_group())
-        paddle.distributed.all_reduce(counts, group=hcg.get_pipe_parallel_group())
-
-    if counts[0].item() != (
-        paddle.distributed.get_world_size() // paddle.distributed.get_world_size(group=hcg.get_model_parallel_group())
-    ):
-        print_rank_0("Data index creation unsuccessful, exiting.")
-        exit()
+    # if counts[0].item() != (
+    #     paddle.distributed.get_world_size() // paddle.distributed.get_world_size(group=hcg.get_model_parallel_group())
+    # ):
+    #     print_rank_0("Data index creation unsuccessful, exiting.")
+    #     exit()
 
     # Load mappings.
     start_time = time.time()

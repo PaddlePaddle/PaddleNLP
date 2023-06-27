@@ -26,8 +26,8 @@
 #    An empty sentence no longer separates documents.
 
 import os
-import shutil
 import struct
+import time
 from functools import lru_cache
 from itertools import accumulate
 
@@ -75,20 +75,23 @@ def make_builder(out_file, impl, vocab_size=None):
 
 
 def make_dataset(path, impl, skip_warmup=False):
-    if not IndexedDataset.exists(path):
-        print(f"Dataset does not exist: {path}")
-        print("Path should be a basename that both .idx and .bin can be appended to get full filenames.")
+    if not os.path.isfile(path + "_ids.npy") or not os.path.isfile(path + "_idx.npz"):
+        if not IndexedDataset.exists(path):
+            print(f"Dataset does not exist: {path}")
+            print("Path should be a basename that both .idx and .bin can be appended to get full filenames.")
+            return None
+        if impl == "infer":
+            impl = infer_dataset_impl(path)
+        if impl == "lazy" and IndexedDataset.exists(path):
+            return IndexedDataset(path)
+        elif impl == "cached" and IndexedDataset.exists(path):
+            return IndexedCachedDataset(path)
+        elif impl == "mmap" and MMapIndexedDataset.exists(path):
+            return MMapIndexedDataset(path, skip_warmup)
+        print(f"Unknown dataset implementation: {impl}")
         return None
-    if impl == "infer":
-        impl = infer_dataset_impl(path)
-    if impl == "lazy" and IndexedDataset.exists(path):
-        return IndexedDataset(path)
-    elif impl == "cached" and IndexedDataset.exists(path):
-        return IndexedCachedDataset(path)
-    elif impl == "mmap" and MMapIndexedDataset.exists(path):
-        return MMapIndexedDataset(path, skip_warmup)
-    print(f"Unknown dataset implementation: {impl}")
-    return None
+    else:
+        return CompatibleIndexedDataset(path)
 
 
 def dataset_exists(path, impl):
@@ -427,25 +430,25 @@ class MMapIndexedDataset(paddle.io.Dataset):
                 print_rank_0("    warming up index mmap file...")
                 _warmup_mmap_file(path)
 
-            self._bin_buffer_mmap = np.memmap(path, mode="r", order="C")
-            self._bin_buffer = memoryview(self._bin_buffer_mmap)
+            self._buffer_mmap = np.memmap(path, mode="r", order="C")
+            self._buffer = memoryview(self._buffer_mmap)
             print_rank_0("    reading sizes...")
-            self._sizes = np.frombuffer(self._bin_buffer, dtype=np.int32, count=self._len, offset=offset)
+            self._sizes = np.frombuffer(self._buffer, dtype=np.int32, count=self._len, offset=offset)
             print_rank_0("    reading pointers...")
             self._pointers = np.frombuffer(
-                self._bin_buffer, dtype=np.int64, count=self._len, offset=offset + self._sizes.nbytes
+                self._buffer, dtype=np.int64, count=self._len, offset=offset + self._sizes.nbytes
             )
             print_rank_0("    reading document index...")
             self._doc_idx = np.frombuffer(
-                self._bin_buffer,
+                self._buffer,
                 dtype=np.int64,
                 count=self._doc_count,
                 offset=offset + self._sizes.nbytes + self._pointers.nbytes,
             )
 
         def __del__(self):
-            self._bin_buffer_mmap._mmap.close()
-            del self._bin_buffer_mmap
+            self._buffer_mmap._mmap.close()
+            del self._buffer_mmap
 
         @property
         def dtype(self):
@@ -483,6 +486,10 @@ class MMapIndexedDataset(paddle.io.Dataset):
 
     def _do_init(self, path, skip_warmup):
         self._path = path
+
+        if not self.exists(path):
+            raise ValueError("Missing file, %s" % (path))
+
         self._index = self.Index(index_file_path(self._path), skip_warmup)
 
         if not skip_warmup:
@@ -558,41 +565,114 @@ class MMapIndexedDataset(paddle.io.Dataset):
 
 
 class MMapIndexedDatasetBuilder(object):
-    def __init__(self, out_file, dtype=np.int64):
+    def __init__(self, out_file, dtype):
         self._data_file = open(out_file, "wb")
         self._dtype = dtype
         self._sizes = []
         self._doc_idx = [0]
 
-    def add_item(self, tensor):
-        np_array = np.array(tensor.numpy(), dtype=self._dtype)
-        self._data_file.write(np_array.tobytes(order="C"))
-        self._sizes.append(np_array.size)
-
-    def add_doc(self, tensor, sizes):
-        np_array = np.array(tensor, dtype=self._dtype)
-        self._data_file.write(np_array.tobytes(order="C"))
-        self._sizes.extend(sizes)
-        self._doc_idx.append(len(self._sizes))
+    def add_token_ids(self, token_ids):
+        self._data_file.write(token_ids.tobytes(order="C"))
+        self._sizes.append(token_ids.size)
+        del token_ids
 
     def end_document(self):
         self._doc_idx.append(len(self._sizes))
-
-    def merge_file_(self, another_file):
-        # Concatenate index
-        index = MMapIndexedDataset.Index(index_file_path(another_file))
-        assert index.dtype == self._dtype
-
-        offset = len(self._sizes)
-        self._sizes.extend(index.sizes)
-        self._doc_idx.extend((offset + index.doc_idx)[1:])
-
-        # Concatenate data
-        with open(data_file_path(another_file), "rb") as f:
-            shutil.copyfileobj(f, self._data_file)
 
     def finalize(self, index_file):
         self._data_file.close()
 
         with MMapIndexedDataset.Index.writer(index_file, self._dtype) as index:
             index.write(self._sizes, self._doc_idx)
+        print("Total sentences num: %d" % len(self._sizes))
+        print("Total documents num: %d" % (len(self._doc_idx) - 1))
+        print("Total tokens num: %d" % sum(self._sizes))
+        print("Average tokens per sentence: %.2f" % (sum(self._sizes) / len(self._sizes)))
+        print("Average tokens per document: %.2f" % (sum(self._sizes) / (len(self._doc_idx) - 1)))
+
+
+def get_indexed_dataset_(data_prefix, data_impl, skip_warmup):
+
+    print_rank_0(" > building dataset index ...")
+
+    start_time = time.time()
+    indexed_dataset = make_dataset(data_prefix, data_impl, skip_warmup)
+    assert indexed_dataset.sizes.shape[0] == indexed_dataset.doc_idx[-1]
+    print_rank_0(" > finished creating indexed dataset in {:4f} " "seconds".format(time.time() - start_time))
+
+    print_rank_0(" > indexed dataset stats:")
+    print_rank_0("    number of documents: {}".format(indexed_dataset.doc_idx.shape[0] - 1))
+    print_rank_0("    number of sentences: {}".format(indexed_dataset.sizes.shape[0]))
+
+    return indexed_dataset
+
+
+class CompatibleIndexedDataset(paddle.io.Dataset):
+    def __init__(self, path):
+        super().__init__()
+
+        self._path = path
+
+        # All documment ids, extend as 1-D array.
+        self._token_ids = np.load(path + "_ids.npy", mmap_mode="r", allow_pickle=True)
+        process_data = np.load(path + "_idx.npz")
+        self._sizes = process_data["lens"]
+        self._pointers = np.empty(len(self._sizes) + 1, dtype=np.int64)
+        self._pointers[0] = 0
+        np.cumsum(self._sizes, out=self._pointers[1:])
+        self._doc_idx = process_data["docs"]
+
+    def __getstate__(self):
+        return self._path
+
+    def __len__(self):
+        return len(self._sizes)
+
+    # @lru_cache(maxsize=8)
+    def __getitem__(self, idx):
+        if isinstance(idx, int):
+            size = self._sizes[idx]
+            ptr = self._pointers[idx]
+            np_array = self._token_ids[ptr : ptr + size]
+            return np_array
+
+        elif isinstance(idx, slice):
+            start, stop, step = idx.indices(len(self))
+            if step != 1:
+                raise ValueError("Slices into indexed_dataset must be contiguous")
+            ptr = self._pointers[start]
+            sizes = self._sizes[idx]
+            offsets = list(accumulate(sizes))
+            total_size = sum(sizes)
+            np_array = self._token_ids[ptr : ptr + total_size]
+            sents = np.split(np_array, offsets[:-1])
+            return sents
+
+    def get(self, idx, offset=0, length=None):
+        """Retrieves a single item from the dataset with the option to only
+        return a portion of the item.
+
+        get(idx) is the same as [idx] but get() does not support slicing.
+        """
+        size = self._sizes[idx]
+        ptr = self._pointers[idx]
+
+        if length is None:
+            length = size - offset
+        ptr += offset
+        np_array = self._token_ids[ptr : ptr + length]
+        return np_array
+
+    @property
+    def sizes(self):
+        return self._sizes
+
+    @property
+    def doc_idx(self):
+        return self._doc_idx
+
+    def get_doc_idx(self):
+        return self._doc_idx
+
+    def set_doc_idx(self, doc_idx_):
+        self._doc_idx = doc_idx_
