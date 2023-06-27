@@ -14,6 +14,7 @@
 
 import distutils.util
 import os
+import time
 
 import fastdeploy as fd
 import numpy as np
@@ -42,6 +43,7 @@ def parse_arguments():
         help="The inference runtime backend.",
     )
     parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
+    parser.add_argument("--cpu_num", type=int, default=1, help="The num of cpus to use.")
     parser.add_argument("--temperature", type=float, default=4.30022621, help="The temperature of the model.")
     parser.add_argument("--max_length", type=int, default=128, help="The max length of sequence.")
     parser.add_argument("--log_interval", type=int, default=10, help="The interval of logging.")
@@ -56,10 +58,7 @@ def parse_arguments():
         "--encode_type",
         type=str,
         default="text",
-        choices=[
-            "image",
-            "text",
-        ],
+        choices=["image", "text", "all"],
         help="The encoder type.",
     )
     parser.add_argument(
@@ -94,14 +93,17 @@ class ErnieVil2Predictor(object):
             return fd.Runtime(option)
         if args.device == "cpu":
             option.use_cpu()
+            option.set_cpu_thread_num(args.cpu_num)
         else:
             option.use_gpu()
         if args.backend == "paddle":
             option.use_paddle_infer_backend()
         elif args.backend == "onnx_runtime":
+
             option.use_ort_backend()
         elif args.backend == "openvino":
             option.use_openvino_backend()
+
         else:
             option.use_trt_backend()
             if args.backend == "paddle_tensorrt":
@@ -159,31 +161,40 @@ class ErnieVil2Predictor(object):
 
 def main():
     args = parse_arguments()
-    texts = [
-        "猫的照片",
-        "狗的照片",
-    ]
-    args.batch_size = 2
-    predictor = ErnieVil2Predictor(args)
-    outputs = predictor.predict(texts)
-    print(outputs)
-    text_feats = outputs["features"]
-    image = Image.open(args.image_path)
-    args.encode_type = "image"
-    args.batch_size = 1
-    predictor = ErnieVil2Predictor(args)
-    images = [image]
-    outputs = predictor.predict(images)
-    image_feats = outputs["features"]
-    print(image_feats)
-    from scipy.special import softmax
+    if args.encode_type in ["text", "all"]:
+        texts = [
+            "猫的照片",
+            "狗的照片",
+        ]
+        args.batch_size = 2
+        predictor = ErnieVil2Predictor(args)
+        outputs = predictor.predict(texts)
+        print(outputs)
+        text_feats = outputs["features"]
+    if args.encode_type in ["image", "all"]:
+        image = Image.open(args.image_path)
+        args.encode_type = "image"
+        args.batch_size = 1
 
-    image_feats = image_feats / np.linalg.norm(image_feats, ord=2, axis=-1, keepdims=True)
-    text_feats = text_feats / np.linalg.norm(text_feats, ord=2, axis=-1, keepdims=True)
-    # Get from dygraph， refer to predict.py
-    exp_data = np.exp(args.temperature)
-    m = softmax(np.matmul(exp_data * text_feats, image_feats.T), axis=0).T
-    print(m)
+        predictor = ErnieVil2Predictor(args)
+
+        images = [image]
+        start_time = time.time()
+        outputs = predictor.predict(images)
+        end_time = time.time()
+        print("Time cost: {} s".format(end_time - start_time))
+        image_feats = outputs["features"]
+        print(image_feats)
+
+    if args.encode_type == "all":
+        from scipy.special import softmax
+
+        image_feats = image_feats / np.linalg.norm(image_feats, ord=2, axis=-1, keepdims=True)
+        text_feats = text_feats / np.linalg.norm(text_feats, ord=2, axis=-1, keepdims=True)
+        # Get from dygraph， refer to predict.py
+        exp_data = np.exp(args.temperature)
+        m = softmax(np.matmul(exp_data * text_feats, image_feats.T), axis=0).T
+        print(m)
 
 
 if __name__ == "__main__":

@@ -178,6 +178,22 @@ python utils/offline_ann_mm.py --index_name wukong_test \
 
 如果安装遇见问题可以查看[FAQ文档](../../FAQ.md)
 
+## 4. 服务化部署
+
+服务化部署采用FASTAPI的方式，并提供了增删查改的功能，以Milvus示例，首先启动[Milvus](https://milvus.io/docs/install_standalone-docker.md)的向量检索服务：
+
+```
+wget https://github.com/milvus-io/milvus/releases/download/v2.2.8/milvus-standalone-docker-compose.yml -O docker-compose.yml
+sudo docker-compose up -d
+```
+
+服务启动后，修改相应的Milvus的配置，然后启动FastAPI服务：
+```
+uvicorn examples.image_text_retrieval.server:app --reload --port 8866 --host '0.0.0.0'
+```
+
+**加载自己训练的模型** ernie_vil2.0使用的是taskflow，如果需要加载自己训练的模型,把原来Taskflow(一般在~/.paddlenlp/taskflow目录里面)对应路径的模型删除，然后传入参数的时候指定task_path即可。
+
 ## Reference
 [1]Y. Sun et al., “[ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation](https://arxiv.org/pdf/2107.02137.pdf),” arXiv:2107.02137 [cs], Jul. 2021, Accessed: Jan. 17, 2022. [Online]. Available: http://arxiv.org/abs/2107.02137
 

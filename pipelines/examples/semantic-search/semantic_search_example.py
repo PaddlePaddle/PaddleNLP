@@ -148,9 +148,12 @@ def get_milvus_retriever(use_gpu):
             embed_title=args.embed_title,
         )
 
-        document_store.write_documents(dicts)
+        # document_store.write_documents(dicts)
+        # # update Embedding
+        # document_store.update_embeddings(retriever)
+        document_store.write_documents(dicts, retriever=retriever)
         # update Embedding
-        document_store.update_embeddings(retriever)
+        # document_store.update_embeddings(retriever)
 
     return retriever
 

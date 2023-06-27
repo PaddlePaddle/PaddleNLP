@@ -15,12 +15,16 @@
 import argparse
 import json
 
+import numpy as np
 import paddle
-from data_util import get_eval_img_dataset, get_eval_txt_dataset
+from data_util import (
+    MyDataCollatorWithPadding,
+    get_eval_img_dataset,
+    get_eval_txt_dataset,
+)
 from paddle.io import DataLoader
 from tqdm import tqdm
 
-from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.transformers import ErnieViLModel, ErnieViLTokenizer
 
 # yapf: disable
@@ -39,6 +43,14 @@ args = parser.parse_args()
 # yapf: enable
 
 
+def _paddle_collate_batch(examples):
+    images_ids = [item[0] for item in examples]
+    images = [item[1] for item in examples]
+    images = np.array(images)
+
+    return images_ids, images
+
+
 def main():
     if args.resume is not None:
         # Finetune
@@ -52,7 +64,7 @@ def main():
     if args.extract_text_feats:
         tokenizer = ErnieViLTokenizer.from_pretrained("ernie_vil-2.0-base-zh")
         eval_dataset = get_eval_txt_dataset(args, tokenizer=tokenizer, max_txt_length=args.context_length)
-        my_collate = DataCollatorWithPadding(tokenizer)
+        my_collate = MyDataCollatorWithPadding(tokenizer)
         text_loader = DataLoader(eval_dataset, collate_fn=my_collate, batch_size=args.text_batch_size)
         print("Make inference for texts...")
         if args.text_feat_output_path is None:
@@ -62,10 +74,10 @@ def main():
             model.eval()
             with paddle.no_grad():
                 for batch in tqdm(text_loader):
-                    text_ids, texts = batch["text_id"], batch["input_ids"]
+                    text_ids, texts = batch["text"], batch["input_ids"]
                     text_features = model.get_text_features(texts)
                     text_features /= text_features.norm(axis=-1, keepdim=True)
-                    for text_id, text_feature in zip(text_ids.tolist(), text_features.tolist()):
+                    for text_id, text_feature in zip(text_ids, text_features.tolist()):
                         fout.write("{}\n".format(json.dumps({"text_id": text_id, "feature": text_feature})))
                         write_cnt += 1
         print("{} text features are stored in {}".format(write_cnt, args.text_feat_output_path))
@@ -73,7 +85,7 @@ def main():
     # Make inference for images
     if args.extract_image_feats:
         image_eval_dataset = get_eval_img_dataset(args)
-        image_loader = DataLoader(image_eval_dataset, batch_size=args.img_batch_size)
+        image_loader = DataLoader(image_eval_dataset, batch_size=args.img_batch_size, collate_fn=_paddle_collate_batch)
         print("Make inference for images...")
         if args.image_feat_output_path is None:
             # by default, we store the image features under the same directory with the text features
@@ -86,7 +98,7 @@ def main():
                     image_ids, images = batch
                     image_features = model.get_image_features(pixel_values=images)
                     image_features /= image_features.norm(axis=-1, keepdim=True)
-                    for image_id, image_feature in zip(image_ids.tolist(), image_features.tolist()):
+                    for image_id, image_feature in zip(image_ids, image_features.tolist()):
                         fout.write("{}\n".format(json.dumps({"image_id": image_id, "feature": image_feature})))
                         write_cnt += 1
         print("{} image features are stored in {}".format(write_cnt, args.image_feat_output_path))

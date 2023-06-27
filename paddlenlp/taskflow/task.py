@@ -56,11 +56,12 @@ class Task(metaclass=abc.ABCMeta):
         self._num_threads = self.kwargs["num_threads"] if "num_threads" in self.kwargs else math.ceil(cpu_count() / 2)
         self._infer_precision = self.kwargs["precision"] if "precision" in self.kwargs else "fp32"
         # Default to use Paddle Inference
-        self._predictor_type = "paddle-inference"
+        self._predictor_type = self.kwargs["predictor_type"] if "predictor_type" in self.kwargs else "paddle-inference"
         # The root directory for storing Taskflow related files, default to ~/.paddlenlp.
         self._home_path = self.kwargs["home_path"] if "home_path" in self.kwargs else PPNLP_HOME
         self._task_flag = self.kwargs["task_flag"] if "task_flag" in self.kwargs else self.model
         self.from_hf_hub = kwargs.pop("from_hf_hub", False)
+        self.cpu_num = kwargs.pop("cpu_num", 4)
         # Add mode flag for onnx output path redirection
         self.export_type = None
 
@@ -246,7 +247,7 @@ class Task(metaclass=abc.ABCMeta):
             onnx_dir = os.path.join(self._task_path, "onnx", self.export_type)
 
         if not os.path.exists(onnx_dir):
-            os.mkdir(onnx_dir)
+            os.makedirs(onnx_dir, exist_ok=True)
         float_onnx_file = os.path.join(onnx_dir, "model.onnx")
         if not os.path.exists(float_onnx_file) or self._param_updated:
             onnx_model = paddle2onnx.command.c_paddle_to_onnx(
