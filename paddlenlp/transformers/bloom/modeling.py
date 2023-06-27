@@ -56,7 +56,7 @@ __all__ = [
 ]
 
 
-def parallel_matmul(x: Tensor, y: Tensor, parallel_output=True):
+def parallel_matmul(x: Tensor, y: Tensor, parallel_output=True, transpose_y=True):
     is_fleet_init = True
     world_size = 1
     try:
@@ -70,12 +70,12 @@ def parallel_matmul(x: Tensor, y: Tensor, parallel_output=True):
         hcg = fleet.get_hybrid_communicate_group()
         model_parallel_group = hcg.get_model_parallel_group()
         input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
-        logits = paddle.matmul(input_parallel, y, transpose_y=True)
+        logits = paddle.matmul(input_parallel, y, transpose_y=transpose_y)
         if parallel_output:
             return logits
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
     else:
-        logits = paddle.matmul(x, y, transpose_y=True)
+        logits = paddle.matmul(x, y, transpose_y=transpose_y)
         return logits
 
 
@@ -551,6 +551,7 @@ class BloomMLP(nn.Layer):
 class BloomBlock(nn.Layer):
     def __init__(self, config, layer_number=None):
         super().__init__()
+        self.config = config
         hidden_size = config.hidden_size
 
         self.input_layernorm = nn.LayerNorm(hidden_size, epsilon=config.layer_norm_epsilon)
@@ -619,7 +620,7 @@ class BloomBlock(nn.Layer):
         return outputs  # hidden_states, present, attentions
 
 
-class BloomPreTrainedModel(PretrainedModel):
+class BloomPretrainedModel(PretrainedModel):
     _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.weight"]
     """
     An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
@@ -804,7 +805,7 @@ class BloomPreTrainedModel(PretrainedModel):
         return mappings
 
 
-class BloomModel(BloomPreTrainedModel):
+class BloomModel(BloomPretrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.padding_idx = 0
@@ -1019,29 +1020,41 @@ class BloomModel(BloomPreTrainedModel):
 class BloomLMHead(nn.Layer):
     def __init__(self, config, embedding_weights=None):
         super(BloomLMHead, self).__init__()
-        self.decoder_weight = (
-            self.create_parameter(
-                shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype(), is_bias=True
-            )
+        self.config = config
+        if config.tensor_parallel_degree > 1:
+            vocab_size = config.vocab_size // config.tensor_parallel_degree
+        else:
+            vocab_size = config.vocab_size
+
+        self.weight = (
+            self.create_parameter(shape=[vocab_size, config.hidden_size], dtype=paddle.get_default_dtype())
             if embedding_weights is None
             else embedding_weights
         )
-        self.config = config
+
+        # Must set distributed attr for Tensor Parallel !
+        self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
+        if self.weight.is_distributed:
+            self.weight.split_axis = 0
 
     def forward(self, hidden_states):
-        logits = parallel_matmul(hidden_states, self.decoder_weight, parallel_output=False)
+        logits = parallel_matmul(
+            hidden_states, self.weight, parallel_output=self.config.tensor_parallel_output, transpose_y=True
+        )
         return logits
 
 
 class BloomPretrainingCriterion(paddle.nn.Layer):
     """
-    Criterion for GPT.
+    Criterion for Bloom.
     It calculates the final loss.
     """
 
-    def __init__(self, pad_token_id=None, tensor_parallel_degree=1, tensor_parallel_output=False):
-        super(BloomPretrainingCriterion, self).__init__()
-        if tensor_parallel_degree > 1 and tensor_parallel_output:
+    def __init__(self, config):
+        # pad_token_id=None, tensor_parallel_degree=1, tensor_parallel_output=False
+        pad_token_id = config.pad_token_id
+        super().__init__()
+        if config.tensor_parallel_degree > 1 and config.tensor_parallel_output:
             self.loss_func = fleet.meta_parallel.ParallelCrossEntropy()
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
@@ -1059,11 +1072,11 @@ class BloomPretrainingCriterion(paddle.nn.Layer):
                 assert self.pad_token_id is not None
                 masked_lm_loss = masked_lm_loss[masked_lm_labels != self.pad_token_id]
                 loss = paddle.mean(masked_lm_loss)
-
+        print(loss)
         return loss
 
 
-class BloomForPretraining(BloomPreTrainedModel):
+class BloomForPretraining(BloomPretrainedModel):
     """
     The pretraining model of Bloom.
     It returns some logits and cached_kvs.
@@ -1074,9 +1087,7 @@ class BloomForPretraining(BloomPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.bloom = BloomModel(config)
-        self.criterion = BloomPretrainingCriterion(
-            pad_token_id=config.pad_token_id, tensor_parallel_degree=config.tensor_parallel_degree
-        )
+        self.criterion = BloomPretrainingCriterion(config)
         self.extra_parameters = [self.bloom.word_embeddings.weight]
 
     def forward(
@@ -1106,18 +1117,14 @@ class BloomForPretraining(BloomPreTrainedModel):
         return loss, logits
 
 
-class BloomForCausalLM(BloomPreTrainedModel):
+class BloomForCausalLM(BloomPretrainedModel):
     _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.weight"]
 
     def __init__(self, config):
         super().__init__(config)
         self.bloom = BloomModel(config)
         self.lm_head = BloomLMHead(config, self.bloom.word_embeddings.weight)
-        self.criterion = BloomPretrainingCriterion(
-            pad_token_id=config.pad_token_id,
-            tensor_parallel_degree=config.tensor_parallel_degree,
-            tensor_parallel_output=True,
-        )
+        self.criterion = BloomPretrainingCriterion(config)
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -1203,10 +1210,16 @@ class BloomForCausalLM(BloomPreTrainedModel):
         )
         hidden_states = transformer_outputs[0]
         # TODO(wj-Mcat): to enable lm_head
-        parallel_output = True
-        if hidden_states.stop_gradient:
-            parallel_output = False
-        lm_logits = parallel_matmul(hidden_states, self.bloom.word_embeddings.weight, parallel_output=parallel_output)
+
+        # if labels is None，means we need full output, instead of tensor_parallel_output
+        # tensor_parallel_output is togather with ParallelCrossEntropy
+        tensor_parallel_output = (
+            self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
+        )
+
+        lm_logits = parallel_matmul(
+            hidden_states, self.bloom.word_embeddings.weight, parallel_output=tensor_parallel_output
+        )
         # lm_logits = self.lm_head(hidden_states)
 
         loss = None
@@ -1239,7 +1252,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
         return tuple(tuple(past_state.index_select(0, beam_idx) for past_state in layer_past) for layer_past in past)
 
 
-class BloomForSequenceClassification(BloomPreTrainedModel):
+class BloomForSequenceClassification(BloomPretrainedModel):
     _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.weight"]
 
     def __init__(self, config):
@@ -1350,7 +1363,7 @@ class BloomForSequenceClassification(BloomPreTrainedModel):
         )
 
 
-class BloomForTokenClassification(BloomPreTrainedModel):
+class BloomForTokenClassification(BloomPretrainedModel):
     _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.weight"]
 
     def __init__(self, config):
@@ -1424,7 +1437,7 @@ class BloomForTokenClassification(BloomPreTrainedModel):
         )
 
 
-class BloomForGeneration(BloomPreTrainedModel):
+class BloomForGeneration(BloomPretrainedModel):
     """
     Bloom Model with pretraining tasks on top.
 

@@ -4,6 +4,30 @@
 
 BLOOM是一种自回归大型语言模型(LLM)，在大量文本数据上训练从而生生成目标文本，同时它能够支持46种语言和13种编程语言的文本交互。BLOOM 主要基于文本生成任务训练而成，可以很好的完成文本续写任务，此外 BloomZ 系列模型加入了 Instruction Tuning，因为可以。
 
+## 预训练
+
+预训练数据制作参考[此处](../../../model_zoo/ernie-1.0/preprocess/docs/OpenWebText2.md)
+
+为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
+```shell
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
+```
+
+将所有预处理得到的文件统一放入一个文件夹中，以备训练使用：
+
+```
+mkdir data
+mv llama_openwebtext_100k_ids.npy ./data
+mv llama_openwebtext_100k_idx.npz ./data
+```
+暂时使用llama的词表即可训练bloom模型.
+
+```shell
+bash -x run_trainer_tp4pp2.sh
+```
+开始训练
+
 
 ## 模型 Finetune
 
