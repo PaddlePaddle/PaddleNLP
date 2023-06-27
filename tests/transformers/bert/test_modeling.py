@@ -536,7 +536,7 @@ class BertCompatibilityTest(unittest.TestCase):
         self.compare_two_weight(first_tensor, second_tensor)
 
     def compare_two_weight(self, first_tensor, second_tensor):
-        diff = paddle.sum(first_tensor - second_tensor).numpy().item()
+        diff = paddle.sum(first_tensor - second_tensor).item()
         self.assertEqual(diff, 0.0)
 
     @slow

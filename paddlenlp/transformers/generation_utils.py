@@ -214,21 +214,19 @@ class BeamSearchScorer(object):
             ):
                 batch_beam_idx = batch_idx * self.group_size + next_index
                 # add to generated hypotheses if end of sentence
-                if (eos_token_id is not None) and (next_token.numpy().item() == eos_token_id):
+                if (eos_token_id is not None) and (next_token.item() == eos_token_id):
                     # If beam_token does not belong to top num_beams tokens,
                     # it should not be added
                     is_beam_token_worse_than_top_num_beams = beam_token_rank >= self.group_size
                     if is_beam_token_worse_than_top_num_beams:
                         continue
-                    beam_hyp.add(
-                        input_ids[batch_beam_idx.numpy().item()].clone(), next_score.numpy().item(), origin_len
-                    )
+                    beam_hyp.add(input_ids[batch_beam_idx.item()].clone(), next_score.item(), origin_len)
 
                 else:
                     # add next predicted token since it is not eos_token
                     next_beam_scores[batch_idx, beam_idx] = next_score
-                    next_beam_tokens[batch_idx, beam_idx] = next_token.numpy().item()
-                    next_beam_indices[batch_idx, beam_idx] = batch_beam_idx.numpy().item()
+                    next_beam_tokens[batch_idx, beam_idx] = next_token.item()
+                    next_beam_indices[batch_idx, beam_idx] = batch_beam_idx.item()
                     beam_idx += 1
 
                 # once the beam for next step is full, don't add more tokens to it.
@@ -243,7 +241,7 @@ class BeamSearchScorer(object):
                 )
 
             # Check if we are done so that we can save a pad step if all(done)
-            if beam_hyp.is_done(next_scores[batch_idx].max().numpy().item(), cur_len, origin_len):
+            if beam_hyp.is_done(next_scores[batch_idx].max().item(), cur_len, origin_len):
                 self._done[batch_idx] = 1
 
         return {
@@ -273,7 +271,7 @@ class BeamSearchScorer(object):
             # beam hypothesis class automatically keeps the best beams
             for beam_id in range(self.num_beams):
                 batch_beam_idx = batch_idx * self.num_beams + beam_id
-                final_score = final_beam_scores[batch_beam_idx].numpy().item()
+                final_score = final_beam_scores[batch_beam_idx].item()
                 final_tokens = input_ids[batch_beam_idx]
                 beam_hyp.add(final_tokens, final_score, origin_len=origin_len)
 
@@ -290,20 +288,20 @@ class BeamSearchScorer(object):
                 best.append([best_hyp, best_score])
 
         # prepare for adding eos
-        sent_max_len = min(sent_lengths.max().numpy().item() + 1, self.max_length)
+        sent_max_len = min(sent_lengths.max().item() + 1, self.max_length)
         decoded = paddle.zeros([batch_size * self.num_beam_hyps_to_keep, sent_max_len], dtype=input_ids.dtype)
         # shorter batches are padded if needed
-        if sent_lengths.min().numpy().item() != sent_lengths.max().numpy().item():
+        if sent_lengths.min().item() != sent_lengths.max().item():
             assert pad_token_id is not None, "`pad_token_id` has to be defined"
             decoded[:, :] = pad_token_id
         decoded_score = paddle.zeros([batch_size * self.num_beam_hyps_to_keep, 1])
 
         # fill with hypotheses and eos_token_id if the latter fits in
         for i, (hypo, score) in enumerate(best):
-            decoded[i, : sent_lengths[i].numpy().item()] = hypo.numpy()
+            decoded[i, : sent_lengths[i].item()] = hypo.numpy()
             decoded_score[i] = score
             if sent_lengths[i] < self.max_length:
-                decoded[i, sent_lengths[i].numpy().item()] = eos_token_id
+                decoded[i, sent_lengths[i].item()] = eos_token_id
         return decoded, decoded_score
 
 
@@ -328,9 +326,7 @@ class GenerationMixin(object):
 
     @staticmethod
     def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
-        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
-            input_ids == pad_token_id
-        ).numpy().item()
+        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(input_ids == pad_token_id).item()
         is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
             (eos_token_id is not None) and (pad_token_id != eos_token_id)
         )
@@ -344,9 +340,7 @@ class GenerationMixin(object):
 
     @staticmethod
     def prepare_seq_len_for_generation(input_ids, pad_token_id, eos_token_id):
-        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
-            input_ids == pad_token_id
-        ).numpy().item()
+        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(input_ids == pad_token_id).item()
         is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
             (eos_token_id is not None) and (pad_token_id != eos_token_id)
         )
