@@ -11,14 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# import base64
 import json
 import logging
 import os
-
-# import pickle
-# import random
 from io import BytesIO
 from math import ceil
 
@@ -65,14 +60,10 @@ class ArrowDataset(Dataset):
             os.path.join(arrow_path, split + ".arrow")
         ), "The arrow directory {} of {} split does not exist!".format(arrow_path, split)
         arrow_split_path = os.path.join(arrow_path, split + ".arrow")
-        # Open Arrow files
-        # import pdb;pdb.set_trace()
         self.df = pa.ipc.open_file(arrow_split_path).read_pandas()
-        # self.table = [pa.ipc.RecordBatchFileReader(pa.memory_map(f"{arrow_path}/{split}.arrow", "r")).read_all()]
         # Fetch number of pairs and images
         self.number_samples = len(self.df)
         self.number_images = self.number_samples
-        # self.number_images = int(self.txn_imgs.get(key=b"num_images").tobytes().decode("utf-8"))
         logging.info(
             "{} Arrow file contains {} images and {} pairs.".format(split, self.number_images, self.number_samples)
         )
@@ -81,7 +72,6 @@ class ArrowDataset(Dataset):
 
         # The self.dataset_len will be edited to a larger value by calling pad_dataset()
         self.dataset_len = self.number_samples
-        # import pdb;pdb.set_trace()
         self.global_batch_size = 1  # Will be modified to the exact global_batch_size after calling pad_dataset()
 
         self.split = split
@@ -90,7 +80,6 @@ class ArrowDataset(Dataset):
         self.use_augment = use_augment
         self.transform = self._build_transform(resolution)
         self.tokenizer = tokenizer
-        # self.all_texts = self.table[text_column_name].to_pandas().tolist()
 
     def _build_transform(self, resolution):
         if self.split == "train" and self.use_augment:
@@ -127,17 +116,10 @@ class ArrowDataset(Dataset):
         sample_index = index % self.number_samples
         data_raw = self.df.iloc[sample_index, :]
         txt_raw = data_raw["caption"]
-        # #print(txt_raw)
-        # if len(txt_raw)>1:
-        #     txt_raw=random.choice(txt_raw)
-        # else:
-        #     txt_raw=txt_raw
         image_raw = data_raw["image"]
         image_bytes = BytesIO(image_raw)
         image_bytes.seek(0)
         image = Image.open(image_bytes)
-        # image=image_raw.decode(encoding='utf-8',errors='ignore')
-        # image= Image.open(BytesIO(base64.urlsafe_b64decode(image)))  # already resized
         image = self.transform(image)
         texts = self.tokenizer(
             [_preprocess_text(txt_raw)], max_seq_len=self.max_txt_length, truncation=True, padding="max_length"
@@ -237,13 +219,7 @@ class EvalImgDataset(Dataset):
 
         logging.debug(f"Loading image arrow from {arrow_imgs_filename}.")
         self.img_df = pa.ipc.open_file(arrow_imgs_filename).read_pandas()
-        # import pdb;pdb.set_trace()
-        # print(self.img_df)
-        # for i in range(len(self.img_df)):
-        #     if len(self.img_df.iloc[i,:])>1:
-        #         print(self.img_df.iloc[i,:])
         self.number_images = len(self.img_df)
-        # import pdb;pdb.set_trace()
         self.transform = self._build_transform(resolution)
         logging.info("The specified arrow directory contains {} images.".format(self.number_images))
 
@@ -262,7 +238,6 @@ class EvalImgDataset(Dataset):
         return self.number_images
 
     def __getitem__(self, idx):
-        # import pdb;pdb.set_trace()
         img_raw, img_id = self.img_df.iloc[idx]["image"], self.img_df.iloc[idx]["image_id"]
         image_bytes = BytesIO(img_raw)
         image_bytes.seek(0)
