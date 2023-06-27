@@ -662,6 +662,7 @@ class Trainer:
                 # Skip past any already trained steps if resuming training
                 # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
                 # We use consumed_samples to reset the status
+
                 if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
                     train_dataloader.batch_sampler, NlpDistributedBatchSampler
                 ):
@@ -1518,7 +1519,6 @@ class Trainer:
         Return:
             `paddle.Tensor`: The tensor with training loss on this batch.
         """
-        # import pdb; pdb.set_trace()
         if self.args.pipeline_parallel_degree > 1:
             return self.training_pipeline_step(model, inputs)
 
