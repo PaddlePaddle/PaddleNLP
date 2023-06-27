@@ -874,6 +874,8 @@ class LlamaLMHead(nn.Layer):
 
 
 class LlamaForCausalLM(LlamaPretrainedModel):
+    enable_to_static_method = True
+
     def __init__(self, config):
         super().__init__(config)
         self.config = config

@@ -82,7 +82,7 @@ class ModelArgument:
     )
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
     num_prefix_tokens: int = field(default=10, metadata={"help": "Number of prefix tokens"})
-    prefix_projection: bool = field(default=True, metadata={"help": "Whether to project the prefix tokens"})
+    prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
     eval_with_do_generation: bool = field(
         default=True, metadata={"help": "Evaluate with generation, instead for calc loss."}

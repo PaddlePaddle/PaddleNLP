@@ -107,9 +107,7 @@ def train():
             optimizer.clear_grad()
 
             if global_step > 0 and global_step % args.log_steps == 0:
-                print(
-                    f"epoch: {epoch} - global_step: {global_step}/{num_training_steps} - loss:{loss.numpy().item():.6f}"
-                )
+                print(f"epoch: {epoch} - global_step: {global_step}/{num_training_steps} - loss:{loss.item():.6f}")
             if (global_step > 0 and global_step % args.eval_steps == 0) or global_step == num_training_steps:
                 precision, recall, f1 = evaluate(model, dev_loader, metric)
                 model.train()

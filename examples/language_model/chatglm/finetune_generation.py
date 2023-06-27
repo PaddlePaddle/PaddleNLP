@@ -123,16 +123,13 @@ def main():
     if model_args.lora:
         if model_args.lora_all_linear:
             target_modules = [".*query_key_value.*", ".*dense.*"]
-            enable_lora_list = [[True, False, True], None]
         else:
             target_modules = [".*query_key_value.*"]
-            enable_lora_list = [[True, False, True]]
         lora_config = LoRAConfig(
             target_modules=target_modules,
             r=model_args.lora_rank,
             lora_alpha=2 * model_args.lora_rank,
             merge_weights=model_args.merge_weights,
-            enable_lora_list=enable_lora_list,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,
             head_dim=model.config.hidden_size // model.config.num_attention_heads,
