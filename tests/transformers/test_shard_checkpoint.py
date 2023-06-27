@@ -57,6 +57,19 @@ class FakeModel(FakePretrainedModel):
 
 
 class TestFromPretrained(unittest.TestCase):
+    def test_from_pretrained_low_cpu_mem_usage_functional(self):
+        # test that we can use `from_pretrained(..., low_cpu_mem_usage=True)` with normal and
+        # sharded models
+        mnames = [
+            "__internal_testing__/tiny-random-bert-sharded",
+            "__internal_testing__/tiny-random-bert",
+        ]
+        for mname in mnames:
+            m1 = BertModel.from_pretrained(mname, low_cpu_mem_usage=True)
+            m2 = BertModel.from_pretrained(mname, low_cpu_mem_usage=False)
+            for p1, p2 in zip(m1.parameters(), m2.parameters()):
+                self.assertTrue(paddle.allclose(p1, p2))
+
     @unittest.skipIf(not is_paddle_cuda_available(), "some op is missing in cpu mode")
     def test_keep_in_fp32_modules(self):
         with tempfile.TemporaryDirectory() as tempdir:
@@ -72,7 +85,6 @@ class TestFromPretrained(unittest.TestCase):
             self.assertEqual(state_dict["norm.weight"].dtype, paddle.float16)
 
             new_model = FakeModel.from_pretrained(tempdir)
-
             self.assertEqual(new_model.linear.weight.dtype, paddle.float16)
             self.assertEqual(new_model.norm.weight.dtype, paddle.float32)
 

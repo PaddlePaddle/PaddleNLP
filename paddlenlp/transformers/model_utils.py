@@ -328,9 +328,7 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike], tensor_parallel_sp
             logger.warning("copy paddle tensor done.")
             return state_dict
 
-    logger.warning("loading pd.")
     state_dict = paddlenlp_load(checkpoint_file, map_location="cpu")
-    logger.warning("loading done.")
     return state_dict
 
 
@@ -701,8 +699,9 @@ def _load_state_dict_into_meta_model(
     `bert.pooler.dense.weight`
 
     """
-    # _convert_state_dict_dtype_and_shape(state_dict, model)
+    from paddle.fluid.framework import convert_np_dtype_to_dtype_
 
+    dtype = convert_np_dtype_to_dtype_(dtype)
     error_msgs = []
 
     for param_name, param in state_dict.items():
@@ -721,9 +720,9 @@ def _load_state_dict_into_meta_model(
                 and any(module_to_keep_in_fp32 in param_name for module_to_keep_in_fp32 in keep_in_fp32_modules)
                 and dtype == paddle.float16
             ):
-                param = param.to(dtype=paddle.float32)
+                param = param.astype(dtype=paddle.float32)
             else:
-                param = param.to(dtype=dtype)
+                param = param.astype(dtype=dtype)
 
         if dtype is None:
             old_param = model
@@ -1615,7 +1614,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     remove_prefix_from_model,
                     ignore_mismatched_sizes,
                 )
-                logger.warning("set state dict to model")
 
                 if config.tensor_parallel_degree > 1 and ".tp" not in shard_file and not pre_tensor_parallel_split:
                     logger.info("convert tp")
@@ -1640,7 +1638,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 else:
                     error_msgs += _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
 
-                logger.warning("done, set state dict to model")
                 # force memory release
                 del state_dict
                 gc.collect()
@@ -1849,15 +1846,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
             else:
                 # 4. loading non-sharded ckpt from the state dict
-                if not low_cpu_mem_usage:
-                    if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
-                        state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
-                    else:
-                        state_dict = load_state_dict(resolved_archive_file)
-
-                    logger.info("loaded weights file from disk, setting weights to model.")
+                if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
+                    state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
                 else:
-                    state_dict = None
+                    state_dict = load_state_dict(resolved_archive_file)
+
+                logger.info("loaded weights file from disk, setting weights to model.")
 
         # Check if `_keep_in_fp32_modules` is not None
         use_keep_in_fp32_modules = (cls._keep_in_fp32_modules is not None) and dtype == "float16"
