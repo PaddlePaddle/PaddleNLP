@@ -94,6 +94,9 @@ class ModelArguments:
     lora_rank: int = field(default=8, metadata={"help": "Lora rank"})
     lora_alpha: int = field(default=16, metadata={"help": "Lora alpha"})
     qat: bool = field(default=False, metadata={"help": "Whether to use QAT technique"})
+    qat_bit_length: int = field(
+        default=8, metadata={"help": "Number of bits to represent an quantized integer in binary"}
+    )
 
 
 def convert_example(example, tokenizer, label_list, max_seq_length=512, is_test=False):
@@ -217,13 +220,17 @@ def main():
         q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
         q_config.add_type_config(
             LoRALinear,
-            weight=FakeQuanterChannelWiseAbsMaxObserver(),
-            activation=FakeQuanterWithAbsMaxObserver(moving_rate=0.9),
+            weight=FakeQuanterChannelWiseAbsMaxObserver(bit_length=model_args.qat_bit_length, dtype=dtype),
+            activation=FakeQuanterWithAbsMaxObserver(
+                moving_rate=0.9, bit_length=model_args.qat_bit_length, dtype=dtype
+            ),
         )
         q_config.add_type_config(
             nn.Linear,
-            weight=FakeQuanterChannelWiseAbsMaxObserver(),
-            activation=FakeQuanterWithAbsMaxObserver(moving_rate=0.9),
+            weight=FakeQuanterChannelWiseAbsMaxObserver(bit_length=model_args.qat_bit_length, dtype=dtype),
+            activation=FakeQuanterWithAbsMaxObserver(
+                moving_rate=0.9, bit_length=model_args.qat_bit_length, dtype=dtype
+            ),
         )
         qat = QAT(q_config)
         model = qat.quantize(model, inplace=True)
