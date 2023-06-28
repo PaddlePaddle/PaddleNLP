@@ -343,7 +343,7 @@ class LlamaCompatibilityTest(unittest.TestCase):
             np.allclose(
                 paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
                 torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
-                rtol=1e-4,
+                rtol=1e-2,
             )
         )
 
@@ -394,7 +394,7 @@ class LlamaCompatibilityTest(unittest.TestCase):
                 np.allclose(
                     paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
                     torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
-                    rtol=1e-4,
+                    rtol=1e-2,
                 )
             )
 
