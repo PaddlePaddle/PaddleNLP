@@ -112,7 +112,7 @@ python infer.py ./control_sd15_canny --scheduler "euler-ancestral" --backend pad
 
 #### 参数说明
 
-`controlnet_infer.py` 除了以上示例的命令行参数，还支持更多命令行参数的设置。展开可查看各命令行参数的说明。
+`infer.py` 除了以上示例的命令行参数，还支持更多命令行参数的设置。展开可查看各命令行参数的说明。
 
 | 参数 |参数说明 |
 |----------|--------------|
@@ -122,7 +122,7 @@ python infer.py ./control_sd15_canny --scheduler "euler-ancestral" --backend pad
 | --device_id | `gpu` 设备的 id。若 `device_id` 为`-1`，视为使用 `cpu` 推理。 |
 | --inference_steps | `UNet` 模型运行的次数，默认为 `50`。 |
 | --benchmark_steps | `Benchmark` 运行的次数，默认为 `1`。 |
-| --use_fp16 | 是否使用 `fp16` 精度。默认为 `False`。使用 `paddle_tensorrt` 后端时可以设为 `True` 开启。 |
+| --use_fp16 | 是否使用 `fp16` 精度。默认为 `False`。使用 `paddle_tensorrt` 后端及 `kunlunxin_xpu` 设备时可以设为 `True` 开启。 |
 | --task_name | 任务类型，默认为`text2img`，可选列表：`['text2img_control', 'img2img_control', 'inpaint_legacy_control', 'hiresfix_control', 'all']`。|
 | --scheduler | 采样器类型。默认为 `'preconfig-euler-ancestral'`。可选列表：`['pndm', 'lms', 'preconfig-lms', 'euler', 'euler-ancestral', 'preconfig-euler-ancestral', 'dpm-multi', 'dpm-single', 'unipc-multi', 'ddim', 'ddpm', 'deis-multi', 'heun', 'kdpm2-ancestral', 'kdpm2']`。|
 | --infer_op | 推理所采用的op，可选列表 `['zero_copy_infer', 'raw', 'all']`，`zero_copy_infer`推理速度更快，默认值为`zero_copy_infer`。 |

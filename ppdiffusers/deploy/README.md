@@ -174,7 +174,7 @@ python infer.py --model_dir stable-diffusion-v1-5-inpainting/ --scheduler euler-
 | --device_id | `gpu` 设备的 id。若 `device_id` 为`-1`，视为使用 `cpu` 推理。 |
 | --inference_steps | `UNet` 模型运行的次数，默认为 `50`。 |
 | --benchmark_steps | `Benchmark` 运行的次数，默认为 `1`。 |
-| --use_fp16 | 是否使用 `fp16` 精度。默认为 `False`。使用 `paddle_tensorrt` 后端时可以设为 `True` 开启。 |
+| --use_fp16 | 是否使用 `fp16` 精度。默认为 `False`。使用 `paddle_tensorrt` 后端及 `kunlunxin_xpu` 设备时可以设为 `True` 开启。 |
 | --task_name | 任务类型，默认为`text2img`，可选列表：`['text2img', 'img2img', 'inpaint', 'inpaint_legacy', 'cycle_diffusion', 'hiresfix', 'all']`。 注意，当`task_name`为`inpaint`时候，我们需要配合`runwayml/stable-diffusion-inpainting@fastdeploy`权重才能正常使用。|
 | --scheduler | 采样器类型。默认为 `'preconfig-euler-ancestral'`。可选列表：`['pndm', 'lms', 'preconfig-lms', 'euler', 'euler-ancestral', 'preconfig-euler-ancestral', 'dpm-multi', 'dpm-single', 'unipc-multi', 'ddim', 'ddpm', 'deis-multi', 'heun', 'kdpm2-ancestral', 'kdpm2']`。|
 | --infer_op | 推理所采用的op，可选列表 `['zero_copy_infer', 'raw', 'all']`，`zero_copy_infer`推理速度更快，默认值为`zero_copy_infer`。 |
