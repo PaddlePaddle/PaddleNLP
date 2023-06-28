@@ -15,7 +15,7 @@
 # limitations under the License.
 
 """
-This script serializes images and image-text pair annotations into LMDB files,
+This script serializes images and image-text pair annotations into arrow files,
 which supports more convenient dataset loading and random access to samples during training
 compared with TSV and Jsonl data files.
 """
@@ -77,9 +77,7 @@ parser.add_argument(
     default=None,
     help="specify the directory which stores the output arrow files. If set to None, the arrow_dir will be set to args.data_dir/arrow",
 )
-parser.add_argument(
-    "--t2i_type", type=str, default="jsonl", help="the type of text2photo filename"
-)
+parser.add_argument("--t2i_type", type=str, default="jsonl", help="the type of text2photo filename")
 parser.add_argument(
     "--image_dir",
     type=str,
@@ -89,9 +87,7 @@ parser.add_argument(
 args = parser.parse_args()
 # yapf: enable
 if __name__ == "__main__":
-    assert os.path.isdir(
-        args.data_dir
-    ), "The data_dir does not exist! Please check the input args..."
+    assert os.path.isdir(args.data_dir), "The data_dir does not exist! Please check the input args..."
     specified_splits = list(set(args.splits.strip().split(",")))  # train test dev
     specified_type = args.t2i_type
     print("Dataset splits to be processed: {}".format(", ".join(specified_splits)))
@@ -100,9 +96,7 @@ if __name__ == "__main__":
         iid2captions = dict()
         iid2photo = defaultdict(list)
         image_dir = args.image_dir
-        assert os.path.isdir(
-            image_dir
-        ), "The image_dir does not exist! Please check the input args..."
+        assert os.path.isdir(image_dir), "The image_dir does not exist! Please check the input args..."
         if specified_type == "jsonl" or specified_type == "json":
             txt_path = datasplit_path + "_texts.jsonl"
             assert os.path.exists(txt_path) is True
@@ -138,20 +132,11 @@ if __name__ == "__main__":
         )
         random.shuffle(paths)
         if type(list(iid2photo.keys())[0]) == int:
-            caption_paths = [
-                path for path in paths if int(path.split("/")[-1][:-4]) in iid2photo
-            ]  # 有效图片路径
-        elif (
-            type(list(iid2photo.keys())[0]) == str
-            and "." not in list(iid2photo.keys())[0]
-        ):
-            caption_paths = [
-                path for path in paths if path.split("/")[-1][:-4] in iid2photo
-            ]  # 有效图片路径
+            caption_paths = [path for path in paths if int(path.split("/")[-1][:-4]) in iid2photo]  # 有效图片路径
+        elif type(list(iid2photo.keys())[0]) == str and "." not in list(iid2photo.keys())[0]:
+            caption_paths = [path for path in paths if path.split("/")[-1][:-4] in iid2photo]  # 有效图片路径
         else:
-            caption_paths = [
-                path for path in paths if path.split("/")[-1] in iid2photo
-            ]  # 有效图片路径
+            caption_paths = [path for path in paths if path.split("/")[-1] in iid2photo]  # 有效图片路径
         bs = []
         for path in tqdm(caption_paths):
             bs += path2rest(path, iid2captions, iid2photo)

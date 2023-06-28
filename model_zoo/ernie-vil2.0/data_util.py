@@ -103,12 +103,6 @@ class ArrowDataset(Dataset):
             )
         return transform
 
-    # def __del__(self):
-    #     if hasattr(self, "env_pairs"):
-    #         self.env_pairs.close()
-    #     if hasattr(self, "env_imgs"):
-    #         self.env_imgs.close()
-
     def __len__(self):
         return self.dataset_len
 

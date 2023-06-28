@@ -129,7 +129,7 @@ Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
 
 本项目使用了 [Flickr30k-CN](https://paddlenlp.bj.bcebos.com/datasets/Flickr30k-CN.tar.gz) 中文场景下的图文数据集。
 
-### 为了训练的时候方便随机读取，我们将tsv和图片数据序列化，转换为arrow文件。
+为了训练的时候方便随机读取，我们将tsv和图片数据序列化，转换为arrow文件。
 ###
 
 ```shell

@@ -64,7 +64,6 @@ def main():
                 for batch in tqdm(text_loader):
                     text_ids, texts = batch["text_id"], batch["input_ids"]
                     text_features = model.get_text_features(texts)
-                    # print(text_features.shape)
                     text_features /= text_features.norm(axis=-1, keepdim=True)
                     for text_id, text_feature in zip(text_ids.tolist(), text_features.tolist()):
                         fout.write("{}\n".format(json.dumps({"text_id": text_id, "feature": text_feature})))
@@ -84,7 +83,6 @@ def main():
             model.eval()
             with paddle.no_grad():
                 for batch in tqdm(image_loader):
-                    # import pdb;pdb.set_trace()
                     image_ids, images = batch
                     image_features = model.get_image_features(pixel_values=images)
                     image_features /= image_features.norm(axis=-1, keepdim=True)
