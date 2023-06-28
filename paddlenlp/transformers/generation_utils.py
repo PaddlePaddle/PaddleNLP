@@ -1600,7 +1600,7 @@ class MinLengthLogitsProcessor(LogitsProcessor):
     """
 
     def __init__(self, min_length, eos_token_id):
-        if min_length < 0:
+        if min_length < 0 and not in_declarative_mode():
             raise ValueError("`min_length` should be a positive integer, but get {}".format(min_length))
 
         if not isinstance(eos_token_id, int) or eos_token_id < 0:
@@ -1627,7 +1627,7 @@ class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
     """
 
     def __init__(self, penalty: float):
-        if not (penalty > 0):
+        if not (penalty > 0) and not in_declarative_mode():
             raise ValueError(f"`penalty` has to be a strictly positive float, but is {penalty}")
 
         self.penalty = penalty
