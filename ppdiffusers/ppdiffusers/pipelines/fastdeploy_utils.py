@@ -93,6 +93,20 @@ logger = logging.get_logger(__name__)
 
 
 class FastDeployDiffusionPipelineMixin:
+    def prepare_infer_op_dict(self, infer_op_dict=None):
+        if infer_op_dict is None:
+            infer_op_dict = {}
+        new_infer_op_dict = {}
+        for name in dir(self):
+            if name.startswith("__"):
+                continue
+            module = getattr(self, name)
+            if isinstance(module, FastDeployRuntimeModel):
+                new_infer_op_dict[name] = (
+                    infer_op_dict.get(name, "zero_copy_infer") if module.is_spport_zero_copy() else "raw"
+                )
+        return new_infer_op_dict
+
     def post_init(self, vae_scaling_factor=0.18215, vae_scale_factor=8, dtype="float32"):
         self.vae_scaling_factor = vae_scaling_factor
         self.vae_scale_factor = vae_scale_factor
@@ -140,6 +154,12 @@ class FastDeployDiffusionPipelineMixin:
     @property
     def unet_hidden_states_dim(self):
         return self.unet.model.get_input_info(2).shape[2]
+
+    @property
+    def text_encoder_hidden_states_dim(self):
+        if self.text_encoder is None:
+            return 768
+        return self.text_encoder.model.get_output_info(0).shape[2]
 
     def change_scheduler(self, scheduler_type="ddim"):
         scheduler_type = scheduler_type.lower()
@@ -307,6 +327,7 @@ class FastDeployDiffusionPipelineMixin:
         is_strength_max=True,
         return_noise=False,
         return_image_latents=False,
+        infer_op=None,
     ):
         shape = [
             batch_size,
@@ -328,7 +349,7 @@ class FastDeployDiffusionPipelineMixin:
 
         if return_image_latents or (latents is None and not is_strength_max):
             image = image.cast(dtype=self.dtype)
-            image_latents = self._encode_vae_image(image)
+            image_latents = self._encode_vae_image(image, infer_op)
 
         if latents is None:
             noise = randn_tensor(shape, generator=generator, dtype=self.dtype)
@@ -363,6 +384,7 @@ class FastDeployDiffusionPipelineMixin:
         width,
         do_classifier_free_guidance,
         return_masked_image_latents=True,
+        infer_op=None,
     ):
         # resize the mask to latents shape as we concatenate the mask to the latents
         # we do that before converting to dtype to avoid breaking in case we're using cpu_offload
@@ -387,7 +409,7 @@ class FastDeployDiffusionPipelineMixin:
             return mask
 
         masked_image = masked_image.cast(dtype=self.dtype)
-        masked_image_latents = self._encode_vae_image(masked_image)
+        masked_image_latents = self._encode_vae_image(masked_image, infer_op)
         if masked_image_latents.shape[0] < batch_size:
             if not batch_size % masked_image_latents.shape[0] == 0:
                 raise ValueError(
@@ -409,49 +431,35 @@ class FastDeployDiffusionPipelineMixin:
         kwargs_keys = set(inspect.signature(self.scheduler.step).parameters.keys())
         return "kwargs" in kwargs_keys or "step_index" in kwargs_keys
 
-    def _encode_vae_image(self, image: paddle.Tensor, **kwargs):
+    def _encode_vae_image(self, image: paddle.Tensor, infer_op=None, **kwargs):
         image_shape = image.shape
-        image_latents = paddle.zeros(
-            [
-                image_shape[0],
-                self.vae_decoder_num_latent_channels,
-                image_shape[2] // self.vae_scale_factor,
-                image_shape[3] // self.vae_scale_factor,
-            ],
-            dtype=self.dtype,
-        )
-        vae_input_name = self.vae_encoder.model.get_input_info(0).name
-        vae_output_name = self.vae_encoder.model.get_output_info(0).name
+        output_shape = [
+            image_shape[0],
+            self.vae_decoder_num_latent_channels,
+            image_shape[2] // self.vae_scale_factor,
+            image_shape[3] // self.vae_scale_factor,
+        ]
+        image_latents = self.vae_encoder(
+            sample=image,
+            infer_op=infer_op,
+            output_shape=output_shape,
+        )[0]
 
-        self.vae_encoder.zero_copy_infer(
-            prebinded_inputs={vae_input_name: image},
-            prebinded_outputs={vae_output_name: image_latents},
-            share_with_raw_ptr=True,
-        )
-        image_latents = self.vae_scaling_factor * image_latents
+        return self.vae_scaling_factor * image_latents
 
-        return image_latents
-
-    def _decode_vae_latents(self, latents: paddle.Tensor):
+    def _decode_vae_latents(self, latents: paddle.Tensor, infer_op=None, **kwargs):
         latents_shape = latents.shape
-        images_vae = paddle.zeros(
-            [
-                latents_shape[0],
-                self.vae_encoder_num_channels,
-                latents_shape[2] * self.vae_scale_factor,
-                latents_shape[3] * self.vae_scale_factor,
-            ],
-            dtype=self.dtype,
-        )
-
-        vae_input_name = self.vae_decoder.model.get_input_info(0).name
-        vae_output_name = self.vae_decoder.model.get_output_info(0).name
-
-        self.vae_decoder.zero_copy_infer(
-            prebinded_inputs={vae_input_name: latents},
-            prebinded_outputs={vae_output_name: images_vae},
-            share_with_raw_ptr=True,
-        )
+        output_shape = [
+            latents_shape[0],
+            self.vae_encoder_num_channels,
+            latents_shape[2] * self.vae_scale_factor,
+            latents_shape[3] * self.vae_scale_factor,
+        ]
+        images_vae = self.vae_decoder(
+            latent_sample=latents,
+            infer_op=infer_op,
+            output_shape=output_shape,
+        )[0]
 
         return images_vae
 
@@ -463,6 +471,7 @@ class FastDeployDiffusionPipelineMixin:
         negative_prompt=None,
         prompt_embeds: Optional[paddle.Tensor] = None,
         negative_prompt_embeds: Optional[paddle.Tensor] = None,
+        infer_op=None,
     ):
         r"""
         Encodes the prompt into text encoder hidden states.
@@ -500,13 +509,13 @@ class FastDeployDiffusionPipelineMixin:
                 padding="max_length",
                 max_length=self.tokenizer.model_max_length,
                 truncation=True,
-                return_tensors="np",
+                return_tensors="pd",
             )
 
             text_input_ids = text_inputs.input_ids
-            untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="np").input_ids  # check
+            untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="pd").input_ids  # check
 
-            if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not np.array_equal(
+            if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not paddle.equal_all(
                 text_input_ids, untruncated_ids
             ):
                 removed_text = self.tokenizer.batch_decode(
@@ -517,8 +526,15 @@ class FastDeployDiffusionPipelineMixin:
                     f" {self.tokenizer.model_max_length} tokens: {removed_text}"
                 )
 
-            prompt_embeds = self.text_encoder(input_ids=text_input_ids.astype(np.int64))[0]
-            prompt_embeds = paddle.to_tensor(prompt_embeds, dtype=self.dtype)
+            prompt_embeds = self.text_encoder(
+                input_ids=text_input_ids,
+                infer_op=infer_op,
+                output_shape=[
+                    batch_size,
+                    self.tokenizer.model_max_length,
+                    self.text_encoder_hidden_states_dim,
+                ],
+            )[0]
 
         bs_embed, seq_len, _ = prompt_embeds.shape
         # duplicate text embeddings for each generation per prompt, using mps friendly method
@@ -551,12 +567,17 @@ class FastDeployDiffusionPipelineMixin:
                 padding="max_length",
                 max_length=max_length,
                 truncation=True,
-                return_tensors="np",
+                return_tensors="pd",
             )
             negative_prompt_embeds = self.text_encoder(
-                input_ids=uncond_input.input_ids.astype(np.int64),
+                input_ids=uncond_input.input_ids,
+                infer_op=infer_op,
+                output_shape=[
+                    batch_size,
+                    max_length,
+                    self.text_encoder_hidden_states_dim,
+                ],
             )[0]
-            negative_prompt_embeds = paddle.to_tensor(negative_prompt_embeds, dtype=self.dtype)
 
         if do_classifier_free_guidance:
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
@@ -581,7 +602,9 @@ class FastDeployDiffusionPipelineMixin:
                 feature_extractor_input = self.image_processor.numpy_to_pil(image)
             safety_checker_input = self.feature_extractor(feature_extractor_input, return_tensors="np")
             image, has_nsfw_concept = self.safety_checker(
-                images=image.numpy(), clip_input=safety_checker_input.pixel_values.astype(self.dtype)
+                images=image.numpy(),
+                clip_input=safety_checker_input.pixel_values.astype(self.dtype),
+                infer_op="raw",
             )
             image = paddle.to_tensor(image, dtype=self.dtype)
         return image, has_nsfw_concept
@@ -625,6 +648,15 @@ class FastDeployRuntimeModel:
             self.latest_params_name = None
             self.model_format = ModelFormat.ONNX
 
+    def is_spport_zero_copy(self):
+        if self.model.runtime_option._option.backend == fd.Backend.PDINFER:
+            return self.model.runtime_option._option.paddle_infer_option.enable_trt
+        # currently we donot spport zero copy model with fd.Backend.LITE.
+        elif self.model.runtime_option._option.backend == fd.Backend.LITE:
+            return False
+        else:
+            return False
+
     def zero_copy_infer(self, prebinded_inputs: dict, prebinded_outputs: dict, share_with_raw_ptr=True, **kwargs):
         """
         Execute inference without copying data from cpu to gpu.
@@ -646,8 +678,38 @@ class FastDeployRuntimeModel:
         self.model.zero_copy_infer()
 
     def __call__(self, **kwargs):
-        inputs = {k: np.array(v) for k, v in kwargs.items()}
-        return self.model.infer(inputs)
+        infer_op = kwargs.pop("infer_op", None)
+        if infer_op is None:
+            infer_op = "raw"
+        # for zero_copy_infer
+        share_with_raw_ptr = kwargs.pop("share_with_raw_ptr", True)
+        output_shape = kwargs.pop("output_shape", None)
+
+        inputs = {}
+        for k, v in kwargs.items():
+            if k == "timestep":
+                v = v.astype("float32")
+            inputs[k] = v
+
+        if infer_op == "zero_copy_infer":
+            output = paddle.zeros(output_shape, dtype="float32")
+            self.zero_copy_infer(
+                prebinded_inputs=inputs,
+                prebinded_outputs={self.model.get_output_info(0).name: output},
+                share_with_raw_ptr=share_with_raw_ptr,
+            )
+            return [
+                output,
+            ]
+        elif infer_op == "raw":
+            inputs = {}
+            for k, v in kwargs.items():
+                if paddle.is_tensor(v):
+                    v = v.numpy()
+                inputs[k] = np.array(v)
+            return [paddle.to_tensor(output) for output in self.model.infer(inputs)]
+        else:
+            raise ValueError("Unknown infer_op {}".format(infer_op))
 
     @staticmethod
     def load_model(

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import inspect
-from typing import Callable, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 import paddle
 import PIL.Image
@@ -87,6 +87,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         callback_steps: Optional[int] = 1,
         controlnet_cond: Union[paddle.Tensor, PIL.Image.Image] = None,
         controlnet_conditioning_scale: float = 1.0,
+        infer_op_dict: Dict[str, str] = None,
     ):
 
         expected_components = inspect.signature(FastDeployStableDiffusionPipeline.__init__).parameters.keys()
@@ -112,6 +113,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             callback_steps=callback_steps,
             controlnet_cond=controlnet_cond,
             controlnet_conditioning_scale=controlnet_conditioning_scale,
+            infer_op_dict=infer_op_dict,
         )
         return output
 
@@ -135,6 +137,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         callback_steps: Optional[int] = 1,
         controlnet_cond: Union[paddle.Tensor, PIL.Image.Image] = None,
         controlnet_conditioning_scale: float = 1.0,
+        infer_op_dict: Dict[str, str] = None,
     ):
         expected_components = inspect.signature(FastDeployStableDiffusionImg2ImgPipeline.__init__).parameters.keys()
         components = {name: component for name, component in self.components.items() if name in expected_components}
@@ -161,6 +164,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             callback_steps=callback_steps,
             controlnet_cond=controlnet_cond,
             controlnet_conditioning_scale=controlnet_conditioning_scale,
+            infer_op_dict=infer_op_dict,
         )
 
         return output
@@ -186,6 +190,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         callback_steps: Optional[int] = 1,
         controlnet_cond: Union[paddle.Tensor, PIL.Image.Image] = None,
         controlnet_conditioning_scale: float = 1.0,
+        infer_op_dict: Dict[str, str] = None,
     ):
         assert (
             self.unet_num_latent_channels == 4
@@ -218,6 +223,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             callback_steps=callback_steps,
             controlnet_cond=controlnet_cond,
             controlnet_conditioning_scale=controlnet_conditioning_scale,
+            infer_op_dict=infer_op_dict,
         )
 
         return output
@@ -243,6 +249,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         callback_steps: Optional[int] = 1,
         controlnet_cond: Union[paddle.Tensor, PIL.Image.Image] = None,
         controlnet_conditioning_scale: float = 1.0,
+        infer_op_dict: Dict[str, str] = None,
     ):
         assert self.unet_num_latent_channels in [4, 9]
         expected_components = inspect.signature(FastDeployStableDiffusionInpaintPipeline.__init__).parameters.keys()
@@ -271,6 +278,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             callback_steps=callback_steps,
             controlnet_cond=controlnet_cond,
             controlnet_conditioning_scale=controlnet_conditioning_scale,
+            infer_op_dict=infer_op_dict,
         )
 
         return output
@@ -297,6 +305,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
+        infer_op_dict: Dict[str, str] = None,
     ):
         expected_components = inspect.signature(FastDeployCycleDiffusionPipeline.__init__).parameters.keys()
         components = {name: component for name, component in self.components.items() if name in expected_components}
@@ -325,6 +334,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             return_dict=return_dict,
             callback=callback,
             callback_steps=callback_steps,
+            infer_op_dict=infer_op_dict,
         )
 
         return output
