@@ -49,7 +49,7 @@ from paddlenlp.transformers.model_utils import PretrainedModel, register_base_mo
 from .configuration import LlamaConfig
 
 LLAMA_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "__internal__testing/tiny-random-llama",
+    "__internal_testing__/tiny-random-llama",
     "facebook/llama-7b",
     "facebook/llama-13b",
 ]

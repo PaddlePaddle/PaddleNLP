@@ -1127,8 +1127,8 @@ class GenerationD2STest(unittest.TestCase):
     def test_to_static_use_top_k(self):
         article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
 
-        tokenizer = AutoTokenizer.from_pretrained("facebook/tiny-random-llama")
-        model = AutoModelForCausalLM.from_pretrained("facebook/tiny-random-llama")
+        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/micro-random-llama")
+        model = AutoModelForCausalLM.from_pretrained("__internal_testing__/micro-random-llama")
         input_ids = paddle.to_tensor(tokenizer(article)["input_ids"]).unsqueeze([0])
 
         model.eval()
@@ -1203,8 +1203,8 @@ class GenerationD2STest(unittest.TestCase):
     def test_to_static_use_top_p(self):
         article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
 
-        tokenizer = AutoTokenizer.from_pretrained("facebook/tiny-random-llama")
-        model = AutoModelForCausalLM.from_pretrained("facebook/tiny-random-llama")
+        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/micro-random-llama")
+        model = AutoModelForCausalLM.from_pretrained("__internal_testing__/micro-random-llama")
         input_ids = paddle.to_tensor(tokenizer(article)["input_ids"]).unsqueeze([0])
 
         model.eval()

@@ -260,7 +260,7 @@ class LlamaModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
 
     @slow
     def test_inference_no_attention(self):
-        model = LlamaModel.from_pretrained("__internal__testing/tiny-random-llama")
+        model = LlamaModel.from_pretrained("__internal_testing__/tiny-random-llama")
         model.eval()
         input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
@@ -283,7 +283,7 @@ class LlamaModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
 
     @slow
     def test_inference_with_attention(self):
-        model = LlamaModel.from_pretrained("__internal__testing/tiny-random-llama")
+        model = LlamaModel.from_pretrained("__internal_testing__/tiny-random-llama")
         model.eval()
         input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])

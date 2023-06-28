@@ -31,8 +31,8 @@ class LlamaTokenizer(PretrainedTokenizer):
     }
     pretrained_resource_files_map = {
         "vocab_file": {
-            "__internal__testing/micro-random-llama": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/sentencepiece.bpe.model",
-            "__internal__testing/tiny-random-llama": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/sentencepiece.bpe.model",
+            "__internal_testing__/micro-random-llama": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/sentencepiece.bpe.model",
+            "__internal_testing__/tiny-random-llama": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/sentencepiece.bpe.model",
             "facebook/llama-7b": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/sentencepiece.bpe.model",
             "facebook/llama-13b": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/sentencepiece.bpe.model",
             "facebook/llama-30b": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/sentencepiece.bpe.model",
@@ -41,8 +41,8 @@ class LlamaTokenizer(PretrainedTokenizer):
     }
 
     pretrained_init_configuration = {
-        "__internal__testing/micro-random-llama": {},
-        "__internal__testing/tiny-random-llama": {},
+        "__internal_testing__/micro-random-llama": {},
+        "__internal_testing__/tiny-random-llama": {},
         "facebook/llama-7b": {},
         "facebook/llama-13b": {},
         "facebook/llama-30b": {},
