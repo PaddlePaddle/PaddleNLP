@@ -13,12 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-#param:
-#docker imagename= registry.baidubce.com/paddlepaddle/paddle_manylinux_devel:cuda10.2-cudnn7
-#paddle= develop_0.0.0
-#paddlenlp= nlp1_install\nlp2_build
-#python= 37
 ####################################
 export python=$1
 export paddle=$2
@@ -29,8 +23,6 @@ mkdir /workspace/PaddleNLP/unittest_logs
 mkdir /workspace/PaddleNLP/coverage_logs
 mkdir /workspace/PaddleNLP/upload
 export log_path=/workspace/PaddleNLP/model_logs
-export LD_LIBRARY_PATH=/opt/_internal/cpython-3.7.0/lib/:${LD_LIBRARY_PATH}
-export PATH=/opt/_internal/cpython-3.7.0/bin/:${PATH}
 export P0case_list=()
 export APIcase_list=()
 declare -A Normal_dic
