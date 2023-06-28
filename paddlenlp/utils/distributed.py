@@ -223,7 +223,10 @@ def dist_gather(tensor, gather_list=None, dst=0, group=None, async_op=False):
     rank = distributed.get_rank(group=group)
     nranks = distributed.get_world_size(group=group)
     task_list = []
-    with _with_batch_p2p_guard("NCCL"):
+    backend = "NCCL"
+    if paddle.get_device().split(":")[0] == "npu":
+        backend = "HCCL"
+    with _with_batch_p2p_guard(backend):
         if rank == dst:
             for src in range(nranks):
                 wait = paddle.distributed.communication.stream.recv(

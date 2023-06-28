@@ -14,18 +14,18 @@
 # limitations under the License.
 
 import gc
+import os
 import tempfile
 import unittest
 
 import paddle
 import paddle.nn as nn
 from parameterized import parameterized
-from ppdiffusers_test.test_modeling_common import ModelTesterMixin
 
 from ppdiffusers import UNet2DConditionModel
-from ppdiffusers.models.cross_attention import (
-    CrossAttnProcessor,
-    LoRACrossAttnProcessor,
+from ppdiffusers.models.attention_processor import (
+    CustomDiffusionAttnProcessor,
+    LoRAAttnProcessor,
 )
 from ppdiffusers.utils import (
     floats_tensor,
@@ -37,10 +37,12 @@ from ppdiffusers.utils import (
 )
 from ppdiffusers.utils.import_utils import is_ppxformers_available
 
+from .test_modeling_common import ModelTesterMixin
+
 logger = logging.get_logger(__name__)
 
 
-def create_lora_layers(model):
+def create_lora_layers(model, mock_weights: bool = True):
     lora_attn_procs = {}
     for name in model.attn_processors.keys():
         cross_attention_dim = None if name.endswith("attn1.processor") else model.config.cross_attention_dim
@@ -52,16 +54,67 @@ def create_lora_layers(model):
         elif name.startswith("down_blocks"):
             block_id = int(name[len("down_blocks.")])
             hidden_size = model.config.block_out_channels[block_id]
-        lora_attn_procs[name] = LoRACrossAttnProcessor(
-            hidden_size=hidden_size, cross_attention_dim=cross_attention_dim
-        )
-        lora_attn_procs[name] = lora_attn_procs[name]
-        with paddle.no_grad():
-            lora_attn_procs[name].to_q_lora.up.weight.set_value(lora_attn_procs[name].to_q_lora.up.weight + 1)
-            lora_attn_procs[name].to_k_lora.up.weight.set_value(lora_attn_procs[name].to_k_lora.up.weight + 1)
-            lora_attn_procs[name].to_v_lora.up.weight.set_value(lora_attn_procs[name].to_v_lora.up.weight + 1)
-            lora_attn_procs[name].to_out_lora.up.weight.set_value(lora_attn_procs[name].to_out_lora.up.weight + 1)
+        lora_attn_procs[name] = LoRAAttnProcessor(hidden_size=hidden_size, cross_attention_dim=cross_attention_dim)
+        if mock_weights:
+            with paddle.no_grad():
+                lora_attn_procs[name].to_q_lora.up.weight.set_value(lora_attn_procs[name].to_q_lora.up.weight + 1)
+                lora_attn_procs[name].to_k_lora.up.weight.set_value(lora_attn_procs[name].to_k_lora.up.weight + 1)
+                lora_attn_procs[name].to_v_lora.up.weight.set_value(lora_attn_procs[name].to_v_lora.up.weight + 1)
+                lora_attn_procs[name].to_out_lora.up.weight.set_value(lora_attn_procs[name].to_out_lora.up.weight + 1)
     return lora_attn_procs
+
+
+def create_custom_ppdiffusion_layers(model, mock_weights: bool = True):
+    train_kv = True
+    train_q_out = True
+    custom_diffusion_attn_procs = {}
+
+    st = model.state_dict()
+    for name, _ in model.attn_processors.items():
+        cross_attention_dim = None if name.endswith("attn1.processor") else model.config.cross_attention_dim
+        if name.startswith("mid_block"):
+            hidden_size = model.config.block_out_channels[-1]
+        elif name.startswith("up_blocks"):
+            block_id = int(name[len("up_blocks.")])
+            hidden_size = list(reversed(model.config.block_out_channels))[block_id]
+        elif name.startswith("down_blocks"):
+            block_id = int(name[len("down_blocks.")])
+            hidden_size = model.config.block_out_channels[block_id]
+        layer_name = name.split(".processor")[0]
+        weights = {
+            "to_k_custom_diffusion.weight": st[layer_name + ".to_k.weight"],
+            "to_v_custom_diffusion.weight": st[layer_name + ".to_v.weight"],
+        }
+        if train_q_out:
+            weights["to_q_custom_diffusion.weight"] = st[layer_name + ".to_q.weight"]
+            weights["to_out_custom_diffusion.0.weight"] = st[layer_name + ".to_out.0.weight"]
+            weights["to_out_custom_diffusion.0.bias"] = st[layer_name + ".to_out.0.bias"]
+        if cross_attention_dim is not None:
+            custom_diffusion_attn_procs[name] = CustomDiffusionAttnProcessor(
+                train_kv=train_kv,
+                train_q_out=train_q_out,
+                hidden_size=hidden_size,
+                cross_attention_dim=cross_attention_dim,
+            )
+            custom_diffusion_attn_procs[name].load_dict(weights)
+            if mock_weights:
+                # add 1 to weights to mock trained weights
+                with paddle.no_grad():
+                    custom_diffusion_attn_procs[name].to_k_custom_diffusion.weight.set_value(
+                        custom_diffusion_attn_procs[name].to_k_custom_diffusion.weight + 1
+                    )
+                    custom_diffusion_attn_procs[name].to_v_custom_diffusion.weight.set_value(
+                        custom_diffusion_attn_procs[name].to_v_custom_diffusion.weight + 1
+                    )
+        else:
+            custom_diffusion_attn_procs[name] = CustomDiffusionAttnProcessor(
+                train_kv=False,
+                train_q_out=False,
+                hidden_size=hidden_size,
+                cross_attention_dim=cross_attention_dim,
+            )
+    del st
+    return custom_diffusion_attn_procs
 
 
 class UNet2DConditionModelTests(ModelTesterMixin, unittest.TestCase):
@@ -104,8 +157,9 @@ class UNet2DConditionModelTests(ModelTesterMixin, unittest.TestCase):
         init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
         model = self.model_class(**init_dict)
         model.enable_xformers_memory_efficient_attention()
-        assert hasattr(
-            model.mid_block.attentions[0].transformer_blocks[0].attn1.processor, "attention_op"
+        assert (
+            model.mid_block.attentions[0].transformer_blocks[0].attn1.processor.__class__.__name__
+            == "XFormersAttnProcessor"
         ), "xformers is not enabled"
 
     def test_gradient_checkpointing(self):
@@ -157,6 +211,71 @@ class UNet2DConditionModelTests(ModelTesterMixin, unittest.TestCase):
         expected_shape = inputs_dict["sample"].shape
         self.assertEqual(output.shape, expected_shape, "Input and output shapes do not match")
 
+    def test_model_with_cross_attention_dim_tuple(self):
+        init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
+
+        init_dict["cross_attention_dim"] = (32, 32)
+
+        model = self.model_class(**init_dict)
+        model.eval()
+
+        with paddle.no_grad():
+            output = model(**inputs_dict)
+
+            if isinstance(output, dict):
+                output = output.sample
+
+        self.assertIsNotNone(output)
+        expected_shape = inputs_dict["sample"].shape
+        self.assertEqual(output.shape, expected_shape, "Input and output shapes do not match")
+
+    def test_model_with_simple_projection(self):
+        init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
+
+        batch_size, _, _, sample_size = inputs_dict["sample"].shape
+
+        init_dict["class_embed_type"] = "simple_projection"
+        init_dict["projection_class_embeddings_input_dim"] = sample_size
+
+        inputs_dict["class_labels"] = floats_tensor((batch_size, sample_size))
+
+        model = self.model_class(**init_dict)
+        model.eval()
+
+        with paddle.no_grad():
+            output = model(**inputs_dict)
+
+            if isinstance(output, dict):
+                output = output.sample
+
+        self.assertIsNotNone(output)
+        expected_shape = inputs_dict["sample"].shape
+        self.assertEqual(output.shape, expected_shape, "Input and output shapes do not match")
+
+    def test_model_with_class_embeddings_concat(self):
+        init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
+
+        batch_size, _, _, sample_size = inputs_dict["sample"].shape
+
+        init_dict["class_embed_type"] = "simple_projection"
+        init_dict["projection_class_embeddings_input_dim"] = sample_size
+        init_dict["class_embeddings_concat"] = True
+
+        inputs_dict["class_labels"] = floats_tensor((batch_size, sample_size))
+
+        model = self.model_class(**init_dict)
+        model.eval()
+
+        with paddle.no_grad():
+            output = model(**inputs_dict)
+
+            if isinstance(output, dict):
+                output = output.sample
+
+        self.assertIsNotNone(output)
+        expected_shape = inputs_dict["sample"].shape
+        self.assertEqual(output.shape, expected_shape, "Input and output shapes do not match")
+
     def test_model_attention_slicing(self):
         init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
         init_dict["attention_head_dim"] = 8, 16
@@ -175,19 +294,19 @@ class UNet2DConditionModelTests(ModelTesterMixin, unittest.TestCase):
             output = model(**inputs_dict)
         assert output is not None
 
-    def test_model_slicable_head_dim(self):
+    def test_model_sliceable_head_dim(self):
         init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
         init_dict["attention_head_dim"] = 8, 16
         model = self.model_class(**init_dict)
 
-        def check_slicable_dim_attr(module: paddle.nn.Layer):
+        def check_sliceable_dim_attr(module: paddle.nn.Layer):
             if hasattr(module, "set_attention_slice"):
                 assert isinstance(module.sliceable_head_dim, int)
             for child in module.children():
-                check_slicable_dim_attr(child)
+                check_sliceable_dim_attr(child)
 
         for module in model.children():
-            check_slicable_dim_attr(module)
+            check_sliceable_dim_attr(module)
 
     def test_special_attn_proc(self):
         class AttnEasyProc(nn.Layer):
@@ -237,25 +356,7 @@ class UNet2DConditionModelTests(ModelTesterMixin, unittest.TestCase):
         model = self.model_class(**init_dict)
         with paddle.no_grad():
             sample1 = model(**inputs_dict).sample
-        lora_attn_procs = {}
-        for name in model.attn_processors.keys():
-            cross_attention_dim = None if name.endswith("attn1.processor") else model.config.cross_attention_dim
-            if name.startswith("mid_block"):
-                hidden_size = model.config.block_out_channels[-1]
-            elif name.startswith("up_blocks"):
-                block_id = int(name[len("up_blocks.")])
-                hidden_size = list(reversed(model.config.block_out_channels))[block_id]
-            elif name.startswith("down_blocks"):
-                block_id = int(name[len("down_blocks.")])
-                hidden_size = model.config.block_out_channels[block_id]
-            lora_attn_procs[name] = LoRACrossAttnProcessor(
-                hidden_size=hidden_size, cross_attention_dim=cross_attention_dim
-            )
-            with paddle.no_grad():
-                lora_attn_procs[name].to_q_lora.up.weight.set_value(lora_attn_procs[name].to_q_lora.up.weight + 1)
-                lora_attn_procs[name].to_k_lora.up.weight.set_value(lora_attn_procs[name].to_k_lora.up.weight + 1)
-                lora_attn_procs[name].to_v_lora.up.weight.set_value(lora_attn_procs[name].to_v_lora.up.weight + 1)
-                lora_attn_procs[name].to_out_lora.up.weight.set_value(lora_attn_procs[name].to_out_lora.up.weight + 1)
+        lora_attn_procs = create_lora_layers(model)
         model.set_attn_processor(lora_attn_procs)
         model.set_attn_processor(model.attn_processors)
         with paddle.no_grad():
@@ -278,14 +379,72 @@ class UNet2DConditionModelTests(ModelTesterMixin, unittest.TestCase):
         with paddle.no_grad():
             sample = model(**inputs_dict, cross_attention_kwargs={"scale": 0.5}).sample
         with tempfile.TemporaryDirectory() as tmpdirname:
-            model.save_attn_procs(tmpdirname)
+            model.save_attn_procs(tmpdirname, to_diffusers=False)
+            self.assertTrue(os.path.isfile(os.path.join(tmpdirname, "paddle_lora_weights.pdparams")))
             paddle.seed(0)
             new_model = self.model_class(**init_dict)
-            new_model.load_attn_procs(tmpdirname)
+            new_model.load_attn_procs(tmpdirname, from_diffusers=False)
+
+        with paddle.no_grad():
+            new_sample = new_model(**inputs_dict, cross_attention_kwargs={"scale": 0.5}).sample
+
+        assert (sample - new_sample).abs().max() < 1e-4
+
+        # LoRA and no LoRA should NOT be the same
+        assert (sample - old_sample).abs().max() > 1e-4
+
+    def test_lora_save_load_safetensors(self):
+        # enable deterministic behavior for gradient checkpointing
+        init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
+
+        init_dict["attention_head_dim"] = (8, 16)
+
+        paddle.seed(0)
+        model = self.model_class(**init_dict)
+
+        with paddle.no_grad():
+            old_sample = model(**inputs_dict).sample
+
+        lora_attn_procs = create_lora_layers(model)
+        model.set_attn_processor(lora_attn_procs)
+
+        with paddle.no_grad():
+            sample = model(**inputs_dict, cross_attention_kwargs={"scale": 0.5}).sample
+
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            model.save_attn_procs(tmpdirname, safe_serialization=True, to_diffusers=True)
+            self.assertTrue(os.path.isfile(os.path.join(tmpdirname, "pytorch_lora_weights.safetensors")))
+            paddle.seed(0)
+            new_model = self.model_class(**init_dict)
+            new_model.load_attn_procs(tmpdirname, from_diffusers=True, use_safetensors=True)
         with paddle.no_grad():
             new_sample = new_model(**inputs_dict, cross_attention_kwargs={"scale": 0.5}).sample
         assert (sample - new_sample).abs().max() < 0.0001
         assert (sample - old_sample).abs().max() > 0.0001
+
+    def test_lora_save_safetensors_load_torch(self):
+        # enable deterministic behavior for gradient checkpointing
+        init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
+
+        init_dict["attention_head_dim"] = (8, 16)
+
+        paddle.seed(0)
+        model = self.model_class(**init_dict)
+
+        lora_attn_procs = create_lora_layers(model, mock_weights=False)
+        model.set_attn_processor(lora_attn_procs)
+        # Saving as torch, properly reloads with directly filename
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            model.save_attn_procs(tmpdirname, to_diffusers=True)
+            self.assertTrue(os.path.isfile(os.path.join(tmpdirname, "pytorch_lora_weights.bin")))
+            paddle.seed(0)
+            new_model = self.model_class(**init_dict)
+            new_model.load_attn_procs(
+                tmpdirname, weight_name="pytorch_lora_weights.bin", from_diffusers=True, use_safetensors=False
+            )
+
+    def test_lora_save_torch_force_load_safetensors_error(self):
+        pass
 
     def test_lora_on_off(self):
         init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
@@ -298,7 +457,7 @@ class UNet2DConditionModelTests(ModelTesterMixin, unittest.TestCase):
         model.set_attn_processor(lora_attn_procs)
         with paddle.no_grad():
             sample = model(**inputs_dict, cross_attention_kwargs={"scale": 0.0}).sample
-        model.set_attn_processor(CrossAttnProcessor())
+        model.set_default_attn_processor()
         with paddle.no_grad():
             new_sample = model(**inputs_dict).sample
         assert (sample - new_sample).abs().max() < 0.0001
@@ -323,6 +482,93 @@ class UNet2DConditionModelTests(ModelTesterMixin, unittest.TestCase):
             off_sample = model(**inputs_dict).sample
         assert (sample - on_sample).abs().max() < 0.05
         assert (sample - off_sample).abs().max() < 0.05
+
+    def test_custom_diffusion_processors(self):
+        # enable deterministic behavior for gradient checkpointing
+        init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
+
+        init_dict["attention_head_dim"] = (8, 16)
+
+        model = self.model_class(**init_dict)
+
+        with paddle.no_grad():
+            sample1 = model(**inputs_dict).sample
+
+        custom_diffusion_attn_procs = create_custom_ppdiffusion_layers(model, mock_weights=False)
+
+        # make sure we can set a list of attention processors
+        model.set_attn_processor(custom_diffusion_attn_procs)
+
+        # test that attn processors can be set to itself
+        model.set_attn_processor(model.attn_processors)
+
+        with paddle.no_grad():
+            sample2 = model(**inputs_dict).sample
+
+        assert (sample1 - sample2).abs().max() < 1e-4
+
+    def test_custom_diffusion_save_load(self):
+        # enable deterministic behavior for gradient checkpointing
+        init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
+
+        init_dict["attention_head_dim"] = (8, 16)
+
+        paddle.seed(0)
+        model = self.model_class(**init_dict)
+
+        with paddle.no_grad():
+            old_sample = model(**inputs_dict).sample
+
+        custom_diffusion_attn_procs = create_custom_ppdiffusion_layers(model, mock_weights=False)
+        model.set_attn_processor(custom_diffusion_attn_procs)
+
+        with paddle.no_grad():
+            sample = model(**inputs_dict).sample
+
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            model.save_attn_procs(tmpdirname, to_diffusers=False)
+            self.assertTrue(os.path.isfile(os.path.join(tmpdirname, "paddle_custom_diffusion_weights.pdparams")))
+            paddle.seed(0)
+            new_model = self.model_class(**init_dict)
+            new_model.load_attn_procs(
+                tmpdirname, weight_name="paddle_custom_diffusion_weights.pdparams", from_diffusers=False
+            )
+
+        with paddle.no_grad():
+            new_sample = new_model(**inputs_dict).sample
+
+        assert (sample - new_sample).abs().max() < 1e-4
+
+        # custom diffusion and no custom diffusion should be the same
+        assert (sample - old_sample).abs().max() < 1e-4
+
+    @unittest.skipIf(
+        not is_ppxformers_available(),
+        reason="XFormers attention is only available with CUDA and `xformers` installed",
+    )
+    def test_custom_diffusion_xformers_on_off(self):
+        # enable deterministic behavior for gradient checkpointing
+        init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
+
+        init_dict["attention_head_dim"] = (8, 16)
+
+        paddle.seed(0)
+        model = self.model_class(**init_dict)
+        custom_diffusion_attn_procs = create_custom_ppdiffusion_layers(model, mock_weights=False)
+        model.set_attn_processor(custom_diffusion_attn_procs)
+
+        # default
+        with paddle.no_grad():
+            sample = model(**inputs_dict).sample
+
+            model.enable_xformers_memory_efficient_attention()
+            on_sample = model(**inputs_dict).sample
+
+            model.disable_xformers_memory_efficient_attention()
+            off_sample = model(**inputs_dict).sample
+
+        assert (sample - on_sample).abs().max() < 1e-4
+        assert (sample - off_sample).abs().max() < 1e-4
 
 
 @slow
@@ -420,7 +666,7 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(latents, timestep=timestep, encoder_hidden_states=encoder_hidden_states).sample
         assert sample.shape == latents.shape
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.01)
 
@@ -441,7 +687,7 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(latents, timestep=timestep, encoder_hidden_states=encoder_hidden_states).sample
         assert sample.shape == latents.shape
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.005)
 
@@ -462,7 +708,7 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(latents, timestep=timestep, encoder_hidden_states=encoder_hidden_states).sample
         assert sample.shape == latents.shape
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.01)
 
@@ -483,7 +729,7 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(latents, timestep=timestep, encoder_hidden_states=encoder_hidden_states).sample
         assert sample.shape == latents.shape
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.005)
 
@@ -504,7 +750,7 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(latents, timestep=timestep, encoder_hidden_states=encoder_hidden_states).sample
         assert sample.shape == [4, 4, 64, 64]
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.01)
 
@@ -525,7 +771,7 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(latents, timestep=timestep, encoder_hidden_states=encoder_hidden_states).sample
         assert sample.shape == [4, 4, 64, 64]
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.005)
 
@@ -546,6 +792,6 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
         with paddle.no_grad():
             sample = model(latents, timestep=timestep, encoder_hidden_states=encoder_hidden_states).sample
         assert sample.shape == latents.shape
-        output_slice = sample[-1, -2:, -2:, :2].flatten().float().cpu()
+        output_slice = sample[-1, -2:, -2:, :2].flatten().cast("float32").cpu()
         expected_output_slice = paddle.to_tensor(expected_slice)
         assert paddle_all_close(output_slice, expected_output_slice, atol=0.005)

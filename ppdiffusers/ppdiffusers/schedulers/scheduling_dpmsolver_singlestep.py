@@ -165,12 +165,12 @@ class DPMSolverSinglestepScheduler(SchedulerMixin, ConfigMixin):
         # settings for DPM-Solver
         if algorithm_type not in ["dpmsolver", "dpmsolver++"]:
             if algorithm_type == "deis":
-                algorithm_type = "dpmsolver++"
+                self.register_to_config(algorithm_type="dpmsolver++")
             else:
                 raise NotImplementedError(f"{algorithm_type} does is not implemented for {self.__class__}")
         if solver_type not in ["midpoint", "heun"]:
             if solver_type in ["logrho", "bh1", "bh2"]:
-                solver_type = "midpoint"
+                self.register_to_config(solver_type="midpoint")
             else:
                 raise NotImplementedError(f"{solver_type} does is not implemented for {self.__class__}")
 
@@ -191,8 +191,8 @@ class DPMSolverSinglestepScheduler(SchedulerMixin, ConfigMixin):
                 the number of diffusion steps used when generating samples with a pre-trained model.
         """
         steps = num_inference_steps
-        order = self.solver_order
-        if self.lower_order_final:
+        order = self.config.solver_order
+        if self.config.lower_order_final:
             if order == 3:
                 if steps % 3 == 0:
                     orders = [1, 2, 3] * (steps // 3 - 1) + [1, 2] + [1]
@@ -216,6 +216,44 @@ class DPMSolverSinglestepScheduler(SchedulerMixin, ConfigMixin):
                 orders = [1] * steps
         return orders
 
+    def _threshold_sample(self, sample: paddle.Tensor) -> paddle.Tensor:
+        """
+        "Dynamic thresholding: At each sampling step we set s to a certain percentile absolute pixel value in xt0 (the
+        prediction of x_0 at timestep t), and if s > 1, then we threshold xt0 to the range [-s, s] and then divide by
+        s. Dynamic thresholding pushes saturated pixels (those near -1 and 1) inwards, thereby actively preventing
+        pixels from saturation at each step. We find that dynamic thresholding results in significantly better
+        photorealism as well as better image-text alignment, especially when using very large guidance weights."
+        https://arxiv.org/abs/2205.11487
+        """
+        dtype = sample.dtype
+        batch_size, channels, height, width = sample.shape
+
+        if dtype not in (paddle.float32, paddle.float64):
+            sample = paddle.cast(
+                sample, "float32"
+            )  # upcast for quantile calculation, and clamp not implemented for cpu half
+
+        # Flatten sample for doing quantile calculation along each image
+        sample = paddle.reshape(sample, [batch_size, channels * height * width])
+
+        abs_sample = sample.abs()  # "a certain percentile absolute pixel value"
+
+        s = paddle.quantile(abs_sample, self.config.dynamic_thresholding_ratio, axis=1)
+        # paddle.clip donot support min > max
+        if self.config.sample_max_value < 1:
+            s = paddle.ones_like(s) * self.config.sample_max_value
+        else:
+            s = paddle.clip(
+                s, min=1, max=self.config.sample_max_value
+            )  # When clip to min=1, equivalent to standard clipping to [-1, 1]
+        s = s.unsqueeze(1)  # (batch_size, 1) because clip will broadcast along axis=0
+        sample = paddle.clip(sample, -s, s) / s  # "we threshold xt0 to the range [-s, s] and then divide by s"
+
+        sample = paddle.reshape(sample, [batch_size, channels, height, width])
+        sample = paddle.cast(sample, dtype)
+
+        return sample
+
     def set_timesteps(self, num_inference_steps: int):
         """
         Sets the timesteps used for the diffusion chain. Supporting function to be run before inference.
@@ -226,7 +264,7 @@ class DPMSolverSinglestepScheduler(SchedulerMixin, ConfigMixin):
         """
         self.num_inference_steps = num_inference_steps
         timesteps = (
-            np.linspace(0, self.num_train_timesteps - 1, num_inference_steps + 1)
+            np.linspace(0, self.config.num_train_timesteps - 1, num_inference_steps + 1)
             .round()[::-1][:-1]
             .copy()
             .astype(np.int64)
@@ -273,19 +311,8 @@ class DPMSolverSinglestepScheduler(SchedulerMixin, ConfigMixin):
                 )
 
             if self.config.thresholding:
-                # Dynamic thresholding in https://arxiv.org/abs/2205.11487
-                dtype = x0_pred.dtype
-                dynamic_max_val = paddle.quantile(
-                    paddle.abs(x0_pred).reshape((x0_pred.shape[0], -1)).cast("float32"),
-                    self.config.dynamic_thresholding_ratio,
-                    axis=1,
-                )
-                dynamic_max_val = paddle.maximum(
-                    dynamic_max_val,
-                    self.config.sample_max_value * paddle.ones_like(dynamic_max_val),
-                )[(...,) + (None,) * (x0_pred.ndim - 1)]
-                x0_pred = paddle.clip(x0_pred, -dynamic_max_val, dynamic_max_val) / dynamic_max_val
-                x0_pred = x0_pred.cast(dtype)
+                x0_pred = self._threshold_sample(x0_pred)
+
             return x0_pred
         # DPM-Solver needs to solve an integral of the noise prediction model.
         elif self.config.algorithm_type == "dpmsolver":
@@ -580,14 +607,14 @@ class DPMSolverSinglestepScheduler(SchedulerMixin, ConfigMixin):
         timesteps: paddle.Tensor,
     ) -> paddle.Tensor:
         # Make sure alphas_cumprod and timestep have same dtype as original_samples
-        self.alphas_cumprod = self.alphas_cumprod.cast(original_samples.dtype)
+        alphas_cumprod = self.alphas_cumprod.cast(original_samples.dtype)
 
-        sqrt_alpha_prod = self.alphas_cumprod[timesteps] ** 0.5
+        sqrt_alpha_prod = alphas_cumprod[timesteps] ** 0.5
         sqrt_alpha_prod = sqrt_alpha_prod.flatten()
         while len(sqrt_alpha_prod.shape) < len(original_samples.shape):
             sqrt_alpha_prod = sqrt_alpha_prod.unsqueeze(-1)
 
-        sqrt_one_minus_alpha_prod = (1 - self.alphas_cumprod[timesteps]) ** 0.5
+        sqrt_one_minus_alpha_prod = (1 - alphas_cumprod[timesteps]) ** 0.5
         sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten()
         while len(sqrt_one_minus_alpha_prod.shape) < len(original_samples.shape):
             sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)

@@ -147,7 +147,9 @@ class SafeDiffusionPipelineFastTests(unittest.TestCase):
         image_slice = image[0, -3:, -3:, -1]
         image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
         assert image.shape == (1, 64, 64, 3)
-        expected_slice = np.array([0.5644, 0.6018, 0.4799, 0.5267, 0.5585, 0.4641, 0.516, 0.4964, 0.4792])
+        expected_slice = np.array(
+            [0.28401083, 0.23724163, 0.38141036, 0.2201719, 0.26111937, 0.5176592, 0.25668317, 0.25036532, 0.47986418]
+        )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
         assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 0.01
 
@@ -200,7 +202,7 @@ class SafeDiffusionPipelineFastTests(unittest.TestCase):
         image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array(
-            [0.17811695, 0.21427456, 0.29789412, 0.21849585, 0.24531782, 0.4673458, 0.17078575, 0.13884068, 0.33425587]
+            [0.18612236, 0.24176982, 0.36099488, 0.21807766, 0.27262795, 0.51991826, 0.22258872, 0.22143877, 0.4452843]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.02
         assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 0.02

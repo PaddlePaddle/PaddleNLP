@@ -49,18 +49,29 @@ from ppdiffusers import (
     UNet2DConditionModel,
     is_ppxformers_available,
 )
-from ppdiffusers.loaders import AttnProcsLayers
-from ppdiffusers.models.cross_attention import LoRACrossAttnProcessor
+from ppdiffusers.loaders import AttnProcsLayers, LoraLoaderMixin
+from ppdiffusers.models.attention_processor import (
+    AttnProcessor,
+    AttnProcessor2_5,
+    LoRAAttnProcessor,
+    LoRAAttnProcessor2_5,
+)
 from ppdiffusers.optimization import get_scheduler
 from ppdiffusers.training_utils import freeze_params, main_process_first, unwrap_model
-from ppdiffusers.utils import PPDIFFUSERS_CACHE
+from ppdiffusers.utils import (
+    PPDIFFUSERS_CACHE,
+    TEXT_ENCODER_ATTN_MODULE,
+    check_min_version,
+)
+
+check_min_version("0.16.1")
 
 
 def url_or_path_join(*path_list):
     return os.path.join(*path_list) if os.path.isdir(os.path.join(*path_list)) else "/".join(path_list)
 
 
-def save_model_card(repo_name, images=None, base_model=str, dataset_name=str, repo_folder=None):
+def save_model_card(repo_id: str, images=None, base_model=str, dataset_name=str, repo_folder=None):
     img_str = ""
     for i, image in enumerate(images):
         image.save(os.path.join(repo_folder, f"image_{i}.png"))
@@ -80,7 +91,7 @@ inference: false
 ---
     """
     model_card = f"""
-# LoRA text2image fine-tuning - {repo_name}
+# LoRA text2image fine-tuning - {repo_id}
 These are LoRA adaption weights for {base_model}. The weights were fine-tuned on the {dataset_name} dataset. You can find some example images in the following. \n
 {img_str}
 """
@@ -283,6 +294,11 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--train_batch_size", type=int, default=16, help="Batch size (per device) for the training dataloader."
     )
+    parser.add_argument(
+        "--train_text_encoder",
+        action="store_true",
+        help="Whether to train the text encoder. If set, the text encoder should be float32 precision.",
+    )
     parser.add_argument("--num_train_epochs", type=int, default=100)
     parser.add_argument(
         "--max_train_steps",
@@ -375,6 +391,7 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
     )
+    parser.add_argument("--noise_offset", type=float, default=0, help="The scale of noise offset.")
     if input_args is not None:
         args = parser.parse_args(input_args)
     else:
@@ -419,6 +436,8 @@ def main():
 
     # Handle the repository creation
     if is_main_process:
+        if args.output_dir is not None:
+            os.makedirs(args.output_dir, exist_ok=True)
         if args.push_to_hub:
             if args.hub_model_id is None:
                 repo_name = get_full_repo_name(Path(args.output_dir).name, token=args.hub_token)
@@ -432,8 +451,6 @@ def main():
                     gitignore.write("step_*\n")
                 if "epoch_*" not in gitignore:
                     gitignore.write("epoch_*\n")
-        elif args.output_dir is not None:
-            os.makedirs(args.output_dir, exist_ok=True)
 
     # Load the tokenizer
     if args.tokenizer_name:
@@ -465,6 +482,14 @@ def main():
     freeze_params(text_encoder.parameters())
     freeze_params(unet.parameters())
 
+    if args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
+        try:
+            unet.enable_xformers_memory_efficient_attention()
+        except Exception as e:
+            logger.warning(
+                "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
+                f" correctly and a GPU is available: {e}"
+            )
     # now we will add new LoRA weights to the attention layers
     # It's important to realize here how many attention weights will be added and of which sizes
     # The sizes of the attention layers consist only of two different variables:
@@ -479,8 +504,8 @@ def main():
     # => 32 layers
 
     # Set correct lora layers
-    lora_attn_procs = {}
-    for name in unet.attn_processors.keys():
+    unet_lora_attn_procs = {}
+    for name, attn_processor in unet.attn_processors.items():
         cross_attention_dim = None if name.endswith("attn1.processor") else unet.config.cross_attention_dim
         if name.startswith("mid_block"):
             hidden_size = unet.config.block_out_channels[-1]
@@ -491,21 +516,42 @@ def main():
             block_id = int(name[len("down_blocks.")])
             hidden_size = unet.config.block_out_channels[block_id]
 
-        lora_attn_procs[name] = LoRACrossAttnProcessor(
-            hidden_size=hidden_size, cross_attention_dim=cross_attention_dim, rank=args.lora_rank
+        if isinstance(attn_processor, AttnProcessor):
+            lora_attn_processor_class = LoRAAttnProcessor
+        elif isinstance(attn_processor, AttnProcessor2_5):
+            lora_attn_processor_class = LoRAAttnProcessor2_5
+        else:
+            raise ValueError(f"Unknown attention processor type: {attn_processor.__class__.__name__}")
+
+        unet_lora_attn_procs[name] = lora_attn_processor_class(
+            hidden_size=hidden_size,
+            cross_attention_dim=cross_attention_dim,
+            rank=args.lora_rank,
         )
 
-    unet.set_attn_processor(lora_attn_procs)
-    lora_layers = AttnProcsLayers(unet.attn_processors)
+    unet.set_attn_processor(unet_lora_attn_procs)
+    unet_lora_layers = AttnProcsLayers(unet.attn_processors)
 
-    if args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
-        try:
-            unet.enable_xformers_memory_efficient_attention()
-        except Exception as e:
-            logger.warn(
-                "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
-                f" correctly and a GPU is available: {e}"
-            )
+    # The text encoder comes from 🤗 transformers, so we cannot directly modify it.
+    # So, instead, we monkey-patch the forward calls of its attention-blocks. For this,
+    # we first load a dummy pipeline with the text encoder and then do the monkey-patching.
+    text_encoder_lora_layers = None
+    if args.train_text_encoder:
+        text_lora_attn_procs = {}
+        for name, module in text_encoder.named_sublayers(include_self=True):
+            if name.endswith(TEXT_ENCODER_ATTN_MODULE):
+                text_lora_attn_procs[name] = LoRAAttnProcessor(
+                    hidden_size=module.out_proj.weight.shape[1],
+                    cross_attention_dim=None,
+                    rank=args.lora_rank,
+                )
+        text_encoder_lora_layers = AttnProcsLayers(text_lora_attn_procs)
+        temp_pipeline = DiffusionPipeline.from_pretrained(
+            args.pretrained_model_name_or_path, text_encoder=text_encoder
+        )
+        temp_pipeline._modify_text_encoder(text_lora_attn_procs)
+        text_encoder = temp_pipeline.text_encoder
+        del temp_pipeline
 
     # Get the datasets: you can either provide your own training and evaluation files (see below)
     # or specify a Dataset from the hub (the dataset will be downloaded automatically from the datasets Hub).
@@ -651,10 +697,15 @@ def main():
         power=args.lr_power,
     )
 
+    params_to_optimize = (
+        list(unet_lora_layers.parameters()) + list(text_encoder_lora_layers.parameters())
+        if args.train_text_encoder
+        else unet_lora_layers.parameters()
+    )
     # Optimizer creation
     optimizer = AdamW(
         learning_rate=lr_scheduler,
-        parameters=lora_layers.parameters(),
+        parameters=params_to_optimize,
         beta1=args.adam_beta1,
         beta2=args.adam_beta2,
         weight_decay=args.adam_weight_decay,
@@ -664,6 +715,8 @@ def main():
 
     if num_processes > 1:
         unet = paddle.DataParallel(unet)
+        if args.train_text_encoder:
+            text_encoder = paddle.DataParallel(text_encoder)
 
     if is_main_process:
         logger.info("-----------  Configuration Arguments -----------")
@@ -689,17 +742,25 @@ def main():
     progress_bar.set_description("Train Steps")
     global_step = 0
     vae.eval()
-    text_encoder.eval()
-    unet.train()
+    if args.train_text_encoder:
+        text_encoder.train()
+    else:
+        text_encoder.eval()
 
     for epoch in range(args.num_train_epochs):
+        unet.train()
         for step, batch in enumerate(train_dataloader):
             # Convert images to latent space
             latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
-            latents = latents * 0.18215
+            latents = latents * vae.config.scaling_factor
 
             # Sample noise that we'll add to the latents
-            noise = paddle.randn(latents.shape)
+            noise = paddle.randn(latents.shape, dtype=latents.dtype)
+            if args.noise_offset:
+                # https://www.crosslabs.org/blog/diffusion-with-offset-noise
+                noise += args.noise_offset * paddle.randn(
+                    (latents.shape[0], latents.shape[1], 1, 1), dtype=latents.dtype
+                )
             batch_size = latents.shape[0]
             # Sample a random timestep for each image
             timesteps = paddle.randint(0, noise_scheduler.config.num_train_timesteps, (batch_size,)).cast("int64")
@@ -744,7 +805,7 @@ def main():
 
             if (step + 1) % args.gradient_accumulation_steps == 0:
                 if num_processes > 1 and args.gradient_checkpointing:
-                    fused_allreduce_gradients(lora_layers.parameters(), None)
+                    fused_allreduce_gradients(params_to_optimize, None)
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
@@ -766,7 +827,13 @@ def main():
 
                     if global_step % args.checkpointing_steps == 0:
                         save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
-                        unwrap_model(unet).save_attn_procs(save_path)
+                        # We combine the text encoder and UNet LoRA parameters with a simple
+                        # custom logic. So, use `LoraLoaderMixin.save_lora_weights()`.
+                        LoraLoaderMixin.save_lora_weights(
+                            save_directory=save_path,
+                            unet_lora_layers=unet_lora_layers,
+                            text_encoder_lora_layers=text_encoder_lora_layers,
+                        )
                         logger.info(f"Saved lora weights to {save_path}")
 
                 if global_step >= args.max_train_steps:
@@ -782,7 +849,9 @@ def main():
                 pipeline = DiffusionPipeline.from_pretrained(
                     args.pretrained_model_name_or_path,
                     unet=unwrap_model(unet),
+                    text_encoder=unwrap_model(text_encoder),
                     safety_checker=None,
+                    requires_safety_checker=False,
                 )
                 pipeline.set_progress_bar_config(disable=True)
 
@@ -801,12 +870,17 @@ def main():
 
                 del pipeline
                 gc.collect()
+                if args.train_text_encoder:
+                    text_encoder.train()
                 unet.train()
 
     # Save the lora layers
     if is_main_process:
-        unet = unwrap_model(unet)
-        unet.save_attn_procs(args.output_dir)
+        LoraLoaderMixin.save_lora_weights(
+            save_directory=args.output_dir,
+            unet_lora_layers=unet_lora_layers,
+            text_encoder_lora_layers=text_encoder_lora_layers,
+        )
 
         if args.push_to_hub:
             save_model_card(
@@ -819,10 +893,12 @@ def main():
             repo.push_to_hub(commit_message="End of training", blocking=False, auto_lfs_prune=True)
         # Final inference
         # Load previous pipeline
-        pipeline = DiffusionPipeline.from_pretrained(args.pretrained_model_name_or_path, safety_checker=None)
+        pipeline = DiffusionPipeline.from_pretrained(
+            args.pretrained_model_name_or_path, safety_checker=None, requires_safety_checker=False
+        )
         pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
         # load attention processors
-        pipeline.unet.load_attn_procs(args.output_dir)
+        pipeline.load_lora_weights(args.output_dir)
 
         # run inference
         if args.validation_prompt and args.num_validation_images > 0:

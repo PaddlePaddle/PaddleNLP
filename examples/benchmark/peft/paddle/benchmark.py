@@ -56,6 +56,7 @@ class ModelArguments:
 
     model_name_or_path: str = field(default=None, metadata={"help": "model name or local path"})
     lora: Optional[bool] = field(default=False, metadata={"help": "whether to use LoRA"})
+    english: Optional[bool] = field(default=False, metadata={"help": "whether to english benchmark dataset"})
 
 
 def main():
@@ -73,6 +74,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     if "llama" in model_args.model_name_or_path:
         tokenizer.pad_token = tokenizer.unk_token
+
     model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         load_state_as_np=True,
@@ -85,9 +87,13 @@ def main():
     )
 
     if model_args.lora:
-        # hardcode parameters for now
+        if "llama" in model_args.model_name_or_path:
+            target_modules = [".*q_proj.*", ".*k_proj.*", ".*v_proj.*"]
+        else:
+            target_modules = [".*query_key_value.*"]
+
         lora_config = LoRAConfig(
-            target_modules=[".*query_key_value.*"],
+            target_modules=target_modules,
             r=8,
             lora_alpha=32,
             dtype=dtype,
@@ -96,9 +102,11 @@ def main():
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
 
-    def preprocess_function(example, max_src_length=512, max_tgt_length=512):
+    def preprocess_function(example, max_src_length=256, max_tgt_length=384):
         inputs = example["instruction"]
         targets = example["output"]
+        if "input" in example:
+            inputs += example["input"]
         model_inputs = tokenizer(inputs, max_length=max_src_length, truncation=True, return_attention_mask=False)
         labels = tokenizer(targets, max_length=max_tgt_length, truncation=True, return_attention_mask=False)
         labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
@@ -107,7 +115,10 @@ def main():
 
         return model_inputs
 
-    dataset = load_dataset("Chinese-Vicuna/guanaco_belle_merge_v1.0")
+    if model_args.english:
+        dataset = load_dataset("tatsu-lab/alpaca")
+    else:
+        dataset = load_dataset("Chinese-Vicuna/guanaco_belle_merge_v1.0")
     # select first 10k examples for benchmarking
     dataset = dataset["train"].select(range(10000))
     dataset = dataset.map(

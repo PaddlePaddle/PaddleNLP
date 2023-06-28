@@ -89,7 +89,9 @@ class TestChatPipeline(unittest.TestCase):
 
 class TestChatGLMPipeline(unittest.TestCase):
     def setUp(self):
-        self.chat = ChatGLMBot(model="__internal_testing__/tiny-random-chatglm", dtype="float32", tgt_length=8)
+        self.chat = ChatGLMBot(
+            model_name_or_path="__internal_testing__/tiny-random-chatglm", dtype="float32", tgt_length=8
+        )
 
     def test_run_without_history(self):
         pipeline = Pipeline()

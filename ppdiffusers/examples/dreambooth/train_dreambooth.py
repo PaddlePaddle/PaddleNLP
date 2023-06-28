@@ -50,6 +50,10 @@ from ppdiffusers import (
 )
 from ppdiffusers.models.modeling_utils import freeze_params, unwrap_model
 from ppdiffusers.optimization import get_scheduler
+from ppdiffusers.utils import check_min_version
+
+# Will error if the minimal version of ppdiffusers is not installed. Remove at your own risks.
+check_min_version("0.16.1")
 
 
 def url_or_path_join(*path_list):
@@ -337,6 +341,8 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
     )
+    parser.add_argument("--noise_offset", type=float, default=1.0, help="The scale of noise offset.")
+
     if input_args is not None:
         args = parser.parse_args(input_args)
     else:
@@ -377,6 +383,7 @@ class DreamBoothDataset(Dataset):
         tokenizer,
         class_data_root=None,
         class_prompt=None,
+        class_num=None,
         height=512,
         width=512,
         center_crop=False,
@@ -407,7 +414,10 @@ class DreamBoothDataset(Dataset):
             for p in Path(class_data_root).iterdir():
                 if any(suffix in p.name for suffix in ext):
                     self.class_images_path.append(p)
-            self.num_class_images = len(self.class_images_path)
+            if class_num is not None:
+                self.num_class_images = min(len(self.class_images_path), class_num)
+            else:
+                self.num_class_images = len(self.class_images_path)
             self._length = max(self.num_class_images, self.num_instance_images)
             self.class_prompt = class_prompt
         else:
@@ -504,8 +514,7 @@ def main():
 
         if cur_class_images < args.num_class_images:
             pipeline = DiffusionPipeline.from_pretrained(
-                args.pretrained_model_name_or_path,
-                safety_checker=None,
+                args.pretrained_model_name_or_path, safety_checker=None, requires_safety_checker=False
             )
             if args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
                 try:
@@ -542,6 +551,9 @@ def main():
             gc.collect()
 
     if is_main_process:
+        if args.output_dir is not None:
+            os.makedirs(args.output_dir, exist_ok=True)
+
         if args.push_to_hub:
             if args.hub_model_id is None:
                 repo_name = get_full_repo_name(Path(args.output_dir).name, token=args.hub_token)
@@ -556,8 +568,6 @@ def main():
                     gitignore.write("step_*\n")
                 if "epoch_*" not in gitignore:
                     gitignore.write("epoch_*\n")
-        elif args.output_dir is not None:
-            os.makedirs(args.output_dir, exist_ok=True)
 
     # Load the tokenizer
     if args.tokenizer_name:
@@ -607,6 +617,7 @@ def main():
         instance_prompt=args.instance_prompt,
         class_data_root=args.class_data_dir if args.with_prior_preservation else None,
         class_prompt=args.class_prompt,
+        class_num=args.num_class_images,
         tokenizer=tokenizer,
         height=args.height,
         width=args.width,
@@ -721,13 +732,18 @@ def main():
         for step, batch in enumerate(train_dataloader):
             # Convert images to latent space
             latents = vae.encode(batch["pixel_values"]).latent_dist.sample()
-            latents = latents * 0.18215
+            latents = latents * vae.config.scaling_factor
 
             # Sample noise that we'll add to the latents
-            noise = paddle.randn(latents.shape)
+            noise = paddle.randn(latents.shape, dtype=latents.dtype)
+            if args.noise_offset:
+                # https://www.crosslabs.org//blog/diffusion-with-offset-noise
+                noise += args.noise_offset * paddle.randn(
+                    (latents.shape[0], latents.shape[1], 1, 1), dtype=latents.dtype
+                )
             batch_size = latents.shape[0]
             # Sample a random timestep for each image
-            timesteps = paddle.randint(0, noise_scheduler.config.num_train_timesteps, (batch_size,)).cast("int64")
+            timesteps = paddle.randint(0, noise_scheduler.config.num_train_timesteps, (batch_size,), dtype="int64")
 
             # Add noise to the latents according to the noise magnitude at each timestep
             # (this is the forward diffusion process)

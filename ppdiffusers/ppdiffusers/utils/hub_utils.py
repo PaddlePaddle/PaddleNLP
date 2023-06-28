@@ -15,6 +15,7 @@
 
 
 import os
+import re
 import sys
 import traceback
 from pathlib import Path
@@ -22,6 +23,7 @@ from typing import Dict, Optional, Union
 from uuid import uuid4
 
 from huggingface_hub import HfFolder, ModelCard, ModelCardData, whoami
+from huggingface_hub.file_download import REGEX_COMMIT_HASH
 from huggingface_hub.utils import is_jinja_available
 
 from ..version import VERSION as __version__
@@ -127,6 +129,20 @@ def create_model_card(args, model_name):
 
     card_path = os.path.join(args.output_dir, "README.md")
     model_card.save(card_path)
+
+
+def extract_commit_hash(resolved_file: Optional[str], commit_hash: Optional[str] = None):
+    """
+    Extracts the commit hash from a resolved filename toward a cache file.
+    """
+    if resolved_file is None or commit_hash is not None:
+        return commit_hash
+    resolved_file = str(Path(resolved_file).as_posix())
+    search = re.search(r"snapshots/([^/]+)/", resolved_file)
+    if search is None:
+        return None
+    commit_hash = search.groups()[0]
+    return commit_hash if REGEX_COMMIT_HASH.match(commit_hash) else None
 
 
 # Old default cache path, potentially to be migrated.

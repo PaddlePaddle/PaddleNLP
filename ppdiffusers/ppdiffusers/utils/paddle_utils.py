@@ -18,6 +18,7 @@ Paddle utilities: Utilities related to Paddle
 """
 import contextlib
 import time
+from contextlib import contextmanager
 from typing import List, Optional, Tuple, Union
 
 from .import_utils import is_paddle_available
@@ -79,11 +80,19 @@ if is_paddle_available():
     @paddle.jit.not_to_static
     def randn_pt(shape, dtype=None, name=None, **kwargs):
         generator = kwargs.get("generator", None)
-        if generator is None:
-            return randn(shape, dtype=dtype, name=name)
+        is_bfloat16 = "bfloat16" in str(dtype) or "bfloat16" in paddle.get_default_dtype()
+        if is_bfloat16:
+            if generator is None:
+                return randn(shape, dtype="float16", name=name).cast(paddle.bfloat16)
+            else:
+                with get_rng_state_tracker().rng_state(generator):
+                    return randn(shape, dtype="float16", name=name).cast(paddle.bfloat16)
         else:
-            with get_rng_state_tracker().rng_state(generator):
+            if generator is None:
                 return randn(shape, dtype=dtype, name=name)
+            else:
+                with get_rng_state_tracker().rng_state(generator):
+                    return randn(shape, dtype=dtype, name=name)
 
     @paddle.jit.not_to_static
     def rand_pt(shape, dtype=None, name=None, **kwargs):
@@ -170,3 +179,34 @@ if is_paddle_available():
         latents = randint_pt(low=low, high=high, shape=shape, dtype=dtype, generator=generator)
 
         return latents
+
+    @contextmanager
+    def dtype_guard(dtype="float32"):
+        if isinstance(dtype, paddle.dtype):
+            dtype = str(dtype).replace("paddle.", "")
+        origin_dtype = paddle.get_default_dtype()
+        paddle.set_default_dtype(dtype)
+        try:
+            yield
+        finally:
+            paddle.set_default_dtype(origin_dtype)
+
+    paddle.dtype_guard = dtype_guard
+
+    _init_weights = True
+
+    @contextmanager
+    def no_init_weights(_enable=True):
+        """
+        Context manager to globally disable weight initialization to speed up loading large models.
+
+        TODO(Patrick): Delete safety argument `_enable=True` at next major version. .
+        """
+        global _init_weights
+        old_init_weights = _init_weights
+        if _enable:
+            _init_weights = False
+        try:
+            yield
+        finally:
+            _init_weights = old_init_weights

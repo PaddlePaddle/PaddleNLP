@@ -1,5 +1,4 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2023 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import inspect
 from typing import List, Optional, Tuple, Union
 
@@ -26,7 +24,7 @@ from ..pipeline_utils import DiffusionPipeline, ImagePipelineOutput
 
 
 class LDMPipeline(DiffusionPipeline):
-    r"""
+    """
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
     library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
 
@@ -51,9 +49,9 @@ class LDMPipeline(DiffusionPipeline):
         num_inference_steps: int = 50,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
-        **kwargs,
+        **kwargs
     ) -> Union[Tuple, ImagePipelineOutput]:
-        r"""
+        """
         Args:
             batch_size (`int`, *optional*, defaults to 1):
                 Number of images to generate.
@@ -72,9 +70,8 @@ class LDMPipeline(DiffusionPipeline):
             [`~pipelines.ImagePipelineOutput`] or `tuple`: [`~pipelines.utils.ImagePipelineOutput`] if `return_dict` is
             True, otherwise a `tuple. When returning a tuple, the first element is a list with the generated images.
         """
-
         latents = randn_tensor(
-            (batch_size, self.unet.in_channels, self.unet.sample_size, self.unet.sample_size),
+            (batch_size, self.unet.config.in_channels, self.unet.config.sample_size, self.unet.config.sample_size),
             generator=generator,
         )
 
@@ -85,27 +82,20 @@ class LDMPipeline(DiffusionPipeline):
 
         # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
         accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
-
         extra_kwargs = {}
         if accepts_eta:
             extra_kwargs["eta"] = eta
-
         for t in self.progress_bar(self.scheduler.timesteps):
             latent_model_input = self.scheduler.scale_model_input(latents, t)
             # predict the noise residual
             noise_prediction = self.unet(latent_model_input, t).sample
             # compute the previous noisy sample x_t -> x_t-1
             latents = self.scheduler.step(noise_prediction, t, latents, **extra_kwargs).prev_sample
-
-        # decode the image latents with the VAE
         image = self.vqvae.decode(latents).sample
-
-        image = (image / 2 + 0.5).clip(0, 1)
-        image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
+        image = (image / 2 + 0.5).clip(min=0, max=1)
+        image = image.cpu().transpose(perm=[0, 2, 3, 1]).numpy()
         if output_type == "pil":
             image = self.numpy_to_pil(image)
-
         if not return_dict:
             return (image,)
-
         return ImagePipelineOutput(images=image)

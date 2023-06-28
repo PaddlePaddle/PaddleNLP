@@ -20,7 +20,7 @@ import paddle.nn.functional as F
 from paddle import nn
 
 from ..utils import is_ppxformers_available
-from .cross_attention import CrossAttention
+from .attention_processor import Attention
 from .embeddings import CombinedTimestepLabelEmbeddings
 
 
@@ -107,7 +107,7 @@ class AttentionBlock(nn.Layer):
         self.channels = channels
 
         self.num_heads = channels // num_head_channels if num_head_channels is not None else 1
-        self.head_size = self.head_size = self.channels // self.num_heads
+        self.head_size = self.channels // self.num_heads
         self.scale = 1 / math.sqrt(self.channels / self.num_heads)
 
         self.group_norm = nn.GroupNorm(num_channels=channels, num_groups=norm_num_groups, epsilon=eps)
@@ -121,17 +121,28 @@ class AttentionBlock(nn.Layer):
         self.proj_attn = nn.Linear(channels, channels)
 
         self._use_memory_efficient_attention_xformers = False
+        self._use_2_5_attn = True
         self._attention_op = None
 
-    def reshape_heads_to_batch_dim(self, tensor, transpose=True):
+    def reshape_heads_to_batch_dim(self, tensor, transpose=True, merge_head_and_batch=False):
         tensor = tensor.reshape([0, 0, self.num_heads, self.head_size])
-        if transpose:
+        # currently we donot use `unmerge_head_and_batch`
+        if transpose or merge_head_and_batch:
             tensor = tensor.transpose([0, 2, 1, 3])
+
+        if merge_head_and_batch:
+            tensor = tensor.flatten(0, 1)
         return tensor
 
-    def reshape_batch_dim_to_heads(self, tensor, transpose=True):
-        if transpose:
+    def reshape_batch_dim_to_heads(self, tensor, transpose=True, unmerge_head_and_batch=False):
+        # currently we donot use `unmerge_head_and_batch`
+        if unmerge_head_and_batch:
+            seq_len = tensor.shape[1]
+            tensor = tensor.reshape([-1, self.num_heads, seq_len, self.head_size])
+
+        if transpose or unmerge_head_and_batch:
             tensor = tensor.transpose([0, 2, 1, 3])
+
         tensor = tensor.reshape([0, 0, tensor.shape[2] * tensor.shape[3]])
         return tensor
 
@@ -264,8 +275,20 @@ class BasicTransformerBlock(nn.Layer):
                 f" define `num_embeds_ada_norm` if setting `norm_type` to {norm_type}."
             )
 
+        if not norm_elementwise_affine:
+            norm_kwargs = {"weight_attr": False, "bias_attr": False}
+        else:
+            norm_kwargs = {}
+
+        # Define 3 blocks. Each block has its own normalization layer.
         # 1. Self-Attn
-        self.attn1 = CrossAttention(
+        if self.use_ada_layer_norm:
+            self.norm1 = AdaLayerNorm(dim, num_embeds_ada_norm)
+        elif self.use_ada_layer_norm_zero:
+            self.norm1 = AdaLayerNormZero(dim, num_embeds_ada_norm)
+        else:
+            self.norm1 = nn.LayerNorm(dim, **norm_kwargs)
+        self.attn1 = Attention(
             query_dim=dim,
             heads=num_attention_heads,
             dim_head=attention_head_dim,
@@ -275,11 +298,15 @@ class BasicTransformerBlock(nn.Layer):
             upcast_attention=upcast_attention,
         )
 
-        self.ff = FeedForward(dim, dropout=dropout, activation_fn=activation_fn, final_dropout=final_dropout)
-
         # 2. Cross-Attn
         if cross_attention_dim is not None or double_self_attention:
-            self.attn2 = CrossAttention(
+            # We currently only use AdaLayerNormZero for self attention where there will only be one attention block.
+            # I.e. the number of returned modulation chunks from AdaLayerZero would not make sense if returned during
+            # the second cross attention block.
+            self.norm2 = (
+                AdaLayerNorm(dim, num_embeds_ada_norm) if self.use_ada_layer_norm else nn.LayerNorm(dim, **norm_kwargs)
+            )
+            self.attn2 = Attention(
                 query_dim=dim,
                 cross_attention_dim=cross_attention_dim if not double_self_attention else None,
                 heads=num_attention_heads,
@@ -289,42 +316,25 @@ class BasicTransformerBlock(nn.Layer):
                 upcast_attention=upcast_attention,
             )  # is self-attn if encoder_hidden_states is none
         else:
-            self.attn2 = None
-
-        if not norm_elementwise_affine:
-            norm_kwargs = {"weight_attr": False, "bias_attr": False}
-        else:
-            norm_kwargs = {}
-
-        if self.use_ada_layer_norm:
-            self.norm1 = AdaLayerNorm(dim, num_embeds_ada_norm)
-        elif self.use_ada_layer_norm_zero:
-            self.norm1 = AdaLayerNormZero(dim, num_embeds_ada_norm)
-        else:
-            self.norm1 = nn.LayerNorm(dim, **norm_kwargs)
-
-        if cross_attention_dim is not None or double_self_attention:
-            # We currently only use AdaLayerNormZero for self attention where there will only be one attention block.
-            # I.e. the number of returned modulation chunks from AdaLayerZero would not make sense if returned during
-            # the second cross attention block.
-            self.norm2 = (
-                AdaLayerNorm(dim, num_embeds_ada_norm) if self.use_ada_layer_norm else nn.LayerNorm(dim, **norm_kwargs)
-            )
-        else:
             self.norm2 = None
+            self.attn2 = None
 
         # 3. Feed-forward
         self.norm3 = nn.LayerNorm(dim, **norm_kwargs)
+        self.ff = FeedForward(dim, dropout=dropout, activation_fn=activation_fn, final_dropout=final_dropout)
 
     def forward(
         self,
         hidden_states,
-        encoder_hidden_states=None,
-        timestep=None,
         attention_mask=None,
+        encoder_hidden_states=None,
+        encoder_attention_mask=None,
+        timestep=None,
         cross_attention_kwargs=None,
         class_labels=None,
     ):
+        # Notice that normalization is always applied before the real computation in the following blocks.
+        # 1. Self-Attention
         if self.use_ada_layer_norm:
             norm_hidden_states = self.norm1(hidden_states, timestep)
         elif self.use_ada_layer_norm_zero:
@@ -334,7 +344,6 @@ class BasicTransformerBlock(nn.Layer):
         else:
             norm_hidden_states = self.norm1(hidden_states)
 
-        # 1. Self-Attention
         cross_attention_kwargs = cross_attention_kwargs if cross_attention_kwargs is not None else {}
         attn_output = self.attn1(
             norm_hidden_states,
@@ -350,12 +359,14 @@ class BasicTransformerBlock(nn.Layer):
             norm_hidden_states = (
                 self.norm2(hidden_states, timestep) if self.use_ada_layer_norm else self.norm2(hidden_states)
             )
+            # TODO (Birch-San): Here we should prepare the encoder_attention mask correctly
+            # prepare attention mask here
 
             # 2. Cross-Attention
             attn_output = self.attn2(
                 norm_hidden_states,
                 encoder_hidden_states=encoder_hidden_states,
-                attention_mask=attention_mask,
+                attention_mask=encoder_attention_mask,
                 **cross_attention_kwargs,
             )
             hidden_states = attn_output + hidden_states

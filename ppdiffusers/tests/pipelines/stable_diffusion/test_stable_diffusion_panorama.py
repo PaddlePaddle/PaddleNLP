@@ -18,11 +18,6 @@ import unittest
 
 import numpy as np
 import paddle
-from ppdiffusers_test.pipeline_params import (
-    TEXT_TO_IMAGE_BATCH_PARAMS,
-    TEXT_TO_IMAGE_PARAMS,
-)
-from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
 
 from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
@@ -37,6 +32,9 @@ from ppdiffusers import (
 from ppdiffusers.utils import slow
 from ppdiffusers.utils.testing_utils import require_paddle_gpu
 
+from ..pipeline_params import TEXT_TO_IMAGE_BATCH_PARAMS, TEXT_TO_IMAGE_PARAMS
+from ..test_pipelines_common import PipelineTesterMixin
+
 
 class StableDiffusionPanoramaPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
     pipeline_class = StableDiffusionPanoramaPipeline
@@ -47,7 +45,7 @@ class StableDiffusionPanoramaPipelineFastTests(PipelineTesterMixin, unittest.Tes
         paddle.seed(0)
         unet = UNet2DConditionModel(
             block_out_channels=(32, 64),
-            layers_per_block=2,
+            layers_per_block=1,
             sample_size=32,
             in_channels=4,
             out_channels=4,
@@ -97,7 +95,7 @@ class StableDiffusionPanoramaPipelineFastTests(PipelineTesterMixin, unittest.Tes
             "generator": generator,
             "height": None,
             "width": None,
-            "num_inference_steps": 2,
+            "num_inference_steps": 1,
             "guidance_scale": 6.0,
             "output_type": "numpy",
         }
@@ -112,9 +110,17 @@ class StableDiffusionPanoramaPipelineFastTests(PipelineTesterMixin, unittest.Tes
         image_slice = image[0, -3:, -3:, -1]
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array(
-            [0.15183353, 0.2552734, 0.3852678, 0.42601097, 0.2554124, 0.47376704, 0.29567584, 0.24760196, 0.35480827]
+            [0.28862977, 0.2441951, 0.2683525, 0.33122095, 0.28755113, 0.46375293, 0.254181, 0.30616608, 0.4785265]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
+
+    # override to speed the overall test timing up.
+    def test_inference_batch_consistent(self):
+        super().test_inference_batch_consistent(batch_sizes=[1, 2])
+
+    # override to speed the overall test timing up.
+    def test_inference_batch_single_identical(self):
+        super().test_inference_batch_single_identical(batch_size=2)
 
     def test_stable_diffusion_panorama_negative_prompt(self):
         components = self.get_dummy_components()
@@ -127,7 +133,7 @@ class StableDiffusionPanoramaPipelineFastTests(PipelineTesterMixin, unittest.Tes
         image_slice = image[0, -3:, -3:, -1]
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array(
-            [0.27549824, 0.34450397, 0.39573267, 0.37212506, 0.36387527, 0.55603653, 0.26159006, 0.30083805, 0.4146811]
+            [0.28995812, 0.24463832, 0.2682391, 0.33033937, 0.2868188, 0.46267676, 0.25425047, 0.3066897, 0.47881347]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
 
@@ -143,7 +149,7 @@ class StableDiffusionPanoramaPipelineFastTests(PipelineTesterMixin, unittest.Tes
         image_slice = image[0, -3:, -3:, -1]
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array(
-            [0.32321337, 0.1593099, 0.26984212, 0.22570723, 0.23723063, 0.47428307, 0.1708372, 0.11924201, 0.32899845]
+            [0.32409406, 0.2660764, 0.41739762, 0.18994612, 0.32522476, 0.4869789, 0.13573006, 0.14128971, 0.32650158]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
 
@@ -155,28 +161,6 @@ class StableDiffusionPanoramaPipelineFastTests(PipelineTesterMixin, unittest.Tes
         inputs = self.get_dummy_inputs()
         with self.assertRaises(ValueError):
             _ = sd_pipe(**inputs).images
-
-    def test_stable_diffusion_panorama_num_images_per_prompt(self):
-        components = self.get_dummy_components()
-        sd_pipe = StableDiffusionPanoramaPipeline(**components)
-        sd_pipe.set_progress_bar_config(disable=None)
-        inputs = self.get_dummy_inputs()
-        images = sd_pipe(**inputs).images
-        assert images.shape == (1, 64, 64, 3)
-        batch_size = 2
-        inputs = self.get_dummy_inputs()
-        inputs["prompt"] = [inputs["prompt"]] * batch_size
-        images = sd_pipe(**inputs).images
-        assert images.shape == (batch_size, 64, 64, 3)
-        num_images_per_prompt = 2
-        inputs = self.get_dummy_inputs()
-        images = sd_pipe(**inputs, num_images_per_prompt=num_images_per_prompt).images
-        assert images.shape == (num_images_per_prompt, 64, 64, 3)
-        batch_size = 2
-        inputs = self.get_dummy_inputs()
-        inputs["prompt"] = [inputs["prompt"]] * batch_size
-        images = sd_pipe(**inputs, num_images_per_prompt=num_images_per_prompt).images
-        assert images.shape == (batch_size * num_images_per_prompt, 64, 64, 3)
 
 
 @slow
