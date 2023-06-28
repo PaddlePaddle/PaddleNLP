@@ -20,7 +20,7 @@ from paddlenlp.peft.prefix import llama_postprocess_past_key_value
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaConfig
 
 
-def parse_arguments():
+def get_parser():
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -35,6 +35,11 @@ def parse_arguments():
     parser.add_argument(
         "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
     )
+    return parser
+
+
+def parse_arguments():
+    parser = get_parser()
     return parser.parse_args()
 
 
