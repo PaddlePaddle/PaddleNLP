@@ -72,6 +72,8 @@ def main():
             dtype = "float16"
         if training_args.bf16:
             dtype = "bfloat16"
+    else:
+        dtype="float32"
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     if "llama" in model_args.model_name_or_path:
