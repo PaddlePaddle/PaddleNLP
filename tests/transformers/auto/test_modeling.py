@@ -20,7 +20,7 @@ import tempfile
 import unittest
 
 from paddlenlp.transformers import AutoModel, BertModel
-from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHT_FILE_NAME
+from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHTS_NAME
 
 
 class AutoModelTest(unittest.TestCase):
@@ -63,6 +63,6 @@ class AutoModelTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             AutoModel.from_pretrained(model_name, cache_dir=tempdir)
             self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, CONFIG_NAME)))
-            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, PADDLE_WEIGHT_FILE_NAME)))
+            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, PADDLE_WEIGHTS_NAME)))
             # check against double appending model_name in cache_dir
             self.assertFalse(os.path.exists(os.path.join(tempdir, model_name, model_name)))

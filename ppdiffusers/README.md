@@ -177,22 +177,36 @@ upscaled_image.save("upsampled_cat_sd2.png")
 #### text_guided_image_inpainting-stable_diffusion_2
 
 ```python
-from ppdiffusers import StableDiffusionUpscalePipeline
+import paddle
+
+from ppdiffusers import PaintByExamplePipeline
 from ppdiffusers.utils import load_image
 
-pipe = StableDiffusionUpscalePipeline.from_pretrained("stabilityai/stable-diffusion-x4-upscaler")
+img_url = "https://paddlenlp.bj.bcebos.com/models/community/Fantasy-Studio/data/image_example_1.png"
+mask_url = "https://paddlenlp.bj.bcebos.com/models/community/Fantasy-Studio/data/mask_example_1.png"
+example_url = "https://paddlenlp.bj.bcebos.com/models/community/Fantasy-Studio/data/reference_example_1.jpeg"
 
-url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/low_res_cat.png"
-low_res_img = load_image(url).resize((128, 128))
+init_image = load_image(img_url).resize((512, 512))
+mask_image = load_image(mask_url).resize((512, 512))
+example_image = load_image(example_url).resize((512, 512))
 
-prompt = "a white cat"
-upscaled_image = pipe(prompt=prompt, image=low_res_img).images[0]
-upscaled_image.save("upsampled_cat_sd2.png")
+pipe = PaintByExamplePipeline.from_pretrained("Fantasy-Studio/Paint-by-Example")
+
+# 使用fp16加快生成速度
+with paddle.amp.auto_cast(True):
+    image = pipe(image=init_image, mask_image=mask_image, example_image=example_image).images[0]
+image.save("image_guided_image_inpainting-paint_by_example-result.png")
 ```
 <div align="center">
-<img alt="image" src="https://user-images.githubusercontent.com/20476674/209324085-0d058b70-89b0-43c2-affe-534eedf116cf.png">
+<img alt="image" src="https://user-images.githubusercontent.com/20476674/247118364-5d91f433-f9ac-4514-b5f0-cb4599905847.png" width=300>
 <center>原图像</center>
-<img alt="image" src="https://user-images.githubusercontent.com/20476674/209323862-ce2d8658-a52b-4f35-90cb-aa7d310022e7.png">
+<div align="center">
+<img alt="image" src="https://user-images.githubusercontent.com/20476674/247118361-0f78d6db-6896-4f8d-b1bd-8350192f7a4e.png" width=300>
+<center>掩码图像</center>
+<div align="center">
+<img alt="image" src="https://user-images.githubusercontent.com/20476674/247118368-305a048d-ddc3-4a5f-8915-58591ef680f0.jpeg" width=300>
+<center>参考图像</center>
+<img alt="image" src="https://user-images.githubusercontent.com/20476674/247117963-e5b9b754-39a3-480b-a557-46a2f9310e79.png" width=300>
 <center>生成图像</center>
 </div>
 </details>
@@ -439,7 +453,7 @@ inpainted_image.save("repaint-image.png")
 <details><summary>&emsp;图像变化（Image Variation）</summary>
 
 #### image_variation-versatile_diffusion
-```
+```python
 from ppdiffusers import VersatileDiffusionImageVariationPipeline
 from ppdiffusers.utils import load_image
 
@@ -469,7 +483,7 @@ image.save("versatile-diffusion-car_variation.png")
 
 #### unconditional_audio_generation-audio_diffusion
 
-```
+```python
 from scipy.io.wavfile import write
 from ppdiffusers import AudioDiffusionPipeline
 import paddle
@@ -510,7 +524,7 @@ image.save("audio_diffusion_test.png")
 
 #### unconditional_audio_generation-spectrogram_diffusion
 
-```
+```python
 import paddle
 import scipy
 
