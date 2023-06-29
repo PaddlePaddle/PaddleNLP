@@ -114,6 +114,8 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
         eta: float = 0.0,
         generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         latents: Optional[paddle.Tensor] = None,
+        parse_prompt_type: str = "raw",
+        max_embeddings_multiples: Optional[int] = 3,
         prompt_embeds: Optional[paddle.Tensor] = None,
         negative_prompt_embeds: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
@@ -235,6 +237,8 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
             negative_prompt,
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
+            parse_prompt_type=parse_prompt_type,
+            max_embeddings_multiples=max_embeddings_multiples,
             infer_op=infer_op_dict.get("text_encoder", None),
         )
 

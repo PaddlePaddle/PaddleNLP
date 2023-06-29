@@ -75,6 +75,16 @@ def parse_arguments():
         ],
         help="The task can be one of [text2img, img2img, inpaint, inpaint_legacy, cycle_diffusion, hiresfix, all]. ",
     )
+    parser.add_argument(
+        "--parse_prompt_type",
+        type=str,
+        default="raw",
+        choices=[
+            "raw",
+            "lpw",
+        ],
+        help="The parse_prompt_type can be one of [raw, lpw]. ",
+    )
     parser.add_argument("--use_fp16", type=strtobool, default=True, help="Wheter to use FP16 mode")
     parser.add_argument("--device_id", type=int, default=0, help="The selected gpu id. -1 means use cpu")
     parser.add_argument(
@@ -84,7 +94,6 @@ def parse_arguments():
         choices=[
             "pndm",
             "lms",
-            "preconfig-lms",
             "euler",
             "euler-ancestral",
             "preconfig-euler-ancestral",
@@ -239,7 +248,8 @@ def main(args):
 
     seed = 1024
     vae_in_channels = 4
-    max_length = 77
+    text_encoder_max_length = 77
+    unet_max_length = text_encoder_max_length * 3  # lpw support max_length is 77x3
     min_image_size = 512
     max_image_size = 768
     max_image_size = max(min_image_size, max_image_size)
@@ -254,9 +264,9 @@ def main(args):
 
     text_encoder_dynamic_shape = {
         "input_ids": {
-            "min_shape": [1, max_length],
-            "max_shape": [1, max_length],
-            "opt_shape": [1, max_length],
+            "min_shape": [1, text_encoder_max_length],
+            "max_shape": [1, text_encoder_max_length],
+            "opt_shape": [1, text_encoder_max_length],
         }
     }
     vae_encoder_dynamic_shape = {
@@ -285,9 +295,9 @@ def main(args):
             "opt_shape": [1],
         },
         "encoder_hidden_states": {
-            "min_shape": [1, max_length, hidden_states],
-            "max_shape": [bs, max_length, hidden_states],
-            "opt_shape": [2, max_length, hidden_states],
+            "min_shape": [1, text_encoder_max_length, hidden_states],
+            "max_shape": [bs, unet_max_length, hidden_states],
+            "opt_shape": [2, text_encoder_max_length, hidden_states],
         },
     }
     # 4. Init runtime
@@ -359,6 +369,7 @@ def main(args):
     )
     pipe.set_progress_bar_config(disable=True)
     pipe.change_scheduler(args.scheduler)
+    parse_prompt_type = args.parse_prompt_type
     width = args.width
     height = args.height
     hr_resize_width = args.hr_resize_width
@@ -391,6 +402,7 @@ def main(args):
                 num_inference_steps=10,
                 height=height,
                 width=width,
+                parse_prompt_type=parse_prompt_type,
                 infer_op_dict=infer_op_dict,
             )
             print("==> Test text2img performance.")
@@ -402,6 +414,7 @@ def main(args):
                     num_inference_steps=args.inference_steps,
                     height=height,
                     width=width,
+                    parse_prompt_type=parse_prompt_type,
                     infer_op_dict=infer_op_dict,
                 ).images
                 latency = time.time() - start
@@ -414,7 +427,6 @@ def main(args):
             images[0].save(f"{folder}/text2img.png")
 
         if args.task_name in ["img2img", "all"]:
-            pipe.change_scheduler(args.scheduler.replace("preconfig-", ""))
             # img2img
             img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
             init_image = load_image(img_url)
@@ -427,6 +439,7 @@ def main(args):
                 num_inference_steps=20,
                 height=height,
                 width=width,
+                parse_prompt_type=parse_prompt_type,
                 infer_op_dict=infer_op_dict,
             )
             print("==> Test img2img performance.")
@@ -439,6 +452,7 @@ def main(args):
                     num_inference_steps=args.inference_steps,
                     height=height,
                     width=width,
+                    parse_prompt_type=parse_prompt_type,
                     infer_op_dict=infer_op_dict,
                 ).images
                 latency = time.time() - start
@@ -451,7 +465,6 @@ def main(args):
             images[0].save(f"{folder}/img2img.png")
 
         if args.task_name in ["inpaint", "inpaint_legacy", "all"]:
-            pipe.change_scheduler(args.scheduler.replace("preconfig-", ""))
             img_url = (
                 "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
             )
@@ -474,6 +487,7 @@ def main(args):
                 num_inference_steps=20,
                 height=height,
                 width=width,
+                parse_prompt_type=parse_prompt_type,
                 infer_op_dict=infer_op_dict,
             )
             print(f"==> Test {task_name} performance.")
@@ -487,6 +501,7 @@ def main(args):
                     num_inference_steps=args.inference_steps,
                     height=height,
                     width=width,
+                    parse_prompt_type=parse_prompt_type,
                     infer_op_dict=infer_op_dict,
                 ).images
                 latency = time.time() - start
@@ -516,7 +531,6 @@ def main(args):
             # custom_pipeline
             # https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/examples/community/pipeline_fastdeploy_stable_diffusion_hires_fix.py
             hiresfix_pipe._progress_bar_config = pipe._progress_bar_config
-            pipe.change_scheduler(args.scheduler.replace("preconfig-", ""))
             # hiresfix
             prompt = "a photo of an astronaut riding a horse on mars"
             time_costs = []
@@ -530,6 +544,7 @@ def main(args):
                 hr_resize_width=hr_resize_width,
                 hr_resize_height=hr_resize_height,
                 enable_hr=True,
+                parse_prompt_type=parse_prompt_type,
                 infer_op_dict=infer_op_dict,
             )
             print("==> Test hiresfix performance.")
@@ -577,6 +592,7 @@ def main(args):
                 source_guidance_scale=1,
                 height=height,
                 width=width,
+                parse_prompt_type=parse_prompt_type,
                 infer_op_dict=infer_op_dict,
             ).images[0]
             print("==> Test cycle diffusion performance.")
@@ -594,6 +610,7 @@ def main(args):
                     source_guidance_scale=1,
                     height=height,
                     width=width,
+                    parse_prompt_type=parse_prompt_type,
                     infer_op_dict=infer_op_dict,
                 ).images
                 latency = time.time() - start

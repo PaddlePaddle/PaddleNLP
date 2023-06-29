@@ -124,8 +124,9 @@ python infer.py ./control_sd15_canny --scheduler "euler-ancestral" --backend pad
 | --benchmark_steps | `Benchmark` 运行的次数，默认为 `1`。 |
 | --use_fp16 | 是否使用 `fp16` 精度。默认为 `False`。使用 `paddle_tensorrt` 后端及 `kunlunxin_xpu` 设备时可以设为 `True` 开启。 |
 | --task_name | 任务类型，默认为`text2img`，可选列表：`['text2img_control', 'img2img_control', 'inpaint_legacy_control', 'hiresfix_control', 'all']`。|
-| --scheduler | 采样器类型。默认为 `'preconfig-euler-ancestral'`。可选列表：`['pndm', 'lms', 'preconfig-lms', 'euler', 'euler-ancestral', 'preconfig-euler-ancestral', 'dpm-multi', 'dpm-single', 'unipc-multi', 'ddim', 'ddpm', 'deis-multi', 'heun', 'kdpm2-ancestral', 'kdpm2']`。|
+| --scheduler | 采样器类型。默认为 `'preconfig-euler-ancestral'`。可选列表：`['pndm', 'lms', 'euler', 'euler-ancestral', 'preconfig-euler-ancestral', 'dpm-multi', 'dpm-single', 'unipc-multi', 'ddim', 'ddpm', 'deis-multi', 'heun', 'kdpm2-ancestral', 'kdpm2']`。|
 | --infer_op | 推理所采用的op，可选列表 `['zero_copy_infer', 'raw', 'all']`，`zero_copy_infer`推理速度更快，默认值为`zero_copy_infer`。 |
+| --parse_prompt_type | 处理prompt文本所使用的方法，可选列表 `['raw', 'lpw']`，`lpw`可强调句子中的单词，并且支持更长的文本输入，默认值为`raw`，则使用原版prompt处理方法。 |
 | --low_threshold | Canny算法最后一步中，小于该阈值的像素直接置为0，默认值为 100。 |
 | --high_threshold | Canny算法最后一步中，大于该阈值的像素直接置为255，默认值为 200。 |
 | --width | 生成图片的宽度，取值范围 512~768。默认值为 512。|

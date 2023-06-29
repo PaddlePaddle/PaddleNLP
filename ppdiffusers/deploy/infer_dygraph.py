@@ -54,6 +54,16 @@ def parse_arguments():
         ],
         help="The task can be one of [text2img, img2img, inpaint, inpaint_legacy, cycle_diffusion, hiresfix, all]. ",
     )
+    parser.add_argument(
+        "--parse_prompt_type",
+        type=str,
+        default="raw",
+        choices=[
+            "raw",
+            "lpw",
+        ],
+        help="The parse_prompt_type can be one of [raw, lpw]. ",
+    )
     parser.add_argument("--use_fp16", type=strtobool, default=True, help="Wheter to use FP16 mode")
     parser.add_argument(
         "--attention_type", type=str, default="raw", choices=["raw", "cutlass", "flash", "all"], help="attention_type."
@@ -62,14 +72,12 @@ def parse_arguments():
     parser.add_argument(
         "--scheduler",
         type=str,
-        default="preconfig-euler-ancestral",
+        default="euler-ancestral",
         choices=[
             "pndm",
             "lms",
-            "preconfig-lms",
             "euler",
             "euler-ancestral",
-            "preconfig-euler-ancestral",
             "dpm-multi",
             "dpm-single",
             "unipc-multi",
@@ -107,6 +115,7 @@ def main(args):
     )
     pipe.set_progress_bar_config(disable=True)
     pipe.change_scheduler(args.scheduler)
+    parse_prompt_type = args.parse_prompt_type
     if args.attention_type == "all":
         args.attention_type = ["raw", "cutlass", "flash"]
     else:
@@ -138,13 +147,23 @@ def main(args):
             prompt = "a photo of an astronaut riding a horse on mars"
             time_costs = []
             # warmup
-            pipe.text2img(prompt, num_inference_steps=10, height=height, width=width)
+            pipe.text2img(
+                prompt,
+                num_inference_steps=10,
+                height=height,
+                width=width,
+                parse_prompt_type=parse_prompt_type,
+            )
             print("==> Test text2img performance.")
             paddle.seed(seed)
             for step in trange(args.benchmark_steps):
                 start = time.time()
                 images = pipe.text2img(
-                    prompt, num_inference_steps=args.inference_steps, height=height, width=width
+                    prompt,
+                    num_inference_steps=args.inference_steps,
+                    height=height,
+                    width=width,
+                    parse_prompt_type=parse_prompt_type,
                 ).images
                 latency = time.time() - start
                 time_costs += [latency]
@@ -156,20 +175,31 @@ def main(args):
             images[0].save(f"{folder}/text2img.png")
 
         if args.task_name in ["img2img", "all"]:
-            pipe.change_scheduler(args.scheduler.replace("preconfig-", ""))
             # img2img
             img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
             init_image = load_image(img_url)
             prompt = "A fantasy landscape, trending on artstation"
             time_costs = []
             # warmup
-            pipe.img2img(prompt, image=init_image, num_inference_steps=20, height=height, width=width)
+            pipe.img2img(
+                prompt,
+                image=init_image,
+                num_inference_steps=20,
+                height=height,
+                width=width,
+                parse_prompt_type=parse_prompt_type,
+            )
             print("==> Test img2img performance.")
             for step in trange(args.benchmark_steps):
                 start = time.time()
                 paddle.seed(seed)
                 images = pipe.img2img(
-                    prompt, image=init_image, num_inference_steps=args.inference_steps, height=height, width=width
+                    prompt,
+                    image=init_image,
+                    num_inference_steps=args.inference_steps,
+                    height=height,
+                    width=width,
+                    parse_prompt_type=parse_prompt_type,
                 ).images
                 latency = time.time() - start
                 time_costs += [latency]
@@ -181,7 +211,6 @@ def main(args):
             images[0].save(f"{folder}/img2img.png")
 
         if args.task_name in ["inpaint", "inpaint_legacy", "all"]:
-            pipe.change_scheduler(args.scheduler.replace("preconfig-", ""))
             img_url = (
                 "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
             )
@@ -203,7 +232,13 @@ def main(args):
                 task_name = "inpaint"
 
             call_fn(
-                prompt, image=init_image, mask_image=mask_image, num_inference_steps=20, height=height, width=width
+                prompt,
+                image=init_image,
+                mask_image=mask_image,
+                num_inference_steps=20,
+                height=height,
+                width=width,
+                parse_prompt_type=parse_prompt_type,
             )
             print(f"==> Test {task_name} performance.")
             for step in trange(args.benchmark_steps):
@@ -216,6 +251,7 @@ def main(args):
                     num_inference_steps=args.inference_steps,
                     height=height,
                     width=width,
+                    parse_prompt_type=parse_prompt_type,
                 ).images
                 latency = time.time() - start
                 time_costs += [latency]
@@ -248,6 +284,7 @@ def main(args):
                 source_guidance_scale=1,
                 height=height,
                 width=width,
+                parse_prompt_type=parse_prompt_type,
             ).images[0]
             print("==> Test cycle diffusion performance.")
             for step in trange(args.benchmark_steps):
@@ -264,6 +301,7 @@ def main(args):
                     source_guidance_scale=1,
                     height=height,
                     width=width,
+                    parse_prompt_type=parse_prompt_type,
                 ).images
                 latency = time.time() - start
                 time_costs += [latency]
@@ -275,8 +313,6 @@ def main(args):
             images[0].save(f"{folder}/cycle_diffusion.png")
 
         if args.task_name in ["hiresfix", "all"]:
-            pipe.change_scheduler(args.scheduler.replace("preconfig-", ""))
-
             # hiresfix
             prompt = "a photo of an astronaut riding a horse on mars"
             time_costs = []
@@ -290,6 +326,7 @@ def main(args):
                 hr_resize_width=hr_resize_width,
                 hr_resize_height=hr_resize_height,
                 enable_hr=True,
+                parse_prompt_type=parse_prompt_type,
             )
             print("==> Test hiresfix performance.")
             for step in trange(args.benchmark_steps):
@@ -304,6 +341,7 @@ def main(args):
                     hr_resize_width=hr_resize_width,
                     hr_resize_height=hr_resize_height,
                     enable_hr=True,
+                    parse_prompt_type=parse_prompt_type,
                 ).images
                 latency = time.time() - start
                 time_costs += [latency]

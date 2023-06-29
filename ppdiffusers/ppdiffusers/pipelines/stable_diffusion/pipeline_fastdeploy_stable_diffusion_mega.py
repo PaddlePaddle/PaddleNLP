@@ -64,7 +64,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         feature_extractor ([`CLIPFeatureExtractor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
-    _optional_components = ["safety_checker", "feature_extractor"]
+    _optional_components = ["vae_encoder", "safety_checker", "feature_extractor"]
 
     def __call__(self, *args, **kwargs):
         return self.text2img(*args, **kwargs)
@@ -81,6 +81,8 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         eta: Optional[float] = 0.0,
         generator: Optional[paddle.Generator] = None,
         latents: Optional[paddle.Tensor] = None,
+        parse_prompt_type: str = "raw",
+        max_embeddings_multiples: Optional[int] = 3,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
@@ -107,6 +109,8 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             eta=eta,
             generator=generator,
             latents=latents,
+            parse_prompt_type=parse_prompt_type,
+            max_embeddings_multiples=max_embeddings_multiples,
             output_type=output_type,
             return_dict=return_dict,
             callback=callback,
@@ -131,6 +135,8 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         eta: Optional[float] = 0.0,
         generator: Optional[paddle.Generator] = None,
         latents: Optional[paddle.Tensor] = None,
+        parse_prompt_type: str = "raw",
+        max_embeddings_multiples: Optional[int] = 3,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
@@ -158,6 +164,8 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             eta=eta,
             generator=generator,
             latents=latents,
+            parse_prompt_type=parse_prompt_type,
+            max_embeddings_multiples=max_embeddings_multiples,
             output_type=output_type,
             return_dict=return_dict,
             callback=callback,
@@ -184,6 +192,8 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         eta: Optional[float] = 0.0,
         generator: Optional[paddle.Generator] = None,
         latents: Optional[paddle.Tensor] = None,
+        parse_prompt_type: str = "raw",
+        max_embeddings_multiples: Optional[int] = 3,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
@@ -217,6 +227,8 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             eta=eta,
             generator=generator,
             latents=latents,
+            parse_prompt_type=parse_prompt_type,
+            max_embeddings_multiples=max_embeddings_multiples,
             output_type=output_type,
             return_dict=return_dict,
             callback=callback,
@@ -243,6 +255,8 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         eta: Optional[float] = 0.0,
         generator: Optional[paddle.Generator] = None,
         latents: Optional[paddle.Tensor] = None,
+        parse_prompt_type: str = "raw",
+        max_embeddings_multiples: Optional[int] = 3,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
@@ -272,6 +286,8 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             eta=eta,
             generator=generator,
             latents=latents,
+            parse_prompt_type=parse_prompt_type,
+            max_embeddings_multiples=max_embeddings_multiples,
             output_type=output_type,
             return_dict=return_dict,
             callback=callback,
@@ -298,6 +314,8 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         num_images_per_prompt: Optional[int] = 1,
         eta: Optional[float] = 0.1,
         latents: Optional[paddle.Tensor] = None,
+        parse_prompt_type: str = "raw",
+        max_embeddings_multiples: Optional[int] = 3,
         generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         prompt_embeds: Optional[paddle.Tensor] = None,
         negative_prompt_embeds: Optional[paddle.Tensor] = None,
@@ -330,6 +348,8 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
             latents=latents,
+            parse_prompt_type=parse_prompt_type,
+            max_embeddings_multiples=max_embeddings_multiples,
             output_type=output_type,
             return_dict=return_dict,
             callback=callback,

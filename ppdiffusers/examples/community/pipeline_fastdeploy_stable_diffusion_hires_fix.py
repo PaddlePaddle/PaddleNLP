@@ -109,7 +109,12 @@ class FastStableDiffusionHiresFixPipeline(DiffusionPipeline, FastDeployDiffusion
     def get_timesteps(self, denoising_steps, denoising_strength):
         steps = int(denoising_steps / min(denoising_strength, 0.999))
         self.scheduler.set_timesteps(steps)
-        timesteps = self.scheduler.timesteps[steps - denoising_steps :]
+
+        t_start = max(steps - denoising_steps, 0)
+        timesteps = self.scheduler.timesteps[t_start * self.scheduler.order :]
+
+        if hasattr(self.scheduler, "step_index_offset"):
+            self.scheduler.step_index_offset = t_start * self.scheduler.order
 
         return timesteps.cast("float32"), denoising_steps
 
@@ -219,6 +224,8 @@ class FastStableDiffusionHiresFixPipeline(DiffusionPipeline, FastDeployDiffusion
         eta: float = 0.0,
         generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         latents: Optional[paddle.Tensor] = None,
+        parse_prompt_type: str = "raw",
+        max_embeddings_multiples: Optional[int] = 3,
         prompt_embeds: Optional[paddle.Tensor] = None,
         negative_prompt_embeds: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
@@ -369,6 +376,8 @@ class FastStableDiffusionHiresFixPipeline(DiffusionPipeline, FastDeployDiffusion
             negative_prompt,
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
+            parse_prompt_type=parse_prompt_type,
+            max_embeddings_multiples=max_embeddings_multiples,
             infer_op=infer_op_dict.get("text_encoder", None),
         )
 
@@ -403,11 +412,15 @@ class FastStableDiffusionHiresFixPipeline(DiffusionPipeline, FastDeployDiffusion
 
         # 7. Denoising loop
         num_warmup_steps = len(timesteps) - sample_steps * self.scheduler.order
+        is_scheduler_support_step_index = self.is_scheduler_support_step_index()
         with self.progress_bar(total=sample_steps) as progress_bar:
             for i, t in enumerate(timesteps):
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
-                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+                if is_scheduler_support_step_index:
+                    latent_model_input = self.scheduler.scale_model_input(latent_model_input, t, step_index=i)
+                else:
+                    latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                 unet_inputs = dict(
                     sample=latent_model_input,
@@ -430,8 +443,13 @@ class FastStableDiffusionHiresFixPipeline(DiffusionPipeline, FastDeployDiffusion
                     noise_pred = noise_pred_unet
 
                 # compute the previous noisy sample x_t -> x_t-1
-                latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
-
+                if is_scheduler_support_step_index:
+                    scheduler_output = self.scheduler.step(
+                        noise_pred, t, latents, step_index=i, return_pred_original_sample=False, **extra_step_kwargs
+                    )
+                else:
+                    scheduler_output = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
+                latents = scheduler_output.prev_sample
                 # call the callback, if provided
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
@@ -501,7 +519,10 @@ class FastStableDiffusionHiresFixPipeline(DiffusionPipeline, FastDeployDiffusion
                 for i, t in enumerate(timesteps):
                     # expand the latents if we are doing classifier free guidance
                     latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
-                    latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+                    if is_scheduler_support_step_index:
+                        latent_model_input = self.scheduler.scale_model_input(latent_model_input, t, step_index=i)
+                    else:
+                        latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                     unet_inputs = dict(
                         sample=latent_model_input,
@@ -524,7 +545,18 @@ class FastStableDiffusionHiresFixPipeline(DiffusionPipeline, FastDeployDiffusion
                         noise_pred = noise_pred_unet
 
                     # compute the previous noisy sample x_t -> x_t-1
-                    latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
+                    if is_scheduler_support_step_index:
+                        scheduler_output = self.scheduler.step(
+                            noise_pred,
+                            t,
+                            latents,
+                            step_index=i,
+                            return_pred_original_sample=False,
+                            **extra_step_kwargs,
+                        )
+                    else:
+                        scheduler_output = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
+                    latents = scheduler_output.prev_sample
 
                     # call the callback, if provided
                     if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):

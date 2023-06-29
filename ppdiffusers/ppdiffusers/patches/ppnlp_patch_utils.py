@@ -355,7 +355,7 @@ if is_paddle_available() and is_paddlenlp_available():
             dropout_p=0.0,
             is_causal=False,
             scale=None,
-            training=False,
+            training=True,
             attention_op="cutlass",
         ):
             if attn_mask is not None or attention_op == "math":

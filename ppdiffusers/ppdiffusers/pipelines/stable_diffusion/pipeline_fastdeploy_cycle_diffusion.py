@@ -174,6 +174,8 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPip
         num_images_per_prompt: Optional[int] = 1,
         eta: Optional[float] = 0.1,
         latents: Optional[paddle.Tensor] = None,
+        parse_prompt_type: str = "lpw",
+        max_embeddings_multiples: Optional[int] = 3,
         generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         prompt_embeds: Optional[paddle.Tensor] = None,
         negative_prompt_embeds: Optional[paddle.Tensor] = None,
@@ -296,12 +298,16 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPip
             negative_prompt=negative_prompt,
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
+            parse_prompt_type=parse_prompt_type,
+            max_embeddings_multiples=max_embeddings_multiples,
             infer_op=infer_op_dict.get("text_encoder", None),
         )
         source_prompt_embeds = self._encode_prompt(
             source_prompt,
             num_images_per_prompt,
             do_classifier_free_guidance,
+            parse_prompt_type=parse_prompt_type,
+            max_embeddings_multiples=max_embeddings_multiples,
             infer_op=infer_op_dict.get("text_encoder", None),
         )
 

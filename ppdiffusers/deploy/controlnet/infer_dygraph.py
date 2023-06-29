@@ -71,6 +71,16 @@ def parse_arguments():
         ],
         help="The task can be one of [text2img_control, img2img_control, inpaint_legacy_control, hiresfix_control, all]. ",
     )
+    parser.add_argument(
+        "--parse_prompt_type",
+        type=str,
+        default="raw",
+        choices=[
+            "raw",
+            "lpw",
+        ],
+        help="The parse_prompt_type can be one of [raw, lpw]. ",
+    )
     parser.add_argument("--use_fp16", type=strtobool, default=True, help="Wheter to use FP16 mode")
     parser.add_argument(
         "--guess_mode",
@@ -85,14 +95,12 @@ def parse_arguments():
     parser.add_argument(
         "--scheduler",
         type=str,
-        default="preconfig-euler-ancestral",
+        default="euler-ancestral",
         choices=[
             "pndm",
             "lms",
-            "preconfig-lms",
             "euler",
             "euler-ancestral",
-            "preconfig-euler-ancestral",
             "dpm-multi",
             "dpm-single",
             "unipc-multi",
@@ -135,6 +143,8 @@ def main(args):
     )
     pipe.set_progress_bar_config(disable=True)
     pipe.change_scheduler(args.scheduler)
+    parse_prompt_type = args.parse_prompt_type
+
     if args.attention_type == "all":
         args.attention_type = ["raw", "cutlass", "flash"]
     else:
@@ -178,6 +188,7 @@ def main(args):
                 controlnet_cond=controlnet_cond,
                 controlnet_conditioning_scale=1.0,
                 guess_mode=guess_mode,
+                parse_prompt_type=parse_prompt_type,
             )
             print("==> Test text2img_control performance.")
             for step in trange(args.benchmark_steps):
@@ -191,6 +202,7 @@ def main(args):
                     controlnet_cond=controlnet_cond,
                     controlnet_conditioning_scale=1.0,
                     guess_mode=guess_mode,
+                    parse_prompt_type=parse_prompt_type,
                 ).images
                 latency = time.time() - start
                 time_costs += [latency]
@@ -202,7 +214,6 @@ def main(args):
             images[0].save(f"{folder}/text2img_control.png")
 
         if args.task_name in ["img2img_control", "all"]:
-            pipe.change_scheduler(args.scheduler.replace("preconfig-", ""))
             img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
             init_image = load_image(img_url)
             controlnet_cond = get_canny_image(init_image, args)
@@ -218,6 +229,7 @@ def main(args):
                 controlnet_cond=controlnet_cond,
                 controlnet_conditioning_scale=1.0,
                 guess_mode=guess_mode,
+                parse_prompt_type=parse_prompt_type,
             )
             print("==> Test img2img_control performance.")
             for step in trange(args.benchmark_steps):
@@ -232,6 +244,7 @@ def main(args):
                     controlnet_cond=controlnet_cond,
                     controlnet_conditioning_scale=1.0,
                     guess_mode=guess_mode,
+                    parse_prompt_type=parse_prompt_type,
                 ).images
                 latency = time.time() - start
                 time_costs += [latency]
@@ -243,7 +256,6 @@ def main(args):
             images[0].save(f"{folder}/img2img_control.png")
 
         if args.task_name in ["inpaint_legacy_control", "all"]:
-            pipe.change_scheduler(args.scheduler.replace("preconfig-", ""))
             img_url = (
                 "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
             )
@@ -264,6 +276,7 @@ def main(args):
                 controlnet_cond=controlnet_cond,
                 controlnet_conditioning_scale=1.0,
                 guess_mode=guess_mode,
+                parse_prompt_type=parse_prompt_type,
             )
             print(f"==> Test {task_name} performance.")
             for step in trange(args.benchmark_steps):
@@ -279,6 +292,7 @@ def main(args):
                     controlnet_cond=controlnet_cond,
                     controlnet_conditioning_scale=1.0,
                     guess_mode=guess_mode,
+                    parse_prompt_type=parse_prompt_type,
                 ).images
                 latency = time.time() - start
                 time_costs += [latency]
@@ -290,7 +304,6 @@ def main(args):
             images[0].save(f"{folder}/{task_name}.png")
 
         if args.task_name in ["hiresfix_control", "all"]:
-            pipe.change_scheduler(args.scheduler.replace("preconfig-", ""))
             # hiresfix_control
             init_image = load_image(
                 "https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/control_bird_canny_demo.png"
@@ -312,6 +325,7 @@ def main(args):
                 controlnet_cond=controlnet_cond,
                 controlnet_conditioning_scale=1.0,
                 guess_mode=guess_mode,
+                parse_prompt_type=parse_prompt_type,
             )
             print("==> Test hiresfix_control performance.")
             for step in trange(args.benchmark_steps):
@@ -329,6 +343,7 @@ def main(args):
                     controlnet_cond=controlnet_cond,
                     controlnet_conditioning_scale=1.0,
                     guess_mode=guess_mode,
+                    parse_prompt_type=parse_prompt_type,
                 ).images
                 latency = time.time() - start
                 time_costs += [latency]

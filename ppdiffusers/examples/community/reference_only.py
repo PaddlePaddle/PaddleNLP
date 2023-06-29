@@ -522,7 +522,7 @@ class ReferenceOnlyPipeline(DiffusionPipeline):
     ):
         assert 0.0 <= attention_auto_machine_weight <= 1.0
         assert 0.0 <= gn_auto_machine_weight <= 2.0
-        assert 0.0 <= current_style_fidelity <= 2.0
+        assert 0.0 <= current_style_fidelity <= 1.0
 
         if self.attn_modules is not None:
             for module in self.attn_modules:
