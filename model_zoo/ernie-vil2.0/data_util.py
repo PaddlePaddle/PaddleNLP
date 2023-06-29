@@ -11,18 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import base64
 import json
 import logging
 import os
-import pickle
 from io import BytesIO
 from math import ceil
 
-import lmdb
 import numpy as np
 import paddle
+import pyarrow as pa
 from paddle.io import Dataset
 from paddle.vision.transforms import (
     Compose,
@@ -45,35 +42,33 @@ def _preprocess_text(text):
     return text
 
 
-class LMDBDataset(Dataset):
-    def __init__(self, lmdb_path, split="val", max_txt_length=64, use_augment=False, resolution=224, tokenizer=None):
-        self.lmdb_path = lmdb_path
-
-        # Assert LMDB directories exist
-        assert os.path.isdir(lmdb_path), "The LMDB directory {} of {} split does not exist!".format(lmdb_path, split)
-        lmdb_pairs = os.path.join(lmdb_path, "pairs")
-        assert os.path.isdir(lmdb_pairs), "The LMDB directory {} of {} image-text pairs does not exist!".format(
-            lmdb_pairs, split
-        )
-        lmdb_imgs = os.path.join(lmdb_path, "imgs")
-        assert os.path.isdir(lmdb_imgs), "The LMDB directory {} of {} image base64 strings does not exist!".format(
-            lmdb_imgs, split
-        )
-
-        # Open LMDB files
-        self.env_pairs = lmdb.open(lmdb_pairs, readonly=True, create=False, lock=False, readahead=False, meminit=False)
-        self.txn_pairs = self.env_pairs.begin(buffers=True)
-        self.env_imgs = lmdb.open(lmdb_imgs, readonly=True, create=False, lock=False, readahead=False, meminit=False)
-        self.txn_imgs = self.env_imgs.begin(buffers=True)
-
+class ArrowDataset(Dataset):
+    def __init__(
+        self,
+        arrow_path,
+        split="val",
+        max_txt_length=64,
+        use_augment=False,
+        resolution=224,
+        tokenizer=None,
+        text_column_name="caption",
+    ):
+        self.arrow_path = arrow_path
+        # Assert Arrow directories exist
+        print(os.path.join(arrow_path, split + ".arrow"))
+        assert os.path.exists(
+            os.path.join(arrow_path, split + ".arrow")
+        ), "The arrow directory {} of {} split does not exist!".format(arrow_path, split)
+        arrow_split_path = os.path.join(arrow_path, split + ".arrow")
+        self.df = pa.ipc.open_file(arrow_split_path).read_pandas()
         # Fetch number of pairs and images
-        self.number_samples = int(self.txn_pairs.get(key=b"num_samples").tobytes().decode("utf-8"))
-        self.number_images = int(self.txn_imgs.get(key=b"num_images").tobytes().decode("utf-8"))
+        self.number_samples = len(self.df)
+        self.number_images = self.number_samples
         logging.info(
-            "{} LMDB file contains {} images and {} pairs.".format(split, self.number_images, self.number_samples)
+            "{} Arrow file contains {} images and {} pairs.".format(split, self.number_images, self.number_samples)
         )
 
-        super(LMDBDataset, self).__init__()
+        super(ArrowDataset, self).__init__()
 
         # The self.dataset_len will be edited to a larger value by calling pad_dataset()
         self.dataset_len = self.number_samples
@@ -108,27 +103,20 @@ class LMDBDataset(Dataset):
             )
         return transform
 
-    def __del__(self):
-        if hasattr(self, "env_pairs"):
-            self.env_pairs.close()
-        if hasattr(self, "env_imgs"):
-            self.env_imgs.close()
-
     def __len__(self):
         return self.dataset_len
 
     def __getitem__(self, index):
         sample_index = index % self.number_samples
-
-        pair = pickle.loads(self.txn_pairs.get("{}".format(sample_index).encode("utf-8")).tobytes())
-        image_id, text_id, raw_text = pair
-
-        image_b64 = self.txn_imgs.get("{}".format(image_id).encode("utf-8")).tobytes()
-        image_b64 = image_b64.decode(encoding="utf8", errors="ignore")
-        image = Image.open(BytesIO(base64.urlsafe_b64decode(image_b64)))  # already resized
+        data_raw = self.df.iloc[sample_index, :]
+        txt_raw = data_raw["caption"]
+        image_raw = data_raw["image"]
+        image_bytes = BytesIO(image_raw)
+        image_bytes.seek(0)
+        image = Image.open(image_bytes)
         image = self.transform(image)
         texts = self.tokenizer(
-            [_preprocess_text(raw_text)], max_seq_len=self.max_txt_length, truncation=True, padding="max_length"
+            [_preprocess_text(txt_raw)], max_seq_len=self.max_txt_length, truncation=True, padding="max_length"
         )
         text = texts["input_ids"][0]
 
@@ -150,13 +138,13 @@ def get_eval_txt_dataset(args, max_txt_length=24, tokenizer=None):
 
 
 def get_eval_img_dataset(args):
-    lmdb_imgs = args.image_data
-    dataset = EvalImgDataset(lmdb_imgs, resolution=224)
+    arrow_imgs = args.image_data
+    dataset = EvalImgDataset(arrow_imgs, resolution=224)
     return dataset
 
 
 def get_train_eval_dataset(args, epoch_id=0, max_txt_length=64, tokenizer=None):
-    train_dataset = LMDBDataset(
+    train_dataset = ArrowDataset(
         args.train_data,
         split="train",
         max_txt_length=max_txt_length,
@@ -164,7 +152,7 @@ def get_train_eval_dataset(args, epoch_id=0, max_txt_length=64, tokenizer=None):
         use_augment=True,
         resolution=224,
     )
-    eval_dataset = LMDBDataset(
+    eval_dataset = ArrowDataset(
         args.val_data,
         split="val",
         max_txt_length=max_txt_length,
@@ -218,19 +206,16 @@ class EvalTxtDataset(Dataset):
 
 
 class EvalImgDataset(Dataset):
-    def __init__(self, lmdb_imgs, resolution=224):
-        assert os.path.isdir(lmdb_imgs), "The image LMDB directory {} not exists!".format(lmdb_imgs)
+    def __init__(self, arrow_imgs_filename, resolution=224):
+        assert os.path.isfile(arrow_imgs_filename), "The image arrow filename {} not exists!".format(
+            arrow_imgs_filename
+        )
 
-        logging.debug(f"Loading image LMDB from {lmdb_imgs}.")
-
-        self.env_imgs = lmdb.open(lmdb_imgs, readonly=True, create=False, lock=False, readahead=False, meminit=False)
-        self.txn_imgs = self.env_imgs.begin(buffers=True)
-        self.cursor_imgs = self.txn_imgs.cursor()
-        self.iter_imgs = iter(self.cursor_imgs)
-        self.number_images = int(self.txn_imgs.get(key=b"num_images").tobytes().decode("utf-8"))
-        logging.info("The specified LMDB directory contains {} images.".format(self.number_images))
-
+        logging.debug(f"Loading image arrow from {arrow_imgs_filename}.")
+        self.img_df = pa.ipc.open_file(arrow_imgs_filename).read_pandas()
+        self.number_images = len(self.img_df)
         self.transform = self._build_transform(resolution)
+        logging.info("The specified arrow directory contains {} images.".format(self.number_images))
 
     def _build_transform(self, resolution):
         normalize = Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
@@ -247,16 +232,12 @@ class EvalImgDataset(Dataset):
         return self.number_images
 
     def __getitem__(self, idx):
-        img_id, image_b64 = next(self.iter_imgs)
-        if img_id == b"num_images":
-            img_id, image_b64 = next(self.iter_imgs)
-
-        img_id = img_id.tobytes()
-        image_b64 = image_b64.tobytes()
-
-        img_id = int(img_id.decode(encoding="utf8", errors="ignore"))
-        image_b64 = image_b64.decode(encoding="utf8", errors="ignore")
-        image = Image.open(BytesIO(base64.urlsafe_b64decode(image_b64)))  # already resized
+        img_raw, img_id = self.img_df.iloc[idx]["image"], self.img_df.iloc[idx]["image_id"]
+        image_bytes = BytesIO(img_raw)
+        image_bytes.seek(0)
+        image = Image.open(image_bytes)
         image = self.transform(image)
+        if type(img_id) != int:
+            img_id = int(img_id)
 
         return img_id, image

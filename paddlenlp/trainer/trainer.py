@@ -46,15 +46,15 @@ from tqdm.auto import tqdm
 
 from ..data import DataCollator, DataCollatorWithPadding, default_data_collator
 from ..peft import LoRAModel, PrefixModelForCausalLM
-from ..transformers.model_utils import PretrainedModel, _add_variant, unwrap_model
-from ..transformers.tokenizer_utils import PretrainedTokenizer
-from ..utils import device_guard
-from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
-from ..utils.env import (
-    LORA_WEIGHT_FILE_NAME,
-    PADDLE_WEIGHT_FILE_NAME,
-    PREFIX_WEIGHT_FILE_NAME,
+from ..transformers.model_utils import (
+    PretrainedModel,
+    _add_variant,
+    paddlenlp_load,
+    unwrap_model,
 )
+from ..transformers.tokenizer_utils import PretrainedTokenizer
+from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
+from ..utils.env import LORA_WEIGHTS_NAME, PADDLE_WEIGHTS_NAME, PREFIX_WEIGHTS_NAME
 from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
@@ -119,14 +119,6 @@ try:
     from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
 except:
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
-
-
-def paddlenlp_load(path, return_numpy=False):
-    if return_numpy:
-        with device_guard():
-            return paddle.load(path)
-    else:
-        return paddle.load(path, return_numpy=return_numpy)
 
 
 def is_dp_group_support_in_group_sharded_parallel():
@@ -413,11 +405,11 @@ class Trainer:
 
         if resume_from_checkpoint is not None:
             if isinstance(self.model, LoRAModel):
-                weight_name = LORA_WEIGHT_FILE_NAME
+                weight_name = LORA_WEIGHTS_NAME
             elif isinstance(self.model, PrefixModelForCausalLM):
-                weight_name = PREFIX_WEIGHT_FILE_NAME
+                weight_name = PREFIX_WEIGHTS_NAME
             else:
-                weight_name = PADDLE_WEIGHT_FILE_NAME
+                weight_name = PADDLE_WEIGHTS_NAME
 
             if not os.path.isfile(
                 os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
@@ -469,11 +461,11 @@ class Trainer:
 
         if resume_from_checkpoint is not None:
             if isinstance(self.model, LoRAModel):
-                weight_name = LORA_WEIGHT_FILE_NAME
+                weight_name = LORA_WEIGHTS_NAME
             elif isinstance(self.model, PrefixModelForCausalLM):
-                weight_name = PREFIX_WEIGHT_FILE_NAME
+                weight_name = PREFIX_WEIGHTS_NAME
             else:
-                weight_name = PADDLE_WEIGHT_FILE_NAME
+                weight_name = PADDLE_WEIGHTS_NAME
             if not os.path.isfile(
                 os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
             ):
@@ -822,11 +814,11 @@ class Trainer:
                 f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
             )
             if isinstance(self.model, LoRAModel):
-                weight_name = LORA_WEIGHT_FILE_NAME
+                weight_name = LORA_WEIGHTS_NAME
             elif isinstance(self.model, PrefixModelForCausalLM):
-                weight_name = PREFIX_WEIGHT_FILE_NAME
+                weight_name = PREFIX_WEIGHTS_NAME
             else:
-                weight_name = PADDLE_WEIGHT_FILE_NAME
+                weight_name = PADDLE_WEIGHTS_NAME
             best_model_path = os.path.join(
                 self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
             )
@@ -1806,7 +1798,7 @@ class Trainer:
                     state_dict = self.model.state_dict()
                 paddle.save(
                     state_dict,
-                    os.path.join(output_dir, _add_variant(PADDLE_WEIGHT_FILE_NAME, self.args.weight_name_suffix)),
+                    os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix)),
                 )
         else:
             self.model.save_pretrained(
@@ -1834,7 +1826,7 @@ class Trainer:
             os.path.join(checkpoint, SCHEDULER_NAME)
         ):
             # Load in optimizer and scheduler states
-            self.optimizer.set_state_dict(paddlenlp_load(os.path.join(checkpoint, optimizer_name), return_numpy=True))
+            self.optimizer.set_state_dict(paddlenlp_load(os.path.join(checkpoint, optimizer_name), map_location="cpu"))
 
             self.lr_scheduler.set_state_dict(paddle.load(os.path.join(checkpoint, SCHEDULER_NAME)))
             if self.do_grad_scaling and os.path.isfile(os.path.join(checkpoint, SCALER_NAME)):
