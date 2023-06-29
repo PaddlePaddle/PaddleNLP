@@ -836,7 +836,7 @@ class FastDeployDiffusionPipelineMixin:
         prompt_embeds: Optional[paddle.Tensor] = None,
         negative_prompt_embeds: Optional[paddle.Tensor] = None,
         infer_op=None,
-        parse_prompt_type: str = "raw",
+        parse_prompt_type: Optional[str] = "lpw",
         max_embeddings_multiples: Optional[int] = 3,
         **kwargs,
     ):

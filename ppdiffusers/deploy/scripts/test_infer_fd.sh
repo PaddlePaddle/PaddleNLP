@@ -28,7 +28,7 @@ python infer.py --model_dir stable-diffusion-v1-5/ \
     --device_id 0 \
     --task_name all \
     --infer_op zero_copy_infer \
-    --benchmark_steps 10
+    --benchmark_steps 10 --parse_prompt_type lpw
 
 python infer.py --model_dir stable-diffusion-v1-5/ \
     --scheduler preconfig-euler-ancestral \
@@ -38,7 +38,7 @@ python infer.py --model_dir stable-diffusion-v1-5/ \
     --device_id 0 \
     --task_name all \
     --infer_op raw \
-    --benchmark_steps 10
+    --benchmark_steps 10 --parse_prompt_type lpw
 
 # test cycle_diffusion
 python export_model.py \
@@ -53,7 +53,7 @@ python infer.py --model_dir stable-diffusion-v1-5-cycle_diffusion/ \
     --device_id 0 \
     --task_name cycle_diffusion \
     --infer_op zero_copy_infer \
-    --benchmark_steps 10
+    --benchmark_steps 10 --parse_prompt_type lpw
 
 python infer.py --model_dir stable-diffusion-v1-5-cycle_diffusion/ \
     --scheduler preconfig-euler-ancestral \
@@ -63,7 +63,7 @@ python infer.py --model_dir stable-diffusion-v1-5-cycle_diffusion/ \
     --device_id 0 \
     --task_name cycle_diffusion \
     --infer_op raw \
-    --benchmark_steps 10
+    --benchmark_steps 10 --parse_prompt_type lpw
 
 # test stable-diffusion-v1-5-inpainting
 python export_model.py \
@@ -72,59 +72,59 @@ python export_model.py \
 
 python infer.py \
     --model_dir stable-diffusion-v1-5-inpainting \
-    --scheduler euler-ancestral \
+    --scheduler preconfig-euler-ancestral \
     --backend paddle_tensorrt \
     --use_fp16 True \
     --device gpu \
     --device_id 0 \
     --task_name inpaint \
     --infer_op zero_copy_infer \
-    --benchmark_steps 10
+    --benchmark_steps 10 --parse_prompt_type lpw
 
 python infer.py \
     --model_dir stable-diffusion-v1-5-inpainting \
-    --scheduler euler-ancestral \
+    --scheduler preconfig-euler-ancestral \
     --backend paddle_tensorrt \
     --use_fp16 True \
     --device gpu \
     --device_id 0 \
     --task_name inpaint \
     --infer_op raw \
-    --benchmark_steps 10
+    --benchmark_steps 10 --parse_prompt_type lpw
 
 # nohup sh test_infer_fd.sh  1> test_infer_fd.log 2>&1 & 
 
-# zero_copy_infer
+## zero_copy_infer lpw
 # ==> Test text2img performance.
-# Mean latency: 0.791007 s, p50 latency: 0.789686 s, p90 latency: 0.791581 s, p95 latency: 0.796705 s.
+# Mean latency: 0.793726 s, p50 latency: 0.793276 s, p90 latency: 0.795765 s, p95 latency: 0.795784 s.
 # ==> Test img2img performance.
-# Mean latency: 0.703892 s, p50 latency: 0.703706 s, p90 latency: 0.704755 s, p95 latency: 0.704946 s.
+# Mean latency: 0.662667 s, p50 latency: 0.662543 s, p90 latency: 0.663988 s, p95 latency: 0.664083 s.
 # ==> Test inpaint_legacy performance.
-# Mean latency: 0.715938 s, p50 latency: 0.715886 s, p90 latency: 0.716202 s, p95 latency: 0.716303 s.
+# Mean latency: 0.713983 s, p50 latency: 0.713049 s, p90 latency: 0.714997 s, p95 latency: 0.719060 s.
 # ==> Test hiresfix performance.
-# Mean latency: 1.438618 s, p50 latency: 1.438173 s, p90 latency: 1.439861 s, p95 latency: 1.440739 s.
+# Mean latency: 1.379235 s, p50 latency: 1.378860 s, p90 latency: 1.381117 s, p95 latency: 1.381354 s.
 
-# raw
+## raw lpw
 # ==> Test text2img performance.
-# Mean latency: 0.864235 s, p50 latency: 0.864001 s, p90 latency: 0.864603 s, p95 latency: 0.865531 s.
+# Mean latency: 0.858216 s, p50 latency: 0.856819 s, p90 latency: 0.863076 s, p95 latency: 0.865202 s.
 # ==> Test img2img performance.
-# Mean latency: 0.715326 s, p50 latency: 0.714759 s, p90 latency: 0.715858 s, p95 latency: 0.718002 s.
+# Mean latency: 0.715608 s, p50 latency: 0.713970 s, p90 latency: 0.722402 s, p95 latency: 0.723554 s.
 # ==> Test inpaint_legacy performance.
-# Mean latency: 0.726799 s, p50 latency: 0.726491 s, p90 latency: 0.727381 s, p95 latency: 0.728085 s.
+# Mean latency: 0.723306 s, p50 latency: 0.723204 s, p90 latency: 0.725012 s, p95 latency: 0.726074 s.
 # ==> Test hiresfix performance.
-# Mean latency: 1.452914 s, p50 latency: 1.453080 s, p90 latency: 1.453319 s, p95 latency: 1.453735 s.
+# Mean latency: 1.449147 s, p50 latency: 1.447849 s, p90 latency: 1.454234 s, p95 latency: 1.454289 s.
 
-# zero_copy_infer
+## zero_copy_infer lpw ddim no preconfig
 # ==> Test cycle diffusion performance.
-# Mean latency: 1.320150 s, p50 latency: 1.319936 s, p90 latency: 1.321060 s, p95 latency: 1.321400 s.
-
-# raw
+# Mean latency: 1.347564 s, p50 latency: 1.347331 s, p90 latency: 1.350945 s, p95 latency: 1.352116 s.
+## raw lpw
 # ==> Test cycle diffusion performance.
-# Mean latency: 1.352944 s, p50 latency: 1.351467 s, p90 latency: 1.355291 s, p95 latency: 1.359292 s.
+# Mean latency: 1.358652 s, p50 latency: 1.356717 s, p90 latency: 1.364285 s, p95 latency: 1.364509 s.
 
-# zero_copy_infer
+## zero_copy_infer lpw
 # ==> Test inpaint performance.
-# Mean latency: 0.714265 s, p50 latency: 0.714164 s, p90 latency: 0.715602 s, p95 latency: 0.716116 s.
-# raw
+# Mean latency: 0.663649 s, p50 latency: 0.663355 s, p90 latency: 0.664185 s, p95 latency: 0.665098 s.
+
+## raw lpw
 # ==> Test inpaint performance.
-# Mean latency: 0.727461 s, p50 latency: 0.727120 s, p90 latency: 0.728364 s, p95 latency: 0.728885 s.
+# Mean latency: 0.716995 s, p50 latency: 0.716940 s, p90 latency: 0.717639 s, p95 latency: 0.717953 s.

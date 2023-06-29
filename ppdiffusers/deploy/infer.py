@@ -78,7 +78,7 @@ def parse_arguments():
     parser.add_argument(
         "--parse_prompt_type",
         type=str,
-        default="raw",
+        default="lpw",
         choices=[
             "raw",
             "lpw",

@@ -247,7 +247,7 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline, FastDeployDiff
         eta: float = 0.0,
         generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         latents: Optional[paddle.Tensor] = None,
-        parse_prompt_type: str = "raw",
+        parse_prompt_type: Optional[str] = "lpw",
         max_embeddings_multiples: Optional[int] = 3,
         prompt_embeds: Optional[paddle.Tensor] = None,
         negative_prompt_embeds: Optional[paddle.Tensor] = None,

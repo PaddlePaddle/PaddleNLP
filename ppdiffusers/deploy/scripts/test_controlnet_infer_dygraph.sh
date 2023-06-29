@@ -17,7 +17,7 @@ cd ../controlnet
 python infer_dygraph.py --pretrained_model_name_or_path runwayml/stable-diffusion-v1-5 \
     --controlnet_pretrained_model_name_or_path lllyasviel/sd-controlnet-canny \
     --task_name all --use_fp16 True \
-    --attention_type all --benchmark_steps 5 --device_id 0
+    --attention_type all --benchmark_steps 5 --device_id 0 --parse_prompt_type lpw
 
 # nohup sh test_controlnet_infer_dygraph.sh  1> test_controlnet_infer_dygraph.log 2>&1 & 
 
@@ -27,27 +27,32 @@ python infer_dygraph.py --pretrained_model_name_or_path runwayml/stable-diffusio
 #     --task_name all --use_fp16 False \
 #     --attention_type all --benchmark_steps 5 --device_id 0
 
+# # raw
 # ==> Test text2img_control performance.
-# Mean latency: 2.722880 s, p50 latency: 2.723120 s, p90 latency: 2.723356 s, p95 latency: 2.723377 s.
+# Mean latency: 2.765781 s, p50 latency: 2.765087 s, p90 latency: 2.767249 s, p95 latency: 2.767289 s.
 # ==> Test img2img_control performance.
-# Mean latency: 2.264095 s, p50 latency: 2.263246 s, p90 latency: 2.266077 s, p95 latency: 2.266149 s.
+# Mean latency: 2.249113 s, p50 latency: 2.247525 s, p90 latency: 2.252412 s, p95 latency: 2.253428 s.
 # ==> Test inpaint_legacy_control performance.
-# Mean latency: 2.825745 s, p50 latency: 2.830061 s, p90 latency: 2.831029 s, p95 latency: 2.831048 s.
+# Mean latency: 2.798517 s, p50 latency: 2.798506 s, p90 latency: 2.799392 s, p95 latency: 2.799600 s.
 # ==> Test hiresfix_control performance.
-# Mean latency: 5.640611 s, p50 latency: 5.640518 s, p90 latency: 5.642084 s, p95 latency: 5.642484 s.
+# Mean latency: 5.625017 s, p50 latency: 5.624560 s, p90 latency: 5.626832 s, p95 latency: 5.627412 s.
+
+# # cutlass
 # ==> Test text2img_control performance.
-# Mean latency: 2.368565 s, p50 latency: 2.366539 s, p90 latency: 2.376273 s, p95 latency: 2.378215 s.
+# Mean latency: 2.221491 s, p50 latency: 2.219046 s, p90 latency: 2.226926 s, p95 latency: 2.227513 s.
 # ==> Test img2img_control performance.
-# Mean latency: 1.875008 s, p50 latency: 1.869065 s, p90 latency: 1.888904 s, p95 latency: 1.892682 s.
+# Mean latency: 1.845735 s, p50 latency: 1.845492 s, p90 latency: 1.847032 s, p95 latency: 1.847059 s.
 # ==> Test inpaint_legacy_control performance.
-# Mean latency: 2.363184 s, p50 latency: 2.363031 s, p90 latency: 2.366102 s, p95 latency: 2.366777 s.
+# Mean latency: 2.299109 s, p50 latency: 2.299197 s, p90 latency: 2.300616 s, p95 latency: 2.300845 s.
 # ==> Test hiresfix_control performance.
-# Mean latency: 3.427918 s, p50 latency: 3.431340 s, p90 latency: 3.434431 s, p95 latency: 3.434833 s.
+# Mean latency: 3.397126 s, p50 latency: 3.397122 s, p90 latency: 3.398814 s, p95 latency: 3.399294 s.
+
+# # flash
 # ==> Test text2img_control performance.
-# Mean latency: 2.293702 s, p50 latency: 2.289995 s, p90 latency: 2.302277 s, p95 latency: 2.306250 s.
+# Mean latency: 2.247151 s, p50 latency: 2.245066 s, p90 latency: 2.251284 s, p95 latency: 2.252165 s.
 # ==> Test img2img_control performance.
-# Mean latency: 1.886367 s, p50 latency: 1.886962 s, p90 latency: 1.888798 s, p95 latency: 1.889029 s.
+# Mean latency: 1.831867 s, p50 latency: 1.832337 s, p90 latency: 1.832757 s, p95 latency: 1.832806 s.
 # ==> Test inpaint_legacy_control performance.
-# Mean latency: 2.377716 s, p50 latency: 2.377670 s, p90 latency: 2.379309 s, p95 latency: 2.379732 s.
+# Mean latency: 2.291782 s, p50 latency: 2.290435 s, p90 latency: 2.298838 s, p95 latency: 2.300244 s.
 # ==> Test hiresfix_control performance.
-# Mean latency: 3.239866 s, p50 latency: 3.239475 s, p90 latency: 3.242614 s, p95 latency: 3.243527 s.
+# Mean latency: 3.166110 s, p50 latency: 3.164805 s, p90 latency: 3.171124 s, p95 latency: 3.172821 s.

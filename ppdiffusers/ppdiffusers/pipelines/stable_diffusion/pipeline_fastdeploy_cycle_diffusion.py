@@ -174,7 +174,7 @@ class FastDeployCycleDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPip
         num_images_per_prompt: Optional[int] = 1,
         eta: Optional[float] = 0.1,
         latents: Optional[paddle.Tensor] = None,
-        parse_prompt_type: str = "lpw",
+        parse_prompt_type: Optional[str] = "lpw",
         max_embeddings_multiples: Optional[int] = 3,
         generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         prompt_embeds: Optional[paddle.Tensor] = None,

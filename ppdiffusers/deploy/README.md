@@ -178,7 +178,7 @@ python infer.py --model_dir stable-diffusion-v1-5-inpainting/ --scheduler euler-
 | --task_name | 任务类型，默认为`text2img`，可选列表：`['text2img', 'img2img', 'inpaint', 'inpaint_legacy', 'cycle_diffusion', 'hiresfix', 'all']`。 注意，当`task_name`为`inpaint`时候，我们需要配合`runwayml/stable-diffusion-inpainting@fastdeploy`权重才能正常使用。|
 | --scheduler | 采样器类型。默认为 `'preconfig-euler-ancestral'`。可选列表：`['pndm', 'lms', 'euler', 'euler-ancestral', 'preconfig-euler-ancestral', 'dpm-multi', 'dpm-single', 'unipc-multi', 'ddim', 'ddpm', 'deis-multi', 'heun', 'kdpm2-ancestral', 'kdpm2']`。|
 | --infer_op | 推理所采用的op，可选列表 `['zero_copy_infer', 'raw', 'all']`，`zero_copy_infer`推理速度更快，默认值为`zero_copy_infer`。 |
-| --parse_prompt_type | 处理prompt文本所使用的方法，可选列表 `['raw', 'lpw']`，`lpw`可强调句子中的单词，并且支持更长的文本输入，默认值为`raw`，则使用原版prompt处理方法。 |
+| --parse_prompt_type | 处理prompt文本所使用的方法，可选列表 `['raw', 'lpw']`，`lpw`可强调句子中的单词，并且支持更长的文本输入，默认值为`lpw`。 |
 | --width | 生成图片的宽度，取值范围 512~768。默认值为 512。|
 | --height | 生成图片的高度，取值范围 512~768。默认值为 512。|
 | --hr_resize_width | hiresfix 所要生成的宽度，取值范围 512~768。默认值为 768。|

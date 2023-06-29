@@ -30,7 +30,7 @@ python infer.py \
     --device_id 0 \
     --task_name all \
     --infer_op zero_copy_infer \
-    --benchmark_steps 10
+    --benchmark_steps 10 --parse_prompt_type lpw
 
 python infer.py \
     --model_dir control_sd15_canny \
@@ -41,23 +41,25 @@ python infer.py \
     --device_id 0 \
     --task_name all \
     --infer_op raw \
-    --benchmark_steps 10
+    --benchmark_steps 10 --parse_prompt_type lpw
 # nohup sh test_controlnet_infer_fd.sh  1> test_controlnet_infer_fd.log 2>&1 & 
 
+## zero_copy_infer lpw
 # ==> Test text2img_control performance.
-# Mean latency: 1.124626 s, p50 latency: 1.123942 s, p90 latency: 1.127096 s, p95 latency: 1.128142 s.
+# Mean latency: 1.116596 s, p50 latency: 1.116411 s, p90 latency: 1.117224 s, p95 latency: 1.117570 s.
 # ==> Test img2img_control performance.
-# Mean latency: 1.006784 s, p50 latency: 1.007280 s, p90 latency: 1.008598 s, p95 latency: 1.008995 s.
+# Mean latency: 0.923659 s, p50 latency: 0.923360 s, p90 latency: 0.924491 s, p95 latency: 0.924889 s.
 # ==> Test inpaint_legacy_control performance.
-# Mean latency: 1.010847 s, p50 latency: 1.010749 s, p90 latency: 1.013414 s, p95 latency: 1.013958 s.
+# Mean latency: 0.990658 s, p50 latency: 0.990560 s, p90 latency: 0.991377 s, p95 latency: 0.991382 s.
 # ==> Test hiresfix_control performance.
-# Mean latency: 2.047749 s, p50 latency: 2.047972 s, p90 latency: 2.049623 s, p95 latency: 2.051662 s.
+# Mean latency: 1.941339 s, p50 latency: 1.940671 s, p90 latency: 1.943967 s, p95 latency: 1.944597 s.
 
+## raw lpw
 # ==> Test text2img_control performance.
-# Mean latency: 1.317447 s, p50 latency: 1.317423 s, p90 latency: 1.319283 s, p95 latency: 1.319428 s.
+# Mean latency: 1.316932 s, p50 latency: 1.316731 s, p90 latency: 1.318196 s, p95 latency: 1.318324 s.
 # ==> Test img2img_control performance.
-# Mean latency: 1.092353 s, p50 latency: 1.092538 s, p90 latency: 1.094368 s, p95 latency: 1.094635 s.
+# Mean latency: 1.081752 s, p50 latency: 1.081734 s, p90 latency: 1.081981 s, p95 latency: 1.082050 s.
 # ==> Test inpaint_legacy_control performance.
-# Mean latency: 1.118845 s, p50 latency: 1.102380 s, p90 latency: 1.155136 s, p95 latency: 1.155555 s.
+# Mean latency: 1.088706 s, p50 latency: 1.088135 s, p90 latency: 1.090777 s, p95 latency: 1.091583 s.
 # ==> Test hiresfix_control performance.
-# Mean latency: 2.326568 s, p50 latency: 2.326191 s, p90 latency: 2.328305 s, p95 latency: 2.329674 s.
+# Mean latency: 2.213738 s, p50 latency: 2.212821 s, p90 latency: 2.214525 s, p95 latency: 2.218274 s.
