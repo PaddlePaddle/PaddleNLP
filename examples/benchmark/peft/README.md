@@ -44,7 +44,7 @@
 | LLaMA-13b | bsz 8 ZeRO 2  | OOM                        |  OOM                       | N/A       |
 
 
-### Bloom
+### ChatGLM
 
 | Model         | Method   | Num GPUs | Batch Size | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
 |---------------|----------|----------|------------|--------------|---------------------------|-------------|--------------------------|---------|

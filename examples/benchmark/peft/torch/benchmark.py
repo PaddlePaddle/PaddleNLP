@@ -75,7 +75,7 @@ def main():
     if 'chatglm' in model_args.model_name_or_path:
         # Add empty_init=False for zero3 training, refer to https://github.com/THUDM/ChatGLM-6B/issues/530
         model = AutoModel.from_pretrained(model_args.model_name_or_path, 
-                                        empty_init=False if training_args.deepspeed is not None else True
+                                        empty_init=False if training_args.deepspeed is not None else True,
                                         trust_remote_code=True)
        
     else:
