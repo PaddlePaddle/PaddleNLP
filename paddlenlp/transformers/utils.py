@@ -13,24 +13,47 @@
 # limitations under the License.
 from __future__ import annotations
 
+import contextlib
 import functools
+import hashlib
+import importlib
 import inspect
 import os
+import re
+import shutil
 import warnings
 from contextlib import ExitStack
-from typing import TYPE_CHECKING, ContextManager, List, Optional, Type
+from pathlib import Path
+from typing import TYPE_CHECKING, ContextManager, List, Optional, Type, Union
+
+from filelock import FileLock
+
+from paddlenlp import __version__
+from paddlenlp.utils.downloader import (
+    COMMUNITY_MODEL_PREFIX,
+    download_check,
+    get_path_from_url_with_filelock,
+    is_url,
+    url_file_exists,
+)
 
 if TYPE_CHECKING:
     from paddlenlp.transformers import PretrainedModel
 
 import numpy as np
 import paddle
+import tqdm
+from huggingface_hub import hf_hub_download, try_to_load_from_cache
+from huggingface_hub.utils import EntryNotFoundError
 from paddle.common_ops_import import convert_dtype
 from paddle.nn import Layer
+from requests.exceptions import HTTPError
 
 from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.import_utils import import_module
 from paddlenlp.utils.log import logger
+
+HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
 
 
 def convert_ndarray_dtype(np_array: np.ndarray, target_dtype: str) -> np.ndarray:
@@ -343,6 +366,326 @@ def find_transformer_model_class_by_name(model_name: str) -> Optional[Type[Pretr
     return None
 
 
+def convert_file_size_to_int(size: Union[int, str]):
+    """
+    Converts a size expressed as a string with digits an unit (like `"5MB"`) to an integer (in bytes).
+    Args:
+        size (`int` or `str`): The size to convert. Will be directly returned if an `int`.
+    Example:
+    ```py
+    >>> convert_file_size_to_int("1MiB")
+    1048576
+    ```
+    """
+    if isinstance(size, int):
+        return size
+    if size.upper().endswith("GIB"):
+        return int(size[:-3]) * (2**30)
+    if size.upper().endswith("MIB"):
+        return int(size[:-3]) * (2**20)
+    if size.upper().endswith("KIB"):
+        return int(size[:-3]) * (2**10)
+    if size.upper().endswith("GB"):
+        int_size = int(size[:-2]) * (10**9)
+        return int_size // 8 if size.endswith("b") else int_size
+    if size.upper().endswith("MB"):
+        int_size = int(size[:-2]) * (10**6)
+        return int_size // 8 if size.endswith("b") else int_size
+    if size.upper().endswith("KB"):
+        int_size = int(size[:-2]) * (10**3)
+        return int_size // 8 if size.endswith("b") else int_size
+    raise ValueError("`size` is not in a valid format. Use an integer followed by the unit, e.g., '5GB'.")
+
+
+def paddlenlp_hub_download(
+    repo_id: str,
+    filename: str,
+    *,
+    subfolder: Optional[str] = None,
+    cache_dir: Union[str, Path, None] = None,
+    local_dir: Union[str, Path, None] = None,
+) -> str:
+
+    # check in cache_dir
+    weight_file_path = os.path.join(cache_dir, filename)
+
+    if os.path.exists(weight_file_path):
+        logger.info(f"Already cached {weight_file_path}")
+        return weight_file_path
+
+    # Download from custom model url
+    if is_url(repo_id):
+        # check wether the target file exist in the comunity bos server
+        if url_file_exists(repo_id):
+            logger.info(f"Downloading {repo_id}")
+            weight_file_path = get_path_from_url_with_filelock(repo_id, cache_dir)
+            # # check the downloaded weight file and registered weight file name
+            download_check(repo_id, "paddlenlp_hub_download")
+
+            # make sure that model states names: model_states.pdparams
+            new_weight_file_path = os.path.join(os.path.split(weight_file_path)[0], filename)
+
+            if weight_file_path != new_weight_file_path:
+                # create lock file, which is empty, under the `LOCK_FILE_HOME` directory.
+                lock_file_name = hashlib.md5((repo_id + cache_dir).encode("utf-8")).hexdigest()
+                # create `.lock` private directory in the cache dir
+                lock_file_path = os.path.join(cache_dir, ".lock", lock_file_name)
+
+                with FileLock(lock_file_path):
+                    if not os.path.exists(new_weight_file_path):
+                        shutil.move(weight_file_path, new_weight_file_path)
+
+                weight_file_path = new_weight_file_path
+
+            return weight_file_path
+
+        return None
+
+    # find in community repo
+    community_model_file_path = "/".join([COMMUNITY_MODEL_PREFIX, repo_id, filename])
+    assert is_url(community_model_file_path)
+
+    # check wether the target file exist in the comunity bos server
+    if url_file_exists(community_model_file_path):
+        logger.info(f"Downloading {community_model_file_path}")
+        weight_file_path = get_path_from_url_with_filelock(community_model_file_path, cache_dir)
+        # # check the downloaded weight file and registered weight file name
+        download_check(community_model_file_path, "paddlenlp_hub_download")
+        return weight_file_path
+
+    return None
+
+
+# Return value when trying to load a file from cache but the file does not exist in the distant repo.
+_CACHED_NO_EXIST = object()
+
+
+def cached_file(
+    path_or_repo_id: Union[str, os.PathLike],
+    filename: str,
+    cache_dir: Optional[Union[str, os.PathLike]] = None,
+    subfolder: str = "",
+    _raise_exceptions_for_missing_entries: bool = True,
+    _raise_exceptions_for_connection_errors: bool = True,
+):
+    """
+    Tries to locate a file in a local folder and repo, downloads and cache it if necessary.
+    Args:
+        path_or_repo_id (`str` or `os.PathLike`):
+            This can be either:
+            - a string, the *model id* of a model repo on huggingface.co.
+            - a path to a *directory* potentially containing the file.
+        filename (`str`):
+            The name of the file to locate in `path_or_repo`.
+        cache_dir (`str` or `os.PathLike`, *optional*):
+            Path to a directory in which a downloaded pretrained model configuration should be cached if the standard
+            cache should not be used.
+        subfolder (`str`, *optional*, defaults to `""`):
+            In case the relevant files are located inside a subfolder of the model repo on huggingface.co, you can
+            specify the folder name here.
+
+    Returns:
+        `Optional[str]`: Returns the resolved file (to the cache folder if downloaded from a repo).
+    Examples:
+    ```python
+    # Download a model weight from the Hub and cache it.
+    model_weights_file = cached_file("bert-base-uncased", "pytorch_model.bin")
+    ```
+    """
+
+    if subfolder is None:
+        subfolder = ""
+
+    path_or_repo_id = str(path_or_repo_id)
+    full_filename = os.path.join(subfolder, filename)
+    if os.path.isdir(path_or_repo_id):
+        resolved_file = os.path.join(os.path.join(path_or_repo_id, subfolder), filename)
+        if not os.path.isfile(resolved_file):
+            if _raise_exceptions_for_missing_entries:
+                raise EnvironmentError(
+                    f"{path_or_repo_id} does not appear to have a file named {full_filename}. Checkout "
+                    f"'https://huggingface.co/{path_or_repo_id}/' for available files."
+                )
+            else:
+                return None
+        return resolved_file
+
+    if cache_dir is None:
+        cache_dir = os.path.join(MODEL_HOME, ".cache")
+    if isinstance(cache_dir, Path):
+        cache_dir = str(cache_dir)
+
+    try:
+        # Load from URL or cache if already cached
+        # import pdb;pdb.set_trace()
+        resolved_file = paddlenlp_hub_download(
+            path_or_repo_id,
+            filename,
+            subfolder=None if len(subfolder) == 0 else subfolder,
+            # revision=revision,
+            cache_dir=cache_dir,
+        )
+    except HTTPError as err:
+        # First we try to see if we have a cached version (not up to date):
+        resolved_file = try_to_load_from_cache(path_or_repo_id, full_filename, cache_dir=cache_dir)
+        if resolved_file is not None and resolved_file != _CACHED_NO_EXIST:
+            return resolved_file
+        if not _raise_exceptions_for_connection_errors:
+            return None
+
+        raise EnvironmentError(f"There was a specific connection error when trying to load {path_or_repo_id}:\n{err}")
+
+    return resolved_file
+
+
+def cached_file_for_hf_hub(
+    path_or_repo_id: Union[str, os.PathLike],
+    filename: str,
+    cache_dir: Optional[Union[str, os.PathLike]] = None,
+    subfolder: str = "",
+    _raise_exceptions_for_missing_entries: bool = True,
+):
+
+    if subfolder is None:
+        subfolder = ""
+
+    path_or_repo_id = str(path_or_repo_id)
+    full_filename = os.path.join(subfolder, filename)
+    if os.path.isdir(path_or_repo_id):
+        resolved_file = os.path.join(os.path.join(path_or_repo_id, subfolder), filename)
+        if not os.path.isfile(resolved_file):
+            if _raise_exceptions_for_missing_entries:
+                raise EnvironmentError(
+                    f"{path_or_repo_id} does not appear to have a file named {full_filename}. Checkout "
+                    f"'https://huggingface.co/{path_or_repo_id}' for available files."
+                )
+            else:
+                return None
+        return resolved_file
+
+    if cache_dir is None:
+        cache_dir = os.path.join(MODEL_HOME, ".cache")
+    if isinstance(cache_dir, Path):
+        cache_dir = str(cache_dir)
+
+    try:
+        # Load from URL or cache if already cached
+        download_check(path_or_repo_id, full_filename, addition="from_hf_hub")
+        resolved_file = hf_hub_download(
+            repo_id=path_or_repo_id,
+            filename=full_filename,
+            cache_dir=cache_dir,
+            subfolder=subfolder,
+            library_name="PaddleNLP",
+            library_version=__version__,
+        )
+        return resolved_file
+    except Exception as e:
+        print(e)
+        raise EnvironmentError(
+            f"{path_or_repo_id} is not a local folder and is not a valid model identifier "
+            "listed on 'https://huggingface.co/models'\nIf this is a private repository, make sure to "
+            "pass a token having permission to this repo with `use_auth_token` or log in with "
+            "`huggingface-cli login` and pass `use_auth_token=True`."
+        )
+
+
+def get_checkpoint_shard_files(
+    pretrained_model_name_or_path,
+    index_filename,
+    cache_dir=None,
+    subfolder="",
+):
+    """
+    For a given model:
+    - download and cache all the shards of a sharded checkpoint if `pretrained_model_name_or_path` is a model ID on the
+      Hub
+    - returns the list of paths to all the shards, as well as some metadata.
+    For the description of each arg, see [`PretrainedModel.from_pretrained`]. `index_filename` is the full path to the
+    index (downloaded and cached if `pretrained_model_name_or_path` is a model ID on the Hub).
+    """
+
+    import json
+
+    if not os.path.isfile(index_filename):
+        raise ValueError(f"Can't find a checkpoint index ({index_filename}) in {pretrained_model_name_or_path}.")
+
+    with open(index_filename, "r") as f:
+        index = json.loads(f.read())
+
+    shard_filenames = sorted(set(index["weight_map"].values()))
+    sharded_metadata = index["metadata"]
+    sharded_metadata["all_checkpoint_keys"] = list(index["weight_map"].keys())
+    sharded_metadata["weight_map"] = index["weight_map"].copy()
+
+    # First, let's deal with local folder.
+    if os.path.isdir(pretrained_model_name_or_path):
+        shard_filenames = [os.path.join(pretrained_model_name_or_path, subfolder, f) for f in shard_filenames]
+        return shard_filenames, sharded_metadata
+
+    # At this stage pretrained_model_name_or_path is a model identifier on the Hub
+    cached_filenames = []
+    # Check if the model is already cached or not. We only try the last checkpoint, this should cover most cases of
+    # downloaded (if interrupted).
+    last_shard = try_to_load_from_cache(
+        pretrained_model_name_or_path,
+        shard_filenames[-1],
+        cache_dir=cache_dir,
+    )
+
+    show_progress_bar = last_shard is None
+    for shard_filename in tqdm.tqdm(shard_filenames, desc="Downloading shards", disable=not show_progress_bar):
+        try:
+            cached_filename = paddlenlp_hub_download(
+                pretrained_model_name_or_path,
+                shard_filename,
+                subfolder=None if len(subfolder) == 0 else subfolder,
+                cache_dir=cache_dir,
+            )
+        # We have already dealt with RepositoryNotFoundError and RevisionNotFoundError when getting the index, so
+        # we don't have to catch them here.
+        except EntryNotFoundError:
+            raise EnvironmentError(
+                f"{pretrained_model_name_or_path} does not appear to have a file named {shard_filename} which is "
+                "required according to the checkpoint index."
+            )
+        except HTTPError:
+            raise EnvironmentError(
+                f"We couldn't connect to '{HUGGINGFACE_CO_RESOLVE_ENDPOINT}' to load {shard_filename}. You should try"
+                " again after checking your internet connection."
+            )
+
+        cached_filenames.append(cached_filename)
+
+    return cached_filenames, sharded_metadata
+
+
+def is_safetensors_available():
+    return importlib.util.find_spec("safetensors") is not None
+
+
+@contextlib.contextmanager
+def device_guard(device="cpu", dev_id=0):
+    origin_device = paddle.device.get_device()
+    if device == "cpu":
+        paddle.set_device(device)
+    elif device in ["gpu", "xpu", "npu"]:
+        paddle.set_device("{}:{}".format(device, dev_id))
+    try:
+        yield
+    finally:
+        paddle.set_device(origin_device)
+
+
+def paddlenlp_load(path, map_location="cpu"):
+    assert map_location in ["cpu", "gpu", "xpu", "npu", "numpy", "np"]
+    if map_location in ["numpy", "np"]:
+        return paddle.load(path, return_numpy=True)
+    else:
+        with device_guard(map_location):
+            return paddle.load(path)
+
+
 def is_paddle_support_lazy_init():
     return hasattr(paddle, "LazyGuard")
 
@@ -402,3 +745,23 @@ def weight_name_suffix():
         return "_".join(name)
     else:
         return None
+
+
+def dtype_byte_size(dtype):
+    """
+    Returns the size (in bytes) occupied by one parameter of type `dtype`.
+
+    Example:
+
+    ```py
+    >>> dtype_byte_size(paddle.float32)
+    4
+    ```
+    """
+    if dtype == paddle.bool:
+        return 1 / 8
+    bit_search = re.search(r"[^\d](\d+)$", str(dtype))
+    if bit_search is None:
+        raise ValueError(f"`dtype` is not a valid dtype: {dtype}.")
+    bit_size = int(bit_search.groups()[0])
+    return bit_size // 8

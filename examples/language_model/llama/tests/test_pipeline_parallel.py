@@ -54,7 +54,7 @@ class TestLlama(unittest.TestCase):
             model_class = LlamaForCausalLM
 
         model_name_or_path = "./llama-7b-2l"
-        # model_name_or_path = "facebook/tiny-random-llama"
+        # model_name_or_path = "__internal_testing__/tiny-random-llama"
         # hidden_size = 4096
         model = model_class.from_pretrained(
             model_name_or_path,

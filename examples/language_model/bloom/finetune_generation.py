@@ -67,7 +67,7 @@ class ModelArgument:
     )
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
     num_prefix_tokens: int = field(default=10, metadata={"help": "Number of prefix tokens"})
-    prefix_projection: bool = field(default=True, metadata={"help": "Whether to project the prefix tokens"})
+    prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
     do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
 
 
@@ -240,7 +240,6 @@ def main():
             r=model_args.r,
             lora_alpha=2 * model_args.r,
             merge_weights=model_args.merge_weights,
-            enable_lora_list=[[True, False, True]],
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,
         )
