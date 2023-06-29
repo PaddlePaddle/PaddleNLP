@@ -25,7 +25,7 @@ import requests
 def setup_args():
     """Setup arguments."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=8014)
+    parser.add_argument("--port", type=int, default=8073)
     args = parser.parse_args()
     return args
 
@@ -58,12 +58,11 @@ def launch(args):
         utt_list = [turn["utterance"] for turn in cleaned_context]
 
         data = {
-            "context": utt_list,
+            "context": utterance,
             "top_p": top_p,
             "temperature": temperature,
-            "max_dec_len": max_length,
-            "min_dec_len": 1,
-            "decoding_strategy": "sampling",
+            "max_length": max_length,
+            "min_length": 1,
         }
         result = requests.post(f"http://0.0.0.0:{args.flask_port}/api/chat", json=data).json()
         bot_response = result["result"]["response"]
@@ -160,13 +159,13 @@ def launch(args):
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
             )
 
-    block.launch(server_name="0.0.0.0", server_port=args.port)
+    block.launch(server_name="0.0.0.0", server_port=args.port, debug=True)
 
 
 def main(args):
-    args = setup_args()
     launch(args)
 
 
 if __name__ == "__main__":
-    main()
+    args = setup_args()
+    main(args)

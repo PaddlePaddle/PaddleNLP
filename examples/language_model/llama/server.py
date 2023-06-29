@@ -18,6 +18,8 @@ import os
 import re
 import time
 from multiprocessing.shared_memory import SharedMemory
+from pathlib import Path
+
 
 import paddle.distributed as dist
 from paddle.distributed import fleet
@@ -59,13 +61,30 @@ def write_shared_memory(memory: SharedMemory, sentence: str):
 
 
 SLEEP_SECOND = 0.5
-SHARED_MEMORY_NAME = f"shared_memory_{os.getppid()}"
+SHARED_MEMORY_NAME = "shared_memory"
 
 
 def create_shared_memory(name: int, rank: int):
-    file = f"{SHARED_MEMORY_NAME}-{name}"
-    return SharedMemory(file, create=rank == 0, size=1024 * 100)
+    """create shared memory between multi-process
 
+    Args:
+        name (int): the name of memory block
+        rank (int): the rank of current process
+    """
+    file = f"{SHARED_MEMORY_NAME}-{name}"
+    shared_memory = None
+    if rank !=0:
+        while True:
+            try:
+                shared_memory = SharedMemory(file, size=1024 * 100)
+                print("success create shared_memory")
+                break
+            except FileNotFoundError:
+                time.sleep(0.01)
+                print("sleep for create shared memory")
+    else:
+        shared_memory = SharedMemory(file, create=True, size=1024 * 100)
+    return shared_memory
 
 def init_distributed_env() -> tuple[int, int]:
     """init distributed envs, and only support mp in ErnieBotModel
@@ -116,6 +135,18 @@ def batchfy_text(texts, batch_size):
 
 
 class PredictorServer(Predictor):
+
+    def __init__(self, args=None, tokenizer=None, model=None, **kwargs):
+        super().__init__(args, tokenizer, model, **kwargs)
+
+        self.input_shared_memory = create_shared_memory("input", self.rank)
+        self.output_shared_memory = create_shared_memory("output", self.rank)
+
+        if self.rank == 0:
+            write_shared_memory(self.input_shared_memory, "")
+            write_shared_memory(self.output_shared_memory, "")
+
+
     def start_predict(self, data):
         print("start to predict under data", data)
 
@@ -156,7 +187,7 @@ class PredictorServer(Predictor):
             logger.info(f"Response: {json.dumps(output, indent=2, ensure_ascii=False)}")
             return jsonify(output)
 
-        app.run(host="0.0.0.0", port=self.args.server_port)
+        app.run(host="0.0.0.0", port=self.args.flask_port)
 
     def start_ui_service(self, args):
         # do not support start ui service in one command
@@ -182,16 +213,16 @@ def main(args, predictor: Predictor):
             context = content.pop("context", "")
             content.pop("extra_info", None)
 
-            if "max_dec_len" in content:
-                content["max_length"] = content.pop("max_dec_len")
-
-            if "min_dec_len" in content:
-                content["min_length"] = content.pop("min_dec_len")
-
             generation_args = content
+            predictor.tgt_length = generation_args["max_length"]
 
-            result, _, _ = predictor.predict([context], **generation_args)
+            for key, value in generation_args.items():
+                setattr(predictor.args, key, value)
+            
+            result = predictor.predict(context)
             result = result["result"][0]
+            if not result:
+                result = "invalid response"
             write_shared_memory(predictor.output_shared_memory, result)
             write_shared_memory(predictor.input_shared_memory, "")
 
