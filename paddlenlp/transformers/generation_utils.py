@@ -37,13 +37,6 @@ from paddlenlp.utils.log import logger
 from .model_outputs import ModelOutput
 from .utils import get_scale_by_dtype
 
-try:
-    from paddle import top_p_sampling
-
-    is_top_p_sampling_avaliable = True
-except:
-    is_top_p_sampling_avaliable = False
-
 __all__ = ["GenerationMixin"]
 
 

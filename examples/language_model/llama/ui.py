@@ -54,9 +54,6 @@ def launch(args):
         utterance = utterance.strip().replace("<br>", "\n")
         context = state.setdefault("context", [])
         context.append({"role": "user", "utterance": utterance})
-        cleaned_context = clean_context(context)
-        utt_list = [turn["utterance"] for turn in cleaned_context]
-
         data = {
             "context": utterance,
             "top_p": top_p,

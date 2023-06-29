@@ -14,12 +14,9 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import time
 from multiprocessing.shared_memory import SharedMemory
-from pathlib import Path
-
 
 import paddle.distributed as dist
 from paddle.distributed import fleet
@@ -73,7 +70,7 @@ def create_shared_memory(name: int, rank: int):
     """
     file = f"{SHARED_MEMORY_NAME}-{name}"
     shared_memory = None
-    if rank !=0:
+    if rank != 0:
         while True:
             try:
                 shared_memory = SharedMemory(file, size=1024 * 100)
@@ -85,6 +82,7 @@ def create_shared_memory(name: int, rank: int):
     else:
         shared_memory = SharedMemory(file, create=True, size=1024 * 100)
     return shared_memory
+
 
 def init_distributed_env() -> tuple[int, int]:
     """init distributed envs, and only support mp in ErnieBotModel
@@ -135,7 +133,6 @@ def batchfy_text(texts, batch_size):
 
 
 class PredictorServer(Predictor):
-
     def __init__(self, args=None, tokenizer=None, model=None, **kwargs):
         super().__init__(args, tokenizer, model, **kwargs)
 
@@ -145,7 +142,6 @@ class PredictorServer(Predictor):
         if self.rank == 0:
             write_shared_memory(self.input_shared_memory, "")
             write_shared_memory(self.output_shared_memory, "")
-
 
     def start_predict(self, data):
         print("start to predict under data", data)
@@ -218,7 +214,7 @@ def main(args, predictor: Predictor):
 
             for key, value in generation_args.items():
                 setattr(predictor.args, key, value)
-            
+
             result = predictor.predict(context)
             result = result["result"][0]
             if not result:
