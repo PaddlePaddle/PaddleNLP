@@ -20,3 +20,4 @@ from .lora_layers import (
     LoRAMergedLinear,
 )
 from .lora_model import LoRAModel
+from .lora_quant_layers import QuantedLoRALinear

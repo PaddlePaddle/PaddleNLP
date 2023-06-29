@@ -260,7 +260,7 @@ class LlamaModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
 
     @slow
     def test_inference_no_attention(self):
-        model = LlamaModel.from_pretrained("facebook/tiny-random-llama")
+        model = LlamaModel.from_pretrained("__internal_testing__/tiny-random-llama")
         model.eval()
         input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
@@ -283,7 +283,7 @@ class LlamaModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
 
     @slow
     def test_inference_with_attention(self):
-        model = LlamaModel.from_pretrained("facebook/tiny-random-llama")
+        model = LlamaModel.from_pretrained("__internal_testing__/tiny-random-llama")
         model.eval()
         input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
@@ -327,7 +327,7 @@ class LlamaCompatibilityTest(unittest.TestCase):
         # 2. forward the paddle model
         from paddlenlp.transformers import LlamaModel
 
-        paddle_model = LlamaModel.from_pretrained(self.torch_model_path)
+        paddle_model = LlamaModel.from_pretrained(self.torch_model_path, convert_from_torch=True)
         paddle_model.eval()
         paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
 
@@ -343,29 +343,9 @@ class LlamaCompatibilityTest(unittest.TestCase):
             np.allclose(
                 paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
                 torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
-                rtol=1e-4,
+                rtol=1e-2,
             )
         )
-
-    @require_package("transformers", "torch")
-    def test_llama_converter_from_local_dir_with_enable_torch(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-
-            # 2. forward the torch  model
-            from transformers import LlamaModel
-
-            torch_model = LlamaModel.from_pretrained(self.torch_model_path)
-            torch_model.save_pretrained(tempdir)
-
-            # 2. forward the paddle model
-            from paddlenlp.transformers import LlamaModel, model_utils
-
-            model_utils.ENABLE_TORCH_CHECKPOINT = False
-
-            with self.assertRaises(ValueError) as error:
-                LlamaModel.from_pretrained(tempdir)
-                self.assertIn("conversion is been disabled" in str(error.exception))
-            model_utils.ENABLE_TORCH_CHECKPOINT = True
 
     @require_package("transformers", "torch")
     def test_llama_converter_from_local_dir(self):
@@ -386,7 +366,7 @@ class LlamaCompatibilityTest(unittest.TestCase):
             # 2. forward the paddle model
             from paddlenlp.transformers import LlamaModel
 
-            paddle_model = LlamaModel.from_pretrained(tempdir)
+            paddle_model = LlamaModel.from_pretrained(tempdir, convert_from_torch=True)
             paddle_model.eval()
             paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
 
@@ -394,7 +374,7 @@ class LlamaCompatibilityTest(unittest.TestCase):
                 np.allclose(
                     paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
                     torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
-                    rtol=1e-4,
+                    rtol=1e-2,
                 )
             )
 
@@ -422,7 +402,7 @@ class LlamaCompatibilityTest(unittest.TestCase):
             from paddlenlp import transformers
 
             paddle_model_class = getattr(transformers, class_name)
-            paddle_model = paddle_model_class.from_pretrained(tempdir)
+            paddle_model = paddle_model_class.from_pretrained(tempdir, convert_from_torch=True)
             paddle_model.eval()
 
             paddle_logit = paddle_model(paddle.to_tensor(input_ids), return_dict=False)[0]

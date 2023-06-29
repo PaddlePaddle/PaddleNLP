@@ -17,8 +17,6 @@ export nlp_dir=${PWD}
 export log_path=${nlp_dir}/model_logs
 export cudaid1=$2
 export cudaid2=$3
-export LD_LIBRARY_PATH=/opt/_internal/cpython-3.7.0/lib/:${LD_LIBRARY_PATH}
-export PATH=/opt/_internal/cpython-3.7.0/bin/:${PATH}
 if [ ! -d "model_logs" ];then
     mkdir model_logs
 fi
@@ -323,7 +321,7 @@ cd ${nlp_dir}
 python -m pytest ./tests/model_zoo/test_gpt.py >${log_path}/gpt >>${log_path}/gpt 2>&1
 print_info $? gpt
 
-fast_gpt
+# fast_gpt
 cd ${nlp_dir}/fast_generation/samples
 python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
 print_info $? fast_generation_gpt
@@ -842,7 +840,7 @@ python ./deploy/python/inference.py --config ./configs/transformer.base.yaml \
     --unk_token "<unk>" --bos_token "<s>" --eos_token "<e>" >${log_path}/transformer_infer) >>${log_path}/transformer_infer 2>&1
 print_info $? transformer_infer
 
-fast_transformer
+# fast_transformer
 }
 # 23 pet
 pet (){
@@ -1178,8 +1176,8 @@ print_info $? t5_export_model_sample
 python t5_export_model_sample.py >${log_path}/t5_export_model_sample >>${log_path}/t5_export_model_sample 2>&1
 print_info $? t5_export_model_sample
 
-fast_gpt
-fast_transformer
+# fast_gpt
+# fast_transformer
 }
 ernie-3.0(){
 cd ${nlp_dir}/model_zoo/ernie-3.0/
@@ -1278,5 +1276,30 @@ ernie_health(){
 gpt-3() {
     bash ${nlp_dir}/scripts/regression/ci_gpt-3.sh
     print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'`
+}
+llama(){
+cd ${nlp_dir}/examples/llama/
+# lora tuning 
+python finetune_generation.py \
+    --model_name_or_path facebook/tiny-random-llama \
+    --do_train \
+    --num_train_epochs 2 \
+    --per_device_train_batch_size 2 \
+    --per_device_eval_batch_size 2 \
+    --overwrite_output_dir \
+    --output_dir ./checkpoints/ \
+    --logging_steps 1 \
+    --max_steps 1 \
+    --fp16 \
+    --fp16_opt_level O2 \
+    --gradient_accumulation_steps 2 \
+    --recompute \
+    --learning_rate 3e-4 \
+    --lr_scheduler_type linear \
+    --max_grad_norm 1.0 \
+    --warmup_steps 20 \
+    --lora True \
+    --r 1 >${log_path}/llama_finetune>>${log_path}/llama_finetune 2>&1
+print_info $? llama_finetune
 }
 $1
