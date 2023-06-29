@@ -488,7 +488,9 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline, FastDepl
                     if add_predicted_noise:
                         init_latents_proper = self.scheduler.add_noise(image_latents, noise_pred_uncond, t)
                     else:
-                        init_latents_proper = self.scheduler.add_noise(image_latents, noise, t)
+                        # https://github.com/huggingface/diffusers/pull/3749/files#diff-39d36ab1e622684e35fe6971c12fb44e24756bdc383aba3d7f6e3b1625bdaafc
+                        noise_timestep = timesteps[i + 1]
+                        init_latents_proper = self.scheduler.add_noise(image_latents, noise, noise_timestep)
                 else:
                     init_latents_proper = image_latents
 
