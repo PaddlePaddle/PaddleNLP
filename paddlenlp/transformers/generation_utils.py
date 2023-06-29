@@ -1270,7 +1270,7 @@ class GenerationMixin(object):
                 "you should not specify InputSpec for top_k and top_p parameters, one of InputSpec is expected"
             )
 
-        use_topp_sampling_op = is_top_p_sampling_avaliable or model_kwargs.get("use_topp_sampling", False)
+        use_topp_sampling_op = is_top_p_sampling_avaliable or model_kwargs.get("use_fuse_topp_sampling", False)
         return_scores = model_kwargs.get("return_scores", True)
 
         batch_size, cur_len = paddle.shape(input_ids)

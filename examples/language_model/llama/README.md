@@ -328,3 +328,19 @@ answer: five context: The Broncos took an early lead in Super Bowl 50 and never 
 question: How many total tackles did von Miller get in the Super Bowl?
 --------------------
 ```
+
+## 服务化推理
+
+提供基于 UI 服务化推理，以下命令将会：
+
+1. 启动多卡模型服务，并让其常驻显存，等待执行。
+2. 启动 Flask 服务，监听外部请求。
+3. 启动 Gradio UI 服务，提供可视化交互界面。
+
+```shell
+python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" server.py \
+    --model_name_or_path facebook/llama-7b \
+    --port 8010 \
+    --flask_port 8011 \
+    --src_length 100
+```

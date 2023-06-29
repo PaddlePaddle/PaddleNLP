@@ -29,8 +29,8 @@ def get_parser():
         "--merge_tensor_parallel_path", default=None, help="The directory of model to merge tensor parallel parts."
     )
     parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
-    parser.add_argument("--src_length", type=int, default=50, help="The batch size of data.")
-    parser.add_argument("--tgt_length", type=int, default=100, help="The batch size of data.")
+    parser.add_argument("--src_length", type=int, default=50, help="the max length of source text")
+    parser.add_argument("--tgt_length", type=int, default=100, help="the max length of decoding length")
 
     parser.add_argument("--top_k", type=int, default=1, help="top_k parameter for generation")
     parser.add_argument("--top_p", type=float, default=1.0, help="top_p parameter for generation")
