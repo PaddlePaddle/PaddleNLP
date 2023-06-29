@@ -43,6 +43,15 @@
 | LLaMA-13b | bsz 8 ZeRO 3  | 747.17                     |  712.53                    | 5%        |
 | LLaMA-13b | bsz 8 ZeRO 2  | OOM                        |  OOM                       | N/A       |
 
+
+### Bloom
+
+| Model         | Method   | Num GPUs | Batch Size | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
+|---------------|----------|----------|------------|--------------|---------------------------|-------------|--------------------------|---------|
+| chatglm-6b | LoRA     | 1        | 4          |              | 2654.73                   |             | 1746.32                  | +52%    |
+| chatglm-6b | Finetune | 4        | 8          | MP 4         | 3109.83                   | ZeRO 3      | 1796.79                  | +73%    |
+| chatglm-6b | Finetune | 4        | 16         | MP 4         | 3569.95                   | ZeRO 3      | 2890.00                  | +24%     |
+
 ### TODOs
 
 - Add ChatGLM
