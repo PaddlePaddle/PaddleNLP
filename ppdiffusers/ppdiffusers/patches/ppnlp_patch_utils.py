@@ -1226,10 +1226,14 @@ if is_paddle_available() and is_paddlenlp_available():
         self,
         save_dir: str,
         is_main_process: bool = True,
+        state_dict=None,
         save_function: Callable = None,
+        max_shard_size="10GB",
         safe_serialization: bool = False,
         variant: Optional[str] = None,
         to_diffusers: Optional[bool] = None,
+        *args,
+        **kwargs,
     ):
         if self.constructed_from_pretrained_config() and hasattr(self, "smart_convert"):
             return save_pretrained_v3(
@@ -1241,7 +1245,18 @@ if is_paddle_available() and is_paddlenlp_available():
                 variant=variant,
                 to_diffusers=to_diffusers,
             )
-        return raw_save_pretrained(self, save_dir, variant=variant)
+        return raw_save_pretrained(
+            self,
+            save_dir=save_dir,
+            is_main_process=is_main_process,
+            state_dict=state_dict,
+            save_function=save_function,
+            max_shard_size=max_shard_size,
+            safe_serialization=safe_serialization,
+            variant=variant,
+            *args,
+            **kwargs,
+        )
 
     PretrainedModel.save_pretrained = save_pretrained
 
