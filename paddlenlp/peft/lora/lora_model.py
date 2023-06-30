@@ -270,7 +270,7 @@ class LoRAModel(nn.Layer):
                 )
         if lora_module is None:
             raise ValueError(
-                f"LoRA strategy only support  paddle.nn.Linear or paddle.distributed.fleet.meta_parallel.ColumnParallelLinear. {module}({module_name}) is not supported"
+                f"LoRA strategy only supports paddle.nn.Linear or paddle.distributed.fleet.meta_parallel.ColumnParallelLinear. {module}({module_name}) is not supported。"
             )
 
         lora_module.weight = module.weight
