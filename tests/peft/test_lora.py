@@ -225,6 +225,18 @@ class TestLoraModel(unittest.TestCase):
             config_loaded_results = config_loaded_lora_model(input_ids)
             self.assertTrue(paddle.allclose(original_results[0], config_loaded_results[0]))
 
+    def test_lora_module_raise_exception(self):
+        lora_config = LoRAConfig(
+            target_modules=[".*norm1.*"],
+            r=4,
+            lora_alpha=8,
+            merge_weights=True,
+            enable_lora_list=None,
+        )
+        model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
+        with self.assertRaises(ValueError):
+            LoRAModel(model, lora_config)
+
 
 class TestLoRAConfig(unittest.TestCase):
     def test_save_load(self):
