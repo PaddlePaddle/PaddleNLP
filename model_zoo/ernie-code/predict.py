@@ -11,10 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
-
-sys.path.insert(0, "/home/PaddleNLP")
-# sys.path.append("/home/PaddleNLP")
+import sys;sys.path.insert(0, "/home/E-Code")
 
 import argparse
 
@@ -30,7 +27,7 @@ parser.add_argument(
     type=str,
 )
 parser.add_argument("--input", default="BadZipFileのAliasは、古い Python バージョンとの互換性のために。", type=str)
-parser.add_argument("--source_lang", default="text", type=str)
+# parser.add_argument("--source_lang", default="text", type=str)
 parser.add_argument("--target_lang", default="code", type=str)
 parser.add_argument("--source_prefix", default="translate Japanese to Python: \n", type=str)
 parser.add_argument("--max_length", type=int, default=1024)
