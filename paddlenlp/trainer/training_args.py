@@ -20,6 +20,7 @@ import contextlib
 import json
 import math
 import os
+import time
 import types
 import warnings
 from dataclasses import asdict, dataclass, field
@@ -718,15 +719,13 @@ class TrainingArguments:
             self.use_hybrid_parallel = True
 
         if self.amp_master_grad:
-            if (
-                self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1
-            ) or self.fp16_opt_level != "O2":
+            if self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1:
                 raise ValueError(
-                    "Temporarily amp master grad only suport for tensor/pipeline parallel with fp16_opt_level O2. please set amp_master_grad to False."
+                    "Temporarily amp master grad only suport for tensor/pipeline parallel. please set amp_master_grad to False."
                 )
-            if not (self.bf16 or self.fp16):
-                logger.warning("set amp_master_grad to false since amp is disabled.")
-                self.amp_master_grad = False
+            # if not (self.bf16 or self.fp16):
+            #     logger.warning("set amp_master_grad to false since amp is disabled.")
+            #     self.amp_master_grad = False
 
         if self.use_hybrid_parallel:
             world_size = paddle.distributed.get_world_size()
@@ -777,6 +776,7 @@ class TrainingArguments:
                                 "disable_partial_send_recv",
                                 "enable_delay_scale_loss",
                                 "enable_dp_comm_overlap",
+                                "enable_timer",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -792,7 +792,11 @@ class TrainingArguments:
                     logger.info(f"PP configs:{strategy.pipeline_configs}, use master_grad: {self.amp_master_grad}")
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
-                        "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config,
+                        "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config
+                        and self.data_parallel_degree > 1,
+                        "sharding_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config
+                        and self.sharding_parallel_degree > 1,
+                        "enable_timer": "enable_timer" in pipeline_parallel_config,
                     }
 
                     if self.do_eval:
@@ -807,20 +811,31 @@ class TrainingArguments:
                 if tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
 
+                if tensor_parallel_degree == 1 and sharding_parallel_degree == 1:
+                    order = ["pp", "dp", "sharding", "mp"]
+                else:
+                    order = ["dp", "sharding", "pp", "mp"]
+
                 hybrid_configs = {
                     "dp_degree": self.data_parallel_degree,
                     "mp_degree": tensor_parallel_degree,
                     "pp_degree": pipeline_parallel_degree,
+                    "order": order,
                     "sharding_degree": sharding_parallel_degree,
                 }
 
                 if pipeline_parallel_degree > 1:
                     hybrid_configs["pp_configs"] = dygraph_pp_configs
-                    logger.info(f"using pipline configs:{dygraph_pp_configs}")
+                    logger.info(f"using pipeline configs:{dygraph_pp_configs}")
 
                 # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
                 strategy.hybrid_configs = hybrid_configs
+                paddle.device.cuda.synchronize()
+                start_time = time.time()
                 fleet.init(is_collective=True, strategy=strategy)
+                paddle.device.cuda.synchronize()
+                elapsed = time.time() - start_time
+                logger.info("NCCL-Connection costs {:.2f} ms.".format(elapsed))
 
                 logger.info(strategy)
 
@@ -1035,7 +1050,7 @@ class TrainingArguments:
         if self.save_on_each_node:
             return self.local_process_index == 0
         else:
-            if self.tensor_parallel_degree > 1:
+            if self.use_hybrid_parallel:
                 # save on dataset rank 0
                 return self.sharding_parallel_rank == 0 and self.data_parallel_rank == 0
             else:
