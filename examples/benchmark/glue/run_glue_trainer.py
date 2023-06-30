@@ -201,7 +201,6 @@ def main():
                 ".*linear1.*",
                 ".*linear2.*",
             ],
-            # target_modules=[".*self_attn.q_proj.*", ".*self_attn.v_proj.*"],
             trainable_modules=[".*classifier.*"],
             r=model_args.lora_rank,
             lora_alpha=model_args.lora_alpha,
