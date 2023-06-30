@@ -133,8 +133,8 @@ class LatentDiffusionModel(nn.Layer):
             self.text_encoder = CLIPTextModel.from_pretrained(
                 model_args.pretrained_model_name_or_path + "/" + "text_encoder"
             )
-            freeze_params(self.vae.parameters())
-            logger.info("Freeze vae parameters!")
+            freeze_params(self.text_encoder.parameters())
+            logger.info("Freeze text_encoder parameters!")
             self.unet = UNet2DConditionModel.from_pretrained(
                 model_args.pretrained_model_name_or_path, subfolder="unet"
             )
