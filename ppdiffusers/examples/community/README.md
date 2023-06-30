@@ -6,12 +6,12 @@
 |-|-|-|-|
 |CLIP Guided Stable Diffusion|使用CLIP引导Stable Diffusion实现文生图|[CLIP Guided Stable Diffusion](#clip-guided-stable-diffusion)||
 |Stable Diffusion Interpolation|在不同的prompts或seed的Stable Diffusion潜空间进行插值|[Stable Diffusion Interpolation](#stable-diffusion-interpolation)||
-|Stable Diffusion Mega|一个 Stable Diffusion 管道实现文生图、图生图、图像修复|[Stable Diffusion Mega](#stable-diffusion-mega)||
-|Long Prompt Weighting Stable Diffusion| 一个没有token数目限制的Stable Diffusion管道，支持在prompt中解析权重|[Long Prompt Weighting Stable Diffusion](#long-prompt-weighting-stable-diffusion)||
+|Stable Diffusion Mega|一个集成Stable Diffusion 文生图、图生图、图像修复的Pipeline|[Stable Diffusion Mega](#stable-diffusion-mega)||
+|Long Prompt Weighting Stable Diffusion| 一个没有token数目限制的Stable Diffusion Pipeline，支持在prompt中解析权重|[Long Prompt Weighting Stable Diffusion](#long-prompt-weighting-stable-diffusion)||
 |AUTOMATIC1111 WebUI Stable Diffusion| 与AUTOMATIC1111的WebUI基本一致的Pipeline |[AUTOMATIC1111 WebUI Stable Diffusion](#automatic1111-webui-stable-diffusion)||
 |Stable Diffusion with High Resolution Fixing| 使用高分辨率修复功能进行文图生成|[Stable Diffusion with High Resolution Fixing](#stable-diffusion-with-high-resolution-fixing)||
 |ControlNet Reference Only| 基于参考图片生成与图片相似的图片|[ControlNet Reference Only](#controlnet-reference-only)||
-
+|Stable Diffusion Mixture Tiling| 基于Mixture机制的多文本大图生成Stable Diffusion Pipeline|[Stable Diffusion Mixture Tiling](#stable-diffusion-mixture-tiling)||
 
 ## Example usages
 
@@ -520,3 +520,34 @@ for control_name in ["none", "reference_only", "reference_adain", "reference_ada
 [reference_only]: https://github.com/PaddlePaddle/PaddleNLP/assets/50394665/4d67e752-cddc-40ab-9524-39e8d9b4a428
 [reference_adain]: https://github.com/PaddlePaddle/PaddleNLP/assets/50394665/266968c7-5065-4589-9bd8-47515d50c6de
 [reference_adain+attn]: https://github.com/PaddlePaddle/PaddleNLP/assets/50394665/73d53a4f-e601-4969-9cb8-e3fdf719ae0c
+
+
+### Stable Diffusion Mixture Tiling
+`StableDiffusionHiresFixPipeline` 基于Stable Diffusion进行文图生成，同时启动高分辨率修复功能。该自定义Pipeline生成图像期间共包含两个阶段: 初始生成图像阶段和高清修复阶段。使用方式如下所示：
+
+```python
+from ppdiffusers import LMSDiscreteScheduler, DiffusionPipeline
+
+# Creater scheduler and model (similar to StableDiffusionPipeline)
+scheduler = LMSDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000)
+pipeline = DiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4", scheduler=scheduler, custom_pipeline="mixture_tiling")
+
+# Mixture of Diffusers generation
+image = pipeline(
+    prompt=[[
+        "A charming house in the countryside, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+        "A dirt road in the countryside crossing pastures, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+        "An old and rusty giant robot lying on a dirt road, by jakub rozalski, dark sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece"
+    ]],
+    tile_height=640,
+    tile_width=640,
+    tile_row_overlap=0,
+    tile_col_overlap=256,
+    guidance_scale=8,
+    seed=7178915308,
+    num_inference_steps=50,
+)["images"][0]
+image.save('mixture_tiling' + ".png")
+```
+生成的图片如下所示：
+<center><img src="https://user-images.githubusercontent.com/20476674/250050184-c3d26d20-dbdf-42f6-9723-5f35f628f68e.png" width=100%></center>
