@@ -464,6 +464,10 @@ class TrainingArguments:
             )
         },
     )
+    save_sharded_model: bool = field(
+        default=False,
+        metadata={"help": ("whether saved sharded model when sharding_parallel_degree > 1")},
+    )
     tensor_parallel_degree: int = field(
         default=-1,
         metadata={
@@ -1028,7 +1032,8 @@ class TrainingArguments:
         else:
             if self.use_hybrid_parallel:
                 # save on dataset rank 0
-                return self.sharding_parallel_rank == 0 and self.data_parallel_rank == 0
+                return (self.sharding_parallel_rank == 0 or self.save_sharded_model) \
+                    and self.data_parallel_rank == 0
             else:
                 return self.process_index == 0
 

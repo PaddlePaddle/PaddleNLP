@@ -1807,6 +1807,9 @@ class Trainer:
                     merge_tensor_parallel=merge_tensor_parallel,
                     variant=self.args.weight_name_suffix,
                     is_main_process=self.args.should_save,
+                    save_sharded_model=self.args.save_sharded_model,
+                    optimizer=self.optimizer,
+                    sharding_degree=self.args.sharding_parallel_degree,
                 )
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
@@ -1824,6 +1827,9 @@ class Trainer:
                 merge_tensor_parallel=merge_tensor_parallel,
                 variant=self.args.weight_name_suffix,
                 is_main_process=self.args.should_save,
+                save_sharded_model=self.args.save_sharded_model,
+                optimizer=self.optimizer,
+                sharding_degree=self.args.sharding_parallel_degree,
             )
 
         if self.args.should_save:
