@@ -400,6 +400,13 @@ elif [ ${MODE} = "benchmark_train" ];then
         tar -zxvf laion400m_demo_data.tar.gz
     fi
 
+    if [[ ${model_name} =~ "stable_diffusion_model" ]]; then
+        rm -rf laion400m_demo_data.tar.gz
+        wget https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/laion400m_demo_data.tar.gz
+        rm -rf data
+        tar -zxvf laion400m_demo_data.tar.gz
+    fi
+
     if [[ ${model_name} =~ "llama" ]]; then
         rm -rf llama_sft_demo_data.tar.gz
         wget https://paddlenlp.bj.bcebos.com/models/community/facebook/llama_sft_demo_data.tar.gz

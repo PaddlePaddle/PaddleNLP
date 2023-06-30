@@ -19,7 +19,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.transformers import AutoTokenizer, CLIPTextModel
 from ppdiffusers import (
     AutoencoderKL,
     DDIMScheduler,
@@ -68,49 +68,70 @@ class LatentDiffusionModel(nn.Layer):
         vae_name_or_path = (
             model_args.vae_name_or_path
             if model_args.pretrained_model_name_or_path is None
-            else os.path.join(model_args.pretrained_model_name_or_path, "vqvae")
+            else os.path.join(
+                model_args.pretrained_model_name_or_path, "vqvae" if not model_args.is_sd_model else "vae"
+            )
         )
         self.vae = AutoencoderKL.from_pretrained(vae_name_or_path)
         freeze_params(self.vae.parameters())
         logger.info("Freeze vae parameters!")
 
-        if model_args.pretrained_model_name_or_path is None:
-            assert (
-                model_args.text_encoder_config_file is not None and model_args.unet_config_file is not None
-            ), "we must supply text_encoder_config_file & unet_config_file"
-            # init text_encoder
-            text_encoder_config = read_json(model_args.text_encoder_config_file)
-            vocab_size = text_encoder_config["vocab_size"]
-            max_position_embeddings = text_encoder_config["max_position_embeddings"]
-            if self.tokenizer.vocab_size != vocab_size:
-                logger.info(
-                    f"The tokenizer has a vocab size of {self.tokenizer.vocab_size}, while the text encoder has a vocab size of {vocab_size}, we will use {self.tokenizer.vocab_size} as vocab_size!"
-                )
-                text_encoder_config["vocab_size"] = self.tokenizer.vocab_size
+        # is ldm model
+        if not model_args.is_sd_model:
+            if model_args.pretrained_model_name_or_path is None:
+                assert (
+                    model_args.text_encoder_config_file is not None and model_args.unet_config_file is not None
+                ), "we must supply text_encoder_config_file & unet_config_file"
+                # init text_encoder
+                text_encoder_config = read_json(model_args.text_encoder_config_file)
+                vocab_size = text_encoder_config["vocab_size"]
+                max_position_embeddings = text_encoder_config["max_position_embeddings"]
+                if self.tokenizer.vocab_size != vocab_size:
+                    logger.info(
+                        f"The tokenizer has a vocab size of {self.tokenizer.vocab_size}, while the text encoder has a vocab size of {vocab_size}, we will use {self.tokenizer.vocab_size} as vocab_size!"
+                    )
+                    text_encoder_config["vocab_size"] = self.tokenizer.vocab_size
 
-            if self.tokenizer.model_max_length != max_position_embeddings:
-                logger.info(
-                    f"The tokenizer's model_max_length {self.tokenizer.model_max_length}, while the text encoder's max_position_embeddings is {max_position_embeddings}, we will use {self.tokenizer.model_max_length} as max_position_embeddings!"
+                if self.tokenizer.model_max_length != max_position_embeddings:
+                    logger.info(
+                        f"The tokenizer's model_max_length {self.tokenizer.model_max_length}, while the text encoder's max_position_embeddings is {max_position_embeddings}, we will use {self.tokenizer.model_max_length} as max_position_embeddings!"
+                    )
+                    text_encoder_config["max_position_embeddings"] = self.tokenizer.model_max_length
+                config = LDMBertConfig(**text_encoder_config)
+                self.text_encoder = LDMBertModel(config)
+                self.text_encoder_is_pretrained = False
+                # init unet2d
+                self.unet = UNet2DConditionModel(**read_json(model_args.unet_config_file))
+                self.unet_is_pretrained = False
+            else:
+                # init text_encoder
+                self.text_encoder = LDMBertModel.from_pretrained(
+                    model_args.pretrained_model_name_or_path, subfolder="bert"
                 )
-                text_encoder_config["max_position_embeddings"] = self.tokenizer.model_max_length
-            config = LDMBertConfig(**text_encoder_config)
-            self.text_encoder = LDMBertModel(config)
-            self.text_encoder_is_pretrained = False
-            # init unet2d
-            self.unet = UNet2DConditionModel(**read_json(model_args.unet_config_file))
-            self.unet_is_pretrained = False
+
+                self.text_encoder_is_pretrained = True
+                # init unet2d
+                self.unet = UNet2DConditionModel.from_pretrained(
+                    model_args.pretrained_model_name_or_path, subfolder="unet"
+                )
+                self.unet_is_pretrained = True
+            self.init_weights()
+            # make sure unet text_encoder in train mode, vae in eval mode
+            self.unet.train()
+            self.text_encoder.train()
+            self.vae.eval()
         else:
-            # init text_encoder
-            self.text_encoder = LDMBertModel.from_pretrained(
-                model_args.pretrained_model_name_or_path, subfolder="bert"
+            self.text_encoder = CLIPTextModel.from_pretrained(
+                model_args.pretrained_model_name_or_path + "/" + "text_encoder"
             )
-
-            self.text_encoder_is_pretrained = True
-            # init unet2d
+            freeze_params(self.vae.parameters())
+            logger.info("Freeze vae parameters!")
             self.unet = UNet2DConditionModel.from_pretrained(
                 model_args.pretrained_model_name_or_path, subfolder="unet"
             )
-            self.unet_is_pretrained = True
+            self.unet.train()
+            self.text_encoder.eval()
+            self.vae.eval()
 
         assert model_args.prediction_type in ["epsilon", "v_prediction"]
         self.prediction_type = model_args.prediction_type
@@ -135,7 +156,8 @@ class LatentDiffusionModel(nn.Layer):
                 prediction_type=self.prediction_type,
             )
             self.eval_scheduler.set_timesteps(model_args.num_inference_steps)
-        self.init_weights()
+
+        self.is_sd_model = model_args.is_sd_model
         self.use_ema = model_args.use_ema
         self.noise_offset = model_args.noise_offset
         if self.use_ema:
@@ -149,11 +171,6 @@ class LatentDiffusionModel(nn.Layer):
                     "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
                     f" correctly and a GPU is available: {e}"
                 )
-
-        # make sure unet text_encoder in train mode, vae in eval mode
-        self.unet.train()
-        self.text_encoder.train()
-        self.vae.eval()
 
     def add_noise(
         self,
@@ -247,6 +264,9 @@ class LatentDiffusionModel(nn.Layer):
             )
             noisy_latents = self.add_noise(latents, noise, timesteps)
 
+        if self.is_sd_model:
+            self.text_encoder.eval()
+
         encoder_hidden_states = self.text_encoder(input_ids)[0]
         noise_pred = self.unet(noisy_latents, timesteps, encoder_hidden_states).sample
 
@@ -328,13 +348,14 @@ class LatentDiffusionModel(nn.Layer):
 
     def set_recompute(self, value=False):
         def fn(layer):
-            # ldmbert
-            if hasattr(layer, "enable_recompute"):
-                layer.enable_recompute = value
-                print("Set", layer.__class__, "recompute", layer.enable_recompute)
-            # unet
-            if hasattr(layer, "gradient_checkpointing"):
-                layer.gradient_checkpointing = value
-                print("Set", layer.__class__, "recompute", layer.gradient_checkpointing)
+            if layer.training:
+                # ldmbert
+                if hasattr(layer, "enable_recompute"):
+                    layer.enable_recompute = value
+                    print("Set", layer.__class__, "recompute", layer.enable_recompute)
+                # unet
+                if hasattr(layer, "gradient_checkpointing"):
+                    layer.gradient_checkpointing = value
+                    print("Set", layer.__class__, "recompute", layer.gradient_checkpointing)
 
         self.apply(fn)
