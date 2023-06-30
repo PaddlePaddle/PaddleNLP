@@ -76,15 +76,6 @@ class LatentDiffusionModel(nn.Layer):
         freeze_params(self.vae.parameters())
         logger.info("Freeze vae parameters!")
 
-        def fn_recursive_set_mem_eff(module: nn.Layer):
-            if hasattr(module, "set_use_memory_efficient_attention_xformers"):
-                module.set_use_memory_efficient_attention_xformers(False)
-
-            for child in module.children():
-                fn_recursive_set_mem_eff(child)
-
-        fn_recursive_set_mem_eff(self.vae)
-
         # is ldm model
         if not model_args.is_sd_model:
             if model_args.pretrained_model_name_or_path is None:
@@ -175,6 +166,7 @@ class LatentDiffusionModel(nn.Layer):
         if model_args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
             try:
                 self.unet.enable_xformers_memory_efficient_attention()
+                self.vae.enable_xformers_memory_efficient_attention()
             except Exception as e:
                 logger.warn(
                     "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
@@ -356,15 +348,17 @@ class LatentDiffusionModel(nn.Layer):
         return image.cast("float32").numpy().round()
 
     def set_recompute(self, value=False):
-        def fn(layer):
-            if layer.training:
-                # ldmbert
-                if hasattr(layer, "enable_recompute"):
-                    layer.enable_recompute = value
-                    print("Set", layer.__class__, "recompute", layer.enable_recompute)
-                # unet
-                if hasattr(layer, "gradient_checkpointing"):
-                    layer.gradient_checkpointing = value
-                    print("Set", layer.__class__, "recompute", layer.gradient_checkpointing)
+        if value:
+            self.unet.enable_gradient_checkpointing()
+        # def fn(layer):
+        #     if layer.training:
+        #         # ldmbert
+        #         if hasattr(layer, "enable_recompute"):
+        #             layer.enable_recompute = value
+        #             print("Set", layer.__class__, "recompute", layer.enable_recompute)
+        #         # unet
+        #         if hasattr(layer, "gradient_checkpointing"):
+        #             layer.gradient_checkpointing = value
+        #             print("Set", layer.__class__, "recompute", layer.gradient_checkpointing)
 
-        self.apply(fn)
+        # self.apply(fn)
