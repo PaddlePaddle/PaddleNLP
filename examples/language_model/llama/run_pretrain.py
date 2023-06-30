@@ -111,7 +111,7 @@ class ModelArguments:
         default="llama", metadata={"help": "Only support for llama pre-training for now."}
     )
     model_name_or_path: str = field(
-        default="facebook/tiny-random-llama",
+        default="__internal_testing__/tiny-random-llama",
         metadata={
             "help": "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
         },

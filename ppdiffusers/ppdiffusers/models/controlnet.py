@@ -22,7 +22,7 @@ import paddle.nn.functional as F
 from ..configuration_utils import ConfigMixin, register_to_config
 from ..initializer import zeros_
 from ..utils import BaseOutput, logging
-from .cross_attention import AttnProcessor
+from .attention_processor import AttentionProcessor, AttnProcessor
 from .embeddings import TimestepEmbedding, Timesteps
 from .modeling_utils import ModelMixin
 from .unet_2d_blocks import (
@@ -125,6 +125,7 @@ class ControlNetModel(ModelMixin, ConfigMixin):
         projection_class_embeddings_input_dim: Optional[int] = None,
         controlnet_conditioning_channel_order: str = "rgb",
         conditioning_embedding_out_channels: Optional[Tuple[int]] = (16, 32, 96, 256),
+        global_pool_conditions: bool = False,
         resnet_pre_temb_non_linearity: bool = False,
     ):
         super().__init__()
@@ -204,12 +205,15 @@ class ControlNetModel(ModelMixin, ConfigMixin):
 
         # pre_temb_act_fun opt
         self.resnet_pre_temb_non_linearity = resnet_pre_temb_non_linearity
-        if act_fn == "swish":
-            self.down_resnet_temb_nonlinearity = lambda x: F.silu(x)
-        elif act_fn == "mish":
-            self.down_resnet_temb_nonlinearity = Mish()
-        elif act_fn == "silu":
-            self.down_resnet_temb_nonlinearity = nn.Silu()
+        if resnet_pre_temb_non_linearity:
+            if act_fn == "swish":
+                self.down_resnet_temb_nonlinearity = lambda x: F.silu(x)
+            elif act_fn == "mish":
+                self.down_resnet_temb_nonlinearity = nn.Mish()
+            elif act_fn == "silu":
+                self.down_resnet_temb_nonlinearity = nn.Silu()
+            elif act_fn == "gelu":
+                self.down_resnet_temb_nonlinearity = nn.GELU()
 
         # down
         output_channel = block_out_channels[0]
@@ -331,7 +335,7 @@ class ControlNetModel(ModelMixin, ConfigMixin):
         return controlnet
 
     @property
-    def attn_processors(self) -> Dict[str, AttnProcessor]:
+    def attn_processors(self) -> Dict[str, AttentionProcessor]:
         r"""
         Returns:
             `dict` of attention processors: A dictionary containing all attention processors used in the model with
@@ -340,7 +344,7 @@ class ControlNetModel(ModelMixin, ConfigMixin):
         # set recursively
         processors = {}
 
-        def fn_recursive_add_processors(name: str, module: nn.Layer, processors: Dict[str, AttnProcessor]):
+        def fn_recursive_add_processors(name: str, module: nn.Layer, processors: Dict[str, AttentionProcessor]):
             if hasattr(module, "set_processor"):
                 processors[f"{name}.processor"] = module.processor
 
@@ -354,13 +358,13 @@ class ControlNetModel(ModelMixin, ConfigMixin):
 
         return processors
 
-    def set_attn_processor(self, processor: Union[AttnProcessor, Dict[str, AttnProcessor]]):
+    def set_attn_processor(self, processor: Union[AttentionProcessor, Dict[str, AttentionProcessor]]):
         r"""
         Parameters:
-            `processor (`dict` of `AttnProcessor` or `AttnProcessor`):
+            `processor (`dict` of `AttentionProcessor` or `AttentionProcessor`):
                 The instantiated processor class or a dictionary of processor classes that will be set as the processor
-                of **all** `CrossAttention` layers.
-            In case `processor` is a dict, the key needs to define the path to the corresponding cross attention processor. This is strongly recommended when setting trainablae attention processors.:
+                of **all** `Attention` layers.
+            In case `processor` is a dict, the key needs to define the path to the corresponding cross attention processor. This is strongly recommended when setting trainable attention processors.:
         """
         count = len(self.attn_processors.keys())
 
@@ -383,6 +387,13 @@ class ControlNetModel(ModelMixin, ConfigMixin):
         for name, module in self.named_children():
             fn_recursive_attn_processor(name, module, processor)
 
+    # Copied from ppdiffusers.models.unet_2d_condition.UNet2DConditionModel.set_default_attn_processor
+    def set_default_attn_processor(self):
+        """
+        Disables custom attention processors and sets the default attention implementation.
+        """
+        self.set_attn_processor(AttnProcessor())
+
     def set_attention_slice(self, slice_size):
         r"""
         Enable sliced attention computation.
@@ -391,24 +402,24 @@ class ControlNetModel(ModelMixin, ConfigMixin):
         Args:
             slice_size (`str` or `int` or `list(int)`, *optional*, defaults to `"auto"`):
                 When `"auto"`, halves the input to the attention heads, so attention will be computed in two steps. If
-                `"max"`, maxium amount of memory will be saved by running only one slice at a time. If a number is
+                `"max"`, maximum amount of memory will be saved by running only one slice at a time. If a number is
                 provided, uses as many slices as `attention_head_dim // slice_size`. In this case, `attention_head_dim`
                 must be a multiple of `slice_size`.
         """
         sliceable_head_dims = []
 
-        def fn_recursive_retrieve_slicable_dims(module: nn.Layer):
+        def fn_recursive_retrieve_sliceable_dims(module: nn.Layer):
             if hasattr(module, "set_attention_slice"):
                 sliceable_head_dims.append(module.sliceable_head_dim)
 
             for child in module.children():
-                fn_recursive_retrieve_slicable_dims(child)
+                fn_recursive_retrieve_sliceable_dims(child)
 
         # retrieve number of attention layers
         for module in self.children():
-            fn_recursive_retrieve_slicable_dims(module)
+            fn_recursive_retrieve_sliceable_dims(module)
 
-        num_slicable_layers = len(sliceable_head_dims)
+        num_sliceable_layers = len(sliceable_head_dims)
 
         if slice_size == "auto":
             # half the attention head size is usually a good trade-off between
@@ -416,9 +427,9 @@ class ControlNetModel(ModelMixin, ConfigMixin):
             slice_size = [dim // 2 for dim in sliceable_head_dims]
         elif slice_size == "max":
             # make smallest slice possible
-            slice_size = num_slicable_layers * [1]
+            slice_size = num_sliceable_layers * [1]
 
-        slice_size = num_slicable_layers * [slice_size] if not isinstance(slice_size, list) else slice_size
+        slice_size = num_sliceable_layers * [slice_size] if not isinstance(slice_size, list) else slice_size
 
         if len(slice_size) != len(sliceable_head_dims):
             raise ValueError(
@@ -461,6 +472,7 @@ class ControlNetModel(ModelMixin, ConfigMixin):
         timestep_cond: Optional[paddle.Tensor] = None,
         attention_mask: Optional[paddle.Tensor] = None,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
+        guess_mode: bool = False,
         return_dict: bool = True,
     ) -> Union[ControlNetOutput, Tuple]:
         # TODO junnyu, add this to support pure fp16
@@ -520,6 +532,9 @@ class ControlNetModel(ModelMixin, ConfigMixin):
             class_emb = self.class_embedding(class_labels).cast(self.dtype)
             emb = emb + class_emb
 
+        if self.resnet_pre_temb_non_linearity:
+            emb = self.down_resnet_temb_nonlinearity(emb)
+
         # 2. pre-process
         sample = self.conv_in(sample)
 
@@ -529,21 +544,18 @@ class ControlNetModel(ModelMixin, ConfigMixin):
 
         # 3. down
         down_block_res_samples = (sample,)
-        if self.resnet_pre_temb_non_linearity:
-            down_nonlinear_temb = self.down_resnet_temb_nonlinearity(emb)
-        else:
-            down_nonlinear_temb = emb
+
         for downsample_block in self.down_blocks:
             if hasattr(downsample_block, "has_cross_attention") and downsample_block.has_cross_attention:
                 sample, res_samples = downsample_block(
                     hidden_states=sample,
-                    temb=down_nonlinear_temb,
+                    temb=emb,
                     encoder_hidden_states=encoder_hidden_states,
                     attention_mask=attention_mask,
                     cross_attention_kwargs=cross_attention_kwargs,
                 )
             else:
-                sample, res_samples = downsample_block(hidden_states=sample, temb=down_nonlinear_temb)
+                sample, res_samples = downsample_block(hidden_states=sample, temb=emb)
 
             down_block_res_samples += res_samples
 
@@ -551,7 +563,7 @@ class ControlNetModel(ModelMixin, ConfigMixin):
         if self.mid_block is not None:
             sample = self.mid_block(
                 sample,
-                down_nonlinear_temb,
+                emb,
                 encoder_hidden_states=encoder_hidden_states,
                 attention_mask=attention_mask,
                 cross_attention_kwargs=cross_attention_kwargs,
@@ -569,15 +581,28 @@ class ControlNetModel(ModelMixin, ConfigMixin):
 
         mid_block_res_sample = self.controlnet_mid_block(sample)
 
-        # add conditioning_scale https://github.com/huggingface/diffusers/pull/2627
-        if isinstance(conditioning_scale, float):
-            down_block_res_samples = [sample * conditioning_scale for sample in down_block_res_samples]
-            mid_block_res_sample *= conditioning_scale
+        # 6. scaling
+        if guess_mode:
+            scales = paddle.logspace(-1, 0, len(down_block_res_samples) + 1)  # 0.1 to 1.0
+            scales *= conditioning_scale
+            down_block_res_samples = [sample * scale for sample, scale in zip(down_block_res_samples, scales)]
+            mid_block_res_sample *= scales[-1]  # last one
         else:
+            # add conditioning_scale https://github.com/huggingface/diffusers/pull/2627
+            if isinstance(conditioning_scale, (float, int)):
+                down_block_res_samples = [sample * conditioning_scale for sample in down_block_res_samples]
+                mid_block_res_sample *= conditioning_scale
+            else:
+                down_block_res_samples = [
+                    sample * ccs for sample, ccs in zip(down_block_res_samples, conditioning_scale[:-1])
+                ]
+                mid_block_res_sample *= conditioning_scale[-1]
+
+        if self.config.global_pool_conditions:
             down_block_res_samples = [
-                sample * ccs for sample, ccs in zip(down_block_res_samples, conditioning_scale[:-1])
+                paddle.mean(sample, axis=(2, 3), keepdim=True) for sample in down_block_res_samples
             ]
-            mid_block_res_sample *= conditioning_scale[-1]
+            mid_block_res_sample = paddle.mean(mid_block_res_sample, axis=(2, 3), keepdim=True)
 
         if not return_dict:
             return (down_block_res_samples, mid_block_res_sample)

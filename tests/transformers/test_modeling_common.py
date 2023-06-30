@@ -203,7 +203,7 @@ def check_two_model_parameter(first_model: PretrainedModel, second_model: Pretra
     # random choice the keys to compare
     key = random.choice(list(first_model.state_dict().keys()))
     diff = first_model.state_dict()[key] - second_model.state_dict()[key]
-    assert diff.sum().numpy().item() == 0
+    assert diff.sum().item() == 0
 
 
 class ModelTesterMixin:

@@ -1,2 +1,3 @@
+protobuf==3.20.2 
 ray[tune]>=2.0
 hyperopt>=0.2.5

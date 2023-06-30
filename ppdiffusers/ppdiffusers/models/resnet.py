@@ -1,5 +1,6 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2023 The HuggingFace Team. All rights reserved.
+# `TemporalConvLayer` Copyright 2023 Alibaba DAMO-VILAB, The ModelScope Team and The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -432,7 +433,7 @@ class ResnetBlock2D(nn.Layer):
         time_embedding_norm (`str`, *optional*, default to `"default"` ): Time scale shift config.
             By default, apply timestep embedding conditioning with a simple shift mechanism. Choose "scale_shift" or
             "ada_group" for a stronger conditioning with scale and shift.
-        kernal (`paddle.Tensor`, optional, default to None): FIR filter, see
+        kernel (`paddle.Tensor`, optional, default to None): FIR filter, see
             [`~models.resnet.FirUpsample2D`] and [`~models.resnet.FirDownsample2D`].
         output_scale_factor (`float`, *optional*, default to be `1.0`): the scale factor to use for the output.
         use_in_shortcut (`bool`, *optional*, default to `True`):
@@ -458,6 +459,7 @@ class ResnetBlock2D(nn.Layer):
         pre_norm=True,
         eps=1e-6,
         non_linearity="swish",
+        skip_time_act: bool = False,  # skip_time_act is the same as pre_temb_non_linearity
         time_embedding_norm="default",  # default, scale_shift, ada_group
         kernel=None,
         output_scale_factor=1.0,
@@ -466,7 +468,7 @@ class ResnetBlock2D(nn.Layer):
         down=False,
         conv_shortcut_bias: bool = True,
         conv_2d_out_channels: Optional[int] = None,
-        pre_temb_non_linearity: bool = False,
+        pre_temb_non_linearity: bool = False,  # skip_time_act is the same as pre_temb_non_linearity
     ):
         super().__init__()
         self.pre_temb_non_linearity = pre_temb_non_linearity
@@ -480,6 +482,7 @@ class ResnetBlock2D(nn.Layer):
         self.down = down
         self.output_scale_factor = output_scale_factor
         self.time_embedding_norm = time_embedding_norm
+        self.skip_time_act = skip_time_act
 
         if groups_out is None:
             groups_out = groups
@@ -567,10 +570,9 @@ class ResnetBlock2D(nn.Layer):
         hidden_states = self.conv1(hidden_states)
 
         if self.time_emb_proj is not None:
-            if not self.pre_temb_non_linearity:
-                temb = self.time_emb_proj(self.nonlinearity(temb))[:, :, None, None]
-            else:
-                temb = self.time_emb_proj(temb)[:, :, None, None]
+            if not self.pre_temb_non_linearity and not self.skip_time_act:
+                temb = self.nonlinearity(temb)
+            temb = self.time_emb_proj(temb)[:, :, None, None]
 
         if temb is not None and self.time_embedding_norm == "default":
             hidden_states = hidden_states + temb
@@ -848,7 +850,7 @@ class TemporalConvLayer(nn.Layer):
 
     def forward(self, hidden_states, num_frames=1):
         hidden_states = (
-            hidden_states[(None), :]
+            hidden_states[None, :]
             .reshape((-1, num_frames) + tuple(hidden_states.shape[1:]))
             .transpose(perm=[0, 2, 1, 3, 4])
         )

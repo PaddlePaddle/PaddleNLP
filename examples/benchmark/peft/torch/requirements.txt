@@ -1,7 +1,6 @@
 deepspeed==0.9.4
-accelerate==0.20.1
 datasets==2.12.0
-peft==0.4.0.dev0
-transformers==4.29.2
+peft @ git+https://github.com/huggingface/peft.git
+transformers==4.30.2
 torch==2.0.1
 # CUDA VERSION 11.7

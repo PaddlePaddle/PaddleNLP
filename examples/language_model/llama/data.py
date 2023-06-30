@@ -117,7 +117,7 @@ def custom_instruction_convert_example(
         else:
             input_seq = prompt_no_input.format_map(example)
 
-        output_seq = example["output"]
+        output_seq = example["output"] + tokenizer.eos_token
     else:
         instruction = ""
         input = ""
@@ -131,13 +131,12 @@ def custom_instruction_convert_example(
             input = example["input"]
 
         input_seq = instruction + input
-        output_seq = output
+        output_seq = output + tokenizer.eos_token
 
     # To compatible with compile training mode in benchmark, input will be pad to fix length
     source_tokenized = tokenizer(
         input_seq,
         return_tensors="pd",
-        padding="loggest" if not benchmark else "max_length",
         max_length=data_args.src_length if not benchmark else model_max_length,
         truncation=True,
     )
@@ -151,7 +150,6 @@ def custom_instruction_convert_example(
     example_tokenized = tokenizer(
         input_seq + output_seq,
         return_tensors="pd",
-        padding="loggest" if not benchmark else "max_length",
         max_length=total_length if not benchmark else model_max_length,
         truncation=True,
     )

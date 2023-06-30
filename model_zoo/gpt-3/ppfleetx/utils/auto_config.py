@@ -199,7 +199,7 @@ def process_strategy(config):
         # pipeline config
         pipeline = strategy.pipeline
         pipeline.enable = True
-        pipeline.schedule_mode = "1F1B"
+        pipeline.schedule_mode = config.Distributed.get("schedule_mode", "1F1B")
         pipeline.micro_batch_size = config.Global.micro_batch_size
         pipeline.accumulate_steps = accumulate_steps
     elif accumulate_steps > 1:

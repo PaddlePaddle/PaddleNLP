@@ -338,27 +338,36 @@ images[0].save("lpw.png")
 * 输入的 token 没有长度限制，可以超过77；
 * 支持clip_skip，即可以使用不同层text_encoder的输出；
 * 支持直接加载webui中的textual_inversion权重；
-
+* 支持ControlNet；
 
 ```python
-import paddle
-from ppdiffusers.utils import image_grid
-from ppdiffusers import DiffusionPipeline
-from webui_stable_diffusion import WebUIStableDiffusionPipeline
 from pathlib import Path
 
-pipe = WebUIStableDiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix", paddle_dtype=paddle.float16)
+import cv2
+import numpy as np
+import paddle
+from PIL import Image
+from webui_stable_diffusion import WebUIStableDiffusionPipeline
+
+from ppdiffusers import ControlNetModel, DiffusionPipeline
+from ppdiffusers.utils import image_grid, load_image
+
+# 支持controlnet模型
+controlnet = ControlNetModel.from_pretrained("lllyasviel/sd-controlnet-canny", paddle_dtype=paddle.float16)
+pipe = WebUIStableDiffusionPipeline.from_pretrained(
+    "TASUKU2023/Chilloutmix", controlnet=controlnet, paddle_dtype=paddle.float16
+)
 # 或者
-# pipe = DiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix", paddle_dtype=paddle.float16, custom_pipeline="webui_stable_diffusion")
+# pipe = DiffusionPipeline.from_pretrained("TASUKU2023/Chilloutmix", controlnet=controlnet, paddle_dtype=paddle.float16, custom_pipeline="webui_stable_diffusion")
 
 # 自动下载civitai的lora及ti文件（请注意自己的网络。）
 # 介绍网页，程序将自动搜索介绍网页的下载链接
-pipe.download_civitai_lora_file('https://civitai.com/models/15365/hanfu')
-pipe.download_civitai_lora_file('https://civitai.com/models/12597/moxin')
-pipe.download_civitai_ti_file('https://civitai.com/models/1998/autumn-style')
-pipe.download_civitai_ti_file('https://civitai.com/models/21131/daisy-ridley-embedding')
+pipe.download_civitai_lora_file("https://civitai.com/models/15365/hanfu")
+pipe.download_civitai_lora_file("https://civitai.com/models/12597/moxin")
+pipe.download_civitai_ti_file("https://civitai.com/models/1998/autumn-style")
+pipe.download_civitai_ti_file("https://civitai.com/models/21131/daisy-ridley-embedding")
 # 纯下载链接
-pipe.download_civitai_lora_file('https://civitai.com/api/download/models/21656')
+pipe.download_civitai_lora_file("https://civitai.com/api/download/models/21656")
 
 print("Supported Lora: " + "、 ".join([p.stem for p in Path(pipe.LORA_DIR).glob("*.safetensors")]))
 
@@ -376,20 +385,75 @@ for enable_lora in [True, False]:
         generator = paddle.Generator().manual_seed(0)
         # guidance_scale
         guidance_scale = 3.5
-        prompt = "# shukezouma, negative space, , shuimobysim , portrait of a woman standing , willow branches, (masterpiece, best quality:1.2), traditional chinese ink painting, <lora:Moxin_10:1.0>, modelshoot style, peaceful, (smile), looking at viewer, wearing long hanfu, hanfu, song, willow tree in background, wuchangshuo,"
+        prompt = "# shukezouma, negative space, , shuimobysim , portrait of a woman standing , willow branches, (masterpiece, best quality:1.2), traditional chinese ink painting, <lora:MoXinV1:1.0>, modelshoot style, peaceful, (smile), looking at viewer, wearing long hanfu, hanfu, song, willow tree in background, wuchangshuo,"
         negative_prompt = "(worst quality:2), (low quality:2), (normal quality:2), lowres, normal quality, skin spots, acnes, skin blemishes, age spot, glans, (watermark:2),"
-        img = pipe(prompt, negative_prompt=negative_prompt, num_inference_steps=50, height=768, width=512, clip_skip=clip_skip, guidance_scale=guidance_scale, generator=generator, enable_lora=enable_lora).images[0]
+        img = pipe(
+            prompt,
+            negative_prompt=negative_prompt,
+            num_inference_steps=50,
+            height=768,
+            width=512,
+            clip_skip=clip_skip,
+            guidance_scale=guidance_scale,
+            generator=generator,
+            enable_lora=enable_lora,
+        ).images[0]
         images.append(img)
     if enable_lora:
         image_grid(images, 2, 2).save(f"lora_enable.png")
     else:
         image_grid(images, 2, 2).save(f"lora_disable.png")
+
+
+image = np.array(
+    load_image("https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/control_bird_canny_demo.png")
+)
+image = cv2.Canny(image, 100, 200)
+image = image[:, :, None]
+image = np.concatenate([image] * 3, axis=2)
+canny_image = Image.fromarray(image)
+canny_image = canny_image.resize((512, 768))
+
+# controlnet
+for enable_lora in [True, False]:
+    images = []
+    for sc in scheduler_name:
+        pipe.switch_scheduler(sc)
+        clip_skip = 1
+        generator = paddle.Generator().manual_seed(0)
+        guidance_scale = 3.5
+        prompt = "a bird <lora:MoXinV1:1.0>"
+        negative_prompt = "(worst quality:2), (low quality:2), (normal quality:2), lowres, normal quality, skin spots, acnes, skin blemishes, age spot, glans, (watermark:2),"
+        img = pipe(
+            prompt,
+            image=canny_image,
+            negative_prompt=negative_prompt,
+            num_inference_steps=50,
+            height=None,  # auto detect image height and width
+            width=None,  # auto detect image height and width
+            clip_skip=clip_skip,
+            guidance_scale=guidance_scale,
+            generator=generator,
+            enable_lora=enable_lora,
+            resize_mode=1,
+            controlnet_conditioning_scale=1.0,
+        ).images[0]
+        images.append(img)
+    if enable_lora:
+        image_grid(images, 2, 2).save(f"lora_enable_controlnet.png")
+    else:
+        image_grid(images, 2, 2).save(f"lora_disable_controlnet.png")
 ```
 
 生成的图片如下所示：
-| lora_disable.png | lora_enable.png |
-|:----------:|:--------------:|
-|<center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832029-c06a1367-1f2c-4206-9666-99854fcee240.png" width=50%></center> | <center class="half"><img src="https://user-images.githubusercontent.com/50394665/230832028-730ce442-dd34-4e36-afd0-81d40843359a.png" width=50%></center> |
+|       lora_disable.png       |       lora_enable.png       |       lora_disable_controlnet.png       |       lora_enable_controlnet.png       |
+|:-------------------:|:-------------------:|:-------------------:|:-------------------:|
+|![][lora_disable]|![][lora_enable]|![][lora_disable_controlnet]|![][lora_enable_controlnet]|
+
+[lora_disable]: https://user-images.githubusercontent.com/50394665/230832029-c06a1367-1f2c-4206-9666-99854fcee240.png
+[lora_enable]: https://user-images.githubusercontent.com/50394665/230832028-730ce442-dd34-4e36-afd0-81d40843359a.png
+[lora_disable_controlnet]: https://github.com/PaddlePaddle/PaddleNLP/assets/50394665/49ad234e-f92c-4e55-9d4c-86b5d392d704
+[lora_enable_controlnet]: https://github.com/PaddlePaddle/PaddleNLP/assets/50394665/cda43315-cfa5-490a-a2ab-09d9ded7bf44
 
 ### Stable Diffusion with High Resolution Fixing
 `StableDiffusionHiresFixPipeline` 基于Stable Diffusion进行文图生成，同时启动高分辨率修复功能。该自定义Pipeline生成图像期间共包含两个阶段: 初始生成图像阶段和高清修复阶段。使用方式如下所示：

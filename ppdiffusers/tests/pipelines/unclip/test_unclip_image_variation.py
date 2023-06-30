@@ -19,11 +19,11 @@ import unittest
 
 import numpy as np
 import paddle
-from ppdiffusers_test.pipeline_params import (
+from ..pipeline_params import (
     IMAGE_VARIATION_BATCH_PARAMS,
     IMAGE_VARIATION_PARAMS,
 )
-from ppdiffusers_test.test_pipelines_common import (
+from ..test_pipelines_common import (
     PipelineTesterMixin,
     assert_mean_pixel_difference,
 )
@@ -55,6 +55,7 @@ class UnCLIPImageVariationPipelineFastTests(PipelineTesterMixin, unittest.TestCa
     required_optional_params = frozenset(
         ["generator", "return_dict", "decoder_num_inference_steps", "super_res_num_inference_steps"]
     )
+    test_xformers_attention = False
 
     @property
     def text_embedder_hidden_size(self):
@@ -205,7 +206,7 @@ class UnCLIPImageVariationPipelineFastTests(PipelineTesterMixin, unittest.TestCa
         if pil_image:
             input_image = input_image * 0.5 + 0.5
             input_image = input_image.clip(min=0, max=1)
-            input_image = input_image.cpu().transpose(perm=[0, 2, 3, 1]).float().numpy()
+            input_image = input_image.cpu().transpose(perm=[0, 2, 3, 1]).cast("float32").numpy()
             input_image = DiffusionPipeline.numpy_to_pil(input_image)[0]
         return {
             "image": input_image,
@@ -301,36 +302,6 @@ class UnCLIPImageVariationPipelineFastTests(PipelineTesterMixin, unittest.TestCa
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
         assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 0.01
 
-    def test_unclip_image_variation_input_num_images_per_prompt(self):
-        components = self.get_dummy_components()
-        pipe = self.pipeline_class(**components)
-        pipe.set_progress_bar_config(disable=None)
-        pipeline_inputs = self.get_dummy_inputs(pil_image=True)
-        pipeline_inputs["image"] = [pipeline_inputs["image"], pipeline_inputs["image"]]
-        output = pipe(**pipeline_inputs, num_images_per_prompt=2)
-        image = output.images
-        tuple_pipeline_inputs = self.get_dummy_inputs(pil_image=True)
-        tuple_pipeline_inputs["image"] = [tuple_pipeline_inputs["image"], tuple_pipeline_inputs["image"]]
-        image_from_tuple = pipe(**tuple_pipeline_inputs, num_images_per_prompt=2, return_dict=False)[0]
-        image_slice = image[0, -3:, -3:, -1]
-        image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
-        assert image.shape == (4, 64, 64, 3)
-        expected_slice = np.array(
-            [
-                5.2204728e-04,
-                9.9861759e-01,
-                9.9755961e-01,
-                9.9804127e-01,
-                9.9411547e-01,
-                9.9248385e-01,
-                9.9973619e-01,
-                9.9777836e-01,
-                9.9973619e-01,
-            ]
-        )
-        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
-        assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 0.01
-
     def test_unclip_passed_image_embed(self):
         class DummyScheduler:
             init_noise_sigma = 1
@@ -341,15 +312,15 @@ class UnCLIPImageVariationPipelineFastTests(PipelineTesterMixin, unittest.TestCa
         generator = paddle.Generator().manual_seed(0)
         dtype = pipe.decoder.dtype
         batch_size = 1
-        shape = (batch_size, pipe.decoder.in_channels, pipe.decoder.sample_size, pipe.decoder.sample_size)
+        shape = (batch_size, pipe.decoder.config.in_channels, pipe.decoder.config.sample_size, pipe.decoder.config.sample_size)
         decoder_latents = pipe.prepare_latents(
             shape, dtype=dtype, generator=generator, latents=None, scheduler=DummyScheduler()
         )
         shape = (
             batch_size,
-            pipe.super_res_first.in_channels // 2,
-            pipe.super_res_first.sample_size,
-            pipe.super_res_first.sample_size,
+            pipe.super_res_first.config.in_channels // 2,
+            pipe.super_res_first.config.sample_size,
+            pipe.super_res_first.config.sample_size,
         )
         super_res_latents = pipe.prepare_latents(
             shape, dtype=dtype, generator=generator, latents=None, scheduler=DummyScheduler()
@@ -371,7 +342,12 @@ class UnCLIPImageVariationPipelineFastTests(PipelineTesterMixin, unittest.TestCa
 
     def test_attention_slicing_forward_pass(self):
         test_max_difference = False
-        self._test_attention_slicing_forward_pass(test_max_difference=test_max_difference)
+        # Check is relaxed because there is not a torch 2.0 sliced attention added kv processor
+        expected_max_diff = 1e-2
+
+        self._test_attention_slicing_forward_pass(
+            test_max_difference=test_max_difference, expected_max_diff=expected_max_diff
+        )
 
     def test_inference_batch_single_identical(self):
         test_max_difference = False

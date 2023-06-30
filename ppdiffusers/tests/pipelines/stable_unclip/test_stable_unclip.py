@@ -16,11 +16,11 @@
 import unittest
 
 import paddle
-from ppdiffusers_test.pipeline_params import (
+from ..pipeline_params import (
     TEXT_TO_IMAGE_BATCH_PARAMS,
     TEXT_TO_IMAGE_PARAMS,
 )
-from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
+from ..test_pipelines_common import PipelineTesterMixin
 
 from paddlenlp.transformers import (
     CLIPTextConfig,
