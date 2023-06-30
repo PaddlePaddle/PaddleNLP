@@ -235,7 +235,7 @@ def main():
             activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
             weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype=dtype)
         else:
-            raise ValueError("qat_typeshould be A8W8, W4, A8W4")
+            raise ValueError("qat_type should be one of ['A8W8', 'W4', 'A8W4']")
 
         q_config.add_type_config(LoRALinear, weight=weight, activation=activation)
         q_config.add_type_config(nn.Linear, weight=weight, activation=activation)
