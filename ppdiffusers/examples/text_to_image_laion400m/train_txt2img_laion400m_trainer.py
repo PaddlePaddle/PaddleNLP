@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import argparse
 import itertools
 import math
 import os
@@ -28,9 +29,23 @@ from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_chec
 from paddlenlp.utils.log import logger
 
 
+def str2bool(v):
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise argparse.ArgumentTypeError("Unsupported value encountered.")
+
+
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    training_args.enable_xformers_memory_efficient_attention = (
+        model_args.enable_xformers_memory_efficient_attention
+    ) = str2bool(os.getenv("FLAG_XFORMERS", "False"))
+    training_args.recompute = model_args.recompute = str2bool(os.getenv("FLAG_RECOMPUTE", "False"))
+
     # report to custom_visualdl
     training_args.report_to = ["custom_visualdl"]
     training_args.resolution = data_args.resolution
@@ -87,8 +102,12 @@ def main():
         model=model, args=training_args, train_dataset=train_dataset, tokenizer=model.tokenizer
     )
     # must set recompute after trainer init
-    trainer.model.set_recompute(training_args.recompute)
-    params_to_train = itertools.chain(trainer.model.text_encoder.parameters(), trainer.model.unet.parameters())
+    if training_args.recompute:
+        trainer.model.set_recompute(training_args.recompute)
+    if model_args.is_sd_model:
+        params_to_train = trainer.model.unet.parameters()
+    else:
+        params_to_train = itertools.chain(trainer.model.text_encoder.parameters(), trainer.model.unet.parameters())
     trainer.set_optimizer_grouped_parameters(params_to_train)
 
     checkpoint = None

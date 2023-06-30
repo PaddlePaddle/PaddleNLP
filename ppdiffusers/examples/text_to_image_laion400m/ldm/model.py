@@ -76,6 +76,15 @@ class LatentDiffusionModel(nn.Layer):
         freeze_params(self.vae.parameters())
         logger.info("Freeze vae parameters!")
 
+        def fn_recursive_set_mem_eff(module: nn.Layer):
+            if hasattr(module, "set_use_memory_efficient_attention_xformers"):
+                module.set_use_memory_efficient_attention_xformers(False)
+
+            for child in module.children():
+                fn_recursive_set_mem_eff(child)
+
+        fn_recursive_set_mem_eff(self.vae)
+
         # is ldm model
         if not model_args.is_sd_model:
             if model_args.pretrained_model_name_or_path is None:
