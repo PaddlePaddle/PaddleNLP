@@ -28,6 +28,7 @@ import sys
 import time
 import types
 from collections.abc import Mapping
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -100,6 +101,7 @@ from .utils.helper import (  # nested_truncate,
     nested_numpify,
     nested_truncate,
 )
+import json
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
 DEFAULT_PROGRESS_CALLBACK = ProgressCallback
@@ -111,6 +113,7 @@ TRAINER_STATE_NAME = "trainer_state.json"
 OPTIMIZER_NAME = "optimizer.pdopt"
 SCHEDULER_NAME = "scheduler.pdparams"
 SCALER_NAME = "scaler.pdparams"
+
 
 
 if is_datasets_available():
@@ -410,39 +413,126 @@ class Trainer:
                 `bool` and equals `True`, load the last checkpoint in *args.output_dir* as saved by a previous instance
                 of [`Trainer`]. Only load model state dict.
         """
-        resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
+        resume_from_checkpoint = self.check_resume_from_checkpoint(resume_from_checkpoint)
 
+        if resume_from_checkpoint is None:
+            return
+
+        if self.args.load_sharded_model:
+            state_dict = self.load_multiple_state_dict_from_checkpoint(resume_from_checkpoint)
+        else:
+            state_dict = self.load_one_state_dict_from_checkpoint(resume_from_checkpoint, self.args.weight_name_suffix)
+        # If the model is on the GPU, it still works!
+        self._set_state_dict_in_model(state_dict)
+        # release memory
+        del state_dict
+
+    def _all_gather_state_dict(self, state_dict, filter_func, group=None):
+        if group is None:
+            group = self.hcg.get_sharding_parallel_group()
+        state_list = list(state_dict.items())
+
+        def map_func(weight):
+            if isinstance(weight, paddle.Tensor):
+                weight = weight.numpy()
+            return weight
+
+        state_list = [(e[0], map_func(e[1])) for e in state_list]
+        len_res = []
+        obj_len = paddle.to_tensor(len(state_list))
+        gather_res = OrderedDict()
+        paddle.distributed.all_gather(len_res, obj_len, group=group)
+        max_len = int(max(len_res).item())
+        for i in range(max_len):
+            tmp = []
+            if i >= obj_len:
+                send_item = ("pack", np.array([]))
+            else:
+                send_item = state_list[i]
+            paddle.distributed.all_gather_object(tmp, send_item, group=group)
+            for recv_item in tmp:
+                if recv_item[0] == "pack" and recv_item[1].size == 0:
+                    continue
+                if not filter_func(recv_item[0]):
+                    continue
+                gather_res[recv_item[0]] = paddle.to_tensor(recv_item[1], place=paddle.CPUPlace())
+            print(f"{i} gather {recv_item[0]} ")
+        return gather_res
+
+
+    def load_multiple_state_dict_from_checkpoint(self, resume_from_checkpoint):
+        """load state_dict of multiple shard from_checkpoint, Only load model state dict."""
+        meta_path = os.path.join(resume_from_checkpoint, MODEL_META_NAME)
+        assert os.path.exists(meta_path), f"meta_path"
+        with open(meta_path, 'r') as handle:
+            model_dist_meta = json.load(handle)
+        assert "parallel_config" in model_dist_meta
+        parallel_config = model_dist_meta["parallel_config"]
+        assert "pp_degree" in parallel_config
+        assert "mp_degree" in parallel_config
+        assert "sharding_dgree" in parallel_config
+        pp_degree =  parallel_config["pp_degree"]
+        mp_degree = parallel_config["mp_degree"]
+        sharding_degree = parallel_config["sharding_dgree"]
+        self.args.pipeline_parallel_degree == pp_degree
+        self.args.tensor_parallel_degree == mp_degree
+        cur_sharding_degree = self.args.sharding_parallel_degree
+
+        state_dict = OrderedDict()
+
+        def get_name_suffix(i):
+            name = []
+            name.append(f"tp{self.args.tensor_parallel_rank:0>2d}")
+            name.append(f"pp{self.args.pipeline_parallel_rank:0>2d}")
+            #name.append(f"shard{i:0>2d}")
+            return "_".join(name)+f".shard{i:0>2d}"
+
+        for i in range(self.args.sharding_parallel_rank, cur_sharding_degree, sharding_degree):
+            tmp = self.load_one_state_dict_from_checkpoint(resume_from_checkpoint, get_name_suffix(i))
+            for (k, v) in tmp.items():
+                state_dict[k] = v
+            del tmp
+
+        def filter_func(name):
+            return True
+
+        state_dict = self._all_gather_state_dict(state_dict, filter_func)
+
+        return state_dict
+
+
+    def load_one_state_dict_from_checkpoint(self, resume_from_checkpoint, weight_name_suffix):
+        """
+        load state_dict of one shard from_checkpoint, Only load model state dict.
+        """
+        if isinstance(self.model, LoRAModel):
+            weight_name = LORA_WEIGHT_FILE_NAME
+        elif isinstance(self.model, PrefixModelForCausalLM):
+            weight_name = PREFIX_WEIGHT_FILE_NAME
+        else:
+            weight_name = PADDLE_WEIGHT_FILE_NAME
+        file_path = os.path.join(resume_from_checkpoint, _add_variant(weight_name, weight_name_suffix))
+        if not os.path.isfile(file_path):
+            raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}, no {file_path}")
+
+        logger.info(f"Loading model from {resume_from_checkpoint} .")
+
+        # We load the model state dict on the CPU to avoid an OOM error.
+        state_dict = paddle.load(
+            os.path.join(resume_from_checkpoint, _add_variant(weight_name, weight_name_suffix)),
+            return_numpy=True,
+        )
+        return state_dict
+
+
+    def check_resume_from_checkpoint(self, resume_from_checkpoint):
+        resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
             resume_from_checkpoint = get_last_checkpoint(self.args.output_dir)
             if resume_from_checkpoint is None:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
-
-        if resume_from_checkpoint is not None:
-            if isinstance(self.model, LoRAModel):
-                weight_name = LORA_WEIGHT_FILE_NAME
-            elif isinstance(self.model, PrefixModelForCausalLM):
-                weight_name = PREFIX_WEIGHT_FILE_NAME
-            else:
-                weight_name = PADDLE_WEIGHT_FILE_NAME
-
-            if not os.path.isfile(
-                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
-            ):
-                raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
-
-            logger.info(f"Loading model from {resume_from_checkpoint} .")
-
-            # We load the model state dict on the CPU to avoid an OOM error.
-            state_dict = paddle.load(
-                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)),
-                return_numpy=True,
-            )
-            # If the model is on the GPU, it still works!
-            self._set_state_dict_in_model(state_dict)
-
-            # release memory
-            del state_dict
+        return resume_from_checkpoint
 
     def train(
         self,
@@ -463,42 +553,11 @@ class Trainer:
         """
         args = self.args
         self.is_in_train = True
-        resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
-
+        resume_from_checkpoint = self.check_resume_from_checkpoint(resume_from_checkpoint)
         # memory metrics - must set up as early as possible
         self._memory_tracker.start()
-
         # Load potential model checkpoint
-        if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
-            resume_from_checkpoint = get_last_checkpoint(args.output_dir)
-            if resume_from_checkpoint is None:
-                raise ValueError(f"No valid checkpoint found in output directory ({args.output_dir})")
-
-        if resume_from_checkpoint is not None:
-            if isinstance(self.model, LoRAModel):
-                weight_name = LORA_WEIGHT_FILE_NAME
-            elif isinstance(self.model, PrefixModelForCausalLM):
-                weight_name = PREFIX_WEIGHT_FILE_NAME
-            else:
-                weight_name = PADDLE_WEIGHT_FILE_NAME
-            if not os.path.isfile(
-                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
-            ):
-                raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
-
-            logger.info(f"Loading model from {resume_from_checkpoint} .")
-
-            # TODO: Need to load the model state dict on the CPU to avoid an OOM error.
-            state_dict = paddle.load(
-                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)),
-                return_numpy=True,
-            )
-            # If the model is on the GPU, it still works!
-            self._set_state_dict_in_model(state_dict)
-
-            # release memory
-            del state_dict
-
+        self.load_state_dict_from_checkpoint(resume_from_checkpoint)
         train_dataloader = self.get_train_dataloader()
 
         total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.dataset_world_size
@@ -1785,6 +1844,33 @@ class Trainer:
         for checkpoint in checkpoints_to_be_deleted:
             logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
             shutil.rmtree(checkpoint)
+    def _save_distributed_strategy(self, dir):
+        pp_degree = 1
+        mp_degree = 1
+        sharding_degree = 1
+        vpp_degree = 1
+        nranks = dist.get_world_size()
+        if nranks > 1:
+            if dist.get_rank():
+                return
+            hcg = fleet.get_hybrid_communicate_group()
+            mp_degree = hcg.get_model_parallel_world_size()
+            pp_degree = hcg.get_pipe_parallel_world_size()
+            sharding_degree = hcg.get_sharding_parallel_world_size()
+            """
+            if pp_degree > 1:
+                assert isinstance(model, fleet.meta_parallel.PipelineParallel), "must be pipeline model"
+                vpp_degree = model._layers.get_num_virtual_stages()
+            """
+        model_meta = {}
+        model_meta["parallel_config"]={"pp_degree":pp_degree,
+                                       "mp_degree":mp_degree,
+                                       "sharding_dgree":sharding_degree,
+                                       "vpp_degree":vpp_degree}
+        path=os.path.join(dir, MODEL_META_NAME)
+        with open(path, 'w') as f:
+            json.dump(model_meta, f, indent=4)
+
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
         # If we are executing this function, we are the process zero, so we don't check for that.
@@ -1831,7 +1917,7 @@ class Trainer:
                 optimizer=self.optimizer,
                 sharding_degree=self.args.sharding_parallel_degree,
             )
-
+        self._save_distributed_strategy(output_dir)
         if self.args.should_save:
             if self.tokenizer is not None:
                 self.tokenizer.save_pretrained(output_dir)
