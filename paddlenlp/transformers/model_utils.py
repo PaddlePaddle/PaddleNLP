@@ -90,8 +90,6 @@ def exlclude_paramters_in_state_dict(model_state_dict, parameter_names, sharding
     print("allgather parameter names:{}".format(tmp))
     sharding_group_param_names = [v for item in tmp for v in item]
     logger.info("sharding_group_param_names:".format(sharding_group_param_names))
-    #
-    import copy
     non_parameters = copy.copy(model_state_dict)
     for k, v in model_state_dict.items():
         if v.name in sharding_group_param_names:

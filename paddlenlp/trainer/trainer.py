@@ -1673,11 +1673,11 @@ class Trainer:
             self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
 
     def _save_checkpoint(self, model, metrics=None):
-        logger.info("_save_checkpoint")
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
 
         # Save model checkpoint
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
+
         run_dir = self.args.output_dir
 
         output_dir = os.path.join(run_dir, checkpoint_folder)
@@ -1685,6 +1685,7 @@ class Trainer:
         if ShardingOption.FULL_SHARD in self.args.sharding:
             # TODO(ZHUI) fix it and set convert2cpu=True to save gpu memory
             model.get_all_parameters(convert2cpu=False)
+
         self.save_model(output_dir)
 
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
