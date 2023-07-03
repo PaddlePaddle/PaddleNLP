@@ -1438,7 +1438,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         is_bf16 = kwargs.get("is_bf16", False)
         parameter_names = list(kwargs.get("parameter_names", []))
         sharding_group = kwargs.get("sharding_group", None)
-        exclude_parameters = kwargs.get("exclude_parameters", False)
         
 
         # 1. retrieve the model related config
@@ -1470,11 +1469,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             state_dict_to_save = self.state_dict()
 
-        if is_bf16 and exclude_parameters:
+        if is_bf16:
             logger.info("before exclude state_dict_to_save len:{}, type:{}, parameter_names type:{}".format(len(state_dict_to_save), type(state_dict_to_save), type(parameter_names)))
-            # state_dict_to_save = exlclude_paramters_in_state_dict(state_dict_to_save, parameter_names, sharding_group)
             state_dict_to_save = exlclude_paramters_in_state_dict(state_dict_to_save, parameter_names, sharding_group)
-            logger.info("state_dict_to_save len:{}".format(len(state_dict_to_save)))
             logger.info("parameter_names len:{}, bf16 state_dict_to_save len:{}, :{}".format(len(parameter_names), len(state_dict_to_save), state_dict_to_save))
 
         if is_main_process:

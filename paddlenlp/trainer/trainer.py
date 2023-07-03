@@ -749,8 +749,6 @@ class Trainer:
 
                 availiable_no_sync = dp_enabled and not forbidden_no_sync
 
-                logger.info("train step:{}".format(step))
-
                 is_no_sync = (
                     ((step + 1) % args.gradient_accumulation_steps != 0)
                     and availiable_no_sync
@@ -1661,7 +1659,7 @@ class Trainer:
 
         return loss.detach()
 
-    def save_model(self, output_dir: Optional[str] = None, merge_tensor_parallel: Optional[bool] = False, exclude_parameters: Optional[bool] = False):
+    def save_model(self, output_dir: Optional[str] = None, merge_tensor_parallel: Optional[bool] = False):
         """
         Will save the model, so you can reload it using `from_pretrained()`.
 
@@ -1671,24 +1669,23 @@ class Trainer:
         if output_dir is None:
             output_dir = self.args.output_dir
 
-        if self.args.should_save_model_state or self.sharding_group.nranks > 1:
-            self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel, exclude_parameters=exclude_parameters)
+        if self.args.should_save_model_state:
+            self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
 
-    def _save_checkpoint(self, model, metrics=None, run_dir=None, exclude_parameters=False):
+    def _save_checkpoint(self, model, metrics=None):
         logger.info("_save_checkpoint")
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
 
         # Save model checkpoint
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
-        if run_dir is None:
-            run_dir = self.args.output_dir
+        run_dir = self.args.output_dir
 
         output_dir = os.path.join(run_dir, checkpoint_folder)
 
         if ShardingOption.FULL_SHARD in self.args.sharding:
             # TODO(ZHUI) fix it and set convert2cpu=True to save gpu memory
             model.get_all_parameters(convert2cpu=False)
-        self.save_model(output_dir, exclude_parameters=exclude_parameters)
+        self.save_model(output_dir)
 
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
@@ -1823,7 +1820,7 @@ class Trainer:
             logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
             shutil.rmtree(checkpoint)
 
-    def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False, exclude_parameters=False):
+    def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
         # If we are executing this function, we are the process zero, so we don't check for that.
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
@@ -1852,7 +1849,6 @@ class Trainer:
                     is_bf16=is_bf16,
                     parameter_names=parameter_names,
                     sharding_group=self.sharding_group,
-                    exclude_parameters=exclude_parameters,
                 )
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
@@ -1860,7 +1856,7 @@ class Trainer:
                     logger.warning("Trainer.model is not a `PretrainedModel`, not suppor for merge_tensor_parallel.")
                 if state_dict is None:
                     state_dict = self.model.state_dict()
-                if exclude_parameters:
+                if is_bf16:
                     from paddlenlp.transformers.model_utils import exlclude_paramters_in_state_dict
                     print("before exclude state_dict_to_save len:{}".format(len(state_dict)))
                     state_dict = exlclude_paramters_in_state_dict(state_dict, parameter_names, self.sharding_group)
@@ -1878,7 +1874,6 @@ class Trainer:
                 is_bf16=is_bf16,
                 parameter_names=parameter_names,
                 sharding_group=self.sharding_group,
-                exclude_parameters=exclude_parameters,
             )
 
         if self.args.should_save:

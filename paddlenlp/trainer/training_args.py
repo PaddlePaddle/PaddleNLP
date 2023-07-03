@@ -1026,7 +1026,9 @@ class TrainingArguments:
         if self.save_on_each_node:
             return self.local_process_index == 0
         else:
-            if self.tensor_parallel_degree > 1:
+            if ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1:
+                return True
+            elif self.tensor_parallel_degree > 1:
                 # save on dataset rank 0
                 return self.sharding_parallel_rank == 0 and self.data_parallel_rank == 0
             else:
