@@ -573,10 +573,10 @@ class Trainer:
                 logger.info("opt_state_dict:{}".format(opt_state_dict))
                 logger.info("model_state_dict len:{}, :{}".format(len(model_state_dict), model_state_dict))
                 for key, param in model_state_dict.items():
-                    if param.name in master_weigth_param_names:
+                    if param.name in master_weigths:
                         logger.info("cast param:{}, key:{}".format(param.name, key))
                         assert param.shape == master_weigths[param.name].shape
-                        paddle.assign(paddle.cast(master_weigths[param.name], paddle.bfloat16), model_state_dict[key])
+                        paddle.assign(paddle.cast(master_weigths[param.name].cuda(), paddle.bfloat16), model_state_dict[key])
                         logger.info("master_weight:{}".format(master_weigths[param.name]))
                     if param.name in sharding_group_param_names:
                         paddle.distributed.broadcast(model_state_dict[key], src=self.sharding_group.ranks[param2rank[param.name]], group=self.sharding_group, sync_op=True)
