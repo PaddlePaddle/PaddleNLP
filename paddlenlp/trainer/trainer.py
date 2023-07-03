@@ -474,31 +474,6 @@ class Trainer:
             if resume_from_checkpoint is None:
                 raise ValueError(f"No valid checkpoint found in output directory ({args.output_dir})")
 
-        if resume_from_checkpoint is not None:
-            if isinstance(self.model, LoRAModel):
-                weight_name = LORA_WEIGHT_FILE_NAME
-            elif isinstance(self.model, PrefixModelForCausalLM):
-                weight_name = PREFIX_WEIGHT_FILE_NAME
-            else:
-                weight_name = PADDLE_WEIGHT_FILE_NAME
-            if not os.path.isfile(
-                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
-            ):
-                raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
-
-            logger.info(f"Loading model from {resume_from_checkpoint} .")
-
-            # TODO: Need to load the model state dict on the CPU to avoid an OOM error.
-            state_dict = paddle.load(
-                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)),
-                return_numpy=True,
-            )
-            # If the model is on the GPU, it still works!
-            self._set_state_dict_in_model(state_dict)
-
-            # release memory
-            del state_dict
-
         train_dataloader = self.get_train_dataloader()
 
         total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.dataset_world_size
@@ -560,6 +535,67 @@ class Trainer:
 
         # Check if saved optimizer or scheduler states exist
         self._load_optimizer_and_scheduler(resume_from_checkpoint)
+
+        # load model
+        if resume_from_checkpoint is not None:
+            if isinstance(self.model, LoRAModel):
+                weight_name = LORA_WEIGHT_FILE_NAME
+            elif isinstance(self.model, PrefixModelForCausalLM):
+                weight_name = PREFIX_WEIGHT_FILE_NAME
+            else:
+                weight_name = PADDLE_WEIGHT_FILE_NAME
+            if not os.path.isfile(
+                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
+            ):
+                raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
+
+            logger.info(f"Loading model from {resume_from_checkpoint} .")
+
+            # TODO: Need to load the model state dict on the CPU to avoid an OOM error.
+            state_dict = paddle.load(
+                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)),
+                return_numpy=True,
+            )
+            # master_weights cast bf16 params and broadcast params
+            if self.args.bf16:
+                assert(self.optimizer._inner_opt, DygraphShardingOptimizer)
+                param2rank = self.optimizer._inner_opt._param2rank
+                opt_state_dict = self.optimizer.state_dict()
+                assert "master_weights" in opt_state_dict
+                master_weigths = opt_state_dict["master_weights"]
+                master_weigth_param_names = list(master_weigths.keys())
+                tmp = []
+                logger.info("master_weigth_param_names:{}".format(master_weigth_param_names))
+                paddle.distributed.all_gather_object(tmp, master_weigth_param_names, group=self.sharding_group)
+                sharding_group_param_names = [v for item in tmp for v in item]
+                logger.info("sharding_group_param_names:{}".format(sharding_group_param_names))
+                model_state_dict = self.model.state_dict()
+                logger.info("opt_state_dict:{}".format(opt_state_dict))
+                logger.info("model_state_dict len:{}, :{}".format(len(model_state_dict), model_state_dict))
+                for key, param in model_state_dict.items():
+                    if param.name in master_weigth_param_names:
+                        logger.info("cast param:{}, key:{}".format(param.name, key))
+                        assert param.shape == master_weigths[param.name].shape
+                        paddle.assign(paddle.cast(master_weigths[param.name], paddle.bfloat16), model_state_dict[key])
+                        logger.info("master_weight:{}".format(master_weigths[param.name]))
+                    if param.name in sharding_group_param_names:
+                        paddle.distributed.broadcast(model_state_dict[key], src=self.sharding_group.ranks[param2rank[param.name]], group=self.sharding_group, sync_op=True)
+                logger.info("casted model_state_dict:{}".format(model_state_dict))
+                # now state_dict is in gpu
+                state_dict = model_state_dict
+                ### save sharding loaded model to check
+                sharding_save_dir = "./sharding_check"
+                os.makedirs(sharding_save_dir, exist_ok=True)
+                self._save(sharding_save_dir, state_dict)
+                logger.info("save loaded done")
+                ###
+                del model_state_dict
+            #
+            # If the model is on the GPU, it still works!
+            self._set_state_dict_in_model(state_dict)
+
+            # release memory
+            del state_dict
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples}")
@@ -713,6 +749,8 @@ class Trainer:
 
                 availiable_no_sync = dp_enabled and not forbidden_no_sync
 
+                logger.info("train step:{}".format(step))
+
                 is_no_sync = (
                     ((step + 1) % args.gradient_accumulation_steps != 0)
                     and availiable_no_sync
@@ -729,7 +767,6 @@ class Trainer:
                     tr_loss_step = self.training_step(model, inputs)
 
                 tr_loss += tr_loss_step
-
                 if (step + 1) % args.gradient_accumulation_steps == 0:
                     # Maunally collect gradients when group_sharded_parallel can't accept dp_group
                     # Case 1: Use sharding stage 2/3 with dp
@@ -1624,7 +1661,7 @@ class Trainer:
 
         return loss.detach()
 
-    def save_model(self, output_dir: Optional[str] = None, merge_tensor_parallel: Optional[bool] = False):
+    def save_model(self, output_dir: Optional[str] = None, merge_tensor_parallel: Optional[bool] = False, exclude_parameters: Optional[bool] = False):
         """
         Will save the model, so you can reload it using `from_pretrained()`.
 
@@ -1634,24 +1671,24 @@ class Trainer:
         if output_dir is None:
             output_dir = self.args.output_dir
 
-        if self.args.should_save_model_state:
-            self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
+        if self.args.should_save_model_state or self.sharding_group.nranks > 1:
+            self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel, exclude_parameters=exclude_parameters)
 
-    def _save_checkpoint(self, model, metrics=None):
+    def _save_checkpoint(self, model, metrics=None, run_dir=None, exclude_parameters=False):
+        logger.info("_save_checkpoint")
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
 
         # Save model checkpoint
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
-
-        run_dir = self.args.output_dir
+        if run_dir is None:
+            run_dir = self.args.output_dir
 
         output_dir = os.path.join(run_dir, checkpoint_folder)
 
         if ShardingOption.FULL_SHARD in self.args.sharding:
             # TODO(ZHUI) fix it and set convert2cpu=True to save gpu memory
             model.get_all_parameters(convert2cpu=False)
-
-        self.save_model(output_dir)
+        self.save_model(output_dir, exclude_parameters=exclude_parameters)
 
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
@@ -1786,13 +1823,18 @@ class Trainer:
             logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
             shutil.rmtree(checkpoint)
 
-    def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
+    def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False, exclude_parameters=False):
         # If we are executing this function, we are the process zero, so we don't check for that.
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
         logger.info(f"Saving model checkpoint to {output_dir}")
         # Save a trained model and configuration using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
+        is_bf16 = self.args.bf16
+        optimzier_state_dict = self.optimizer.state_dict()
+        assert "master_weights" in optimzier_state_dict
+        parameter_names = list(optimzier_state_dict["master_weights"].keys())
+        logger.info("parameter_names len:{} , type:{}, parameter_names:{}".format(len(parameter_names), type(parameter_names), parameter_names))
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
 
@@ -1807,6 +1849,10 @@ class Trainer:
                     merge_tensor_parallel=merge_tensor_parallel,
                     variant=self.args.weight_name_suffix,
                     is_main_process=self.args.should_save,
+                    is_bf16=is_bf16,
+                    parameter_names=parameter_names,
+                    sharding_group=self.sharding_group,
+                    exclude_parameters=exclude_parameters,
                 )
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
@@ -1814,6 +1860,11 @@ class Trainer:
                     logger.warning("Trainer.model is not a `PretrainedModel`, not suppor for merge_tensor_parallel.")
                 if state_dict is None:
                     state_dict = self.model.state_dict()
+                if exclude_parameters:
+                    from paddlenlp.transformers.model_utils import exlclude_paramters_in_state_dict
+                    print("before exclude state_dict_to_save len:{}".format(len(state_dict)))
+                    state_dict = exlclude_paramters_in_state_dict(state_dict, parameter_names, self.sharding_group)
+                    print("parameter_names len:{}, bf16 state_dict len:{}, :{}".format(len(parameter_names), len(state_dict), state_dict))
                 paddle.save(
                     state_dict,
                     os.path.join(output_dir, _add_variant(PADDLE_WEIGHT_FILE_NAME, self.args.weight_name_suffix)),
@@ -1824,6 +1875,10 @@ class Trainer:
                 merge_tensor_parallel=merge_tensor_parallel,
                 variant=self.args.weight_name_suffix,
                 is_main_process=self.args.should_save,
+                is_bf16=is_bf16,
+                parameter_names=parameter_names,
+                sharding_group=self.sharding_group,
+                exclude_parameters=exclude_parameters,
             )
 
         if self.args.should_save:

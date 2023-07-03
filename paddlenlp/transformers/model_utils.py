@@ -78,6 +78,27 @@ __all__ = [
     "register_base_model",
 ]
 
+def exlclude_paramters_in_state_dict(model_state_dict, parameter_names, sharding_group):
+    assert sharding_group is not None
+    assert isinstance(model_state_dict, dict) and isinstance(parameter_names, (list, set)), "parameter_names type:{}".format(type(parameter_names))
+    logger.info("sharding_group:".format(sharding_group))
+    state_param_names = [v.name for k,v in model_state_dict.items()]
+    logger.info("parameter_names:{}, state_param_names:{}".format(parameter_names, state_param_names))
+    # allgather parameter names in sharding group
+    tmp = []
+    paddle.distributed.all_gather_object(tmp, parameter_names, group=sharding_group)
+    print("allgather parameter names:{}".format(tmp))
+    sharding_group_param_names = [v for item in tmp for v in item]
+    logger.info("sharding_group_param_names:".format(sharding_group_param_names))
+    #
+    import copy
+    non_parameters = copy.copy(model_state_dict)
+    for k, v in model_state_dict.items():
+        if v.name in sharding_group_param_names:
+            non_parameters.pop(k)
+    
+    logger.info("non_parameters len:{}, model_state_dict len:{}".format(len(non_parameters), len(model_state_dict)))
+    return non_parameters
 
 def prune_linear_layer(layer: nn.Linear, index: paddle.Tensor, dim: int = 0) -> nn.Linear:
     """
@@ -1414,6 +1435,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
         variant = kwargs.get("variant", None)
         is_main_process = kwargs.get("is_main_process", True)
+        is_bf16 = kwargs.get("is_bf16", False)
+        parameter_names = list(kwargs.get("parameter_names", []))
+        sharding_group = kwargs.get("sharding_group", None)
+        exclude_parameters = kwargs.get("exclude_parameters", False)
+        
 
         # 1. retrieve the model related config
 
@@ -1443,6 +1469,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 # WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, variant)
 
             state_dict_to_save = self.state_dict()
+
+        if is_bf16 and exclude_parameters:
+            logger.info("before exclude state_dict_to_save len:{}, type:{}, parameter_names type:{}".format(len(state_dict_to_save), type(state_dict_to_save), type(parameter_names)))
+            # state_dict_to_save = exlclude_paramters_in_state_dict(state_dict_to_save, parameter_names, sharding_group)
+            state_dict_to_save = exlclude_paramters_in_state_dict(state_dict_to_save, parameter_names, sharding_group)
+            logger.info("state_dict_to_save len:{}".format(len(state_dict_to_save)))
+            logger.info("parameter_names len:{}, bf16 state_dict_to_save len:{}, :{}".format(len(parameter_names), len(state_dict_to_save), state_dict_to_save))
 
         if is_main_process:
             # Attach architecture to the config
