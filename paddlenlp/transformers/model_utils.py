@@ -1482,15 +1482,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         config_to_save = copy.deepcopy(model_to_save.config)
         state_dict_to_save = model_to_save.state_dict()
-        variants = []
         if sharding_degree > 1 and save_sharded_model:
             sharding_rank = fleet.get_hybrid_communicate_group().get_sharding_parallel_rank()
             state_dict_to_save = filter_sharded_params(state_dict_to_save, optimizer, sharding_rank)
-            variants.append(f"shard{sharding_rank:0>2d}")
         if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
             state_dict_to_save = model_to_save.merge_tensor_parallel(state_dict_to_save, config_to_save)
             config_to_save.tensor_parallel_degree = 1
             # set variant to None for merge_tensor_parallel, but there should no relationship with variant setting
+            variant = None
             if config_to_save.tensor_parallel_rank != 0:
                 logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
                 return
@@ -1498,7 +1497,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if config_to_save.tensor_parallel_degree > 1:
                 if variant is None:
                     variant = f"tp{config_to_save.tensor_parallel_rank:0>2d}"
-                variants.append(variant)
                 # WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, variant)
 
         if is_bf16 and save_sharded_model:
@@ -1512,13 +1510,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             config_to_save.architectures = [model_to_save.__class__.__name__]
             config_to_save.save_pretrained(save_dir)
 
-        variants.reverse()
-        for v in variants:
-            WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, v)
-
         # Save model
         if paddle.in_dynamic_mode():
-            file_name = os.path.join(save_dir, WEIGHTS_NAME)
+            file_name = os.path.join(save_dir, _add_variant(WEIGHTS_NAME, variant))
             paddle.save(state_dict_to_save, file_name)
             # for sharding
             # sharding_dir = "./sharding_model/" + save_dir.split('/')[-1]

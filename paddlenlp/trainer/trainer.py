@@ -518,8 +518,8 @@ class Trainer:
             name = []
             name.append(f"tp{self.args.tensor_parallel_rank:0>2d}")
             name.append(f"pp{self.args.pipeline_parallel_rank:0>2d}")
-            #name.append(f"shard{i:0>2d}")
-            return "_".join(name)+f".shard{i:0>2d}"
+            name.append(f"shard{i:0>2d}")
+            return "_".join(name)
 
         for i in range(self.args.sharding_parallel_rank, cur_sharding_degree, sharding_degree):
             tmp = self.load_one_state_dict_from_checkpoint(resume_from_checkpoint, get_name_suffix(i))
