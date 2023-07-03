@@ -52,7 +52,7 @@ class ModelArgument:
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
     lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
     merge_weights: bool = field(
-        default=True, metadata={"help": "Merge weights of the original model and the Lora model"}
+        default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
     )
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
     num_prefix_tokens: int = field(default=64, metadata={"help": "Number of prefix tokens"})
