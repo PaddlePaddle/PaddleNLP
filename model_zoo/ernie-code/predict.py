@@ -11,10 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys;sys.path.insert(0, "/home/E-Code")
 
 import argparse
-
 import numpy as np
 import paddle
 
@@ -23,11 +21,10 @@ from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokeni
 parser = argparse.ArgumentParser("ERNIE-CODE")
 parser.add_argument(
     "--model_name_or_path",
-    default="/home/models/erine-code-512",
+    default="ernie-code-base-L512",
     type=str,
 )
 parser.add_argument("--input", default="BadZipFileのAliasは、古い Python バージョンとの互換性のために。", type=str)
-# parser.add_argument("--source_lang", default="text", type=str)
 parser.add_argument("--target_lang", default="code", type=str)
 parser.add_argument("--source_prefix", default="translate Japanese to Python: \n", type=str)
 parser.add_argument("--max_length", type=int, default=1024)
@@ -42,6 +39,7 @@ def predict():
     paddle.set_device(args.device)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     model = AutoModelForConditionalGeneration.from_pretrained(args.model_name_or_path)
+
     prefix = args.source_prefix if args.source_prefix is not None else ""
 
     def preprocess_function(inputs, tokenizer):
@@ -60,6 +58,7 @@ def predict():
         "length_penalty": 0,
         "min_length": 0,
     }
+    print(model_inputs)
     generated_tokens, _ = model.generate(
         paddle.to_tensor(np.array(model_inputs["input_ids"]).reshape(1, -1).astype("int64")),
         attention_mask=paddle.to_tensor(np.array(model_inputs["attention_mask"]).reshape(1, -1).astype("int64")),

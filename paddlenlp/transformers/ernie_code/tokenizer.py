@@ -19,7 +19,7 @@ from typing import List, Union
 
 import numpy as np
 import paddle
-
+import sentencepiece as spm
 from ..t5.tokenizer import T5Tokenizer
 
 __all__ = [
@@ -103,6 +103,28 @@ class ErnieCodeTokenizer(T5Tokenizer):
         "ernie-code-base-L512": {"do_lower_case": False},
     }
 
+
+    def __init__(
+        self,
+        sentencepiece_model_file,
+        do_lower_case=False,
+        remove_space=True,
+        keep_accents=True,
+        eos_token="</s>",
+        unk_token="<unk>",
+        pad_token="<pad>",
+        extra_ids=0,
+        additional_special_tokens=[],
+        sp_model_kwargs=None,
+        **kwargs
+    ):
+        if additional_special_tokens == None or 0 == len(additional_special_tokens):
+            additional_special_tokens = ["\n", "\t","<|space|><|space|><|space|><|space|>", "<|space|><|space|>", "<|space|>"]
+
+        super(ErnieCodeTokenizer, self).__init__(sentencepiece_model_file, do_lower_case, remove_space, keep_accents, eos_token, unk_token, pad_token,
+            extra_ids, additional_special_tokens, sp_model_kwargs, **kwargs
+        )
+
     def preprocess_text(self, inputs: str):
         if self.remove_space:
             outputs = " ".join(inputs.strip().split())
@@ -120,7 +142,7 @@ class ErnieCodeTokenizer(T5Tokenizer):
         i = 0
         while i < len(tokens):
             if "\n" == outputs[i]:
-
+                
                 while i + 1 < len(tokens) and " " == tokens[i + 1]:
                     tokens[i + 1] = formate_dict.get(" ")
                     i += 1

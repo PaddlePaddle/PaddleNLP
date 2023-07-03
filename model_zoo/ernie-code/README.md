@@ -17,7 +17,6 @@
 ```shell
 python predict.py \
   --input 'BadZipFileのAliasは、古い Python バージョンとの互換性のために。' \
-  --source_lang 'text' \
   --target_lang 'code' \
   --source_prefix 'translate Japanese to Python: \n' \
   --max_length 1024 \
@@ -27,7 +26,6 @@ python predict.py \
 
 配置文件中参数释义如下：
 - `input`: 表示输入的文本序列。
-- `source_lang`: 表示源语言，可指定为'text'或'code'。
 - `target_lang`: 表示目标语言，可指定为'text'或'code'。
 - `source_prefix`: 表示提示词。
 - `max_length`: 表示输入/输出文本最大长度。

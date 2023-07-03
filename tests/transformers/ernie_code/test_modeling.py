@@ -700,3 +700,6 @@ class ErnieCodeEncoderOnlyModelTest(ModelTesterMixin, unittest.TestCase):
 
     def test_model_name_list(self):
         pass
+    
+    def test_save_load(self):
+        pass
