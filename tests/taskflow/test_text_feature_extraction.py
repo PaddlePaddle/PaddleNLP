@@ -16,26 +16,101 @@ import unittest
 from tempfile import TemporaryDirectory
 
 from paddlenlp.taskflow import Taskflow
-from paddlenlp.taskflow.text_feature_extraction import TextFeatureExtractionTask
+
+# from paddlenlp.taskflow.text_feature_extraction import (
+#     SentenceFeatureExtractionTask,
+#     TextFeatureExtractionTask,
+# )
+from paddlenlp.taskflow.text_feature_extraction import SentenceFeatureExtractionTask
+
+# class TestTextFeatureExtractionTask(unittest.TestCase):
+#     @classmethod
+#     def setUpClass(cls):
+#         cls.temp_dir = TemporaryDirectory()
+#         cls.max_seq_len = 32
+#         cls.model = "__internal_testing__/tiny-random-rocketqa-query-encoder"
+
+#     @classmethod
+#     def tearDownClass(cls):
+#         cls.temp_dir.cleanup()
+
+#     @unittest.skipIf(True, "TODO, fix ci for new from_pretrained!")
+#     def test_text_feature_extraction_task(self):
+#         input_text = (["这是一只猫", "这是一只狗"],)
+#         # dygraph text test
+#         dygraph_taskflow = TextFeatureExtractionTask(
+#             model="rocketqa-zh-nano-query-encoder",
+#             task="feature_extraction",
+#             task_path=self.model,
+#             _static_mode=False,
+#             device_id=0,
+#         )
+#         dygraph_results = dygraph_taskflow(input_text)
+#         shape = dygraph_results["features"].shape
+#         self.assertEqual(shape[0], 2)
+
+#         # static text test
+#         static_taskflow = TextFeatureExtractionTask(
+#             model="rocketqa-zh-nano-query-encoder",
+#             task="feature_extraction",
+#             task_path=self.model,
+#             _static_mode=True,
+#             device_id=0,
+#         )
+#         static_results = static_taskflow(input_text)
+#         shape = static_results["features"].shape
+#         self.assertEqual(shape[0], 2)
+
+#         for dygraph_result, static_result in zip(dygraph_results["features"], static_results["features"]):
+#             for dygraph_pred, static_pred in zip(dygraph_result.tolist(), static_result.tolist()):
+#                 self.assertAlmostEqual(dygraph_pred, static_pred, delta=1e-5)
+
+#     @unittest.skipIf(True, "TODO, fix ci for new from_pretrained!")
+#     def test_taskflow_task(self):
+#         input_text = ["这是一只猫", "这是一只狗"]
+#         # dygraph test
+#         dygraph_taskflow = Taskflow(
+#             model="rocketqa-zh-nano-query-encoder",
+#             task="feature_extraction",
+#             task_path=self.model,
+#             _static_mode=False,
+#         )
+#         dygraph_results = dygraph_taskflow(input_text)
+#         shape = dygraph_results["features"].shape
+
+#         self.assertEqual(shape[0], 2)
+
+#         # static test
+#         static_taskflow = Taskflow(
+#             model="rocketqa-zh-nano-query-encoder",
+#             task="feature_extraction",
+#             task_path=self.model,
+#             _static_mode=True,
+#         )
+#         static_results = static_taskflow(input_text)
+#         self.assertEqual(static_results["features"].shape[0], 2)
+
+#         for dygraph_result, static_result in zip(dygraph_results["features"], static_results["features"]):
+#             for dygraph_pred, static_pred in zip(dygraph_result.tolist(), static_result.tolist()):
+#                 self.assertAlmostEqual(dygraph_pred, static_pred, delta=1e-5)
 
 
-class TestTextFeatureExtractionTask(unittest.TestCase):
+class TestSentenceeExtractionTask(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.temp_dir = TemporaryDirectory()
         cls.max_seq_len = 32
-        cls.model = "__internal_testing__/tiny-random-rocketqa-query-encoder"
+        cls.model = "__internal_testing__/moka-ai/m3e-base"
 
     @classmethod
     def tearDownClass(cls):
         cls.temp_dir.cleanup()
 
-    @unittest.skipIf(True, "TODO, fix ci for new from_pretrained!")
     def test_text_feature_extraction_task(self):
         input_text = (["这是一只猫", "这是一只狗"],)
         # dygraph text test
-        dygraph_taskflow = TextFeatureExtractionTask(
-            model="rocketqa-zh-nano-query-encoder",
+        dygraph_taskflow = SentenceFeatureExtractionTask(
+            model="moka-ai/m3e-base",
             task="feature_extraction",
             task_path=self.model,
             _static_mode=False,
@@ -46,8 +121,8 @@ class TestTextFeatureExtractionTask(unittest.TestCase):
         self.assertEqual(shape[0], 2)
 
         # static text test
-        static_taskflow = TextFeatureExtractionTask(
-            model="rocketqa-zh-nano-query-encoder",
+        static_taskflow = SentenceFeatureExtractionTask(
+            model="moka-ai/m3e-base",
             task="feature_extraction",
             task_path=self.model,
             _static_mode=True,
@@ -56,17 +131,15 @@ class TestTextFeatureExtractionTask(unittest.TestCase):
         static_results = static_taskflow(input_text)
         shape = static_results["features"].shape
         self.assertEqual(shape[0], 2)
-
         for dygraph_result, static_result in zip(dygraph_results["features"], static_results["features"]):
             for dygraph_pred, static_pred in zip(dygraph_result.tolist(), static_result.tolist()):
                 self.assertAlmostEqual(dygraph_pred, static_pred, delta=1e-5)
 
-    @unittest.skipIf(True, "TODO, fix ci for new from_pretrained!")
     def test_taskflow_task(self):
         input_text = ["这是一只猫", "这是一只狗"]
         # dygraph test
         dygraph_taskflow = Taskflow(
-            model="rocketqa-zh-nano-query-encoder",
+            model="moka-ai/m3e-base",
             task="feature_extraction",
             task_path=self.model,
             _static_mode=False,
@@ -78,7 +151,7 @@ class TestTextFeatureExtractionTask(unittest.TestCase):
 
         # static test
         static_taskflow = Taskflow(
-            model="rocketqa-zh-nano-query-encoder",
+            model="moka-ai/m3e-base",
             task="feature_extraction",
             task_path=self.model,
             _static_mode=True,
