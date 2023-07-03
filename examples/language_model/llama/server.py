@@ -18,8 +18,6 @@ import re
 import time
 from multiprocessing.shared_memory import SharedMemory
 
-import paddle.distributed as dist
-from paddle.distributed import fleet
 from predict_generation import Predictor, get_parser
 
 from paddlenlp.utils.log import logger
@@ -82,39 +80,6 @@ def create_shared_memory(name: int, rank: int):
     else:
         shared_memory = SharedMemory(file, create=True, size=1024 * 100)
     return shared_memory
-
-
-def init_distributed_env() -> tuple[int, int]:
-    """init distributed envs, and only support mp in ErnieBotModel
-
-    Returns:
-        tuple[int, int]: tensor_parallel_degree, tensor_parallel_rank
-    """
-    tensor_parallel_degree = dist.get_world_size()
-    tensor_parallel_rank = 0
-
-    if tensor_parallel_degree > 1:
-        strategy = fleet.DistributedStrategy()
-        strategy.hybrid_configs = {
-            "dp_degree": 1,
-            "mp_degree": tensor_parallel_degree,
-            "pp_degree": 1,
-            "sharding_degree": 1,
-        }
-
-        strategy.pipeline_configs = {
-            "accumulate_steps": 1,
-            "micro_batch_size": 1,
-            "enable_partial_send_recv": True,
-            "p2p_cache_shape": True,
-            # "delay_scale_loss": True, Fix ME
-        }
-
-        fleet.init(is_collective=True, strategy=strategy)
-        hcg = fleet.get_hybrid_communicate_group()
-        tensor_parallel_rank = hcg.get_model_parallel_rank()
-
-    return tensor_parallel_degree, tensor_parallel_rank
 
 
 def enforce_stop_tokens(text, stop) -> str:
