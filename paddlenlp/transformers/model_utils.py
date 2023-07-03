@@ -1504,6 +1504,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if is_bf16 and save_sharded_model:
             logger.info("before exclude state_dict_to_save len:{}, type:{}, parameter_names type:{}".format(len(state_dict_to_save), type(state_dict_to_save), type(parameter_names)))
             state_dict_to_save = exlclude_paramters_in_state_dict(state_dict_to_save, parameter_names, sharding_group)
+            # sharding_state_dict_to_save = exlclude_paramters_in_state_dict(state_dict_to_save, parameter_names, sharding_group)
             logger.info("parameter_names len:{}, bf16 state_dict_to_save len:{}, :{}".format(len(parameter_names), len(state_dict_to_save), state_dict_to_save))
 
         if is_main_process:
@@ -1519,6 +1520,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if paddle.in_dynamic_mode():
             file_name = os.path.join(save_dir, WEIGHTS_NAME)
             paddle.save(state_dict_to_save, file_name)
+            # for sharding
+            # sharding_dir = "./sharding_model/" + save_dir.split('/')[-1]
+            # logger.info("sharding_dir:{}".format(sharding_dir))
+            # os.makedirs(sharding_dir, exist_ok=True)
+            # sharding_file_name = os.path.join(sharding_dir, WEIGHTS_NAME)
+            # paddle.save(sharding_state_dict_to_save, sharding_file_name)
             del model_to_save
         else:
             logger.warning("Save pretrained model only supported dygraph mode for now!")

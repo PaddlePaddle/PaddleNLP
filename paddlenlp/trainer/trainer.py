@@ -425,10 +425,10 @@ class Trainer:
 
         if self.args.load_sharded_model:
             state_dict = self.load_state_dict_from_checkpoint_with_reshard(resume_from_checkpoint)
+            if self.args.bf16:
+                state_dict = self.recover_params_from_master_weights(state_dict)
         else:
             state_dict = self.load_one_state_dict_from_checkpoint(resume_from_checkpoint, self.args.weight_name_suffix)
-        if self.args.bf16:
-            state_dict = self.recover_params_from_master_weights(state_dict)
 
         # If the model is on the GPU, it still works!
         self._set_state_dict_in_model(state_dict)
@@ -460,6 +460,12 @@ class Trainer:
                 paddle.distributed.broadcast(model_state_dict[key], src=self.sharding_group.ranks[param2rank[param.name]], group=self.sharding_group, sync_op=True)
         logger.info("casted model_state_dict:{}".format(model_state_dict))
         state_dict.update(model_state_dict)
+        ### save sharding loaded model to check
+        # sharding_save_dir = "./sharding_check"
+        # os.makedirs(sharding_save_dir, exist_ok=True)
+        # self._save(sharding_save_dir, state_dict)
+        # logger.info("save loaded done")
+        ###
         return state_dict
 
     def _all_gather_state_dict(self, state_dict, filter_func, group=None):
@@ -2101,11 +2107,11 @@ class Trainer:
         return state_dict
 
 
-        def _load_optimizer_state(self, checkpoint):
-            if self.args.load_sharded_model:
-                return self._load_optimizer_state_with_reshard(checkpoint)
-            else:
-                return self._load_optimizer_state_of_one_shard(checkpoint, self.args.optimizer_name_suffix)
+    def _load_optimizer_state(self, checkpoint):
+        if self.args.load_sharded_model:
+            return self._load_optimizer_state_with_reshard(checkpoint)
+        else:
+            return self._load_optimizer_state_of_one_shard(checkpoint, self.args.optimizer_name_suffix)
 
     def _load_optimizer_and_scheduler(self, checkpoint):
         """If optimizer and scheduler states exist, load them."""
