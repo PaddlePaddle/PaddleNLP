@@ -38,6 +38,7 @@ from huggingface_hub import (
 from huggingface_hub.utils import EntryNotFoundError
 from paddle import Tensor
 from paddle.nn import Embedding, Layer
+from paddle.distributed import fleet
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddle.utils.download import is_url
@@ -77,6 +78,33 @@ __all__ = [
     "PretrainedModel",
     "register_base_model",
 ]
+
+def unwrap_optimizer(optimizer, optimizer_instances=()):
+    if optimizer is None:
+        return None
+    while hasattr(optimizer, "_inner_opt") and not isinstance(optimizer, optimizer_instances):
+        optimizer = optimizer._inner_opt
+    if isinstance(optimizer, optimizer_instances):
+        return optimizer
+    return None
+
+def filter_sharded_params(state_dict, optimizer, sharding_rank):
+    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer \
+        import DygraphShardingOptimizer
+
+    logger.info(f"filter sharded_params not placed in sharding_rank {sharding_rank} .")
+
+    optimizer = unwrap_optimizer(optimizer, DygraphShardingOptimizer)
+    if optimizer is None:
+        return state_dict
+    filtered_state_dict = OrderedDict()
+    for (k, v) in state_dict.items():
+        assert v.name in optimizer._param2rank
+        sharded_rank = optimizer._param2rank[v.name]
+        if sharded_rank != sharding_rank:
+            continue
+        filtered_state_dict[k] = v
+    return filtered_state_dict
 
 def exlclude_paramters_in_state_dict(model_state_dict, parameter_names, sharding_group):
     assert sharding_group is not None
@@ -1436,7 +1464,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         is_bf16 = kwargs.get("is_bf16", False)
         parameter_names = list(kwargs.get("parameter_names", []))
         sharding_group = kwargs.get("sharding_group", None)
-        
+        optimizer = kwargs.get("optimizer", None)
+        save_sharded_model = kwargs.get("save_sharded_model", False)
+        sharding_degree = sharding_group.get_sharding_parallel_world_size()
 
         # 1. retrieve the model related config
 
@@ -1449,13 +1479,17 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         dtype = get_parameter_dtype(model_to_save)
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
-        state_dict_to_save = None
         config_to_save = copy.deepcopy(model_to_save.config)
+        state_dict_to_save = model_to_save.state_dict()
+        variants = []
+        if sharding_degree > 1 and save_sharded_model:
+            sharding_rank = sharding_group.get_sharding_parallel_rank()
+            state_dict_to_save = filter_sharded_params(state_dict_to_save, optimizer, sharding_rank)
+            variants.append(f"shard{sharding_rank:0>2d}")
         if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
-            state_dict_to_save = model_to_save.merge_tensor_parallel(model_to_save.state_dict(), config_to_save)
+            state_dict_to_save = model_to_save.merge_tensor_parallel(state_dict_to_save, config_to_save)
             config_to_save.tensor_parallel_degree = 1
             # set variant to None for merge_tensor_parallel, but there should no relationship with variant setting
-            variant = None
             if config_to_save.tensor_parallel_rank != 0:
                 logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
                 return
@@ -1463,11 +1497,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if config_to_save.tensor_parallel_degree > 1:
                 if variant is None:
                     variant = f"tp{config_to_save.tensor_parallel_rank:0>2d}"
+                variants.append(variant)
                 # WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, variant)
 
-            state_dict_to_save = self.state_dict()
-
-        if is_bf16:
+        if is_bf16 and save_sharded_model:
             logger.info("before exclude state_dict_to_save len:{}, type:{}, parameter_names type:{}".format(len(state_dict_to_save), type(state_dict_to_save), type(parameter_names)))
             state_dict_to_save = exlclude_paramters_in_state_dict(state_dict_to_save, parameter_names, sharding_group)
             logger.info("parameter_names len:{}, bf16 state_dict_to_save len:{}, :{}".format(len(parameter_names), len(state_dict_to_save), state_dict_to_save))
@@ -1477,9 +1510,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             config_to_save.architectures = [model_to_save.__class__.__name__]
             config_to_save.save_pretrained(save_dir)
 
+        variants.reverse()
+        for v in variants:
+            WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, v)
+
         # Save model
         if paddle.in_dynamic_mode():
-            file_name = os.path.join(save_dir, _add_variant(WEIGHTS_NAME, variant))
+            file_name = os.path.join(save_dir, WEIGHTS_NAME)
             paddle.save(state_dict_to_save, file_name)
             del model_to_save
         else:
