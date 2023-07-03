@@ -49,7 +49,7 @@ from paddlenlp.transformers.model_utils import PretrainedModel, register_base_mo
 from .configuration import LlamaConfig
 
 LLAMA_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "facebook/tiny-random-llama",
+    "__internal_testing__/tiny-random-llama",
     "facebook/llama-7b",
     "facebook/llama-13b",
 ]
@@ -874,6 +874,8 @@ class LlamaLMHead(nn.Layer):
 
 
 class LlamaForCausalLM(LlamaPretrainedModel):
+    enable_to_static_method = True
+
     def __init__(self, config):
         super().__init__(config)
         self.config = config

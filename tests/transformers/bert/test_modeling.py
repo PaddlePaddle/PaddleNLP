@@ -536,7 +536,7 @@ class BertCompatibilityTest(unittest.TestCase):
         self.compare_two_weight(first_tensor, second_tensor)
 
     def compare_two_weight(self, first_tensor, second_tensor):
-        diff = paddle.sum(first_tensor - second_tensor).numpy().item()
+        diff = paddle.sum(first_tensor - second_tensor).item()
         self.assertEqual(diff, 0.0)
 
     @slow
@@ -634,26 +634,6 @@ class BertCompatibilityTest(unittest.TestCase):
             )
 
     @require_package("transformers", "torch")
-    def test_bert_converter_from_local_dir_with_enable_torch(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-
-            # 2. forward the torch  model
-            from transformers import BertModel
-
-            torch_model = BertModel.from_pretrained("hf-internal-testing/tiny-random-BertModel")
-            torch_model.save_pretrained(tempdir)
-
-            # 2. forward the paddle model
-            from paddlenlp.transformers import BertModel, model_utils
-
-            model_utils.ENABLE_TORCH_CHECKPOINT = False
-
-            with self.assertRaises(ValueError) as error:
-                BertModel.from_pretrained(tempdir)
-                self.assertIn("conversion is been disabled" in str(error.exception))
-            model_utils.ENABLE_TORCH_CHECKPOINT = True
-
-    @require_package("transformers", "torch")
     def test_bert_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
 
@@ -672,7 +652,7 @@ class BertCompatibilityTest(unittest.TestCase):
             # 2. forward the paddle model
             from paddlenlp.transformers import BertModel
 
-            paddle_model = BertModel.from_pretrained(tempdir)
+            paddle_model = BertModel.from_pretrained(tempdir, convert_from_torch=True)
             paddle_model.eval()
             paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
 
@@ -729,7 +709,7 @@ class BertCompatibilityTest(unittest.TestCase):
             from paddlenlp import transformers
 
             paddle_model_class = getattr(transformers, class_name)
-            paddle_model = paddle_model_class.from_pretrained(tempdir)
+            paddle_model = paddle_model_class.from_pretrained(tempdir, convert_from_torch=True)
             paddle_model.eval()
 
             paddle_logit = paddle_model(paddle.to_tensor(input_ids), return_dict=False)[0]

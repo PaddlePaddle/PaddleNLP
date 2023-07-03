@@ -2,6 +2,7 @@ opencv-python==4.6.0.66
 opencv-contrib-python==4.6.0.66
 regex
 attrdict==2.0.1
+easydict==1.10.0
 PyYAML==5.4.1
 subword_nmt==0.3.7
 visualdl
