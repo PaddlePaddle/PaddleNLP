@@ -1032,6 +1032,7 @@ class TrainingArguments:
             work for data parallel, tensor parallel
             not work for sharding
         """
+        logger.info("self.save_sharded_model:{}, self.sharding:{}, self.sharding_parallel_degree:{}".format(self.save_sharded_model, self.sharding, self.sharding_parallel_degree))
         if self.save_on_each_node:
             return self.local_process_index == 0
         else:

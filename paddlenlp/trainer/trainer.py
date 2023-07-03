@@ -119,7 +119,7 @@ TRAINER_STATE_NAME = "trainer_state.json"
 OPTIMIZER_NAME = "optimizer.pdopt"
 SCHEDULER_NAME = "scheduler.pdparams"
 SCALER_NAME = "scaler.pdparams"
-
+MODEL_META_NAME = "model_meta.json"
 
 if is_datasets_available():
     import datasets
@@ -801,6 +801,8 @@ class Trainer:
                     forbidden_no_sync = True
 
                 availiable_no_sync = dp_enabled and not forbidden_no_sync
+
+                logger.info("train step:{}".format(step))
 
                 is_no_sync = (
                     ((step + 1) % args.gradient_accumulation_steps != 0)
@@ -1721,7 +1723,7 @@ class Trainer:
 
         if output_dir is None:
             output_dir = self.args.output_dir
-
+        logger.info("save_model, self.args.should_save_model_state:{}".format(self.args.should_save_model_state))
         if self.args.should_save_model_state:
             self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
 
@@ -1944,6 +1946,7 @@ class Trainer:
                     sharding_group=self.sharding_group,
                     save_sharded_model=self.args.save_sharded_model,
                     optimizer=self.optimizer,
+                    sharding_degree=self.args.sharding_parallel_degree,
                 )
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
@@ -1971,6 +1974,7 @@ class Trainer:
                 sharding_group=self.sharding_group,
                 save_sharded_model=self.args.save_sharded_model,
                 optimizer=self.optimizer,
+                sharding_degree=self.args.sharding_parallel_degree,
             )
 
         self._save_distributed_strategy(output_dir)

@@ -19,6 +19,7 @@ import os
 import re
 import shutil
 import tempfile
+from collections import OrderedDict
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type
 
@@ -1466,7 +1467,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         sharding_group = kwargs.get("sharding_group", None)
         optimizer = kwargs.get("optimizer", None)
         save_sharded_model = kwargs.get("save_sharded_model", False)
-        sharding_degree = sharding_group.get_sharding_parallel_world_size()
+        sharding_degree = kwargs.get("sharding_degree", 1)
 
         # 1. retrieve the model related config
 
@@ -1483,7 +1484,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         state_dict_to_save = model_to_save.state_dict()
         variants = []
         if sharding_degree > 1 and save_sharded_model:
-            sharding_rank = sharding_group.get_sharding_parallel_rank()
+            sharding_rank = fleet.get_hybrid_communicate_group().get_sharding_parallel_rank()
             state_dict_to_save = filter_sharded_params(state_dict_to_save, optimizer, sharding_rank)
             variants.append(f"shard{sharding_rank:0>2d}")
         if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
