@@ -26,7 +26,6 @@ from ppdiffusers import (
     DDPMScheduler,
     LDMBertModel,
     UNet2DConditionModel,
-    is_ppxformers_available,
 )
 from ppdiffusers.models.attention import AttentionBlock
 from ppdiffusers.models.ema import LitEma
@@ -163,12 +162,12 @@ class LatentDiffusionModel(nn.Layer):
         if self.use_ema:
             self.model_ema = LitEma(self.unet)
 
-        if model_args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
+        if model_args.enable_xformers_memory_efficient_attention:
             try:
                 self.unet.enable_xformers_memory_efficient_attention()
                 self.vae.enable_xformers_memory_efficient_attention()
             except Exception as e:
-                logger.warn(
+                raise ValueError(
                     "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
                     f" correctly and a GPU is available: {e}"
                 )
