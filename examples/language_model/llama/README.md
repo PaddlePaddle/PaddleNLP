@@ -191,7 +191,7 @@ python finetune_generation.py \
 ```shell
 python -u  -m paddle.distributed.launch \
     --gpus "4,5,6,7"   finetune_generation.py \
-    --model_name_or_path facebook/tiny-random-llama \
+    --model_name_or_path __internal_testing__/tiny-random-llama \
     --do_train \
     --do_eval \
     --num_train_epochs 1 \

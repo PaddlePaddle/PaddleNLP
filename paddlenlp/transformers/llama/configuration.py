@@ -23,8 +23,25 @@ __all__ = [
 ]
 
 LLAMA_PRETRAINED_INIT_CONFIGURATION = {
-    # Hypothetical model weights (tiny-random-llama) for test only
-    "facebook/tiny-random-llama": {
+    # Hypothetical model weights (tiny-random-llama & micro-random-llama) for test only
+    "__internal_testing__/micro-random-llama": {
+        "hidden_size": 64,
+        "initializer_range": 0.02,
+        "intermediate_size": 1000,
+        "max_position_embeddings": 2048,
+        "model_type": "llama",
+        "num_attention_heads": 8,
+        "num_hidden_layers": 1,
+        "rms_norm_eps": 1e-06,
+        "vocab_size": 32000,
+        "bos_token_id": 1,
+        "eos_token_id": 2,
+        "pad_token_id": 0,
+        "use_cache": False,
+        "use_recompute": False,
+        "use_flash_attention": False,
+    },
+    "__internal_testing__/tiny-random-llama": {
         "hidden_size": 768,
         "initializer_range": 0.02,
         "intermediate_size": 11008,
@@ -114,7 +131,8 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
 # Hypothetical model weights (tiny-random-llama) for test only
 LLAMA_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
-        "facebook/tiny-random-llama": "https://bj.bcebos.com/paddlenlp/models/community/facebook/tiny-random-llama/model_state.pdparams",
+        "__internal_testing__/micro-random-llama": "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/micro-random-llama/model_state.pdparams",
+        "__internal_testing__/tiny-random-llama": "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-llama/model_state.pdparams",
         "facebook/llama-7b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-7b/model_state.pdparams",
         "facebook/llama-13b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-13b/model_state.pdparams",
         "facebook/llama-30b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-30b/model_state.pdparams",
