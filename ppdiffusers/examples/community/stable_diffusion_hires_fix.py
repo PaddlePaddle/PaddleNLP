@@ -309,7 +309,12 @@ class StableDiffusionHiresFixPipeline(DiffusionPipeline):
     def get_timesteps(self, denoising_steps, denoising_strength):
         steps = int(denoising_steps / min(denoising_strength, 0.999))
         self.scheduler.set_timesteps(steps)
-        timesteps = self.scheduler.timesteps[steps - denoising_steps :]
+
+        t_start = max(steps - denoising_steps, 0)
+        timesteps = self.scheduler.timesteps[t_start * self.scheduler.order :]
+
+        if hasattr(self.scheduler, "step_index_offset"):
+            self.scheduler.step_index_offset = t_start * self.scheduler.order
 
         return timesteps, denoising_steps
 

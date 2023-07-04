@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
 import paddle
@@ -247,6 +247,8 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline, FastDepl
         eta: float = 0.0,
         generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         latents: Optional[paddle.Tensor] = None,
+        parse_prompt_type: Optional[str] = "lpw",
+        max_embeddings_multiples: Optional[int] = 3,
         prompt_embeds: Optional[paddle.Tensor] = None,
         negative_prompt_embeds: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
@@ -255,6 +257,7 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline, FastDepl
         callback_steps: Optional[int] = 1,
         controlnet_cond: Union[paddle.Tensor, PIL.Image.Image] = None,
         controlnet_conditioning_scale: float = 1.0,
+        infer_op_dict: Dict[str, str] = None,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -355,6 +358,7 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline, FastDepl
             negative_prompt_embeds,
             strength,
         )
+        infer_op_dict = self.prepare_infer_op_dict(infer_op_dict)
         # 2. Define call parameters
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
@@ -389,6 +393,9 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline, FastDepl
             negative_prompt,
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
+            parse_prompt_type=parse_prompt_type,
+            max_embeddings_multiples=max_embeddings_multiples,
+            infer_op=infer_op_dict.get("text_encoder", None),
         )
 
         # 4. set timesteps
@@ -411,6 +418,7 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline, FastDepl
             is_strength_max=is_strength_max,
             return_noise=True,
             return_image_latents=True,
+            infer_op=infer_op_dict.get("vae_encoder", None),
         )
 
         # 6. Prepare mask latent variables
@@ -422,13 +430,11 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline, FastDepl
             width,
             do_classifier_free_guidance,
             return_masked_image_latents=False,
+            infer_op=infer_op_dict.get("vae_encoder", None),
         )
 
         # 7. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
-
-        unet_output_name = self.unet.model.get_output_info(0).name
-        unet_input_names = [self.unet.model.get_input_info(i).name for i in range(self.unet.model.num_inputs())]
 
         if do_classifier_free_guidance:
             init_mask = mask[: mask.shape[0] // 2]
@@ -437,28 +443,29 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline, FastDepl
 
         # 8. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
+        is_scheduler_support_step_index = self.is_scheduler_support_step_index()
+
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
-                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
-                noise_pred_unet = paddle.zeros_like(latent_model_input)
+                if is_scheduler_support_step_index:
+                    latent_model_input = self.scheduler.scale_model_input(latent_model_input, t, step_index=i)
+                else:
+                    latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
-                unet_inputs = {
-                    unet_input_names[0]: latent_model_input,
-                    unet_input_names[1]: t,
-                    unet_input_names[2]: prompt_embeds,
-                }
-                if do_controlnet:
-                    unet_inputs[unet_input_names[3]] = control_image
-                    unet_inputs[unet_input_names[4]] = control_conditioning_scale
-
-                # predict the noise residual
-                self.unet.zero_copy_infer(
-                    prebinded_inputs=unet_inputs,
-                    prebinded_outputs={unet_output_name: noise_pred_unet},
-                    share_with_raw_ptr=True,
+                unet_inputs = dict(
+                    sample=latent_model_input,
+                    timestep=t,
+                    encoder_hidden_states=prompt_embeds,
+                    infer_op=infer_op_dict.get("unet", None),
+                    output_shape=latent_model_input.shape,
                 )
+                if do_controlnet:
+                    unet_inputs["controlnet_cond"] = control_image
+                    unet_inputs["controlnet_conditioning_scale"] = control_conditioning_scale
+                # predict the noise residual
+                noise_pred_unet = self.unet(**unet_inputs)[0]
 
                 # perform guidance
                 if do_classifier_free_guidance:
@@ -466,15 +473,24 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline, FastDepl
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
                 else:
                     noise_pred = noise_pred_unet
+
                 # compute the previous noisy sample x_t -> x_t-1
-                latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs, return_dict=False)[0]
+                if is_scheduler_support_step_index:
+                    scheduler_output = self.scheduler.step(
+                        noise_pred, t, latents, step_index=i, return_pred_original_sample=False, **extra_step_kwargs
+                    )
+                else:
+                    scheduler_output = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
+                latents = scheduler_output.prev_sample
 
                 if i < len(timesteps) - 1:
                     # masking
                     if add_predicted_noise:
                         init_latents_proper = self.scheduler.add_noise(image_latents, noise_pred_uncond, t)
                     else:
-                        init_latents_proper = self.scheduler.add_noise(image_latents, noise, t)
+                        # https://github.com/huggingface/diffusers/pull/3749/files#diff-39d36ab1e622684e35fe6971c12fb44e24756bdc383aba3d7f6e3b1625bdaafc
+                        noise_timestep = timesteps[i + 1]
+                        init_latents_proper = self.scheduler.add_noise(image_latents, noise, noise_timestep)
                 else:
                     init_latents_proper = image_latents
 
@@ -490,7 +506,9 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline, FastDepl
                         paddle.device.cuda.synchronize()
 
         if not output_type == "latent":
-            image = self._decode_vae_latents(latents / self.vae_scaling_factor)
+            image = self._decode_vae_latents(
+                latents / self.vae_scaling_factor, infer_op=infer_op_dict.get("vae_decoder", None)
+            )
             image, has_nsfw_concept = self.run_safety_checker(image)
         else:
             image = latents
