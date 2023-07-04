@@ -1040,7 +1040,7 @@ class TrainingArguments:
         else:
             if ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.save_sharded_model:
                 return True
-            elif self.tensor_parallel_degree > 1:
+            elif self.use_hybrid_parallel > 1:
                 # save on dataset rank 0
                 return self.sharding_parallel_rank == 0 and self.data_parallel_rank == 0
             else:

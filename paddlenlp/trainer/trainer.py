@@ -423,15 +423,20 @@ class Trainer:
         if resume_from_checkpoint is None:
             return
 
+        state_dict = None
         if self.args.load_sharded_model:
             state_dict = self.load_state_dict_from_checkpoint_with_reshard(resume_from_checkpoint)
             if self.args.bf16:
                 state_dict = self.recover_params_from_master_weights(state_dict)
         else:
-            state_dict = self.load_one_state_dict_from_checkpoint(resume_from_checkpoint, self.args.weight_name_suffix)
+            if self.args.dataset_rank == 0:
+                state_dict = self.load_one_state_dict_from_checkpoint(resume_from_checkpoint, self.args.weight_name_suffix)
+            else:
+                logger.info(f"not loading ckpt :{self.args.dataset_rank}")
 
         # If the model is on the GPU, it still works!
-        self._set_state_dict_in_model(state_dict)
+        if state_dict is not None:
+            self._set_state_dict_in_model(state_dict)
         # release memory
         del state_dict
 
@@ -461,10 +466,10 @@ class Trainer:
         logger.info("casted model_state_dict:{}".format(model_state_dict))
         state_dict.update(model_state_dict)
         ### save sharding loaded model to check
-        # sharding_save_dir = "./sharding_check"
-        # os.makedirs(sharding_save_dir, exist_ok=True)
-        # self._save(sharding_save_dir, state_dict)
-        # logger.info("save loaded done")
+        sharding_save_dir = "./sharding_check"
+        os.makedirs(sharding_save_dir, exist_ok=True)
+        self._save(sharding_save_dir, state_dict)
+        logger.info("save loaded done")
         ###
         return state_dict
 
@@ -808,7 +813,7 @@ class Trainer:
 
                 availiable_no_sync = dp_enabled and not forbidden_no_sync
 
-                logger.info("train step:{}".format(step))
+                # logger.info("train step:{}".format(step))
 
                 is_no_sync = (
                     ((step + 1) % args.gradient_accumulation_steps != 0)
@@ -1000,7 +1005,7 @@ class Trainer:
 
     def _set_state_dict_in_model(self, state_dict):
         # TODO  @ZHUI paddle need return the results of set_state_dict.
-        self.model.set_state_dict(state_dict)
+        logger.info(f"set state-dict :{self.model.set_state_dict(state_dict)}")
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
@@ -1929,10 +1934,12 @@ class Trainer:
         # Save a trained model and configuration using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
         is_bf16 = self.args.bf16
-        optimzier_state_dict = self.optimizer.state_dict()
-        assert "master_weights" in optimzier_state_dict
-        parameter_names = list(optimzier_state_dict["master_weights"].keys())
-        logger.info("parameter_names len:{} , type:{}, parameter_names:{}".format(len(parameter_names), type(parameter_names), parameter_names))
+        parameter_names = []
+        if is_bf16:
+            optimzier_state_dict = self.optimizer.state_dict()
+            assert "master_weights" in optimzier_state_dict
+            parameter_names = list(optimzier_state_dict["master_weights"].keys())
+            logger.info("parameter_names len:{} , type:{}, parameter_names:{}".format(len(parameter_names), type(parameter_names), parameter_names))
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
 
@@ -2129,6 +2136,10 @@ class Trainer:
             self.lr_scheduler.set_state_dict(paddle.load(os.path.join(checkpoint, SCHEDULER_NAME)))
             if self.do_grad_scaling and os.path.isfile(os.path.join(checkpoint, SCALER_NAME)):
                 self.scaler.load_state_dict(paddle.load(os.path.join(checkpoint, SCALER_NAME), return_numpy=True))
+        else:
+            raise ValueError(
+                f"optimizer-state-dict not found, opt:{os.path.join(checkpoint, optimizer_name)} scheduler:{os.path.join(checkpoint, SCHEDULER_NAME)}"
+            )
 
     def log(self, logs: Dict[str, float], **kwargs) -> None:
         """
