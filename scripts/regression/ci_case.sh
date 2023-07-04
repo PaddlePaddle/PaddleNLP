@@ -1279,6 +1279,8 @@ gpt-3() {
 }
 llama(){
 cd ${nlp_dir}/examples/language_model/llama/
+# install the dependency packages
+pip install requirements.txt
 # lora tuning 
 python finetune_generation.py \
     --model_name_or_path facebook/tiny-random-llama \
