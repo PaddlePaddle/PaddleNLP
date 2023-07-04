@@ -1278,7 +1278,7 @@ gpt-3() {
     print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'`
 }
 llama(){
-cd ${nlp_dir}/examples/llama/
+cd ${nlp_dir}/examples/language_model/llama/
 # lora tuning 
 python finetune_generation.py \
     --model_name_or_path facebook/tiny-random-llama \

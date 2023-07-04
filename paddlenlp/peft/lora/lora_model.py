@@ -208,6 +208,7 @@ class LoRAModel(nn.Layer):
         for name in attribute_chain[:-1]:
             parent_module = getattr(parent_module, name)
         module = getattr(parent_module, attribute_chain[-1])
+        lora_module = None
         if enable_lora is None:
             if isinstance(module, nn.Linear):
                 lora_module = LoRALinear(
@@ -267,6 +268,10 @@ class LoRAModel(nn.Layer):
                         )
                     ),
                 )
+        if lora_module is None:
+            raise ValueError(
+                f"LoRA strategy only supports paddle.nn.Linear or paddle.distributed.fleet.meta_parallel.ColumnParallelLinear. {module}({module_name}) is not supported。"
+            )
 
         lora_module.weight = module.weight
         if module.bias is not None:
@@ -290,7 +295,7 @@ class LoRAModel(nn.Layer):
         trainable_state_dict = OrderedDict()
         for name, weight in self.model.state_dict().items():
             # get lora parameter & QAT scale parameter
-            if not weight.stop_gradient or "activation_quanter._scale" in name or "weight_quanter._scale" in name:
+            if not weight.stop_gradient or "activation_quanter" in name or "weight_quanter" in name:
                 trainable_state_dict[name] = weight
         return trainable_state_dict
 
