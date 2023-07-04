@@ -957,7 +957,7 @@ class Trainer:
                 metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
 
         if self.control.should_save:
-            self._save_checkpoint(model, metrics=metrics, use_async_save=True)
+            self._save_checkpoint(model, metrics=metrics, use_async_save=self.args.use_async_save)
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
 
     def _get_learning_rate(self):
