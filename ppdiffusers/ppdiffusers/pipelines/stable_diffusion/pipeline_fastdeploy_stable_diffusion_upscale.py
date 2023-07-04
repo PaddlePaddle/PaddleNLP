@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import paddle
@@ -105,12 +105,15 @@ class FastDeployStableDiffusionUpscalePipeline(DiffusionPipeline, FastDeployDiff
         eta: float = 0.0,
         generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         latents: Optional[paddle.Tensor] = None,
+        parse_prompt_type: Optional[str] = "lpw",
+        max_embeddings_multiples: Optional[int] = 3,
         prompt_embeds: Optional[np.ndarray] = None,
         negative_prompt_embeds: Optional[np.ndarray] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
+        infer_op_dict: Dict[str, str] = None,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -175,6 +178,7 @@ class FastDeployStableDiffusionUpscalePipeline(DiffusionPipeline, FastDeployDiff
 
         # 1. Check inputs
         self.check_inputs(prompt, image, noise_level, callback_steps)
+        infer_op_dict = self.prepare_infer_op_dict(infer_op_dict)
 
         # 2. Define call parameters
         if prompt is not None and isinstance(prompt, str):
@@ -197,6 +201,9 @@ class FastDeployStableDiffusionUpscalePipeline(DiffusionPipeline, FastDeployDiff
             negative_prompt,
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
+            parse_prompt_type=parse_prompt_type,
+            max_embeddings_multiples=max_embeddings_multiples,
+            infer_op=infer_op_dict.get("text_encoder", None),
         )
 
         # 4. Preprocess image
@@ -241,30 +248,31 @@ class FastDeployStableDiffusionUpscalePipeline(DiffusionPipeline, FastDeployDiff
         # 8. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
 
-        unet_output_name = self.unet.model.get_output_info(0).name
-        unet_input_names = [self.unet.model.get_input_info(i).name for i in range(self.unet.model.num_inputs())]
         # 9. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
+        is_scheduler_support_step_index = self.is_scheduler_support_step_index()
+
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
-                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
-                noise_pred_unet = paddle.zeros_like(latent_model_input)
-                # concat latents, image in the channel dimension
-                latent_model_input = paddle.concat([latent_model_input, image], axis=1)
+                if is_scheduler_support_step_index:
+                    latent_model_input = self.scheduler.scale_model_input(latent_model_input, t, step_index=i)
+                else:
+                    latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
-                unet_inputs = {
-                    unet_input_names[0]: latent_model_input,
-                    unet_input_names[1]: t,
-                    unet_input_names[2]: prompt_embeds,
-                }
-                # predict the noise residual
-                self.unet.zero_copy_infer(
-                    prebinded_inputs=unet_inputs,
-                    prebinded_outputs={unet_output_name: noise_pred_unet},
-                    share_with_raw_ptr=True,
+                unet_inputs = dict(
+                    sample=paddle.concat(
+                        [latent_model_input, image], axis=1
+                    ),  # concat latents, image in the channel dimension
+                    timestep=t,
+                    encoder_hidden_states=prompt_embeds,
+                    infer_op=infer_op_dict.get("unet", None),
+                    output_shape=latent_model_input.shape,
                 )
+                # predict the noise residual
+                noise_pred_unet = self.unet(**unet_inputs)[0]
+
                 # perform guidance
                 if do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred_unet.chunk(2)
@@ -273,7 +281,13 @@ class FastDeployStableDiffusionUpscalePipeline(DiffusionPipeline, FastDeployDiff
                     noise_pred = noise_pred_unet
 
                 # compute the previous noisy sample x_t -> x_t-1
-                latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
+                if is_scheduler_support_step_index:
+                    scheduler_output = self.scheduler.step(
+                        noise_pred, t, latents, step_index=i, return_pred_original_sample=False, **extra_step_kwargs
+                    )
+                else:
+                    scheduler_output = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
+                latents = scheduler_output.prev_sample
 
                 # call the callback, if provided
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
@@ -285,7 +299,9 @@ class FastDeployStableDiffusionUpscalePipeline(DiffusionPipeline, FastDeployDiff
                         paddle.device.cuda.synchronize()
 
         if not output_type == "latent":
-            image = self._decode_vae_latents(latents / self.vae_scaling_factor)
+            image = self._decode_vae_latents(
+                latents / self.vae_scaling_factor, infer_op=infer_op_dict.get("vae_decoder", None)
+            )
         else:
             image = latents
 
