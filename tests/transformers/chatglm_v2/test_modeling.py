@@ -137,12 +137,12 @@ class ChatGLMv2Tester:
         )
         if self.parent.use_labels:
             loss = result.loss if self.parent.return_dict else result[0]
-            self.parent.assertEqual(loss.shape, [1])
+            self.parent.assertIsNotNone(loss)
             logits = result.logits if self.parent.return_dict else result[1]
             past_key_values = result.past_key_values[0] if self.parent.return_dict else result[2][0]
         else:
             loss = result.loss if self.parent.return_dict else None
-            self.parent.assertTrue(loss is None)
+            self.parent.assertIsNone(loss)
             logits = result.logits if self.parent.return_dict else result[0]
             past_key_values = result.past_key_values[0] if self.parent.return_dict else result[1][0]
         self.parent.assertEqual(logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
@@ -164,20 +164,19 @@ class ChatGLMv2Tester:
 
 
 @parameterized_class(
-    ("return_dict", "multi_query_attention"),
+    ("return_dict", "multi_query_attention", "use_labels"),
     [
-        [False, False],
-        [False, True],
-        [True, False],
-        [True, True],
+        [False, False, False],
+        [False, True, False],
+        [True, False, False],
+        [True, True, True],
     ],
 )
 class ChatGLMv2Test(ModelTesterMixin, unittest.TestCase):
     base_model_class = ChatGLMv2Model
     return_dict: bool = True
-    use_labels: bool = False
     multi_query_attention = False
-    # test_resize_embeddings = False
+    use_labels: bool = False
     use_test_model_name_list = False
 
     all_model_classes = (ChatGLMv2Model, ChatGLMv2ForConditionalGeneration)

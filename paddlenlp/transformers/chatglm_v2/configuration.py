@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 ChatGLM2-6B Model Team and PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ from ..configuration_utils import PretrainedConfig
 
 
 class ChatGLMv2Config(PretrainedConfig):
-    model_type = "chatglmv2"
+    model_type = "chatglm_v2"
     attribute_map = {"num_layers": "num_hidden_layers", "padded_vocab_size": "vocab_size"}
 
     def __init__(
