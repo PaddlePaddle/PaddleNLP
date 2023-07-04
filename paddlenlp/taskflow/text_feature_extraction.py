@@ -16,7 +16,6 @@ from typing import Optional
 
 import numpy as np
 import paddle
-from tqdm.autonotebook import trange
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.transformers import AutoModel, AutoTokenizer, ErnieDualEncoder
@@ -467,7 +466,7 @@ class SentenceFeatureExtractionTask(Task):
         one_batch = []
         self.length_sorted_idx = np.argsort([-text_length(sen) for sen in data])
         sentences_sorted = [data[idx] for idx in self.length_sorted_idx]
-        for example in trange(len(sentences_sorted)):
+        for example in range(len(sentences_sorted)):
             one_batch.append(sentences_sorted[example])
             if len(one_batch) == batch_size:
                 yield _parse_batch(one_batch)
