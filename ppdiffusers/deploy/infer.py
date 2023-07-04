@@ -24,7 +24,7 @@ import numpy as np
 from tqdm.auto import trange
 
 from paddlenlp.trainer.argparser import strtobool
-from ppdiffusers import FastDeployStableDiffusionMegaPipeline
+from ppdiffusers import DiffusionPipeline, FastDeployStableDiffusionMegaPipeline
 from ppdiffusers.utils import load_image
 
 
@@ -71,9 +71,10 @@ def parse_arguments():
             "inpaint",
             "inpaint_legacy",
             "cycle_diffusion",
+            "mixture_tiling",
             "all",
         ],
-        help="The task can be one of [text2img, img2img, inpaint, inpaint_legacy, cycle_diffusion, all]. ",
+        help="The task can be one of [text2img, img2img, inpaint, inpaint_legacy, cycle_diffusion, mixture_tiling, all]. ",
     )
     parser.add_argument(
         "--scheduler",
@@ -419,6 +420,80 @@ def main(args):
             f"p90 latency: {np.percentile(time_costs, 90):2f} s, p95 latency: {np.percentile(time_costs, 95):2f} s."
         )
         images[0].save("cycle_diffusion.png")
+
+    if args.task_name in ["mixture_tiling", "all"]:
+        print("mixture_tiling yes yes yes")
+        mixture_tiling_pipe = DiffusionPipeline.from_pretrained(
+            args.model_dir,
+            vae_encoder=pipe.vae_encoder,
+            vae_decoder=pipe.vae_decoder,
+            text_encoder=pipe.text_encoder,
+            tokenizer=pipe.tokenizer,
+            unet=pipe.unet,
+            scheduler=pipe.scheduler,
+            safety_checker=pipe.safety_checker,
+            feature_extractor=pipe.feature_extractor,
+            requires_safety_checker=pipe.requires_safety_checker,
+            # custom_pipeline="pipeline_fastdeploy_stable_diffusion_mixture_tiling",
+            custom_pipeline="/root/project/paddlenlp/ppdiffusers_upgrade/PaddleNLP/ppdiffusers/examples/community/pipeline_fastdeploy_stable_diffusion_mixture_tiling.py",
+        )
+        # custom_pipeline
+        mixture_tiling_pipe._progress_bar_config = pipe._progress_bar_config
+        # mixture_tiling
+        prompt = [
+            [
+                "A charming house in the countryside, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+                "A dirt road in the countryside crossing pastures, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+                "An old and rusty giant robot lying on a dirt road, by jakub rozalski, dark sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+            ]
+        ]
+        time_costs = []
+        # warmup
+        mixture_tiling_pipe(
+            prompt=[
+                [
+                    "A charming house in the countryside, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+                    "A dirt road in the countryside crossing pastures, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+                    "An old and rusty giant robot lying on a dirt road, by jakub rozalski, dark sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+                ]
+            ],
+            tile_height=512,
+            tile_width=512,
+            tile_row_overlap=0,
+            tile_col_overlap=256,
+            guidance_scale=8,
+            seed=7178915308,
+            num_inference_steps=50,
+            infer_op_dict=None,
+        )
+        print("==> Test mixture tiling.")
+        for step in trange(args.benchmark_steps):
+            start = time.time()
+            images = mixture_tiling_pipe(
+                prompt=[
+                    [
+                        "A charming house in the countryside, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+                        "A dirt road in the countryside crossing pastures, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+                        "An old and rusty giant robot lying on a dirt road, by jakub rozalski, dark sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+                    ]
+                ],
+                tile_height=512,
+                tile_width=512,
+                tile_row_overlap=0,
+                tile_col_overlap=256,
+                guidance_scale=8,
+                seed=7178915308,
+                num_inference_steps=50,
+                infer_op_dict=None,
+            )["images"][0]
+            latency = time.time() - start
+            time_costs += [latency]
+            # print(f"No {step:3d} time cost: {latency:2f} s")
+        print(
+            f"Mean latency: {np.mean(time_costs):2f} s, p50 latency: {np.percentile(time_costs, 50):2f} s, "
+            f"p90 latency: {np.percentile(time_costs, 90):2f} s, p95 latency: {np.percentile(time_costs, 95):2f} s."
+        )
+        images[0].save("mixture_tiling.png")
 
 
 if __name__ == "__main__":
