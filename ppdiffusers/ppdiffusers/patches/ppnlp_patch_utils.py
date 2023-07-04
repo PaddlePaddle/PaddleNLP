@@ -355,7 +355,7 @@ if is_paddle_available() and is_paddlenlp_available():
             dropout_p=0.0,
             is_causal=False,
             scale=None,
-            training=False,
+            training=True,
             attention_op="cutlass",
         ):
             if attn_mask is not None or attention_op == "math":
@@ -849,7 +849,7 @@ if is_paddle_available() and is_paddlenlp_available():
 
         loaded_state_dict_keys = list(state_dict.keys())
 
-        model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
+        model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model_old(
             model=model,
             state_dict=state_dict,
             loaded_keys=loaded_state_dict_keys,
@@ -915,6 +915,185 @@ if is_paddle_available() and is_paddlenlp_available():
 
         return model
 
+    import re
+
+    import numpy as np
+
+    @classmethod
+    def _load_pretrained_model_old(
+        cls,
+        model: PretrainedModel,
+        state_dict: Dict[str, paddle.Tensor],
+        loaded_keys: List[str],
+        ignore_mismatched_sizes=False,
+        dtype=None,
+    ) -> Tuple[List[str]]:
+        model_state_dict = model.state_dict()
+
+        expected_keys = list(model_state_dict.keys())
+        prefix = model.base_model_prefix
+
+        if len(prefix) > 0:
+            has_prefix_module = any(s.startswith(prefix) for s in loaded_keys)
+            expects_prefix_module = any(s.startswith(prefix) for s in expected_keys)
+        else:
+            has_prefix_module = False
+            expects_prefix_module = False
+
+        # key re-naming operations are never done on the keys
+        # that are loaded, but always on the keys of the newly initialized model
+        remove_prefix_from_model = not has_prefix_module and expects_prefix_module
+        add_prefix_to_model = has_prefix_module and not expects_prefix_module
+
+        if remove_prefix_from_model:
+            expected_keys = [".".join(s.split(".")[1:]) if s.startswith(prefix) else s for s in expected_keys]
+        elif add_prefix_to_model:
+            expected_keys = [".".join([prefix, s]) for s in expected_keys]
+
+        missing_keys = list(set(expected_keys) - set(loaded_keys))
+        unexpected_keys = list(set(loaded_keys) - set(expected_keys))
+
+        # Some models may have keys that are not in the state by design, removing them before needlessly warning
+        # the user.
+        if cls._keys_to_ignore_on_load_missing is not None:
+            for pat in cls._keys_to_ignore_on_load_missing:
+                missing_keys = [k for k in missing_keys if re.search(pat, k) is None]
+
+        if cls._keys_to_ignore_on_load_unexpected is not None:
+            for pat in cls._keys_to_ignore_on_load_unexpected:
+                unexpected_keys = [k for k in unexpected_keys if re.search(pat, k) is None]
+
+        # Make sure we are able to load base models as well as derived models (with heads)
+        start_prefix = ""
+        model_to_load = model
+        if len(cls.base_model_prefix) > 0 and not hasattr(model, cls.base_model_prefix) and has_prefix_module:
+            start_prefix = cls.base_model_prefix + "."
+
+        def _find_mismatched_keys(
+            state_dict,
+            model_state_dict,
+            loaded_keys,
+            add_prefix_to_model,
+            remove_prefix_from_model,
+            ignore_mismatched_sizes,
+        ):
+            mismatched_keys = []
+            if ignore_mismatched_sizes:
+                for checkpoint_key in loaded_keys:
+                    model_key = checkpoint_key
+                    if remove_prefix_from_model:
+                        # The model key starts with `prefix` but `checkpoint_key` doesn't so we add it.
+                        model_key = f"{prefix}.{checkpoint_key}"
+                    elif add_prefix_to_model:
+                        # The model key doesn't start with `prefix` but `checkpoint_key` does so we remove it.
+                        model_key = ".".join(checkpoint_key.split(".")[1:])
+
+                    if (
+                        model_key in model_state_dict
+                        and state_dict[checkpoint_key].shape != model_state_dict[model_key].shape
+                    ):
+                        mismatched_keys.append(
+                            (checkpoint_key, state_dict[checkpoint_key].shape, model_state_dict[model_key].shape)
+                        )
+                        del state_dict[checkpoint_key]
+            return mismatched_keys
+
+        # Whole checkpoint
+        mismatched_keys = _find_mismatched_keys(
+            state_dict,
+            model_state_dict,
+            loaded_keys,
+            add_prefix_to_model,
+            remove_prefix_from_model,
+            ignore_mismatched_sizes,
+        )
+
+        start_prefix = prefix + "."
+
+        # `add_prefix_to_model` and `remove_prefix_from_model` are for different situation,
+        # you can check the following matrix, which means:
+        # the value of cell: (add_prefix_to_model, remove_prefix_from_model)
+        # the load/Init-Base is the state-dict which don't contain `prefix`.
+        # the load/Init-DownStream is the state-dict which contain the `prefix`
+        #
+        # |                 | load-Base | load-DownStream |
+        # |-----------------|-----------|-----------------|
+        # | Init-Base       | F,F       | T,F             |
+        # | Init-DonwStream | F,T       | F,F             |
+        #
+        # the above value matrix will help you understand the following code.
+        if add_prefix_to_model:
+            for key in list(state_dict.keys()):
+                if key.startswith(start_prefix):
+                    state_dict[key.replace(start_prefix, "")] = state_dict.pop(key)
+
+        if remove_prefix_from_model:
+            for key in list(state_dict.keys()):
+                state_dict[start_prefix + key] = state_dict.pop(key)
+
+        # convert the dtype of state dict
+        if dtype is not None:
+            if isinstance(dtype, paddle.dtype):
+                dtype = str(dtype)[7:]
+
+            if dtype not in ["float32", "float16", "bfloat16"]:
+                raise ValueError(
+                    f"the value of `dtype` should be one of [`float32`, `float16`, `bfloat16`], but received {dtype}"
+                )
+            for key in state_dict.keys():
+                target_dtype = dtype
+                if isinstance(state_dict[key], np.ndarray):
+                    if not issubclass(state_dict[key].dtype.type, np.floating):
+                        continue
+
+                    # TODO(wj-Mcat): add `keep_in_fp32` feature to enable hybrid fp32 state-dict
+                    # this is the temp hard code for fused-mt transformer
+                    if model.keep_in_fp32_modules(key, model.config, dtype):
+                        target_dtype = "float32"
+                    # state_dict[key] = convert_ndarray_dtype(state_dict[key], target_dtype)
+
+                elif isinstance(state_dict[key], paddle.Tensor):
+                    if not state_dict[key].is_floating_point():
+                        continue
+
+                    # TODO(wj-Mcat): add `keep_in_fp32` feature to enable hybrid fp32 state-dict
+                    # this is the temp hard code for fused-mt transformer
+                    if model.keep_in_fp32_modules(key, model.config, dtype):
+                        target_dtype = "float32"
+                    state_dict[key] = paddle.cast(state_dict[key], dtype=target_dtype)
+                else:
+                    raise ValueError(f"the dtype<{state_dict[key].dtype}> of current state-dict[{key}] is not valid")
+        else:
+            dtype_prefix_len = len("paddle.")
+            for k, v in model_to_load.state_dict().items():
+                if not isinstance(v, np.ndarray):
+                    dtype = str(v.dtype)[dtype_prefix_len:]
+                if k in state_dict:
+                    if paddle.in_dynamic_mode():
+                        if isinstance(state_dict[k], np.ndarray):
+                            state_dict[k] = state_dict[k].astype(dtype)
+                        else:
+                            state_dict[k] = paddle.cast(state_dict[k], dtype)
+                    else:
+                        # there are some latent error when case dtype in static-mode, so let's:
+                        # 1. convert fluid.*.Tensor -> numpy.ndarray
+                        # 2. cast the dtype with numpy tools
+                        # 3. paddle works well with ndarray state-dict
+                        state_dict[k] = np.array(state_dict[k])
+                        state_dict[k] = state_dict[k].astype(dtype)
+
+        # For model parallel if FastGeneration
+        # To avoid recursive import temporarily.
+        import paddlenlp.ops.fast_transformer.transformer.decoding as ft_decoding
+
+        state_to_load = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_dict)
+        if paddle.in_dynamic_mode():
+            model_to_load.set_state_dict(state_to_load)
+
+        return model_to_load, missing_keys, unexpected_keys, mismatched_keys
+
+    PretrainedModel._load_pretrained_model_old = _load_pretrained_model_old
+
     # PretrainedModel.from_pretrained is classmethod
     raw_from_pretrained = PretrainedModel.from_pretrained.__func__
     raw_save_pretrained = PretrainedModel.save_pretrained
@@ -931,20 +1110,23 @@ if is_paddle_available() and is_paddlenlp_available():
         variant=None,
         **kwargs
     ):
-        if cls.constructed_from_pretrained_config() and (
-            hasattr(cls, "smart_convert") or hasattr(cls, "register_load_torch_hook")
-        ):
-            return from_pretrained_v3(
-                cls,
-                pretrained_model_name_or_path,
-                *args,
-                from_hf_hub=from_hf_hub,
-                subfolder=subfolder,
-                paddle_dtype=paddle_dtype,
-                from_diffusers=from_diffusers,
-                variant=variant,
-                **kwargs,
-            )
+        try:
+            if cls.constructed_from_pretrained_config() and (
+                hasattr(cls, "smart_convert") or hasattr(cls, "register_load_torch_hook")
+            ):
+                return from_pretrained_v3(
+                    cls,
+                    pretrained_model_name_or_path,
+                    *args,
+                    from_hf_hub=from_hf_hub,
+                    subfolder=subfolder,
+                    paddle_dtype=paddle_dtype,
+                    from_diffusers=from_diffusers,
+                    variant=variant,
+                    **kwargs,
+                )
+        except Exception:
+            pass
 
         dtype = kwargs.pop("dtype", paddle_dtype)
         if isinstance(dtype, paddle.dtype):
@@ -1044,10 +1226,14 @@ if is_paddle_available() and is_paddlenlp_available():
         self,
         save_dir: str,
         is_main_process: bool = True,
+        state_dict=None,
         save_function: Callable = None,
+        max_shard_size="10GB",
         safe_serialization: bool = False,
         variant: Optional[str] = None,
         to_diffusers: Optional[bool] = None,
+        *args,
+        **kwargs,
     ):
         if self.constructed_from_pretrained_config() and hasattr(self, "smart_convert"):
             return save_pretrained_v3(
@@ -1059,7 +1245,18 @@ if is_paddle_available() and is_paddlenlp_available():
                 variant=variant,
                 to_diffusers=to_diffusers,
             )
-        return raw_save_pretrained(self, save_dir, variant=variant)
+        return raw_save_pretrained(
+            self,
+            save_dir=save_dir,
+            is_main_process=is_main_process,
+            state_dict=state_dict,
+            save_function=save_function,
+            max_shard_size=max_shard_size,
+            safe_serialization=safe_serialization,
+            variant=variant,
+            *args,
+            **kwargs,
+        )
 
     PretrainedModel.save_pretrained = save_pretrained
 
