@@ -957,7 +957,7 @@ class Trainer:
                 metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
 
         if self.control.should_save:
-            self._save_checkpoint(model, metrics=metrics)
+            self._save_checkpoint(model, metrics=metrics, use_async_save=True)
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
 
     def _get_learning_rate(self):
@@ -1628,7 +1628,12 @@ class Trainer:
 
         return loss.detach()
 
-    def save_model(self, output_dir: Optional[str] = None, merge_tensor_parallel: Optional[bool] = False):
+    def save_model(
+        self,
+        output_dir: Optional[str] = None,
+        merge_tensor_parallel: Optional[bool] = False,
+        use_async_save: Optional[bool] = False,
+    ):
         """
         Will save the model, so you can reload it using `from_pretrained()`.
 
@@ -1639,10 +1644,14 @@ class Trainer:
             output_dir = self.args.output_dir
 
         if self.args.should_save_model_state:
-            self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
+            self._save(
+                output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel, use_async_save=use_async_save
+            )
 
-    def _save_checkpoint(self, model, metrics=None):
+    def _save_checkpoint(self, model, metrics=None, use_async_save=False):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
+        if use_async_save:
+            paddle.clear_async_save_task_queue()
 
         # Save model checkpoint
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
@@ -1655,27 +1664,42 @@ class Trainer:
             # TODO(ZHUI) fix it and set convert2cpu=True to save gpu memory
             model.get_all_parameters(convert2cpu=False)
 
-        self.save_model(output_dir)
+        self.save_model(output_dir, use_async_save=use_async_save)
 
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
         if self.args.use_hybrid_parallel:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
-                paddle.save(
-                    self.optimizer.state_dict(),
-                    os.path.join(output_dir, optimizer_name),
-                )
+                if use_async_save:
+                    paddle.async_save(
+                        self.optimizer.state_dict(),
+                        os.path.join(output_dir, optimizer_name),
+                    )
+                else:
+                    paddle.save(
+                        self.optimizer.state_dict(),
+                        os.path.join(output_dir, optimizer_name),
+                    )
 
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
-                paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+                if use_async_save:
+                    paddle.async_save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+                else:
+                    paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
             # FIXME: manybe only save one copy
-            paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
+            if use_async_save:
+                paddle.async_save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
+            else:
+                paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
 
             if self.do_grad_scaling:
-                paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
+                if use_async_save:
+                    paddle.async_save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
+                else:
+                    paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
 
         # Determine the new best metric / best model checkpoint
         if metrics is not None and self.args.metric_for_best_model is not None:
@@ -1716,9 +1740,15 @@ class Trainer:
         if self.args.world_size > 1:
             # use global process_index to save
             process_index = self.args.process_index
-            paddle.save(rng_states, os.path.join(output_dir, f"rng_state_{process_index}.pth"))
+            if use_async_save:
+                paddle.async_save(rng_states, os.path.join(output_dir, f"rng_state_{process_index}.pth"))
+            else:
+                paddle.save(rng_states, os.path.join(output_dir, f"rng_state_{process_index}.pth"))
         else:
-            paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
+            if use_async_save:
+                paddle.async_save(rng_states, os.path.join(output_dir, "rng_state.pth"))
+            else:
+                paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
 
         # Maybe delete some older checkpoints.
         if self.args.should_save and (True if not self.args.use_hybrid_parallel else self.args.local_rank == 0):
@@ -1790,7 +1820,9 @@ class Trainer:
             logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
             shutil.rmtree(checkpoint)
 
-    def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
+    def _save(
+        self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False, use_async_save=False
+    ):
         # If we are executing this function, we are the process zero, so we don't check for that.
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
@@ -1828,6 +1860,7 @@ class Trainer:
                 merge_tensor_parallel=merge_tensor_parallel,
                 variant=self.args.weight_name_suffix,
                 is_main_process=self.args.should_save,
+                use_async_save=use_async_save,
             )
 
         if self.args.should_save:
