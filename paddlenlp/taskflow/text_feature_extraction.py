@@ -318,14 +318,18 @@ class TextFeatureExtractionTask(Task):
 
 
 def text_length(text):
-    if isinstance(text, dict):  # {key: value} case
+    # {key: value} case
+    if isinstance(text, dict):
         return len(next(iter(text.values())))
-    elif not hasattr(text, "__len__"):  # Object has no len() method
+    # Object has no len() method
+    elif not hasattr(text, "__len__"):
         return 1
-    elif len(text) == 0 or isinstance(text[0], int):  # Empty string or list of ints
+    # Empty string or list of ints
+    elif len(text) == 0 or isinstance(text[0], int):
         return len(text)
+    # Sum of length of individual strings
     else:
-        return sum([len(t) for t in text])  # Sum of length of individual strings
+        return sum([len(t) for t in text])
 
 
 class SentenceFeatureExtractionTask(Task):
@@ -349,20 +353,13 @@ class SentenceFeatureExtractionTask(Task):
         reinitialize: bool = False,
         share_parameters: bool = False,
         is_paragraph: bool = False,
-        output_emb_size: Optional[int] = None,
-        pooling_mode_cls_token: bool = False,
-        pooling_mode_max_tokens: bool = False,
-        pooling_mode_mean_tokens: bool = False,
-        pooling_mode_mean_sqrt_len_tokens: bool = False,
+        pooling_mode: str = "cls_token",
         **kwargs
     ):
         super().__init__(
             task=task,
             model=model,
-            pooling_mode_cls_token=False,
-            pooling_mode_max_tokens=False,
-            pooling_mode_mean_sqrt_len_tokens=False,
-            pooling_mode_mean_tokens=False,
+            pooling_mode=pooling_mode,
             **kwargs,
         )
         self._seed = None
@@ -375,30 +372,14 @@ class SentenceFeatureExtractionTask(Task):
 
         self.reinitialize = reinitialize
         self.share_parameters = share_parameters
-        self.output_emb_size = output_emb_size
         self.is_paragraph = is_paragraph
-        self._check_para_encoder()
-        self.pooling_mode_cls_token = pooling_mode_cls_token
-        self.pooling_mode_max_tokens = pooling_mode_max_tokens
-        self.pooling_mode_mean_tokens = pooling_mode_mean_tokens
-        self.pooling_mode_mean_sqrt_len_tokens = pooling_mode_mean_sqrt_len_tokens
-        # self._check_task_files()
+        self.pooling_mode = pooling_mode
         self._check_predictor_type()
         self._construct_tokenizer()
-        # self._get_inference_model()
         if self._static_mode:
             self._get_inference_model()
         else:
             self._construct_model(model)
-
-    def _check_para_encoder(self):
-        if self.model in ENCODER_TYPE:
-            if ENCODER_TYPE[self.model] == "paragraph":
-                self.is_paragraph = True
-            else:
-                self.is_paragraph = False
-        else:
-            self.is_paragraph = False
 
     def _construct_model(self, model):
         """
@@ -445,21 +426,12 @@ class SentenceFeatureExtractionTask(Task):
             to_tokenize = [[str(s).strip() for s in col] for col in to_tokenize]
             if max_seq_len is None:
                 max_seq_len = self.max_seq_len
-            if self.is_paragraph:
-                # The input of the passage encoder is [CLS][SEP]...[SEP].
-                tokenized_inputs = self._tokenizer(
-                    text=to_tokenize[0],
-                    padding=True,
-                    truncation="longest_first",
-                    max_seq_len=max_seq_len,
-                )
-            else:
-                tokenized_inputs = self._tokenizer(
-                    to_tokenize[0],
-                    padding=True,
-                    truncation="longest_first",
-                    max_seq_len=max_seq_len,
-                )
+            tokenized_inputs = self._tokenizer(
+                to_tokenize[0],
+                padding=True,
+                truncation="longest_first",
+                max_seq_len=max_seq_len,
+            )
             return tokenized_inputs
 
         # Seperates data into some batches.
@@ -500,7 +472,7 @@ class SentenceFeatureExtractionTask(Task):
                             self.input_handles[1].copy_from_cpu(batch_inputs["token_type_ids"])
                             self.predictor.run()
                             token_embeddings = self.output_handle[0].copy_to_cpu()
-                            if self.pooling_mode_max_tokens:
+                            if self.pooling_mode == "max_tokens":
                                 attention_mask = (batch_inputs["input_ids"] != self.pad_token_id).astype(
                                     token_embeddings.dtype
                                 )
@@ -510,7 +482,7 @@ class SentenceFeatureExtractionTask(Task):
                                 token_embeddings[input_mask_expanded == 0] = -1e9
                                 max_over_time = np.max(token_embeddings, 1)
                                 all_feats.append(max_over_time)
-                            elif self.pooling_mode_mean_tokens or self.pooling_mode_mean_sqrt_len_tokens:
+                            elif self.pooling_mode == "mean_tokens" or self.pooling_mode == "mean_sqrt_len_tokens":
                                 attention_mask = (batch_inputs["input_ids"] != self.pad_token_id).astype(
                                     token_embeddings.dtype
                                 )
@@ -520,9 +492,9 @@ class SentenceFeatureExtractionTask(Task):
                                 sum_embeddings = np.sum(token_embeddings * input_mask_expanded, 1)
                                 sum_mask = input_mask_expanded.sum(1)
                                 sum_mask = np.clip(sum_mask, a_min=1e-9, a_max=np.max(sum_mask))
-                                if self.pooling_mode_mean_tokens:
+                                if self.pooling_mode == "mean_tokens":
                                     all_feats.append(sum_embeddings / sum_mask)
-                                elif self.pooling_mode_mean_sqrt_len_tokens:
+                                elif self.pooling_mode == "mean_sqrt_len_tokens":
                                     all_feats.append(sum_embeddings / np.sqrt(sum_mask))
                             else:
                                 cls_token = token_embeddings[:, 0]
@@ -534,7 +506,7 @@ class SentenceFeatureExtractionTask(Task):
                             input_dict["input_ids"] = batch_inputs["input_ids"]
                             input_dict["token_type_ids"] = batch_inputs["token_type_ids"]
                             token_embeddings = self.predictor.run(None, input_dict)[0]
-                            if self.pooling_mode_max_tokens:
+                            if self.pooling_mode == "max_tokens":
                                 attention_mask = (batch_inputs["input_ids"] != self.pad_token_id).astype(
                                     token_embeddings.dtype
                                 )
@@ -544,7 +516,7 @@ class SentenceFeatureExtractionTask(Task):
                                 token_embeddings[input_mask_expanded == 0] = -1e9
                                 max_over_time = np.max(token_embeddings, 1)
                                 all_feats.append(max_over_time)
-                            elif self.pooling_mode_mean_tokens or self.pooling_mode_mean_sqrt_len_tokens:
+                            elif self.pooling_mode == "mean_tokens" or self.pooling_mode == "mean_sqrt_len_tokens":
                                 attention_mask = (batch_inputs["input_ids"] != self.pad_token_id).astype(
                                     token_embeddings.dtype
                                 )
@@ -554,9 +526,9 @@ class SentenceFeatureExtractionTask(Task):
                                 sum_embeddings = np.sum(token_embeddings * input_mask_expanded, 1)
                                 sum_mask = input_mask_expanded.sum(1)
                                 sum_mask = np.clip(sum_mask, a_min=1e-9, a_max=np.max(sum_mask))
-                                if self.pooling_mode_mean_tokens:
+                                if self.pooling_mode == "mean_tokens":
                                     all_feats.append(sum_embeddings / sum_mask)
-                                elif self.pooling_mode_mean_sqrt_len_tokens:
+                                elif self.pooling_mode == "mean_sqrt_len_tokens":
                                     all_feats.append(sum_embeddings / np.sqrt(sum_mask))
                             else:
                                 cls_token = token_embeddings[:, 0]
@@ -566,7 +538,7 @@ class SentenceFeatureExtractionTask(Task):
                 for batch_inputs in inputs["batches"]:
                     batch_inputs = self._collator(batch_inputs)
                     token_embeddings = self._model(input_ids=batch_inputs["input_ids"])[0]
-                    if self.pooling_mode_max_tokens:
+                    if self.pooling_mode == "max_tokens":
                         attention_mask = (batch_inputs["input_ids"] != self.pad_token_id).astype(
                             self._model.pooler.dense.weight.dtype
                         )
@@ -575,7 +547,7 @@ class SentenceFeatureExtractionTask(Task):
                         max_over_time = paddle.max(token_embeddings, 1)
                         all_feats.append(max_over_time)
 
-                    elif self.pooling_mode_mean_tokens or self.pooling_mode_mean_sqrt_len_tokens:
+                    elif self.pooling_mode == "mean_tokens" or self.pooling_mode == "mean_sqrt_len_tokens":
                         attention_mask = (batch_inputs["input_ids"] != self.pad_token_id).astype(
                             self._model.pooler.dense.weight.dtype
                         )
@@ -583,9 +555,9 @@ class SentenceFeatureExtractionTask(Task):
                         sum_embeddings = paddle.sum(token_embeddings * input_mask_expanded, 1)
                         sum_mask = input_mask_expanded.sum(1)
                         sum_mask = paddle.clip(sum_mask, min=1e-9)
-                        if self.pooling_mode_mean_tokens:
+                        if self.pooling_mode == "mean_tokens":
                             all_feats.append(sum_embeddings / sum_mask)
-                        elif self.pooling_mode_mean_sqrt_len_tokens:
+                        elif self.pooling_mode == "mean_sqrt_len_tokens":
                             all_feats.append(sum_embeddings / paddle.sqrt(sum_mask))
                     else:
                         cls_token = token_embeddings[:, 0]

@@ -673,10 +673,10 @@ TASKS = {
                 "task_flag": "feature_extraction-moka-ai/m3e-base",
                 "task_priority_path": "moka-ai/m3e-base",
             },
-            "__internal_testing__/moka-ai-m3e-base": {
+            "__internal_testing__/tiny-random-m3e": {
                 "task_class": SentenceFeatureExtractionTask,
-                "task_flag": "__internal_testing__/moka-ai-m3e-base",
-                "task_priority_path": "__internal_testing__/moka-ai-m3e-base",
+                "task_flag": "__internal_testing__/tiny-random-m3e",
+                "task_priority_path": "__internal_testing__/tiny-random-m3e",
             },
         },
         "default": {"model": "PaddlePaddle/ernie_vil-2.0-base-zh"},

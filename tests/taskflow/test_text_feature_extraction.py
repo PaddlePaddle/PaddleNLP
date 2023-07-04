@@ -99,7 +99,7 @@ class TestSentenceeExtractionTask(unittest.TestCase):
     def setUpClass(cls):
         cls.temp_dir = TemporaryDirectory()
         cls.max_seq_len = 32
-        cls.model = "__internal_testing__/moka-ai-m3e-base"
+        cls.model = "__internal_testing__/tiny-random-m3e"
 
     @classmethod
     def tearDownClass(cls):
