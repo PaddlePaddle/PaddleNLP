@@ -526,7 +526,7 @@ class Trainer:
             name.append(f"shard{i:0>2d}")
             return "_".join(name)
 
-        for i in range(self.args.sharding_parallel_rank, cur_sharding_degree, sharding_degree):
+        for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
             tmp = self.load_one_state_dict_from_checkpoint(resume_from_checkpoint, get_name_suffix(i))
             for (k, v) in tmp.items():
                 state_dict[k] = v
@@ -2053,7 +2053,7 @@ class Trainer:
             name.append(f"shard{i:0>2d}")
             return "_".join(name)
 
-        for i in range(self.args.sharding_parallel_rank, cur_sharding_degree, sharding_degree):
+        for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
             tmp = self._load_optimizer_state_of_one_shard(checkpoint, get_name_suffix(i))
 
             if not tmp:
