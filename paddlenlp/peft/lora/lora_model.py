@@ -407,12 +407,14 @@ class LoRAModel(nn.Layer):
             return getattr(self.model, name)
 
     def train(self):
+        self.training = True
         self.model.training = True
         for layer in self.model.sublayers():
             layer.training = True
             layer.train()
 
     def eval(self):
+        self.training = False
         self.model.training = False
         for layer in self.model.sublayers():
             layer.training = False
