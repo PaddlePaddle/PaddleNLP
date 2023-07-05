@@ -365,12 +365,6 @@ class MLP(nn.Layer):
         # Project to 4h. If using swiglu double the output width, see https://arxiv.org/pdf/2002.05202.pdf
         self.dense_h_to_4h = nn.Linear(config.hidden_size, config.ffn_hidden_size * 2, bias_attr=self.add_bias)
 
-        def swiglu(x):
-            x = paddle.chunk(x, 2, axis=-1)
-            return F.silu(x[0]) * x[1]
-
-        self.activation_func = swiglu
-
         # Project back to h.
         self.dense_4h_to_h = nn.Linear(
             config.ffn_hidden_size,
@@ -381,7 +375,11 @@ class MLP(nn.Layer):
     def forward(self, hidden_states):
         # [s, b, 4hp]
         intermediate_parallel = self.dense_h_to_4h(hidden_states)
-        intermediate_parallel = self.activation_func(intermediate_parallel)
+        # Special Slicing to accomodate Tensor Parallel
+        # Even channels is ffc_fc, odd channels is gate
+        ffn_fc = intermediate_parallel[..., 0::2]
+        gate = intermediate_parallel[..., 1::2]
+        intermediate_parallel = F.silu(ffn_fc) * gate
         # [s, b, h]
         output = self.dense_4h_to_h(intermediate_parallel)
         return output
