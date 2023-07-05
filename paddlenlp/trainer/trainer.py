@@ -424,7 +424,7 @@ class Trainer:
             return
 
         state_dict = None
-        if self.args.load_sharded_model:
+        if self.args.load_sharding_stage1_model:
             state_dict = self.load_state_dict_from_checkpoint_with_reshard(resume_from_checkpoint)
             if self.args.bf16:
                 state_dict = self.recover_params_from_master_weights(state_dict)
@@ -465,12 +465,6 @@ class Trainer:
                 paddle.distributed.broadcast(model_state_dict[key], src=self.sharding_group.ranks[param2rank[param.name]], group=self.sharding_group, sync_op=True)
         logger.info("casted model_state_dict:{}".format(model_state_dict))
         state_dict.update(model_state_dict)
-        ### save sharding loaded model to check
-        sharding_save_dir = "./sharding_check"
-        os.makedirs(sharding_save_dir, exist_ok=True)
-        self._save(sharding_save_dir, state_dict)
-        logger.info("save loaded done")
-        ###
         return state_dict
 
     def _all_gather_state_dict(self, state_dict, filter_func, group=None):
@@ -1957,9 +1951,8 @@ class Trainer:
                     is_bf16=is_bf16,
                     parameter_names=parameter_names,
                     sharding_group=self.sharding_group,
-                    save_sharded_model=self.args.save_sharded_model,
+                    save_sharding_stage1_model=self.args.save_sharding_stage1_model,
                     optimizer=self.optimizer,
-                    sharding_degree=self.args.sharding_parallel_degree,
                 )
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
@@ -1967,7 +1960,7 @@ class Trainer:
                     logger.warning("Trainer.model is not a `PretrainedModel`, not suppor for merge_tensor_parallel.")
                 if state_dict is None:
                     state_dict = self.model.state_dict()
-                if is_bf16 and self.args.save_sharded_model:
+                if is_bf16 and self.args.save_sharding_stage1_model:
                     from paddlenlp.transformers.model_utils import exlclude_paramters_in_state_dict
                     print("before exclude state_dict_to_save len:{}".format(len(state_dict)))
                     state_dict = exlclude_paramters_in_state_dict(state_dict, parameter_names, self.sharding_group)
@@ -1985,7 +1978,7 @@ class Trainer:
                 is_bf16=is_bf16,
                 parameter_names=parameter_names,
                 sharding_group=self.sharding_group,
-                save_sharded_model=self.args.save_sharded_model,
+                save_sharding_stage1_model=self.args.save_sharding_stage1_model,
                 optimizer=self.optimizer,
                 sharding_degree=self.args.sharding_parallel_degree,
             )
@@ -2115,7 +2108,7 @@ class Trainer:
 
 
     def _load_optimizer_state(self, checkpoint):
-        if self.args.load_sharded_model:
+        if self.args.load_sharding_stage1_model:
             return self._load_optimizer_state_with_reshard(checkpoint)
         else:
             return self._load_optimizer_state_of_one_shard(checkpoint, self.args.optimizer_name_suffix)

@@ -1466,8 +1466,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         parameter_names = list(kwargs.get("parameter_names", []))
         sharding_group = kwargs.get("sharding_group", None)
         optimizer = kwargs.get("optimizer", None)
-        save_sharded_model = kwargs.get("save_sharded_model", False)
-        sharding_degree = kwargs.get("sharding_degree", 1)
+        save_sharding_stage1_model = kwargs.get("save_sharding_stage1_model", False)
 
         # 1. retrieve the model related config
 
@@ -1482,7 +1481,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         config_to_save = copy.deepcopy(model_to_save.config)
         state_dict_to_save = model_to_save.state_dict()
-        if sharding_degree > 1 and save_sharded_model:
+        if save_sharding_stage1_model:
             sharding_rank = fleet.get_hybrid_communicate_group().get_sharding_parallel_rank()
             state_dict_to_save = filter_sharded_params(state_dict_to_save, optimizer, sharding_rank)
         if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
@@ -1499,10 +1498,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     variant = f"tp{config_to_save.tensor_parallel_rank:0>2d}"
                 # WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, variant)
 
-        if is_bf16 and save_sharded_model:
+        if is_bf16 and save_sharding_stage1_model:
             logger.info("before exclude state_dict_to_save len:{}, type:{}, parameter_names type:{}".format(len(state_dict_to_save), type(state_dict_to_save), type(parameter_names)))
             state_dict_to_save = exlclude_paramters_in_state_dict(state_dict_to_save, parameter_names, sharding_group)
-            # sharding_state_dict_to_save = exlclude_paramters_in_state_dict(state_dict_to_save, parameter_names, sharding_group)
             logger.info("parameter_names len:{}, bf16 state_dict_to_save len:{}, :{}".format(len(parameter_names), len(state_dict_to_save), state_dict_to_save))
 
         if is_main_process:
@@ -1514,12 +1512,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if paddle.in_dynamic_mode():
             file_name = os.path.join(save_dir, _add_variant(WEIGHTS_NAME, variant))
             paddle.save(state_dict_to_save, file_name)
-            # for sharding
-            # sharding_dir = "./sharding_model/" + save_dir.split('/')[-1]
-            # logger.info("sharding_dir:{}".format(sharding_dir))
-            # os.makedirs(sharding_dir, exist_ok=True)
-            # sharding_file_name = os.path.join(sharding_dir, WEIGHTS_NAME)
-            # paddle.save(sharding_state_dict_to_save, sharding_file_name)
             del model_to_save
         else:
             logger.warning("Save pretrained model only supported dygraph mode for now!")
