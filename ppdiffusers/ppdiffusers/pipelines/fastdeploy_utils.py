@@ -1214,11 +1214,11 @@ class FastDeployRuntimeModel:
                 the device to cpu and the backend to paddle inference
         """
         option = runtime_options
-        # if option is None or not isinstance(runtime_options, fd.RuntimeOption):
-        #     logger.info("No fastdeploy.RuntimeOption specified, using CPU device and paddle inference backend.")
-        #     option = fd.RuntimeOption()
-        #     option.use_paddle_backend()
-        #     option.use_cpu()
+        if option is None or not isinstance(runtime_options, fd.RuntimeOption):
+            logger.info("No fastdeploy.RuntimeOption specified, using CPU device and paddle inference backend.")
+            option = fd.RuntimeOption()
+            option.use_paddle_backend()
+            option.use_cpu()
 
         if params_path is None or model_path.endswith(".onnx"):
             option.use_ort_backend()
@@ -1226,9 +1226,9 @@ class FastDeployRuntimeModel:
         else:
             option.set_model_path(model_path, params_path)
 
-        # # set cache file
-        # option.set_trt_cache_file(str(Path(model_path).parent / "_opt_cache/"))
-        # option.set_lite_model_cache_dir(str(Path(model_path).parent))
+        # set cache file
+        option.set_trt_cache_file(str(Path(model_path).parent / "_opt_cache/"))
+        option.set_lite_model_cache_dir(str(Path(model_path).parent))
 
         return fd.Runtime(option)
 
