@@ -14,6 +14,12 @@
 
 from ..configuration_utils import PretrainedConfig
 
+CHATGLM_V2_PRETRAINED_RESOURCE_FILES_MAP = {
+    "model_state": {
+        "THUDM/chatglm2-6b": "https://paddlenlp.bj.bcebos.com/models/community/THUDM/chatglm2-6b/model_state.pdparams",
+    }
+}
+
 
 class ChatGLMv2Config(PretrainedConfig):
     model_type = "chatglm_v2"

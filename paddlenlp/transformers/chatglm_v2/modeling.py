@@ -25,7 +25,7 @@ from ..model_outputs import (
     CausalLMOutputWithPast,
     ModelOutput,
 )
-from .configuration import ChatGLMv2Config
+from .configuration import CHATGLM_V2_PRETRAINED_RESOURCE_FILES_MAP, ChatGLMv2Config
 
 CHATGLM_6B_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "THUDM/chatglm2-6b",
@@ -530,7 +530,7 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
     """
 
     config_class = ChatGLMv2Config
-    # base_model_prefix = "transformer"
+    pretrained_resource_files_map = CHATGLM_V2_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "chatglm_v2"
 
     def get_masks(self, input_ids, past_key_values, padding_mask=None):
