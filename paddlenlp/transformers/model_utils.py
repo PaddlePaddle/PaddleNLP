@@ -712,6 +712,9 @@ def _load_state_dict_into_meta_model(
         if param_name.startswith(start_prefix):
             param_name = param_name[len(start_prefix) :]
 
+        if param.place != paddle.framework._current_expected_place():
+            param = param._copy_to(paddle.framework._current_expected_place(), False)
+
         # # We convert floating dtypes to the `dtype` passed. We want to keep the buffers/params
         # # in int/uint/bool and not cast them.
         if dtype is not None and paddle.is_floating_point(param):
@@ -733,7 +736,7 @@ def _load_state_dict_into_meta_model(
                     break
 
             if old_param is not None:
-                param = param.to(dtype=old_param.dtype)
+                param = param.astype(dtype=old_param.dtype)
 
         with paddle.no_grad():
             model.state_dict()[param_name].get_tensor()._share_data_with(param.value().get_tensor())

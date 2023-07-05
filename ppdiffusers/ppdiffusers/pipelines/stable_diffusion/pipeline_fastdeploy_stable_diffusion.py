@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 import paddle
 import PIL
@@ -114,6 +114,8 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
         eta: float = 0.0,
         generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         latents: Optional[paddle.Tensor] = None,
+        parse_prompt_type: Optional[str] = "lpw",
+        max_embeddings_multiples: Optional[int] = 3,
         prompt_embeds: Optional[paddle.Tensor] = None,
         negative_prompt_embeds: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
@@ -122,6 +124,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
         callback_steps: Optional[int] = 1,
         controlnet_cond: Union[paddle.Tensor, PIL.Image.Image] = None,
         controlnet_conditioning_scale: float = 1.0,
+        infer_op_dict: Dict[str, str] = None,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -198,6 +201,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
             prompt_embeds,
             negative_prompt_embeds,
         )
+        infer_op_dict = self.prepare_infer_op_dict(infer_op_dict)
 
         # 2. Define call parameters
         if prompt is not None and isinstance(prompt, str):
@@ -233,6 +237,9 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
             negative_prompt,
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
+            parse_prompt_type=parse_prompt_type,
+            max_embeddings_multiples=max_embeddings_multiples,
+            infer_op=infer_op_dict.get("text_encoder", None),
         )
 
         # 4. Prepare timesteps
@@ -254,8 +261,6 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
         # 7. Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
 
-        unet_output_name = self.unet.model.get_output_info(0).name
-        unet_input_names = [self.unet.model.get_input_info(i).name for i in range(self.unet.model.num_inputs())]
         is_scheduler_support_step_index = self.is_scheduler_support_step_index()
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
@@ -265,23 +270,20 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
                     latent_model_input = self.scheduler.scale_model_input(latent_model_input, t, step_index=i)
                 else:
                     latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
-                noise_pred_unet = paddle.zeros_like(latent_model_input)
 
-                unet_inputs = {
-                    unet_input_names[0]: latent_model_input,
-                    unet_input_names[1]: t,
-                    unet_input_names[2]: prompt_embeds,
-                }
-                if do_controlnet:
-                    unet_inputs[unet_input_names[3]] = control_image
-                    unet_inputs[unet_input_names[4]] = control_conditioning_scale
-
-                # predict the noise residual
-                self.unet.zero_copy_infer(
-                    prebinded_inputs=unet_inputs,
-                    prebinded_outputs={unet_output_name: noise_pred_unet},
-                    share_with_raw_ptr=True,
+                unet_inputs = dict(
+                    sample=latent_model_input,
+                    timestep=t,
+                    encoder_hidden_states=prompt_embeds,
+                    infer_op=infer_op_dict.get("unet", None),
+                    output_shape=latent_model_input.shape,
                 )
+                if do_controlnet:
+                    unet_inputs["controlnet_cond"] = control_image
+                    unet_inputs["controlnet_conditioning_scale"] = control_conditioning_scale
+                # predict the noise residual
+                noise_pred_unet = self.unet(**unet_inputs)[0]
+
                 # perform guidance
                 if do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred_unet.chunk(2)
@@ -306,7 +308,9 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline, FastDeployDiffusionPi
                         paddle.device.cuda.synchronize()
 
         if not output_type == "latent":
-            image = self._decode_vae_latents(latents / self.vae_scaling_factor)
+            image = self._decode_vae_latents(
+                latents / self.vae_scaling_factor, infer_op=infer_op_dict.get("vae_decoder", None)
+            )
             image, has_nsfw_concept = self.run_safety_checker(image)
         else:
             image = latents

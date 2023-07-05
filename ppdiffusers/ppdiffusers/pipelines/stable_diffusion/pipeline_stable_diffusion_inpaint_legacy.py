@@ -614,11 +614,17 @@ class StableDiffusionInpaintPipelineLegacy(
 
                 # compute the previous noisy sample x_t -> x_t-1
                 latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
-                # masking
-                if add_predicted_noise:
-                    init_latents_proper = self.scheduler.add_noise(init_latents_orig, noise_pred_uncond, t)
+
+                if i < len(timesteps) - 1:
+                    # masking
+                    if add_predicted_noise:
+                        init_latents_proper = self.scheduler.add_noise(init_latents_orig, noise_pred_uncond, t)
+                    else:
+                        # https://github.com/huggingface/diffusers/pull/3749/files#diff-39d36ab1e622684e35fe6971c12fb44e24756bdc383aba3d7f6e3b1625bdaafc
+                        noise_timestep = timesteps[i + 1]
+                        init_latents_proper = self.scheduler.add_noise(init_latents_orig, noise, noise_timestep)
                 else:
-                    init_latents_proper = self.scheduler.add_noise(init_latents_orig, noise, t)
+                    init_latents_proper = init_latents_orig
 
                 latents = (init_latents_proper * mask) + (latents * (1 - mask))
 
@@ -627,9 +633,6 @@ class StableDiffusionInpaintPipelineLegacy(
                     progress_bar.update()
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)
-
-        # use original latents corresponding to unmasked portions of the image
-        latents = (init_latents_orig * mask) + (latents * (1 - mask))
 
         # 10. Post-processing
         image = self.decode_latents(latents)
