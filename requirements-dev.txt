@@ -14,3 +14,4 @@ unidecode
 soundfile
 librosa
 numpy==1.23.5
+rouge

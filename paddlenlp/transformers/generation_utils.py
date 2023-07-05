@@ -32,17 +32,17 @@ except ImportError:
 
 from paddle.fluid.dygraph.base import in_declarative_mode
 
-from paddlenlp.utils.log import logger
-
-from .model_outputs import ModelOutput
-from .utils import get_scale_by_dtype
-
 try:
     from paddle import top_p_sampling
 
     is_top_p_sampling_avaliable = True
 except:
     is_top_p_sampling_avaliable = False
+
+from paddlenlp.utils.log import logger
+
+from .model_outputs import ModelOutput
+from .utils import get_scale_by_dtype
 
 __all__ = ["GenerationMixin"]
 
@@ -1147,6 +1147,9 @@ class GenerationMixin(object):
             else:
                 next_tokens = paddle.multinomial(probs)
 
+            if self.config.tensor_parallel_degree > 1:
+                paddle.distributed.broadcast(next_tokens, 0)
+
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
@@ -1267,7 +1270,7 @@ class GenerationMixin(object):
                 "you should not specify InputSpec for top_k and top_p parameters, one of InputSpec is expected"
             )
 
-        use_topp_sampling_op = is_top_p_sampling_avaliable or model_kwargs.get("use_topp_sampling", False)
+        use_topp_sampling_op = is_top_p_sampling_avaliable or model_kwargs.get("use_fuse_topp_sampling", False)
         return_scores = model_kwargs.get("return_scores", True)
 
         batch_size, cur_len = paddle.shape(input_ids)
@@ -1322,7 +1325,7 @@ class GenerationMixin(object):
                 logits = logits / temperature
                 if use_topp_sampling_op:
                     top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
-                    _, next_tokens = paddle.top_p_sampling(probs, top_ps_tensor)
+                    _, next_tokens = top_p_sampling(probs, top_ps_tensor)
                 else:
                     probs = TopPProcess(probs, top_p, min_tokens_to_keep)
                     next_tokens = paddle.multinomial(probs)
@@ -1888,11 +1891,6 @@ def TopKProcess(probs, top_k, min_tokens_to_keep):
 
 
 def TopPProcess(probs, top_p, min_tokens_to_keep):
-    if is_top_p_sampling_avaliable:
-        top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
-        probs, _ = top_p_sampling(probs, top_ps_tensor)
-        return probs
-
     sorted_indices = paddle.argsort(probs, descending=True)
     if isinstance(sorted_indices, tuple):
         sorted_probs, sorted_indices = sorted_indices
