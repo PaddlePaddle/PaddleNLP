@@ -58,7 +58,9 @@ from ..transformers.model_utils import (
     PretrainedModel,
     _add_variant,
     unwrap_model,
-    unwrap_optimizer
+    unwrap_optimizer,
+    filter_sharded_params,
+    exlclude_paramters_in_state_dict
 )
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils import device_guard
@@ -1990,11 +1992,13 @@ class Trainer:
                     logger.warning("Trainer.model is not a `PretrainedModel`, not suppor for merge_tensor_parallel.")
                 if state_dict is None:
                     state_dict = self.model.state_dict()
-                if is_bf16 and self.args.save_sharding_stage1_model:
-                    from paddlenlp.transformers.model_utils import exlclude_paramters_in_state_dict
-                    print("before exclude state_dict_to_save len:{}".format(len(state_dict)))
-                    state_dict = exlclude_paramters_in_state_dict(state_dict, parameter_names, self.sharding_group)
-                    print("parameter_names len:{}, bf16 state_dict len:{}, :{}".format(len(parameter_names), len(state_dict), state_dict))
+                if self.args.save_sharding_stage1_model:
+                    sharding_rank = fleet.get_hybrid_communicate_group().get_sharding_parallel_rank()
+                    state_dict = filter_sharded_params(state_dict, self.optimizer, sharding_rank)
+                    if is_bf16:
+                        print("before exclude state_dict_to_save len:{}".format(len(state_dict)))
+                        state_dict = exlclude_paramters_in_state_dict(state_dict, parameter_names, self.sharding_group)
+                        print("parameter_names len:{}, bf16 state_dict len:{}, :{}".format(len(parameter_names), len(state_dict), state_dict))
                 paddle.save(
                     state_dict,
                     os.path.join(output_dir, _add_variant(PADDLE_WEIGHT_FILE_NAME, self.args.weight_name_suffix)),

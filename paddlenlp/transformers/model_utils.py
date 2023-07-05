@@ -110,7 +110,7 @@ def filter_sharded_params(state_dict, optimizer, sharding_rank):
 def exlclude_paramters_in_state_dict(model_state_dict, parameter_names, sharding_group):
     assert sharding_group is not None
     assert isinstance(model_state_dict, dict) and isinstance(parameter_names, (list, set)), "parameter_names type:{}".format(type(parameter_names))
-    logger.info("sharding_group:".format(sharding_group))
+    logger.info("sharding_group:{}".format(sharding_group))
     state_param_names = [v.name for k,v in model_state_dict.items()]
     logger.info("parameter_names:{}, state_param_names:{}".format(parameter_names, state_param_names))
     # allgather parameter names in sharding group
