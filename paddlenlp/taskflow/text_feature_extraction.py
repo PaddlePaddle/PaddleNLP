@@ -408,7 +408,6 @@ class SentenceFeatureExtractionTask(Task):
         """
 
         def _parse_batch(batch_examples, max_seq_len=None):
-            # import pdb;pdb.set_trace()
             if isinstance(batch_examples[0], str):
                 to_tokenize = [batch_examples]
             else:
