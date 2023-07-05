@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import math
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import paddle
 import paddle.nn as nn
@@ -31,38 +31,6 @@ CHATGLM_6B_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "THUDM/chatglm2-6b",
     # See all ChatGLM models at https://huggingface.co/models?filter=chatglm
 ]
-
-
-def baddbmm(input, batch1, batch2, beta=1.0, alpha=1.0):
-    return beta * input + alpha * paddle.matmul(batch1, batch2)
-
-
-def split_tensor_along_last_dim(
-    tensor: paddle.Tensor,
-    num_partitions: int,
-    contiguous_split_chunks: bool = False,
-) -> List[paddle.Tensor]:
-    """Split a tensor along its last dimension.
-
-    Arguments:
-        tensor: input tensor.
-        num_partitions: number of partitions to split the tensor
-        contiguous_split_chunks: If True, make each chunk contiguous
-                                 in memory.
-
-    Returns:
-        A list of Tensors
-    """
-    # Get the size and dimension.
-    # last_dim = tensor.dim() - 1
-    # last_dim_size = tensor.shape[last_dim] // num_partitions
-    # Split.
-    tensor_list = paddle.split(tensor, num_partitions, axis=-1)
-    # # Note: paddle.split does not create contiguous tensors by default.
-    # if contiguous_split_chunks:
-    #     return tuple(chunk.contiguous() for chunk in tensor_list)
-
-    return tensor_list
 
 
 class RotaryEmbedding(nn.Layer):
@@ -181,23 +149,9 @@ class CoreAttention(nn.Layer):
         # [sk, b, np, hn] -> [sk, b * np, hn]
         key_layer = key_layer.reshape([output_size[3], output_size[0] * output_size[1], -1])
 
-        # preallocting input tensor: [b * np, sq, sk]
-        matmul_input_buffer = paddle.empty(
-            [output_size[0] * output_size[1], output_size[2], output_size[3]],
-            dtype=query_layer.dtype,
-        )
-
         # Raw attention scores. [b * np, sq, sk]
-        # matmul_result = paddle.bmm(
-        #     query_layer.transpose([1, 0, 2]),
-        #     key_layer.transpose([1, 2, 0])
-        #     ) * (1.0 / self.norm_factor)
-        matmul_result = baddbmm(
-            matmul_input_buffer,
-            query_layer.transpose([1, 0, 2]),  # [b * np, sq, hn]
-            key_layer.transpose([1, 2, 0]),  # [b * np, hn, sk]
-            beta=0.0,
-            alpha=(1.0 / self.norm_factor),
+        matmul_result = paddle.bmm(query_layer.transpose([1, 0, 2]), key_layer.transpose([1, 2, 0])) * (
+            1.0 / self.norm_factor
         )
 
         # change view to [b, np, sq, sk]
@@ -221,7 +175,9 @@ class CoreAttention(nn.Layer):
 
         if attention_mask is not None:
             attention_scores = paddle.where(
-                attention_mask > 0, paddle.full_like(attention_scores, -1e6), attention_scores
+                attention_mask > 0,
+                paddle.full_like(attention_scores, paddle.finfo(attention_scores.dtype).min),
+                attention_scores,
             )
 
         attention_probs = F.softmax(attention_scores.astype("float32"), axis=-1)
@@ -346,7 +302,7 @@ class SelfAttention(nn.Layer):
             mixed_x_layer = mixed_x_layer.reshape(new_tensor_shape)
 
             # [seq_length, b, np, 3 * hn] --> 3 [seq_length, b, np, hn]
-            (query_layer, key_layer, value_layer) = split_tensor_along_last_dim(mixed_x_layer, 3)
+            (query_layer, key_layer, value_layer) = paddle.split(mixed_x_layer, 3, axis=-1)
 
         # apply relative positional encoding (rotary embedding)
         if rotary_pos_emb is not None:
@@ -589,7 +545,6 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
                 [paddle.ones([batch_size, seq_length, past_length]), full_attention_mask], axis=-1
             )
         if padding_mask is not None:
-            print(padding_mask.shape, full_attention_mask.shape)
             full_attention_mask = full_attention_mask * padding_mask.unsqueeze(1)
         if not past_length and padding_mask is not None:
             full_attention_mask -= padding_mask.unsqueeze(-1) - 1
