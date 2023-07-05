@@ -156,7 +156,6 @@ class CoreAttention(nn.Layer):
 
         # change view to [b, np, sq, sk]
         attention_scores = matmul_result.reshape(output_size)
-        # print("attention_scores", attention_scores[..., :3].numpy().tolist())
 
         # ===========================
         # Attention probs and dropout
