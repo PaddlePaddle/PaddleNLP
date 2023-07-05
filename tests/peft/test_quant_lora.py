@@ -126,6 +126,7 @@ class TestQuantedLoRAModel(unittest.TestCase):
         q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
         q_config.add_type_config(LoRALinear, weight=FakeQuanterWithAbsMaxObserver(moving_rate=0.9))
         qat = QAT(q_config)
+        self.lora_model.train()
         quant_lora_model = qat.quantize(self.lora_model, inplace=False)
         quantizer_cnt = self._count_layers(quant_lora_model, FakeQuanterWithAbsMaxObserverLayer)
         # 2 LoRA layers (q_proj, v_proj) per transformer layer
@@ -136,6 +137,7 @@ class TestQuantedLoRAModel(unittest.TestCase):
         q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
         q_config.add_type_config(LoRALinear, weight=None, activation=None)
         qat = QAT(q_config)
+        self.lora_model.train()
         quant_lora_model = qat.quantize(self.lora_model, inplace=False)
         quant_lora_model.eval()
         self.lora_model.eval()
@@ -149,6 +151,7 @@ class TestQuantedLoRAModel(unittest.TestCase):
         q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
         q_config.add_type_config(LoRALinear, weight=FakeQuanterWithAbsMaxObserver(moving_rate=0.9))
         qat = QAT(q_config)
+        self.lora_model.train()
         quant_lora_model = qat.quantize(self.lora_model, inplace=False)
         quant_lora_model.eval()
         input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 5]))
@@ -161,6 +164,7 @@ class TestQuantedLoRAModel(unittest.TestCase):
         q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
         q_config.add_type_config(LoRALinear, weight=FakeQuanterWithAbsMaxObserver(moving_rate=0.9))
         qat = QAT(q_config)
+        self.lora_model.train()
         quant_lora_model = qat.quantize(self.lora_model, inplace=False)
         for name, weight in quant_lora_model.state_dict().items():
             if "lora" in name:
