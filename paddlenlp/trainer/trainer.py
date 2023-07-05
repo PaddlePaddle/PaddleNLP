@@ -120,6 +120,7 @@ OPTIMIZER_NAME = "optimizer.pdopt"
 SCHEDULER_NAME = "scheduler.pdparams"
 SCALER_NAME = "scaler.pdparams"
 MODEL_META_NAME = "model_meta.json"
+SHARDING_META_NAME = "shard_meta.json"
 
 if is_datasets_available():
     import datasets
@@ -1920,6 +1921,35 @@ class Trainer:
         assert "sharding_degree" in parallel_config
         return parallel_config
 
+    def _save_sharding_meta(self, dir):
+        nranks = dist.get_world_size()
+        if nranks <= 1:
+            return
+
+        hcg = fleet.get_hybrid_communicate_group()
+        mp_degree = hcg.get_model_parallel_world_size()
+        pp_degree = hcg.get_pipe_parallel_world_size()
+        sharding_degree = hcg.get_sharding_parallel_world_size()
+        sharding_rank = self.args.sharding_parallel_rank
+        optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
+        sharding_meta = {}
+        if optimizer and sharding_rank == 0:
+            param2rank = { k: v for (k, v) in optimizer._param2rank.items()}
+            sharding_meta["param2rank"] = param2rank
+            suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
+            path = os.path.join(dir, _add_variant(SHARDING_META_NAME, suffix))
+            with open(path, 'w') as f:
+                json.dump(sharding_meta, f, indent=4)
+
+    def _load_sharding_meta(self, dir):
+        suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
+        meta_path = os.path.join(dir, _add_variant(SHARDING_META_NAME, suffix))
+        assert os.path.exists(meta_path), f"{meta_path} not exist"
+        with open(meta_path, 'r') as f:
+            sharding_meta = json.load(f)
+        assert "param2rank" in sharding_meta
+        return sharding_meta
+
     def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
         # If we are executing this function, we are the process zero, so we don't check for that.
         output_dir = output_dir if output_dir is not None else self.args.output_dir
@@ -1984,6 +2014,7 @@ class Trainer:
             )
 
         self._save_distributed_strategy(output_dir)
+        self._save_sharding_meta(output_dir)
         if self.args.should_save:
             if self.tokenizer is not None:
                 self.tokenizer.save_pretrained(output_dir)
@@ -2017,8 +2048,9 @@ class Trainer:
     def _load_optimizer_state_of_one_shard(self, checkpoint, optimizer_name_suffix):
         optimizer_name = _add_variant(OPTIMIZER_NAME, optimizer_name_suffix)
         path = os.path.join(checkpoint, optimizer_name)
+        logger.info(f"load optimizer state from {path}")
         if os.path.isfile(path):
-            return paddlenlp_load(os.path.join(checkpoint, optimizer_name), return_numpy=True)
+            return paddlenlp_load(path, return_numpy=True)
         return None
 
     def _load_optimizer_state_with_reshard(self, checkpoint):
@@ -2031,8 +2063,22 @@ class Trainer:
         self.args.tensor_parallel_degree == mp_degree
         cur_sharding_degree = self.args.sharding_parallel_degree
 
-        # no need reshard
-        if sharding_degree == cur_sharding_degree:
+        def need_reshard():
+            if sharding_degree != cur_sharding_degree:
+                return True
+            sharding_meta = self._load_sharding_meta(checkpoint)
+            param2rank = sharding_meta["param2rank"]
+            optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
+            assert optimizer
+            assert len(param2rank) == len(optimizer._param2rank)
+            for (k, v) in param2rank.items():
+                assert k in optimizer._param2rank
+                if optimizer._param2rank[k] != int(v):
+                    return True
+            return False
+
+        if not need_reshard():
+            logger.info("do not need reshard")
             return self._load_optimizer_state_of_one_shard(checkpoint, self.args.optimizer_name_suffix)
 
         state_dict = OrderedDict()
