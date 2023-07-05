@@ -347,12 +347,9 @@ class SentenceFeatureExtractionTask(Task):
         task: str = None,
         model: str = None,
         batch_size: int = 1,
-        max_seq_len: int = 128,
+        max_seq_len: int = 512,
         _static_mode: bool = True,
         return_tensors: str = "pd",
-        reinitialize: bool = False,
-        share_parameters: bool = False,
-        is_paragraph: bool = False,
         pooling_mode: str = "cls_token",
         **kwargs
     ):
@@ -369,10 +366,6 @@ class SentenceFeatureExtractionTask(Task):
         self.model = model
         self._static_mode = _static_mode
         self.return_tensors = return_tensors
-
-        self.reinitialize = reinitialize
-        self.share_parameters = share_parameters
-        self.is_paragraph = is_paragraph
         self.pooling_mode = pooling_mode
         self._check_predictor_type()
         self._construct_tokenizer()
@@ -415,6 +408,7 @@ class SentenceFeatureExtractionTask(Task):
         """
 
         def _parse_batch(batch_examples, max_seq_len=None):
+            # import pdb;pdb.set_trace()
             if isinstance(batch_examples[0], str):
                 to_tokenize = [batch_examples]
             else:
