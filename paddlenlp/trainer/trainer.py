@@ -449,24 +449,21 @@ class Trainer:
         opt_state_dict = self.optimizer.state_dict()
         assert "master_weights" in opt_state_dict
         master_weigths = opt_state_dict["master_weights"]
-        master_weigth_param_names = list(master_weigths.keys())
+        param_names_in_master_weights = list(master_weigths.keys())
         tmp = []
-        logger.info("master_weigth_param_names:{}".format(master_weigth_param_names))
-        paddle.distributed.all_gather_object(tmp, master_weigth_param_names, group=self.sharding_group)
+        logger.info("param_names_in_master_weights:{}".format(param_names_in_master_weights))
+        paddle.distributed.all_gather_object(tmp, param_names_in_master_weights, group=self.sharding_group)
         sharding_group_param_names = [v for item in tmp for v in item]
         logger.info("sharding_group_param_names:{}".format(sharding_group_param_names))
         model_state_dict = self.model.state_dict()
-        logger.info("opt_state_dict:{}".format(opt_state_dict))
-        logger.info("model_state_dict len:{}, :{}".format(len(model_state_dict), model_state_dict))
+        logger.info("before recover, model_state_dict: {}".format(model_state_dict))
         for key, param in model_state_dict.items():
             if param.name in master_weigths:
-                logger.info("cast param:{}, key:{}".format(param.name, key))
                 assert param.shape == master_weigths[param.name].shape
                 paddle.assign(paddle.cast(master_weigths[param.name].cuda(), paddle.bfloat16), model_state_dict[key])
-                logger.info("master_weight:{}".format(master_weigths[param.name]))
             if param.name in sharding_group_param_names:
                 paddle.distributed.broadcast(model_state_dict[key], src=self.sharding_group.ranks[param2rank[param.name]], group=self.sharding_group, sync_op=True)
-        logger.info("casted model_state_dict:{}".format(model_state_dict))
+        logger.info("after recover, casted model_state_dict: {}".format(model_state_dict))
         state_dict.update(model_state_dict)
         return state_dict
 
@@ -810,8 +807,6 @@ class Trainer:
 
                 availiable_no_sync = dp_enabled and not forbidden_no_sync
 
-                # logger.info("train step:{}".format(step))
-
                 is_no_sync = (
                     ((step + 1) % args.gradient_accumulation_steps != 0)
                     and availiable_no_sync
@@ -828,6 +823,7 @@ class Trainer:
                     tr_loss_step = self.training_step(model, inputs)
 
                 tr_loss += tr_loss_step
+
                 if (step + 1) % args.gradient_accumulation_steps == 0:
                     # Maunally collect gradients when group_sharded_parallel can't accept dp_group
                     # Case 1: Use sharding stage 2/3 with dp
@@ -1731,7 +1727,7 @@ class Trainer:
 
         if output_dir is None:
             output_dir = self.args.output_dir
-        logger.info("save_model, self.args.should_save_model_state:{}".format(self.args.should_save_model_state))
+
         if self.args.should_save_model_state:
             self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
 
@@ -1960,12 +1956,11 @@ class Trainer:
         # Save a trained model and configuration using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
         is_bf16 = self.args.bf16
-        parameter_names = []
+        param_names_in_master_weights = []
         if is_bf16:
             optimzier_state_dict = self.optimizer.state_dict()
             assert "master_weights" in optimzier_state_dict
-            parameter_names = list(optimzier_state_dict["master_weights"].keys())
-            logger.info("parameter_names len:{} , type:{}, parameter_names:{}".format(len(parameter_names), type(parameter_names), parameter_names))
+            param_names_in_master_weights = list(optimzier_state_dict["master_weights"].keys())
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
 
@@ -1981,7 +1976,7 @@ class Trainer:
                     variant=self.args.weight_name_suffix,
                     is_main_process=self.args.should_save,
                     is_bf16=is_bf16,
-                    parameter_names=parameter_names,
+                    param_names_in_master_weights=param_names_in_master_weights,
                     sharding_group=self.sharding_group,
                     save_sharding_stage1_model=self.args.save_sharding_stage1_model,
                     optimizer=self.optimizer,
@@ -1993,12 +1988,12 @@ class Trainer:
                 if state_dict is None:
                     state_dict = self.model.state_dict()
                 if self.args.save_sharding_stage1_model:
-                    sharding_rank = fleet.get_hybrid_communicate_group().get_sharding_parallel_rank()
+                    sharding_rank = self.sharding_group.rank
                     state_dict = filter_sharded_params(state_dict, self.optimizer, sharding_rank)
                     if is_bf16:
-                        print("before exclude state_dict_to_save len:{}".format(len(state_dict)))
-                        state_dict = exlclude_paramters_in_state_dict(state_dict, parameter_names, self.sharding_group)
-                        print("parameter_names len:{}, bf16 state_dict len:{}, :{}".format(len(parameter_names), len(state_dict), state_dict))
+                        logger.info("before exclude state_dict_to_save len:{}".format(len(state_dict)))
+                        state_dict = exlclude_paramters_in_state_dict(state_dict, param_names_in_master_weights, self.sharding_group)
+                        logger.info("after exclude state_dict len:{}".format(len(state_dict)))
                 paddle.save(
                     state_dict,
                     os.path.join(output_dir, _add_variant(PADDLE_WEIGHT_FILE_NAME, self.args.weight_name_suffix)),
@@ -2010,7 +2005,7 @@ class Trainer:
                 variant=self.args.weight_name_suffix,
                 is_main_process=self.args.should_save,
                 is_bf16=is_bf16,
-                parameter_names=parameter_names,
+                param_names_in_master_weights=param_names_in_master_weights,
                 sharding_group=self.sharding_group,
                 save_sharding_stage1_model=self.args.save_sharding_stage1_model,
                 optimizer=self.optimizer,

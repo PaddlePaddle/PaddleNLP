@@ -107,25 +107,23 @@ def filter_sharded_params(state_dict, optimizer, sharding_rank):
         filtered_state_dict[k] = v
     return filtered_state_dict
 
-def exlclude_paramters_in_state_dict(model_state_dict, parameter_names, sharding_group):
+def exlclude_paramters_in_state_dict(model_state_dict, param_names_in_master_weights, sharding_group, save_sharding_stage1_model=True):
     assert sharding_group is not None
-    assert isinstance(model_state_dict, dict) and isinstance(parameter_names, (list, set)), "parameter_names type:{}".format(type(parameter_names))
-    logger.info("sharding_group:{}".format(sharding_group))
+    assert isinstance(model_state_dict, dict) and isinstance(param_names_in_master_weights, (list, set)), "param_names_in_master_weights type:{}".format(type(param_names_in_master_weights))
     state_param_names = [v.name for k,v in model_state_dict.items()]
-    logger.info("parameter_names:{}, state_param_names:{}".format(parameter_names, state_param_names))
-    # allgather parameter names in sharding group
-    tmp = []
-    paddle.distributed.all_gather_object(tmp, parameter_names, group=sharding_group)
-    print("allgather parameter names:{}".format(tmp))
-    sharding_group_param_names = [v for item in tmp for v in item]
-    logger.info("sharding_group_param_names:".format(sharding_group_param_names))
-    non_parameters = copy.copy(model_state_dict)
+    logger.debug("param_names_in_master_weights:{}, state_param_names:{}".format(param_names_in_master_weights, state_param_names))
+    if not save_sharding_stage1_model:
+        # allgather parameter names in sharding group
+        tmp = []
+        paddle.distributed.all_gather_object(tmp, param_names_in_master_weights, group=sharding_group)
+        param_names_in_master_weights = [v for item in tmp for v in item]
+        logger.info("sharding_group_param_names:{}".format(param_names_in_master_weights))
+    non_parameters_state_dict = copy.copy(model_state_dict)
     for k, v in model_state_dict.items():
-        if v.name in sharding_group_param_names:
-            non_parameters.pop(k)
-    
-    logger.info("non_parameters len:{}, model_state_dict len:{}".format(len(non_parameters), len(model_state_dict)))
-    return non_parameters
+        if v.name in param_names_in_master_weights:
+            non_parameters_state_dict.pop(k)
+
+    return non_parameters_state_dict
 
 def prune_linear_layer(layer: nn.Linear, index: paddle.Tensor, dim: int = 0) -> nn.Linear:
     """
@@ -1463,7 +1461,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         variant = kwargs.get("variant", None)
         is_main_process = kwargs.get("is_main_process", True)
         is_bf16 = kwargs.get("is_bf16", False)
-        parameter_names = list(kwargs.get("parameter_names", []))
+        param_names_in_master_weights = list(kwargs.get("param_names_in_master_weights", []))
         sharding_group = kwargs.get("sharding_group", None)
         optimizer = kwargs.get("optimizer", None)
         save_sharding_stage1_model = kwargs.get("save_sharding_stage1_model", False)
@@ -1482,7 +1480,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config_to_save = copy.deepcopy(model_to_save.config)
         state_dict_to_save = model_to_save.state_dict()
         if save_sharding_stage1_model:
-            sharding_rank = fleet.get_hybrid_communicate_group().get_sharding_parallel_rank()
+            sharding_rank = sharding_group.rank
             state_dict_to_save = filter_sharded_params(state_dict_to_save, optimizer, sharding_rank)
         if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
             state_dict_to_save = model_to_save.merge_tensor_parallel(state_dict_to_save, config_to_save)
@@ -1499,9 +1497,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 # WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, variant)
 
         if is_bf16 and save_sharding_stage1_model:
-            logger.info("before exclude state_dict_to_save len:{}, type:{}, parameter_names type:{}".format(len(state_dict_to_save), type(state_dict_to_save), type(parameter_names)))
-            state_dict_to_save = exlclude_paramters_in_state_dict(state_dict_to_save, parameter_names, sharding_group)
-            logger.info("parameter_names len:{}, bf16 state_dict_to_save len:{}, :{}".format(len(parameter_names), len(state_dict_to_save), state_dict_to_save))
+            state_dict_to_save = exlclude_paramters_in_state_dict(state_dict_to_save, param_names_in_master_weights, sharding_group)
+            logger.info("param_names_in_master_weights len:{}, bf16 state_dict_to_save len:{}, :{}".format(len(param_names_in_master_weights), len(state_dict_to_save), state_dict_to_save))
 
         if is_main_process:
             # Attach architecture to the config
