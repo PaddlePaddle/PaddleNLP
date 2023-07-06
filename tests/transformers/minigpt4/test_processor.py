@@ -91,7 +91,26 @@ class MiniGPT4ProcessorTest(unittest.TestCase):
 
         input_str = ["lower newer"]
         encoded_processor = processor.process_texts(texts=input_str, return_tensors="np")
-        encoded_tok = tokenizer(input_str, return_token_type_ids=False, return_tensors="np")
+
+        first_texts = "###Human: <Img>"
+        second_texts = "</Img> lower newer###Assistant: "
+        first_text_encoding = tokenizer(
+            text=first_texts,
+            return_tensors="np",
+            add_special_tokens=True,
+        )
+        second_text_encoding = tokenizer(
+            text=second_texts,
+            return_tensors="np",
+            add_special_tokens=False,
+        )
+
+        encoded_tok = {
+            "first_input_ids": first_text_encoding["input_ids"],
+            "first_attention_mask": first_text_encoding["attention_mask"],
+            "second_input_ids": second_text_encoding["input_ids"],
+            "second_attention_mask": second_text_encoding["attention_mask"],
+        }
 
         for key in encoded_tok.keys():
             self.assertListEqual(encoded_tok[key].tolist(), encoded_processor[key].tolist())
@@ -107,7 +126,6 @@ class MiniGPT4ProcessorTest(unittest.TestCase):
 
         inputs = processor(text=input_str, images=image_input)
 
-        # breakpoint()
         self.assertListEqual(
             list(inputs.keys()),
             ["pixel_values", "first_input_ids", "first_attention_mask", "second_input_ids", "second_attention_mask"],
