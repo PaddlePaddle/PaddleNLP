@@ -501,7 +501,8 @@ class ChatGLMStack(nn.Layer):
     ):
 
         if input_ids is not None and inputs_embeds is not None:
-            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+            input_ids = None
+            logger.warning("Specify both input_ids and inputs_embeds at the same time, will use inputs_embeds")
         elif input_ids is not None:
             batch_size, seq_length = input_ids.shape[:2]
         elif inputs_embeds is not None:
@@ -791,6 +792,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                 "position_ids": position_ids,
                 "use_cache": True,
                 "attention_mask": attention_mask,
+                **kwargs,
             }
         else:
             if attention_mask is not None and attention_mask.dtype != paddle.int64:
@@ -807,6 +809,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                 "position_ids": position_ids,
                 "use_cache": True,
                 "attention_mask": attention_mask,
+                **kwargs,
             }
 
     def update_model_kwargs_for_generation(
