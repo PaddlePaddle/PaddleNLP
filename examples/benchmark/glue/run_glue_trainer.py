@@ -219,7 +219,8 @@ def main():
             FakeQuanterWithAbsMaxObserver,
         )
 
-        from paddlenlp.peft.lora import LoRALinear, QuantedLoRALinear
+        from paddlenlp.peft.lora import LoRALinear
+        from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
 
         q_config = QuantConfig(activation=None, weight=None)
         q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
