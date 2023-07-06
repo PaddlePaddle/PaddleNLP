@@ -11,9 +11,9 @@
 
 | Model         | Method   | Num GPUs | Batch Size | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
 |---------------|----------|----------|------------|--------------|---------------------------|-------------|--------------------------|---------|
-| Bloomz-7b1-mt | LoRA     | 1        | 4          |              | 2293.46                   |             | 1736.92                  | +32%    |
-| Bloomz-7b1-mt | Finetune | 4        | 8          | MP 4         | 2873.13                   | ZeRO 3      | 1634.58                  | +76%    |
-| Bloomz-7b1-mt | Finetune | 4        | 16         | MP 4         | 2853.83                   | ZeRO 3      | 2694.64                  | +6%     |
+| Bloomz-7b1-mt | LoRA     | 1        | 4          |              | 2293.46                   |             | 1980.32                 | +16%    |
+| Bloomz-7b1-mt | Finetune | 4        | 8          | MP 4         | 2873.13                   | ZeRO 3      | 1702.00                  | +69%    |
+| Bloomz-7b1-mt | Finetune | 4        | 16         | MP 4         | 2853.83                   | ZeRO 3      | 2849.90                  | +0%     |
 
 
 ### Llama
@@ -48,23 +48,23 @@
 
 | Model         | Method   | Num GPUs | Batch Size | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
 |---------------|----------|----------|------------|--------------|---------------------------|-------------|--------------------------|---------|
-| chatglm-6b | LoRA     | 1        | 4          |              | 2654.73                   |             | 1866.48                  | +42%    |
-| chatglm-6b | Finetune | 4        | 8          | MP 4         | 3109.83                   | ZeRO 3      | 1840.99                  | +69%    |
-| chatglm-6b | Finetune | 4        | 16         | MP 4         | 3569.95                   | ZeRO 3      | 3191.35                  | +12%     |
+| chatglm-6b    | LoRA     | 1        | 4          |              |        2654.73            |             |       1866.48            | +42%    |
+| chatglm-6b    | Finetune | 4        | 8          |   MP 4       |        3109.83            |   ZeRO 3    |       1840.99            | +69%    |
+| chatglm-6b    | Finetune | 4        | 16         |   MP 4       |        3569.95            |   ZeRO 3    |       3191.35            | +12%    |
 
 
 ###### 多卡分布式实验记录
 
 - Finetuning with 4 GPUs
 
-| Model     | Setup         | Paddle Effective Tokens /s | Torch Effective Tokens /s  |  Speedup  |
-|-----------|---------------|----------------------------|----------------------------|-----------|
-| chatglm-6b  | bsz 8 MP4     |  3109.83             |         N/A                 |   N/A     |
-| chatglm-6b  | bsz 8 ZeRO 3  |                    |         1840.99             |       |
-| chatglm-6b  | bsz 8 ZeRO 2  |                     |                     |       |
-| chatglm-6b  | bsz 16 (8*2) MP4 |                 |                       |       |
-| chatglm-6b  | bsz 16 ZeRO 3 |                     |                     |        |
-| chatglm-6b  | bsz 16 ZeRO 2 |                 |                    |       |
+| Model     | Setup           | Paddle Effective Tokens /s | Torch Effective Tokens /s  |  Speedup  |
+|-----------|-----------------|----------------------------|----------------------------|-----------|
+| chatglm-6b  | bsz 8 MP4     |  3109.83                   |         N/A                |   N/A     |
+| chatglm-6b  | bsz 8 ZeRO 3  |    N/A                     |         1840.99            |   N/A     |
+| chatglm-6b  | bsz 8 ZeRO 2  |    2457.88                 |         2124.17            |   16%     |
+| chatglm-6b  | bsz 16 MP4    |    3549.68                 |         N/A                |   N/A     |
+| chatglm-6b  | bsz 16 ZeRO 3 |    N/A                     |         3184.26            |   N/A     |
+| chatglm-6b  | bsz 16 ZeRO 2 |    3462.83                 |         3151.07            |   10%     |
 
 ### TODOs
 
