@@ -15,33 +15,52 @@
 import inspect
 from copy import deepcopy
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
-import numpy as np
 import paddle
 from tqdm.auto import tqdm
 
-# from ppdiffusers.models import AutoencoderKL, UNet2DConditionModel
+from ppdiffusers.models import AutoencoderKL, UNet2DConditionModel
 from ppdiffusers.pipeline_utils import DiffusionPipeline
-from ppdiffusers.pipelines.fastdeploy_utils import (
-    FastDeployDiffusionPipelineMixin,
-    FastDeployRuntimeModel,
-)
-
-# from ppdiffusers.pipelines.stable_diffusion import StableDiffusionSafetyChecker
+from ppdiffusers.pipelines.stable_diffusion import StableDiffusionSafetyChecker
 from ppdiffusers.schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
 from ppdiffusers.utils import logging
 
 try:
     from ligo.segments import segment
 
-    from paddlenlp.transformers import (  # CLIPTextModel,
+    from paddlenlp.transformers import (
         CLIPFeatureExtractor,
+        CLIPTextModel,
         CLIPTokenizer,
     )
 except ImportError:
     raise ImportError("Please install paddlenlp and ligo-segments to use the mixture pipeline")
 logger = logging.get_logger(__name__)
+EXAMPLE_DOC_STRING = """
+    Examples:
+        ```py
+        >>> from ppdiffusers import LMSDiscreteScheduler, DiffusionPipeline
+
+        >>> scheduler = LMSDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000)
+        >>> pipeline = DiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4", scheduler=scheduler, custom_pipeline="mixture_tiling")
+
+        >>> image = pipeline(
+        >>>     prompt=[[
+        >>>         "A charming house in the countryside, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+        >>>         "A dirt road in the countryside crossing pastures, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+        >>>         "An old and rusty giant robot lying on a dirt road, by jakub rozalski, dark sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece"
+        >>>     ]],
+        >>>     tile_height=640,
+        >>>     tile_width=640,
+        >>>     tile_row_overlap=0,
+        >>>     tile_col_overlap=256,
+        >>>     guidance_scale=8,
+        >>>     seed=7178915308,
+        >>>     num_inference_steps=50,
+    >>> )["images"][0]
+        ```
+"""
 
 
 def _tile2pixel_indices(tile_row, tile_col, tile_width, tile_height, tile_row_overlap, tile_col_overlap):
@@ -112,24 +131,6 @@ def _tile2latent_exclusive_indices(
 class StableDiffusionExtrasMixin:
     """Mixin providing additional convenience method to Stable Diffusion pipelines"""
 
-    def _decode_vae_latents(self, latents: paddle.Tensor, infer_op=None, **kwargs):
-        latents_shape = latents.shape
-        output_shape = [
-            latents_shape[0],
-            4,
-            latents_shape[2] * self.vae_scale_factor,
-            latents_shape[3] * self.vae_scale_factor,
-        ]
-        print(output_shape)
-        print(latents.shape)
-        images_vae = self.vae_decoder(
-            latent_sample=latents,
-            infer_op=infer_op,
-            output_shape=output_shape,
-        )[0]
-
-        return images_vae
-
     def decode_latents(self, latents, cpu_vae=False):
         """Decodes a given array of latents into pixel space"""
         # scale and decode the image latents with vae
@@ -141,50 +142,28 @@ class StableDiffusionExtrasMixin:
             vae = self.vae
         lat = 1 / 0.18215 * lat
         image = vae.decode(lat).sample
-        # images_vae = self.vae_decoder(
-        #     latent_sample=latents,
-        #     infer_op=infer_op,
-        #     output_shape=output_shape,
-        # )[0]
+        paddle.save(image, "/root/project/paddlenlp/ppdiffusers_upgrade/drawer/fp16_inference_alignment/records/2.pt")
         image = (image / 2 + 0.5).clip(min=0, max=1)
-        image = image.cpu().transpose(perm=[0, 2, 3, 1]).numpy()
+        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
+        image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
+        # image = image.cpu().transpose(perm=[0, 2, 3, 1]).numpy()
         return self.numpy_to_pil(image)
 
-    # def decode_latents(self, latents: paddle.Tensor, infer_op=None, **kwargs):
-    #     latents_shape = latents.shape
-    #     output_shape = [
-    #         latents_shape[0],
-    #         self.vae_encoder_num_channels,
-    #         latents_shape[2] * self.vae_scale_factor,
-    #         latents_shape[3] * self.vae_scale_factor,
-    #     ]
-    #     images_vae = self.vae_decoder(
-    #         latent_sample=latents,
-    #         infer_op=infer_op,
-    #         output_shape=output_shape,
-    #     )[0]
 
-    #     return images_vae
-
-
-class FastDeployStableDiffusionTilingPipeline(
-    DiffusionPipeline, StableDiffusionExtrasMixin, FastDeployDiffusionPipelineMixin
-):
+class StableDiffusionTilingPipeline(DiffusionPipeline, StableDiffusionExtrasMixin):
     def __init__(
         self,
-        vae_encoder: FastDeployRuntimeModel,
-        vae_decoder: FastDeployRuntimeModel,
-        text_encoder: FastDeployRuntimeModel,
+        vae: AutoencoderKL,
+        text_encoder: CLIPTextModel,
         tokenizer: CLIPTokenizer,
-        unet: FastDeployRuntimeModel,
+        unet: UNet2DConditionModel,
         scheduler: Union[DDIMScheduler, PNDMScheduler],
-        safety_checker: FastDeployRuntimeModel,
+        safety_checker: StableDiffusionSafetyChecker,
         feature_extractor: CLIPFeatureExtractor,
     ):
         super().__init__()
         self.register_modules(
-            vae_encoder=vae_encoder,
-            vae_decoder=vae_decoder,
+            vae=vae,
             text_encoder=text_encoder,
             tokenizer=tokenizer,
             unet=unet,
@@ -192,7 +171,6 @@ class FastDeployStableDiffusionTilingPipeline(
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
         )
-        self.post_init()
 
     class SeedTilesMode(Enum):
         """Modes in which the latents of a particular tile can be re-seeded"""
@@ -216,10 +194,7 @@ class FastDeployStableDiffusionTilingPipeline(
         seed_tiles: Optional[List[List[int]]] = None,
         seed_tiles_mode: Optional[Union[str, List[List[str]]]] = "full",
         seed_reroll_regions: Optional[List[Tuple[int, int, int, int, int]]] = None,
-        # cpu_vae: Optional[bool] = False,
-        # parse_prompt_type: Optional[str] = "lpw",
-        # max_embeddings_multiples: Optional[int] = 3,
-        infer_op_dict: Dict[str, str] = None,
+        cpu_vae: Optional[bool] = False,
     ):
         """
         Function to run the diffusion pipeline with tiling support.
@@ -238,10 +213,7 @@ class FastDeployStableDiffusionTilingPipeline(
             seed_tiles: specific seeds for the initialization latents in each tile. These will override the latents generated for the whole canvas using the standard seed parameter.
             seed_tiles_mode: either "full" "exclusive". If "full", all the latents affected by the tile be overriden. If "exclusive", only the latents that are affected exclusively by this tile (and no other tiles) will be overrriden.
             seed_reroll_regions: a list of tuples in the form (start row, end row, start column, end column, seed) defining regions in pixel space for which the latents will be overriden using the given seed. Takes priority over seed_tiles.
-            # cpu_vae: the decoder from latent space to pixel space can require too mucho GPU RAM for large images. If you find out of memory errors at the end of the generation process, try setting this parameter to True to run the decoder in CPU. Slower, but should run without memory issues.
-            # parse_prompt_type: This parameter specifies the type of prompt parsing to be performed. Choosen from: "None", "lpw", "raw", "webui".
-            # max_embeddings_multiples: This parameter determines the maximum number of embeddings that can be generated. The value of 3 suggests that the maximum number of embeddings allowed will be three times the size of the original number.
-            infer_op_dict: The parameter infer_op_dict is a dictionary that maps module to it's inference op. The purpose of this dictionary is to store inferred operations or operations that have been deduced or determined during some process. The op are choosen from the following: 'None', 'zero_copy_infer', 'raw'.
+            cpu_vae: the decoder from latent space to pixel space can require too mucho GPU RAM for large images. If you find out of memory errors at the end of the generation process, try setting this parameter to True to run the decoder in CPU. Slower, but should run without memory issues.
 
         Examples:
 
@@ -249,8 +221,6 @@ class FastDeployStableDiffusionTilingPipeline(
             A PIL image with the generated image.
 
         """
-        infer_op_dict = self.prepare_infer_op_dict(infer_op_dict)
-
         if not isinstance(prompt, list) or not all(isinstance(row, list) for row in prompt):
             raise ValueError(f"`prompt` has to be a list of lists but is {type(prompt)}")
         grid_rows = len(prompt)
@@ -273,7 +243,7 @@ class FastDeployStableDiffusionTilingPipeline(
         # create original noisy latents using the timesteps
         height = tile_height + (grid_rows - 1) * (tile_height - tile_row_overlap)
         width = tile_width + (grid_cols - 1) * (tile_width - tile_col_overlap)
-        latents_shape = (batch_size, self.vae_decoder_num_latent_channels, height // 8, width // 8)
+        latents_shape = (batch_size, self.unet.config.in_channels, height // 8, width // 8)
         generator = paddle.Generator().manual_seed(seed)
         latents = paddle.randn(shape=latents_shape, generator=generator)
 
@@ -339,9 +309,8 @@ class FastDeployStableDiffusionTilingPipeline(
             ]
             for row in prompt
         ]
-        text_embeddings = [
-            [self.text_encoder(input_ids=col.input_ids.astype(np.int64))[0] for col in row] for row in text_input
-        ]
+        text_embeddings = [[self.text_encoder(col.input_ids)[0] for col in row] for row in text_input]
+        # breakpoint()
 
         # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
         # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
@@ -355,7 +324,7 @@ class FastDeployStableDiffusionTilingPipeline(
                     uncond_input = self.tokenizer(
                         [""] * batch_size, padding="max_length", max_length=max_length, return_tensors="pd"
                     )
-                    uncond_embeddings = self.text_encoder(input_ids=uncond_input.input_ids.astype(np.int64))[0]
+                    uncond_embeddings = self.text_encoder(uncond_input.input_ids)[0]
 
                     # For classifier free guidance, we need to do two forward passes.
                     # Here we concatenate the unconditional and text embeddings into a single batch
@@ -375,9 +344,7 @@ class FastDeployStableDiffusionTilingPipeline(
         tile_weights = self._gaussian_weights(tile_width, tile_height, batch_size)
 
         # Diffusion timesteps
-        is_scheduler_support_step_index = self.is_scheduler_support_step_index()
         for i, t in tqdm(enumerate(self.scheduler.timesteps)):
-            t = t.cast("float32")
             # Diffuse each tile
             noise_preds = []
             for row in range(grid_rows):
@@ -391,22 +358,36 @@ class FastDeployStableDiffusionTilingPipeline(
                     latent_model_input = (
                         paddle.concat(x=[tile_latents] * 2) if do_classifier_free_guidance else tile_latents
                     )
-                    if is_scheduler_support_step_index:
-                        latent_model_input = self.scheduler.scale_model_input(latent_model_input, t, step_index=i)
-                    else:
-                        latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
-                    # predict the noise residual
-                    unet_inputs = dict(
-                        sample=latent_model_input,
-                        timestep=t,
-                        encoder_hidden_states=text_embeddings[row][col],
-                        infer_op=infer_op_dict.get("unet", None),
-                        output_shape=latent_model_input.shape,
+                    latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+
+                    paddle.save(
+                        latent_model_input,
+                        "/root/project/paddlenlp/ppdiffusers_upgrade/drawer/fp16_inference_alignment/records/2001"
+                        + str(i)
+                        + str(row)
+                        + str(col)
+                        + ".pt",
                     )
-                    noise_pred = self.unet(**unet_inputs)[0]
-                    # noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings[row][col])[
-                    #     "sample"
-                    # ]
+                    paddle.save(
+                        t,
+                        "/root/project/paddlenlp/ppdiffusers_upgrade/drawer/fp16_inference_alignment/records/2002"
+                        + str(i)
+                        + str(row)
+                        + str(col)
+                        + ".pt",
+                    )
+                    paddle.save(
+                        text_embeddings,
+                        "/root/project/paddlenlp/ppdiffusers_upgrade/drawer/fp16_inference_alignment/records/2003"
+                        + str(i)
+                        + str(row)
+                        + str(col)
+                        + ".pt",
+                    )
+                    # predict the noise residual
+                    noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings[row][col])[
+                        "sample"
+                    ]
                     # perform guidance
                     if do_classifier_free_guidance:
                         noise_pred_uncond, noise_pred_text = noise_pred.chunk(chunks=2)
@@ -434,22 +415,21 @@ class FastDeployStableDiffusionTilingPipeline(
             # Average overlapping areas with more than 1 contributor
             noise_pred /= contributors
             # compute the previous noisy sample x_t -> x_t-1
-            if is_scheduler_support_step_index:
-                latents = self.scheduler.step(
-                    noise_pred, t, latents, step_index=i, return_pred_original_sample=False
-                ).prev_sample
-            else:
-                latents = self.scheduler.step(noise_pred, t, latents).prev_sample
-            if i == len(self.scheduler.timesteps) - 1:
-                # sync for accuracy it/s measure
-                paddle.device.cuda.synchronize()
-
+            paddle.save(
+                latents,
+                "/root/project/paddlenlp/ppdiffusers_upgrade/drawer/fp16_inference_alignment/records/3000"
+                + str(i)
+                + ".pt",
+            )
+            latents = self.scheduler.step(noise_pred, t, latents).prev_sample
+            paddle.save(
+                latents,
+                "/root/project/paddlenlp/ppdiffusers_upgrade/drawer/fp16_inference_alignment/records/1000"
+                + str(i)
+                + ".pt",
+            )
         # scale and decode the image latents with vae
-        # image = self.decode_latents(latents, cpu_vae)
-        image = self._decode_vae_latents(latents)
-        image = (image / 2 + 0.5).clip(min=0, max=1)
-        image = image.cpu().transpose(perm=[0, 2, 3, 1]).numpy()
-        image = self.numpy_to_pil(image)
+        image = self.decode_latents(latents, cpu_vae)
         return {"images": image}
 
     def _gaussian_weights(self, tile_width, tile_height, nbatches):
@@ -472,7 +452,5 @@ class FastDeployStableDiffusionTilingPipeline(
         ]
         weights = np.outer(y_probs, x_probs)
         return paddle.tile(
-            # x=paddle.to_tensor(data=weights), repeat_times=(nbatches, self.unet.config.in_channels, 1, 1)
-            x=paddle.to_tensor(data=weights),
-            repeat_times=(nbatches, self.vae_decoder_num_latent_channels, 1, 1),
+            x=paddle.to_tensor(data=weights), repeat_times=(nbatches, self.unet.config.in_channels, 1, 1)
         )

@@ -87,6 +87,7 @@ def parse_arguments():
         help="The parse_prompt_type can be one of [raw, lpw]. ",
     )
     parser.add_argument("--use_fp16", type=strtobool, default=True, help="Wheter to use FP16 mode")
+    parser.add_argument("--use_bf16", type=strtobool, default=False, help="Wheter to use BF16 mode")
     parser.add_argument("--device_id", type=int, default=0, help="The selected gpu id. -1 means use cpu")
     parser.add_argument(
         "--scheduler",
@@ -144,12 +145,14 @@ def create_paddle_inference_runtime(
     use_trt=False,
     dynamic_shape=None,
     use_fp16=False,
+    use_bf16=False,
     device_id=0,
     disable_paddle_trt_ops=[],
     disable_paddle_pass=[],
     paddle_stream=None,
     workspace=None,
 ):
+    assert not use_fp16 or not use_bf16, "use_fp16 and use_bf16 are mutually exclusive"
     option = fd.RuntimeOption()
     option.use_paddle_backend()
     if device_id == -1:
@@ -160,6 +163,8 @@ def create_paddle_inference_runtime(
         option.set_external_raw_stream(paddle_stream)
     for pass_name in disable_paddle_pass:
         option.paddle_infer_option.delete_pass(pass_name)
+    if use_bf16:
+        option.paddle_infer_option.inference_precision = "bfloat16"
     if use_trt:
         option.paddle_infer_option.disable_trt_ops(disable_paddle_trt_ops)
         option.paddle_infer_option.enable_trt = True
@@ -270,6 +275,7 @@ def main(args):
             "opt_shape": [1, text_encoder_max_length],
         }
     }
+
     vae_encoder_dynamic_shape = {
         "sample": {
             "min_shape": [1, 3, min_image_size, min_image_size],
@@ -277,6 +283,15 @@ def main(args):
             "opt_shape": [1, 3, min_image_size, min_image_size],
         }
     }
+
+    # vae_decoder_dynamic_shape = {
+    #     "latent_sample": {
+    #         "min_shape": [1, vae_in_channels, min_image_size // 8, min_image_size // 8],
+    #         "max_shape": [1, vae_in_channels, max_image_size // 8, max_image_size // 8],
+    #         "opt_shape": [1, vae_in_channels, min_image_size // 8, min_image_size // 8],
+    #     }
+    # }
+
     vae_decoder_dynamic_shape = {
         "latent_sample": {
             "min_shape": [1, vae_in_channels, min_image_size // 8, min_image_size // 8],
@@ -284,6 +299,7 @@ def main(args):
             "opt_shape": [1, vae_in_channels, min_image_size // 8, min_image_size // 8],
         }
     }
+
     unet_dynamic_shape = {
         "sample": {
             "min_shape": [1, unet_in_channels, min_image_size // 8, min_image_size // 8],
@@ -338,6 +354,7 @@ def main(args):
                 use_trt=args.use_trt,
                 dynamic_shape=text_encoder_dynamic_shape,
                 use_fp16=args.use_fp16,
+                use_bf16=args.use_bf16,
                 device_id=args.device_id,
                 disable_paddle_trt_ops=["arg_max", "range", "lookup_table_v2"],
                 paddle_stream=paddle_stream,
@@ -346,6 +363,7 @@ def main(args):
                 use_trt=args.use_trt,
                 dynamic_shape=vae_encoder_dynamic_shape,
                 use_fp16=args.use_fp16,
+                use_bf16=args.use_bf16,
                 device_id=args.device_id,
                 paddle_stream=paddle_stream,
             ),
@@ -353,6 +371,7 @@ def main(args):
                 use_trt=args.use_trt,
                 dynamic_shape=vae_decoder_dynamic_shape,
                 use_fp16=args.use_fp16,
+                use_bf16=args.use_bf16,
                 device_id=args.device_id,
                 paddle_stream=paddle_stream,
             ),
@@ -360,6 +379,7 @@ def main(args):
                 use_trt=args.use_trt,
                 dynamic_shape=unet_dynamic_shape,
                 use_fp16=args.use_fp16,
+                use_bf16=args.use_bf16,
                 device_id=args.device_id,
                 paddle_stream=paddle_stream,
             ),
@@ -642,27 +662,20 @@ def main(args):
         # custom_pipeline
         mixture_tiling_pipe._progress_bar_config = pipe._progress_bar_config
         # mixture_tiling
-        prompt = [
-            [
-                "A charming house in the countryside, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
-                "A dirt road in the countryside crossing pastures, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
-                "An old and rusty giant robot lying on a dirt road, by jakub rozalski, dark sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
-            ]
-        ]
         time_costs = []
         # warmup
         mixture_tiling_pipe(
             prompt=[
                 [
                     "A charming house in the countryside, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
-                    "A dirt road in the countryside crossing pastures, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
-                    "An old and rusty giant robot lying on a dirt road, by jakub rozalski, dark sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+                    # "A dirt road in the countryside crossing pastures, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+                    # "An old and rusty giant robot lying on a dirt road, by jakub rozalski, dark sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
                 ]
             ],
             tile_height=512,
             tile_width=512,
             tile_row_overlap=0,
-            tile_col_overlap=256,
+            tile_col_overlap=0,
             guidance_scale=8,
             seed=7178915308,
             num_inference_steps=50,
@@ -675,19 +688,19 @@ def main(args):
                 prompt=[
                     [
                         "A charming house in the countryside, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
-                        "A dirt road in the countryside crossing pastures, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
-                        "An old and rusty giant robot lying on a dirt road, by jakub rozalski, dark sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+                        # "A dirt road in the countryside crossing pastures, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+                        # "An old and rusty giant robot lying on a dirt road, by jakub rozalski, dark sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
                     ]
                 ],
                 tile_height=512,
                 tile_width=512,
                 tile_row_overlap=0,
-                tile_col_overlap=256,
+                tile_col_overlap=0,
                 guidance_scale=8,
                 seed=7178915308,
                 num_inference_steps=50,
                 infer_op_dict=None,
-            )["images"][0]
+            )["images"]
             latency = time.time() - start
             time_costs += [latency]
             # print(f"No {step:3d} time cost: {latency:2f} s")
