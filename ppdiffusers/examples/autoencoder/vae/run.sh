@@ -37,6 +37,6 @@ nohup python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train_vae.
     --disc_weight 0.5 \
     --use_ema \
     --ema_decay 0.999 \
-    --recompute True \
+    --recompute \
     --enable_xformers_memory_efficient_attention \
     --resolution 512 1> paddle_vae.out 2>&1 & 
