@@ -1647,10 +1647,7 @@ class Trainer:
             output_dir = self.args.output_dir
 
         if self.args.should_save_model_state:
-            self._save(
-                output_dir=output_dir,
-                merge_tensor_parallel=merge_tensor_parallel,
-            )
+            self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
@@ -1675,10 +1672,7 @@ class Trainer:
         if self.args.use_hybrid_parallel:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
-                self.save_func(
-                    self.optimizer.state_dict(),
-                    os.path.join(output_dir, optimizer_name),
-                )
+                self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, optimizer_name))
 
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
@@ -1803,12 +1797,7 @@ class Trainer:
             logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
             shutil.rmtree(checkpoint)
 
-    def _save(
-        self,
-        output_dir: Optional[str] = None,
-        state_dict=None,
-        merge_tensor_parallel=False,
-    ):
+    def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
         # If we are executing this function, we are the process zero, so we don't check for that.
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
