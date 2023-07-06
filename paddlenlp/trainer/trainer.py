@@ -223,6 +223,10 @@ class Trainer:
             args = TrainingArguments(output_dir=output_dir)
 
         self.args = args
+        if self.args.use_async_save:
+            self.save_func = paddle.async_save
+        else:
+            self.save_func = paddle.save
         self.is_in_train = False
         # self.do_grad_scaling = args.fp16
 
@@ -1632,7 +1636,6 @@ class Trainer:
         self,
         output_dir: Optional[str] = None,
         merge_tensor_parallel: Optional[bool] = False,
-        use_async_save: Optional[bool] = False,
     ):
         """
         Will save the model, so you can reload it using `from_pretrained()`.
@@ -1645,7 +1648,8 @@ class Trainer:
 
         if self.args.should_save_model_state:
             self._save(
-                output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel, use_async_save=use_async_save
+                output_dir=output_dir,
+                merge_tensor_parallel=merge_tensor_parallel,
             )
 
     def _save_checkpoint(self, model, metrics=None):
@@ -1671,35 +1675,20 @@ class Trainer:
         if self.args.use_hybrid_parallel:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
-                if self.args.use_async_save:
-                    paddle.async_save(
-                        self.optimizer.state_dict(),
-                        os.path.join(output_dir, optimizer_name),
-                    )
-                else:
-                    paddle.save(
-                        self.optimizer.state_dict(),
-                        os.path.join(output_dir, optimizer_name),
-                    )
+                self.save_func(
+                    self.optimizer.state_dict(),
+                    os.path.join(output_dir, optimizer_name),
+                )
 
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
-                if self.args.use_async_save:
-                    paddle.async_save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
-                else:
-                    paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+                self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
             # FIXME: manybe only save one copy
-            if self.args.use_async_save:
-                paddle.async_save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
-            else:
-                paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
+            self.save_func(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
 
             if self.do_grad_scaling:
-                if self.args.use_async_save:
-                    paddle.async_save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
-                else:
-                    paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
+                self.save_func(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
 
         # Determine the new best metric / best model checkpoint
         if metrics is not None and self.args.metric_for_best_model is not None:
@@ -1740,15 +1729,9 @@ class Trainer:
         if self.args.world_size > 1:
             # use global process_index to save
             process_index = self.args.process_index
-            if self.args.use_async_save:
-                paddle.async_save(rng_states, os.path.join(output_dir, f"rng_state_{process_index}.pth"))
-            else:
-                paddle.save(rng_states, os.path.join(output_dir, f"rng_state_{process_index}.pth"))
+            self.save_func(rng_states, os.path.join(output_dir, f"rng_state_{process_index}.pth"))
         else:
-            if self.args.use_async_save:
-                paddle.async_save(rng_states, os.path.join(output_dir, "rng_state.pth"))
-            else:
-                paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
+            self.save_func(rng_states, os.path.join(output_dir, "rng_state.pth"))
 
         # Maybe delete some older checkpoints.
         if self.args.should_save and (True if not self.args.use_hybrid_parallel else self.args.local_rank == 0):
@@ -1821,7 +1804,10 @@ class Trainer:
             shutil.rmtree(checkpoint)
 
     def _save(
-        self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False, use_async_save=False
+        self,
+        output_dir: Optional[str] = None,
+        state_dict=None,
+        merge_tensor_parallel=False,
     ):
         # If we are executing this function, we are the process zero, so we don't check for that.
         output_dir = output_dir if output_dir is not None else self.args.output_dir
@@ -1860,7 +1846,7 @@ class Trainer:
                 merge_tensor_parallel=merge_tensor_parallel,
                 variant=self.args.weight_name_suffix,
                 is_main_process=self.args.should_save,
-                use_async_save=use_async_save,
+                use_async_save=self.args.use_async_save,
             )
 
         if self.args.should_save:
