@@ -27,6 +27,7 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import set_seed
 from paddlenlp.utils.log import logger
+from ppdiffusers.models.ema import LitEma
 from ppdiffusers.training_utils import freeze_params, main_process_first, unwrap_model
 
 
@@ -346,6 +347,8 @@ def main():
         beta1=0.5,
         beta2=0.9,
     )
+    if args.use_ema:
+        vae.model_ema = LitEma(vae, decay=args.ema_decay)
     if args.recompute:
         vae.enable_gradient_checkpointing()
     if args.enable_xformers_memory_efficient_attention:

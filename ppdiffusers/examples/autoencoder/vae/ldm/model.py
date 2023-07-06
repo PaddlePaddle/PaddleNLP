@@ -28,7 +28,8 @@ from ppdiffusers.models.autoencoder_kl import (
     DiagonalGaussianDistribution,
     Encoder,
 )
-from ppdiffusers.models.ema import LitEma
+
+# from ppdiffusers.models.ema import LitEma
 from ppdiffusers.models.modeling_utils import ModelMixin
 
 from .losses import LPIPSWithDiscriminator
@@ -136,8 +137,8 @@ class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
         count_params(self)
         self.init_weights()
         self.use_ema = use_ema
-        if use_ema:
-            self.model_ema = LitEma(self, decay=ema_decay)
+        # if use_ema:
+        #     self.model_ema = LitEma(self, decay=ema_decay)
 
     def init_weights(self):
         reset_initialized_parameter(self.encoder)
