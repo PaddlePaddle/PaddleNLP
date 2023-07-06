@@ -590,6 +590,10 @@ class TrainingArguments:
         default=True,
         metadata={"help": "Whether use lazy data processing."},
     )
+    use_async_save: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether to use paddle.async_save instead of paddle.save."},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
