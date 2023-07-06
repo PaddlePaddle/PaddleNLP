@@ -222,6 +222,13 @@ def parse_args():
     parser.add_argument(
         "--disc_loss", type=str, choices=["hinge", "vanilla"], default="hinge", help="The type of discriminator loss."
     )
+    parser.add_argument("--use_ema", action="store_true", help="Whether to use_ema.")
+    parser.add_argument(
+        "--enable_xformers_memory_efficient_attention",
+        action="store_true",
+        help="Whether to enable_xformers_memory_efficient_attention.",
+    )
+    parser.add_argument("--ema_decay", type=float, default=0.999, help="The value of ema_decay.")
     args = parser.parse_args()
 
     args.logging_dir = os.path.join(args.output_dir, args.logging_dir)
@@ -335,6 +342,10 @@ def main():
         beta1=0.5,
         beta2=0.9,
     )
+    if args.recompute:
+        vae.enable_gradient_checkpointing()
+    if args.enable_xformers_memory_efficient_attention:
+        vae.enable_xformers_memory_efficient_attention()
 
     optimizers = [opt_ae, opt_disc]
 
