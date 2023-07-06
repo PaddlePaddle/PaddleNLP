@@ -44,6 +44,8 @@ def count_params(model, verbose=True):
 
 # regist a new model
 class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
+    _supports_gradient_checkpointing = True
+
     @register_to_config
     def __init__(
         self,
