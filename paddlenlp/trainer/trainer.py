@@ -1665,7 +1665,7 @@ class Trainer:
             # TODO(ZHUI) fix it and set convert2cpu=True to save gpu memory
             model.get_all_parameters(convert2cpu=False)
 
-        self.save_model(output_dir, use_async_save=self.args.use_async_save)
+        self.save_model(output_dir)
 
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
