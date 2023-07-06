@@ -23,10 +23,7 @@ from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, ChatGLMForConditionalGeneration
-import os
 
-# os.environ['http_proxy']="http://172.19.57.45:3128"
-# os.environ['https_proxy']="http://172.19.57.45:3128"
 
 """
 单卡
