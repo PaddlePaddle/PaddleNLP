@@ -31,6 +31,7 @@ from transformers import (
 import numpy as np
 from utils import CustomTrainer, ProfilerCallback
 
+
 """
 单卡
 python benchmark.py --model_name_or_path bigscience/bloomz-7b1-mt  \
@@ -64,8 +65,10 @@ class ModelArguments:
 def main():
     parser = HfArgumentParser((ModelArguments, TrainingArguments))
     model_args, training_args = parser.parse_args_into_dataclasses()
+
     if "llama" in model_args.model_name_or_path:
-        tokenizer = LlamaTokenizer.from_pretrained(model_args.model_name_or_path)
+        tokenizer = LlamaTokenizer.from_pretrained(model_args.model_name_or_path,
+                                                    use_fast=False)
         tokenizer.pad_token_id = 0
     elif "chatglm" in model_args.model_name_or_path:
         tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
@@ -76,10 +79,10 @@ def main():
         # Add empty_init=False for zero3 training, refer to https://github.com/THUDM/ChatGLM-6B/issues/530
         model = AutoModel.from_pretrained(model_args.model_name_or_path, 
                                         empty_init=False if training_args.deepspeed is not None else True,
-                                        trust_remote_code=True)
+                                        trust_remote_code=True, torch_dtype="auto")
        
     else:
-        model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
+        model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path, torch_dtype="auto")
 
     if model_args.lora:
         if "llama" in model_args.model_name_or_path:
@@ -110,9 +113,10 @@ def main():
             inputs += example["input"]
         targets = example["output"]
         model_inputs = tokenizer(inputs, max_length=max_src_length, truncation=True, return_attention_mask=False)
-
+        
         labels = tokenizer(targets, max_length=max_tgt_length, truncation=True, return_attention_mask=False)
         labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
+        
         model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
         return model_inputs
@@ -122,12 +126,15 @@ def main():
         dataset = load_dataset("tatsu-lab/alpaca")
     else:
         dataset = load_dataset("Chinese-Vicuna/guanaco_belle_merge_v1.0")
+
     # select first 10k examples for benchmarking
     dataset = dataset["train"].select(range(10000))
     dataset = dataset.map(
         lambda example: preprocess_function(example), remove_columns=["instruction", "input", "output"]
     )
     total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
+
+
 
     if model_args.profiler:
         prof = profiler.profile(
@@ -144,8 +151,10 @@ def main():
                 profile_memory=True,
                 with_stack=True,
             )
+
     trainer = CustomTrainer(
         model=model,
+        tokenizer=tokenizer, 
         train_dataset=dataset,
         callbacks=[ProfilerCallback(prof=prof)] if model_args.profiler else [],
         args=training_args,

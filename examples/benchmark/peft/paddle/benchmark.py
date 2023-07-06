@@ -135,31 +135,39 @@ def main():
         dataset = load_dataset("tatsu-lab/alpaca")
     else:
         dataset = load_dataset("Chinese-Vicuna/guanaco_belle_merge_v1.0")
+
     # select first 10k examples for benchmarking
     dataset = dataset["train"].select(range(10000))
     dataset = dataset.map(
         lambda example: preprocess_function(example), remove_columns=["instruction", "input", "output"]
     )
     total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
+
     if model_args.profiler:
         prof = profiler.Profiler(
             targets=[profiler.ProfilerTarget.CPU, profiler.ProfilerTarget.GPU],profile_memory=True,
             scheduler = profiler.make_scheduler(closed=1, ready=2, record=1, repeat=1),
             on_trace_ready = profiler.export_chrome_tracing('./log'),
         )
+
     
     trainer = CustomTrainer(
         model=model,
+        tokenizer=tokenizer,
         train_dataset=dataset,
         callbacks=[ProfilerCallback(prof)] if model_args.profiler else [],
         args=training_args,
         data_collator=DataCollatorForSeq2Seq(return_tensors="pd", tokenizer=tokenizer),
     )
+
+
     train_metrics = trainer.train()
     tokens_per_second = trainer.total_observed_tokens / train_metrics.metrics["train_runtime"]
     effective_tokens_per_second = total_effective_tokens / train_metrics.metrics["train_runtime"]
     print(f"Tokens per second: {tokens_per_second:.2f}")
     print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
+
+
 
 
 if __name__ == "__main__":

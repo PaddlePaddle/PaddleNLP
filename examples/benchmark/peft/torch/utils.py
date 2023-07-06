@@ -14,7 +14,6 @@
 
 from transformers import Trainer, TrainerCallback, TrainingArguments, TrainerState, TrainerControl
 
-
 class CustomTrainer(Trainer):
     total_observed_tokens = 0.0
 
@@ -22,7 +21,6 @@ class CustomTrainer(Trainer):
         input_ids = inputs["input_ids"]
         self.total_observed_tokens += float(input_ids.shape[0] * input_ids.shape[1])
         return super().training_step(model, inputs)
-
 
 class ProfilerCallback(TrainerCallback):
     "A callback that prints a message at the beginning of training"
