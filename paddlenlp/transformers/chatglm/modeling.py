@@ -117,7 +117,13 @@ class RotaryEmbeddings(nn.Layer):
             self.max_seq_len_cached = seq_len
 
             # x.shape = [b, s, n, h/n/2]
-            t = paddle.arange(seq_len, dtype=self.inv_freq.dtype)
+            # TODO(duanyanhui): npu arange kernel don't support fp16, and
+            # it can't be fallbacked to cpu. It will be fixed in future.
+            if paddle.get_device().split(":")[0] == "npu":
+                t = paddle.arange(start=0, end=seq_len, dtype="float32")
+                t = t.cast(self.inv_freq.dtype)
+            else:
+                t = paddle.arange(start=0, end=seq_len, dtype=self.inv_freq.dtype)
             # [s, h/n/2]
             # TODO: Failed for fp16 when converting to static graph.
             freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
