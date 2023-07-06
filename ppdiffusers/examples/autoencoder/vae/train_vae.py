@@ -441,7 +441,7 @@ def main():
                 # ref: https://github.com/Lightning-AI/lightning/blob/a58639ce7e864dd70484e7d34c37730ae204183c/src/pytorch_lightning/core/module.py#L1449-L1464
                 unwrap_model(vae).untoggle_optimizer(optimizers, optimizer_idx)
                 logs.update(log_dict)
-
+            unwrap_model(vae).on_train_batch_end()
             progress_bar.update(1)
             global_step += 1
             # progress_bar.set_postfix(**logs)
