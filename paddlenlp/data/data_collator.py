@@ -360,6 +360,7 @@ class DataCollatorForSeq2Seq:
     pad_to_multiple_of: Optional[int] = None
     label_pad_token_id: int = -100
     return_tensors: str = "pd"
+    return_attention_mask: Optional[bool] = None
 
     def __call__(self, features, return_tensors=None):
         # Deep copy to avoid modifying features in-place
@@ -396,6 +397,7 @@ class DataCollatorForSeq2Seq:
             max_length=self.max_length,
             pad_to_multiple_of=self.pad_to_multiple_of,
             return_tensors=return_tensors,
+            return_attention_mask=self.return_attention_mask,
         )
 
         # prepare decoder_input_ids

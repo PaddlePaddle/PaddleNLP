@@ -221,6 +221,7 @@ def main():
         return_tensors="pd",
         tokenizer=tokenizer,
         max_length=model_max_length if data_args.always_pad_to_max_length else -1,
+        return_attention_mask=True,
     )
 
     def compute_metrics_trainer(eval_preds, tokenizer):
