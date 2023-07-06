@@ -293,6 +293,8 @@ def main():
             use_actnorm=args.use_actnorm,
             disc_conditional=args.disc_conditional,
             disc_loss=args.disc_loss,
+            ema_decay=args.ema_decay,
+            use_ema=args.use_ema,
             **model_kwargs,
         )
     else:
@@ -313,6 +315,8 @@ def main():
             use_actnorm=args.use_actnorm,
             disc_conditional=args.disc_conditional,
             disc_loss=args.disc_loss,
+            ema_decay=args.ema_decay,
+            use_ema=args.use_ema,
         )
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
