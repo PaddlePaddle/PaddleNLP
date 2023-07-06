@@ -1465,6 +1465,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         sharding_group = kwargs.get("sharding_group", None)
         optimizer = kwargs.get("optimizer", None)
         save_sharding_stage1_model = kwargs.get("save_sharding_stage1_model", False)
+        use_async_save = kwargs.get("use_async_save", False)
 
         # 1. retrieve the model related config
 
@@ -1508,7 +1509,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # Save model
         if paddle.in_dynamic_mode():
             file_name = os.path.join(save_dir, _add_variant(WEIGHTS_NAME, variant))
-            paddle.save(state_dict_to_save, file_name)
+            if use_async_save:
+                paddle.async_save(state_dict_to_save, file_name)
+            else:
+                paddle.save(state_dict_to_save, file_name)
             del model_to_save
         else:
             logger.warning("Save pretrained model only supported dygraph mode for now!")
