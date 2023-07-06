@@ -25,8 +25,8 @@ from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, ChatGLMForConditionalGeneration
 import os
 
-os.environ['http_proxy']="http://172.19.57.45:3128"
-os.environ['https_proxy']="http://172.19.57.45:3128"
+# os.environ['http_proxy']="http://172.19.57.45:3128"
+# os.environ['https_proxy']="http://172.19.57.45:3128"
 
 """
 单卡
@@ -91,7 +91,7 @@ def main():
             dtype=dtype,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             tensor_parallel_rank=training_args.tensor_parallel_rank,
-            # use_recompute=training_args.recompute,
+            recompute=training_args.recompute,
         )
 
     else:

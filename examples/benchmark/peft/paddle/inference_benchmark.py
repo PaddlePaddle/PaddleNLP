@@ -42,7 +42,7 @@ if __name__ == "__main__":
     args = parse_args()
     all_texts = [
         "你好",
-        "强改写：一群蚂蚁士兵冲向一块披萨",
+        "去年9月，拼多多海外版“Temu”正式在美国上线。数据显示，截至2023年2月23日，Temu App新增下载量4000多万，新增用户增速第一，AppStore购物榜霸榜69天、Google Play购物榜霸榜114天。",
     ]
     tokenizer = LlamaTokenizer.from_pretrained(args.model_name_or_path)
 
