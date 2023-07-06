@@ -142,6 +142,10 @@ class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
         # if use_ema:
         #     self.model_ema = LitEma(self, decay=ema_decay)
 
+    def _set_gradient_checkpointing(self, module, value=False):
+        if isinstance(module, (Encoder, Decoder)):
+            module.gradient_checkpointing = value
+
     def init_weights(self):
         reset_initialized_parameter(self.encoder)
         reset_initialized_parameter(self.decoder)
