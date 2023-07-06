@@ -48,9 +48,23 @@
 
 | Model         | Method   | Num GPUs | Batch Size | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
 |---------------|----------|----------|------------|--------------|---------------------------|-------------|--------------------------|---------|
-| chatglm-6b | LoRA     | 1        | 4          |              | 2654.73                   |             | 1746.32                  | +52%    |
-| chatglm-6b | Finetune | 4        | 8          | MP 4         | 3109.83                   | ZeRO 3      | 1796.79                  | +73%    |
-| chatglm-6b | Finetune | 4        | 16         | MP 4         | 3569.95                   | ZeRO 3      | 2890.00                  | +24%     |
+| chatglm-6b | LoRA     | 1        | 4          |              | 2654.73                   |             | 1866.48                  | +42%    |
+| chatglm-6b | Finetune | 4        | 8          | MP 4         | 3109.83                   | ZeRO 3      | 1840.99                  | +69%    |
+| chatglm-6b | Finetune | 4        | 16         | MP 4         | 3569.95                   | ZeRO 3      | 3191.35                  | +12%     |
+
+
+###### 多卡分布式实验记录
+
+- Finetuning with 4 GPUs
+
+| Model     | Setup         | Paddle Effective Tokens /s | Torch Effective Tokens /s  |  Speedup  |
+|-----------|---------------|----------------------------|----------------------------|-----------|
+| chatglm-6b  | bsz 8 MP4     |  3109.83             |         N/A                 |   N/A     |
+| chatglm-6b  | bsz 8 ZeRO 3  |                    |         1840.99             |       |
+| chatglm-6b  | bsz 8 ZeRO 2  |                     |                     |       |
+| chatglm-6b  | bsz 16 (8*2) MP4 |                 |                       |       |
+| chatglm-6b  | bsz 16 ZeRO 3 |                     |                     |        |
+| chatglm-6b  | bsz 16 ZeRO 2 |                 |                    |       |
 
 ### TODOs
 
