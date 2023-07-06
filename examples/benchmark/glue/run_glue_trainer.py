@@ -204,7 +204,7 @@ def main():
             trainable_modules=[".*classifier.*"],
             r=model_args.lora_rank,
             lora_alpha=model_args.lora_alpha,
-            merge_weights=True,
+            merge_weights=False,
             dtype=dtype,
         )
         model = LoRAModel(model, lora_config)
