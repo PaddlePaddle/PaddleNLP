@@ -2025,7 +2025,7 @@ class Trainer:
         if group is None:
             group = self.hcg.get_sharding_parallel_group()
         res = []
-        paddle.distributed.all_gather_object(res, obj)
+        paddle.distributed.all_gather_object(res, obj, group)
         return res
 
     def _map_optimizer_state_to_param(self, optimizer_state_names):
