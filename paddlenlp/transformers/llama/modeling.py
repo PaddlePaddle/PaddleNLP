@@ -26,6 +26,7 @@ import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
+from paddle.incubate.nn import FusedMultiTransformer
 from paddle.utils import try_import
 
 from paddlenlp.transformers.conversion_utils import (
@@ -54,12 +55,7 @@ LLAMA_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "facebook/llama-13b",
 ]
 
-__all__ = [
-    "LlamaModel",
-    "LlamaPretrainedModel",
-    "LlamaForCausalLM",
-    "LlamaPretrainingCriterion",
-]
+__all__ = ["LlamaModel", "LlamaPretrainedModel", "LlamaForCausalLM", "LlamaPretrainingCriterion", "FusedLlamaModel"]
 
 
 def get_triangle_upper_mask(x, mask=None):
@@ -250,6 +246,24 @@ class LlamaRMSNorm(nn.Layer):
         if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
             hidden_states = paddle.cast(hidden_states, self.weight.dtype)
         return hidden_states * self.weight
+
+
+class FusedLlamaRMSNorm(nn.Layer):
+    def __init__(self, config):
+        super().__init__()
+        self.hidden_size = config.hidden_size
+        self.weight = paddle.create_parameter(
+            shape=[self.hidden_size],
+            dtype=paddle.get_default_dtype(),
+            default_initializer=nn.initializer.Constant(1.0),
+        )
+        self.variance_epsilon = config.rms_norm_eps
+        self.config = config
+
+    def forward(self, hidden_states):
+        return paddle.incubate.nn.functional.rms_norm(
+            hidden_states, self.weight, None, self.variance_epsilon, begin_norm_axis=2
+        )
 
 
 class LlamaRotaryEmbedding(nn.Layer):
@@ -880,7 +894,11 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         super().__init__(config)
         self.config = config
 
-        self.llama = LlamaModel(config)
+        if config.use_fast:
+            self.llama = FusedLlamaModel(config)
+        else:
+            self.llama = LlamaModel(config)
+
         self.lm_head = LlamaLMHead(config)
         self.criterion = LlamaPretrainingCriterion(config)
 
@@ -1002,3 +1020,332 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict, use_structured_name=True):
+        if not self.config.use_fast:
+            return super().set_state_dict(state_dict)
+
+        self.lm_head.weight.set_value(state_dict["lm_head.weight"])
+        self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys() if "llama" in k})
+
+
+class FusedLlamaModel(LlamaPretrainedModel):
+    """
+    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`LlamaDecoderLayer`]
+    Args:
+        config: LlamaConfig
+    """
+
+    def __init__(self, config: LlamaConfig):
+        super().__init__(config)
+        self.vocab_size = config.vocab_size
+        self.hidden_size = config.hidden_size
+        self.num_attention_heads = config.num_attention_heads
+        self.intermediate_size = config.intermediate_size
+        self.num_layers = config.num_hidden_layers
+        self.epsilon = config.rms_norm_eps
+        self.max_position_embeddings = config.max_position_embeddings
+
+        if config.tensor_parallel_degree > 1:
+            self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
+                self.vocab_size,
+                self.hidden_size,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+            )
+        else:
+            self.embed_tokens = nn.Embedding(
+                self.vocab_size,
+                self.hidden_size,
+            )
+
+        # get ring_id
+        ring_id = -1
+        try:
+            hcg = fleet.get_hybrid_communicate_group()
+            model_parallel_group = hcg.get_model_parallel_group()
+            ring_id = model_parallel_group.id
+        except:
+            pass
+
+        ln_scale_attrs = [paddle.ParamAttr(name="fusellama.{}.ln_scale".format(i)) for i in range(self.num_layers)]
+        qkv_weight_attrs = [paddle.ParamAttr(name="fusellama.{}.qkv_weight".format(i)) for i in range(self.num_layers)]
+        out_proj_weight_attrs = [
+            paddle.ParamAttr(name="fusellama.{}.out_proj_weight".format(i)) for i in range(self.num_layers)
+        ]
+        ffn_ln_scale_attrs = [
+            paddle.ParamAttr(name="fusellama.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
+        ]
+        ffn1_weight_attrs = [
+            paddle.ParamAttr(name="fusellama.{}.ffn1_weight".format(i)) for i in range(self.num_layers)
+        ]
+        ffn2_weight_attrs = [
+            paddle.ParamAttr(name="fusellama.{}.ffn2_weight".format(i)) for i in range(self.num_layers)
+        ]
+        self.transformer_block = FusedMultiTransformer(
+            self.hidden_size,
+            self.num_attention_heads,
+            self.intermediate_size,
+            activation="swiglu",
+            num_layers=config.num_hidden_layers,
+            nranks=max(config.tensor_parallel_degree, 1),
+            ring_id=ring_id,
+            ln_scale_attrs=ln_scale_attrs,
+            qkv_weight_attrs=qkv_weight_attrs,
+            linear_weight_attrs=out_proj_weight_attrs,
+            ffn_ln_scale_attrs=ffn_ln_scale_attrs,
+            ffn1_weight_attrs=ffn1_weight_attrs,
+            ffn2_weight_attrs=ffn2_weight_attrs,
+            epsilon=self.epsilon,
+            norm_type="rmsnorm",
+            use_neox_rotary_style=True,
+        )
+        self.norm = LlamaRMSNorm(config)
+
+        self.cache_kvs = []
+
+        self.gradient_checkpointing = False
+
+    def get_input_embeddings(self):
+        return self.embed_tokens
+
+    def set_input_embeddings(self, value):
+        self.embed_tokens = value
+
+    def _prepare_decoder_attention_mask(self, attention_mask, input_shape, past_key_values_length, dtype):
+        # create causal mask
+        # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+        combined_attention_mask = None
+        if input_shape[-1] > 1:
+            combined_attention_mask = _make_causal_mask(
+                input_shape, past_key_values_length=past_key_values_length, dtype=dtype
+            )
+
+        if attention_mask is not None:
+            # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+            expanded_attn_mask = _expand_mask(attention_mask, dtype, tgt_length=input_shape[-1])
+            combined_attention_mask = (
+                expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
+            )
+        combined_attention_mask = paddle.maximum(
+            combined_attention_mask.astype(dtype), paddle.to_tensor(float(finfo(dtype).min), dtype=dtype)
+        )
+        return combined_attention_mask
+
+    @paddle.jit.not_to_static
+    def recompute_training(self, layer_module, hidden_states, attention_mask, output_attentions):
+        def create_custom_forward(module):
+            def custom_forward(*inputs):
+                return module(*inputs, output_attentions, None)
+
+            return custom_forward
+
+        hidden_states = recompute(
+            create_custom_forward(layer_module),
+            hidden_states,
+            attention_mask,
+            use_reentrant=False,
+        )
+        return hidden_states
+
+    def forward(
+        self,
+        input_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        use_cache=None,
+        past_key_values=None,
+        output_attentions=False,
+        output_hidden_states=None,
+        return_dict=False,
+        **kwargs,
+    ):
+        past_key_values = kwargs.get("cache", past_key_values)
+        is_decoder = past_key_values is not None
+
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        # retrieve input_ids and inputs_embeds
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time")
+        elif input_ids is not None:
+            batch_size, seq_length = input_ids.shape
+        elif inputs_embeds is not None:
+            batch_size, seq_length, _ = inputs_embeds.shape
+        else:
+            raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
+
+        if past_key_values is None:
+            past_key_values = tuple([None] * self.config.num_hidden_layers)
+
+        seq_length_with_past = seq_length
+        cache_length = 0
+        if past_key_values[0] is not None:
+            cache_length = paddle.shape(past_key_values[0][0])[2]
+            seq_length_with_past += cache_length
+        if inputs_embeds is None:
+            inputs_embeds = self.embed_tokens(input_ids)
+
+        # embed positions
+        if attention_mask is None:
+            attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
+
+        if is_decoder:
+            causal_mask = 1.0 - attention_mask[:, None, None, :]
+        else:
+            causal_mask = paddle.tensor.triu(
+                paddle.ones((paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1])), diagonal=1
+            )
+            causal_mask = paddle.logical_or(causal_mask, 1.0 - attention_mask[:, None, None, :]).astype(
+                paddle.get_default_dtype()
+            )
+        causal_mask *= float(finfo(inputs_embeds.dtype).min)
+
+        hidden_states = inputs_embeds
+
+        # Transformer cache kv
+        if len(self.cache_kvs) == 0:
+            max_seq_length = 1024
+            self.cache_kvs = [
+                paddle.fluid.layers.fill_constant_batch_size_like(
+                    input_ids,
+                    shape=[
+                        2,
+                        -1,
+                        self.config.num_attention_heads // self.config.tensor_parallel_degree,
+                        max_seq_length,
+                        self.hidden_size // self.config.num_attention_heads,
+                    ],
+                    input_dim_idx=0,
+                    output_dim_idx=1,
+                    value=0.0,
+                    dtype=paddle.get_default_dtype(),
+                )
+                for _ in range(self.config.num_hidden_layers)
+            ]
+
+        # decoder layers
+        all_hidden_states = () if output_hidden_states else None
+        all_self_attns = () if output_attentions else None
+
+        head_dim = self.hidden_size // self.num_attention_heads
+        offset = paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else 0
+
+        rotary_embeddings = self.get_rotary_embedding(
+            batch_size, self.max_position_embeddings, 10000, head_dim, seq_length, offset
+        )
+
+        print("inputs_embeds", inputs_embeds)
+        hidden_states, presents = self.transformer_block(
+            hidden_states,
+            attn_mask=paddle.cast(causal_mask, dtype=hidden_states.dtype),
+            caches=self.cache_kvs,
+            rotary_embs=paddle.cast(rotary_embeddings, dtype=paddle.float32),
+            rotary_emb_dims=1,
+            time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
+        )
+        print("last-layer-hidden_states", hidden_states)
+
+        hidden_states = self.norm(hidden_states)
+        print("norm-output-hidden_states", hidden_states)
+
+        if output_hidden_states:
+            all_hidden_states = all_hidden_states + (hidden_states,)
+
+        if not return_dict:
+            return tuple(v for v in [hidden_states, presents, all_hidden_states, all_self_attns] if v is not None)
+
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=hidden_states,
+            past_key_values=presents,
+            hidden_states=all_hidden_states,
+            attentions=all_self_attns,
+        )
+
+    def get_rotary_embedding(self, bsz, max_position_embeddings, base, head_dim, seq_length, offset):
+        inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, head_dim, 2), "float32") / head_dim))
+        t = paddle.arange(max_position_embeddings, dtype=inv_freq.dtype)
+
+        # shape: [S, D/2]
+        freqs = paddle.einsum("i,j->ij", t, inv_freq)
+        # shape: [S, D]
+        emb = paddle.concat([freqs, freqs], axis=-1)
+
+        # shape: [1, S, D]
+        emb = paddle.unsqueeze(emb, 0)
+        # shape: [1, S, 1, D]
+        emb = paddle.unsqueeze(emb, 2)
+        # shape: [B, S, 1, D]
+        emb = paddle.repeat_interleave(emb, bsz, axis=0)
+
+        cos_emb = paddle.cos(emb)
+        sin_emb = paddle.sin(emb)
+        stacked_rotary_emb = paddle.concat([cos_emb, sin_emb], axis=0)
+        return stacked_rotary_emb[:, offset : seq_length + offset, :, :]
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict, use_structured_name=True):
+        unfused_state_dict = {}
+        head_size = self.hidden_size // self.num_attention_heads
+
+        self.embed_tokens.weight.set_value(paddle.to_tensor(state_dict["llama.embed_tokens.weight"]))
+        self.norm.weight.set_value(paddle.to_tensor(state_dict["llama.norm.weight"]))
+
+        for idx in range(self.config.num_hidden_layers):
+            unfused_state_dict = {}
+            unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
+                "llama.layers.{}.self_attn.q_proj.weight".format(idx)
+            ]
+            unfused_state_dict["self_attn.k_proj.weight"] = state_dict[
+                "llama.layers.{}.self_attn.k_proj.weight".format(idx)
+            ]
+            unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
+                "llama.layers.{}.self_attn.v_proj.weight".format(idx)
+            ]
+
+            concated_qkv_weight = (
+                np.concatenate(
+                    [
+                        unfused_state_dict["self_attn.q_proj.weight"],
+                        unfused_state_dict["self_attn.k_proj.weight"],
+                        unfused_state_dict["self_attn.v_proj.weight"],
+                    ],
+                    axis=-1,
+                )
+                .transpose(1, 0)
+                .reshape(
+                    3, self.num_attention_heads // self.config.tensor_parallel_degree, head_size, self.hidden_size
+                )
+            )
+            self.transformer_block.qkv_weights[idx].set_value(paddle.to_tensor(concated_qkv_weight))
+
+            self.transformer_block.linear_weights[idx].set_value(
+                paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.weight".format(idx)])
+            )
+
+            unfused_state_dict["mlp.gate_proj.weight"] = state_dict["llama.layers.{}.mlp.gate_proj.weight".format(idx)]
+            unfused_state_dict["mlp.up_proj.weight"] = state_dict["llama.layers.{}.mlp.up_proj.weight".format(idx)]
+
+            concated_ffn1_weight = np.concatenate(
+                [unfused_state_dict["mlp.gate_proj.weight"], unfused_state_dict["mlp.up_proj.weight"]], axis=-1
+            )
+            self.transformer_block.ffn1_weights[idx].set_value(paddle.to_tensor(concated_ffn1_weight))
+
+            self.transformer_block.ffn2_weights[idx].set_value(
+                paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)])
+            )
+
+            self.transformer_block.ln_scales[idx].set_value(
+                paddle.to_tensor(state_dict["llama.layers.{}.input_layernorm.weight".format(idx)])
+            )
+
+            self.transformer_block.ffn_ln_scales[idx].set_value(
+                paddle.to_tensor(state_dict["llama.layers.{}.post_attention_layernorm.weight".format(idx)])
+            )

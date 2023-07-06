@@ -216,6 +216,7 @@ class LlamaConfig(PretrainedConfig):
         bos_token_id=1,
         eos_token_id=2,
         tie_word_embeddings=False,
+        use_fast: bool = False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -238,6 +239,8 @@ class LlamaConfig(PretrainedConfig):
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
+
+        self.use_fast = use_fast
 
         super().__init__(
             pad_token_id=pad_token_id,

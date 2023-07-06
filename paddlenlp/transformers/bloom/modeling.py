@@ -26,6 +26,7 @@ from paddle import Tensor, nn
 from paddle.autograd import PyLayer
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
+from paddle.incubate.nn import FusedMultiTransformer
 
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -48,6 +49,7 @@ from .processor import (
 
 __all__ = [
     "BloomModel",
+    "FusedBloomModel",
     "BloomForPretraining",
     "BloomForCausalLM",
     "BloomForSequenceClassification",
@@ -1109,9 +1111,13 @@ class BloomForPretraining(BloomPreTrainedModel):
 class BloomForCausalLM(BloomPreTrainedModel):
     _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.weight"]
 
-    def __init__(self, config):
+    def __init__(self, config: BloomConfig):
         super().__init__(config)
-        self.bloom = BloomModel(config)
+        if config.use_fast:
+            self.bloom = FusedBloomModel(config)
+        else:
+            self.bloom = BloomModel(config)
+
         self.lm_head = BloomLMHead(config, self.bloom.word_embeddings.weight)
         self.criterion = BloomPretrainingCriterion(
             pad_token_id=config.pad_token_id,
@@ -1237,6 +1243,17 @@ class BloomForCausalLM(BloomPreTrainedModel):
         beam_idx at every generation step.
         """
         return tuple(tuple(past_state.index_select(0, beam_idx) for past_state in layer_past) for layer_past in past)
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict, use_structured_name=True):
+        if not self.config.use_fast:
+            return super().set_state_dict(state_dict)
+
+        self.lm_head.set_state_dict(
+            {k: state_dict[k] for k in state_dict.keys() if "lm_head" in k},
+            use_structured_name,
+        )
+        self.bloom.set_state_dict({k: state_dict[k] for k in state_dict.keys() if "bloom" in k})
 
 
 class BloomForSequenceClassification(BloomPreTrainedModel):
@@ -1887,3 +1904,347 @@ class BloomForGeneration(BloomPreTrainedModel):
         else:
             raise ValueError(f"Not support {decode_strategy} strategy yet!")
         return ret
+
+
+class FusedBloomModel(BloomPreTrainedModel):
+    def __init__(self, config: BloomConfig):
+        super().__init__(config)
+        self.padding_idx = 0
+
+        self.embed_dim = config.hidden_size
+        self.n_head = config.n_head
+
+        # Embedding + LN Embedding
+        # self.word_embeddings = nn.Embedding(config.vocab_size, self.embed_dim)
+        if config.tensor_parallel_degree > 1:
+            self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
+                config.vocab_size,
+                config.hidden_size,
+                weight_attr=paddle.ParamAttr(
+                    initializer=nn.initializer.Normal(mean=0.0, std=config.initializer_range)
+                ),
+            )
+        else:
+            self.word_embeddings = nn.Embedding(config.vocab_size, self.embed_dim)
+
+        self.word_embeddings_layernorm = nn.LayerNorm(self.embed_dim, epsilon=config.layer_norm_epsilon)
+
+        # get ring_id
+        ring_id = -1
+        try:
+            hcg = fleet.get_hybrid_communicate_group()
+            model_parallel_group = hcg.get_model_parallel_group()
+            ring_id = model_parallel_group.id
+        except:
+            pass
+
+        # config.tensor_parallel_degree = 8
+        # Transformer blocks
+        ln_scale_attrs = [paddle.ParamAttr(name="fusemt.{}.ln_scale".format(i)) for i in range(config.n_layer)]
+        ln_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ln_bias".format(i)) for i in range(config.n_layer)]
+        qkv_weight_attrs = [paddle.ParamAttr(name="fusemt.{}.qkv_weight".format(i)) for i in range(config.n_layer)]
+        qkv_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.qkv_bias".format(i)) for i in range(config.n_layer)]
+        linear_weight_attrs = [
+            paddle.ParamAttr(name="fusemt.{}.linear_weight".format(i)) for i in range(config.n_layer)
+        ]
+        linear_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.linear_bias".format(i)) for i in range(config.n_layer)]
+        ffn_ln_scale_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn_ln_scale".format(i)) for i in range(config.n_layer)]
+        ffn_ln_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn_ln_bias".format(i)) for i in range(config.n_layer)]
+        ffn1_weight_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn1_weight".format(i)) for i in range(config.n_layer)]
+        ffn1_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn1_bias".format(i)) for i in range(config.n_layer)]
+        ffn2_weight_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn2_weight".format(i)) for i in range(config.n_layer)]
+        ffn2_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn2_bias".format(i)) for i in range(config.n_layer)]
+        self.transformer_block = FusedMultiTransformer(
+            self.embed_dim,
+            self.n_head,
+            4 * self.embed_dim,
+            activation="gelu",
+            num_layers=config.n_layer,
+            nranks=config.tensor_parallel_degree,
+            ring_id=ring_id,
+            ln_scale_attrs=ln_scale_attrs,
+            ln_bias_attrs=ln_bias_attrs,
+            qkv_weight_attrs=qkv_weight_attrs,
+            qkv_bias_attrs=qkv_bias_attrs,
+            linear_weight_attrs=linear_weight_attrs,
+            linear_bias_attrs=linear_bias_attrs,
+            ffn_ln_scale_attrs=ffn_ln_scale_attrs,
+            ffn_ln_bias_attrs=ffn_ln_bias_attrs,
+            ffn1_weight_attrs=ffn1_weight_attrs,
+            ffn1_bias_attrs=ffn1_bias_attrs,
+            ffn2_weight_attrs=ffn2_weight_attrs,
+            ffn2_bias_attrs=ffn2_bias_attrs,
+        )
+        self.cache_kvs = []
+
+        # Final Layer Norm
+        self.ln_f = nn.LayerNorm(self.embed_dim, epsilon=config.layer_norm_epsilon)
+
+        self.gradient_checkpointing = False
+
+    def get_input_embeddings(self):
+        return self.word_embeddings
+
+    def _prepare_attn_mask(
+        self,
+        attention_mask: Tensor,
+        input_shape: Tuple[int, int],
+        past_key_values_length: int,
+    ) -> Tensor:
+        # create causal mask
+        # [batch_size, seq_length] -> [batch_size, tgt_length, src_length]
+        combined_attention_mask = None
+        _, src_length = input_shape
+
+        if src_length > 1:
+            combined_attention_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
+
+        # [batch_size, seq_length] -> [batch_size, tgt_length, src_length]
+        expanded_attn_mask = _expand_mask(attention_mask, tgt_length=src_length)
+        combined_attention_mask = (
+            expanded_attn_mask
+            if combined_attention_mask is None
+            else paddle.logical_or(expanded_attn_mask, combined_attention_mask)
+        )
+
+        return combined_attention_mask
+
+    def set_input_embeddings(self, new_embeddings: Tensor):
+        self.word_embeddings = new_embeddings
+
+    @paddle.jit.not_to_static
+    def recompute_training(
+        self,
+        block,
+        hidden_states,
+        layer_past,
+        attention_mask,
+        head_mask,
+        use_cache,
+        output_attentions,
+        alibi,
+    ):
+        def create_custom_forward(module):
+            def custom_forward(*inputs):
+                return module(*inputs)
+
+            return custom_forward
+
+        hidden_states = recompute(
+            create_custom_forward(block),
+            hidden_states,
+            layer_past,
+            attention_mask,
+            head_mask,
+            use_cache,
+            output_attentions,
+            alibi,
+            use_reentrant=False,
+        )
+        return hidden_states
+
+    def forward(
+        self,
+        input_ids=None,
+        past_key_values=None,
+        attention_mask=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        use_cache=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+        **kwargs,
+    ) -> Union[Tuple[Tensor], BaseModelOutputWithPastAndCrossAttentions]:
+
+        past_key_values = kwargs.get("cache", past_key_values)
+        is_decoder = past_key_values is not None
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        elif input_ids is not None:
+            batch_size, seq_length = input_ids.shape
+        elif inputs_embeds is not None:
+            batch_size, seq_length, _ = inputs_embeds.shape
+        else:
+            raise ValueError("You have to specify either input_ids or inputs_embeds")
+
+        if past_key_values is None:
+            past_key_values = tuple([None] * self.config.n_layer)
+
+        # Prepare head mask if needed
+        # 1.0 in head_mask indicate we keep the head
+        # attention_probs has shape batch_size x num_heads x N x N
+        # head_mask has shape n_layer x batch x num_heads x N x N
+        # head_mask = self.get_head_mask(head_mask, self.config.n_layer)
+
+        if inputs_embeds is None:
+            inputs_embeds = self.word_embeddings(input_ids)
+
+        hidden_states = self.word_embeddings_layernorm(inputs_embeds)
+
+        # Transformer cache kv
+        if len(self.cache_kvs) == 0:
+            max_seq_len = 1024
+            self.cache_kvs = [
+                paddle.fluid.layers.fill_constant_batch_size_like(
+                    input_ids,
+                    shape=[
+                        2,
+                        -1,
+                        self.config.n_head // self.config.tensor_parallel_degree,
+                        max_seq_len,
+                        self.embed_dim // self.config.n_head,
+                    ],
+                    input_dim_idx=0,
+                    output_dim_idx=1,
+                    value=0.0,
+                    dtype=paddle.get_default_dtype(),
+                )
+                for _ in range(self.config.n_layer)
+            ]
+
+        presents = () if use_cache else None
+        all_self_attentions = () if output_attentions else None
+        all_hidden_states = () if output_hidden_states else None
+
+        # Compute alibi tensor: check build_alibi_tensor documentation
+        seq_length_with_past = seq_length
+        if past_key_values[0] is not None:
+            seq_length_with_past = attention_mask.shape[-1]
+
+        if attention_mask is None:
+            attention_mask = paddle.ones([batch_size, seq_length_with_past], dtype=paddle.get_default_dtype())
+
+        if position_ids is not None:
+            arange_tensor = ((attention_mask.cumsum(axis=-1) - 1) * attention_mask)[:, None, :]
+            alibi = position_ids[..., None] * arange_tensor
+        else:
+            alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
+        if is_decoder:
+            causal_mask = 1.0 - attention_mask[:, None, None, :]
+        else:
+            causal_mask = paddle.tensor.triu(
+                paddle.ones((paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1])),
+                diagonal=1,
+            )
+            causal_mask = paddle.logical_or(causal_mask, 1.0 - attention_mask[:, None, None, :]).astype(
+                paddle.get_default_dtype()
+            )
+
+        if self.config.tensor_parallel_degree > 1:
+            block_size = self.config.n_head // self.config.tensor_parallel_degree
+            alibi = alibi[
+                :,
+                self.config.tensor_parallel_rank * block_size : (self.config.tensor_parallel_rank + 1) * block_size,
+            ]
+            alibi = alibi.reshape([batch_size, block_size, 1, seq_length_with_past])
+        else:
+            alibi = alibi.reshape([batch_size, self.config.n_head, 1, seq_length_with_past])
+
+        alibi = alibi.expand(
+            [
+                batch_size,
+                self.config.n_head // self.config.tensor_parallel_degree,
+                seq_length,
+                seq_length_with_past,
+            ]
+        )
+
+        attn_mask = alibi + causal_mask * -60000.0
+        # attn_mask = alibi + causal_mask * -3.38e38
+        hidden_states, presents = self.transformer_block(
+            hidden_states,
+            attn_mask=paddle.cast(attn_mask, dtype=hidden_states.dtype),
+            caches=self.cache_kvs,
+            time_step=paddle.increment(paddle.shape(attn_mask)[-1], -1) if is_decoder else None,
+        )
+
+        # Add last hidden state
+        hidden_states = self.ln_f(hidden_states)
+
+        if output_hidden_states:
+            all_hidden_states = all_hidden_states + (hidden_states,)
+
+        if not return_dict:
+            return tuple(
+                v
+                for v in [
+                    hidden_states,
+                    presents,
+                    all_hidden_states,
+                    all_self_attentions,
+                ]
+                if v is not None
+            )
+
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=hidden_states,
+            past_key_values=presents,
+            hidden_states=all_hidden_states,
+            attentions=all_self_attentions,
+        )
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict, use_structured_name=True):
+        for k, v in state_dict.items():
+            if k.find("word_embeddings.weight") >= 0:
+                self.word_embeddings.weight.set_value(paddle.to_tensor(v))
+            elif k.find("word_embeddings_layernorm.weight") >= 0:
+                self.word_embeddings_layernorm.weight.set_value(paddle.to_tensor(v))
+            elif k.find("word_embeddings_layernorm.bias") >= 0:
+                self.word_embeddings_layernorm.bias.set_value(paddle.to_tensor(v))
+            elif k.find("ln_f.weight") >= 0:
+                self.ln_f.weight.set_value(paddle.to_tensor(v))
+            elif k.find("ln_f.bias") >= 0:
+                self.ln_f.bias.set_value(paddle.to_tensor(v))
+            else:
+                # transformer block weights
+                idx = int(k.split(".")[2])
+                if k.endswith("input_layernorm.weight"):
+                    self.transformer_block.ln_scales[idx].set_value(paddle.to_tensor(v).astype("float32"))
+                elif k.endswith("input_layernorm.bias"):
+                    self.transformer_block.ln_biases[idx].set_value(paddle.to_tensor(v).astype("float32"))
+                elif k.endswith("self_attention.query_key_value.weight"):
+                    v = v.reshape(
+                        [
+                            self.embed_dim,
+                            self.n_head // self.config.tensor_parallel_degree,
+                            3,
+                            self.embed_dim // self.n_head,
+                        ]
+                    ).transpose([2, 1, 3, 0])
+                    self.transformer_block.qkv_weights[idx].set_value(paddle.to_tensor(v))
+                elif k.endswith("self_attention.query_key_value.bias"):
+                    v = v.reshape(
+                        [
+                            self.n_head // self.config.tensor_parallel_degree,
+                            3,
+                            self.embed_dim // self.n_head,
+                        ]
+                    ).transpose([1, 0, 2])
+                    self.transformer_block.qkv_biases[idx].set_value(paddle.to_tensor(v))
+                elif k.endswith("self_attention.dense.weight"):
+                    self.transformer_block.linear_weights[idx].set_value(paddle.to_tensor(v))
+                elif k.endswith("self_attention.dense.bias"):
+                    self.transformer_block.linear_biases[idx].set_value(paddle.to_tensor(v))
+                elif k.endswith("post_attention_layernorm.weight"):
+                    self.transformer_block.ffn_ln_scales[idx].set_value(paddle.to_tensor(v).astype("float32"))
+                elif k.endswith("post_attention_layernorm.bias"):
+                    self.transformer_block.ffn_ln_biases[idx].set_value(paddle.to_tensor(v).astype("float32"))
+                elif k.endswith("mlp.dense_h_to_4h.weight"):
+                    self.transformer_block.ffn1_weights[idx].set_value(paddle.to_tensor(v))
+                elif k.endswith("mlp.dense_h_to_4h.bias"):
+                    self.transformer_block.ffn1_biases[idx].set_value(paddle.to_tensor(v))
+                elif k.endswith("mlp.dense_4h_to_h.weight"):
+                    self.transformer_block.ffn2_weights[idx].set_value(paddle.to_tensor(v))
+                elif k.endswith("mlp.dense_4h_to_h.bias"):
+                    self.transformer_block.ffn2_biases[idx].set_value(paddle.to_tensor(v))
+                else:
+                    raise ValueError("Unknow weight {}".format(k))
