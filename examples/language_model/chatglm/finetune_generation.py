@@ -52,13 +52,17 @@ class ModelArgument:
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
     lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
     merge_weights: bool = field(
-        default=True, metadata={"help": "Merge weights of the original model and the Lora model"}
+        default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
     )
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
     num_prefix_tokens: int = field(default=64, metadata={"help": "Number of prefix tokens"})
     prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
     do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
     lora_all_linear: bool = field(default=False, metadata={"help": "Whether to use LoRA technique for all linear."})
+    qat: bool = field(default=False, metadata={"help": "Whether to use QAT technique"})
+    qat_bit_length: int = field(
+        default=8, metadata={"help": "Number of bits to represent an quantized integer in binary"}
+    )
 
 
 def main():
@@ -122,7 +126,11 @@ def main():
         model.print_trainable_parameters()
     if model_args.lora:
         if model_args.lora_all_linear:
-            target_modules = [".*query_key_value.*", ".*dense.*"]
+            # Not yet support RowParallelLinear
+            if training_args.tensor_parallel_degree > 1:
+                target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
+            else:
+                target_modules = [".*query_key_value.*", ".*dense_h_to_4h.*"]
         else:
             target_modules = [".*query_key_value.*"]
         lora_config = LoRAConfig(
@@ -137,6 +145,35 @@ def main():
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
+
+    if model_args.qat:
+        from paddle import nn
+        from paddle.quantization import QAT, QuantConfig
+        from paddle.quantization.quanters import (
+            FakeQuanterChannelWiseAbsMaxObserver,
+            FakeQuanterWithAbsMaxObserver,
+        )
+
+        from paddlenlp.peft.lora import LoRALinear, QuantedLoRALinear
+
+        q_config = QuantConfig(activation=None, weight=None)
+        q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
+        q_config.add_type_config(
+            LoRALinear,
+            weight=FakeQuanterChannelWiseAbsMaxObserver(bit_length=model_args.qat_bit_length, dtype=dtype),
+            activation=FakeQuanterWithAbsMaxObserver(
+                moving_rate=0.9, bit_length=model_args.qat_bit_length, dtype=dtype
+            ),
+        )
+        q_config.add_type_config(
+            nn.Linear,
+            weight=FakeQuanterChannelWiseAbsMaxObserver(bit_length=model_args.qat_bit_length, dtype=dtype),
+            activation=FakeQuanterWithAbsMaxObserver(
+                moving_rate=0.9, bit_length=model_args.qat_bit_length, dtype=dtype
+            ),
+        )
+        qat = QAT(q_config)
+        model = qat.quantize(model, inplace=True)
     tokenizer = ChatGLMTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load the dataset.
