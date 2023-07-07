@@ -17,11 +17,15 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-from data import convert_example, custom_instruction_convert_example, reader
+from data import (
+    DataCollatorForSupervisedDataset,
+    convert_example,
+    custom_instruction_convert_example,
+    reader,
+)
 from modeling_pp import LlamaForCausalLMPipe
 from utils import LlamaTrainer, compute_metrics, compute_metrics_not_do_generation
 
-from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.peft.prefix import llama_postprocess_past_key_value
@@ -37,6 +41,7 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class DataArgument:
+
     data_name: str = field(default=None, metadata={"help": "The name of data."})
     task_name: str = field(default=None, metadata={"help": "The name of task."})
     dataset_path: str = field(default=None, metadata={"help": "The file name of train dataset."})
@@ -274,10 +279,11 @@ def main():
         dev_ds = dev_ds.map(partial(trans_func, is_test=is_test))
 
     model_max_length = 1024 if not training_args.benchmark else 512
-    collate_fn = DataCollatorForSeq2Seq(
+    collate_fn = DataCollatorForSupervisedDataset(
         return_tensors="pd",
         tokenizer=tokenizer,
         max_length=model_max_length if data_args.always_pad_to_max_length else -1,
+        padding="max_length" if data_args.always_pad_to_max_length else True,
         return_attention_mask=True,
     )
 
