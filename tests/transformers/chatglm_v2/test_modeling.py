@@ -38,7 +38,6 @@ class ChatGLMv2Tester:
         hidden_size=8,
         ffn_hidden_size=8,
         num_attention_heads=2,
-        multi_query_attention=False,
         rmsnorm=True,
         use_cache=True,
     ):
@@ -52,7 +51,6 @@ class ChatGLMv2Tester:
         self.hidden_size = hidden_size
         self.ffn_hidden_size = ffn_hidden_size
         self.num_attention_heads = num_attention_heads
-        self.multi_query_attention = multi_query_attention
         self.rmsnorm = rmsnorm
         self.use_cache = use_cache
 
@@ -78,7 +76,7 @@ class ChatGLMv2Tester:
             kv_channels=self.kv_channels,
             use_cache=self.use_cache,
             rmsnorm=self.rmsnorm,
-            multi_query_attention=self.multi_query_attention,
+
         )
 
     def create_and_check_model(self, config, input_ids, labels):
@@ -148,43 +146,31 @@ class ChatGLMv2Tester:
         self.parent.assertEqual(logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
         if config.use_cache:
             self.parent.assertTrue(isinstance(past_key_values, tuple))
-            if config.multi_query_attention:
-                self.parent.assertEqual(
-                    past_key_values[0].shape,
-                    [self.seq_length, self.batch_size, config.multi_query_group_num, config.kv_channels],
-                )
-            else:
-                self.parent.assertEqual(
-                    past_key_values[0].shape,
-                    [self.seq_length, self.batch_size, config.num_attention_heads, config.kv_channels],
-                )
-
+            self.parent.assertEqual(
+                past_key_values[0].shape,
+                [self.seq_length, self.batch_size, config.multi_query_group_num, config.kv_channels],
+            )
         else:
             self.parent.assertTrue(past_key_values is None)
 
 
 @parameterized_class(
-    ("return_dict", "multi_query_attention", "use_labels"),
+    ("return_dict", "use_labels"),
     [
-        [False, False, False],
-        [False, True, False],
-        [True, False, False],
-        [True, True, True],
+        [False, True],
+        [True, False],
     ],
 )
 class ChatGLMv2Test(ModelTesterMixin, unittest.TestCase):
     base_model_class = ChatGLMv2Model
     return_dict: bool = True
-    multi_query_attention = False
     use_labels: bool = False
     use_test_model_name_list = False
 
     all_model_classes = (ChatGLMv2Model, ChatGLMv2ForConditionalGeneration)
 
     def setUp(self):
-        # super().setUp()
-        # self.assertFalse(self.multi_query_attention)
-        self.model_tester = ChatGLMv2Tester(self, multi_query_attention=self.multi_query_attention)
+        self.model_tester = ChatGLMv2Tester(self)
 
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()

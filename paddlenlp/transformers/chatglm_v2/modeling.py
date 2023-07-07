@@ -13,11 +13,21 @@
 # limitations under the License.
 
 import math
+from functools import partial
 from typing import Any, Dict, Optional, Tuple
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.distributed.fleet.meta_parallel import (
+    ColumnParallelLinear,
+    ParallelCrossEntropy,
+    RowParallelLinear,
+    VocabParallelEmbedding,
+    get_rng_state_tracker,
+)
+from paddle.distributed.fleet import HybridCommunicateGroup
+import paddle.distributed.fleet as fleet
 
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -230,35 +240,31 @@ class SelfAttention(nn.Layer):
 
         self.multi_query_attention = config.multi_query_attention
         self.qkv_hidden_size = 3 * self.projection_size
-        if self.multi_query_attention:
-            self.num_multi_query_groups_per_partition = config.multi_query_group_num
-            self.qkv_hidden_size = (
-                self.projection_size + 2 * self.hidden_size_per_attention_head * config.multi_query_group_num
-            )
-        self.query_key_value = nn.Linear(
-            config.hidden_size,
-            self.qkv_hidden_size,
-            bias_attr=config.add_bias_linear or config.add_qkv_bias,
-        )
-
         self.core_attention = CoreAttention(config, self.layer_number)
-
-        # Output.
-        self.dense = nn.Linear(self.projection_size, config.hidden_size, bias_attr=config.add_bias_linear)
-
-    def _allocate_memory(self, inference_max_sequence_len, batch_size, device=None, dtype=None):
-        if self.multi_query_attention:
-            num_attention_heads = self.num_multi_query_groups_per_partition
-        else:
-            num_attention_heads = self.num_attention_heads_per_partition
-        return paddle.empty(
-            inference_max_sequence_len,
-            batch_size,
-            num_attention_heads,
-            self.hidden_size_per_attention_head,
-            dtype=dtype,
-            device=device,
+        self.num_multi_query_groups_per_partition = config.multi_query_group_num
+        self.qkv_hidden_size = (
+            self.projection_size + 2 * self.hidden_size_per_attention_head * config.multi_query_group_num
         )
+
+            
+        if config.tensor_parallel_degree > 1:
+            self.query_key_value = fleet.meta_parallel.ColumnParallelLinear(
+                config.hidden_size,
+                self.qkv_hidden_size,
+                has_bias=config.add_bias_linear or config.add_qkv_bias,
+                gather_output=False
+            )
+            self.dense = fleet.meta_parallel.RowParallelLinear(
+                config.hidden_size, config.hidden_size, input_is_parallel=True, has_bias=True
+            )
+            self.num_attention_heads = config.num_attention_heads // config.tensor_parallel_degree
+        else:
+            self.query_key_value = nn.Linear(
+                config.hidden_size,
+                self.qkv_hidden_size,
+                bias_attr=config.add_bias_linear or config.add_qkv_bias,
+            )
+            self.dense = nn.Linear(self.projection_size, config.hidden_size, bias_attr=config.add_bias_linear)
 
     def forward(self, hidden_states, attention_mask, rotary_pos_emb, kv_cache=None, use_cache=True):
         # hidden_states: [seq_length, b, h]
@@ -274,34 +280,24 @@ class SelfAttention(nn.Layer):
 
         mixed_x_layer = self.query_key_value(hidden_states)
 
-        if self.multi_query_attention:
-            (query_layer, key_layer, value_layer) = mixed_x_layer.split(
-                [
-                    self.num_attention_heads_per_partition * self.hidden_size_per_attention_head,
-                    self.num_multi_query_groups_per_partition * self.hidden_size_per_attention_head,
-                    self.num_multi_query_groups_per_partition * self.hidden_size_per_attention_head,
-                ],
-                axis=-1,
-            )
-            query_layer = query_layer.reshape(
-                query_layer.shape[:-1] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
-            )
-            key_layer = key_layer.reshape(
-                key_layer.shape[:-1] + [self.num_multi_query_groups_per_partition, self.hidden_size_per_attention_head]
-            )
-            value_layer = value_layer.reshape(
-                value_layer.shape[:-1]
-                + [self.num_multi_query_groups_per_partition, self.hidden_size_per_attention_head]
-            )
-        else:
-            new_tensor_shape = mixed_x_layer.shape[:-1] + [
-                self.num_attention_heads_per_partition,
-                3 * self.hidden_size_per_attention_head,
-            ]
-            mixed_x_layer = mixed_x_layer.reshape(new_tensor_shape)
-
-            # [seq_length, b, np, 3 * hn] --> 3 [seq_length, b, np, hn]
-            (query_layer, key_layer, value_layer) = paddle.split(mixed_x_layer, 3, axis=-1)
+        (query_layer, key_layer, value_layer) = mixed_x_layer.split(
+            [
+                self.num_attention_heads_per_partition * self.hidden_size_per_attention_head,
+                self.num_multi_query_groups_per_partition * self.hidden_size_per_attention_head,
+                self.num_multi_query_groups_per_partition * self.hidden_size_per_attention_head,
+            ],
+            axis=-1,
+        )
+        query_layer = query_layer.reshape(
+            query_layer.shape[:-1] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
+        )
+        key_layer = key_layer.reshape(
+            key_layer.shape[:-1] + [self.num_multi_query_groups_per_partition, self.hidden_size_per_attention_head]
+        )
+        value_layer = value_layer.reshape(
+            value_layer.shape[:-1]
+            + [self.num_multi_query_groups_per_partition, self.hidden_size_per_attention_head]
+        )
 
         # apply relative positional encoding (rotary embedding)
         if rotary_pos_emb is not None:
@@ -318,21 +314,20 @@ class SelfAttention(nn.Layer):
         else:
             kv_cache = None
 
-        if self.multi_query_attention:
-            key_layer = key_layer.unsqueeze(-2)
-            key_layer = key_layer.tile(
-                [1, 1, 1, self.num_attention_heads_per_partition // self.num_multi_query_groups_per_partition, 1]
-            )
-            key_layer = key_layer.reshape(
-                key_layer.shape[:2] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
-            )
-            value_layer = value_layer.unsqueeze(-2)
-            value_layer = value_layer.tile(
-                [1, 1, 1, self.num_attention_heads_per_partition // self.num_multi_query_groups_per_partition, 1]
-            )
-            value_layer = value_layer.reshape(
-                value_layer.shape[:2] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
-            )
+        key_layer = key_layer.unsqueeze(-2)
+        key_layer = key_layer.tile(
+            [1, 1, 1, self.num_attention_heads_per_partition // self.num_multi_query_groups_per_partition, 1]
+        )
+        key_layer = key_layer.reshape(
+            key_layer.shape[:2] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
+        )
+        value_layer = value_layer.unsqueeze(-2)
+        value_layer = value_layer.tile(
+            [1, 1, 1, self.num_attention_heads_per_partition // self.num_multi_query_groups_per_partition, 1]
+        )
+        value_layer = value_layer.reshape(
+            value_layer.shape[:2] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
+        )
 
         # ==================================
         # core attention computation
@@ -362,15 +357,22 @@ class MLP(nn.Layer):
 
         self.add_bias = config.add_bias_linear
 
-        # Project to 4h. If using swiglu double the output width, see https://arxiv.org/pdf/2002.05202.pdf
-        self.dense_h_to_4h = nn.Linear(config.hidden_size, config.ffn_hidden_size * 2, bias_attr=self.add_bias)
-
-        # Project back to h.
-        self.dense_4h_to_h = nn.Linear(
-            config.ffn_hidden_size,
-            config.hidden_size,
-            bias_attr=self.add_bias,
-        )
+        if config.tensor_parallel_degree > 1:
+            self.dense_h_to_4h = fleet.meta_parallel.ColumnParallelLinear(
+                config.hidden_size, config.ffn_hidden_size * 2, has_bias=self.add_bias, gather_output=False
+            )
+            self.dense_4h_to_h = fleet.meta_parallel.RowParallelLinear(
+                config.ffn_hidden_size, config.hidden_size, input_is_parallel=self.add_bias, has_bias=True
+            )
+        else:
+            # Project to 4h due to swiglu doubling the output width, see https://arxiv.org/pdf/2002.05202.pdf
+            self.dense_h_to_4h = nn.Linear(config.hidden_size, config.ffn_hidden_size * 2, bias_attr=self.add_bias)
+            # Project back to h.
+            self.dense_4h_to_h = nn.Linear(
+                config.ffn_hidden_size,
+                config.hidden_size,
+                bias_attr=self.add_bias,
+            )
 
     def forward(self, hidden_states):
         # [s, b, 4hp]
@@ -553,6 +555,43 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
         batch_size, seq_length = input_ids.shape
         position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
         return position_ids
+    
+    @classmethod
+    def _get_tensor_parallel_mappings(cls, config, is_split=True):
+
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+
+        fn = split_or_merge_func(
+            is_split=is_split,
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_rank=config.tensor_parallel_rank,
+            num_attention_heads=config.num_attention_heads,
+        )
+
+        def get_tensor_parallel_split_mappings(num_hidden_layers):
+            final_actions = {}
+            base_actions = {
+                # Column Linear
+                "encoder.layers.0.mlp.dense_h_to_4h.weight": partial(fn, is_column=True),
+                "encoder.layers.0.self_attention.query_key_value.bias": partial(fn, is_column=True),
+                "encoder.layers.0.self_attention.query_key_value.weight": partial(fn, is_column=True),
+                "output_layer.weight": partial(fn, is_column=True),
+                # Row Linear
+                "embedding.word_embeddings.weight": partial(fn, is_column=False),
+                "encoder.layers.0.self_attention.dense.weight": partial(fn, is_column=False),
+                "encoder.layers.0.mlp.dense_4h_to_h.weight": partial(fn, is_column=False),
+            }
+            for key, action in base_actions.items():
+                if "layers.0." in key:
+                    for i in range(num_hidden_layers):
+                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
+                final_actions[key] = action
+
+            return final_actions
+
+        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+
+        return mappings
 
 
 class Embedding(nn.Layer):
@@ -562,8 +601,13 @@ class Embedding(nn.Layer):
         super(Embedding, self).__init__()
 
         self.hidden_size = config.hidden_size
-        # Word embeddings (parallel).
-        self.word_embeddings = nn.Embedding(config.padded_vocab_size, self.hidden_size)
+        if config.tensor_parallel_degree > 1:
+            self.word_embeddings = VocabParallelEmbedding(
+                config.vocab_size,
+                config.hidden_size
+            )
+        else:
+            self.word_embeddings = nn.Embedding(config.padded_vocab_size, self.hidden_size)
         self.fp32_residual_connection = config.fp32_residual_connection
 
     def forward(self, input_ids):
@@ -591,7 +635,15 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         )
         self.rotary_pos_emb = RotaryEmbedding(rotary_dim // 2)
         self.encoder = GLMTransformer(config)
-        self.output_layer = nn.Linear(config.hidden_size, config.padded_vocab_size, bias_attr=False)
+        if config.tensor_parallel_degree > 1:
+            self.output_layer = fleet.meta_parallel.ColumnParallelLinear(
+                config.hidden_size,
+                config.padded_vocab_size,
+                has_bias=False,
+                gather_output=not config.tensor_parallel_output
+            )
+        else:
+            self.output_layer = nn.Linear(config.hidden_size, config.padded_vocab_size, bias_attr=False)
 
     def get_input_embeddings(self):
         return self.embedding.word_embeddings
@@ -751,16 +803,20 @@ class ChatGLMv2ForConditionalGeneration(ChatGLMv2PretrainedModel):
 
         loss = None
         if labels is not None:
-            lm_logits = lm_logits.astype("float32")
+            reshaped_logits = lm_logits.reshape([-1, lm_logits.shape[-1]]).astype("float32")
+            reshaped_labels = labels.reshape([-1])
 
-            # Shift so that tokens < n predict n and flatten the logits and labels
-            shift_logits = lm_logits[..., :-1, :]
-            shift_logits = shift_logits.reshape([-1, shift_logits.shape[-1]])
-            shift_labels = labels[..., 1:].reshape([-1])
+            if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
+                loss_fn = ParallelCrossEntropy()
+            else:
+                loss_fn = nn.CrossEntropyLoss(reduction="none")
+            
+            loss_mask = (labels != -100).astype("float32")
+            loss = loss_fn(reshaped_logits, reshaped_labels)
+            loss = paddle.sum(loss.reshape([-1]).cast(paddle.float32) * loss_mask.reshape([-1]).cast(paddle.float32))
+            loss = loss / loss_mask.sum()
 
-            loss = F.cross_entropy(shift_logits, shift_labels, ignore_index=-100)
-
-            lm_logits = lm_logits.astype(hidden_states.dtype)
+            # lm_logits = lm_logits.astype(hidden_states.dtype)
             loss = loss.astype(hidden_states.dtype)
 
         if not return_dict:
