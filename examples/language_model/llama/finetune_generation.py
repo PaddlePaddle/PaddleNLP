@@ -17,7 +17,12 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-from data import convert_example, custom_instruction_convert_example, reader
+from data import (
+    DataCollatorForSupervisedDataset,
+    convert_example,
+    custom_instruction_convert_example,
+    reader,
+)
 from modeling_pp import LlamaForCausalLMPipe
 from utils import (
     LlamaTrainer,
@@ -26,7 +31,6 @@ from utils import (
     save_infer_result,
 )
 
-from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.peft.prefix import llama_postprocess_past_key_value
@@ -42,8 +46,6 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class DataArgument:
-    # task_name: str = field(default="school_math_0.25M", metadata={"help": "The name of task."})
-    # data_name: str = field(default="bellegroup", metadata={"help": "The name of data."})
     task_name: str = field(default="squad", metadata={"help": "The name of task."})
     src_length: int = field(default=608, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=160, metadata={"help": "The max length of target text."})
@@ -81,7 +83,7 @@ class ModelArgument:
     prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
     eval_with_do_generation: bool = field(
-        default=True, metadata={"help": "Evaluate with generation, instead for calc loss."}
+        default=False, metadata={"help": "Evaluate with generation, instead for calc loss."}
     )
     instruction_generation: bool = field(default=False, metadata={"help": "Instruction generation finetuning"})
     benchmark: bool = field(
@@ -217,10 +219,11 @@ def main():
         dev_ds = dev_ds.map(partial(trans_func, is_test=is_test))
 
     model_max_length = 1024 if not training_args.benchmark else 512
-    collate_fn = DataCollatorForSeq2Seq(
+    collate_fn = DataCollatorForSupervisedDataset(
         return_tensors="pd",
         tokenizer=tokenizer,
         max_length=model_max_length if data_args.always_pad_to_max_length else -1,
+        padding="max_length" if data_args.always_pad_to_max_length else True,
         return_attention_mask=True,
     )
 
