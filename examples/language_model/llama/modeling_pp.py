@@ -218,7 +218,8 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
         use_recompute = self.config.use_recompute
         recompute_granularity = self.config.recompute_granularity
-        virtual_pp_degree = self.config.virtual_pp_degree
+        # virtual_pp_degree = self.config.virtual_pp_degree
+        virtual_pp_degree = getattr(self.config, "virtual_pp_degree", 1)
 
         hcg = get_hcg()
         tensor_parallel_degree = max(hcg.get_model_parallel_world_size(), 1)

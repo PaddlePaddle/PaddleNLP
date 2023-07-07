@@ -87,7 +87,7 @@ def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
     latent_width = width // 8 if width is not None else None
     # get arguments
     cross_attention_dim = pipeline.unet.config.cross_attention_dim  # 768 or 1024 or 1280
-    unet_channels = pipeline.unet.config.in_channels  # 4 or 9
+    unet_channels = pipeline.unet.config.in_channels  # 4
     vae_in_channels = pipeline.vae.config.in_channels  # 3
     vae_latent_channels = pipeline.vae.config.latent_channels  # 4
     print(

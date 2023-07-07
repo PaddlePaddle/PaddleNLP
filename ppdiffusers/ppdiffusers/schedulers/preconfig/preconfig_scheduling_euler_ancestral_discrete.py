@@ -147,6 +147,7 @@ class PreconfigEulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         self.timesteps = paddle.to_tensor(timesteps, dtype=paddle.float32)
         self.is_scale_input_called = False
         self.preconfig = preconfig
+        self.step_index_offset = 0
 
     def scale_model_input(
         self, sample: paddle.Tensor, timestep: Union[float, paddle.Tensor], **kwargs
@@ -163,7 +164,7 @@ class PreconfigEulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         """
         self.is_scale_input_called = True
         if kwargs.get("step_index") is not None:
-            step_index = kwargs["step_index"]
+            step_index = kwargs["step_index"] + self.step_index_offset
         else:
             step_index = (self.timesteps == timestep).nonzero().item()
 
@@ -172,6 +173,8 @@ class PreconfigEulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
             sample = sample / ((sigma**2 + 1) ** 0.5)
             return sample
         else:
+            if step_index > (len(self.latent_scales) - 1):
+                step_index = -1
             return sample * self.latent_scales[step_index]
 
     def set_timesteps(self, num_inference_steps: int):
@@ -183,6 +186,7 @@ class PreconfigEulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
                 the number of diffusion steps used when generating samples with a pre-trained model.
         """
         self.num_inference_steps = num_inference_steps
+        self.step_index_offset = 0
 
         timesteps = np.linspace(0, self.config.num_train_timesteps - 1, num_inference_steps, dtype=float)[::-1].copy()
         sigmas = np.array(((1 - self.alphas_cumprod) / self.alphas_cumprod) ** 0.5)
@@ -239,7 +243,7 @@ class PreconfigEulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         else:
             return_pred_original_sample = True
         if kwargs.get("step_index") is not None:
-            step_index = kwargs["step_index"]
+            step_index = kwargs["step_index"] + self.step_index_offset
         else:
             step_index = (self.timesteps == timestep).nonzero().item()
         sigma = self.sigmas[step_index]

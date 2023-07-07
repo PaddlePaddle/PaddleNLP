@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import inspect
-from typing import Callable, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 import paddle
 import PIL.Image
@@ -64,7 +64,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         feature_extractor ([`CLIPFeatureExtractor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
-    _optional_components = ["safety_checker", "feature_extractor"]
+    _optional_components = ["vae_encoder", "safety_checker", "feature_extractor"]
 
     def __call__(self, *args, **kwargs):
         return self.text2img(*args, **kwargs)
@@ -81,12 +81,15 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         eta: Optional[float] = 0.0,
         generator: Optional[paddle.Generator] = None,
         latents: Optional[paddle.Tensor] = None,
+        parse_prompt_type: Optional[str] = "lpw",
+        max_embeddings_multiples: Optional[int] = 3,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
         controlnet_cond: Union[paddle.Tensor, PIL.Image.Image] = None,
         controlnet_conditioning_scale: float = 1.0,
+        infer_op_dict: Dict[str, str] = None,
     ):
 
         expected_components = inspect.signature(FastDeployStableDiffusionPipeline.__init__).parameters.keys()
@@ -106,12 +109,15 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             eta=eta,
             generator=generator,
             latents=latents,
+            parse_prompt_type=parse_prompt_type,
+            max_embeddings_multiples=max_embeddings_multiples,
             output_type=output_type,
             return_dict=return_dict,
             callback=callback,
             callback_steps=callback_steps,
             controlnet_cond=controlnet_cond,
             controlnet_conditioning_scale=controlnet_conditioning_scale,
+            infer_op_dict=infer_op_dict,
         )
         return output
 
@@ -129,12 +135,15 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         eta: Optional[float] = 0.0,
         generator: Optional[paddle.Generator] = None,
         latents: Optional[paddle.Tensor] = None,
+        parse_prompt_type: Optional[str] = "lpw",
+        max_embeddings_multiples: Optional[int] = 3,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
         controlnet_cond: Union[paddle.Tensor, PIL.Image.Image] = None,
         controlnet_conditioning_scale: float = 1.0,
+        infer_op_dict: Dict[str, str] = None,
     ):
         expected_components = inspect.signature(FastDeployStableDiffusionImg2ImgPipeline.__init__).parameters.keys()
         components = {name: component for name, component in self.components.items() if name in expected_components}
@@ -155,12 +164,15 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             eta=eta,
             generator=generator,
             latents=latents,
+            parse_prompt_type=parse_prompt_type,
+            max_embeddings_multiples=max_embeddings_multiples,
             output_type=output_type,
             return_dict=return_dict,
             callback=callback,
             callback_steps=callback_steps,
             controlnet_cond=controlnet_cond,
             controlnet_conditioning_scale=controlnet_conditioning_scale,
+            infer_op_dict=infer_op_dict,
         )
 
         return output
@@ -180,12 +192,15 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         eta: Optional[float] = 0.0,
         generator: Optional[paddle.Generator] = None,
         latents: Optional[paddle.Tensor] = None,
+        parse_prompt_type: Optional[str] = "lpw",
+        max_embeddings_multiples: Optional[int] = 3,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
         controlnet_cond: Union[paddle.Tensor, PIL.Image.Image] = None,
         controlnet_conditioning_scale: float = 1.0,
+        infer_op_dict: Dict[str, str] = None,
     ):
         assert (
             self.unet_num_latent_channels == 4
@@ -212,12 +227,15 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             eta=eta,
             generator=generator,
             latents=latents,
+            parse_prompt_type=parse_prompt_type,
+            max_embeddings_multiples=max_embeddings_multiples,
             output_type=output_type,
             return_dict=return_dict,
             callback=callback,
             callback_steps=callback_steps,
             controlnet_cond=controlnet_cond,
             controlnet_conditioning_scale=controlnet_conditioning_scale,
+            infer_op_dict=infer_op_dict,
         )
 
         return output
@@ -237,12 +255,15 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         eta: Optional[float] = 0.0,
         generator: Optional[paddle.Generator] = None,
         latents: Optional[paddle.Tensor] = None,
+        parse_prompt_type: Optional[str] = "lpw",
+        max_embeddings_multiples: Optional[int] = 3,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
         controlnet_cond: Union[paddle.Tensor, PIL.Image.Image] = None,
         controlnet_conditioning_scale: float = 1.0,
+        infer_op_dict: Dict[str, str] = None,
     ):
         assert self.unet_num_latent_channels in [4, 9]
         expected_components = inspect.signature(FastDeployStableDiffusionInpaintPipeline.__init__).parameters.keys()
@@ -265,12 +286,15 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             eta=eta,
             generator=generator,
             latents=latents,
+            parse_prompt_type=parse_prompt_type,
+            max_embeddings_multiples=max_embeddings_multiples,
             output_type=output_type,
             return_dict=return_dict,
             callback=callback,
             callback_steps=callback_steps,
             controlnet_cond=controlnet_cond,
             controlnet_conditioning_scale=controlnet_conditioning_scale,
+            infer_op_dict=infer_op_dict,
         )
 
         return output
@@ -290,6 +314,8 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         num_images_per_prompt: Optional[int] = 1,
         eta: Optional[float] = 0.1,
         latents: Optional[paddle.Tensor] = None,
+        parse_prompt_type: Optional[str] = "lpw",
+        max_embeddings_multiples: Optional[int] = 3,
         generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         prompt_embeds: Optional[paddle.Tensor] = None,
         negative_prompt_embeds: Optional[paddle.Tensor] = None,
@@ -297,6 +323,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
         callback_steps: Optional[int] = 1,
+        infer_op_dict: Dict[str, str] = None,
     ):
         expected_components = inspect.signature(FastDeployCycleDiffusionPipeline.__init__).parameters.keys()
         components = {name: component for name, component in self.components.items() if name in expected_components}
@@ -321,10 +348,13 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
             latents=latents,
+            parse_prompt_type=parse_prompt_type,
+            max_embeddings_multiples=max_embeddings_multiples,
             output_type=output_type,
             return_dict=return_dict,
             callback=callback,
             callback_steps=callback_steps,
+            infer_op_dict=infer_op_dict,
         )
 
         return output

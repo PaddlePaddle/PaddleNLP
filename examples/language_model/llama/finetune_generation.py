@@ -46,8 +46,6 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class DataArgument:
-    # task_name: str = field(default="school_math_0.25M", metadata={"help": "The name of task."})
-    # data_name: str = field(default="bellegroup", metadata={"help": "The name of data."})
     task_name: str = field(default="squad", metadata={"help": "The name of task."})
     src_length: int = field(default=608, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=160, metadata={"help": "The max length of target text."})
@@ -85,7 +83,7 @@ class ModelArgument:
     prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
     eval_with_do_generation: bool = field(
-        default=True, metadata={"help": "Evaluate with generation, instead for calc loss."}
+        default=False, metadata={"help": "Evaluate with generation, instead for calc loss."}
     )
     instruction_generation: bool = field(default=False, metadata={"help": "Instruction generation finetuning"})
     benchmark: bool = field(
@@ -222,7 +220,11 @@ def main():
 
     model_max_length = 1024 if not training_args.benchmark else 512
     collate_fn = DataCollatorForSupervisedDataset(
-        tokenizer, max_length=model_max_length if data_args.always_pad_to_max_length else -1
+        return_tensors="pd",
+        tokenizer=tokenizer,
+        max_length=model_max_length if data_args.always_pad_to_max_length else -1,
+        padding="max_length" if data_args.always_pad_to_max_length else True,
+        return_attention_mask=True,
     )
 
     def compute_metrics_trainer(eval_preds, tokenizer):
