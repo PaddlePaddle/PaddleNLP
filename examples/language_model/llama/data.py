@@ -87,7 +87,7 @@ def convert_example(example, tokenizer, data_args, is_test=False):
     )
 
     input_ids = example_tokenized["input_ids"][0]
-    labels = copy.deepcopy(input_ids)
+    labels = paddle.concat([input_ids[1:], paddle.to_tensor([tokenizer.eos_token_id])])
     labels[:source_input_ids_len] = IGNORE_INDEX
 
     if is_test:
@@ -155,7 +155,7 @@ def custom_instruction_convert_example(
     )
 
     input_ids = example_tokenized["input_ids"][0]
-    labels = copy.deepcopy(input_ids)
+    labels = paddle.concat([input_ids[1:], paddle.to_tensor([tokenizer.eos_token_id])])
     labels[:source_input_ids_len] = IGNORE_INDEX
 
     if is_test:

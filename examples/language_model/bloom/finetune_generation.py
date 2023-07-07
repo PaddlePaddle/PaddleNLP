@@ -118,7 +118,11 @@ def convert_example(
     )
 
     input_ids = source_tokenized["input_ids"] + [tokenizer.eos_token_id] + target_tokenized["input_ids"]
-    labels = (len(input_ids) - target_input_ids_len) * [tokenizer.pad_token_id] + target_tokenized["input_ids"]
+    labels = (
+        (len(input_ids) - target_input_ids_len) * [tokenizer.pad_token_id]
+        + target_tokenized["input_ids"][1:]
+        + [tokenizer.eos_token_id]
+    )
     return dict(
         input_ids=input_ids,
         labels=labels,
@@ -172,7 +176,11 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Tr
             + [tokenizer.bos_token_id]
             + target_tokenized["input_ids"]
         )
-        labels = (len(input_ids) - target_input_ids_len) * [tokenizer.pad_token_id] + target_tokenized["input_ids"]
+        labels = (
+            (len(input_ids) - target_input_ids_len) * [tokenizer.pad_token_id]
+            + target_tokenized["input_ids"][1:]
+            + [tokenizer.eos_token_id]
+        )
 
         inputs = {
             "input_ids": input_ids,
