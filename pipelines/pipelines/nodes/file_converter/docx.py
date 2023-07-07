@@ -178,3 +178,48 @@ class DocxToTextConverter(BaseConverter):
             image: Image = related_part.image
             result_list.append(image)
         return result_list
+
+
+class DocxTotxtConvertersplitter(BaseConverter):
+    def __init__(self, chunk_size=4000, filters: list = []):
+        self.chunk_size = chunk_size
+        self._filter = filters
+
+    def clean(self, documents: List[dict]):
+        for special_character in self._filter:
+            for doc in documents:
+                doc["content"] = doc["content"].replace(special_character, "")
+        return documents
+
+    def convert(
+        self,
+        file_path: Path,
+    ) -> List[str]:
+        """
+        Extract text from a .docx file.
+        """
+        # Creating word reader object.
+        file = docx.Document(file_path)
+        txt_documents = ""
+        # This part will parse the docs files with images, the text and the following images will be added as an document
+        for i in range(len(file.paragraphs)):
+            paragraph = file.paragraphs[i]
+            if paragraph.text != "":
+                if paragraph.text[-1] != "\n":
+                    txt_documents += paragraph.text + "\n"
+                else:
+                    txt_documents += paragraph.text
+        from pipelines.nodes.preprocessor.text_splitter import SpacyTextSplitter
+
+        text_splits = SpacyTextSplitter(chunk_size=300)
+        texts = text_splits.split_text(txt_documents)
+        ret = []
+        for i, txt in enumerate(texts):
+            doc = {}
+            doc["content"] = txt
+            doc["content_type"] = "text"
+            doc["meta"] = {}
+            ret.append(doc)
+        if self._filter is not None and len(self._filter) > 0:
+            ret = self.clean(ret)
+        return ret
