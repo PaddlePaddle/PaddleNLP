@@ -198,7 +198,9 @@ def main():
     )
     tokenizer.pad_token = tokenizer.unk_token
 
-    trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
+    trans_func = partial(
+        custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args, benchmark=training_args.benchmark
+    )
     # Load the dataset.
     if training_args.benchmark:
         train_ds = load_dataset(reader, data_path="./data/train.txt", lazy=False)
