@@ -76,7 +76,6 @@ class ChatGLMv2Tester:
             kv_channels=self.kv_channels,
             use_cache=self.use_cache,
             rmsnorm=self.rmsnorm,
-
         )
 
     def create_and_check_model(self, config, input_ids, labels):

@@ -17,8 +17,10 @@ from functools import partial
 from typing import Any, Dict, Optional, Tuple
 
 import paddle
+import paddle.distributed.fleet as fleet
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.distributed.fleet import HybridCommunicateGroup
 from paddle.distributed.fleet.meta_parallel import (
     ColumnParallelLinear,
     ParallelCrossEntropy,
@@ -26,8 +28,6 @@ from paddle.distributed.fleet.meta_parallel import (
     VocabParallelEmbedding,
     get_rng_state_tracker,
 )
-from paddle.distributed.fleet import HybridCommunicateGroup
-import paddle.distributed.fleet as fleet
 
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -239,55 +239,44 @@ class SelfAttention(nn.Layer):
         self.num_attention_heads_per_partition = config.num_attention_heads
 
         self.multi_query_attention = config.multi_query_attention
-        self.qkv_hidden_size = 3 * self.projection_size
         self.core_attention = CoreAttention(config, self.layer_number)
         self.num_multi_query_groups_per_partition = config.multi_query_group_num
-        self.qkv_hidden_size = (
-            self.projection_size + 2 * self.hidden_size_per_attention_head * config.multi_query_group_num
-        )
 
-            
         if config.tensor_parallel_degree > 1:
-            self.query_key_value = fleet.meta_parallel.ColumnParallelLinear(
+            self.query = fleet.meta_parallel.ColumnParallelLinear(
                 config.hidden_size,
-                self.qkv_hidden_size,
+                config.hidden_size,
                 has_bias=config.add_bias_linear or config.add_qkv_bias,
-                gather_output=False
+                gather_output=False,
             )
             self.dense = fleet.meta_parallel.RowParallelLinear(
                 config.hidden_size, config.hidden_size, input_is_parallel=True, has_bias=True
             )
             self.num_attention_heads = config.num_attention_heads // config.tensor_parallel_degree
         else:
-            self.query_key_value = nn.Linear(
+            self.query = nn.Linear(
                 config.hidden_size,
-                self.qkv_hidden_size,
+                config.hidden_size,
                 bias_attr=config.add_bias_linear or config.add_qkv_bias,
             )
             self.dense = nn.Linear(self.projection_size, config.hidden_size, bias_attr=config.add_bias_linear)
+        self.key = nn.Linear(self.projection_size, self.hidden_size_per_attention_head * config.multi_query_group_num, bias_attr=config.add_qkv_bias)
+        self.value = nn.Linear(self.projection_size, self.hidden_size_per_attention_head * config.multi_query_group_num, bias_attr=config.add_qkv_bias)
 
     def forward(self, hidden_states, attention_mask, rotary_pos_emb, kv_cache=None, use_cache=True):
         # hidden_states: [seq_length, b, h]
+        query_layer = self.query(hidden_states)
+        key_layer = self.key(hidden_states)
+        value_layer = self.value(hidden_states)
 
-        # =================================================
-        # Pre-allocate memory for key-values for inference.
-        # =================================================
-        # =====================
-        # Query, Key, and Value
-        # =====================
-
-        # Attention heads [seq_length, b, h] --> [seq_length, b, (np * 3 * hn)]
-
-        mixed_x_layer = self.query_key_value(hidden_states)
-
-        (query_layer, key_layer, value_layer) = mixed_x_layer.split(
-            [
-                self.num_attention_heads_per_partition * self.hidden_size_per_attention_head,
-                self.num_multi_query_groups_per_partition * self.hidden_size_per_attention_head,
-                self.num_multi_query_groups_per_partition * self.hidden_size_per_attention_head,
-            ],
-            axis=-1,
-        )
+        # (query_layer, key_layer, value_layer) = mixed_x_layer.split(
+        #     [
+        #         self.num_attention_heads_per_partition * self.hidden_size_per_attention_head,
+        #         self.num_multi_query_groups_per_partition * self.hidden_size_per_attention_head,
+        #         self.num_multi_query_groups_per_partition * self.hidden_size_per_attention_head,
+        #     ],
+        #     axis=-1,
+        # )
         query_layer = query_layer.reshape(
             query_layer.shape[:-1] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
         )
@@ -295,8 +284,7 @@ class SelfAttention(nn.Layer):
             key_layer.shape[:-1] + [self.num_multi_query_groups_per_partition, self.hidden_size_per_attention_head]
         )
         value_layer = value_layer.reshape(
-            value_layer.shape[:-1]
-            + [self.num_multi_query_groups_per_partition, self.hidden_size_per_attention_head]
+            value_layer.shape[:-1] + [self.num_multi_query_groups_per_partition, self.hidden_size_per_attention_head]
         )
 
         # apply relative positional encoding (rotary embedding)
@@ -555,7 +543,7 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
         batch_size, seq_length = input_ids.shape
         position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
         return position_ids
-    
+
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):
 
@@ -602,10 +590,7 @@ class Embedding(nn.Layer):
 
         self.hidden_size = config.hidden_size
         if config.tensor_parallel_degree > 1:
-            self.word_embeddings = VocabParallelEmbedding(
-                config.vocab_size,
-                config.hidden_size
-            )
+            self.word_embeddings = VocabParallelEmbedding(config.vocab_size, config.hidden_size)
         else:
             self.word_embeddings = nn.Embedding(config.padded_vocab_size, self.hidden_size)
         self.fp32_residual_connection = config.fp32_residual_connection
@@ -640,7 +625,7 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
                 config.hidden_size,
                 config.padded_vocab_size,
                 has_bias=False,
-                gather_output=not config.tensor_parallel_output
+                gather_output=not config.tensor_parallel_output,
             )
         else:
             self.output_layer = nn.Linear(config.hidden_size, config.padded_vocab_size, bias_attr=False)
@@ -810,7 +795,7 @@ class ChatGLMv2ForConditionalGeneration(ChatGLMv2PretrainedModel):
                 loss_fn = ParallelCrossEntropy()
             else:
                 loss_fn = nn.CrossEntropyLoss(reduction="none")
-            
+
             loss_mask = (labels != -100).astype("float32")
             loss = loss_fn(reshaped_logits, reshaped_labels)
             loss = paddle.sum(loss.reshape([-1]).cast(paddle.float32) * loss_mask.reshape([-1]).cast(paddle.float32))
