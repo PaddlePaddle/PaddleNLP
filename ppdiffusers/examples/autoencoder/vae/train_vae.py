@@ -230,7 +230,7 @@ def parse_args():
         help="Whether to enable_xformers_memory_efficient_attention.",
     )
     parser.add_argument("--recompute", action="store_true", help="Whether to recompute.")
-    parser.add_argument("--ema_decay", type=float, default=0.999, help="The value of ema_decay.")
+    parser.add_argument("--ema_decay", type=float, default=0.9999, help="The value of ema_decay.")
     args = parser.parse_args()
 
     args.logging_dir = os.path.join(args.output_dir, args.logging_dir)
