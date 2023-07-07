@@ -16,10 +16,11 @@
 import unittest
 
 import paddle
-from ppdiffusers_test.test_modeling_common import ModelTesterMixin
 
 from ppdiffusers import VQModel
 from ppdiffusers.utils import floats_tensor
+
+from .test_modeling_common import ModelTesterMixin
 
 
 class VQModelTests(ModelTesterMixin, unittest.TestCase):

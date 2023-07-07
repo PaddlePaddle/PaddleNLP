@@ -117,7 +117,6 @@ def main():
             r=4,
             lora_alpha=8,
             merge_weights=True,
-            enable_lora_list=[[True, False, True]],
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,
         )

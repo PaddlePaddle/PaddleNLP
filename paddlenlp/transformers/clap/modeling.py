@@ -49,6 +49,16 @@ CLAP_PRETRAINED_MODEL_ARCHIVE_LIST = [
 ]
 
 
+__all__ = [
+    "ClapTextModelWithProjection",
+    "ClapAudioModelWithProjection",
+    "ClapModel",
+    "ClapAudioConfig",
+    "ClapAudioModel",
+    "ClapTextModel",
+]
+
+
 def Parameter(tensor):
     return paddle.create_parameter(tensor.shape, dtype=tensor.dtype, default_initializer=nn.initializer.Assign(tensor))
 
@@ -130,8 +140,7 @@ def create_position_ids_from_input_ids(input_ids, padding_idx, past_key_values_l
     Returns: paddle.Tensor
     """
     # The series of casts and type-conversions here are carefully balanced to both work with ONNX export and XLA.
-    mask = input_ids.not_equal(paddle.to_tensor(padding_idx, dtype="int32")).cast("int32")
-
+    mask = input_ids.cast("int32").not_equal(paddle.to_tensor([padding_idx], dtype="int32")).cast("int32")
     incremental_indices = (paddle.cumsum(mask, axis=1).cast(mask.dtype) + past_key_values_length) * mask
     return incremental_indices.cast("int64") + padding_idx
 
@@ -1104,7 +1113,6 @@ class ClapTextEmbeddings(nn.Layer):
             input_shape = inputs_embeds.shape[:-1]
 
         seq_length = input_shape[1]
-
         # Setting the token_type_ids to the registered buffer in constructor where it is all zeros, which usually occurs
         # when its auto-generated, registered buffer helps users when tracing the model without passing token_type_ids, solves
         # issue #5664
@@ -1118,7 +1126,8 @@ class ClapTextEmbeddings(nn.Layer):
 
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
-        token_type_embeddings = self.token_type_embeddings(token_type_ids)
+
+        token_type_embeddings = self.token_type_embeddings(token_type_ids.cast("int64"))
 
         embeddings = inputs_embeds + token_type_embeddings
         if self.position_embedding_type == "absolute":
@@ -1878,7 +1887,6 @@ class ClapTextModel(ClapPreTrainedModel):
         # input head_mask has shape [num_heads] or [num_hidden_layers x num_heads]
         # and head_mask is converted to shape [num_hidden_layers x batch x num_heads x seq_length x seq_length]
         head_mask = self.get_head_mask(head_mask, self.config.num_hidden_layers)
-
         embedding_output = self.embeddings(
             input_ids=input_ids,
             position_ids=position_ids,

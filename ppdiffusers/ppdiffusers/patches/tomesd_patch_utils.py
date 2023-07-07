@@ -244,9 +244,10 @@ def make_tome_block(block_class: Type[nn.Layer]) -> Type[nn.Layer]:
         def forward(
             self: BasicTransformerBlock,
             hidden_states,
-            encoder_hidden_states=None,
-            timestep=None,
             attention_mask=None,
+            encoder_hidden_states=None,
+            encoder_attention_mask=None,
+            timestep=None,
             cross_attention_kwargs=None,
             class_labels=None,
         ) -> paddle.Tensor:
@@ -290,7 +291,7 @@ def make_tome_block(block_class: Type[nn.Layer]) -> Type[nn.Layer]:
                 attn_output = self.attn2(
                     norm_hidden_states,
                     encoder_hidden_states=encoder_hidden_states,
-                    attention_mask=attention_mask,
+                    attention_mask=encoder_attention_mask,
                     **cross_attention_kwargs,
                 )
                 # (5) ToMe u_c

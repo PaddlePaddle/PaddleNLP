@@ -33,9 +33,12 @@ import requests
 
 from .import_utils import (
     BACKENDS_MAPPING,
+    is_compel_available,
     is_fastdeploy_available,
+    is_note_seq_available,
     is_opencv_available,
     is_paddle_available,
+    is_paddle_version,
     is_torch_available,
 )
 from .logging import get_logger
@@ -174,11 +177,25 @@ def nightly(test_case):
     return unittest.skipUnless(_run_nightly_tests, "test is nightly")(test_case)
 
 
+def require_paddle_2_5(test_case):
+    """
+    Decorator marking a test that requires Paddle 2.5. These tests are skipped when it isn't installed.
+    """
+    return unittest.skipUnless(is_paddle_available() and is_paddle_version(">=", "2.5.0"), "test requires Paddle 2.5")(
+        test_case
+    )
+
+
 def require_paddle(test_case):
     """
     Decorator marking a test that requires Paddle. These tests are skipped when Paddle isn't installed.
     """
     return unittest.skipUnless(is_paddle_available(), "test requires Paddle")(test_case)
+
+
+def require_torch(test_case):
+    """Decorator marking a test that requires TORCH."""
+    return unittest.skipUnless(is_torch_available(), "test requires TORCH")(test_case)
 
 
 def require_paddle_gpu(test_case):
@@ -188,11 +205,26 @@ def require_paddle_gpu(test_case):
     )
 
 
+def require_compel(test_case):
+    """
+    Decorator marking a test that requires compel: https://github.com/damian0815/compel. These tests are skipped when
+    the library is not installed.
+    """
+    return unittest.skipUnless(is_compel_available(), "test requires compel")(test_case)
+
+
 def require_fastdeploy(test_case):
     """
     Decorator marking a test that requires fastdeploy. These tests are skipped when fastdeploy isn't installed.
     """
     return unittest.skipUnless(is_fastdeploy_available(), "test requires fastdeploy")(test_case)
+
+
+def require_note_seq(test_case):
+    """
+    Decorator marking a test that requires note_seq. These tests are skipped when note_seq isn't installed.
+    """
+    return unittest.skipUnless(is_note_seq_available(), "test requires note_seq")(test_case)
 
 
 def load_numpy(arry: Union[str, np.ndarray], local_path: Optional[str] = None) -> np.ndarray:
@@ -268,6 +300,16 @@ def load_image(image: Union[str, PIL.Image.Image]) -> PIL.Image.Image:
     image = PIL.ImageOps.exif_transpose(image)
     image = image.convert("RGB")
     return image
+
+
+def preprocess_image(image: PIL.Image, batch_size: int):
+    w, h = image.size
+    w, h = (x - x % 8 for x in (w, h))  # resize to integer multiple of 8
+    image = image.resize((w, h), resample=PIL.Image.LANCZOS)
+    image = np.array(image).astype(np.float32) / 255.0
+    image = np.vstack([image[None].transpose(0, 3, 1, 2)] * batch_size)
+    image = paddle.to_tensor(image)
+    return 2.0 * image - 1.0
 
 
 def export_to_video(video_frames: List[np.ndarray], output_video_path: str = None) -> str:

@@ -42,7 +42,6 @@ from utils import (
 from visualdl import LogWriter
 
 from paddlenlp.trainer import get_last_checkpoint
-from paddlenlp.trainer.trainer import paddlenlp_load
 from paddlenlp.trainer.training_args import default_logdir
 from paddlenlp.transformers import (
     CosineAnnealingWithWarmupDecay,
@@ -51,7 +50,7 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     PretrainedModel,
 )
-from paddlenlp.transformers.model_utils import _add_variant
+from paddlenlp.transformers.model_utils import _add_variant, paddlenlp_load
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
@@ -319,7 +318,7 @@ def do_train(args):
         optimizer.set_state_dict(
             paddlenlp_load(
                 os.path.join(last_checkpoint, OPTIMIZER_NAME),
-                return_numpy=True,
+                map_location="cpu",
             )
         )
         global_step = int(str(last_checkpoint).split("-")[-1])

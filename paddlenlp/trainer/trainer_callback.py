@@ -251,6 +251,15 @@ class TrainerCallback:
         """
         pass
 
+    def on_load_data_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        pass
+
+    def on_optimizer_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        pass
+
+    def on_optimizer_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        pass
+
     def on_substep_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
         """
         Event called at the end of an substep during gradient accumulation.
@@ -369,6 +378,15 @@ class CallbackHandler(TrainerCallback):
         control.should_evaluate = False
         control.should_save = False
         return self.call_event("on_step_begin", args, state, control)
+
+    def on_load_data_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, inputs: Dict):
+        return self.call_event("on_load_data_end", args, state, control, inputs=inputs)
+
+    def on_optimizer_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, scaler):
+        return self.call_event("on_optimizer_begin", args, state, control, scaler=scaler)
+
+    def on_optimizer_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, scaler):
+        return self.call_event("on_optimizer_end", args, state, control, scaler=scaler)
 
     def on_substep_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl):
         return self.call_event("on_substep_end", args, state, control)

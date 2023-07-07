@@ -20,7 +20,7 @@ import paddle
 import PIL.Image
 
 from paddlenlp.transformers import (
-    CLIPFeatureExtractor,
+    CLIPImageProcessor,
     CLIPTextModelWithProjection,
     CLIPTokenizer,
     CLIPVisionModelWithProjection,
@@ -70,12 +70,12 @@ class VersatileDiffusionPipeline(DiffusionPipeline):
         scheduler ([`SchedulerMixin`]):
             A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
             [`DDIMScheduler`], [`LMSDiscreteScheduler`], or [`PNDMScheduler`].
-        image_feature_extractor ([`CLIPFeatureExtractor`]):
+        image_feature_extractor ([`CLIPImageProcessor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
 
     tokenizer: CLIPTokenizer
-    image_feature_extractor: CLIPFeatureExtractor
+    image_feature_extractor: CLIPImageProcessor
     text_encoder: CLIPTextModelWithProjection
     image_encoder: CLIPVisionModelWithProjection
     image_unet: UNet2DConditionModel
@@ -86,7 +86,7 @@ class VersatileDiffusionPipeline(DiffusionPipeline):
     def __init__(
         self,
         tokenizer: CLIPTokenizer,
-        image_feature_extractor: CLIPFeatureExtractor,
+        image_feature_extractor: CLIPImageProcessor,
         text_encoder: CLIPTextModelWithProjection,
         image_encoder: CLIPVisionModelWithProjection,
         image_unet: UNet2DConditionModel,

@@ -49,7 +49,7 @@ from paddlenlp.transformers.model_utils import PretrainedModel, register_base_mo
 from .configuration import LlamaConfig
 
 LLAMA_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "facebook/tiny-random-llama",
+    "__internal_testing__/tiny-random-llama",
     "facebook/llama-7b",
     "facebook/llama-13b",
 ]
@@ -874,6 +874,8 @@ class LlamaLMHead(nn.Layer):
 
 
 class LlamaForCausalLM(LlamaPretrainedModel):
+    enable_to_static_method = True
+
     def __init__(self, config):
         super().__init__(config)
         self.config = config
@@ -931,11 +933,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
 
         if isinstance(outputs, CausalLMOutputWithCrossAttentions) and "past_key_values" in outputs:
             model_kwargs["past_key_values"] = outputs.past_key_values
-
-        # update token_type_ids with last value
-        if "token_type_ids" in model_kwargs and model_kwargs["token_type_ids"] is not None:
-            token_type_ids = model_kwargs["token_type_ids"]
-            model_kwargs["token_type_ids"] = paddle.concat([token_type_ids, token_type_ids[:, -1:]], axis=-1)
 
         if not is_encoder_decoder and "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]
