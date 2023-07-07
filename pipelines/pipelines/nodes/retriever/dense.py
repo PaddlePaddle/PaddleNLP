@@ -62,6 +62,8 @@ class DensePassageRetriever(BaseRetriever):
         similarity_function: str = "dot_product",
         progress_bar: bool = True,
         mode: Literal["snippets", "raw_documents", "preprocessed_documents"] = "preprocessed_documents",
+        pooling_mode="cls_token",
+        **kwargs
     ):
         """
         Init the Retriever incl. the two encoder models from a local or remote model checkpoint.
@@ -119,6 +121,7 @@ class DensePassageRetriever(BaseRetriever):
             output_emb_size=output_emb_size,
             similarity_function=similarity_function,
             progress_bar=progress_bar,
+            pooling_mode=pooling_mode,
         )
 
         self.devices, _ = initialize_device_settings(use_cuda=use_gpu, multi_gpu=True)
@@ -163,6 +166,8 @@ class DensePassageRetriever(BaseRetriever):
                 reinitialize=reinitialize,
                 share_parameters=share_parameters,
                 device_id=0 if use_gpu else -1,
+                pooling_mode=pooling_mode,
+                **kwargs,
             )
             self.passage_encoder = Taskflow(
                 "feature_extraction",
@@ -175,6 +180,8 @@ class DensePassageRetriever(BaseRetriever):
                 reinitialize=reinitialize,
                 share_parameters=share_parameters,
                 device_id=0 if use_gpu else -1,
+                pooling_mode=pooling_mode,
+                **kwargs,
             )
 
     def retrieve(
