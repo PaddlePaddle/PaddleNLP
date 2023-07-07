@@ -10,11 +10,11 @@
 
 - 数据: 10k条[Chinese-Vicuna/guanaco_belle_merge_v1.0](https://huggingface.co/datasets/Chinese-Vicuna/guanaco_belle_merge_v1.0)
 
-| Model         | Method   | Num GPUs | Batch Size | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
+| Model         | Method   | Num GPUs | Batch Size | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | **Speedup** |
 |---------------|----------|----------|------------|--------------|---------------------------|-------------|--------------------------|---------|
-| Bloomz-7b1-mt | LoRA     | 1        | 4          |              | 2293.46                   |             | 1980.32                 | +16%    |
-| Bloomz-7b1-mt | Finetune | 4        | 8          | MP 4         | 2873.13                   | ZeRO 3      | 1702.00                  | +69%    |
-| Bloomz-7b1-mt | Finetune | 4        | 16         | MP 4         | 2853.83                   | ZeRO 3      | 2849.90                  | +0%     |
+| Bloomz-7b1-mt | LoRA     | 1        | 4          |              | 2293.46                   |             | 1980.32                  | **16%**    |
+| Bloomz-7b1-mt | Finetune | 4        | 8          | MP 4         | 2873.13                   | ZeRO 3      | 1702.00                  | **69%**    |
+| Bloomz-7b1-mt | Finetune | 4        | 16         | MP 4         | 2853.83                   | ZeRO 3      | 2849.90                  | **0%**     |
 
 
 ### Llama
@@ -23,11 +23,11 @@
 
 | Model     | Method   | Num GPUs | Batch Size  | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
 |-----------|----------|----------|-------------|--------------|---------------------------|-------------|--------------------------|---------|
-| Llama-7b  | LoRA     | 1        | 4           |              |  1986.63                  |             | 1895.90                  |  +5%  |
-| Llama-13b | LoRA     | 1        | 8           | recompute    |  838.78                   | gradient ckpt |    768.26              |  +9%  |
-| Llama-7b  | Finetune | 4        | 8           | MP4          |  2213.46                  | ZeRO 2      | 1621.52                  |  +36%  |
-| Llama-7b  | Finetune | 4        | 16          | sharding 2   |  2804.19                  | ZeRO 2      | 2465.55                  |  +14%  |
-| Llama-13b | Finetune | 4        | 8           | MP4 recompute|  1651.50                  | ZeRO 3      | 736.19                   | +124%  |
+| Llama-7b  | LoRA     | 1        | 4           |              |  1986.63                  |             | 1895.90                  |  **5%**  |
+| Llama-13b | LoRA     | 1        | 8           | recompute    |  838.78                   | gradient ckpt |    768.26              |  **9%**  |
+| Llama-7b  | Finetune | 4        | 8           | MP4          |  2213.46                  | ZeRO 2      | 1621.52                  |  **36%**  |
+| Llama-7b  | Finetune | 4        | 16          | sharding 2   |  2804.19                  | ZeRO 2      | 2465.55                  |  **14%**  |
+| Llama-13b | Finetune | 4        | 8           | MP4 recompute|  1651.50                  | ZeRO 3      | 736.19                   |  **124%**  |
 
 
 ###### 多卡分布式实验记录
@@ -51,9 +51,9 @@
 
 | Model         | Method   | Num GPUs | Batch Size | Paddle Setup | Paddle Effective Tokens/s | Torch Setup | Torch Effective Tokens/s | Speedup |
 |---------------|----------|----------|------------|--------------|---------------------------|-------------|--------------------------|---------|
-| chatglm-6b    | LoRA     | 1        | 4          |              |        2654.73            |             |       1866.48            | +42%    |
-| chatglm-6b    | Finetune | 4        | 8          |   MP 4       |        3109.83            |   ZeRO 3    |       1840.99            | +69%    |
-| chatglm-6b    | Finetune | 4        | 16         |   MP 4       |        3569.95            |   ZeRO 3    |       3191.35            | +12%    |
+| chatglm-6b    | LoRA     | 1        | 4          |              |        2654.73            |             |       1866.48            | **42%**    |
+| chatglm-6b    | Finetune | 4        | 8          |   MP 4       |        3109.83            |   ZeRO 2    |       2124.17            | **46%**    |
+| chatglm-6b    | Finetune | 4        | 16         |   MP 4       |        3569.95            |   ZeRO 3    |       3191.35            | **12%**    |
 
 
 ###### 多卡分布式实验记录
@@ -71,6 +71,5 @@
 
 ### TODOs
 
-- Add ChatGLM
 - Add Llama-30b and Llama-65b
 - Enable Flash Attention
