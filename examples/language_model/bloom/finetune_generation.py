@@ -118,11 +118,11 @@ def convert_example(
     )
 
     input_ids = source_tokenized["input_ids"] + [tokenizer.eos_token_id] + target_tokenized["input_ids"]
-    labels = (
-        (len(input_ids) - target_input_ids_len) * [tokenizer.pad_token_id]
-        + target_tokenized["input_ids"][1:]
-        + [tokenizer.eos_token_id]
-    )
+    labels = (len(input_ids) - target_input_ids_len) * [tokenizer.pad_token_id] + target_tokenized["input_ids"]
+
+    # shift labels
+    input_ids, labels = input_ids[:-1], labels[1:]
+
     return dict(
         input_ids=input_ids,
         labels=labels,
