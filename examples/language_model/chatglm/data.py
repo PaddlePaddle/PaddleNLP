@@ -76,7 +76,7 @@ def convert_example(example, tokenizer, data_args, is_test=True):
         attention_mask = attention_mask[None, :, :]
         attention_mask = (attention_mask < 0.5).astype("int64")
 
-        labels = [-100] * context_length + input_ids[mask_position + 2 :] + [tokenizer.eos_token_id]
+        labels = [-100] * context_length + input_ids[mask_position + 1 :]
 
         # shift labels
         input_ids, labels = input_ids[:-1], labels[1:]
@@ -138,7 +138,7 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Tr
         attention_mask = attention_mask[None, :, :]
         attention_mask = (attention_mask < 0.5).astype("int64")
 
-        labels = [-100] * context_length + input_ids[mask_position + 2 :] + [tokenizer.eos_token_id]
+        labels = [-100] * context_length + input_ids[mask_position + 1 :]
 
         # shift labels
         input_ids, labels = input_ids[:-1], labels[1:]
