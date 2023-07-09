@@ -1893,7 +1893,7 @@ class Trainer:
         sharding_degree = 1
         vpp_degree = 1
         nranks = dist.get_world_size()
-        if nranks > 1:
+        if self.args.use_hybrid_parallel and nranks > 1:
             if dist.get_rank():
                 return
             hcg = fleet.get_hybrid_communicate_group()
@@ -1928,7 +1928,7 @@ class Trainer:
 
     def _save_sharding_meta(self, dir):
         nranks = dist.get_world_size()
-        if nranks <= 1:
+        if not self.args.use_hybrid_parallel or nranks <= 1:
             return
 
         hcg = fleet.get_hybrid_communicate_group()
