@@ -19,6 +19,7 @@ import os
 import re
 import shutil
 import tempfile
+from collections import OrderedDict
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type
 
@@ -38,6 +39,7 @@ from huggingface_hub import (
 from huggingface_hub.utils import EntryNotFoundError
 from paddle import Tensor
 from paddle.nn import Embedding, Layer
+from paddle.distributed import fleet
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddle.utils.download import is_url
@@ -78,6 +80,50 @@ __all__ = [
     "register_base_model",
 ]
 
+def unwrap_optimizer(optimizer, optimizer_instances=()):
+    if optimizer is None:
+        return None
+    while hasattr(optimizer, "_inner_opt") and not isinstance(optimizer, optimizer_instances):
+        optimizer = optimizer._inner_opt
+    if isinstance(optimizer, optimizer_instances):
+        return optimizer
+    return None
+
+def filter_sharded_params(state_dict, optimizer, sharding_rank):
+    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer \
+        import DygraphShardingOptimizer
+
+    logger.info(f"filter sharded_params not placed in sharding_rank {sharding_rank} .")
+
+    optimizer = unwrap_optimizer(optimizer, DygraphShardingOptimizer)
+    if optimizer is None:
+        return state_dict
+    filtered_state_dict = OrderedDict()
+    for (k, v) in state_dict.items():
+        assert v.name in optimizer._param2rank
+        sharded_rank = optimizer._param2rank[v.name]
+        if sharded_rank != sharding_rank:
+            continue
+        filtered_state_dict[k] = v
+    return filtered_state_dict
+
+def exlclude_paramters_in_state_dict(model_state_dict, param_names_in_master_weights, sharding_group, save_sharding_stage1_model=True):
+    assert sharding_group is not None
+    assert isinstance(model_state_dict, dict) and isinstance(param_names_in_master_weights, (list, set)), "param_names_in_master_weights type:{}".format(type(param_names_in_master_weights))
+    state_param_names = [v.name for k,v in model_state_dict.items()]
+    logger.debug("param_names_in_master_weights:{}, state_param_names:{}".format(param_names_in_master_weights, state_param_names))
+    if not save_sharding_stage1_model:
+        # allgather parameter names in sharding group
+        tmp = []
+        paddle.distributed.all_gather_object(tmp, param_names_in_master_weights, group=sharding_group)
+        param_names_in_master_weights = [v for item in tmp for v in item]
+        logger.info("sharding_group_param_names:{}".format(param_names_in_master_weights))
+    non_parameters_state_dict = copy.copy(model_state_dict)
+    for k, v in model_state_dict.items():
+        if v.name in param_names_in_master_weights:
+            non_parameters_state_dict.pop(k)
+
+    return non_parameters_state_dict
 
 def prune_linear_layer(layer: nn.Linear, index: paddle.Tensor, dim: int = 0) -> nn.Linear:
     """
@@ -1414,6 +1460,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
         variant = kwargs.get("variant", None)
         is_main_process = kwargs.get("is_main_process", True)
+        is_bf16 = kwargs.get("is_bf16", False)
+        param_names_in_master_weights = list(kwargs.get("param_names_in_master_weights", []))
+        sharding_group = kwargs.get("sharding_group", None)
+        optimizer = kwargs.get("optimizer", None)
+        save_sharding_stage1_model = kwargs.get("save_sharding_stage1_model", False)
         use_async_save = kwargs.get("use_async_save", False)
 
         # 1. retrieve the model related config
@@ -1427,10 +1478,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         dtype = get_parameter_dtype(model_to_save)
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
-        state_dict_to_save = None
         config_to_save = copy.deepcopy(model_to_save.config)
+        state_dict_to_save = model_to_save.state_dict()
+        if save_sharding_stage1_model:
+            sharding_rank = sharding_group.rank
+            state_dict_to_save = filter_sharded_params(state_dict_to_save, optimizer, sharding_rank)
         if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
-            state_dict_to_save = model_to_save.merge_tensor_parallel(model_to_save.state_dict(), config_to_save)
+            state_dict_to_save = model_to_save.merge_tensor_parallel(state_dict_to_save, config_to_save)
             config_to_save.tensor_parallel_degree = 1
             # set variant to None for merge_tensor_parallel, but there should no relationship with variant setting
             variant = None
@@ -1443,7 +1497,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     variant = f"tp{config_to_save.tensor_parallel_rank:0>2d}"
                 # WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, variant)
 
-            state_dict_to_save = self.state_dict()
+        if is_bf16 and save_sharding_stage1_model:
+            state_dict_to_save = exlclude_paramters_in_state_dict(state_dict_to_save, param_names_in_master_weights, sharding_group)
+            logger.info("param_names_in_master_weights len:{}, bf16 state_dict_to_save len:{}, :{}".format(len(param_names_in_master_weights), len(state_dict_to_save), state_dict_to_save))
 
         if is_main_process:
             # Attach architecture to the config

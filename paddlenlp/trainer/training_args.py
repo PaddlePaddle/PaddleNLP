@@ -464,6 +464,15 @@ class TrainingArguments:
             )
         },
     )
+    save_sharded_model: bool = field(
+        default=False,
+        metadata={"help": ("whether saved sharded model when sharding_parallel_degree > 1")},
+    )
+
+    load_sharded_model: bool = field(
+        default=False,
+        metadata={"help": ("whether load a sharded model when sharding_parallel_degree > 1")},
+    )
     tensor_parallel_degree: int = field(
         default=-1,
         metadata={
@@ -968,6 +977,8 @@ class TrainingArguments:
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
+            if self.save_sharding_stage1_model:
+                name.append(f"shard{self.sharding_parallel_rank:0>2d}")
             return "_".join(name)
         else:
             return None
@@ -1030,7 +1041,9 @@ class TrainingArguments:
         if self.save_on_each_node:
             return self.local_process_index == 0
         else:
-            if self.use_hybrid_parallel:
+            if self.save_sharding_stage1_model:
+                return True
+            elif self.use_hybrid_parallel > 1:
                 # save on dataset rank 0
                 return self.sharding_parallel_rank == 0 and self.data_parallel_rank == 0
             else:
@@ -1042,6 +1055,14 @@ class TrainingArguments:
         Whether or not to use no_sync for the gradients when doing gradient accumulation.
         """
         return True
+
+    @property
+    def save_sharding_stage1_model(self):
+        return ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.save_sharded_model
+
+    @property
+    def load_sharding_stage1_model(self):
+        return ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.load_sharded_model
 
     @contextlib.contextmanager
     def main_process_first(self, local=True, desc="work"):
