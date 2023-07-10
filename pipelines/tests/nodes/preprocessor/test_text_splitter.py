@@ -17,7 +17,9 @@ import unittest
 
 from pipelines.nodes.preprocessor.text_splitter import (
     CharacterTextSplitter,
+    MarkdownHeaderTextSplitter,
     RecursiveCharacterTextSplitter,
+    SpacyTextSplitter,
 )
 
 
@@ -140,3 +142,37 @@ class TestCharacterTextSplitter(unittest.TestCase):
             "-H.",
         ]
         assert output == expected_output
+
+    def test_spcay_text_splitter(self) -> None:
+        text = """Hi.\n\nI'm Harrison.\n\nHow? Are? You?\nOkay then f f f f.
+        This is a weird text to write, but gotta test the splittingggg some how.
+        Bye!\n\n-H."""
+        splitter = SpacyTextSplitter(chunk_size=10, chunk_overlap=1, pipeline="en_core_web_sm")
+        output = splitter.split_text(text)
+        expected_output = [
+            "Hi.\n\nI'm Harrison.",
+            "How? Are?",
+            "You?",
+            "Okay then f f f f.",
+            "This is a weird text to write, but gotta test the splittingggg some how.",
+            "Bye!\n\n-H.",
+        ]
+        assert expected_output == output
+
+    def test_markdown_text_splitter(self) -> None:
+        md = "## Bar\n\nHi this is Jim  \nHi this is Joe\n\n ## Baz\n\n Hi this is Molly"
+        headers_to_split_on = [
+            ("#", "Header 1"),
+            ("##", "Header 2"),
+            ("###", "Header 3"),
+        ]
+        markdown_splitter = MarkdownHeaderTextSplitter(
+            separator="\n",
+            chunk_size=10,
+            headers_to_split_on=headers_to_split_on,
+            return_each_line=False,
+            filters=["\n"],
+        )
+        output = markdown_splitter.split_text(md)
+        expected_output = ["Bar\nHi this is Jim\nHi this is Joe", "Baz\nHi this is Molly"]
+        assert expected_output == output
