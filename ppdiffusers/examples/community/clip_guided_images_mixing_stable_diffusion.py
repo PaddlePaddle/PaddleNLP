@@ -175,15 +175,6 @@ class CLIPGuidedImagesMixingStableDiffusion(DiffusionPipeline):
         latents = init_latents
         return latents
 
-    #     def get_image_description(self, image):
-    #         transformed_image = self.coca_transform(image).unsqueeze(axis=0)
-    # # >>>        with paddle.no_grad(), torch.cuda.amp.autocast():
-    #         with paddle.no_grad(), paddle.amp.auto_cast():
-    #             breakpoint()
-    #             generated = self.coca_model.generate(transformed_image.cast(self.coca_model.dtype))
-    #         generated = self.coca_tokenizer.decode(generated[0].cpu().numpy())
-    #         return generated.split('<end_of_text>')[0].replace('<start_of_text>', '').rstrip(' .,')
-
     def get_clip_image_embeddings(self, image, batch_size):
         clip_image_input = self.feature_extractor.preprocess(image)
         clip_image_features = (
@@ -194,7 +185,6 @@ class CLIPGuidedImagesMixingStableDiffusion(DiffusionPipeline):
         image_embeddings_clip = image_embeddings_clip.repeat_interleave(repeats=batch_size, axis=0)
         return image_embeddings_clip
 
-    # >>>    @torch.enable_grad()
     @paddle.enable_grad()
     def cond_fn(
         self,
@@ -283,32 +273,7 @@ class CLIPGuidedImagesMixingStableDiffusion(DiffusionPipeline):
             raise ValueError(f"You have passed {batch_size} batch_size, but only {len(generator)} generators.")
         if height % 8 != 0 or width % 8 != 0:
             raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
-        # >>>        if isinstance(generator, torch.Generator) and batch_size > 1:
-        #             generator = [generator] + [None] * (batch_size - 1)
-        # if isinstance(generator, paddle.Generator) and batch_size > 1:
-        # if batch_size > 1:
-        #     generator = [generator] + [None] * (batch_size - 1)
-        # coca_is_none = [('model', self.coca_model is None), ('tokenizer',
-        #     self.coca_tokenizer is None), ('transform', self.coca_transform is
-        #     None)]
-        # coca_is_none = [x[0] for x in coca_is_none if x[1]]
-        # coca_is_none_str = ', '.join(coca_is_none)
 
-        # generate prompts with coca model if prompt is None
-        # if content_prompt is None:
-        #     if len(coca_is_none):
-        #         raise ValueError(
-        #             f'Content prompt is None and CoCa [{coca_is_none_str}] is None.Set prompt or pass Coca [{coca_is_none_str}] to DiffusionPipeline.'
-        #             )
-        #     content_prompt = self.get_image_description(content_image)
-        # if style_prompt is None:
-        #     if len(coca_is_none):
-        #         raise ValueError(
-        #             f'Style prompt is None and CoCa [{coca_is_none_str}] is None. Set prompt or pass Coca [{coca_is_none_str}] to DiffusionPipeline.'
-        #             )
-        #     style_prompt = self.get_image_description(style_image)
-
-        # get prompt text embeddings for content and style
         content_text_input = self.tokenizer(
             content_prompt,
             padding="max_length",

@@ -12,6 +12,7 @@
 |Stable Diffusion with High Resolution Fixing| 使用高分辨率修复功能进行文图生成|[Stable Diffusion with High Resolution Fixing](#stable-diffusion-with-high-resolution-fixing)||
 |ControlNet Reference Only| 基于参考图片生成与图片相似的图片|[ControlNet Reference Only](#controlnet-reference-only)||
 |Stable Diffusion Mixture Tiling| 基于Mixture机制的多文本大图生成Stable Diffusion Pipeline|[Stable Diffusion Mixture Tiling](#stable-diffusion-mixture-tiling)||
+|CLIP Guided Images Mixing Stable Diffusion Pipeline| 一个用于图片融合的Stable Diffusion Pipeline|[CLIP Guided Images Mixing Using Stable Diffusion](#clip-guided-images-mixing-with-stable-diffusion)||
 
 ## Example usages
 
@@ -523,7 +524,7 @@ for control_name in ["none", "reference_only", "reference_adain", "reference_ada
 
 
 ### Stable Diffusion Mixture Tiling
-`StableDiffusionHiresFixPipeline` 基于Stable Diffusion进行文图生成，同时启动高分辨率修复功能。该自定义Pipeline生成图像期间共包含两个阶段: 初始生成图像阶段和高清修复阶段。使用方式如下所示：
+`StableDiffusionTilingPipeline`是一个基于Mixture机制的多文本大图生成Stable Diffusion Pipeline。使用方式如下所示：
 
 ```python
 from ppdiffusers import LMSDiscreteScheduler, DiffusionPipeline
@@ -551,3 +552,77 @@ image.save('mixture_tiling' + ".png")
 ```
 生成的图片如下所示：
 <center><img src="https://user-images.githubusercontent.com/20476674/250050184-c3d26d20-dbdf-42f6-9723-5f35f628f68e.png" width=100%></center>
+
+### CLIP Guided Images Mixing With Stable Diffusion
+`CLIPGuidedImagesMixingStableDiffusion` 基于Stable Diffusion来针对输入的两个图片进行融合：
+```python
+import requests
+from io import BytesIO
+
+import PIL
+import paddle
+import open_clip
+from open_clip import SimpleTokenizer
+from ppdiffusers import DiffusionPipeline
+from paddlenlp.transformers import CLIPFeatureExtractor, CLIPModel
+
+
+def download_image(url):
+    response = requests.get(url)
+    return PIL.Image.open(BytesIO(response.content)).convert("RGB")
+
+# Loading additional models
+feature_extractor = CLIPFeatureExtractor.from_pretrained(
+    "laion/CLIP-ViT-B-32-laion2B-s34B-b79K"
+)
+clip_model = CLIPModel.from_pretrained(
+    "laion/CLIP-ViT-B-32-laion2B-s34B-b79K", paddle_dtype=paddle.float16
+)
+
+mixing_pipeline = DiffusionPipeline.from_pretrained(
+    "CompVis/stable-diffusion-v1-4",
+    custom_pipeline="clip_guided_images_mixing_stable_diffusion",
+    clip_model=clip_model,
+    feature_extractor=feature_extractor,
+    paddle_dtype=paddle.float16,
+)
+mixing_pipeline.enable_attention_slicing()
+
+# Pipline running
+generator = paddle.Generator().manual_seed(17)
+
+def download_image(url):
+    response = requests.get(url)
+    return PIL.Image.open(BytesIO(response.content)).convert("RGB")
+
+content_image = download_image("https://paddlenlp.bj.bcebos.com/models/community/westfish/develop/clip_guided_images_mixing_stable_diffusion_images/boromir.jpg")
+style_image = download_image("https://paddlenlp.bj.bcebos.com/models/community/westfish/develop/clip_guided_images_mixing_stable_diffusion_images/gigachad.jpg")
+
+pipe_images = mixing_pipeline(
+    num_inference_steps=50,
+    content_image=content_image,
+    style_image=style_image,
+    content_prompt="boromir",
+    style_prompt="gigachad",
+    noise_strength=0.65,
+    slerp_latent_style_strength=0.9,
+    slerp_prompt_style_strength=0.1,
+    slerp_clip_image_style_strength=0.1,
+    guidance_scale=9.0,
+    batch_size=1,
+    clip_guidance_scale=100,
+    generator=generator,
+).images
+
+pipe_images[0].save('clip_guided_images_mixing_stable_diffusion.png')
+```
+图片生成效果如下所示：
+<div align="center">
+<center><img src="https://user-images.githubusercontent.com/20476674/251700919-8abd694f-d93f-4ead-8379-f99405aff1c4.jpg" width=30%></center>
+<center>内容图像</center>
+<div align="center">
+<center><img src="https://user-images.githubusercontent.com/20476674/251700932-4ff5f914-bbd6-4c99-abc4-c7a7fc0fa826.jpg" width=30%></center>
+<center>风格图像</center>
+<div align="center">
+<center><img src="https://user-images.githubusercontent.com/20476674/251701022-c11ea706-f865-4b3f-ab99-9eb79c87439b.png" width=30%></center>
+<center>生成图像</center>
