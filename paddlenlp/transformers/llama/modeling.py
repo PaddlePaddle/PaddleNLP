@@ -26,6 +26,11 @@ import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
+
+try:
+    from paddle.incubate.nn.functional import fused_rotary_position_embedding
+except ImportError:
+    fused_rotary_position_embedding = None
 from paddle.utils import try_import
 
 from paddlenlp.transformers.conversion_utils import (
@@ -474,8 +479,12 @@ class LlamaAttention(nn.Layer):
             kv_seq_len += offset
 
         if self.config.rope:
-            cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-            query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, offset=offset)
+            if past_key_value is None and fused_rotary_position_embedding is not None:
+                query_states, key_states, _ = fused_rotary_position_embedding(query_states, key_states, None)
+            else:
+                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+
+                query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, offset=offset)
             # [bsz, nh, t, hd]
 
         if past_key_value is not None:
