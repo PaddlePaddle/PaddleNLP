@@ -43,6 +43,7 @@ class TextSplitter(BaseComponent):
         chunk_size: int = 4000,
         chunk_overlap: int = 200,
         length_function: Callable[[str], int] = len,
+        filters: list = [],
     ):
         """Create a new TextSplitter."""
         if chunk_overlap > chunk_size:
@@ -52,7 +53,7 @@ class TextSplitter(BaseComponent):
         self._chunk_size = chunk_size
         self._chunk_overlap = chunk_overlap
         self._length_function = length_function
-        self._filter = None
+        self._filter = filters
 
     @abstractmethod
     def split_text(self, text: str) -> List[str]:

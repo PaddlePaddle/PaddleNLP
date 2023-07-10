@@ -26,7 +26,7 @@ from pipelines.nodes import (
     PromptTemplate,
     TruncatedConversationHistory,
 )
-from pipelines.nodes.file_converter.markdown import Markdown2txt
+from pipelines.nodes.file_converter.markdown import MarkdownRawTextConverter
 from pipelines.nodes.preprocessor.text_splitter import MarkdownHeaderTextSplitter
 from pipelines.pipelines import Pipeline
 
@@ -76,7 +76,7 @@ def chat_markdown_tutorial():
 
     # Indexing Markdowns
     if args.title_split is True:
-        markdown_converter = Markdown2txt()
+        markdown_converter = MarkdownRawTextConverter()
         headers_to_split_on = [
             ("#", "Header 1"),
             ("##", "Header 2"),

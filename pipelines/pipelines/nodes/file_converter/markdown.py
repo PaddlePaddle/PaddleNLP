@@ -78,7 +78,7 @@ class MarkdownConverter(BaseConverter):
         return text
 
 
-class Markdown2txt(BaseConverter):
+class MarkdownRawTextConverter(BaseConverter):
     def convert(
         self,
         file_path: Path,
