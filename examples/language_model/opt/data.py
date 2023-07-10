@@ -72,6 +72,9 @@ def convert_example(
     labels = deepcopy(input_ids)
     labels[:source_input_ids_len] = IGNORE_INDEX
 
+    # shift labels
+    input_ids, labels = input_ids[:-1], labels[1:]
+
     return dict(
         input_ids=input_ids,
         labels=labels,

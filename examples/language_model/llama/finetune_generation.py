@@ -158,6 +158,7 @@ def main():
         fp16_opt_level=training_args.fp16_opt_level,
         use_flash_attention=model_args.use_flash_attention,
         use_recompute=training_args.recompute,
+        lm_shift_labels=False,
     )
 
     if model_args.lora:
