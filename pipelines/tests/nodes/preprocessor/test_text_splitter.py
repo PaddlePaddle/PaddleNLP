@@ -147,14 +147,15 @@ class TestCharacterTextSplitter(unittest.TestCase):
         text = """Hi.\n\nI'm Harrison.\n\nHow? Are? You?\nOkay then f f f f.
         This is a weird text to write, but gotta test the splittingggg some how.
         Bye!\n\n-H."""
-        splitter = SpacyTextSplitter(chunk_size=10, chunk_overlap=1)
+        splitter = SpacyTextSplitter(chunk_size=10, chunk_overlap=1, pipeline="en_core_web_sm")
         output = splitter.split_text(text)
         expected_output = [
-            "Hi.\n\nI'm Harrison.\n\nHow?",
-            "Are?",
+            "Hi.\n\nI'm Harrison.",
+            "How? Are?",
             "You?",
             "Okay then f f f f.",
-            "This is a weird text to write, but gotta test the splittingggg some how.\n        Bye!\n\n-H.",
+            "This is a weird text to write, but gotta test the splittingggg some how.",
+            "Bye!\n\n-H.",
         ]
         assert expected_output == output
 

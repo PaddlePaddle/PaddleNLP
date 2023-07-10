@@ -234,7 +234,11 @@ class SpacyTextSplitter(TextSplitter):
             import spacy
         except ImportError:
             raise ImportError("Spacy is not installed, please install it with `pip install spacy`.")
-        self._tokenizer = spacy.load(pipeline)
+        try:
+            self._tokenizer = spacy.load(pipeline)
+        except:
+            spacy.cli.download(pipeline)
+            self._tokenizer = spacy.load(pipeline)
         self._separator = separator
 
     def split_text(self, text: str) -> List[str]:
