@@ -1,10 +1,18 @@
-# port of models described in RW
-# We use the bloom model as a starting point for these model.
-# Please refer to the bloom models for usage instructions.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-#import paddle
 import paddle
-#from paddle import nn
 from paddle import Tensor, nn
 
 from ..model_outputs import (
@@ -25,7 +33,6 @@ from typing import Optional, Tuple, Union, List
 from .. import PretrainedModel
 from ...utils.converter import StateDictNameMapping, init_name_mappings
 from paddlenlp.utils.log import logger
-#from transformers.utils import logging
 
 from .configuration import (
     RWConfig,
@@ -42,9 +49,6 @@ class Linear(nn.Linear):
             return ret
         else:
             return ret + self.bias
-
-
-from einops import rearrange
 
 # rotary pos emb helpers (paddle.jit.script does not seem to support staticmethod...)
 def rotate_half(x):
@@ -85,7 +89,6 @@ class RotaryEmbedding(paddle.nn.Layer):
             emb = paddle.concat((freqs, freqs), axis=-1)
 
             if dtype in [paddle.float16, paddle.bfloat16]:
-                #emb = emb.float()
                 emb = paddle.cast(emb, dtype)
 
             self.cos_cached = emb.cos()[None, :, :]
@@ -131,9 +134,6 @@ def build_alibi_tensor(attention_mask: Tensor, num_heads: int, dtype: paddle.dty
     closest_power_of_2 = 2 ** math.floor(math.log2(num_heads))
 
     base = paddle.to_tensor(2 ** (-(2 ** -(math.log2(closest_power_of_2) - 3))), dtype=paddle.float32)
-    #base = Tensor(
-    #    2 ** (-(2 ** -(math.log2(closest_power_of_2) - 3))), dtype=paddle.float32
-    #)
     powers = paddle.arange(1, 1 + closest_power_of_2, dtype=paddle.float32)
     slopes = paddle.pow(base, powers)
 
@@ -145,12 +145,6 @@ def build_alibi_tensor(attention_mask: Tensor, num_heads: int, dtype: paddle.dty
         extra_powers = paddle.arange(1, 1 + 2 * num_remaining_heads, 2, dtype=paddle.int32)
         slopes = paddle.concat([slopes, paddle.pow(extra_base, extra_powers)], axis=0)
 
-    # Note: alibi will added to the attention bias that will be applied to the query, key product of attention
-    # => therefore alibi will have to be of shape (batch_size, num_heads, query_length, key_length)
-    # => here we set (batch_size=1, num_heads=num_heads, query_length=1, key_length=max_length)
-    # => the query_length dimension will then be broadcasted correctly
-    # This is more or less identical to T5's relative position bias:
-    # https://github.com/huggingface/transformers/blob/f681437203baa7671de3174b0fa583c349d9d5e1/src/transformers/models/t5/modeling_t5.py#L527
     arange_tensor = ((attention_mask.cumsum(axis=-1) - 1) * attention_mask)[:, None, :]
     alibi = paddle.cast(slopes[..., None], "bfloat16") * arange_tensor
     return paddle.cast(alibi.reshape([batch_size * num_heads, 1, seq_length]), dtype)
@@ -299,8 +293,6 @@ class Attention(nn.Layer):
             # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
             if input_dtype == paddle.float16 or input_dtype == paddle.bfloat16:
                 attention_scores = paddle.cast(attention_scores, paddle.float32)
-            # attn_weights = paddle.masked_fill(attention_scores, attention_mask, paddle.finfo(attention_scores.dtype).min)
-            #attention_scores = paddle.where(attention_mask, mask_value, attention_scores)
             attention_scores = paddle.where(attention_mask > 0, paddle.full_like(attention_scores, -1e38), attention_scores)
             attention_probs = F.softmax(
                 attention_scores * self.inv_norm_factor,
@@ -336,10 +328,6 @@ class Attention(nn.Layer):
 
             attention_scores = query_layer_ @ key_layer_.transpose([0, 1, 3, 2])
 
-            # change reshape to [batch_size, num_heads, q_length, kv_length]
-            #attention_scores = matmul_result.reshape([batch_size, self.num_heads, q_length, kv_length])
-
-            #mask_value = paddle.to_tensor(-1e9, dtype=attention_scores.dtype)
             attention_mask_float = paddle.zeros_like(attention_mask, dtype=attention_scores.dtype)
             attention_mask_float = paddle.where(attention_mask, paddle.full_like(attention_scores, -1e9), attention_mask_float)
 
@@ -545,10 +533,6 @@ class RWPreTrainedModel(PretrainedModel):
                 if len(mapping) > 1 and mapping[1] != None:
                     mapping[1] = "transformer." + mapping[1]
 
-        #if cls.__name__ != "RobertaModel":
-        #    for mapping in mappings:
-        #        mapping[1] = "roberta." + mapping[1]
-
         if config.architectures is not None:
             if "RWForCausalLM" in config.architectures:
                 mappings.extend(
@@ -585,21 +569,6 @@ class RWPreTrainedModel(PretrainedModel):
             )
             if getattr(layer, "bias", None) is not None:
                 layer.weight.set_value(paddle.zeros(shape=layer.weight.shape, dtype=paddle.get_default_dtype()))
-        #TODO: laynorm initialization
-
-        #if isinstance(module, nn.Linear) or isinstance(module, Linear):
-        #    # Slightly different from the TF version which uses truncated_normal for initialization
-        #    # cf https://github.com/pypaddle/pypaddle/pull/5617
-        #    module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
-        #    if module.bias is not None:
-        #        module.bias.data.zero_()
-        #elif isinstance(module, nn.Embedding):
-        #    module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
-        #    if module.padding_idx is not None:
-        #        module.weight.data[module.padding_idx].zero_()
-        #elif isinstance(module, LayerNorm):
-        #    module.bias.data.zero_()
-        #    module.weight.data.fill_(1.0)
 
     def _set_gradient_checkpointing(self, module: nn.Layer, value: bool = False):
         if isinstance(module, RWModel):
@@ -660,10 +629,6 @@ class RWModel(RWPreTrainedModel):
         self.ln_f = LayerNorm(self.embed_dim, epsilon=config.layer_norm_epsilon)
 
         self.gradient_checkpointing = False
-
-        # Initialize weights and apply final processing
-        #self.post_init()
-        #TODO:
 
     def get_input_embeddings(self):
         return self.word_embeddings
@@ -876,9 +841,6 @@ class RWForCausalLM(RWPreTrainedModel):
         self.transformer = RWModel(config)
         self.lm_head = CausalLMHead(config.vocab_size, config.hidden_size, bias_attr=False)
 
-        # Initialize weights and apply final processing
-        #self.post_init()
-
     def get_output_embeddings(self):
         return self.lm_head
 
@@ -998,129 +960,6 @@ class RWForCausalLM(RWPreTrainedModel):
         """
         return tuple(tuple(past_state.index_select(0, beam_idx) for past_state in layer_past) for layer_past in past)
 
-#class RWForSequenceClassification(RWPreTrainedModel):
-#    _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.weight"]
-#
-#    def __init__(self, config: RWConfig):
-#        super().__init__(config)
-#        self.num_labels = config.num_labels
-#        self.transformer = RWModel(config)
-#        self.score = nn.Linear(config.hidden_size, config.num_labels)
-#
-#        # Initialize weights and apply final processing
-#        #self.post_init()
-#
-#    def forward(
-#        self,
-#        input_ids=None,
-#        past_key_values: Optional[Tuple[Tuple[Tensor, Tensor], ...]] = None,
-#        attention_mask: Optional[Tensor] = None,
-#        head_mask: Optional[Tensor] = None,
-#        inputs_embeds: Optional[Tensor] = None,
-#        labels: Optional[Tensor] = None,
-#        use_cache: Optional[bool] = None,
-#        output_attentions: Optional[bool] = None,
-#        output_hidden_states: Optional[bool] = None,
-#        return_dict: Optional[bool] = None,
-#        **deprecated_arguments,
-#    ) -> Union[Tuple[Tensor], SequenceClassifierOutputWithPast]:
-#        r"""
-#        labels (`paddle.LongTensor` of shape `(batch_size,)`, *optional*):
-#            Labels for computing the sequence classification/regression loss. Indices should be in `[0, ...,
-#            config.num_labels - 1]`. If `config.num_labels == 1` a regression loss is computed (Mean-Square loss), If
-#            `config.num_labels > 1` a classification loss is computed (Cross-Entropy).
-#        """
-#        if deprecated_arguments.pop("position_ids", False) is not False:
-#            # `position_ids` could have been `Tensor` or `None` so defaulting pop to `False` allows to detect if users were passing explicitly `None`
-#            warnings.warn(
-#                "`position_ids` have no functionality in BLOOM and will be removed in v5.0.0. You can safely ignore"
-#                " passing `position_ids`.",
-#                FutureWarning,
-#            )
-#        if len(deprecated_arguments) > 0:
-#            raise ValueError(f"Got unexpected arguments: {deprecated_arguments}")
-#
-#        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-#
-#        transformer_outputs = self.transformer(
-#            input_ids,
-#            past_key_values=past_key_values,
-#            attention_mask=attention_mask,
-#            head_mask=head_mask,
-#            inputs_embeds=inputs_embeds,
-#            use_cache=use_cache,
-#            output_attentions=output_attentions,
-#            output_hidden_states=output_hidden_states,
-#            return_dict=return_dict,
-#        )
-#
-#        hidden_states = transformer_outputs[0]
-#        #[bz, seq, num_labels]
-#        logits = self.score(hidden_states)
-#
-#        if input_ids is not None:
-#            batch_size = input_ids.shape[0]
-#        else:
-#            batch_size = inputs_embeds.shape[0]
-#
-#        if self.config.pad_token_id is None and batch_size != 1:
-#            raise ValueError("Cannot handle batch sizes > 1 if no padding token is defined.")
-#        if self.config.pad_token_id is None:
-#            sequence_lengths = -1
-#        else:
-#            if input_ids is not None:
-#                sequence_lengths = paddle.not_equal(input_ids, paddle.full(shape=input_ids.shape, fill_value=self.config.pad_token_id, dtype=input_ids.dtype)).sum(axis=-1) - 1
-#            else:
-#                sequence_lengths = -1
-#                logger.warning(
-#                    f"{self.__class__.__name__} will not detect padding tokens in `inputs_embeds`. Results may be "
-#                    "unexpected if using padding tokens in conjunction with `inputs_embeds.`"
-#                )
-#
-#        import pdb; pdb.set_trace()
-#        if isinstance(sequence_length, Tensor):
-#            # [bz, 1]
-#            sequence_lengths_idx = sequence_lengths.unsqueeze(1)
-#            # [1, num_labels]
-#            right_index = paddle.arange(self.config.num_labels).unsqueeze(0)
-#            # idx: [bz, num_labels] 
-#            pooled_logits = logits[:, sequence_lengths]
-#
-#        loss = None
-#        if labels is not None:
-#            if self.config.problem_type is None:
-#                if self.num_labels == 1:
-#                    self.config.problem_type = "regression"
-#                elif self.num_labels > 1 and (labels.dtype == paddle.long or labels.dtype == paddle.int):
-#                    self.config.problem_type = "single_label_classification"
-#                else:
-#                    self.config.problem_type = "multi_label_classification"
-#
-#            if self.config.problem_type == "regression":
-#                loss_fct = MSELoss()
-#                if self.num_labels == 1:
-#                    loss = loss_fct(pooled_logits.squeeze(), labels.squeeze())
-#                else:
-#                    loss = loss_fct(pooled_logits, labels)
-#            elif self.config.problem_type == "single_label_classification":
-#                loss_fct = CrossEntropyLoss()
-#                loss = loss_fct(pooled_logits, labels)
-#            elif self.config.problem_type == "multi_label_classification":
-#                loss_fct = BCEWithLogitsLoss()
-#                loss = loss_fct(pooled_logits, labels)
-#        if not return_dict:
-#            output = (pooled_logits,) + transformer_outputs[1:]
-#            return ((loss,) + output) if loss is not None else output
-#
-#        return SequenceClassifierOutputWithPast(
-#            loss=loss,
-#            logits=pooled_logits,
-#            past_key_values=transformer_outputs.past_key_values,
-#            hidden_states=transformer_outputs.hidden_states,
-#            attentions=transformer_outputs.attentions,
-#        )
-
-
 class RWForTokenClassification(RWPreTrainedModel):
     _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.weight"]
 
@@ -1137,9 +976,6 @@ class RWForTokenClassification(RWPreTrainedModel):
             classifier_dropout = 0.1
         self.dropout = nn.Dropout(classifier_dropout)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-
-        # Initialize weights and apply final processing
-        #self.post_init()
 
     def forward(
         self,
@@ -1215,9 +1051,6 @@ class RWForQuestionAnswering(RWPreTrainedModel):
         self.transformer = RWModel(config)
         self.qa_outputs = nn.Linear(config.hidden_size, 2)
 
-        # Initialize weights and apply final processing
-        #self.post_init()
-
     def forward(
         self,
         input_ids=None,
@@ -1266,12 +1099,9 @@ class RWForQuestionAnswering(RWPreTrainedModel):
 
         total_loss = None
         if start_positions is not None and end_positions is not None:
-            #import pdb; pdb.set_trace()
             # If we are on multi-GPU, split add a dimension
-            #[bz,]
             if len(start_positions.shape) > 1:
                 start_positions = start_positions.squeeze(-1)
-            #[bz,]
             if len(end_positions.shape) > 1:
                 end_positions = end_positions.squeeze(-1)
             # sometimes the start/end positions are outside our model inputs, we ignore these terms
