@@ -11,6 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import sys
+
+sys.path = ["/qingzhong/qingzhong/PaddleNLP", "/qingzhong/qingzhong/langchain"] + sys.path
+sys.path.append("/qingzhong/qingzhong/PaddleNLP/pipelines")
+text_path = "/qingzhong/qingzhong/qingzhong/update_piplines/docx_file/new_data.txt"
 import argparse
 import glob
 
@@ -64,9 +69,6 @@ def chat_docx_tutorial():
         embed_title=args.embed_title,
     )
 
-    # Indexing PDFs
-    # pdf_converter = PDFToTextConverter()
-    # text_splitter = CharacterTextSplitter(separator="\f", chunk_size=args.chunk_size, chunk_overlap=0, filters=["\n"])
     docx_converter = DocxTotxtConverter()
     text_splitter = SpacyTextSplitter(separator="\n", chunk_size=args.chunk_size, chunk_overlap=0, filters=["\n"])
     indexing_pipeline = Pipeline()

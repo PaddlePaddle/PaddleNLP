@@ -117,8 +117,6 @@ def chat_markdown_tutorial():
     )
     query_pipeline.add_node(component=ernie_bot, name="ErnieBot", inputs=["TruncateHistory"])
     query = "Jupyter 和 AI Studio Notebook 有什么区别？如何使用Jupyter？"
-    query = "Jupyter 和 AI Studio Notebook 有什么区别？如何使用Jupyter？"
-    query = "新手如何创建数据集？"
     start_time = time.time()
     prediction = query_pipeline.run(query=query, params={"Retriever": {"top_k": 30}, "Ranker": {"top_k": 2}})
     end_time = time.time()
