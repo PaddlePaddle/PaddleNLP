@@ -2,7 +2,7 @@ paddlenlp>=2.5.2
 paddleocr
 pdf2image>1.14
 requests
-pydantic
+pydantic<2
 mmh3
 more_itertools
 elasticsearch>=7.7,<=7.11
