@@ -48,6 +48,7 @@ class RWConfig(PretrainedConfig):
         n_head_kv=None,
         bias=False,
         alibi=False,
+        parallel_attn=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -68,6 +69,7 @@ class RWConfig(PretrainedConfig):
         self.n_head_kv = n_head if n_head_kv is None else n_head_kv
         self.alibi = alibi
         self.bias = bias
+        self.parallel_attn = parallel_attn
 
         super().__init__(bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
 
