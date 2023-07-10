@@ -1211,9 +1211,14 @@ class BloomForCausalLM(BloomPreTrainedModel):
 
         loss = None
         if labels is not None:
-            # Shift so that tokens < n predict n
-            shift_logits = lm_logits[..., :-1, :]
-            shift_labels = labels[..., 1:]
+            if self.config.lm_shift_labels:
+                # Shift so that tokens < n predict n
+                shift_logits = lm_logits[..., :-1, :]
+                shift_labels = labels[..., 1:]
+            else:
+                shift_logits = lm_logits
+                shift_labels = labels
+
             # Flatten the tokens
             loss = self.criterion(shift_logits, shift_labels)
 

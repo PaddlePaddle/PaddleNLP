@@ -119,6 +119,10 @@ def convert_example(
 
     input_ids = source_tokenized["input_ids"] + [tokenizer.eos_token_id] + target_tokenized["input_ids"]
     labels = (len(input_ids) - target_input_ids_len) * [tokenizer.pad_token_id] + target_tokenized["input_ids"]
+
+    # shift labels
+    input_ids, labels = input_ids[:-1], labels[1:]
+
     return dict(
         input_ids=input_ids,
         labels=labels,
@@ -173,6 +177,9 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Tr
             + target_tokenized["input_ids"]
         )
         labels = (len(input_ids) - target_input_ids_len) * [tokenizer.pad_token_id] + target_tokenized["input_ids"]
+
+        # shift labels
+        input_ids, labels = input_ids[:-1], labels[1:]
 
         inputs = {
             "input_ids": input_ids,
@@ -230,6 +237,7 @@ def main():
         dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
+        lm_shift_labels=False,
         use_recompute=training_args.recompute,
     )
 
