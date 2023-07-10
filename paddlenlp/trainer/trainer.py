@@ -819,6 +819,11 @@ class Trainer:
                 # sharding
                 # stage1. the same as ddp
                 # stage2. manualy collect gradient on dp group
+
+                hack_dp_master_grad = self.args.amp_master_grad and not self.args.use_hybrid_parallel
+                if hack_dp_master_grad:
+                    is_no_sync = False
+
                 if is_no_sync:
                     # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
                     with model.no_sync():
@@ -864,6 +869,10 @@ class Trainer:
                         if self.optimizer._dp_enable:
                             assert not enable_dp_comm_overlap
                             fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
+
+                    # Case 3: hack dp with master_grad
+                    if hack_dp_master_grad and not (args.recompute and availiable_no_sync):
+                        fused_allreduce_gradients(list(model.parameters()), None)
 
                     # pipeline parallel mode,  handle gradient merge here
                     if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
@@ -1411,7 +1420,12 @@ class Trainer:
 
         # Multi-gpu training
         if self.args.world_size > 1 and not self.args.use_hybrid_parallel:
-            model = paddle.DataParallel(model)
+            if self.args.amp_master_grad:
+                mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
+                logger.warning("Note amp_master_grad using in dp is an experimental support!")
+                self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
+            else:
+                model = paddle.DataParallel(model)
             # Distributed training (should be after fp16 initialization)
 
         in_pipeline_parallel_mode = self.args.pipeline_parallel_degree > 1
