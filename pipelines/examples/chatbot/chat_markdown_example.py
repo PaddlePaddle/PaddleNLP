@@ -75,9 +75,6 @@ def chat_markdown_tutorial():
     )
 
     # Indexing Markdowns
-    markdown_converter = MarkdownConverter()
-
-    text_splitter = CharacterTextSplitter(separator="\n", chunk_size=args.chunk_size, chunk_overlap=0, filters=["\n"])
     if args.title_split is True:
         markdown_converter = MarkdownRawTextConverter()
         headers_to_split_on = [
