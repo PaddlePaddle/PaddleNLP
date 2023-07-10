@@ -40,7 +40,7 @@ from paddlenlp.trainer import (
     get_last_checkpoint,
     set_seed,
 )
-from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -148,16 +148,20 @@ def main():
         model_class = LlamaForCausalLMPipe
 
     # Load the pretrained language model.
-    model = model_class.from_pretrained(
+    config = AutoConfig.from_pretrained(
         model_args.model_name_or_path,
-        load_state_as_np=True,
-        low_cpu_mem_usage=True,
-        dtype=dtype,  # todo enable set dtype to avoid additional mem usage
+        tensor_parallel_output=False,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         fp16_opt_level=training_args.fp16_opt_level,
         use_flash_attention=model_args.use_flash_attention,
         use_recompute=training_args.recompute,
+    )
+    model = model_class.from_pretrained(
+        model_args.model_name_or_path,
+        config=config,
+        low_cpu_mem_usage=True,
+        dtype=dtype,  # todo enable set dtype to avoid additional mem usage
     )
 
     if model_args.lora:
