@@ -11,11 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
 
-sys.path = ["/qingzhong/qingzhong/PaddleNLP", "/qingzhong/qingzhong/langchain"] + sys.path
-sys.path.append("/qingzhong/qingzhong/PaddleNLP/pipelines")
-text_path = "/qingzhong/qingzhong/qingzhong/update_piplines/docx_file/new_data.txt"
 import argparse
 import glob
 
