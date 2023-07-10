@@ -44,6 +44,7 @@ class RWConfig(PretrainedConfig):
         apply_residual_connection_post_layernorm=False,
         hidden_dropout=0.0,
         attention_dropout=0.0,
+        multi_query=False,
         n_head_kv=None,
         bias=False,
         alibi=False,
@@ -60,6 +61,7 @@ class RWConfig(PretrainedConfig):
         self.apply_residual_connection_post_layernorm = apply_residual_connection_post_layernorm
         self.hidden_dropout = hidden_dropout
         self.attention_dropout = attention_dropout
+        self.multi_query = multi_query
 
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
