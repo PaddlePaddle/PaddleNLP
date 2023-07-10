@@ -1887,7 +1887,23 @@ class Trainer:
             logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
             shutil.rmtree(checkpoint)
 
-    def _save_distributed_strategy(self, dir):
+    def _save_distributed_model_meta(self,dir):
+        nranks = dist.get_world_size()
+        if self.args.use_hybrid_parallel and nranks > 1:
+            if dist.get_rank():
+                return
+        model_meta = {}
+        parallel_config = self._get_distributed_strategy()
+        if parallel_config:
+            model_meta["parallel_config"] = parallel_config
+        sharding_meta = self._gather_gather_sharding_meta()
+        if shard_meta:
+            model_meta["sharding_meta"] = sharding_meta
+        path=os.path.join(dir, MODEL_META_NAME)
+        with open(path, 'w') as f:
+            json.dump(model_meta, f, indent=4)
+
+    def _get_distributed_strategy(self):
         pp_degree = 1
         mp_degree = 1
         sharding_degree = 1
@@ -1905,49 +1921,61 @@ class Trainer:
                 assert isinstance(model, fleet.meta_parallel.PipelineParallel), "must be pipeline model"
                 vpp_degree = model._layers.get_num_virtual_stages()
             """
-        model_meta = {}
-        model_meta["parallel_config"]={"pp_degree":pp_degree,
-                                       "mp_degree":mp_degree,
-                                       "sharding_degree":sharding_degree,
-                                       "vpp_degree":vpp_degree}
-        path=os.path.join(dir, MODEL_META_NAME)
-        with open(path, 'w') as f:
-            json.dump(model_meta, f, indent=4)
+        parallel_config = {"pp_degree":pp_degree,
+                     "mp_degree":mp_degree,
+                     "sharding_degree":sharding_degree,
+                     "vpp_degree":vpp_degree}
+        return parallel_config
+
+   def _load_model_meta(self, dir):
+       meta_path = os.path.join(dir, MODEL_META_NAME)
+       assert os.path.exists(meta_path), f"{meta_path} not exist"
+       with open(meta_path, 'r') as handle:
+           model_dist_meta = json.load(handle)
+       assert "parallel_config" in model_dist_meta
+       return model_dist_meta
 
     def _load_distributed_strategy(self, dir):
-        meta_path = os.path.join(dir, MODEL_META_NAME)
-        assert os.path.exists(meta_path), f"{meta_path} not exist"
-        with open(meta_path, 'r') as handle:
-            model_dist_meta = json.load(handle)
-        assert "parallel_config" in model_dist_meta
+        model_dist_meta = self._load_model_meta(dir)
         parallel_config = model_dist_meta["parallel_config"]
         assert "pp_degree" in parallel_config
         assert "mp_degree" in parallel_config
         assert "sharding_degree" in parallel_config
         return parallel_config
 
-    def _save_sharding_meta(self, dir):
+    def _gather_sharding_meta(self):
         nranks = dist.get_world_size()
         if not self.args.use_hybrid_parallel or nranks <= 1:
-            return
-
-        hcg = fleet.get_hybrid_communicate_group()
-        mp_degree = hcg.get_model_parallel_world_size()
-        pp_degree = hcg.get_pipe_parallel_world_size()
-        sharding_degree = hcg.get_sharding_parallel_world_size()
-        sharding_rank = self.args.sharding_parallel_rank
+            return None
+        if self.args.sharding_parallel_rank != 0:
+            return None
         optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
+        if not optimizer:
+            return None
+
+        sharding_metas = {}
         sharding_meta = {}
-        if optimizer and sharding_rank == 0:
-            param2rank = { k: v for (k, v) in optimizer._param2rank.items()}
-            sharding_meta["param2rank"] = param2rank
-            suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
-            path = os.path.join(dir, _add_variant(SHARDING_META_NAME, suffix))
-            with open(path, 'w') as f:
-                json.dump(sharding_meta, f, indent=4)
+        param2rank = { k: v for (k, v) in optimizer._param2rank.items()}
+        sharding_meta["param2rank"] = param2rank
+        suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
+        sharding_metas[suffix] = sharding_meta
+        sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_model_parallel_group())
+        sharding_metas = {k:v for e in sharding_metas_list for (k, v) in e.items()}
+        if self.args.tensor_parallel_rank != 0:
+            return None
+        sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_pipe_parallel_group())
+        sharding_metas = {k:v for e in sharding_metas_list for (k, v) in e.items()}
+        return sharding_metas
 
     def _load_sharding_meta(self, dir):
         suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
+        distributed_model_meta = self._load_model_meta(dir)
+        if "sharding_meta" in distributed_model_meta:
+            sharding_meta = distributed_model_meta["sharding_meta"]
+            assert "param2rank" in sharding_meta
+            return sharding_meta
+
+        # for backward compatibility
         meta_path = os.path.join(dir, _add_variant(SHARDING_META_NAME, suffix))
         assert os.path.exists(meta_path), f"{meta_path} not exist"
         with open(meta_path, 'r') as f:
@@ -2024,8 +2052,7 @@ class Trainer:
                 use_async_save=self.args.use_async_save,
             )
 
-        self._save_distributed_strategy(output_dir)
-        self._save_sharding_meta(output_dir)
+        self._save_distributed_model_meta(output_dir)
         if self.args.should_save:
             if self.tokenizer is not None:
                 self.tokenizer.save_pretrained(output_dir)
