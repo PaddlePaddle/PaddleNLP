@@ -19,6 +19,7 @@
 import collections
 import contextlib
 import inspect
+import json
 import math
 import os
 import random
@@ -27,8 +28,8 @@ import shutil
 import sys
 import time
 import types
-from collections.abc import Mapping
 from collections import OrderedDict
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -57,10 +58,10 @@ from ..peft import LoRAModel, PrefixModelForCausalLM
 from ..transformers.model_utils import (
     PretrainedModel,
     _add_variant,
+    exlclude_paramters_in_state_dict,
+    filter_sharded_params,
     unwrap_model,
     unwrap_optimizer,
-    filter_sharded_params,
-    exlclude_paramters_in_state_dict
 )
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils import device_guard
@@ -108,8 +109,6 @@ from .utils.helper import (  # nested_truncate,
     nested_numpify,
     nested_truncate,
 )
-
-import json
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
 DEFAULT_PROGRESS_CALLBACK = ProgressCallback
@@ -437,7 +436,9 @@ class Trainer:
                 state_dict = self.recover_params_from_master_weights(state_dict)
         else:
             if self.args.dataset_rank == 0:
-                state_dict = self.load_one_state_dict_from_checkpoint(resume_from_checkpoint, self.args.weight_name_suffix)
+                state_dict = self.load_one_state_dict_from_checkpoint(
+                    resume_from_checkpoint, self.args.weight_name_suffix
+                )
             else:
                 logger.info(f"not loading ckpt :{self.args.dataset_rank}")
 
@@ -448,7 +449,7 @@ class Trainer:
         del state_dict
 
     def recover_params_from_master_weights(self, state_dict):
-        assert(self.optimizer._inner_opt, DygraphShardingOptimizer)
+        assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
         param2rank = self.optimizer._inner_opt._param2rank
         opt_state_dict = self.optimizer.state_dict()
         assert "master_weights" in opt_state_dict
@@ -466,7 +467,12 @@ class Trainer:
                 assert param.shape == master_weigths[param.name].shape
                 paddle.assign(paddle.cast(master_weigths[param.name].cuda(), paddle.bfloat16), model_state_dict[key])
             if param.name in sharding_group_param_names:
-                paddle.distributed.broadcast(model_state_dict[key], src=self.sharding_group.ranks[param2rank[param.name]], group=self.sharding_group, sync_op=True)
+                paddle.distributed.broadcast(
+                    model_state_dict[key],
+                    src=self.sharding_group.ranks[param2rank[param.name]],
+                    group=self.sharding_group,
+                    sync_op=True,
+                )
         logger.info("after recover, casted model_state_dict: {}".format(model_state_dict))
         state_dict.update(model_state_dict)
         return state_dict
@@ -503,7 +509,6 @@ class Trainer:
                 print(f"{i} gather {recv_item[0]} ")
         return gather_res
 
-
     def load_state_dict_from_checkpoint_with_reshard(self, resume_from_checkpoint):
         """load state_dict from_checkpoint with reshard, Only load model state dict."""
         parallel_config = self._load_distributed_strategy(resume_from_checkpoint)
@@ -537,7 +542,6 @@ class Trainer:
 
         return state_dict
 
-
     def load_one_state_dict_from_checkpoint(self, resume_from_checkpoint, weight_name_suffix):
         """
         load state_dict of one shard from_checkpoint, Only load model state dict.
@@ -560,7 +564,6 @@ class Trainer:
             return_numpy=True,
         )
         return state_dict
-
 
     def check_resume_from_checkpoint(self, resume_from_checkpoint):
         resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
@@ -1887,7 +1890,7 @@ class Trainer:
             logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
             shutil.rmtree(checkpoint)
 
-    def _save_distributed_model_meta(self,dir):
+    def _save_distributed_model_meta(self, dir):
         if not self.args.use_hybrid_parallel:
             return
         nranks = dist.get_world_size()
@@ -1901,12 +1904,12 @@ class Trainer:
         sharding_metas = self._gather_sharding_metas()
         if sharding_metas:
             model_meta["sharding_metas"] = sharding_metas
-        
-        if dist.get_rank():
-            return  
 
-        path=os.path.join(dir, MODEL_META_NAME)
-        with open(path, 'w') as f:
+        if dist.get_rank():
+            return
+
+        path = os.path.join(dir, MODEL_META_NAME)
+        with open(path, "w") as f:
             json.dump(model_meta, f, indent=4)
 
     def _get_distributed_strategy(self):
@@ -1927,16 +1930,18 @@ class Trainer:
                 assert isinstance(model, fleet.meta_parallel.PipelineParallel), "must be pipeline model"
                 vpp_degree = model._layers.get_num_virtual_stages()
             """
-        parallel_config = {"pp_degree":pp_degree,
-                     "mp_degree":mp_degree,
-                     "sharding_degree":sharding_degree,
-                     "vpp_degree":vpp_degree}
+        parallel_config = {
+            "pp_degree": pp_degree,
+            "mp_degree": mp_degree,
+            "sharding_degree": sharding_degree,
+            "vpp_degree": vpp_degree,
+        }
         return parallel_config
 
     def _load_model_meta(self, dir):
         meta_path = os.path.join(dir, MODEL_META_NAME)
         assert os.path.exists(meta_path), f"{meta_path} not exist"
-        with open(meta_path, 'r') as handle:
+        with open(meta_path, "r") as handle:
             model_dist_meta = json.load(handle)
         assert "parallel_config" in model_dist_meta
         return model_dist_meta
@@ -1964,16 +1969,16 @@ class Trainer:
 
         sharding_metas = {}
         sharding_meta = {}
-        param2rank = { k: v for (k, v) in optimizer._param2rank.items()}
+        param2rank = {k: v for (k, v) in optimizer._param2rank.items()}
         sharding_meta["param2rank"] = param2rank
         suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
         sharding_metas[suffix] = sharding_meta
         sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_model_parallel_group())
-        sharding_metas = {k:v for e in sharding_metas_list for (k, v) in e.items()}
+        sharding_metas = {k: v for e in sharding_metas_list for (k, v) in e.items()}
         if self.args.tensor_parallel_rank != 0:
             return None
         sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_pipe_parallel_group())
-        sharding_metas = {k:v for e in sharding_metas_list for (k, v) in e.items()}
+        sharding_metas = {k: v for e in sharding_metas_list for (k, v) in e.items()}
         return sharding_metas
 
     def _load_sharding_meta(self, dir):
@@ -1989,7 +1994,7 @@ class Trainer:
         # for backward compatibility
         meta_path = os.path.join(dir, _add_variant(SHARDING_META_NAME, suffix))
         assert os.path.exists(meta_path), f"{meta_path} not exist"
-        with open(meta_path, 'r') as f:
+        with open(meta_path, "r") as f:
             sharding_meta = json.load(f)
         assert "param2rank" in sharding_meta
         return sharding_meta
@@ -2042,7 +2047,9 @@ class Trainer:
                     state_dict = filter_sharded_params(state_dict, self.optimizer, sharding_rank)
                     if is_bf16:
                         logger.info("before exclude state_dict_to_save len:{}".format(len(state_dict)))
-                        state_dict = exlclude_paramters_in_state_dict(state_dict, param_names_in_master_weights, sharding_group)
+                        state_dict = exlclude_paramters_in_state_dict(
+                            state_dict, param_names_in_master_weights, sharding_group
+                        )
                         logger.info("after exclude state_dict len:{}".format(len(state_dict)))
                 paddle.save(
                     state_dict,
@@ -2100,7 +2107,7 @@ class Trainer:
         logger.info(f"load optimizer state from {path}")
         if os.path.isfile(path):
             return paddlenlp_load(path, return_numpy=True)
-        logger.info(f"{path} not exists")   
+        logger.info(f"{path} not exists")
         return None
 
     def _load_optimizer_state_with_reshard(self, checkpoint):
@@ -2178,6 +2185,7 @@ class Trainer:
             param_name = opt_to_p[name]
             assert param_name in param2rank, f"param_name {param_name} not in param2rank param2"
             return param2rank[param_name] == self.args.sharding_parallel_rank
+
         # state dict
         state_dict = self._all_gather_state_dict(state_dict, opt_filter_func)
 
@@ -2186,11 +2194,12 @@ class Trainer:
             if name in opt_to_p:
                 name = opt_to_p[name]
             return param2rank[name] == self.args.sharding_parallel_rank
+
         # master weights
         master_weights = self._all_gather_state_dict(master_weights, master_weights_filter_func)
         state_dict["master_weights"] = master_weights
 
-        #lr scheduler
+        # lr scheduler
         print(lr_scheduler)
         lr_schedulers = self._all_gather_simple_object(lr_scheduler)
         lr_scheduler = {}
@@ -2201,7 +2210,6 @@ class Trainer:
             state_dict["LR_Scheduler"] = lr_scheduler[0]
 
         return state_dict
-
 
     def _load_optimizer_state(self, checkpoint):
         if self.args.load_sharding_stage1_model:
@@ -2216,9 +2224,7 @@ class Trainer:
 
         opt_state_dict = self._load_optimizer_state(checkpoint)
 
-        if opt_state_dict and os.path.isfile(
-            os.path.join(checkpoint, SCHEDULER_NAME)
-        ):
+        if opt_state_dict and os.path.isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
             # Load in optimizer and scheduler states
             self.optimizer.set_state_dict(opt_state_dict)
 
