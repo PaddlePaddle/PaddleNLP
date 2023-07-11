@@ -193,6 +193,9 @@ fi
 if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     # Install paddlenlp
     cd ${nlp_dir}
+    python -m pip uninstall protobuf -y
+    python -m pip uninstall protobuf -y
+    python -m pip install protobuf==3.20.2
     if [ ! -f ./dist/p****.whl ];then
         install_paddle
         echo "install_nlp_develop"
@@ -200,9 +203,6 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
         python -m pip install --user paddlenlp-ci-py3-none-any.whl
     else
         echo "instal_nlp_pr"
-        python -m pip uninstall protobuf -y
-        python -m pip uninstall protobuf -y
-        python -m pip install protobuf==3.20.2
         python -m pip install  dist/p****.whl
     fi
     pip list
