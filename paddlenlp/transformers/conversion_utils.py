@@ -1014,7 +1014,9 @@ class ConversionMixin:
             else:
                 tensor = tensor.numpy() if is_dst else None
 
-            state_dict_to_save[key] = tensor
+            # keep state dict use paddle.tensor
+            with device_guard("cpu"):
+                state_dict_to_save[key] = paddle.Tensor(tensor, zero_copy=True)
 
         if len(name_action_mappings) > 0:
             for x in name_action_mappings.keys():
