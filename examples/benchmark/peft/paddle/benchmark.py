@@ -131,7 +131,7 @@ def main():
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
 
         return model_inputs
-
+    
     if model_args.english:
         dataset = load_dataset("tatsu-lab/alpaca")
     else:
