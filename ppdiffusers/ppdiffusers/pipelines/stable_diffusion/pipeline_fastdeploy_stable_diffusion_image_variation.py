@@ -24,13 +24,10 @@ from ppdiffusers.pipelines.fastdeploy_utils import (
     FastDeployRuntimeModel,
 )
 
-# from ...models import AutoencoderKL, UNet2DConditionModel
 from ...schedulers import KarrasDiffusionSchedulers
 from ...utils import logging
 from ..pipeline_utils import DiffusionPipeline
 from . import StableDiffusionPipelineOutput
-
-# from .safety_checker import StableDiffusionSafetyChecker
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -100,27 +97,19 @@ class FastDeployStableDiffusionImageVariationPipeline(DiffusionPipeline, FastDep
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
         )
-        # self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
         self.register_to_config(requires_safety_checker=requires_safety_checker)
         self.post_init()
 
     def _encode_image(self, image, num_images_per_prompt, do_classifier_free_guidance, infer_op_dict):
-        # dtype = self.image_encoder.dtype
-
         if not isinstance(image, paddle.Tensor):
             image = self.feature_extractor(images=image, return_tensors="pd").pixel_values
 
-        # image = image.cast(dtype)
-        # breakpoint()
-        # image_embeddings = self.image_encoder(image).image_embeds
         image_encoder_inputs = dict(
             pixel_values=image,
             infer_op=infer_op_dict.get("image_encoder", None),
             output_shape=[image.shape[0], 768],
         )
-        # breakpoint()
         image_embeddings = self.image_encoder(**image_encoder_inputs)[0]
-
         image_embeddings = image_embeddings.unsqueeze(1)
 
         # duplicate image embeddings for each generation per prompt, using mps friendly method
@@ -137,44 +126,6 @@ class FastDeployStableDiffusionImageVariationPipeline(DiffusionPipeline, FastDep
             image_embeddings = paddle.concat([negative_prompt_embeds, image_embeddings])
 
         return image_embeddings
-
-    # # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.run_safety_checker
-    # def run_safety_checker(self, image, dtype):
-    #     if self.safety_checker is not None:
-    #         safety_checker_input = self.feature_extractor(self.numpy_to_pil(image), return_tensors="pd")
-    #         image, has_nsfw_concept = self.safety_checker(
-    #             images=image, clip_input=safety_checker_input.pixel_values.cast(dtype)
-    #         )
-    #     else:
-    #         has_nsfw_concept = None
-    #     return image, has_nsfw_concept
-
-    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents
-    # def decode_latents(self, latents):
-    #     latents = 1 / self.vae.config.scaling_factor * latents
-    #     image = self.vae.decode(latents).sample
-    #     image = (image / 2 + 0.5).clip(0, 1)
-    #     # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
-    #     image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
-    #     return image
-
-    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_extra_step_kwargs
-    # def prepare_extra_step_kwargs(self, generator, eta):
-    #     # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
-    #     # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
-    #     # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
-    #     # and should be between [0, 1]
-
-    #     accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
-    #     extra_step_kwargs = {}
-    #     if accepts_eta:
-    #         extra_step_kwargs["eta"] = eta
-
-    #     # check if the scheduler accepts generator
-    #     accepts_generator = "generator" in set(inspect.signature(self.scheduler.step).parameters.keys())
-    #     if accepts_generator:
-    #         extra_step_kwargs["generator"] = generator
-    #     return extra_step_kwargs
 
     def check_inputs(self, image, height, width, callback_steps):
         if (
@@ -197,22 +148,6 @@ class FastDeployStableDiffusionImageVariationPipeline(DiffusionPipeline, FastDep
                 f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
                 f" {type(callback_steps)}."
             )
-
-    # # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_latents
-    # def prepare_latents(self, batch_size, num_channels_latents, height, width, dtype, generator, latents=None):
-    #     shape = (batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor)
-    #     if isinstance(generator, list) and len(generator) != batch_size:
-    #         raise ValueError(
-    #             f"You have passed a list of generators of length {len(generator)}, but requested an effective batch"
-    #             f" size of {batch_size}. Make sure the batch size matches the length of the generators."
-    #         )
-
-    #     if latents is None:
-    #         latents = randn_tensor(shape, generator=generator, dtype=dtype)
-
-    #     # scale the initial noise by the standard deviation required by the scheduler
-    #     latents = latents * self.scheduler.init_noise_sigma
-    #     return latents
 
     @paddle.no_grad()
     def __call__(
@@ -316,13 +251,10 @@ class FastDeployStableDiffusionImageVariationPipeline(DiffusionPipeline, FastDep
         timesteps, num_inference_steps = self.get_timesteps(num_inference_steps)
 
         # 5. Prepare latent variables
-        # num_channels_latents = self.unet.config.in_channels
         latents = self.prepare_latents(
             batch_size * num_images_per_prompt,
-            # num_channels_latents,
             height,
             width,
-            # image_embeddings.dtype,
             generator,
             latents,
         )
@@ -343,7 +275,6 @@ class FastDeployStableDiffusionImageVariationPipeline(DiffusionPipeline, FastDep
                     latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                 # predict the noise residual
-                # noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=image_embeddings).sample
                 unet_inputs = dict(
                     sample=latent_model_input,
                     timestep=t,
@@ -359,7 +290,6 @@ class FastDeployStableDiffusionImageVariationPipeline(DiffusionPipeline, FastDep
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
                 # compute the previous noisy sample x_t -> x_t-1
-                # latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
                 if is_scheduler_support_step_index:
                     scheduler_output = self.scheduler.step(
                         noise_pred, t, latents, step_index=i, return_pred_original_sample=False, **extra_step_kwargs
@@ -378,7 +308,6 @@ class FastDeployStableDiffusionImageVariationPipeline(DiffusionPipeline, FastDep
                         paddle.device.cuda.synchronize()
 
         # 8. Post-processing
-        # image = self.decode_latents(latents)
         image = self._decode_vae_latents(
             latents / self.vae_scaling_factor, infer_op=infer_op_dict.get("vae_decoder", None)
         )
@@ -390,9 +319,6 @@ class FastDeployStableDiffusionImageVariationPipeline(DiffusionPipeline, FastDep
             do_denormalize = [True] * image.shape[0]
         else:
             do_denormalize = [not has_nsfw for has_nsfw in has_nsfw_concept]
-        # # 10. Convert to PIL
-        # if output_type == "pil":
-        #     image = self.numpy_to_pil(image)
 
         image = self.image_processor.postprocess(image, output_type=output_type, do_denormalize=do_denormalize)
 

@@ -142,7 +142,6 @@ class StableDiffusionExtrasMixin:
             vae = self.vae
         lat = 1 / 0.18215 * lat
         image = vae.decode(lat).sample
-        paddle.save(image, "/root/project/paddlenlp/ppdiffusers_upgrade/drawer/fp16_inference_alignment/records/2.pd")
         image = (image / 2 + 0.5).clip(min=0, max=1)
         image = image.cpu().transpose(perm=[0, 2, 3, 1]).numpy()
         return self.numpy_to_pil(image)
@@ -356,30 +355,6 @@ class StableDiffusionTilingPipeline(DiffusionPipeline, StableDiffusionExtrasMixi
                         paddle.concat(x=[tile_latents] * 2) if do_classifier_free_guidance else tile_latents
                     )
                     latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
-                    paddle.save(
-                        latent_model_input,
-                        "/root/project/paddlenlp/ppdiffusers_upgrade/drawer/fp16_inference_alignment/records/2001"
-                        + str(i)
-                        + str(row)
-                        + str(col)
-                        + ".pd",
-                    )
-                    paddle.save(
-                        t,
-                        "/root/project/paddlenlp/ppdiffusers_upgrade/drawer/fp16_inference_alignment/records/2002"
-                        + str(i)
-                        + str(row)
-                        + str(col)
-                        + ".pd",
-                    )
-                    paddle.save(
-                        text_embeddings,
-                        "/root/project/paddlenlp/ppdiffusers_upgrade/drawer/fp16_inference_alignment/records/2003"
-                        + str(i)
-                        + str(row)
-                        + str(col)
-                        + ".pd",
-                    )
 
                     # predict the noise residual
                     noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings[row][col])[
@@ -412,19 +387,7 @@ class StableDiffusionTilingPipeline(DiffusionPipeline, StableDiffusionExtrasMixi
             # Average overlapping areas with more than 1 contributor
             noise_pred /= contributors
             # compute the previous noisy sample x_t -> x_t-1
-            paddle.save(
-                latents,
-                "/root/project/paddlenlp/ppdiffusers_upgrade/drawer/fp16_inference_alignment/records/3000"
-                + str(i)
-                + ".pd",
-            )
             latents = self.scheduler.step(noise_pred, t, latents).prev_sample
-            paddle.save(
-                latents,
-                "/root/project/paddlenlp/ppdiffusers_upgrade/drawer/fp16_inference_alignment/records/1000"
-                + str(i)
-                + ".pd",
-            )
 
         # scale and decode the image latents with vae
         image = self.decode_latents(latents, cpu_vae)

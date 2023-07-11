@@ -229,12 +229,6 @@ class CLIPGuidedImagesMixingStableDiffusion(DiffusionPipeline):
         image = paddle.vision.transforms.Resize(self.feature_extractor_size)(image)
         image = rearrange(image, "(c t) h w -> c t h w", c=c_size)
 
-        # c_size = self.feature_extractor_size.shape[0]
-        # feature_extractor_size = rearrange(self.feature_extractor_size, 'c t h w -> (c t) h w')
-        # resized_feature_extractor_size = paddle.vision.transforms.Resize(feature_extractor_size)
-        # resized_feature_extractor_size = rearrange(resized_feature_extractor_size, '(c t) h w -> c t h w', c=c_size)
-        # image = resized_feature_extractor_size(image)
-
         image = self.normalize(image)
         image_embeddings_clip = self.clip_model.get_image_features(image)
         image_embeddings_clip = image_embeddings_clip / image_embeddings_clip.norm(p=2, axis=-1, keepdim=True)

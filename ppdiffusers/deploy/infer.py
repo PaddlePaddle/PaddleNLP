@@ -74,7 +74,7 @@ def parse_arguments():
             "mixture_tiling",
             "all",
         ],
-        help="The task can be one of [text2img, img2img, inpaint, inpaint_legacy, cycle_diffusion,  hiresfix, mixture_tiling, all]. ",
+        help="The task can be one of [text2img, img2img, inpaint, inpaint_legacy, cycle_diffusion, hiresfix, mixture_tiling, all]. ",
     )
     parser.add_argument(
         "--parse_prompt_type",
@@ -283,14 +283,6 @@ def main(args):
             "opt_shape": [1, 3, min_image_size, min_image_size],
         }
     }
-
-    # vae_decoder_dynamic_shape = {
-    #     "latent_sample": {
-    #         "min_shape": [1, vae_in_channels, min_image_size // 8, min_image_size // 8],
-    #         "max_shape": [1, vae_in_channels, max_image_size // 8, max_image_size // 8],
-    #         "opt_shape": [1, vae_in_channels, min_image_size // 8, min_image_size // 8],
-    #     }
-    # }
 
     vae_decoder_dynamic_shape = {
         "latent_sample": {

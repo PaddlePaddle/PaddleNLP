@@ -133,22 +133,13 @@ def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
     print(f"Save vae_decoder model in {save_path} successfully.")
     del pipeline.vae
 
-    # if "inpainting" in model_path:
-    #     fd_pipe_cls = FastDeployStableDiffusionInpaintPipeline
-    # else:
-    #     fd_pipe_cls = FastDeployStableDiffusionMegaPipeline
-    #     pipeline_fastdeploy_stable_diffusion_image_variation
-
     fd_pipe_cls = FastDeployStableDiffusionImageVariationPipeline
 
-    # breakpoint()
     fastdeploy_pipeline = fd_pipe_cls(
         vae_encoder=FastDeployRuntimeModel.from_pretrained(output_path / "vae_encoder"),
         vae_decoder=FastDeployRuntimeModel.from_pretrained(output_path / "vae_decoder"),
-        # text_encoder=FastDeployRuntimeModel.from_pretrained(output_path / "text_encoder"),
         image_encoder=FastDeployRuntimeModel.from_pretrained(output_path / "image_encoder"),
         unet=FastDeployRuntimeModel.from_pretrained(output_path / "unet"),
-        # tokenizer=pipeline.tokenizer,
         scheduler=pipeline.scheduler,
         safety_checker=None,
         feature_extractor=pipeline.feature_extractor,

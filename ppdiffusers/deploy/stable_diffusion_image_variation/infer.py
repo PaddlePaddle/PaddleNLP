@@ -16,12 +16,9 @@ import argparse
 import os
 import time
 
-# isort: split
-import paddle
-
-# isort: split
 import fastdeploy as fd
 import numpy as np
+import paddle
 from tqdm.auto import trange
 
 from paddlenlp.trainer.argparser import strtobool
@@ -238,12 +235,9 @@ def main(args):
 
     seed = 1024
     vae_in_channels = 4
-    # text_encoder_max_length = 77
-    # unet_max_length = text_encoder_max_length * 3  # lpw support max_length is 77x3
     min_image_size = 512
     max_image_size = 768
     max_image_size = max(min_image_size, max_image_size)
-    # hidden_states = 1024 if args.is_sd2_0 else 768
     unet_in_channels = 4
     bs = 2
 
@@ -286,9 +280,6 @@ def main(args):
             "min_shape": [1, 3, 128, 128],
             "max_shape": [bs, 3, 512, 512],
             "opt_shape": [2, 3, 512, 512],
-            # "min_shape": [1, text_encoder_max_length, hidden_states],
-            # "max_shape": [bs, unet_max_length, hidden_states],
-            # "opt_shape": [2, text_encoder_max_length, hidden_states],
         },
     }
     # 4. Init runtime

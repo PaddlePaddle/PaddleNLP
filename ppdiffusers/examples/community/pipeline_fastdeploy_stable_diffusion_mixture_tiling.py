@@ -141,30 +141,9 @@ class StableDiffusionExtrasMixin:
             vae = self.vae
         lat = 1 / 0.18215 * lat
         image = vae.decode(lat).sample
-        # images_vae = self.vae_decoder(
-        #     latent_sample=latents,
-        #     infer_op=infer_op,
-        #     output_shape=output_shape,
-        # )[0]
         image = (image / 2 + 0.5).clip(min=0, max=1)
         image = image.cpu().transpose(perm=[0, 2, 3, 1]).numpy()
         return self.numpy_to_pil(image)
-
-    # def decode_latents(self, latents: paddle.Tensor, infer_op=None, **kwargs):
-    #     latents_shape = latents.shape
-    #     output_shape = [
-    #         latents_shape[0],
-    #         self.vae_encoder_num_channels,
-    #         latents_shape[2] * self.vae_scale_factor,
-    #         latents_shape[3] * self.vae_scale_factor,
-    #     ]
-    #     images_vae = self.vae_decoder(
-    #         latent_sample=latents,
-    #         infer_op=infer_op,
-    #         output_shape=output_shape,
-    #     )[0]
-
-    #     return images_vae
 
 
 class FastDeployStableDiffusionTilingPipeline(
@@ -216,7 +195,6 @@ class FastDeployStableDiffusionTilingPipeline(
         seed_tiles: Optional[List[List[int]]] = None,
         seed_tiles_mode: Optional[Union[str, List[List[str]]]] = "full",
         seed_reroll_regions: Optional[List[Tuple[int, int, int, int, int]]] = None,
-        # cpu_vae: Optional[bool] = False,
         # parse_prompt_type: Optional[str] = "lpw",
         # max_embeddings_multiples: Optional[int] = 3,
         infer_op_dict: Dict[str, str] = None,
@@ -404,9 +382,7 @@ class FastDeployStableDiffusionTilingPipeline(
                         output_shape=latent_model_input.shape,
                     )
                     noise_pred = self.unet(**unet_inputs)[0]
-                    # noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings[row][col])[
-                    #     "sample"
-                    # ]
+
                     # perform guidance
                     if do_classifier_free_guidance:
                         noise_pred_uncond, noise_pred_text = noise_pred.chunk(chunks=2)
@@ -445,7 +421,6 @@ class FastDeployStableDiffusionTilingPipeline(
                 paddle.device.cuda.synchronize()
 
         # scale and decode the image latents with vae
-        # image = self.decode_latents(latents, cpu_vae)
         image = self._decode_vae_latents(latents)
         image = (image / 2 + 0.5).clip(min=0, max=1)
         image = image.cpu().transpose(perm=[0, 2, 3, 1]).numpy()
@@ -472,7 +447,6 @@ class FastDeployStableDiffusionTilingPipeline(
         ]
         weights = np.outer(y_probs, x_probs)
         return paddle.tile(
-            # x=paddle.to_tensor(data=weights), repeat_times=(nbatches, self.unet.config.in_channels, 1, 1)
             x=paddle.to_tensor(data=weights),
             repeat_times=(nbatches, self.vae_decoder_num_latent_channels, 1, 1),
         )
