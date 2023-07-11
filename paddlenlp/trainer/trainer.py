@@ -18,6 +18,7 @@
 
 import collections
 import contextlib
+import copy
 import inspect
 import json
 import math
@@ -449,6 +450,7 @@ class Trainer:
         del state_dict
 
     def recover_params_from_master_weights(self, state_dict):
+        assert isinstance(state_dict, dict)
         assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
         param2rank = self.optimizer._inner_opt._param2rank
         opt_state_dict = self.optimizer.state_dict()
@@ -460,10 +462,15 @@ class Trainer:
         paddle.distributed.all_gather_object(tmp, param_names_in_master_weights, group=self.sharding_group)
         sharding_group_param_names = [v for item in tmp for v in item]
         logger.info("sharding_group_param_names:{}".format(sharding_group_param_names))
-        model_state_dict = self.model.state_dict()
+        not_bf16_param_names = [p.name for _, p in state_dict.items()]
+        model_state_dict = copy.copy(self.model.state_dict())
+        model_state_dict.update(state_dict)
         logger.info("before recover, model_state_dict: {}".format(model_state_dict))
         for key, param in model_state_dict.items():
             if param.name in master_weigths:
+                assert param.name not in not_bf16_param_names, "param name:{}, not_bf16_param_names:{}".format(
+                    param.name, not_bf16_param_names
+                )
                 assert param.shape == master_weigths[param.name].shape
                 paddle.assign(paddle.cast(master_weigths[param.name].cuda(), paddle.bfloat16), model_state_dict[key])
             if param.name in sharding_group_param_names:
@@ -474,8 +481,7 @@ class Trainer:
                     sync_op=True,
                 )
         logger.info("after recover, casted model_state_dict: {}".format(model_state_dict))
-        state_dict.update(model_state_dict)
-        return state_dict
+        return model_state_dict
 
     def _all_gather_state_dict(self, state_dict, filter_func, group=None):
         if group is None:
