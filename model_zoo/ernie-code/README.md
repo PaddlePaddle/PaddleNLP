@@ -39,7 +39,7 @@ text：BadZipFileのAliasは、古い Python バージョンとの互換性の�
 code：def badzip_file_alias(self): \n        """BadZipFileのAliasは、古いPython バージョンとの互換性のために。 \n        """ \n        if self._version == \'1.0\': \n            return self._version \n        else: \n            return self._version
 ```
 
-## 模型导出预测
+## 模型参数转换(PyTorch-->PaddlePaddle)
 
 本项目提供了权重转化脚本`converter.py`，用户可以参考该脚本将Huggingface模型权重转化为paddle形式。
 
@@ -50,4 +50,4 @@ python converter.py \
 ```
 
 ## 参考文献
-- [ERNIE-Code: Beyond English-Centric Cross-lingual Pretraining for Programming Languages](https://arxiv.org/abs/2212.06742)
+- [ERNIE-Code: Beyond English-Centric Cross-lingual Pretraining for Programming Languages](https://aclanthology.org/2023.findings-acl.676.pdf)
