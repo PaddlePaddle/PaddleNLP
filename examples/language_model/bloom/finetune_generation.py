@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 from dataclasses import dataclass, field
 from functools import partial
@@ -19,7 +20,7 @@ from functools import partial
 import numpy as np
 import paddle
 from sklearn.metrics import accuracy_score
-from utils import BloomTrainer, compute_metrics, save_infer_result
+from utils import BloomTrainer, compute_metrics
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
@@ -32,24 +33,10 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class DataArgument:
-    task_name: str = field(default="dureader_qg", metadata={"help": "The name of task."})
+    data_name: str = field(default=None, metadata={"help": "The name of data."})
+    task_name_or_path: str = field(default=None, metadata={"help": "Path or name for dataset"})
     src_length: int = field(default=512, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=512, metadata={"help": "The max length of target text."})
-    min_tgt_length: int = field(default=0, metadata={"help": "The min length of target text."})
-    length_penalty: float = field(default=0.7, metadata={"help": "The length penalty."})
-    no_repeat_ngram_size: int = field(default=3, metadata={"help": "The no repeat ngram size."})
-    num_beams: int = field(default=5, metadata={"help": "The number of beams."})
-    select_topk: bool = field(default=True, metadata={"help": "Whether to select top k tokens for generation."})
-    top_p: float = field(
-        default=0.0, metadata={"help": "The cumulative probability for top-p-filtering in the 'sampling' strategy."}
-    )
-    top_k: int = field(
-        default=0,
-        metadata={
-            "help": "The number of highest probability tokens to keep for top-k-filtering in the 'sampling' strategy."
-        },
-    )
-    generate_num: int = field(default=0, metadata={"help": "Save first k examples generation result in dev dataset"})
 
 
 @dataclass
@@ -58,48 +45,72 @@ class ModelArgument:
         default="bigscience/bloom-560m",
         metadata={"help": "Build-in pretrained model name or the path to local model."},
     )
-    label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
+    eval_with_do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
+
+    # lora
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
-    r: int = field(default=4, metadata={"help": "Lora attention dimension"})
+    lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
+    lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
     merge_weights: bool = field(
         default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
     )
+    # prefix tuning
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
     num_prefix_tokens: int = field(default=10, metadata={"help": "Number of prefix tokens"})
     prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
-    do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
+    # qat
+    qat: bool = field(default=False, metadata={"help": "Whether to use QAT technique"})
+    qat_type: str = field(default="A8W8", metadata={"help": "Quantization type. Supported values: A8W8, W4,A8W4"})
+
+
+def read_local_dataset(path):
+    with open(path, "r", encoding="utf-8") as fp:
+        for line in fp:
+            yield json.loads(line.strip())
 
 
 def convert_example(
     example,
     tokenizer,
-    decoder_start_token_id,
     max_source_length,
     max_target_length,
-    is_train=True,
 ):
     """Convert all examples into necessary features."""
-    source = None
-    title = None
-    target = None
-    if "source" in example and "title" in example:
-        source = example["source"]
-        if "title" in example.keys():
-            title = example["title"]
-    elif "context" in example and "answer" in example:
-        source = example["context"]
-        if "answer" in example.keys():
-            title = example["answer"]
-    else:
-        assert False, "Source and title are not in the input dictionary, nor are context and answer."
-    if "target" in example.keys():
-        target = example["target"]
-    elif "question" in example.keys():
-        target = example["question"]
+    if "source" in example:
+        source = None
+        title = None
+        target = None
+        if "source" in example and "title" in example:
+            source = example["source"]
+            if "title" in example.keys():
+                title = example["title"]
+        elif "context" in example and "answer" in example:
+            source = example["context"]
+            if "answer" in example.keys():
+                title = example["answer"]
+        else:
+            assert False, "Source and title are not in the input dictionary, nor are context and answer."
 
-    # Add the eos token for the source and target
-    source = "答案：" + title + "，上下文：" + source + "在已知答案的前提下，问题："
+        if "target" in example.keys():
+            target = example["target"]
+        elif "question" in example.keys():
+            target = example["question"]
+
+        # Add the eos token for the source and target
+        source = "答案：" + title + "，上下文：" + source + "在已知答案的前提下，问题："
+    elif "content" in example:
+        source = example["content"]
+        target = example["summary"]
+    elif "instruction" in example:
+        source = example["instruction"]
+        target = example["output"]
+    elif "src" in example:
+        source = example["src"][0] if isinstance(example["src"], list) else example["src"]
+        target = example["tgt"][0] if isinstance(example["tgt"], list) else example["tgt"]
+    else:
+        raise ValueError("Please check dataset format.")
+
     target = target[: max_target_length - 1]
     target = target + tokenizer.eos_token
 
@@ -129,72 +140,14 @@ def convert_example(
     )
 
 
-def custom_instruction_convert_example(example, tokenizer, data_args, is_test=True):
-    instruction = ""
-    input = ""
-    response = ""
-    if "instruction" in example and "output" in example:
-        instruction = example["instruction"]
-        response = example["output"]
-    else:
-        assert False, "instruction and output are not in the input dictionary."
-    if "input" in example["input"]:
-        input = example["input"]
-
-    prompt = instruction + input
-    # dataset for evaluation
-    if is_test:
-        inputs = {
-            **tokenizer(prompt, max_length=data_args.src_length, truncation=True, padding="max_length"),
-            "labels": tokenizer(response, max_length=data_args.tgt_length, truncation=True, padding="max_length")[
-                "input_ids"
-            ],
-        }
-    # dataset for training
-    else:
-        response = response[: data_args.tgt_length - 1]
-        target_tokenized = tokenizer(
-            response,
-            add_special_tokens=False,
-            max_length=data_args.tgt_length - 2,
-            truncation=True,
-            truncation_side="right",
-        )
-        target_input_ids_len = (np.array(target_tokenized["input_ids"]) != tokenizer.pad_token_id).sum()
-
-        source_tokenized = tokenizer(
-            prompt,
-            add_special_tokens=False,
-            max_length=data_args.src_length - 1,
-            truncation=True,
-            truncation_side="left",
-        )
-
-        input_ids = (
-            [tokenizer.bos_token_id]
-            + source_tokenized["input_ids"]
-            + [tokenizer.bos_token_id]
-            + target_tokenized["input_ids"]
-        )
-        labels = (len(input_ids) - target_input_ids_len) * [tokenizer.pad_token_id] + target_tokenized["input_ids"]
-
-        # shift labels
-        input_ids, labels = input_ids[:-1], labels[1:]
-
-        inputs = {
-            "input_ids": input_ids,
-            "labels": labels,
-        }
-    return inputs
-
-
 def main():
     # Parse the model and data  arguements
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
-    setattr(training_args, "label_smoothing", model_args.label_smoothing)
+
     setattr(training_args, "lr_decay_ratio", model_args.lr_decay_ratio)
 
     # Set the training device
@@ -222,7 +175,7 @@ def main():
             )
 
     # Set the dtype for loading model
-    dtype = None
+    dtype = paddle.get_default_dtype()
     if training_args.fp16_opt_level == "O2":
         if training_args.fp16:
             dtype = "float16"
@@ -232,7 +185,6 @@ def main():
     # Load the pretrained language model.
     model = BloomForCausalLM.from_pretrained(
         model_args.model_name_or_path,
-        load_state_as_np=True,
         low_cpu_mem_usage=True,  # todo enable low_cpu_mem_usage=True
         dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         tensor_parallel_degree=training_args.tensor_parallel_degree,
@@ -242,18 +194,66 @@ def main():
     )
 
     if model_args.lora:
-        # hardcode parameters for now
-        lora_config = LoRAConfig(
-            target_modules=[".*query_key_value.*"],
-            r=model_args.r,
-            lora_alpha=2 * model_args.r,
-            merge_weights=model_args.merge_weights,
-            tensor_parallel_degree=training_args.tensor_parallel_degree,
-            dtype=dtype,
-        )
-        model = LoRAModel(model, lora_config)
+        if model_args.lora_path is None:
+            # Not yet support RowParallelLinear
+            if training_args.tensor_parallel_degree > 1:
+                target_modules = [".*query_key_value.*", ".*dense_h_to_4h.*"]
+            else:
+                target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
+            lora_config = LoRAConfig(
+                target_modules=target_modules,
+                r=model_args.lora_rank,
+                lora_alpha=2 * model_args.lora_rank,
+                merge_weights=model_args.merge_weights,
+                tensor_parallel_degree=training_args.tensor_parallel_degree,
+                dtype=dtype,
+            )
+            model = LoRAModel(model, lora_config)
+        else:
+            model = LoRAModel.from_pretrained(mode=model, lora_path=model_args.lora_path)
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
+
+    if model_args.qat:
+        from paddle import nn
+        from paddle.quantization import QAT, QuantConfig
+        from paddle.quantization.quanters import FakeQuanterWithAbsMaxObserver
+
+        # FakeQuanterChannelWiseAbsMaxObserver not yet merge in Paddle develop
+        # from paddle.quantization.quanters import FakeQuanterChannelWiseAbsMaxObserver
+        from paddle.quantization.quanters.abs_max import (
+            FakeQuanterWithAbsMaxObserverLayer,
+        )
+        from paddleslim.quant.quanters import PACTQuanter
+
+        from paddlenlp.peft.lora import LoRALinear
+        from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
+
+        q_config = QuantConfig(activation=None, weight=None)
+        q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
+
+        if model_args.qat_type == "A8W8":
+            activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
+            # activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
+            # weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype=dtype)
+            weight = FakeQuanterWithAbsMaxObserver(bit_length=8, dtype=dtype)
+        elif model_args.qat_type == "W4":
+            activation = None
+            # weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype=dtype)
+            weight = FakeQuanterWithAbsMaxObserver(bit_length=4, dtype=dtype)
+        elif model_args.qat_type == "A8W4":
+            activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
+            # activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
+            # weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype=dtype)
+            weight = FakeQuanterWithAbsMaxObserver(bit_length=8, dtype=dtype)
+        else:
+            raise ValueError("qat_type should be one of ['A8W8', 'W4', 'A8W4']")
+
+        q_config.add_type_config(LoRALinear, weight=weight, activation=activation)
+        q_config.add_type_config(nn.Linear, weight=weight, activation=activation)
+
+        qat = QAT(q_config)
+        model = qat.quantize(model, inplace=True)
 
     if model_args.prefix_tuning:
         prefix_config = PrefixConfig(
@@ -277,24 +277,30 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load the dataset.
-    if model_args.do_generation:
-        trans_func = partial(
-            convert_example,
-            tokenizer=tokenizer,
-            decoder_start_token_id=tokenizer.bos_token_id,
-            max_source_length=data_args.src_length,
-            max_target_length=data_args.tgt_length,
+    if os.path.exists(os.path.join(data_args.task_name_or_path, "train.json")) and os.path.exists(
+        os.path.join(data_args.task_name_or_path, "dev.json")
+    ):
+        train_ds = load_dataset(
+            read_local_dataset, path=os.path.join(data_args.task_name_or_path, "train.json"), lazy=False
         )
-        train_ds, dev_ds = load_dataset("dureader_qg", splits=("train", "dev"))
-
-        train_ds = train_ds.map(trans_func, lazy=False)
-        dev_ds = dev_ds.map(trans_func, lazy=False)
+        dev_ds = load_dataset(
+            read_local_dataset, path=os.path.join(data_args.task_name_or_path, "dev.json"), lazy=False
+        )
+    elif data_args.data_name is not None:
+        train_ds, dev_ds = load_dataset(data_args.data_name, data_args.task_name_or_path, splits=["train", "dev"])
     else:
-        train_ds, dev_ds = load_dataset("bellegroup", "school_math_0.25M", splits=["train", "dev"])
-        trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
+        train_ds, dev_ds = load_dataset(data_args.task_name_or_path, splits=["train", "dev"])
 
-        train_ds = train_ds.map(partial(trans_func, is_test=False))
-        dev_ds = dev_ds.map(partial(trans_func, is_test=False))
+    # Load the dataset.
+    trans_func = partial(
+        convert_example,
+        tokenizer=tokenizer,
+        max_source_length=data_args.src_length,
+        max_target_length=data_args.tgt_length,
+    )
+
+    train_ds = train_ds.map(trans_func, lazy=False)
+    dev_ds = dev_ds.map(trans_func, lazy=False)
 
     collate_fn = DataCollatorForSeq2Seq(
         tokenizer=tokenizer,
@@ -337,8 +343,10 @@ def main():
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics_func if model_args.do_generation else compute_metrics_not_do_generation,
-        do_generation=model_args.do_generation,
+        compute_metrics=compute_metrics_func
+        if model_args.eval_with_do_generation
+        else compute_metrics_not_do_generation,
+        do_generation=model_args.eval_with_do_generation,
         data_collator=collate_fn,
         data_args=data_args,
     )
@@ -356,11 +364,6 @@ def main():
     if training_args.do_eval:
         eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("test", eval_result)
-
-    if data_args.generate_num > 0:
-        save_infer_result(
-            trainer, dev_ds, k=data_args.generate_num, src_length=data_args.src_length, tgt_length=data_args.tgt_length
-        )
 
 
 if __name__ == "__main__":
