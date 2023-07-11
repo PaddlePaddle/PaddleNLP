@@ -96,6 +96,9 @@ def convert_example(example, tokenizer, data_args, is_test=False):
             labels=labels,
         )
 
+    # shift labels
+    input_ids, labels = input_ids[:-1], labels[1:]
+
     return dict(
         input_ids=input_ids,
         labels=labels,
@@ -163,6 +166,9 @@ def custom_instruction_convert_example(
             input_ids=source_tokenized["input_ids"][0],
             labels=labels,
         )
+
+    # shift labels
+    input_ids, labels = input_ids[:-1], labels[1:]
 
     return dict(
         input_ids=input_ids,

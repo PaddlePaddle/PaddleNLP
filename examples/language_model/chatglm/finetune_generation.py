@@ -105,6 +105,7 @@ def main():
         dtype=dtype,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
+        lm_shift_labels=False,
     )
     if model_args.prefix_tuning:
         prefix_config = PrefixConfig(

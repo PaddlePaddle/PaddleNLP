@@ -1161,7 +1161,7 @@ class GenerationMixin(object):
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
 
             if eos_token_id is not None:
-                unfinished_flag = paddle.logical_and(unfinished_flag, next_tokens != eos_token_id)
+                unfinished_flag = get_unfinished_flag(input_ids, unfinished_flag, eos_token_id)
 
             # Stop when there is a </s> in all sentences
             if not paddle.any(unfinished_flag):
@@ -1346,7 +1346,7 @@ class GenerationMixin(object):
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
 
             if eos_token_id is not None:
-                unfinished_flag = paddle.logical_and(unfinished_flag, next_tokens != eos_token_id)
+                unfinished_flag = get_unfinished_flag(input_ids, unfinished_flag, eos_token_id)
 
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder

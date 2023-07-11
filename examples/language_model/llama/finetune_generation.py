@@ -156,8 +156,8 @@ def main():
         fp16_opt_level=training_args.fp16_opt_level,
         use_flash_attention=model_args.use_flash_attention,
         use_recompute=training_args.recompute,
-        low_cpu_mem_usage=True,
         dtype=dtype,  # todo enable set dtype to avoid additional mem usage
+        lm_shift_labels=False,
     )
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
@@ -197,7 +197,9 @@ def main():
     )
     tokenizer.pad_token = tokenizer.unk_token
 
-    trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
+    trans_func = partial(
+        custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args, benchmark=training_args.benchmark
+    )
     # Load the dataset.
     if training_args.benchmark:
         train_ds = load_dataset(reader, data_path="./data/train.txt", lazy=False)
