@@ -1888,17 +1888,23 @@ class Trainer:
             shutil.rmtree(checkpoint)
 
     def _save_distributed_model_meta(self,dir):
+        if not self.args.use_hybrid_parallel:
+            return
         nranks = dist.get_world_size()
-        if self.args.use_hybrid_parallel and nranks > 1:
-            if dist.get_rank():
-                return
+        if nranks <= 1:
+            return
+
         model_meta = {}
         parallel_config = self._get_distributed_strategy()
         if parallel_config:
             model_meta["parallel_config"] = parallel_config
-        sharding_meta = self._gather_gather_sharding_meta()
-        if shard_meta:
-            model_meta["sharding_meta"] = sharding_meta
+        sharding_metas = self._gather_sharding_metas()
+        if sharding_metas:
+            model_meta["sharding_metas"] = sharding_metas
+        
+        if dist.get_rank():
+            return  
+
         path=os.path.join(dir, MODEL_META_NAME)
         with open(path, 'w') as f:
             json.dump(model_meta, f, indent=4)
@@ -1927,13 +1933,13 @@ class Trainer:
                      "vpp_degree":vpp_degree}
         return parallel_config
 
-   def _load_model_meta(self, dir):
-       meta_path = os.path.join(dir, MODEL_META_NAME)
-       assert os.path.exists(meta_path), f"{meta_path} not exist"
-       with open(meta_path, 'r') as handle:
-           model_dist_meta = json.load(handle)
-       assert "parallel_config" in model_dist_meta
-       return model_dist_meta
+    def _load_model_meta(self, dir):
+        meta_path = os.path.join(dir, MODEL_META_NAME)
+        assert os.path.exists(meta_path), f"{meta_path} not exist"
+        with open(meta_path, 'r') as handle:
+            model_dist_meta = json.load(handle)
+        assert "parallel_config" in model_dist_meta
+        return model_dist_meta
 
     def _load_distributed_strategy(self, dir):
         model_dist_meta = self._load_model_meta(dir)
@@ -1943,12 +1949,15 @@ class Trainer:
         assert "sharding_degree" in parallel_config
         return parallel_config
 
-    def _gather_sharding_meta(self):
+    def _gather_sharding_metas(self):
         nranks = dist.get_world_size()
         if not self.args.use_hybrid_parallel or nranks <= 1:
             return None
         if self.args.sharding_parallel_rank != 0:
             return None
+        if self.args.data_parallel_rank != 0:
+            return None
+
         optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
         if not optimizer:
             return None
@@ -1970,8 +1979,10 @@ class Trainer:
     def _load_sharding_meta(self, dir):
         suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
         distributed_model_meta = self._load_model_meta(dir)
-        if "sharding_meta" in distributed_model_meta:
-            sharding_meta = distributed_model_meta["sharding_meta"]
+        if "sharding_metas" in distributed_model_meta:
+            sharding_metas = distributed_model_meta["sharding_metas"]
+            assert suffix in sharding_metas
+            sharding_meta = sharding_metas[suffix]
             assert "param2rank" in sharding_meta
             return sharding_meta
 
@@ -2089,6 +2100,7 @@ class Trainer:
         logger.info(f"load optimizer state from {path}")
         if os.path.isfile(path):
             return paddlenlp_load(path, return_numpy=True)
+        logger.info(f"{path} not exists")   
         return None
 
     def _load_optimizer_state_with_reshard(self, checkpoint):
@@ -2097,8 +2109,8 @@ class Trainer:
         pp_degree = parallel_config["pp_degree"]
         mp_degree = parallel_config["mp_degree"]
         sharding_degree = parallel_config["sharding_degree"]
-        self.args.pipeline_parallel_degree == pp_degree
-        self.args.tensor_parallel_degree == mp_degree
+        assert self.args.pipeline_parallel_degree == pp_degree
+        assert self.args.tensor_parallel_degree == mp_degree
         cur_sharding_degree = self.args.sharding_parallel_degree
 
         def need_reshard():
@@ -2118,7 +2130,7 @@ class Trainer:
         if not need_reshard():
             logger.info("do not need reshard")
             return self._load_optimizer_state_of_one_shard(checkpoint, self.args.optimizer_name_suffix)
-
+        logger.info("reshard optimizer state")
         state_dict = OrderedDict()
         master_weights = OrderedDict()
         lr_scheduler = {}
@@ -2215,7 +2227,7 @@ class Trainer:
                 self.scaler.load_state_dict(paddle.load(os.path.join(checkpoint, SCALER_NAME), return_numpy=True))
         else:
             raise ValueError(
-                f"optimizer-state-dict not found, opt:{os.path.join(checkpoint, optimizer_name)} scheduler:{os.path.join(checkpoint, SCHEDULER_NAME)}"
+                f"optimizer-state-dict not found, opt:{checkpoint} scheduler:{os.path.join(checkpoint, SCHEDULER_NAME)}"
             )
 
     def log(self, logs: Dict[str, float], **kwargs) -> None:
