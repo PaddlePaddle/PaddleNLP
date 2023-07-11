@@ -381,9 +381,9 @@ class UnCLIPPipeline(DiffusionPipeline):
         self.decoder_scheduler.set_timesteps(decoder_num_inference_steps)
         decoder_timesteps_tensor = self.decoder_scheduler.timesteps
 
-        num_channels_latents = self.decoder.in_channels
-        height = self.decoder.sample_size
-        width = self.decoder.sample_size
+        num_channels_latents = self.decoder.config.in_channels
+        height = self.decoder.config.sample_size
+        width = self.decoder.config.sample_size
 
         decoder_latents = self.prepare_latents(
             (batch_size, num_channels_latents, height, width),
@@ -440,9 +440,9 @@ class UnCLIPPipeline(DiffusionPipeline):
         self.super_res_scheduler.set_timesteps(super_res_num_inference_steps)
         super_res_timesteps_tensor = self.super_res_scheduler.timesteps
 
-        channels = self.super_res_first.in_channels // 2
-        height = self.super_res_first.sample_size
-        width = self.super_res_first.sample_size
+        channels = self.super_res_first.config.in_channels // 2
+        height = self.super_res_first.config.sample_size
+        width = self.super_res_first.config.sample_size
 
         super_res_latents = self.prepare_latents(
             (batch_size, channels, height, width),
@@ -468,7 +468,9 @@ class UnCLIPPipeline(DiffusionPipeline):
             else:
                 unet = self.super_res_first
 
-            latent_model_input = paddle.concat([super_res_latents, image_upscaled], axis=1)
+            latent_model_input = paddle.concat(
+                [super_res_latents, image_upscaled.cast(super_res_latents.dtype)], axis=1
+            )
 
             noise_pred = unet(
                 sample=latent_model_input,

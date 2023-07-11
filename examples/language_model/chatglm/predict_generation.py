@@ -15,9 +15,8 @@
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.layers import LoRAConfig, LoRAModel
-from paddlenlp.prompt import PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.prompt.prefix import (
+from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.peft.prefix import (
     chatglm_pad_attention_mask,
     chatglm_postprocess_past_key_value,
 )
@@ -68,8 +67,8 @@ class Predictor(object):
             self.tokenizer = ChatGLMTokenizer.from_pretrained(args.model_name_or_path)
             self.batch_size = args.batch_size
             self.args = args
-            self.src_length = args.src_length
-            self.tgt_length = args.tgt_length
+            self.src_length = self.args.src_length
+            self.tgt_length = self.args.tgt_length
 
             tensor_parallel_degree = paddle.distributed.get_world_size()
             tensor_parallel_rank = 0
@@ -104,10 +103,12 @@ class Predictor(object):
             )
             if self.args.lora_path is not None:
                 self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
+                self.model.mark_only_lora_as_trainable()
             if self.args.prefix_path is not None:
                 self.model = PrefixModelForCausalLM.from_pretrained(
                     self.model, self.args.prefix_path, chatglm_postprocess_past_key_value, chatglm_pad_attention_mask
                 )
+
         self.model.eval()
 
     def preprocess(self, input_text):
@@ -131,7 +132,7 @@ class Predictor(object):
             top_k=1,
             max_length=self.tgt_length,
             bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=self.tokenizer.end_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
             pad_token_id=self.tokenizer.pad_token_id,
             use_cache=True,
         )

@@ -695,8 +695,8 @@ def ppocr2example(ocr_res, img_path):
     doc_tokens = []
     doc_boxes = []
 
-    im_w_box = max([seg["bbox"].left + seg["bbox"].width for seg in segments]) + 20
-    im_h_box = max([seg["bbox"].top + seg["bbox"].height for seg in segments]) + 20
+    im_w_box = max([seg["bbox"].left + seg["bbox"].width for seg in segments]) + 20 if segments else 0
+    im_h_box = max([seg["bbox"].top + seg["bbox"].height for seg in segments]) + 20 if segments else 0
     img = Image.open(img_path)
     im_w, im_h = img.size
     im_w, im_h = max(im_w, im_w_box), max(im_h, im_h_box)

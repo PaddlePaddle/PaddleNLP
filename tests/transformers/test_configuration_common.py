@@ -183,7 +183,6 @@ class ConfigTester(object):
         for key, value in config_common_kwargs.items():
             if getattr(config, key) != value:
                 wrong_values.append((key, getattr(config, key), value))
-
         if len(wrong_values) > 0:
             errors = "\n".join([f"- {v[0]}: got {v[1]} instead of {v[2]}" for v in wrong_values])
             raise ValueError(f"The following keys were not properly set in the config:\n{errors}")
@@ -196,6 +195,15 @@ class ConfigTester(object):
         self.create_and_test_config_with_num_classes()
         self.check_config_can_be_init_without_params()
         self.check_config_arguments_init()
+
+    def create_and_test_config_with_num_labels(self):
+        config = self.config_class(**self.inputs_dict, num_labels=5)
+        self.parent.assertEqual(len(config.id2label), 5)
+        self.parent.assertEqual(len(config.label2id), 5)
+
+        config.num_labels = 3
+        self.parent.assertEqual(len(config.id2label), 3)
+        self.parent.assertEqual(len(config.label2id), 3)
 
 
 class ConfigTestUtils:

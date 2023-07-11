@@ -128,7 +128,7 @@ class ErnieTokenizer(PretrainedTokenizer):
             Defaults to`True`.
         unk_token (str, optional):
             A special token representing the *unknown (out-of-vocabulary)* token.
-            An unknown token is set to be `unk_token` inorder to be converted to an ID.
+            An unknown token is set to be `unk_token` in order to be converted to an ID.
             Defaults to "[UNK]".
         sep_token (str, optional):
             A special token separating two different sentences in the same input.

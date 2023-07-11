@@ -22,7 +22,7 @@ from data import DataCollatorForSupervisedDataset, convert_example
 from utils import OPTTrainer, compute_metrics
 
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import LoRAConfig, LoRAModel
+from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import GPTTokenizer, OPTForCausalLM
 from paddlenlp.utils.log import logger
@@ -101,6 +101,7 @@ def main():
         # dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
+        lm_shift_labels=False,
     )
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced

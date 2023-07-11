@@ -23,6 +23,7 @@ from paddlenlp.transformers.llama.modeling import (
     LlamaConfig,
     LlamaDecoderLayer,
     LlamaLMHead,
+    LlamaModel,
     LlamaPretrainedModel,
     LlamaPretrainingCriterion,
     LlamaRMSNorm,
@@ -33,11 +34,44 @@ def get_hcg():
     return fleet.get_hybrid_communicate_group()
 
 
-class LlamaEmbedding(nn.Layer):
+def parse_args(args):
+    if isinstance(args, tuple):
+        if len(args) == 3:
+            hidden_states, attention_mask, position_ids = args
+        elif len(args) == 2:
+            hidden_states, attention_mask = args
+            position_ids = None
+    else:
+        hidden_states = args
+        attention_mask, position_ids = None, None
+
+    if position_ids is not None:
+        position_ids.stop_gradient = True
+
+    if attention_mask is not None:
+        attention_mask.stop_gradient = True
+
+    return hidden_states, attention_mask, position_ids
+
+
+def return_args(hidden_states, attention_mask=None, position_ids=None):
+    ret = (hidden_states,)
+
+    if attention_mask is not None:
+        ret += (attention_mask.clone(),)
+    if position_ids is not None:
+        ret += (position_ids.clone(),)
+    if len(ret) == 1:
+        ret = ret[0]
+
+    return ret
+
+
+class LlamaEmbeddingPipe(nn.Layer):
     """Extends LlamaEmbeddings to forward attention_mask through the pipeline."""
 
     def __init__(self, config):
-        super(LlamaEmbedding, self).__init__()
+        super(LlamaEmbeddingPipe, self).__init__()
         if config.tensor_parallel_degree > 1:
             self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
                 config.vocab_size,
@@ -47,7 +81,7 @@ class LlamaEmbedding(nn.Layer):
         else:
             self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
 
-    def forward(self, input_ids):
+    def forward(self, args):
         """_summary_
 
         Args:
@@ -56,7 +90,30 @@ class LlamaEmbedding(nn.Layer):
         Returns:
             _type_: _description_
         """
-        return self.embed_tokens(input_ids)
+        input_ids, attention_mask, position_ids = parse_args(args)
+
+        input_embeds = self.embed_tokens(input_ids)
+        batch_size, seq_length = input_ids.shape
+        if attention_mask is not None:
+            attention_mask = LlamaModel._prepare_decoder_attention_mask(
+                attention_mask, (batch_size, seq_length), 0, input_embeds.dtype
+            )
+            attention_mask.stop_gradient = True
+
+        return return_args(input_embeds, attention_mask, position_ids)
+
+
+class LlamaDecoderLayerPipe(LlamaDecoderLayer):
+    def forward(self, args):
+        hidden_states, attention_mask, position_ids = parse_args(args)
+        hidden_states = super().forward(hidden_states, attention_mask=attention_mask)
+        return return_args(hidden_states, attention_mask, position_ids)
+
+
+class LlamaRMSNormPipe(LlamaRMSNorm):
+    def forward(self, args):
+        hidden_states, attention_mask, position_ids = parse_args(args)
+        return super().forward(hidden_states)
 
 
 class PipelinePretrainedModel(PretrainedModel):
@@ -81,23 +138,39 @@ class PipelinePretrainedModel(PretrainedModel):
         else:
             mapping = {}
             state_dict_keys = list(super().state_dict().keys())
+            first_key = state_dict_keys[0].split(".")
+            # if use virtual pp_degree, the prefix is like 0.0.xxx
+            # else it will be like 0.xxx
+            use_virtual_pp_degree = first_key[0].isdigit() and first_key[1].isdigit()
+
             prefixs = self.get_sequential_name_prefixs()
             for k in state_dict_keys:
                 name_splited = k.split(".")
-                name_splited[0] = prefixs[name_splited[0]]
-                mapping[".".join(name_splited)] = k
+                if use_virtual_pp_degree:
+                    idx = str(int(name_splited[0]) + int(name_splited[1]))
+                    single_name = [prefixs[idx]]
+                    single_name.extend(name_splited[2:])
+                else:
+                    idx = name_splited[0]
+                    single_name = [prefixs[idx]]
+                    single_name.extend(name_splited[1:])
+                mapping[".".join(single_name)] = k
+
             self._pipeline_name_mapping = mapping
 
         return self._pipeline_name_mapping
 
     def state_dict(self, *args, **kwargs):
         state_dict = super().state_dict(*args, **kwargs)
-        prefixs = self.get_sequential_name_prefixs()
+
+        if self._pipeline_name_mapping is None:
+            self._set_pipeline_name_mapping()
+        assert len(self._pipeline_name_mapping) > 0, "The pipeline stage must have parameters!"
+        pp_to_single_mapping = {v: k for k, v in self._pipeline_name_mapping.items()}
+
         for k in list(state_dict.keys()):
             v = state_dict.pop(k)
-            name_splited = k.split(".")
-            name_splited[0] = prefixs[name_splited[0]]
-            state_dict[".".join(name_splited)] = v
+            state_dict[pp_to_single_mapping[k]] = v
 
         return state_dict
 
@@ -112,7 +185,8 @@ class PipelinePretrainedModel(PretrainedModel):
                 continue
             state_dict[self._pipeline_name_mapping[k]] = v
 
-        return super().set_state_dict(state_dict, *args, **kwargs)
+        ret = super().set_state_dict(state_dict, *args, **kwargs)
+        return ret
 
 
 class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
@@ -125,26 +199,27 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     config_class = LlamaConfig
 
     _get_tensor_parallel_mappings = LlamaPretrainedModel._get_tensor_parallel_mappings
+    _init_weights = LlamaPretrainedModel._init_weights
+
     # NO base_model_prefix !!!!
 
     def __init__(
         self,
         config,
-        # num_partitions=1,
-        # topology=None,
-        use_recompute=True,
-        # fused_linear=False,
-        # fuse_attn_qkv=False,
+        # use_recompute=None,
         # scale_qk_by_layer_num=True,
-        recompute_granularity="full",
-        virtual_pp_degree=1,
+        # recompute_granularity="full",
+        # virtual_pp_degree=4,
         # sequence_parallel=False,
         # no_recompute_layers=None,
         pp_recompute_interval=1,
-        # use_flash_attn=False,
-        # fused_softmax_with_triangular=False,
     ):
         self.config = config
+
+        use_recompute = self.config.use_recompute
+        recompute_granularity = self.config.recompute_granularity
+        # virtual_pp_degree = self.config.virtual_pp_degree
+        virtual_pp_degree = getattr(self.config, "virtual_pp_degree", 1)
 
         hcg = get_hcg()
         tensor_parallel_degree = max(hcg.get_model_parallel_world_size(), 1)
@@ -153,11 +228,11 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         config.tensor_parallel_degree = tensor_parallel_degree
         config.tensor_parallel_rank = tensor_parallel_rank
 
-        self.add_sequential_layer(LayerDesc(LlamaEmbedding, config=config), "llama")
+        self.add_sequential_layer(LayerDesc(LlamaEmbeddingPipe, config=config), "llama")
         for i in range(config.num_hidden_layers):
-            self.add_sequential_layer(LayerDesc(LlamaDecoderLayer, config=config), f"llama.layers.{i}")
+            self.add_sequential_layer(LayerDesc(LlamaDecoderLayerPipe, config=config), f"llama.layers.{i}")
 
-        self.add_sequential_layer(LayerDesc(LlamaRMSNorm, config=config), "llama.norm")
+        self.add_sequential_layer(LayerDesc(LlamaRMSNormPipe, config=config), "llama.norm")
         self.add_sequential_layer(LayerDesc(LlamaLMHead, config=config), "lm_head")
 
         recompute_interval = 0
@@ -185,5 +260,6 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             },
             num_virtual_pipeline_stages=virtual_pp_degree,
         )
+        self.apply(self._init_weights)
         # DON'T init PipelinePretrainedModel
         # PipelinePretrainedModel.__init__(self.super(), config=config)

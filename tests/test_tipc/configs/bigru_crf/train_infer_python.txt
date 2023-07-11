@@ -2,7 +2,7 @@
 model_name:bigru_crf
 python:python3.7
 gpu_list:0|0,1
---device:gpu
+--device:gpu|gpu
 null:null
 --epoch:lite_train_lite_infer=1|lite_train_whole_infer=1|whole_train_whole_infer=100
 --save_model:./test_tipc/output/

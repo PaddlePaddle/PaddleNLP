@@ -33,7 +33,7 @@ from ppfleetx.utils.log import logger
 import paddlenlp  # noqa: F401
 from paddlenlp.transformers.gpt.tokenizer import GPTChineseTokenizer
 
-from .metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
+from .metrics import Accuracy, AccuracyAndF1, Mcc, PearsonAndSpearman
 from .utils import process_configs
 
 MODEL_CLASSES = {

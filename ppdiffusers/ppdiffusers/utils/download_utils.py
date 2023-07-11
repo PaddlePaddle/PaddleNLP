@@ -17,6 +17,7 @@ import os
 import os.path
 import re
 import tempfile
+import warnings
 from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
@@ -33,14 +34,19 @@ from huggingface_hub.utils import (
     RevisionNotFoundError,
 )
 from huggingface_hub.utils import tqdm as hf_tqdm
+from packaging import version
 from requests import HTTPError
 from tqdm.auto import tqdm as base_tqdm
 from tqdm.contrib.concurrent import thread_map
 
+from ..version import VERSION as __version__
 from .constants import (
+    DEPRECATED_REVISION_ARGS,
     HUGGINGFACE_CO_RESOLVE_ENDPOINT,
     PPDIFFUSERS_CACHE,
     PPNLP_BOS_RESOLVE_ENDPOINT,
+    TORCH_SAFETENSORS_WEIGHTS_NAME,
+    WEIGHTS_NAME,
 )
 from .logging import get_logger
 
@@ -54,6 +60,7 @@ def _add_variant(weights_name: str, variant: Optional[str] = None) -> str:
     return weights_name
 
 
+# https://github.com/huggingface/diffusers/blob/da2ce1a6b92f48cabe9e9d3944c4ee8b007b2871/src/diffusers/utils/hub_utils.py#L246
 def _get_model_file(
     pretrained_model_name_or_path,
     *,
@@ -67,6 +74,8 @@ def _get_model_file(
     local_files_only=None,
     use_auth_token=None,
     user_agent=None,
+    commit_hash=None,
+    file_lock_timeout=-1,
     from_hf_hub=False,
 ):
     pretrained_model_name_or_path = str(pretrained_model_name_or_path)
@@ -100,6 +109,8 @@ def _get_model_file(
             local_files_only=local_files_only,
             use_auth_token=use_auth_token,
             user_agent=user_agent,
+            file_lock_timeout=file_lock_timeout,
+            commit_hash=commit_hash,
         )
 
 
@@ -156,14 +167,28 @@ ALLOW_PATTERNS_MAPPING = {
         "config.json",
     ],
     "mel": ["mel_config.json"],
+    "melgan": ["model.onnx"],
     "others": [
+        # models
         "model_state.pdparams",
         "model_config.json",
         "config.json",
-        "model_config.json",
+        # scheduler
         "scheduler_config.json",
+        # feature_extractor
         "preprocessor_config.json",
+        # onnx
+        "model.onnx",
         "pipeline.py",
+        # tokenizer
+        "tokenizer_config.json",
+        "vocab.json",
+        "added_tokens.json",
+        "vocab.txt",
+        "special_tokens_map.json",
+        "spiece.model",
+        "merges.txt",
+        "sentencepiece.bpe.model",
     ],
 }
 
@@ -405,8 +430,40 @@ def bos_hf_download(
     use_auth_token=None,
     user_agent=None,
     file_lock_timeout=-1,
+    commit_hash=None,
 ):
     if from_hf_hub:
+        # 1. First check if deprecated way of loading from branches is used
+        if (
+            revision in DEPRECATED_REVISION_ARGS
+            and (filename == WEIGHTS_NAME or filename == TORCH_SAFETENSORS_WEIGHTS_NAME)
+            and version.parse(version.parse(__version__).base_version) >= version.parse("0.17.0")
+        ):
+            try:
+                model_file = hf_hub_download(
+                    pretrained_model_name_or_path,
+                    filename=_add_variant(filename, revision),
+                    cache_dir=cache_dir,
+                    force_download=force_download,
+                    proxies=proxies,
+                    resume_download=resume_download,
+                    local_files_only=local_files_only,
+                    use_auth_token=use_auth_token,
+                    user_agent=user_agent,
+                    subfolder=subfolder,
+                    revision=revision or commit_hash,
+                )
+                warnings.warn(
+                    f"Loading the variant {revision} from {pretrained_model_name_or_path} via `revision='{revision}'` is deprecated. Loading instead from `revision='main'` with `variant={revision}`. Loading model variants via `revision='{revision}'` will be removed in diffusers v1. Please use `variant='{revision}'` instead.",
+                    FutureWarning,
+                )
+                return model_file
+            except:  # noqa: E722
+                warnings.warn(
+                    f"You are loading the variant {revision} from {pretrained_model_name_or_path} via `revision='{revision}'`. This behavior is deprecated and will be removed in diffusers v1. One should use `variant='{revision}'` instead. However, it appears that {pretrained_model_name_or_path} currently does not have a {_add_variant(filename, revision)} file in the 'main' branch of {pretrained_model_name_or_path}. \n The Diffusers team and community would be very grateful if you could open an issue: https://github.com/huggingface/diffusers/issues/new with the title '{pretrained_model_name_or_path} is missing {_add_variant(filename, revision)}' so that the correct variant file can be added.",
+                    FutureWarning,
+                )
+        # 2. Load model file as usual
         try:
             model_file = hf_hub_download(
                 pretrained_model_name_or_path,
@@ -520,6 +577,7 @@ def ppdiffusers_bos_dir_download(
     revision: Optional[str] = None,
     repo_type: Optional[str] = None,
     cache_dir: Union[str, Path, None] = None,
+    force_download: bool = False,
     resume_download: bool = False,
     folder_names: Optional[Union[List[str], str]] = None,
     max_workers: int = 1,
@@ -543,20 +601,40 @@ def ppdiffusers_bos_dir_download(
             allow_patterns = [ap for ap in allow_patterns if "pdparams" not in ap]
             allow_patterns.extend(["inference.pdiparams", "inference.pdmodel"])
         for filename in allow_patterns:
+            need_to_check_no_variant_file = False
+            raw_filename = filename
             if "pdparams" in filename:
                 filename = _add_variant(filename, variant)
+                need_to_check_no_variant_file = variant is not None
+
             url = ppdiffusers_bos_url(
                 repo_id,
                 filename=filename,
                 subfolder=subfolder,
             )
             if url_file_exists(url):
+                # exist file
                 filtered_repo_files.append(
                     [
                         filename,
                         subfolder,
                     ]
                 )
+            else:
+                if need_to_check_no_variant_file:
+                    url = ppdiffusers_bos_url(
+                        repo_id,
+                        filename=raw_filename,
+                        subfolder=subfolder,
+                    )
+                    if url_file_exists(url):
+                        # exist file
+                        filtered_repo_files.append(
+                            [
+                                raw_filename,
+                                subfolder,
+                            ]
+                        )
 
     def _inner_ppdiffusers_bos_download(repo_file_list):
         filename, _subfolder = repo_file_list
@@ -568,6 +646,7 @@ def ppdiffusers_bos_dir_download(
             cache_dir=cache_dir,
             revision=revision,
             resume_download=resume_download,
+            force_download=force_download,
             file_lock_timeout=file_lock_timeout,
         )
 

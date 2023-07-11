@@ -407,6 +407,8 @@ def all_gather(v, group=None):
     if paddle.distributed.get_world_size() <= 1:
         return v.item()
     ret = []
+    if len(v.shape) < 1:
+        v = v.reshape([-1])
     paddle.distributed.all_gather(ret, v, group=group)
     concat = paddle.concat(ret, axis=0)
     return concat.mean().item()

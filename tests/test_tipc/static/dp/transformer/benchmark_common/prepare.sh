@@ -1,3 +1,17 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 cd ../examples/machine_translation/transformer/
 
 sed -i "s/^random_seed:.*/random_seed: 128/g" configs/transformer.base.yaml
@@ -52,8 +66,8 @@ export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
 python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
 python -m pip install setuptools_scm 
 python -m pip install Cython 
-python -m pip install -r ../requirements.txt  -i https://pypi.tuna.tsinghua.edu.cn/simple
-python -m pip install attrdict pyyaml -i https://pypi.tuna.tsinghua.edu.cn/simple
+python -m pip install -r ../requirements.txt  #-i https://pypi.tuna.tsinghua.edu.cn/simple
+python -m pip install attrdict easydict pyyaml #-i https://pypi.tuna.tsinghua.edu.cn/simple
 
 python -m pip install -e ../
 # python -m pip install paddlenlp    # PDC 镜像中安装失败

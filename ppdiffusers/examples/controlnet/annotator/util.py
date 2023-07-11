@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import os
+import random
 
 import cv2
 import numpy as np
@@ -51,3 +52,31 @@ def resize_image(input_image, resolution):
     W = int(np.round(W / 64.0)) * 64
     img = cv2.resize(input_image, (W, H), interpolation=cv2.INTER_LANCZOS4 if k > 1 else cv2.INTER_AREA)
     return img
+
+
+def make_noise_disk(H, W, C, F):
+    noise = np.random.uniform(low=0, high=1, size=((H // F) + 2, (W // F) + 2, C))
+    noise = cv2.resize(noise, (W + 2 * F, H + 2 * F), interpolation=cv2.INTER_CUBIC)
+    noise = noise[F : F + H, F : F + W]
+    noise -= np.min(noise)
+    noise /= np.max(noise)
+    if C == 1:
+        noise = noise[:, :, None]
+    return noise
+
+
+def img2mask(img, H, W, low=10, high=90):
+    assert img.ndim == 3 or img.ndim == 2
+    assert img.dtype == np.uint8
+
+    if img.ndim == 3:
+        y = img[:, :, random.randrange(0, img.shape[2])]
+    else:
+        y = img
+
+    y = cv2.resize(y, (W, H), interpolation=cv2.INTER_CUBIC)
+
+    if random.uniform(0, 1) < 0.5:
+        y = 255 - y
+
+    return y < np.percentile(y, random.randrange(low, high))

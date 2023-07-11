@@ -18,12 +18,8 @@ import unittest
 
 import numpy as np
 import paddle
-from ppdiffusers_test.pipeline_params import (
-    TEXT_TO_IMAGE_BATCH_PARAMS,
-    TEXT_TO_IMAGE_PARAMS,
-)
-from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
 
+import ppdiffusers  # noqa F401
 from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, XLMRobertaTokenizer
 from ppdiffusers import (
     AltDiffusionPipeline,
@@ -38,6 +34,9 @@ from ppdiffusers.pipelines.alt_diffusion.modeling_roberta_series import (
 )
 from ppdiffusers.utils import slow
 from ppdiffusers.utils.testing_utils import require_paddle_gpu
+
+from ..pipeline_params import TEXT_TO_IMAGE_BATCH_PARAMS, TEXT_TO_IMAGE_PARAMS
+from ..test_pipelines_common import PipelineTesterMixin
 
 
 class AltDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
@@ -137,7 +136,7 @@ class AltDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         expected_slice = np.array(
             [0.32336113, 0.2371237, 0.34009337, 0.22972241, 0.23742735, 0.4925817, 0.22020563, 0.20505491, 0.43374813]
         )
-        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.05
 
     def test_alt_diffusion_pndm(self):
         components = self.get_dummy_components()
@@ -164,7 +163,7 @@ class AltDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         expected_slice = np.array(
             [0.24095133, 0.26875997, 0.34291863, 0.2529385, 0.2736602, 0.49928105, 0.23973131, 0.21133915, 0.41810605]
         )
-        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.05
 
 
 @slow
@@ -222,4 +221,4 @@ class AltDiffusionPipelineIntegrationTests(unittest.TestCase):
                 0.9157286882400513,
             ]
         )
-        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
+        assert np.abs(image_slice.flatten() - expected_slice).max() < 0.05

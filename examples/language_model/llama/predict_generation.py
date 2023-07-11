@@ -15,13 +15,12 @@
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.layers import LoRAConfig, LoRAModel
-from paddlenlp.prompt import PrefixModelForCausalLM
-from paddlenlp.prompt.prefix import llama_postprocess_past_key_value
+from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.peft.prefix import llama_postprocess_past_key_value
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaConfig
 
 
-def parse_arguments():
+def get_parser():
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -30,12 +29,22 @@ def parse_arguments():
         "--merge_tensor_parallel_path", default=None, help="The directory of model to merge tensor parallel parts."
     )
     parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
-    parser.add_argument("--src_length", type=int, default=50, help="The batch size of data.")
-    parser.add_argument("--tgt_length", type=int, default=100, help="The batch size of data.")
+    parser.add_argument("--src_length", type=int, default=50, help="the max length of source text")
+    parser.add_argument("--tgt_length", type=int, default=100, help="the max length of decoding length")
+
+    parser.add_argument("--top_k", type=int, default=1, help="top_k parameter for generation")
+    parser.add_argument("--top_p", type=float, default=1.0, help="top_p parameter for generation")
+    parser.add_argument("--temperature", type=float, default=0.95, help="top_p parameter for generation")
+
     parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     parser.add_argument(
         "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
     )
+    return parser
+
+
+def parse_arguments():
+    parser = get_parser()
     return parser.parse_args()
 
 
@@ -49,46 +58,59 @@ def batchfy_text(texts, batch_size):
 
 
 class Predictor(object):
-    def __init__(self, args):
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-        self.tokenizer.pad_token = self.tokenizer.unk_token
-        self.batch_size = args.batch_size
-        self.args = args
-
-        tensor_parallel_degree = paddle.distributed.get_world_size()
-        tensor_parallel_rank = 0
-        if tensor_parallel_degree > 1:
-            strategy = fleet.DistributedStrategy()
-            strategy.hybrid_configs = {
-                "dp_degree": 1,
-                "mp_degree": tensor_parallel_degree,
-                "pp_degree": 1,
-                "sharding_degree": 1,
-            }
-            fleet.init(is_collective=True, strategy=strategy)
-            hcg = fleet.get_hybrid_communicate_group()
-            tensor_parallel_rank = hcg.get_model_parallel_rank()
-
-        if self.args.lora_path is not None:
-            lora_config = LoRAConfig.from_pretrained(self.args.lora_path)
-            dtype = lora_config.dtype
+    def __init__(self, args=None, tokenizer=None, model=None, **kwargs):
+        if args is None:
+            self.tokenizer = tokenizer
+            self.model = model
+            self.src_length = kwargs["src_length"]
+            self.tgt_length = kwargs["tgt_length"]
         else:
-            config = LlamaConfig.from_pretrained(args.model_name_or_path)
-            dtype = "float16" if config.dtype is None else config.dtype
+            self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+            self.tokenizer.pad_token = self.tokenizer.unk_token
+            self.batch_size = args.batch_size
+            self.args = args
+            self.src_length = self.args.src_length
+            self.tgt_length = self.args.tgt_length
 
-        self.model = AutoModelForCausalLM.from_pretrained(
-            args.model_name_or_path,
-            tensor_parallel_degree=tensor_parallel_degree,
-            tensor_parallel_rank=tensor_parallel_rank,
-            load_state_as_np=True,
-            dtype=dtype,
-        )
-        if self.args.lora_path is not None:
-            self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
-        if self.args.prefix_path is not None:
-            self.model = PrefixModelForCausalLM.from_pretrained(
-                self.model, self.args.prefix_path, llama_postprocess_past_key_value
+            tensor_parallel_degree = paddle.distributed.get_world_size()
+            tensor_parallel_rank = 0
+            if tensor_parallel_degree > 1:
+                strategy = fleet.DistributedStrategy()
+                strategy.hybrid_configs = {
+                    "dp_degree": 1,
+                    "mp_degree": tensor_parallel_degree,
+                    "pp_degree": 1,
+                    "sharding_degree": 1,
+                }
+                fleet.init(is_collective=True, strategy=strategy)
+                hcg = fleet.get_hybrid_communicate_group()
+                tensor_parallel_rank = hcg.get_model_parallel_rank()
+
+            self.rank = tensor_parallel_rank
+
+            if self.args.lora_path is not None:
+                lora_config = LoRAConfig.from_pretrained(self.args.lora_path)
+                dtype = lora_config.dtype
+            elif self.args.prefix_path is not None:
+                prefix_config = PrefixConfig.from_pretrained(self.args.prefix_path)
+                dtype = prefix_config.dtype
+            else:
+                config = LlamaConfig.from_pretrained(args.model_name_or_path)
+                dtype = "float16" if config.dtype is None else config.dtype
+
+            self.model = AutoModelForCausalLM.from_pretrained(
+                args.model_name_or_path,
+                tensor_parallel_degree=tensor_parallel_degree,
+                tensor_parallel_rank=tensor_parallel_rank,
+                load_state_as_np=True,
+                dtype=dtype,
             )
+            if self.args.lora_path is not None:
+                self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
+            if self.args.prefix_path is not None:
+                self.model = PrefixModelForCausalLM.from_pretrained(
+                    self.model, self.args.prefix_path, llama_postprocess_past_key_value
+                )
 
         self.model.eval()
 
@@ -97,7 +119,7 @@ class Predictor(object):
             input_text,
             padding=True,
             return_tensors="np",
-            max_length=self.args.src_length,
+            max_length=self.src_length,
             return_attention_mask=True,
             return_position_ids=True,
         )
@@ -111,11 +133,11 @@ class Predictor(object):
             with paddle.no_grad():
                 result = self.model.generate(
                     **inputs,
-                    max_length=self.args.tgt_length,
+                    max_length=self.tgt_length,
                     decode_strategy="sampling",
-                    temperature=1.0,
-                    top_k=1,
-                    top_p=1.0,
+                    temperature=self.args.temperature,
+                    top_k=self.args.top_k,
+                    top_p=self.args.top_p,
                     repetition_penalty=1.0,
                 )
         else:
@@ -123,11 +145,11 @@ class Predictor(object):
                 with paddle.amp.auto_cast(False, level="O2", dtype=self.model.config.dtype):
                     result = self.model.generate(
                         **inputs,
-                        max_length=self.args.tgt_length,
+                        max_length=self.tgt_length,
                         decode_strategy="sampling",
-                        temperature=1.0,
-                        top_k=1,
-                        top_p=1.0,
+                        temperature=self.args.temperature,
+                        top_k=self.args.top_k,
+                        top_p=self.args.top_p,
                         repetition_penalty=1.0,
                     )
         result = result[0]

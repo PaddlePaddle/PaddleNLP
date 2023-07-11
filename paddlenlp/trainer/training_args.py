@@ -182,6 +182,17 @@ class TrainingArguments:
         fp16_opt_level (`str`, *optional*, defaults to 'O1'):
             For `fp16` training,  AMP optimization level selected in ['O0', 'O1', 'O2']. See details at
             https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/amp/auto_cast_cn.html
+        amp_custom_black_list (`List[str]`, *optional*, defaults to `None`):
+            The custom black_list. The set of ops that support fp16/bf16 calculation and are considered numerically-dangerous
+            and whose effects may also be observed in downstream ops. These ops will not be converted to fp16/bf16.
+        amp_custom_white_list (`List[str]`, *optional*, defaults to `None`):
+            The custom white_list. It’s the set of ops that support fp16/bf16 calculation and are considered numerically-safe and
+             performance-critical. These ops will be converted to fp16/bf16.
+        amp_master_grad (`bool`, *optional*, defaults to `False`):
+            For amp opt level=’O2’, whether to use float32 weight gradients
+            for calculations such as gradient clipping, weight decay, and weight updates. If master_grad is enabled,
+            the weight gradients will be float32 dtype after the backpropagation. Default is False, there is only float16 weight gradients.
+            Note: only support model parallel and pipeline parallel for now !!!
         sharding (`str`, *optional*, defaults to ``):
             Whether or not to use Paddle Sharding Data Parallel training (in distributed training
             only). The base option should be `stage1`, `stage2` or `stage3` and you can add
@@ -195,6 +206,25 @@ class TrainingArguments:
             Sharding parameter in certain cards group. For example, aussume we use 2 machines each with 8 cards,
             then set sharding_parallel_degree=8, sharding will only communication inside machine.
             default -1 means sharding parameters between all workers.
+        tensor_parallel_degree (`int`, *optional*, defaults to `-1`)
+            Tensor parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.3 Tensor Model Parallelism).
+            This techique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts)
+            tensor_parallel_degree means split the transformer layer to how many parts.
+            default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better proformance.
+            Note, this need model support in source code, currently GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM is supported.
+        pipeline_parallel_degree (`int`, *optional*, defaults to `-1`)
+            Pipeline parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.2 Pipeline Model Parallelism).
+            Pipeline parallelism assigns multi-transformer layers to different cards, the micro batch data stream passed between cards like pipelines.
+            pipeline_parallel_degree means split all transformer layers to how many stages.
+            default -1 for not use pipeline parallel.
+            Note. this need model support in source code, see llama modeling_pp.py file
+        pipeline_parallel_config (`str`, *optional*)(
+            Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it.
+            following config is support:
+              disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape.
+              disable_partial_send_recv, optmize send speed for tensor parallel.
+              enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
+              enable_dp_comm_overlap, fuse data parallel gradient communication.
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -208,6 +238,8 @@ class TrainingArguments:
         eval_steps (`int`, *optional*):
             Number of update steps between two evaluations if `evaluation_strategy="steps"`. Will default to the same
             value as `logging_steps` if not set.
+        max_evaluate_steps (`int`, *optional*, defaults to -1):
+            If set to a positive number, the total number of evaluation steps to perform.
         dataloader_num_workers (`int`, *optional*, defaults to 0):
             Number of subprocesses to use for data loading. 0 means that the data will be loaded in the
             main process.
@@ -391,6 +423,15 @@ class TrainingArguments:
             )
         },
     )
+    amp_master_grad: bool = field(
+        default=False,
+        metadata={
+            "help": "amp_master_grad (bool, optional) – For amp opt level=’O2’, whether to use float32 weight gradients "
+            " for calculations such as gradient clipping, weight decay, and weight updates. If master_grad is enabled,"
+            " the weight gradients will be float32 dtype after the backpropagation. Default is False, there is only float16 weight gradients."
+            "Note: only support model parallel and pipeline parallel for now !!!"
+        },
+    )
     bf16_full_eval: bool = field(
         default=False,
         metadata={
@@ -403,6 +444,19 @@ class TrainingArguments:
     fp16_full_eval: bool = field(
         default=False,
         metadata={"help": "Whether to use full float16 evaluation instead of 32-bit"},
+    )
+
+    amp_custom_black_list: Optional[List[str]] = field(
+        default=None,
+        metadata={
+            "help": "The set of ops that support fp16/bf16 calculation and are considered numerically-dangerous and whose effects may also be observed in downstream ops."
+        },
+    )
+    amp_custom_white_list: Optional[List[str]] = field(
+        default=None,
+        metadata={
+            "help": "The the set of ops that support fp16/bf16 calculation and are considered numerically-safe and performance-critical. These ops will be converted to fp16/bf16."
+        },
     )
 
     sharding: str = field(
@@ -418,14 +472,7 @@ class TrainingArguments:
     )
     sharding_degree: int = field(  # Alias for sharding_parallel_degree
         default=-1,
-        metadata={
-            "help": (
-                "@deprecated Please use sharding_parallel_degree. "
-                "Sharding parameter in certain cards group. For example, aussume we use 2 machines each with 8 cards, "
-                "then set sharding_degree=8, sharding will only communication inside machine. "
-                "default -1 means sharding parameters between all workers."
-            )
-        },
+        metadata={"help": ("@deprecated Please use sharding_parallel_degree. ")},
     )
     sharding_parallel_degree: int = field(
         default=-1,
@@ -437,10 +484,29 @@ class TrainingArguments:
             )
         },
     )
-    tensor_parallel_degree: int = field(default=-1, metadata={"help": ("-1 for not use tensor parallel")})
-    pipeline_parallel_degree: int = field(default=-1, metadata={"help": ("-1 for not use pipeline parallel")})
-    pipeline_parallel_micro_batch_size: int = field(
-        default=1, metadata={"help": ("mirco_batch_size in pipeline parallel mode")}
+    tensor_parallel_degree: int = field(
+        default=-1,
+        metadata={
+            "help": (
+                "Tensor parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.3 Tensor Model Parallelism). "
+                "This techique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts) "
+                "tensor_parallel_degree means split the transformer layer to how many parts."
+                "default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better proformance."
+                "Note, this need model support in source code, currently GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM is supported. "
+            )
+        },
+    )
+    pipeline_parallel_degree: int = field(
+        default=-1,
+        metadata={
+            "help": (
+                "Pipeline parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.2 Pipeline Model Parallelism). "
+                "Pipeline parallelism assigns multi-transformer layers to different cards, the micro batch data stream passed between cards like pipelines."
+                "pipeline_parallel_degree means split all transformer layers to how many stages."
+                "default -1 for not use pipeline parallel."
+                "Note. this need model support in source code, see llama modeling_pp.py file"
+            )
+        },
     )
     pipeline_parallel_config: str = field(
         default="",
@@ -451,6 +517,7 @@ class TrainingArguments:
                 "disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape. \n"
                 "disable_partial_send_recv, optmize send speed for tensor parallel.\n"
                 "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
+                "enable_dp_comm_overlap, fuse data parallel gradient communication. \n"
             )
         },
     )
@@ -477,6 +544,9 @@ class TrainingArguments:
         default=False, metadata={"help": "Drop the last incomplete batch if it is not divisible by the batch size."}
     )
     eval_steps: int = field(default=None, metadata={"help": "Run an evaluation every X steps."})
+    max_evaluate_steps: int = field(
+        default=-1, metadata={"help": "If set to a positive number, the total number of evaluation steps to perform."}
+    )
     dataloader_num_workers: int = field(
         default=0,
         metadata={
@@ -647,6 +717,17 @@ class TrainingArguments:
         if len(self.sharding) > 0 or self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1:
             self.use_hybrid_parallel = True
 
+        if self.amp_master_grad:
+            if (
+                self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1
+            ) or self.fp16_opt_level != "O2":
+                raise ValueError(
+                    "Temporarily amp master grad only suport for tensor/pipeline parallel with fp16_opt_level O2. please set amp_master_grad to False."
+                )
+            if not (self.bf16 or self.fp16):
+                logger.warning("set amp_master_grad to false since amp is disabled.")
+                self.amp_master_grad = False
+
         if self.use_hybrid_parallel:
             world_size = paddle.distributed.get_world_size()
             tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
@@ -695,32 +776,32 @@ class TrainingArguments:
                                 "disable_p2p_cache_shape",
                                 "disable_partial_send_recv",
                                 "enable_delay_scale_loss",
+                                "enable_dp_comm_overlap",
                             ]:
                                 raise ValueError(
-                                    f"Found unknown pipeline model config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
+                                    f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
                                 )
-                    assert (
-                        self.per_device_train_batch_size % self.pipeline_parallel_micro_batch_size == 0
-                    ), "train_batch_size should be multiple of mirco_batch_size."
-                    pp_accumulate_steps = self.per_device_train_batch_size // self.pipeline_parallel_micro_batch_size
 
                     strategy.pipeline_configs = {
-                        "accumulate_steps": pp_accumulate_steps,
-                        "micro_batch_size": self.pipeline_parallel_micro_batch_size,
-                        "enable_partial_send_recv": False
-                        if "disable_partial_send_recv" in pipeline_parallel_config
-                        else True,
+                        "accumulate_steps": self.gradient_accumulation_steps,
+                        "micro_batch_size": self.per_device_train_batch_size,
+                        "enable_partial_send_recv": "disable_partial_send_recv" not in pipeline_parallel_config,
                         "p2p_cache_shape": False if "disable_p2p_cache_shape" in pipeline_parallel_config else True,
                         # "delay_scale_loss": True, Fix ME
                     }
+                    logger.info(f"PP configs:{strategy.pipeline_configs}, use master_grad: {self.amp_master_grad}")
                     dygraph_pp_configs = {
-                        "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False
+                        "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
+                        "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config,
                     }
 
                     if self.do_eval:
-                        assert self.per_device_train_batch_size == self.per_device_eval_batch_size, (
+                        assert (
+                            self.per_device_train_batch_size * self.gradient_accumulation_steps
+                            == self.per_device_eval_batch_size
+                        ), (
                             "In pipeline model, the evaluation also shares same setting with training. "
-                            "Please set per_device_eval_batch_size=per_device_train_batch_size."
+                            "Please set per_device_eval_batch_size=per_device_train_batch_size * gradient_accumulation_steps."
                         )
 
                 if tensor_parallel_degree > 1:
@@ -734,8 +815,8 @@ class TrainingArguments:
                 }
 
                 if pipeline_parallel_degree > 1:
-                    if dygraph_pp_configs["delay_scale_loss"]:
-                        hybrid_configs["pp_configs"] = dygraph_pp_configs
+                    hybrid_configs["pp_configs"] = dygraph_pp_configs
+                    logger.info(f"using pipline configs:{dygraph_pp_configs}")
 
                 # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
                 strategy.hybrid_configs = hybrid_configs

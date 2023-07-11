@@ -31,7 +31,8 @@ from paddle.incubate.distributed.utils.io import save_for_auto_inference
 from paddle.profiler import SummaryView
 from ppfleetx.core.engine import BasicEngine, InferenceEngine, TensorRTConfig
 from ppfleetx.core.module import BasicModule
-from ppfleetx.distributed.apis import amp, env
+from ppfleetx.distributed.apis import env
+from paddle.distributed.fleet.utils import mix_precision_utils
 try:
     from ppfleetx.optims import build_lr_scheduler, build_optimizer
     from ppfleetx.utils.compression_helper import prune_model, quant_model
@@ -209,9 +210,9 @@ class EagerEngine(BasicEngine):
             and self._amp_level == "O2"
             and self._use_main_grad
         ):
-            self._module.model = amp.MixPrecisionLayer(self._module.model, dtype=self._amp_dtype)
-            self._optimizer = amp.MixPrecisionOptimizer(self._optimizer)
-            self._scaler = amp.MixPrecisionScaler(self._scaler)
+            self._module.model = mix_precision_utils.MixPrecisionLayer(self._module.model, dtype=self._amp_dtype)
+            self._optimizer = mix_precision_utils.MixPrecisionOptimizer(self._optimizer)
+            self._scaler = mix_precision_utils.MixPrecisionScaler(self._scaler)
 
         # distributed configs
         self._distributed = dist.get_world_size() > 1
@@ -287,7 +288,7 @@ class EagerEngine(BasicEngine):
             self._optimizer._set_broadcast_overlap(self._broadcast_overlap, layers=origin_model, num_groups=2)
 
     def _wrap_3D_parallel(self):
-        if isinstance(self._module.model, amp.MixPrecisionLayer):
+        if isinstance(self._module.model, mix_precision_utils.MixPrecisionLayer):
             if dist.get_world_size() == self._dp_degree:
                 sync_params_buffers(self._module.model, comm_group=self._dp_group, src_rank=self._dp_group.ranks[0])
             elif self._pp_degree > 1:
@@ -458,7 +459,7 @@ class EagerEngine(BasicEngine):
                 else:
                     all_reduce_parameters(self._optimizer.all_fused_tensors, self._dp_group)
             elif (
-                isinstance(self._module.model, amp.MixPrecisionLayer)
+                isinstance(self._module.model, mix_precision_utils.MixPrecisionLayer)
                 and self._distributed
                 and dist.get_world_size() == self._dp_degree
             ):

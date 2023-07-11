@@ -80,7 +80,7 @@ def write_model(model_path, input_base_path, model_size):
     dim = params["dim"]
     dims_per_head = dim // n_heads
     base = 10000.0
-    inv_freq = 1.0 / (base ** (paddle.arange(0, dims_per_head, 2) / dims_per_head))
+    inv_freq = 1.0 / (base ** (paddle.arange(0, dims_per_head, 2, dtype="int64") / dims_per_head))
 
     # permute for sliced rotary
     def permute(w):

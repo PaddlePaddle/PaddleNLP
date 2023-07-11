@@ -57,6 +57,12 @@ class ModelArguments:
         metadata={"help": "Path to latents, used for alignment."},
     )
     random_alignment: bool = field(default=False, metadata={"help": "Whether to align random."})
+    timestep_sample_schedule: Optional[str] = field(
+        default="linear",
+        metadata={
+            "help": "The type of timestep-sampling schedule during training, select from ['linear', 'cosine', 'cubic']."
+        },
+    )
 
 
 @dataclass
@@ -98,6 +104,7 @@ class GenerateArguments:
     """
 
     use_controlnet: bool = field(default=False, metadata={"help": "Whether or not use text condition"})
+    use_dumpy_dataset: bool = field(default=False, metadata={"help": "Whether or not use dummpy dataset"})
     adapter_model_name_or_path: str = field(default=None, metadata={"help": "adapter model name or path."})
     sd_model_name_or_path: str = field(default=None, metadata={"help": "sd model name or path."})
     file: str = field(default="data/test.openpose.filelist", metadata={"help": "eval file."})
