@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 Technology Innovation Institute (TII) and PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,9 +23,6 @@ from ..model_outputs import (
     TokenClassifierOutput,
 )
 
-from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, LayerNorm, MSELoss
-from paddle.nn import functional as F
-
 import math
 import warnings
 from typing import Optional, Tuple, Union, List
@@ -38,17 +35,6 @@ from .configuration import (
     RWConfig,
     RW_PRETRAINED_INIT_CONFIGURATION,
 )
-
-
-# NOTE(Hesslow): Unfortunately we did not fuse matmul and bias during training, this means that there's one additional quantization to bfloat16 between the operations.
-# In order not to degrade the quality of our HF-port, we keep these characteristics in the final model.
-class Linear(nn.Linear):
-    def forward(self, input: Tensor) -> Tensor:
-        ret = input @ self.weight
-        if self.bias is None:
-            return ret
-        else:
-            return ret + self.bias
 
 # rotary pos emb helpers (paddle.jit.script does not seem to support staticmethod...)
 def rotate_half(x):
@@ -151,7 +137,7 @@ def build_alibi_tensor(attention_mask: Tensor, num_heads: int, dtype: paddle.dty
 
 
 def dropout_add(x: Tensor, residual: Tensor, prob: float, training: bool) -> Tensor:
-    out = F.dropout(x, p=prob, training=training)
+    out = nn.functional.dropout(x, p=prob, training=training)
     out = residual + out
     return out
 
@@ -178,13 +164,13 @@ class Attention(nn.Layer):
         self.inv_norm_factor = 1.0 / math.sqrt(self.head_dim)
         self.beta = self.inv_norm_factor
 
-        self.query_key_value = Linear(
+        self.query_key_value = nn.Linear(
             self.hidden_size,
             3 * self.hidden_size if not config.multi_query else (self.hidden_size + 2 * self.head_dim),
             bias_attr=config.bias,
         )
         self.multi_query = config.multi_query
-        self.dense = Linear(self.hidden_size, self.hidden_size, bias_attr=config.bias)
+        self.dense = nn.Linear(self.hidden_size, self.hidden_size, bias_attr=config.bias)
         self.attention_dropout = nn.Dropout(config.attention_dropout)
         self.num_kv = config.n_head if not self.multi_query else 1
 
@@ -293,8 +279,8 @@ class Attention(nn.Layer):
             # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
             if input_dtype == paddle.float16 or input_dtype == paddle.bfloat16:
                 attention_scores = paddle.cast(attention_scores, paddle.float32)
-            attention_scores = paddle.where(attention_mask > 0, paddle.full_like(attention_scores, -1e38), attention_scores)
-            attention_probs = F.softmax(
+            attention_scores = paddle.where(attention_mask > 0, paddle.full_like(attention_scores, paddle.finfo(attention_scores.dtype).min), attention_scores)
+            attention_probs = nn.functional.softmax(
                 attention_scores * self.inv_norm_factor,
                 axis=-1,
                 dtype=hidden_states.dtype,
@@ -329,7 +315,7 @@ class Attention(nn.Layer):
             attention_scores = query_layer_ @ key_layer_.transpose([0, 1, 3, 2])
 
             attention_mask_float = paddle.zeros_like(attention_mask, dtype=attention_scores.dtype)
-            attention_mask_float = paddle.where(attention_mask, paddle.full_like(attention_scores, -1e9), attention_mask_float)
+            attention_mask_float = paddle.where(attention_mask > 0, paddle.full_like(attention_scores, paddle.finfo(attention_scores.dtype).min), attention_mask_float)
 
             # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
             input_dtype = attention_scores.dtype
@@ -337,7 +323,7 @@ class Attention(nn.Layer):
             if input_dtype == paddle.float16 or input_dtype == paddle.bfloat16:
                 attention_scores = paddle.cast(attention_scores, paddle.float32)
             # attn_weights = paddle.masked_fill(attention_scores, attention_mask, paddle.finfo(attention_scores.dtype).min)
-            attention_probs = F.softmax(
+            attention_probs = nn.functional.softmax(
                 (attention_scores + alibi) * self.inv_norm_factor + attention_mask_float,
                 axis=-1,
                 dtype=hidden_states.dtype,
@@ -372,9 +358,9 @@ class MLP(nn.Layer):
         super().__init__()
         hidden_size = config.hidden_size
 
-        self.dense_h_to_4h = Linear(hidden_size, 4 * hidden_size, bias_attr=config.bias)
+        self.dense_h_to_4h = nn.Linear(hidden_size, 4 * hidden_size, bias_attr=config.bias)
         self.act = nn.GELU()
-        self.dense_4h_to_h = Linear(4 * hidden_size, hidden_size, bias_attr=config.bias)
+        self.dense_4h_to_h = nn.Linear(4 * hidden_size, hidden_size, bias_attr=config.bias)
         self.hidden_dropout = config.hidden_dropout
 
     def forward(self, x: Tensor) -> Tensor:
@@ -388,13 +374,13 @@ class DecoderLayer(nn.Layer):
         super().__init__()
         hidden_size = config.hidden_size
 
-        self.input_layernorm = LayerNorm(hidden_size, epsilon=config.layer_norm_epsilon)
+        self.input_layernorm = nn.LayerNorm(hidden_size, epsilon=config.layer_norm_epsilon)
         self.num_heads = config.n_head
         self.self_attention = Attention(config)
 
         if not config.parallel_attn:
             # unused if parallel attn
-            self.post_attention_layernorm = LayerNorm(hidden_size, epsilon=config.layer_norm_epsilon)
+            self.post_attention_layernorm = nn.LayerNorm(hidden_size, epsilon=config.layer_norm_epsilon)
 
         self.mlp = MLP(config)
 
@@ -455,7 +441,6 @@ class DecoderLayer(nn.Layer):
 
 
 class RWPreTrainedModel(PretrainedModel):
-    _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.weight"]
     """
     An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
     models.
@@ -463,8 +448,6 @@ class RWPreTrainedModel(PretrainedModel):
 
     config_class = RWConfig
     base_model_prefix = "transformer"
-    supports_gradient_checkpointing = True
-    _no_split_modules = ["DecoderLayer"]
 
     pretrained_init_configuration = RW_PRETRAINED_INIT_CONFIGURATION
 
@@ -541,20 +524,7 @@ class RWPreTrainedModel(PretrainedModel):
                         "lm_head.bias",
                     ]
                 )
-            if "RWForTokenClassification" in config.architectures:
-                mappings.extend(
-                    [
-                        ["classifier.weight", None, "transpose"],
-                        ["classifier.bias", None],
-                    ]
-                )
-            if "RWForQuestionAnswering" in config.architectures:
-                mappings.extend(
-                    [
-                        ["qa_outputs.weight", None, "transpose"],
-                        ["qa_outputs.bias", None],
-                    ]
-                )
+
         init_name_mappings(mappings)
         return [StateDictNameMapping(*mapping) for mapping in mappings]
 
@@ -626,7 +596,7 @@ class RWModel(RWPreTrainedModel):
         self.h = nn.LayerList([DecoderLayer(config) for _ in range(config.num_hidden_layers)])
 
         # Final Layer Norm
-        self.ln_f = LayerNorm(self.embed_dim, epsilon=config.layer_norm_epsilon)
+        self.ln_f = nn.LayerNorm(self.embed_dim, epsilon=config.layer_norm_epsilon)
 
         self.gradient_checkpointing = False
 
@@ -777,32 +747,16 @@ class RWModel(RWPreTrainedModel):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
-            if self.gradient_checkpointing and self.training:
-
-                if use_cache:
-                    logger.warning(
-                        "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
-                    )
-                    use_cache = False
-
-                def create_custom_forward(module):
-                    def custom_forward(*inputs):
-                        # None for past_key_value
-                        return module(*inputs, use_cache=use_cache, output_attentions=output_attentions)
-
-                    return custom_forward
-
-            else:
-                outputs = block(
-                    hidden_states,
-                    layer_past=layer_past,
-                    attention_mask=causal_mask,
-                    head_mask=head_mask[i],
-                    use_cache=use_cache,
-                    output_attentions=output_attentions,
-                    alibi=alibi,
-                    i=i,
-                )
+            outputs = block(
+                hidden_states,
+                layer_past=layer_past,
+                attention_mask=causal_mask,
+                head_mask=head_mask[i],
+                use_cache=use_cache,
+                output_attentions=output_attentions,
+                alibi=alibi,
+                i=i,
+            )
 
             hidden_states = outputs[0]
             if use_cache is True:
@@ -834,7 +788,7 @@ class CausalLMHead(nn.Linear):
         return ret
 
 class RWForCausalLM(RWPreTrainedModel):
-    _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.weight"]
+    _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
 
     def __init__(self, config: RWConfig):
         super().__init__(config)
@@ -900,16 +854,6 @@ class RWForCausalLM(RWPreTrainedModel):
             `labels = input_ids` Indices are selected in `[-100, 0, ..., config.vocab_size]` All labels set to `-100`
             are ignored (masked), the loss is only computed for labels in `[0, ..., config.vocab_size]`
         """
-        if deprecated_arguments.pop("position_ids", False) is not False:
-            # `position_ids` could have been `Tensor` or `None` so defaulting pop to `False` allows to detect if users were passing explicitly `None`
-            warnings.warn(
-                "`position_ids` have no functionality in BLOOM and will be removed in v5.0.0. You can safely ignore"
-                " passing `position_ids`.",
-                FutureWarning,
-            )
-        if len(deprecated_arguments) > 0:
-            raise ValueError(f"Got unexpected arguments: {deprecated_arguments}")
-
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         transformer_outputs = self.transformer(
@@ -929,12 +873,17 @@ class RWForCausalLM(RWPreTrainedModel):
 
         loss = None
         if labels is not None:
-            # Shift so that tokens < n predict n
-            shift_logits = lm_logits[..., :-1, :]
-            shift_labels = labels[..., 1:]
+            if self.config.lm_shift_labels:
+                # Shift so that tokens < n predict n
+                shift_logits = lm_logits[..., :-1, :]
+                shift_labels = labels[..., 1:]
+            else:
+                shift_logits = lm_logits
+                shift_labels = labels
+
             batch_size, seq_length, vocab_size = shift_logits.shape
             # Flatten the tokens
-            loss_fct = CrossEntropyLoss()
+            loss_fct = nn.CrossEntropyLoss()
             loss = loss_fct(
                 shift_logits.reshape([batch_size * seq_length, vocab_size]), shift_labels.reshape([batch_size * seq_length])
             )
@@ -959,169 +908,3 @@ class RWForCausalLM(RWPreTrainedModel):
         beam_idx at every generation step.
         """
         return tuple(tuple(past_state.index_select(0, beam_idx) for past_state in layer_past) for layer_past in past)
-
-class RWForTokenClassification(RWPreTrainedModel):
-    _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.weight"]
-
-    def __init__(self, config: RWConfig):
-        super().__init__(config)
-        self.num_labels = config.num_labels
-
-        self.transformer = RWModel(config)
-        if hasattr(config, "classifier_dropout") and config.classifier_dropout is not None:
-            classifier_dropout = config.classifier_dropout
-        elif hasattr(config, "hidden_dropout") and config.hidden_dropout is not None:
-            classifier_dropout = config.hidden_dropout
-        else:
-            classifier_dropout = 0.1
-        self.dropout = nn.Dropout(classifier_dropout)
-        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
-
-    def forward(
-        self,
-        input_ids=None,
-        past_key_values: Optional[Tuple[Tuple[Tensor, Tensor], ...]] = None,
-        attention_mask: Optional[Tensor] = None,
-        head_mask: Optional[Tensor] = None,
-        inputs_embeds: Optional[Tensor] = None,
-        labels: Optional[Tensor] = None,
-        use_cache: Optional[bool] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
-        **deprecated_arguments,
-    ) -> Union[Tuple[Tensor], TokenClassifierOutput]:
-        r"""
-        labels (`paddle.LongTensor` of shape `(batch_size,)`, *optional*):
-            Labels for computing the sequence classification/regression loss. Indices should be in `[0, ...,
-            config.num_labels - 1]`. If `config.num_labels == 1` a regression loss is computed (Mean-Square loss), If
-            `config.num_labels > 1` a classification loss is computed (Cross-Entropy).
-        """
-        if deprecated_arguments.pop("position_ids", False) is not False:
-            # `position_ids` could have been `Tensor` or `None` so defaulting pop to `False` allows to detect if users were passing explicitly `None`
-            warnings.warn(
-                "`position_ids` have no functionality in BLOOM and will be removed in v5.0.0. You can safely ignore"
-                " passing `position_ids`.",
-                FutureWarning,
-            )
-        if len(deprecated_arguments) > 0:
-            raise ValueError(f"Got unexpected arguments: {deprecated_arguments}")
-
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
-        transformer_outputs = self.transformer(
-            input_ids,
-            past_key_values=past_key_values,
-            attention_mask=attention_mask,
-            head_mask=head_mask,
-            inputs_embeds=inputs_embeds,
-            use_cache=use_cache,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-        )
-
-        hidden_states = transformer_outputs[0]
-        hidden_states = self.dropout(hidden_states)
-        logits = self.classifier(hidden_states)
-
-        loss = None
-        if labels is not None:
-            batch_size, seq_length = labels.shape
-            loss_fct = CrossEntropyLoss()
-            loss = loss_fct(logits.reshape([batch_size * seq_length, self.num_labels]), labels.reshape([batch_size * seq_length]))
-
-        if not return_dict:
-            output = (logits,) + transformer_outputs[2:]
-            return ((loss,) + output) if loss is not None else output
-
-        return TokenClassifierOutput(
-            loss=loss,
-            logits=logits,
-            hidden_states=transformer_outputs.hidden_states,
-            attentions=transformer_outputs.attentions,
-        )
-
-
-class RWForQuestionAnswering(RWPreTrainedModel):
-    _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.weight"]
-
-    def __init__(self, config):
-        super().__init__(config)
-        self.transformer = RWModel(config)
-        self.qa_outputs = nn.Linear(config.hidden_size, 2)
-
-    def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        start_positions=None,
-        end_positions=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
-    ) -> Union[Tuple, QuestionAnsweringModelOutput]:
-        r"""
-        start_positions (`paddle.LongTensor` of shape `(batch_size,)`, *optional*):
-            Labels for position (index) of the start of the labelled span for computing the token classification loss.
-            Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
-            are not taken into account for computing the loss.
-        end_positions (`paddle.LongTensor` of shape `(batch_size,)`, *optional*):
-            Labels for position (index) of the end of the labelled span for computing the token classification loss.
-            Positions are clamped to the length of the sequence (`sequence_length`). Position outside of the sequence
-            are not taken into account for computing the loss.
-        """
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
-        outputs = self.transformer(
-            input_ids,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            head_mask=head_mask,
-            inputs_embeds=inputs_embeds,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-        )
-        sequence_output = outputs[0]
-
-        #[bz, seq, 2]
-        logits = self.qa_outputs(sequence_output)
-        #[bz, seq, 1] //
-        start_logits, end_logits = paddle.unstack(x=logits, axis=-1)
-        #[bz, seq]
-        start_logits = start_logits.squeeze(-1)
-        #[bz, seq]
-        end_logits = end_logits.squeeze(-1)
-
-        total_loss = None
-        if start_positions is not None and end_positions is not None:
-            # If we are on multi-GPU, split add a dimension
-            if len(start_positions.shape) > 1:
-                start_positions = start_positions.squeeze(-1)
-            if len(end_positions.shape) > 1:
-                end_positions = end_positions.squeeze(-1)
-            # sometimes the start/end positions are outside our model inputs, we ignore these terms
-            ignored_index = start_logits.shape[1]   #  seq_len
-            start_positions = start_positions.clip(0, ignored_index)
-            end_positions = end_positions.clip(0, ignored_index)
-
-            loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
-            start_loss = loss_fct(start_logits, start_positions)
-            end_loss = loss_fct(end_logits, end_positions)
-            total_loss = (start_loss + end_loss) / 2
-
-        if not return_dict:
-            output = (start_logits, end_logits) + outputs[2:]
-            return ((total_loss,) + output) if total_loss is not None else output
-
-        return QuestionAnsweringModelOutput(
-            loss=total_loss,
-            start_logits=start_logits,
-            end_logits=end_logits,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )

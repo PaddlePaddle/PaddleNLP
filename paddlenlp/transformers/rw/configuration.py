@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 Technology Innovation Institute (TII) and PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,6 +49,7 @@ class RWConfig(PretrainedConfig):
         bias=False,
         alibi=False,
         parallel_attn=False,
+        lm_shift_labels=True,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -70,6 +71,7 @@ class RWConfig(PretrainedConfig):
         self.alibi = alibi
         self.bias = bias
         self.parallel_attn = parallel_attn
+        self.lm_shift_labels = lm_shift_labels
 
         super().__init__(bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
 
