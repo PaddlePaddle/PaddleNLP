@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 
 import paddle
 from paddle.distributed import fleet
@@ -31,19 +32,19 @@ def parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--model_name_or_path", default="THUDM/chatglm-6b", required=True, help="The directory of model."
-    )
+    parser.add_argument("--model_name_or_path", default="THUDM/chatglm-6b", help="The directory of model.")
     parser.add_argument(
         "--merge_tensor_parallel_path", default=None, help="The directory of model to merge tensor parallel parts."
     )
     parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
-    parser.add_argument("--src_length", type=int, default=128, help="The batch size of data.")
-    parser.add_argument("--tgt_length", type=int, default=128, help="The batch size of data.")
+    parser.add_argument("--src_length", type=int, default=1024, help="The batch size of data.")
+    parser.add_argument("--tgt_length", type=int, default=1024, help="The batch size of data.")
     parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     parser.add_argument(
         "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
     )
+    parser.add_argument("--data_file", default=None, help="data file directory")
+    parser.add_argument("--predict_file", default="prediction.json", help="predict result file directory")
     return parser.parse_args()
 
 
@@ -158,15 +159,31 @@ class Predictor(object):
 if __name__ == "__main__":
     args = parse_arguments()
     predictor = Predictor(args)
-    all_texts = [
-        "你好",
-        "[Round 0]\n问：你好\n答：你好👋!我是人工智能助手 ChatGLM-6B,很高兴见到你,欢迎问我任何问题。\n[Round 1]\n问：晚上睡不着应该怎么办\n答：",
-    ]
+
+    if args.data_file is None:
+        all_texts = [
+            "你好",
+            "[Round 0]\n问：你好\n答：你好👋!我是人工智能助手 ChatGLM-6B,很高兴见到你,欢迎问我任何问题。\n[Round 1]\n问：晚上睡不着应该怎么办\n答：",
+        ]
+    else:
+        all_texts = []
+        with open(args.data_file, "r", encoding="utf-8") as f:
+            for line in f:
+                example = json.loads(line)
+                if "src" in example:
+                    context = example["src"][0] if isinstance(example["src"], list) else example["src"]
+                elif "content" in example:
+                    context = example["content"]
+                all_texts.append(context)
+
     batch_texts = batchfy_text(all_texts, args.batch_size)
-    for bs, texts in enumerate(batch_texts):
-        outputs = predictor.predict(texts)
-        for text, result in zip(texts, outputs["result"]):
-            print("{}\n{}".format(text, result))
+    with open(args.predict_file, "w", encoding="utf-8") as f:
+        for bs, texts in enumerate(batch_texts):
+            outputs = predictor.predict(texts)
+            for text, result in zip(texts, outputs["result"]):
+                print("{}\n{}".format(text, result))
+                out = {"src": text, "output": result}
+                f.write(json.dumps(out, ensure_ascii=False) + "\n")
 
     if args.merge_tensor_parallel_path is not None:
         predictor.model.save_pretrained(

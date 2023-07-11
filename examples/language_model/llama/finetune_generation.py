@@ -47,20 +47,6 @@ class DataArgument:
     dataset_path: str = field(default=None, metadata={"help": "The file name of train dataset."})
     src_length: int = field(default=512, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=256, metadata={"help": "The max length of target text."})
-    min_tgt_length: int = field(default=0, metadata={"help": "The min length of target text."})
-    length_penalty: float = field(default=0.7, metadata={"help": "The length penalty."})
-    no_repeat_ngram_size: int = field(default=3, metadata={"help": "The no repeat ngram size."})
-    num_beams: int = field(default=5, metadata={"help": "The number of beams."})
-    select_topk: bool = field(default=True, metadata={"help": "Whether to select top k tokens for generation."})
-    top_p: float = field(
-        default=0.0, metadata={"help": "The cumulative probability for top-p-filtering in the 'sampling' strategy."}
-    )
-    top_k: int = field(
-        default=0,
-        metadata={
-            "help": "The number of highest probability tokens to keep for top-k-filtering in the 'sampling' strategy."
-        },
-    )
 
 
 @dataclass
@@ -70,12 +56,6 @@ class ModelArgument:
     )
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
-    merge_weights: bool = field(
-        default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
-    )
-    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
-    num_prefix_tokens: int = field(default=10, metadata={"help": "Number of prefix tokens"})
-    prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
     eval_with_do_generation: bool = field(
         default=False, metadata={"help": "Evaluate with generation, instead for calc loss."}
@@ -88,9 +68,18 @@ class ModelArgument:
         default=None,
         metadata={"help": "profiler_options."},
     )
+    # lora
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
     lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
     lora_rank: int = field(default=4, metadata={"help": "Lora attention dimension"})
+    merge_weights: bool = field(
+        default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
+    )
+    # prefix
+    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
+    num_prefix_tokens: int = field(default=10, metadata={"help": "Number of prefix tokens"})
+    prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
+    # qat
     qat: bool = field(default=False, metadata={"help": "Whether to use QAT technique"})
     qat_type: str = field(default="A8W8", metadata={"help": "Quantization type. Supported values: A8W8, W4,A8W4"})
 
@@ -163,8 +152,17 @@ def main():
 
     if model_args.lora:
         if model_args.lora_path is None:
-            lora_config = LoRAConfig(
-                target_modules=[
+            # Not yet support RowParallelLinear
+            if training_args.tensor_parallel_degree > 1:
+                target_modules = [
+                    ".*q_proj.*",
+                    ".*v_proj.*",
+                    ".*k_proj.*",
+                    ".*gate_proj.*",
+                    ".*up_proj.*",
+                ]
+            else:
+                target_modules = [
                     ".*q_proj.*",
                     ".*v_proj.*",
                     ".*k_proj.*",
@@ -172,7 +170,10 @@ def main():
                     ".*gate_proj.*",
                     ".*down_proj.*",
                     ".*up_proj.*",
-                ],
+                ]
+
+            lora_config = LoRAConfig(
+                target_modules=target_modules,
                 r=model_args.lora_rank,
                 lora_alpha=2 * model_args.lora_rank,
                 merge_weights=model_args.merge_weights,
@@ -198,7 +199,8 @@ def main():
         from paddleslim.quant.quanters import PACTQuanter
 
         # from paddle.quantization.quanters import FakeQuanterWithAbsMaxObserver
-        from paddlenlp.peft.lora import LoRALinear, QuantedLoRALinear
+        from paddlenlp.peft.lora import LoRALinear
+        from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
 
         q_config = QuantConfig(activation=None, weight=None)
         q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
@@ -275,8 +277,7 @@ def main():
         train_ds = train_ds.map(partial(trans_func))
     if training_args.do_eval:
         # pipeline_parallel eval is the same as training.
-        is_test = model_args.eval_with_do_generation
-        dev_ds = dev_ds.map(partial(trans_func, is_test=is_test))
+        dev_ds = dev_ds.map(partial(trans_func, is_test=model_args.eval_with_do_generation))
 
     model_max_length = 1024 if not training_args.benchmark else 512
     collate_fn = DataCollatorForSupervisedDataset(

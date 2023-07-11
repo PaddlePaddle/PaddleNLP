@@ -13,6 +13,8 @@
 # limitations under the License.
 from __future__ import annotations
 
+import json
+
 import paddle
 from paddle.distributed import fleet
 
@@ -35,6 +37,8 @@ def parse_arguments():
     parser.add_argument(
         "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
     )
+    parser.add_argument("--data_file", default=None, help="data file directory")
+    parser.add_argument("--predict_file", default="prediction.json", help="predict result file directory")
     return parser.parse_args()
 
 
@@ -168,15 +172,30 @@ class Predictor(object):
 def predict():
     args = parse_arguments()
     predictor = Predictor(args)
-    all_texts = [
-        "答案：年基准利率4.35%，上下文：从实际看,贷款的基本条件是: 一是中国大陆居民,年龄在60岁以下; 二是有稳定的住址和工作或经营地点; 三是有稳定的收入来源; 四是无不良信用记录,贷款用途不能作为炒股,赌博等行为; 五是具有完全民事行为能力。在已知答案的前提下，问题：</s>",
-        "答案：U系列，上下文：U系列是最好的，采用国际顶尖技术（由格力自主研发）双级变频压缩机，提高压缩机运转效率，制冷制热能力更强劲；1赫兹变频技术，使空调相当于一个15 W电灯泡，更加节能省电；送风面积广，风力大；生态风，净化空气。非常不错，现在国美在做活动，可以了解一下。在已知答案的前提下，问题：</s>",
-    ]
+
+    if args.data_file is None:
+        all_texts = [
+            "答案：年基准利率4.35%，上下文：从实际看,贷款的基本条件是: 一是中国大陆居民,年龄在60岁以下; 二是有稳定的住址和工作或经营地点; 三是有稳定的收入来源; 四是无不良信用记录,贷款用途不能作为炒股,赌博等行为; 五是具有完全民事行为能力。在已知答案的前提下，问题：</s>",
+            "答案：U系列，上下文：U系列是最好的，采用国际顶尖技术（由格力自主研发）双级变频压缩机，提高压缩机运转效率，制冷制热能力更强劲；1赫兹变频技术，使空调相当于一个15 W电灯泡，更加节能省电；送风面积广，风力大；生态风，净化空气。非常不错，现在国美在做活动，可以了解一下。在已知答案的前提下，问题：</s>",
+        ]
+    else:
+        all_texts = []
+        with open(args.data_file, "r", encoding="utf-8") as f:
+            for line in f:
+                example = json.loads(line)
+                if "src" in example:
+                    context = example["src"][0] if isinstance(example["src"], list) else example["src"]
+                elif "content" in example:
+                    context = example["content"]
+                all_texts.append(context)
     batch_texts = batchfy_text(all_texts, args.batch_size)
-    for bs, texts in enumerate(batch_texts):
-        outputs = predictor.predict(texts)
-        for text, result in zip(texts, outputs["result"]):
-            print("{}\n{}".format(text, result))
+    with open(args.predict_file, "w", encoding="utf-8") as f:
+        for bs, texts in enumerate(batch_texts):
+            outputs = predictor.predict(texts)
+            for text, result in zip(texts, outputs["result"]):
+                print("{}\n{}".format(text, result))
+                out = {"src": text, "output": result}
+                f.write(json.dumps(out, ensure_ascii=False) + "\n")
     if args.save_onepiece_model_path is not None:
         predictor.save_onepiece_model(args.save_onepiece_model_path)
 
