@@ -84,6 +84,8 @@ def convert_example(example, tokenizer, data_args, is_test=True):
         # shift labels
         input_ids, labels = input_ids[:-1], labels[1:]
 
+        attention_mask = attention_mask[..., :-1, :-1]
+
         inputs = {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
