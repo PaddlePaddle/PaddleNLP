@@ -49,20 +49,17 @@ class Predictor(object):
             self.src_length = kwargs["src_length"]
             self.tgt_length = kwargs["tgt_length"]
         else:
-            #self.tokenizer = RWTokenizer.from_pretrained(args.model_name_or_path)
-            self.tokenizer = RWTokenizer.from_pretrained('../falcon-7b-paddle/tokenizer/')
+            self.tokenizer = RWTokenizer.from_pretrained(args.model_name_or_path)
             self.batch_size = args.batch_size
             self.args = args
             self.src_length = self.args.src_length
             self.tgt_length = self.args.tgt_length
 
-            #config = RWConfig.from_pretrained(args.model_name_or_path)
-            config = RWConfig.from_pretrained('../falcon-7b-paddle/falcon-7b/')
+            config = RWConfig.from_pretrained(args.model_name_or_path)
             dtype = config.dtype if config.dtype is not None else config.paddle_dtype
 
             self.model = RWForCausalLM.from_pretrained(
-                #args.model_name_or_path,
-                '../falcon-7b-paddle/falcon-7b/',
+                args.model_name_or_path,
                 dtype=dtype,
             )
         self.model.eval()
@@ -115,8 +112,8 @@ if __name__ == "__main__":
     args = parse_arguments()
     predictor = Predictor(args)
     all_texts = [
-        "你好",
-        "[Round 0]\n问：你好\n答：你好👋!我是人工智能助手 Falcon-7B,很高兴见到你,欢迎问我任何问题。\n[Round 1]\n问：晚上睡不着应该怎么办\n答：",
+        "Hello!",
+        "Please introduce yourself, ",
     ]
     batch_texts = batchfy_text(all_texts, args.batch_size)
     for bs, texts in enumerate(batch_texts):

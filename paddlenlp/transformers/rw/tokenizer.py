@@ -26,48 +26,37 @@ __all__ = ["RWTokenizer"]
 
 class RWTokenizer(GPTTokenizer):
     """
-    Constructs a RW tokenizer. It uses a basic tokenizer to do punctuation
-    splitting, lower casing and so on, and follows a WordPiece tokenizer to
-    tokenize as subwords.
+    Constructs a RWModel tokenizer based on byte-level Byte-Pair-Encoding.
+
+    This tokenizer inherits from :class:`~paddlenlp.transformers.GPTTokenizer`
+    which contains most of the main methods. For more information regarding those methods,
+    please refer to this superclass.
 
     Args:
         vocab_file (str):
-            The vocabulary file path (ends with '.txt') required to instantiate
-            a `WordpieceTokenizer`.
-        do_lower_case (bool):
-            Whether or not to lowercase the input when tokenizing.
-            Defaults to`True`.
-        unk_token (str):
-            A special token representing the *unknown (out-of-vocabulary)* token.
-            An unknown token is set to be `unk_token` inorder to be converted to an ID.
-            Defaults to "[UNK]".
-        sep_token (str):
-            A special token separating two different sentences in the same input.
-            Defaults to "[SEP]".
-        pad_token (str):
-            A special token used to make arrays of tokens the same size for batching purposes.
-            Defaults to "[PAD]".
-        cls_token (str):
-            A special token used for sequence classification. It is the last token
-            of the sequence when built with special tokens. Defaults to "[CLS]".
-        mask_token (str):
-            A special token representing a masked token. This is the token used
-            in the masked language modeling task which the model tries to predict the original unmasked ones.
-            Defaults to "[MASK]".
+            Path to the vocab file.
+            The vocab file contains a mapping from vocabulary strings to indices.
+        merges_file (str):
+            Path to the merge file.
+            The merge file is used to split the input sentence into "subword" units.
+            The vocab file is then used to encode those units as intices.
+        errors (str):
+            Paradigm to follow when decoding bytes to UTF-8.
+            Defaults to `'replace'`.
+        max_len (int, optional):
+            The maximum value of the input sequence length.
+            Defaults to `None`.
 
     Examples:
         .. code-block::
 
             from paddlenlp.transformers import RWTokenizer
-            
-            tokenizer = RWTokenizer.from_pretrained('nezha-base-chinese')
 
-            inputs = tokenizer('欢迎使用百度飞桨！')
-            print(inputs)
+            tokenizer = RWTokenizer.from_pretrained('tiiuae/falcon-7b')
+            print(tokenizer('Welcome to use PaddlePaddle and PaddleNLP'))
 
             '''
-            {'input_ids': [101, 3614, 6816, 886, 4500, 4636, 2428, 7607, 3444, 8013, 102],
-            'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
+            {'input_ids': [11302, 271, 745, 337, 18849, 59, 18849, 273, 337, 18849, 57, 15549]}
             '''
 
     """
