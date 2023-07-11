@@ -24,12 +24,7 @@ from data import (
     reader,
 )
 from modeling_pp import LlamaForCausalLMPipe
-from utils import (
-    LlamaTrainer,
-    compute_metrics,
-    compute_metrics_not_do_generation,
-    save_infer_result,
-)
+from utils import LlamaTrainer, compute_metrics, compute_metrics_not_do_generation
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
@@ -46,24 +41,12 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class DataArgument:
-    task_name: str = field(default="squad", metadata={"help": "The name of task."})
-    src_length: int = field(default=608, metadata={"help": "The max length of source text."})
-    tgt_length: int = field(default=160, metadata={"help": "The max length of target text."})
-    min_tgt_length: int = field(default=0, metadata={"help": "The min length of target text."})
-    length_penalty: float = field(default=0.7, metadata={"help": "The length penalty."})
-    no_repeat_ngram_size: int = field(default=3, metadata={"help": "The no repeat ngram size."})
-    num_beams: int = field(default=5, metadata={"help": "The number of beams."})
-    select_topk: bool = field(default=True, metadata={"help": "Whether to select top k tokens for generation."})
-    top_p: float = field(
-        default=0.0, metadata={"help": "The cumulative probability for top-p-filtering in the 'sampling' strategy."}
-    )
-    top_k: int = field(
-        default=0,
-        metadata={
-            "help": "The number of highest probability tokens to keep for top-k-filtering in the 'sampling' strategy."
-        },
-    )
-    generate_num: int = field(default=0, metadata={"help": "Save first k examples generation result in dev dataset"})
+
+    data_name: str = field(default=None, metadata={"help": "The name of data."})
+    task_name: str = field(default=None, metadata={"help": "The name of task."})
+    dataset_path: str = field(default=None, metadata={"help": "The file name of train dataset."})
+    src_length: int = field(default=512, metadata={"help": "The max length of source text."})
+    tgt_length: int = field(default=256, metadata={"help": "The max length of target text."})
 
 
 @dataclass
@@ -73,19 +56,10 @@ class ModelArgument:
     )
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
-    lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
-    r: int = field(default=4, metadata={"help": "Lora attention dimension"})
-    merge_weights: bool = field(
-        default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
-    )
-    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
-    num_prefix_tokens: int = field(default=10, metadata={"help": "Number of prefix tokens"})
-    prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
     eval_with_do_generation: bool = field(
         default=False, metadata={"help": "Evaluate with generation, instead for calc loss."}
     )
-    instruction_generation: bool = field(default=False, metadata={"help": "Instruction generation finetuning"})
     benchmark: bool = field(
         default=False,
         metadata={"help": "Whether or not run benchmark."},
@@ -94,6 +68,20 @@ class ModelArgument:
         default=None,
         metadata={"help": "profiler_options."},
     )
+    # lora
+    lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
+    lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
+    lora_rank: int = field(default=4, metadata={"help": "Lora attention dimension"})
+    merge_weights: bool = field(
+        default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
+    )
+    # prefix
+    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
+    num_prefix_tokens: int = field(default=10, metadata={"help": "Number of prefix tokens"})
+    prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
+    # qat
+    qat: bool = field(default=False, metadata={"help": "Whether to use QAT technique"})
+    qat_type: str = field(default="A8W8", metadata={"help": "Quantization type. Supported values: A8W8, W4,A8W4"})
 
 
 def main():
@@ -104,6 +92,8 @@ def main():
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
     training_args.benchmark = model_args.benchmark
+    training_args.tgt_length = data_args.tgt_length
+
     training_args.profiler_options = model_args.profiler_options
     setattr(training_args, "label_smoothing", model_args.label_smoothing)
     setattr(training_args, "lr_decay_ratio", model_args.lr_decay_ratio)
@@ -160,18 +150,79 @@ def main():
         lm_shift_labels=False,
     )
     if model_args.lora:
-        # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
-        lora_config = LoRAConfig(
-            target_modules=[".*q_proj.*", ".*v_proj.*"],
-            r=model_args.r,
-            lora_alpha=2 * model_args.r,
-            merge_weights=model_args.merge_weights,
-            tensor_parallel_degree=training_args.tensor_parallel_degree,
-            dtype=dtype,
-        )
-        model = LoRAModel(model, lora_config)
+        if model_args.lora_path is None:
+            # Not yet support RowParallelLinear
+            if training_args.tensor_parallel_degree > 1:
+                target_modules = [
+                    ".*q_proj.*",
+                    ".*v_proj.*",
+                    ".*k_proj.*",
+                    ".*gate_proj.*",
+                    ".*up_proj.*",
+                ]
+            else:
+                target_modules = [
+                    ".*q_proj.*",
+                    ".*v_proj.*",
+                    ".*k_proj.*",
+                    ".*o_proj.*",
+                    ".*gate_proj.*",
+                    ".*down_proj.*",
+                    ".*up_proj.*",
+                ]
+
+            lora_config = LoRAConfig(
+                target_modules=target_modules,
+                r=model_args.lora_rank,
+                lora_alpha=2 * model_args.lora_rank,
+                merge_weights=model_args.merge_weights,
+                tensor_parallel_degree=training_args.tensor_parallel_degree,
+                dtype=dtype,
+            )
+            model = LoRAModel(model, lora_config)
+        else:
+            model = LoRAModel.from_pretrained(mode=model, lora_path=model_args.lora_path)
+
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
+
+    if model_args.qat:
+        from paddle import nn
+        from paddle.quantization import QAT, QuantConfig
+
+        # FakeQuanterChannelWiseAbsMaxObserver not yet merge in Paddle develop
+        from paddle.quantization.quanters import FakeQuanterChannelWiseAbsMaxObserver
+        from paddle.quantization.quanters.abs_max import (
+            FakeQuanterWithAbsMaxObserverLayer,
+        )
+        from paddleslim.quant.quanters import PACTQuanter
+
+        # from paddle.quantization.quanters import FakeQuanterWithAbsMaxObserver
+        from paddlenlp.peft.lora import LoRALinear
+        from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
+
+        q_config = QuantConfig(activation=None, weight=None)
+        q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
+
+        if model_args.qat_type == "A8W8":
+            activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
+            # activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
+            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype=dtype)
+        elif model_args.qat_type == "W4":
+            activation = None
+            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype=dtype)
+        elif model_args.qat_type == "A8W4":
+            activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
+            # activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
+            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype=dtype)
+        else:
+            raise ValueError("qat_type should be one of ['A8W8', 'W4', 'A8W4']")
+
+        q_config.add_type_config(LoRALinear, weight=weight, activation=activation)
+        q_config.add_type_config(nn.Linear, weight=weight, activation=activation)
+
+        qat = QAT(q_config)
+        model = qat.quantize(model, inplace=True)
 
     if model_args.prefix_tuning:
         prefix_config = PrefixConfig(
@@ -197,27 +248,35 @@ def main():
     )
     tokenizer.pad_token = tokenizer.unk_token
 
-    trans_func = partial(
-        custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args, benchmark=training_args.benchmark
-    )
     # Load the dataset.
     if training_args.benchmark:
         train_ds = load_dataset(reader, data_path="./data/train.txt", lazy=False)
         training_args.do_eval = False
         data_args.always_pad_to_max_length = True
+        trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
     elif training_args.do_train or training_args.do_eval:
-        if model_args.instruction_generation:
-            train_ds, dev_ds = load_dataset("bellegroup", "school_math_0.25M", splits=["train", "dev"])
+        if data_args.data_name is not None:
+            if data_args.task_name is not None:
+                train_ds, dev_ds = load_dataset(data_args.data_name, data_args.task_name, splits=["train", "dev"])
+            else:
+                raise ValueError("`data_args.task_name` and `data_args.data_name` should be specified together")
+        elif data_args.task_name is not None:
+            if data_args.task_name == "squad":
+                train_ds, dev_ds = load_dataset("squad", splits=["train_v1", "dev_v1"])
+            else:
+                train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train", "dev"])
+        elif data_args.dataset_path is not None:
+            train_ds = load_dataset(reader, data_path=os.path.join(data_args.dataset_path, "train.json"), lazy=False)
+            dev_ds = load_dataset(reader, data_path=os.path.join(data_args.dataset_path, "dev.json"), lazy=False)
         else:
-            train_ds, dev_ds = load_dataset("squad", splits=["train_v1", "dev_v1"])
-            trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
+            raise ValueError("Please set the correct data arguments(data_name, task_name, dataset_pat)")
+        trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
 
     if training_args.do_train:
         train_ds = train_ds.map(partial(trans_func))
     if training_args.do_eval:
         # pipeline_parallel eval is the same as training.
-        is_test = model_args.eval_with_do_generation
-        dev_ds = dev_ds.map(partial(trans_func, is_test=is_test))
+        dev_ds = dev_ds.map(partial(trans_func, is_test=model_args.eval_with_do_generation))
 
     model_max_length = 1024 if not training_args.benchmark else 512
     collate_fn = DataCollatorForSupervisedDataset(
@@ -273,11 +332,6 @@ def main():
     if training_args.do_eval:
         eval_result = trainer.evaluate()
         trainer.log_metrics("test", eval_result)
-
-    if data_args.generate_num > 0:
-        save_infer_result(
-            trainer, dev_ds, k=data_args.generate_num, src_length=data_args.src_length, tgt_length=data_args.tgt_length
-        )
 
 
 if __name__ == "__main__":

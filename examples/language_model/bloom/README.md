@@ -10,95 +10,69 @@ BLOOM是一种自回归大型语言模型(LLM)，在大量文本数据上训练�
 支持单个模型进行模型并行的生成式微调，示例脚本如下所示：
 
 ```shell
-python -m paddle.distributed.launch --log_dir our_log --gpus "0,1,2,3" finetune_generation.py \
+python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
     --model_name_or_path bigscience/bloom-560m \
-    --num_train_epochs 4 \
-    --learning_rate 1e-6 \
-    --warmup_ratio 0.06 \
-    --weight_decay 0.1 \
-    --label_smoothing 0.1 \
-    --save_steps 100 \
-    --logging_steps 1 \
-    --eval_steps 100 \
+    --task_name_or_path "dureader_qg" \
     --output_dir ./checkpoints/bloom-560m \
-    --src_length 500 \
-    --tgt_length 100 \
-    --min_tgt_length 0 \
-    --per_device_eval_batch_size 8 \
     --per_device_train_batch_size 4 \
-    --gradient_accumulation_steps 32 \
-    --max_grad_norm 1.0 \
-    --scale_loss 32768 \
-    --lr_scheduler_type linear \
-    --do_train \
-    --do_eval \
+    --gradient_accumulation_steps 2 \
+    --per_device_eval_batch_size 8 \
+    --num_train_epochs 1 \
+    --learning_rate 3e-5 \
+    --warmup_steps 30 \
+    --logging_steps 1 \
+    --evaluation_strategy epoch \
+    --save_strategy epoch \
+    --src_length 1024 \
+    --tgt_length 1024 \
     --fp16 \
     --fp16_opt_level O2 \
+    --do_train \
+    --do_eval \
+    --disable_tqdm True \
+    --load_best_model_at_end True \
+    --metric_for_best_model accuracy \
+    --eval_with_do_generation False \
+    --tensor_parallel_degree 4 \
     --recompute \
-    --tensor_parallel_degree 4
+    --save_total_limit 1 \
+    --scale_loss 32768 \
+    --overwrite_output_dir
 ```
 
 支持大模型的模型并行微调，设置 `tensor_parallel_degree` 就是模型并行的并行度
-
-```shell
-python -m paddle.distributed.launch --log_dir our_log --gpus "0,1,2,3" finetune_generation.py \
-    --model_name_or_path bigscience/bloom-560m \
-    --num_train_epochs 4 \
-    --learning_rate 1e-6 \
-    --warmup_ratio 0.06 \
-    --weight_decay 0.1 \
-    --label_smoothing 0.1 \
-    --save_steps 20 \
-    --logging_steps 1 \
-    --eval_steps 20 \
-    --output_dir ./checkpoints/bloom-560m \
-    --src_length 500 \
-    --tgt_length 100 \
-    --min_tgt_length 0 \
-    --per_device_eval_batch_size 8 \
-    --per_device_train_batch_size 4 \
-    --gradient_accumulation_steps 32 \
-    --max_grad_norm 1.0 \
-    --scale_loss 32768 \
-    --lr_scheduler_type linear \
-    --do_train \
-    --do_eval \
-    --fp16 \
-    --fp16_opt_level O2 \
-    --recompute \
-    --tensor_parallel_degree 4
-```
 
 支持单个模型进行单卡LoRA微调，示例脚本如下所示：
 
 ```shell
 python finetune_generation.py \
     --model_name_or_path bigscience/bloom-560m \
+    --task_name_or_path "dureader_qg" \
+    --output_dir ./checkpoints/bloom-560m \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 2 \
+    --per_device_eval_batch_size 8 \
     --num_train_epochs 2 \
     --learning_rate 3e-4 \
-    --warmup_ratio 0.06 \
-    --weight_decay 0.1 \
-    --label_smoothing 0.1 \
-    --save_steps 1000 \
+    --warmup_steps 30 \
     --logging_steps 1 \
-    --eval_steps 1000 \
-    --output_dir ./checkpoints/bloom-560m \
-    --src_length 500 \
-    --tgt_length 100 \
-    --min_tgt_length 0 \
-    --per_device_eval_batch_size 8 \
-    --per_device_train_batch_size 4 \
-    --gradient_accumulation_steps 4 \
-    --max_grad_norm 1.0 \
-    --scale_loss 32768 \
-    --lr_scheduler_type linear \
-    --do_train \
-    --do_eval \
+    --evaluation_strategy epoch \
+    --save_strategy epoch \
+    --src_length 1024 \
+    --tgt_length 1024 \
     --fp16 \
     --fp16_opt_level O2 \
+    --do_train \
+    --do_eval \
+    --disable_tqdm True \
+    --load_best_model_at_end True \
+    --metric_for_best_model accuracy \
+    --eval_with_do_generation False \
     --recompute \
+    --save_total_limit 1 \
+    --overwrite_output_dir \
     --lora True \
-    --r 8
+    --lora_rank 8
 ```
 
 支持单个模型进行单卡Prefix微调，示例脚本如下所示：
@@ -106,30 +80,31 @@ python finetune_generation.py \
 ```shell
 python finetune_generation.py \
     --model_name_or_path bigscience/bloom-560m \
-    --num_train_epochs 2 \
-    --learning_rate 3e-2 \
-    --warmup_ratio 0.06 \
-    --weight_decay 0.1 \
-    --label_smoothing 0.1 \
-    --save_steps 1000 \
-    --logging_steps 1 \
-    --eval_steps 1000 \
+    --task_name_or_path "dureader_qg" \
     --output_dir ./checkpoints/bloom-560m \
-    --src_length 500 \
-    --tgt_length 100 \
-    --min_tgt_length 0 \
-    --per_device_eval_batch_size 8 \
     --per_device_train_batch_size 4 \
-    --gradient_accumulation_steps 4 \
-    --max_grad_norm 1.0 \
-    --scale_loss 32768 \
-    --lr_scheduler_type linear \
-    --do_train \
-    --do_eval \
+    --gradient_accumulation_steps 2 \
+    --per_device_eval_batch_size 8 \
+    --num_train_epochs 2 \
+    --learning_rate 3e-4 \
+    --warmup_steps 30 \
+    --logging_steps 1 \
+    --evaluation_strategy epoch \
+    --save_strategy epoch \
+    --src_length 1024 \
+    --tgt_length 1024 \
     --fp16 \
     --fp16_opt_level O2 \
+    --do_train \
+    --do_eval \
+    --disable_tqdm True \
+    --load_best_model_at_end True \
+    --metric_for_best_model accuracy \
+    --eval_with_do_generation False \
     --recompute \
-    --prefix True \
+    --save_total_limit 1 \
+    --overwrite_output_dir \
+    --prefix_tuning True \
     --num_prefix_tokens 64
 ```
 
@@ -158,9 +133,10 @@ python finetune_generation.py \
 - `tensor_parallel_degree`: 模型并行数量。
 - `do_generation`: 在评估的时候是否调用model.generate,默认为False。
 - `lora`: 是否使用LoRA技术。
-- `prefix`: 是否使用Prefix技术。
+- `lora_path`: 初始化lora参数和配置文件路径。
+- `lora_rank`: lora 算法中rank（秩）的值。
 - `merge_weights`: 是否合并原始模型和Lora模型的权重。
-- `r`: lora 算法中rank（秩）的值。
+- `prefix_tuning`: 是否使用Prefix技术。
 - `num_prefix_tokens`: prefix tuning算法中前缀token数量。
 
 ## 模型动态图预测
