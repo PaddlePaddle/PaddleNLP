@@ -78,6 +78,9 @@ def convert_example(example, tokenizer, data_args, is_test=True):
 
         labels = [-100] * context_length + input_ids[mask_position + 1 :]
 
+        # shift labels
+        input_ids, labels = input_ids[:-1], labels[1:]
+
         inputs = {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
@@ -136,6 +139,9 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Tr
         attention_mask = (attention_mask < 0.5).astype("int64")
 
         labels = [-100] * context_length + input_ids[mask_position + 1 :]
+
+        # shift labels
+        input_ids, labels = input_ids[:-1], labels[1:]
 
         inputs = {
             "input_ids": input_ids,
