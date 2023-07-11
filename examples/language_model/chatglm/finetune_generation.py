@@ -22,12 +22,11 @@ from data import convert_example, custom_instruction_convert_example, read_local
 from sklearn.metrics import accuracy_score
 from utils import ChatGLMTrainer, save_infer_result
 
-from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers import LoRAConfig, LoRAModel
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
-from paddlenlp.prompt import PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.prompt.prefix import (
+from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.peft.prefix import (
     chatglm_pad_attention_mask,
     chatglm_postprocess_past_key_value,
 )
@@ -42,9 +41,7 @@ class DataArgument:
     src_length: int = field(default=128, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=180, metadata={"help": "The max length of target text."})
     num_beams: int = field(default=5, metadata={"help": "The number of beams."})
-    generate_num: int = field(default=100, metadata={"help": "Save first k examples generation result in dev dataset"})
-    src_length: int = field(default=256, metadata={"help": "Source length for generation."})
-    tgt_length: int = field(default=512, metadata={"help": "Target length for generation."})
+    generate_num: int = field(default=0, metadata={"help": "Save first k examples generation result in dev dataset"})
 
 
 @dataclass
@@ -52,9 +49,20 @@ class ModelArgument:
     model_name_or_path: str = field(
         default="THUDM/chatglm-6b", metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
-    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix Tuning technique"})
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
+    lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
+    merge_weights: bool = field(
+        default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
+    )
+    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
+    num_prefix_tokens: int = field(default=64, metadata={"help": "Number of prefix tokens"})
+    prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
     do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
+    lora_all_linear: bool = field(default=False, metadata={"help": "Whether to use LoRA technique for all linear."})
+    qat: bool = field(default=False, metadata={"help": "Whether to use QAT technique"})
+    qat_bit_length: int = field(
+        default=8, metadata={"help": "Number of bits to represent an quantized integer in binary"}
+    )
 
 
 def main():
@@ -97,14 +105,15 @@ def main():
         dtype=dtype,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
+        lm_shift_labels=False,
     )
     if model_args.prefix_tuning:
         prefix_config = PrefixConfig(
-            num_prefix_tokens=64,
+            num_prefix_tokens=model_args.num_prefix_tokens,
             num_attention_heads=model.config.num_attention_heads,
             num_hidden_layers=model.config.num_hidden_layers,
             hidden_size=model.config.hidden_size,
-            # prefix_projection=True,
+            prefix_projection=model_args.prefix_projection,
             prefix_projection_hidden_size=model.config.hidden_size,
             dtype=dtype,
         )
@@ -117,18 +126,56 @@ def main():
         model.mark_only_prefix_as_trainable()
         model.print_trainable_parameters()
     if model_args.lora:
+        if model_args.lora_all_linear:
+            # Not yet support RowParallelLinear
+            if training_args.tensor_parallel_degree > 1:
+                target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
+            else:
+                target_modules = [".*query_key_value.*", ".*dense_h_to_4h.*"]
+        else:
+            target_modules = [".*query_key_value.*"]
         lora_config = LoRAConfig(
-            target_modules=[".*query_key_value.*"],
-            r=8,
-            lora_alpha=16,
-            merge_weights=True,
-            enable_lora_list=[[True, False, True]],
+            target_modules=target_modules,
+            r=model_args.lora_rank,
+            lora_alpha=2 * model_args.lora_rank,
+            merge_weights=model_args.merge_weights,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,
+            head_dim=model.config.hidden_size // model.config.num_attention_heads,
         )
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
+
+    if model_args.qat:
+        from paddle import nn
+        from paddle.quantization import QAT, QuantConfig
+        from paddle.quantization.quanters import (
+            FakeQuanterChannelWiseAbsMaxObserver,
+            FakeQuanterWithAbsMaxObserver,
+        )
+
+        from paddlenlp.peft.lora import LoRALinear
+        from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
+
+        q_config = QuantConfig(activation=None, weight=None)
+        q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
+        q_config.add_type_config(
+            LoRALinear,
+            weight=FakeQuanterChannelWiseAbsMaxObserver(bit_length=model_args.qat_bit_length, dtype=dtype),
+            activation=FakeQuanterWithAbsMaxObserver(
+                moving_rate=0.9, bit_length=model_args.qat_bit_length, dtype=dtype
+            ),
+        )
+        q_config.add_type_config(
+            nn.Linear,
+            weight=FakeQuanterChannelWiseAbsMaxObserver(bit_length=model_args.qat_bit_length, dtype=dtype),
+            activation=FakeQuanterWithAbsMaxObserver(
+                moving_rate=0.9, bit_length=model_args.qat_bit_length, dtype=dtype
+            ),
+        )
+        qat = QAT(q_config)
+        model = qat.quantize(model, inplace=True)
     tokenizer = ChatGLMTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load the dataset.
@@ -152,7 +199,7 @@ def main():
         train_ds = train_ds.map(partial(trans_func, is_test=False))
         test_ds = dev_ds.map(partial(trans_func, is_test=False))
 
-    collate_fn = DataCollatorWithPadding(
+    collate_fn = DataCollatorForSeq2Seq(
         tokenizer=tokenizer, max_length=data_args.src_length + data_args.tgt_length, padding=True
     )
 
@@ -161,11 +208,12 @@ def main():
         rouge2 = Rouge2()
         rougel = RougeL()
         bleu4 = BLEU(n_size=4)
-        predictions = [x[x != -100] for x in eval_preds.predictions]
-        references = [x[x != -100] for x in eval_preds.label_ids]
 
+        predictions = [x[x != -100].tolist() for x in eval_preds.predictions]
+        references = [x[x != -100].tolist() for x in eval_preds.label_ids]
+        predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+        references = tokenizer.batch_decode(references, skip_special_tokens=True)
         # for pred in predictions:
-
         rouge1_score = rouge1.score(predictions, references)
         rouge2_score = rouge2.score(predictions, references)
         for pred, ref in zip(predictions, references):
@@ -179,10 +227,11 @@ def main():
         }
 
     def compute_metrics(eval_preds):
-
-        predictions = [x[x != -100] for x in eval_preds.predictions]
-        references = [x[x != -100] for x in eval_preds.label_ids]
-        accuracy = accuracy_score(y_true=np.array(references).flatten(), y_pred=np.array(predictions).flatten())
+        flattened_preds = np.array(eval_preds.predictions).flatten()
+        flattened_labels = np.array(eval_preds.label_ids).flatten()
+        filtered_preds = flattened_preds[flattened_labels != -100]
+        filtered_labels = flattened_labels[flattened_labels != -100]
+        accuracy = accuracy_score(y_true=filtered_labels, y_pred=filtered_preds)
         return {
             "accuracy": accuracy,
         }

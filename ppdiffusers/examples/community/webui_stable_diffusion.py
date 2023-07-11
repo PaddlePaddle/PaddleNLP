@@ -23,9 +23,11 @@ from typing import Any, Callable, Dict, List, Optional, Union
 
 import paddle
 import paddle.nn as nn
+import PIL
+import PIL.Image
 
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
-from ppdiffusers.models import AutoencoderKL, UNet2DConditionModel
+from ppdiffusers.models import AutoencoderKL, ControlNetModel, UNet2DConditionModel
 from ppdiffusers.pipelines.pipeline_utils import DiffusionPipeline
 from ppdiffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from ppdiffusers.pipelines.stable_diffusion.safety_checker import (
@@ -33,6 +35,7 @@ from ppdiffusers.pipelines.stable_diffusion.safety_checker import (
 )
 from ppdiffusers.schedulers import KarrasDiffusionSchedulers
 from ppdiffusers.utils import (
+    PIL_INTERPOLATION,
     PPDIFFUSERS_CACHE,
     logging,
     ppdiffusers_url_download,
@@ -52,6 +55,72 @@ import os.path
 from huggingface_hub.file_download import _request_wrapper, hf_raise_for_status
 
 # lark omegaconf
+
+
+def resize_image(resize_mode, im, width, height, upscaler_name=None):
+    """
+    Resizes an image with the specified resize_mode, width, and height.
+
+    Args:
+        resize_mode: The mode to use when resizing the image.
+           -1: do nothing.
+            0: Resize the image to the specified width and height.
+            1: Resize the image to fill the specified width and height, maintaining the aspect ratio, and then center the image within the dimensions, cropping the excess.
+            2: Resize the image to fit within the specified width and height, maintaining the aspect ratio, and then center the image within the dimensions, filling empty with data from image.
+        im: The image to resize.
+        width: The width to resize the image to.
+        height: The height to resize the image to.
+        upscaler_name: The name of the upscaler to use. If not provided, defaults to opts.upscaler_for_img2img.
+    """
+    # ["Just resize", "Crop and resize", "Resize and fill", "Do nothing"]
+    #         0              1                   2               -1
+    def resize(im, w, h):
+        if upscaler_name is None or upscaler_name == "None" or im.mode == "L":
+            return im.resize((w, h), resample=PIL_INTERPOLATION["lanczos"])
+
+    if resize_mode == -1:
+        return im
+    elif resize_mode == 0:
+        res = resize(im, width, height)
+
+    elif resize_mode == 1:
+        ratio = width / height
+        src_ratio = im.width / im.height
+
+        src_w = width if ratio > src_ratio else im.width * height // im.height
+        src_h = height if ratio <= src_ratio else im.height * width // im.width
+
+        resized = resize(im, src_w, src_h)
+        res = Image.new("RGB", (width, height))
+        res.paste(resized, box=(width // 2 - src_w // 2, height // 2 - src_h // 2))
+
+    else:
+        ratio = width / height
+        src_ratio = im.width / im.height
+
+        src_w = width if ratio < src_ratio else im.width * height // im.height
+        src_h = height if ratio >= src_ratio else im.height * width // im.width
+
+        resized = resize(im, src_w, src_h)
+        res = Image.new("RGB", (width, height))
+        res.paste(resized, box=(width // 2 - src_w // 2, height // 2 - src_h // 2))
+
+        if ratio < src_ratio:
+            fill_height = height // 2 - src_h // 2
+            res.paste(resized.resize((width, fill_height), box=(0, 0, width, 0)), box=(0, 0))
+            res.paste(
+                resized.resize((width, fill_height), box=(0, resized.height, width, resized.height)),
+                box=(0, fill_height + src_h),
+            )
+        elif ratio > src_ratio:
+            fill_width = width // 2 - src_w // 2
+            res.paste(resized.resize((fill_width, height), box=(0, 0, 0, height)), box=(0, 0))
+            res.paste(
+                resized.resize((fill_width, height), box=(resized.width, 0, resized.width, height)),
+                box=(fill_width + src_w, 0),
+            )
+
+    return res
 
 
 def get_civitai_download_url(display_url, url_prefix="https://civitai.com"):
@@ -212,6 +281,8 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
             Tokenizer of class
             [CLIPTokenizer](https://huggingface.co/docs/transformers/v4.21.0/en/model_doc/clip#transformers.CLIPTokenizer).
         unet ([`UNet2DConditionModel`]): Conditional U-Net architecture to denoise the encoded image latents.
+        controlnet ([`ControlNetModel`]):
+            Provides additional conditioning to the unet during the denoising process.
         scheduler ([`SchedulerMixin`]):
             A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
             [`DDIMScheduler`], [`LMSDiscreteScheduler`], [`PNDMScheduler`], [`EulerDiscreteScheduler`], [`EulerAncestralDiscreteScheduler`]
@@ -222,7 +293,7 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
         feature_extractor ([`CLIPFeatureExtractor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
-    _optional_components = ["safety_checker", "feature_extractor"]
+    _optional_components = ["safety_checker", "feature_extractor", "controlnet"]
     enable_emphasis = True
     comma_padding_backtrack = 20
     LORA_DIR = os.path.join(PPDIFFUSERS_CACHE, "lora")
@@ -234,6 +305,7 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
         text_encoder: CLIPTextModel,
         tokenizer: CLIPTokenizer,
         unet: UNet2DConditionModel,
+        controlnet: ControlNetModel,
         scheduler: KarrasDiffusionSchedulers,
         safety_checker: StableDiffusionSafetyChecker,
         feature_extractor: CLIPFeatureExtractor,
@@ -262,6 +334,7 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
             text_encoder=text_encoder,
             tokenizer=tokenizer,
             unet=unet,
+            controlnet=controlnet,
             scheduler=scheduler,
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
@@ -450,10 +523,12 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
     def check_inputs(
         self,
         prompt,
+        image,
         height,
         width,
         callback_steps,
         negative_prompt=None,
+        controlnet_conditioning_scale=1.0,
     ):
         if height % 8 != 0 or width % 8 != 0:
             raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
@@ -472,6 +547,77 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
         if negative_prompt is not None and not isinstance(negative_prompt, str):
             raise ValueError(f"`negative_prompt` has to be of type `str` but is {type(negative_prompt)}")
 
+        # Check `image`
+        if image is not None and self.controlnet is not None:
+            if isinstance(self.controlnet, ControlNetModel):
+                self.check_image(image, prompt)
+            else:
+                assert False
+
+            # Check `controlnet_conditioning_scale`
+            if isinstance(self.controlnet, ControlNetModel):
+                if not isinstance(controlnet_conditioning_scale, (float, list, tuple)):
+                    raise TypeError(
+                        "For single controlnet: `controlnet_conditioning_scale` must be type `float, list(float) or tuple(float)`."
+                    )
+
+    def check_image(self, image, prompt):
+        image_is_pil = isinstance(image, PIL.Image.Image)
+        image_is_tensor = isinstance(image, paddle.Tensor)
+        image_is_pil_list = isinstance(image, list) and isinstance(image[0], PIL.Image.Image)
+        image_is_tensor_list = isinstance(image, list) and isinstance(image[0], paddle.Tensor)
+
+        if not image_is_pil and not image_is_tensor and not image_is_pil_list and not image_is_tensor_list:
+            raise TypeError(
+                "image must be one of PIL image, paddle tensor, list of PIL images, or list of paddle tensors"
+            )
+
+        if image_is_pil:
+            image_batch_size = 1
+        elif image_is_tensor:
+            image_batch_size = image.shape[0]
+        elif image_is_pil_list:
+            image_batch_size = len(image)
+        elif image_is_tensor_list:
+            image_batch_size = len(image)
+
+        if prompt is not None and isinstance(prompt, str):
+            prompt_batch_size = 1
+        elif prompt is not None and isinstance(prompt, list):
+            prompt_batch_size = len(prompt)
+
+        if image_batch_size != 1 and image_batch_size != prompt_batch_size:
+            raise ValueError(
+                f"If image batch size is not 1, image batch size must be same as prompt batch size. image batch size: {image_batch_size}, prompt batch size: {prompt_batch_size}"
+            )
+
+    def prepare_image(self, image, width, height, dtype, resize_mode=-1):
+        if not isinstance(image, paddle.Tensor):
+            if isinstance(image, PIL.Image.Image):
+                image = resize_image(resize_mode=resize_mode, im=image, width=width, height=height)
+                image = [image]
+
+            if isinstance(image[0], PIL.Image.Image):
+                image = [resize_image(resize_mode=resize_mode, im=im, width=width, height=height) for im in image]
+
+                images = []
+                for image_ in image:
+                    image_ = image_.convert("RGB")
+                    image_ = image_.resize((width, height), resample=PIL_INTERPOLATION["lanczos"])
+                    image_ = np.array(image_)
+                    image_ = image_[None, :]
+                    images.append(image_)
+
+                image = np.concatenate(images, axis=0)
+                image = np.array(image).astype(np.float32) / 255.0
+                image = image.transpose(0, 3, 1, 2)
+                image = paddle.to_tensor(image)
+            elif isinstance(image[0], paddle.Tensor):
+                image = paddle.concat(image, axis=0)
+
+        image = image.cast(dtype)
+        return image
+
     def prepare_latents(self, batch_size, num_channels_latents, height, width, dtype, generator, latents=None):
         shape = [batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor]
         if isinstance(generator, list) and len(generator) != batch_size:
@@ -487,10 +633,33 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
         latents = latents * self.scheduler.init_noise_sigma
         return latents
 
+    def _default_height_width(self, height, width, image):
+        while isinstance(image, list):
+            image = image[0]
+
+        if height is None:
+            if isinstance(image, PIL.Image.Image):
+                height = image.height
+            elif isinstance(image, paddle.Tensor):
+                height = image.shape[3]
+
+            height = (height // 8) * 8  # round down to nearest multiple of 8
+
+        if width is None:
+            if isinstance(image, PIL.Image.Image):
+                width = image.width
+            elif isinstance(image, paddle.Tensor):
+                width = image.shape[2]
+
+            width = (width // 8) * 8  # round down to nearest multiple of 8
+
+        return height, width
+
     @paddle.no_grad()
     def __call__(
         self,
         prompt: str = None,
+        image: PIL.Image.Image = None,
         height: Optional[int] = None,
         width: Optional[int] = None,
         num_inference_steps: int = 50,
@@ -505,7 +674,11 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
         callback_steps: Optional[int] = 1,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
         clip_skip: int = 1,
+        controlnet_conditioning_scale: Union[float, List[float]] = 1.0,
         enable_lora: bool = True,
+        resize_mode: int = 0,
+        # ["Just resize", "Crop and resize", "Resize and fill", "Do nothing"]
+        #         0              1                   2               -1
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -514,6 +687,13 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
             prompt (`str`, *optional*):
                 The prompt or prompts to guide the image generation. If not defined, one has to pass `prompt_embeds`.
                 instead.
+            image (`paddle.Tensor`, `PIL.Image.Image`):
+                The ControlNet input condition. ControlNet uses this input condition to generate guidance to Unet. If
+                the type is specified as `paddle.Tensor`, it is passed to ControlNet as is. `PIL.Image.Image` can
+                also be accepted as an image. The dimensions of the output image defaults to `image`'s dimensions. If
+                height and/or width are passed, `image` is resized according to them. If multiple ControlNets are
+                specified in init, images must be passed as a list such that each element of the list can be correctly
+                batched for input to a single controlnet.
             height (`int`, *optional*, defaults to self.unet.config.sample_size * self.vae_scale_factor):
                 The height in pixels of the generated image.
             width (`int`, *optional*, defaults to self.unet.config.sample_size * self.vae_scale_factor):
@@ -555,9 +735,13 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
             cross_attention_kwargs (`dict`, *optional*):
                 A kwargs dictionary that if specified is passed along to the `AttnProcessor` as defined under
                 `self.processor` in
-                [diffusers.cross_attention](https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/cross_attention.py).
+                [ppdiffusers.cross_attention](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/cross_attention.py).
             clip_skip (`int`, *optional*, defaults to 1):
                 CLIP_stop_at_last_layers, if clip_skip <= 1, we will use the last_hidden_state from text_encoder.
+            controlnet_conditioning_scale (`float` or `List[float]`, *optional*, defaults to 1.0):
+                The outputs of the controlnet are multiplied by `controlnet_conditioning_scale` before they are added
+                to the residual in the original unet. If multiple ControlNets are specified in init, you can set the
+                corresponding scale as a list.
         Examples:
 
         Returns:
@@ -568,19 +752,31 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
             (nsfw) content, according to the `safety_checker`.
         """
         self.add_ti_embedding_dir(self.TI_DIR)
-
+        enable_control = image is not None and self.controlnet is not None
         try:
             # 0. Default height and width to unet
-            height = height or max(self.unet.config.sample_size * self.vae_scale_factor, 512)
-            width = width or max(self.unet.config.sample_size * self.vae_scale_factor, 512)
+            if enable_control:
+                height, width = self._default_height_width(height, width, image)
+                image = self.prepare_image(
+                    image=image,
+                    width=width,
+                    height=height,
+                    dtype=self.controlnet.dtype,
+                    resize_mode=resize_mode,
+                )
+            else:
+                height = height or max(self.unet.config.sample_size * self.vae_scale_factor, 512)
+                width = width or max(self.unet.config.sample_size * self.vae_scale_factor, 512)
 
             # 1. Check inputs. Raise error if not correct
             self.check_inputs(
                 prompt,
+                image,
                 height,
                 width,
                 callback_steps,
                 negative_prompt,
+                controlnet_conditioning_scale,
             )
 
             batch_size = 1
@@ -658,30 +854,70 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
                     latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                     if do_batch:
+                        encoder_hidden_states = paddle.concat([uncond_tensor, cond_tensor])
+                        control_kwargs = {}
+                        if enable_control:
+                            down_block_res_samples, mid_block_res_sample = self.controlnet(
+                                latent_model_input,
+                                t,
+                                encoder_hidden_states=encoder_hidden_states,
+                                controlnet_cond=paddle.concat([image, image]),
+                                conditioning_scale=controlnet_conditioning_scale,
+                                return_dict=False,
+                            )
+                            control_kwargs["down_block_additional_residuals"] = down_block_res_samples
+                            control_kwargs["mid_block_additional_residual"] = mid_block_res_sample
                         noise_pred = self.unet(
                             latent_model_input,
                             t,
-                            encoder_hidden_states=paddle.concat([uncond_tensor, cond_tensor]),
+                            encoder_hidden_states=encoder_hidden_states,
                             cross_attention_kwargs=cross_attention_kwargs,
+                            **control_kwargs,
                         ).sample
                         noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
                         noise_pred = noise_pred_uncond + weight * guidance_scale * (
                             noise_pred_text - noise_pred_uncond
                         )
                     else:
+                        control_kwargs = {}
+                        if enable_control:
+                            down_block_res_samples, mid_block_res_sample = self.controlnet(
+                                latent_model_input,
+                                t,
+                                encoder_hidden_states=cond_tensor,
+                                controlnet_cond=image,
+                                conditioning_scale=controlnet_conditioning_scale,
+                                return_dict=False,
+                            )
+                            control_kwargs["down_block_additional_residuals"] = down_block_res_samples
+                            control_kwargs["mid_block_additional_residual"] = mid_block_res_sample
                         noise_pred = self.unet(
                             latent_model_input,
                             t,
                             encoder_hidden_states=cond_tensor,
                             cross_attention_kwargs=cross_attention_kwargs,
+                            **control_kwargs,
                         ).sample
 
                         if do_classifier_free_guidance:
+                            control_kwargs = {}
+                            if enable_control:
+                                down_block_res_samples, mid_block_res_sample = self.controlnet(
+                                    latent_model_input,
+                                    t,
+                                    encoder_hidden_states=uncond_tensor,
+                                    controlnet_cond=image,
+                                    conditioning_scale=controlnet_conditioning_scale,
+                                    return_dict=False,
+                                )
+                                control_kwargs["down_block_additional_residuals"] = down_block_res_samples
+                                control_kwargs["mid_block_additional_residual"] = mid_block_res_sample
                             noise_pred_uncond = self.unet(
                                 latent_model_input,
                                 t,
                                 encoder_hidden_states=uncond_tensor,
                                 cross_attention_kwargs=cross_attention_kwargs,
+                                **control_kwargs,
                             ).sample
                             noise_pred = noise_pred_uncond + weight * guidance_scale * (noise_pred - noise_pred_uncond)
 

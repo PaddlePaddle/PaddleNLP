@@ -25,6 +25,7 @@ from .utils import (
     is_k_diffusion_available,
     is_k_diffusion_version,
     is_librosa_available,
+    is_note_seq_available,
     is_paddle_available,
     is_paddle_version,
     is_paddlenlp_available,
@@ -61,6 +62,7 @@ else:
         MultiAdapter,
         PriorTransformer,
         T2IAdapter,
+        T5FilmDecoder,
         Transformer2DModel,
         UNet1DModel,
         UNet2DConditionModel,
@@ -140,7 +142,14 @@ else:
     from .pipelines import (
         AltDiffusionImg2ImgPipeline,
         AltDiffusionPipeline,
+        AudioLDMPipeline,
         CycleDiffusionPipeline,
+        IFImg2ImgPipeline,
+        IFImg2ImgSuperResolutionPipeline,
+        IFInpaintingPipeline,
+        IFInpaintingSuperResolutionPipeline,
+        IFPipeline,
+        IFSuperResolutionPipeline,
         LDMTextToImagePipeline,
         PaintByExamplePipeline,
         SemanticStableDiffusionPipeline,
@@ -155,6 +164,7 @@ else:
         StableDiffusionInstructPix2PixPipeline,
         StableDiffusionLatentUpscalePipeline,
         StableDiffusionMegaPipeline,
+        StableDiffusionModelEditingPipeline,
         StableDiffusionPanoramaPipeline,
         StableDiffusionPipeline,
         StableDiffusionPipelineAllinOne,
@@ -165,6 +175,7 @@ else:
         StableUnCLIPImg2ImgPipeline,
         StableUnCLIPPipeline,
         TextToVideoSDPipeline,
+        TextToVideoZeroPipeline,
         UnCLIPImageVariationPipeline,
         UnCLIPPipeline,
         UniDiffuserPipeline,
@@ -199,6 +210,7 @@ else:
         FastDeployStableDiffusionInpaintPipelineLegacy,
         FastDeployStableDiffusionMegaPipeline,
         FastDeployStableDiffusionPipeline,
+        FastDeployStableDiffusionUpscalePipeline,
     )
 
 try:
@@ -208,6 +220,16 @@ except OptionalDependencyNotAvailable:
     from .utils.dummy_paddle_and_librosa_objects import *  # noqa F403
 else:
     from .pipelines import AudioDiffusionPipeline, Mel
+
+
+try:
+    if not (is_paddle_available() and is_paddlenlp_available() and is_note_seq_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from .utils.dummy_paddle_and_paddlenlp_and_note_seq_objects import *  # noqa F403
+else:
+    from .pipelines import SpectrogramDiffusionPipeline
+
 
 try:
     if not (is_paddle_available() and is_paddlenlp_available() and is_einops_available()):
@@ -224,3 +246,11 @@ except OptionalDependencyNotAvailable:
     from .utils.dummy_paddle_and_einops_objects import *  # noqa F403
 else:
     from .models import UViTModel
+
+try:
+    if not (is_note_seq_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from .utils.dummy_note_seq_objects import *  # noqa F403
+else:
+    from .pipelines import MidiProcessor

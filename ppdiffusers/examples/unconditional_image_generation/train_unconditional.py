@@ -34,6 +34,10 @@ from paddlenlp.utils.log import logger
 from ppdiffusers import DDPMPipeline, DDPMScheduler, UNet2DModel
 from ppdiffusers.optimization import get_scheduler
 from ppdiffusers.training_utils import EMAModel, unwrap_model
+from ppdiffusers.utils import check_min_version, is_ppxformers_available
+
+# Will error if the minimal version of diffusers is not installed. Remove at your own risks.
+check_min_version("0.16.1")
 
 
 def _extract_into_tensor(arr, timesteps, broadcast_shape):
@@ -258,6 +262,9 @@ def parse_args():
         ),
     )
     parser.add_argument("--seed", type=int, default=None, help="A seed for reproducible training.")
+    parser.add_argument(
+        "--enable_xformers_memory_efficient_attention", action="store_true", help="Whether or not to use xformers."
+    )
     args = parser.parse_args()
 
     if args.dataset_name is None and args.train_data_dir is None:
@@ -386,6 +393,14 @@ def main():
             model_config=model.config,
         )
 
+    if args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
+        try:
+            model.enable_xformers_memory_efficient_attention()
+        except Exception as e:
+            logger.warn(
+                "Could not enable memory efficient attention. Make sure develop paddlepaddle is installed"
+                f" correctly and a GPU is available: {e}"
+            )
     # Initialize the scheduler
     accepts_prediction_type = "prediction_type" in set(inspect.signature(DDPMScheduler.__init__).parameters.keys())
     if accepts_prediction_type:
@@ -549,6 +564,7 @@ def main():
             if epoch % args.save_images_epochs == 0 or epoch == args.num_epochs - 1:
                 unet = unwrap_model(model)
                 if args.use_ema:
+                    ema_model.store(unet.parameters())
                     ema_model.copy_to(unet.parameters())
                 pipeline = DDPMPipeline(
                     unet=unet,
@@ -564,6 +580,8 @@ def main():
                     output_type="numpy",
                 ).images
 
+                if args.use_ema:
+                    ema_model.restore(unet.parameters())
                 # denormalize the images and save to tensorboard
                 images_processed = (images * 255).round().astype("uint8")
                 if args.report_to == "tensorboard":
@@ -573,7 +591,22 @@ def main():
 
             if epoch % args.save_model_epochs == 0 or epoch == args.num_epochs - 1:
                 # save the model
+                # save the model
+                unet = unwrap_model(model)
+
+                if args.use_ema:
+                    ema_model.store(unet.parameters())
+                    ema_model.copy_to(unet.parameters())
+
+                pipeline = DDPMPipeline(
+                    unet=unet,
+                    scheduler=noise_scheduler,
+                )
+
                 pipeline.save_pretrained(args.output_dir)
+
+                if args.use_ema:
+                    ema_model.restore(unet.parameters())
 
     if is_main_process:
         writer.close()

@@ -13,14 +13,35 @@
 # limitations under the License.
 
 import copy
+import json
 from dataclasses import dataclass
-from typing import Dict, List
 
+import numpy as np
 import paddle
 
-from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
+from paddlenlp.data import DataCollatorForSeq2Seq
 
 IGNORE_INDEX = -100
+
+PROMPT_DICT = {
+    "prompt_input": (
+        "Below is an instruction that describes a task, paired with an input that provides further context. "
+        "Write a response that appropriately completes the request.\n\n"
+        "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:"
+    ),
+    "prompt_no_input": (
+        "Below is an instruction that describes a task. "
+        "Write a response that appropriately completes the request.\n\n"
+        "### Instruction:\n{instruction}\n\n### Response:"
+    ),
+}
+
+
+def reader(data_path):
+    with open(data_path, "r", encoding="utf-8") as f:
+        for line in f:
+            json_line = json.loads(line)
+            yield json_line
 
 
 def convert_example(example, tokenizer, data_args, is_test=False):
@@ -61,7 +82,7 @@ def convert_example(example, tokenizer, data_args, is_test=False):
         input_seq + output_seq,
         return_tensors="pd",
         max_length=data_args.src_length + data_args.tgt_length,
-        padding="max_length" if data_args.always_pad_to_max_length else False,
+        padding=False,
         truncation=True,
     )
 
@@ -75,39 +96,51 @@ def convert_example(example, tokenizer, data_args, is_test=False):
             labels=labels,
         )
 
+    # shift labels
+    input_ids, labels = input_ids[:-1], labels[1:]
+
     return dict(
         input_ids=input_ids,
         labels=labels,
     )
 
 
-def custom_instruction_convert_example(example, tokenizer, data_args, is_test=False):
+def custom_instruction_convert_example(
+    example, tokenizer, data_args, is_test=False, benchmark=False, model_max_length=512
+):
     """
     Convert an example into necessary features.
     """
 
-    instruction = ""
-    input = ""
-    output = ""
-    if "instruction" in example and "output" in example:
-        instruction = example["instruction"]
-        output = example["output"]
-    else:
-        assert False, "instruction and output are not in the input dictionary."
-    if "input" in example["input"]:
-        input = example["input"]
+    if benchmark:
+        prompt_input, prompt_no_input = PROMPT_DICT["prompt_input"], PROMPT_DICT["prompt_no_input"]
 
-    if "chat" in data_args.task_name:
+        if example.get("input", "") != "":
+            input_seq = prompt_input.format_map(example)
+        else:
+            input_seq = prompt_no_input.format_map(example)
+
+        output_seq = example["output"] + tokenizer.eos_token
+    else:
+        instruction = ""
+        input = ""
+        output = ""
+        if "instruction" in example and "output" in example:
+            instruction = example["instruction"]
+            output = example["output"]
+        else:
+            assert False, "instruction and output are not in the input dictionary."
+        if "input" in example["input"]:
+            input = example["input"]
+
         input_seq = instruction + input
-    else:
-        input_seq = "Human: " + instruction + input + "\n Assistant: "
+        output_seq = output + tokenizer.eos_token
 
-    output_seq = output
-
+    # To compatible with compile training mode in benchmark, input will be pad to fix length
     source_tokenized = tokenizer(
         input_seq,
         return_tensors="pd",
-        max_length=data_args.src_length,
+        max_length=data_args.src_length if not benchmark else model_max_length,
         truncation=True,
     )
 
@@ -115,10 +148,12 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Fa
         source_tokenized["input_ids"].not_equal(paddle.to_tensor(tokenizer.pad_token_id)).sum().item()
     )
 
+    total_length = data_args.src_length + data_args.tgt_length
+
     example_tokenized = tokenizer(
         input_seq + output_seq,
         return_tensors="pd",
-        max_length=data_args.src_length + data_args.tgt_length,
+        max_length=total_length if not benchmark else model_max_length,
         truncation=True,
     )
 
@@ -132,14 +167,16 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Fa
             labels=labels,
         )
 
+    # shift labels
+    input_ids, labels = input_ids[:-1], labels[1:]
+
     return dict(
         input_ids=input_ids,
         labels=labels,
     )
 
 
-def left_padding(inputs, pad_id):
-    max_length = 0
+def left_padding(inputs, pad_id, max_length=-1):
     for ids in inputs:
         max_length = max(max_length, len(ids))
 
@@ -157,20 +194,49 @@ def left_padding(inputs, pad_id):
 
 
 @dataclass
-class DataCollatorForSupervisedDataset(object):
+class DataCollatorForSupervisedDataset(DataCollatorForSeq2Seq):
     """Collate examples for supervised fine-tuning."""
 
-    tokenizer: PretrainedTokenizerBase
+    def __call__(self, features, return_tensors=None):
+        # Deep copy to avoid modifying features in-place
+        batch = copy.deepcopy(features)
+        if return_tensors is None:
+            return_tensors = self.return_tensors
+        labels = [feature["labels"] for feature in batch] if "labels" in batch[0].keys() else None
+        # We have to pad the labels before calling `tokenizer.pad` as this method won't pad them and needs them of the
+        # same length to return tensors.
+        if labels is not None:
+            # Note(gongenlei): In pipeline, max_label_length = self.max_length
+            if self.padding == "max_length" and self.max_length is not None:
+                max_label_length = self.max_length
+            else:
+                max_label_length = max(len(l) for l in labels)
+            if self.pad_to_multiple_of is not None:
+                max_label_length = (
+                    (max_label_length + self.pad_to_multiple_of - 1)
+                    // self.pad_to_multiple_of
+                    * self.pad_to_multiple_of
+                )
 
-    def __call__(self, features: List[Dict]) -> Dict[str, paddle.Tensor]:
+            padding_side = self.tokenizer.padding_side
+            for feature in batch:
+                remainder = [IGNORE_INDEX] * (max_label_length - len(feature["labels"]))
+                if isinstance(feature["labels"], list):
+                    feature["labels"] = (
+                        feature["labels"] + remainder if padding_side == "right" else remainder + feature["labels"]
+                    )
+                elif padding_side == "right":
+                    feature["labels"] = np.concatenate([feature["labels"], remainder]).astype(np.int64)
+                else:
+                    feature["labels"] = np.concatenate([remainder, feature["labels"]]).astype(np.int64)
 
-        input_ids, labels = tuple([feature[key] for feature in features] for key in ("input_ids", "labels"))
-        input_ids = left_padding(input_ids, pad_id=self.tokenizer.pad_token_id)
-        labels = left_padding(labels, pad_id=IGNORE_INDEX)
-        attention_mask = paddle.cast(input_ids.not_equal(paddle.to_tensor(self.tokenizer.pad_token_id)), "int")
-
-        return dict(
-            input_ids=input_ids,
-            labels=labels,
-            attention_mask=attention_mask,
+        batch = self.tokenizer.pad(
+            batch,
+            padding=self.padding,
+            max_length=self.max_length,
+            pad_to_multiple_of=self.pad_to_multiple_of,
+            return_tensors=return_tensors,
+            return_attention_mask=self.return_attention_mask,
         )
+
+        return batch

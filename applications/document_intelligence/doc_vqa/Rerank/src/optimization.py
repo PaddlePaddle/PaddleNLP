@@ -68,7 +68,7 @@ def optimization(
         elif scheduler == "linear_warmup_decay":
             scheduled_lr = linear_warmup_decay(learning_rate, warmup_steps, num_train_steps)
         else:
-            raise ValueError("Unkown learning rate scheduler, should be " "'noam_decay' or 'linear_warmup_decay'")
+            raise ValueError("Unknown learning rate scheduler, should be " "'noam_decay' or 'linear_warmup_decay'")
         if use_lamb:
             optimizer = fluid.optimizer.LambOptimizer(learning_rate=scheduled_lr)
         else:

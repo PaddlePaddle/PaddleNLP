@@ -159,7 +159,7 @@ def run_evaluate(
     for eval_step, batch in enumerate(data_loader):
         loss_return = exe.run(program, feed=batch, fetch_list=eval_fetch)
         if is_last:
-            all_loss.append(float(loss_return))
+            all_loss.append(float(loss_return[0]))
         if eval_step >= iter_steps - 1:
             if not is_last:
                 break

@@ -46,7 +46,8 @@ class UNet2DModel(ModelMixin, ConfigMixin):
 
     Parameters:
         sample_size (`int` or `Tuple[int, int]`, *optional*, defaults to `None`):
-            Height and width of input/output sample.
+            Height and width of input/output sample. Dimensions must be a multiple of `2 ** (len(block_out_channels) -
+            1)`.
         in_channels (`int`, *optional*, defaults to 3): Number of channels in the input image.
         out_channels (`int`, *optional*, defaults to 3): Number of channels in the output.
         center_input_sample (`bool`, *optional*, defaults to `False`): Whether to center the input sample.
@@ -72,8 +73,9 @@ class UNet2DModel(ModelMixin, ConfigMixin):
         norm_eps (`float`, *optional*, defaults to `1e-5`): The epsilon for the normalization.
         resnet_time_scale_shift (`str`, *optional*, defaults to `"default"`): Time scale shift config
             for resnet blocks, see [`~models.resnet.ResnetBlock2D`]. Choose from `default` or `scale_shift`.
-        class_embed_type (`str`, *optional*, defaults to None): The type of class embedding to use which is ultimately
-            summed with the time embeddings. Choose from `None`, `"timestep"`, or `"identity"`.
+        class_embed_type (`str`, *optional*, defaults to None):
+            The type of class embedding to use which is ultimately summed with the time embeddings. Choose from `None`,
+            `"timestep"`, or `"identity"`.
         num_class_embeds (`int`, *optional*, defaults to None):
             Input dimension of the learnable embedding matrix to be projected to `time_embed_dim`, when performing
             class conditioning with `class_embed_type` equal to `None`.
@@ -150,14 +152,15 @@ class UNet2DModel(ModelMixin, ConfigMixin):
 
         # pre_temb_act_fun opt
         self.resnet_pre_temb_non_linearity = resnet_pre_temb_non_linearity
-        if act_fn == "swish":
-            self.down_resnet_temb_nonlinearity = lambda x: F.silu(x)
-        elif act_fn == "mish":
-            self.down_resnet_temb_nonlinearity = nn.Mish()
-        elif act_fn == "silu":
-            self.down_resnet_temb_nonlinearity = nn.Silu()
-        elif act_fn == "gelu":
-            self.down_resnet_temb_nonlinearity = nn.GELU()
+        if resnet_pre_temb_non_linearity:
+            if act_fn == "swish":
+                self.down_resnet_temb_nonlinearity = lambda x: F.silu(x)
+            elif act_fn == "mish":
+                self.down_resnet_temb_nonlinearity = nn.Mish()
+            elif act_fn == "silu":
+                self.down_resnet_temb_nonlinearity = nn.Silu()
+            elif act_fn == "gelu":
+                self.down_resnet_temb_nonlinearity = nn.GELU()
 
         # down
         output_channel = block_out_channels[0]
@@ -303,21 +306,21 @@ class UNet2DModel(ModelMixin, ConfigMixin):
         # 3. down
         down_block_res_samples = (sample,)
 
-        # ! resnet_pre_temb_non_linearity
-        down_nonlinear_temb = self.down_resnet_temb_nonlinearity(emb) if self.resnet_pre_temb_non_linearity else emb
+        if self.resnet_pre_temb_non_linearity:
+            emb = self.down_resnet_temb_nonlinearity(emb)
 
         for downsample_block in self.down_blocks:
             if hasattr(downsample_block, "skip_conv"):
                 sample, res_samples, skip_sample = downsample_block(
-                    hidden_states=sample, temb=down_nonlinear_temb, skip_sample=skip_sample
+                    hidden_states=sample, temb=emb, skip_sample=skip_sample
                 )
             else:
-                sample, res_samples = downsample_block(hidden_states=sample, temb=down_nonlinear_temb)
+                sample, res_samples = downsample_block(hidden_states=sample, temb=emb)
 
             down_block_res_samples += res_samples
 
         # 4. mid
-        sample = self.mid_block(sample, down_nonlinear_temb)
+        sample = self.mid_block(sample, emb)
 
         # 5. up
         skip_sample = None
@@ -326,9 +329,9 @@ class UNet2DModel(ModelMixin, ConfigMixin):
             down_block_res_samples = down_block_res_samples[: -len(upsample_block.resnets)]
 
             if hasattr(upsample_block, "skip_conv"):
-                sample, skip_sample = upsample_block(sample, res_samples, down_nonlinear_temb, skip_sample)
+                sample, skip_sample = upsample_block(sample, res_samples, emb, skip_sample)
             else:
-                sample = upsample_block(sample, res_samples, down_nonlinear_temb)
+                sample = upsample_block(sample, res_samples, emb)
 
         # 6. post-process
         sample = self.conv_norm_out(sample)

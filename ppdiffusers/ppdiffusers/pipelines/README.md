@@ -23,6 +23,498 @@ Pipelines提供了一种对各种SOTA扩散模型进行各种下游任务推理�
 **【注意】** Pipelines不（也不应该）提供任何训练功能。
 如果您正在寻找训练的相关示例，请查看[examples](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples).
 
+
+## 任务展示
+### 文本图像多模
+
+<details>
+<summary>&emsp;文图生成（Text-to-Image Generation）</summary>
+
+#### text_to_image_generation-stable_diffusion
+
+```python
+from ppdiffusers import StableDiffusionPipeline
+
+# 加载模型和scheduler
+pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
+
+# 执行pipeline进行推理
+prompt = "a photo of an astronaut riding a horse on mars"
+image = pipe(prompt).images[0]
+
+# 保存图片
+image.save("astronaut_rides_horse_sd.png")
+```
+<div align="center">
+<img width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209322401-6ecfeaaa-6878-4302-b592-07a31de4e590.png">
+</div>
+
+
+#### text_to_image_generation-deepfloyd_if
+
+```python
+import paddle
+
+from ppdiffusers import DiffusionPipeline, IFPipeline, IFSuperResolutionPipeline
+from ppdiffusers.utils import pd_to_pil
+
+# Stage 1: generate images
+pipe = IFPipeline.from_pretrained("DeepFloyd/IF-I-XL-v1.0", variant="fp16", paddle_dtype=paddle.float16)
+pipe.enable_xformers_memory_efficient_attention()
+prompt = 'a photo of a kangaroo wearing an orange hoodie and blue sunglasses standing in front of the eiffel tower holding a sign that says "very deep learning"'
+prompt_embeds, negative_embeds = pipe.encode_prompt(prompt)
+image = pipe(
+    prompt_embeds=prompt_embeds,
+    negative_prompt_embeds=negative_embeds,
+    output_type="pd",
+).images
+
+# save intermediate image
+pil_image = pd_to_pil(image)
+pil_image[0].save("text_to_image_generation-deepfloyd_if-result-if_stage_I.png")
+# save gpu memory
+pipe.to(paddle_device="cpu")
+
+# Stage 2: super resolution stage1
+super_res_1_pipe = IFSuperResolutionPipeline.from_pretrained(
+    "DeepFloyd/IF-II-L-v1.0", text_encoder=None, variant="fp16", paddle_dtype=paddle.float16
+)
+super_res_1_pipe.enable_xformers_memory_efficient_attention()
+
+image = super_res_1_pipe(
+    image=image,
+    prompt_embeds=prompt_embeds,
+    negative_prompt_embeds=negative_embeds,
+    output_type="pd",
+).images
+# save intermediate image
+pil_image = pd_to_pil(image)
+pil_image[0].save("text_to_image_generation-deepfloyd_if-result-if_stage_II.png")
+# save gpu memory
+super_res_1_pipe.to(paddle_device="cpu")
+
+# Stage 3: super resolution stage2
+super_res_2_pipe = DiffusionPipeline.from_pretrained(
+    "stabilityai/stable-diffusion-x4-upscaler", paddle_dtype=paddle.float16
+)
+super_res_2_pipe.enable_xformers_memory_efficient_attention()
+
+image = super_res_2_pipe(
+    prompt=prompt,
+    image=image,
+).images
+image[0].save("text_to_image_generation-deepfloyd_if-result-if_stage_III.png")
+```
+<div align="center">
+<img alt="image" src="https://user-images.githubusercontent.com/20476674/246785766-700dfad9-159d-4bfb-bfc7-c18df938a052.png">
+<center>if_stage_I</center>
+<img alt="image" src="https://user-images.githubusercontent.com/20476674/246785773-3359ca5f-dadf-4cc8-b318-ff1f9d4a2d35.png">
+<center>if_stage_II</center>
+<img alt="image" src="https://user-images.githubusercontent.com/20476674/246785774-8870829a-354b-4a87-9d67-93af315f51e6.png">
+<center>if_stage_III</center>
+</div>
+</details>
+
+
+<details><summary>&emsp;文本引导的图像放大（Text-Guided Image Upscaling）</summary>
+
+#### text_guided_image_upscaling-stable_diffusion_2
+
+```python
+from ppdiffusers import StableDiffusionUpscalePipeline
+from ppdiffusers.utils import load_image
+
+pipe = StableDiffusionUpscalePipeline.from_pretrained("stabilityai/stable-diffusion-x4-upscaler")
+
+url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/low_res_cat.png"
+low_res_img = load_image(url).resize((128, 128))
+
+prompt = "a white cat"
+upscaled_image = pipe(prompt=prompt, image=low_res_img).images[0]
+upscaled_image.save("upsampled_cat_sd2.png")
+```
+<div align="center">
+<img alt="image" src="https://user-images.githubusercontent.com/20476674/209324085-0d058b70-89b0-43c2-affe-534eedf116cf.png">
+<center>原图像</center>
+<img alt="image" src="https://user-images.githubusercontent.com/20476674/209323862-ce2d8658-a52b-4f35-90cb-aa7d310022e7.png">
+<center>生成图像</center>
+</div>
+</details>
+
+<details><summary>&emsp;文本引导的图像编辑（Text-Guided Image Inpainting）</summary>
+
+#### text_guided_image_inpainting-stable_diffusion_2
+
+```python
+from ppdiffusers import StableDiffusionUpscalePipeline
+from ppdiffusers.utils import load_image
+
+pipe = StableDiffusionUpscalePipeline.from_pretrained("stabilityai/stable-diffusion-x4-upscaler")
+
+url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/low_res_cat.png"
+low_res_img = load_image(url).resize((128, 128))
+
+prompt = "a white cat"
+upscaled_image = pipe(prompt=prompt, image=low_res_img).images[0]
+upscaled_image.save("upsampled_cat_sd2.png")
+```
+<div align="center">
+<img alt="image" src="https://user-images.githubusercontent.com/20476674/209324085-0d058b70-89b0-43c2-affe-534eedf116cf.png">
+<center>原图像</center>
+<img alt="image" src="https://user-images.githubusercontent.com/20476674/209323862-ce2d8658-a52b-4f35-90cb-aa7d310022e7.png">
+<center>生成图像</center>
+</div>
+</details>
+
+
+<details><summary>&emsp;文本引导的图像变换（Image-to-Image Text-Guided Generation）</summary>
+
+#### image_to_image_text_guided_generation-stable_diffusion
+```python
+import paddle
+
+from ppdiffusers import StableDiffusionImg2ImgPipeline
+from ppdiffusers.utils import load_image
+
+# 加载pipeline
+pipe = StableDiffusionImg2ImgPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
+
+# 下载初始图片
+url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
+
+init_image = load_image(url).resize((768, 512))
+
+prompt = "A fantasy landscape, trending on artstation"
+# 使用fp16加快生成速度
+with paddle.amp.auto_cast(True):
+    image = pipe(prompt=prompt, image=init_image, strength=0.75, guidance_scale=7.5).images[0]
+
+image.save("fantasy_landscape.png")
+```
+<div align="center">
+<img width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209327142-d8e1d0c7-3bf8-4a08-a0e8-b11451fc84d8.png">
+<center>原图像</center>
+<img width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209325799-d9ff279b-0d57-435f-bda7-763e3323be23.png">
+<center>生成图像</center>
+</div>
+</details>
+</details>
+
+<details><summary>&emsp;文本图像双引导图像生成（Dual Text and Image Guided Generation）</summary>
+
+#### dual_text_and_image_guided_generation-versatile_diffusion
+```python
+from ppdiffusers import VersatileDiffusionDualGuidedPipeline
+from ppdiffusers.utils import load_image
+
+url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/benz.jpg"
+image = load_image(url)
+text = "a red car in the sun"
+
+pipe = VersatileDiffusionDualGuidedPipeline.from_pretrained("shi-labs/versatile-diffusion")
+pipe.remove_unused_weights()
+
+text_to_image_strength = 0.75
+image = pipe(prompt=text, image=image, text_to_image_strength=text_to_image_strength).images[0]
+image.save("versatile-diffusion-red_car.png")
+```
+<div align="center">
+<img width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209325965-2475e9c4-a524-4970-8498-dfe10ff9cf24.jpg" >
+<center>原图像</center>
+<img width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209325293-049098d0-d591-4abc-b151-9291ac2636da.png">
+<center>生成图像</center>
+</div>
+</details>
+
+### 文本视频多模
+
+<details>
+<summary>&emsp;文本条件的视频生成（Text-to-Video Generation）</summary>
+
+#### text_to_video_generation-synth
+
+```python
+import imageio
+
+from ppdiffusers import DPMSolverMultistepScheduler, TextToVideoSDPipeline
+
+pipe = TextToVideoSDPipeline.from_pretrained("damo-vilab/text-to-video-ms-1.7b")
+pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+
+prompt = "An astronaut riding a horse."
+video_frames = pipe(prompt, num_inference_steps=25).frames
+imageio.mimsave("text_to_video_generation-synth-result-astronaut_riding_a_horse.mp4", video_frames, fps=8)
+```
+<div align="center">
+<img width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/246780441-8242a955-490b-4326-8415-84264a54a938.gif">
+</div>
+
+#### text_to_video_generation-zero
+
+```python
+import imageio
+
+# pip install imageio[ffmpeg]
+import paddle
+
+from ppdiffusers import TextToVideoZeroPipeline
+
+model_id = "runwayml/stable-diffusion-v1-5"
+pipe = TextToVideoZeroPipeline.from_pretrained(model_id, paddle_dtype=paddle.float16)
+
+prompt = "A panda is playing guitar on times square"
+result = pipe(prompt=prompt).images
+result = [(r * 255).astype("uint8") for r in result]
+imageio.mimsave("text_to_video_generation-zero-result-panda.mp4", result, fps=4)
+```
+<div align="center">
+<img width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/246779321-c2b0c2b4-e383-40c7-a4d8-f417e8062b35.gif">
+</div>
+
+</details>
+
+### 文本音频多模
+
+<details>
+<summary>&emsp;文本条件的音频生成（Text-to-Audio Generation）</summary>
+
+#### text_to_audio_generation-audio_ldm
+
+```python
+import paddle
+import scipy
+
+from ppdiffusers import AudioLDMPipeline
+
+pipe = AudioLDMPipeline.from_pretrained("cvssp/audioldm", paddle_dtype=paddle.float16)
+
+prompt = "Techno music with a strong, upbeat tempo and high melodic riffs"
+audio = pipe(prompt, num_inference_steps=10, audio_length_in_s=5.0).audios[0]
+
+output_path = "text_to_audio_generation-audio_ldm-techno.wav"
+# save the audio sample as a .wav file
+scipy.io.wavfile.write(output_path, rate=16000, data=audio)
+```
+<div align = "center">
+  <thead>
+  </thead>
+  <tbody>
+   <tr>
+      <td align = "center">
+      <a href="https://paddlenlp.bj.bcebos.com/models/community/westfish/develop_ppdiffusers_data/techno.wav" rel="nofollow">
+            <img align="center" src="https://user-images.githubusercontent.com/20476674/209344877-edbf1c24-f08d-4e3b-88a4-a27e1fd0a858.png" width="200 style="max-width: 100%;"></a><br>
+      </td>
+    </tr>
+  </tbody>
+</div>
+</details>
+
+### 图像
+
+<details><summary>&emsp;无条件图像生成（Unconditional Image Generation）</summary>
+
+#### unconditional_image_generation-latent_diffusion_uncond
+
+```python
+from ppdiffusers import LDMPipeline
+
+# 加载模型和scheduler
+pipe = LDMPipeline.from_pretrained("CompVis/ldm-celebahq-256")
+
+# 执行pipeline进行推理
+image = pipe(num_inference_steps=200).images[0]
+
+# 保存图片
+image.save("ldm_generated_image.png")
+```
+<div align="center">
+<img width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209327936-7fe914e0-0ea0-4e21-a433-24eaed6ee94c.png">
+</div>
+</details>
+
+<details><summary>&emsp;超分（Super Superresolution）</summary>
+
+#### super_resolution-latent_diffusion
+```python
+import paddle
+
+from ppdiffusers import LDMSuperResolutionPipeline
+from ppdiffusers.utils import load_image
+
+# 加载pipeline
+pipe = LDMSuperResolutionPipeline.from_pretrained("CompVis/ldm-super-resolution-4x-openimages")
+
+# 下载初始图片
+url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
+
+init_image = load_image(url).resize((128, 128))
+init_image.save("original-image.png")
+
+# 使用fp16加快生成速度
+with paddle.amp.auto_cast(True):
+    image = pipe(init_image, num_inference_steps=100, eta=1).images[0]
+
+image.save("super-resolution-image.png")
+```
+<div align="center">
+<img  alt="image" src="https://user-images.githubusercontent.com/20476674/209328660-9700fdc3-72b3-43bd-9a00-23b370ba030b.png">
+<center>原图像</center>
+<img  alt="image" src="https://user-images.githubusercontent.com/20476674/209328479-4eaea5d8-aa4a-4f31-aa2a-b47e3c730f15.png">
+<center>生成图像</center>
+</div>
+</details>
+
+
+<details><summary>&emsp;图像编辑（Image Inpainting）</summary>
+
+#### image_inpainting-repaint
+```python
+from ppdiffusers import RePaintPipeline, RePaintScheduler
+from ppdiffusers.utils import load_image
+
+img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/celeba_hq_256.png"
+mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/mask_256.png"
+
+# Load the original image and the mask as PIL images
+original_image = load_image(img_url).resize((256, 256))
+mask_image = load_image(mask_url).resize((256, 256))
+
+scheduler = RePaintScheduler.from_pretrained("google/ddpm-ema-celebahq-256", subfolder="scheduler")
+pipe = RePaintPipeline.from_pretrained("google/ddpm-ema-celebahq-256", scheduler=scheduler)
+
+output = pipe(
+    original_image=original_image,
+    mask_image=mask_image,
+    num_inference_steps=250,
+    eta=0.0,
+    jump_length=10,
+    jump_n_sample=10,
+)
+inpainted_image = output.images[0]
+
+inpainted_image.save("repaint-image.png")
+```
+<div align="center">
+<img  alt="image" src="https://user-images.githubusercontent.com/20476674/209329052-b6fc2aaf-1a59-49a3-92ef-60180fdffd81.png">
+<center>原图像</center>
+<img  alt="image" src="https://user-images.githubusercontent.com/20476674/209329048-4fe12176-32a0-4800-98f2-49bd8d593799.png">
+<center>mask图像</center>
+<img  alt="image" src="https://user-images.githubusercontent.com/20476674/209329241-b7e4d99e-468a-4b95-8829-d77ee14bfe98.png">
+<center>生成图像</center>
+</div>
+</details>
+
+
+
+<details><summary>&emsp;图像变化（Image Variation）</summary>
+
+#### image_variation-versatile_diffusion
+```
+from ppdiffusers import VersatileDiffusionImageVariationPipeline
+from ppdiffusers.utils import load_image
+
+url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/benz.jpg"
+image = load_image(url)
+
+pipe = VersatileDiffusionImageVariationPipeline.from_pretrained("shi-labs/versatile-diffusion")
+
+image = pipe(image).images[0]
+image.save("versatile-diffusion-car_variation.png")
+```
+<div align="center">
+<img  width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209331434-51f6cdbd-b8e4-4faa-8e49-1cc852e35603.jpg">
+<center>原图像</center>
+<img  width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209331591-f6cc4cd8-8430-4627-8d22-bf404fb2bfdd.png">
+<center>生成图像</center>
+</div>
+</details>
+
+
+
+
+
+### 音频
+
+<details><summary>&emsp;无条件音频生成（Unconditional Audio Generation）</summary>
+
+#### unconditional_audio_generation-audio_diffusion
+
+```
+from scipy.io.wavfile import write
+from ppdiffusers import AudioDiffusionPipeline
+import paddle
+
+# 加载模型和scheduler
+pipe = AudioDiffusionPipeline.from_pretrained("teticio/audio-diffusion-ddim-256")
+pipe.set_progress_bar_config(disable=None)
+generator = paddle.Generator().manual_seed(42)
+
+output = pipe(generator=generator)
+audio = output.audios[0]
+image = output.images[0]
+
+# 保存音频到本地
+for i, audio in enumerate(audio):
+    write(f"audio_diffusion_test{i}.wav", pipe.mel.sample_rate, audio.transpose())
+
+# 保存图片
+image.save("audio_diffusion_test.png")
+```
+<div align = "center">
+  <thead>
+  </thead>
+  <tbody>
+   <tr>
+      <td align = "center">
+      <a href="https://paddlenlp.bj.bcebos.com/models/community/teticio/data/audio_diffusion_test0.wav" rel="nofollow">
+            <img align="center" src="https://user-images.githubusercontent.com/20476674/209344877-edbf1c24-f08d-4e3b-88a4-a27e1fd0a858.png" width="200 style="max-width: 100%;"></a><br>
+      </td>
+    </tr>
+  </tbody>
+</div>
+
+<div align="center">
+<img  width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209342125-93e8715e-895b-4115-9e1e-e65c6c2cd95a.png">
+</div>
+
+
+#### unconditional_audio_generation-spectrogram_diffusion
+
+```
+import paddle
+import scipy
+
+from ppdiffusers import MidiProcessor, SpectrogramDiffusionPipeline
+from ppdiffusers.utils.download_utils import ppdiffusers_url_download
+
+# Download MIDI from: wget https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/beethoven_hammerklavier_2.mid
+mid_file_path = ppdiffusers_url_download(
+    "https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/beethoven_hammerklavier_2.mid", cache_dir="."
+)
+pipe = SpectrogramDiffusionPipeline.from_pretrained("google/music-spectrogram-diffusion", paddle_dtype=paddle.float16)
+processor = MidiProcessor()
+output = pipe(processor(mid_file_path))
+audio = output.audios[0]
+
+output_path = "unconditional_audio_generation-spectrogram_diffusion-result-beethoven_hammerklavier_2.wav"
+# save the audio sample as a .wav file
+scipy.io.wavfile.write(output_path, rate=16000, data=audio)
+```
+<div align = "center">
+  <thead>
+  </thead>
+  <tbody>
+   <tr>
+      <td align = "center">
+      <a href="https://paddlenlp.bj.bcebos.com/models/community/westfish/develop_ppdiffusers_data/beethoven_hammerklavier_2.wav" rel="nofollow">
+            <img align="center" src="https://user-images.githubusercontent.com/20476674/209344877-edbf1c24-f08d-4e3b-88a4-a27e1fd0a858.png" width="200 style="max-width: 100%;"></a><br>
+      </td>
+    </tr>
+  </tbody>
+</div>
+</details>
+
+
 ## Pipelines汇总
 
 下表总结了所有支持的Pipelines，以及相应的来源、任务、推理脚本。
@@ -75,308 +567,3 @@ Pipelines提供了一种对各种SOTA扩散模型进行各种下游任务推理�
 - `save_pretrained` 该方法接受一个本地目录路径，Pipelines的所有模型或组件都将被保存到该目录下。对于每个模型或组件，都会在给定目录下创建一个子文件夹。同时`model_index.json`文件将会创建在本地目录路径的根目录下，以便可以再次从本地路径实例化整个Pipelines。
 
 - `__call__` Pipelines在推理时将调用该方法。该方法定义了Pipelines的推理逻辑，它应该包括预处理、张量在不同模型之间的前向传播、后处理等整个推理流程。
-
-
-## 任务展示
-### 文本图像多模态
-<details><summary>&emsp;文图生成（Text-to-Image Generation）</summary>
-
-- stable_diffusion
-
-```python
-from ppdiffusers import StableDiffusionPipeline
-
-# 加载模型和scheduler
-pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
-
-# 执行pipeline进行推理
-prompt = "a photo of an astronaut riding a horse on mars"
-image = pipe(prompt).images[0]
-
-# 保存图片
-image.save("astronaut_rides_horse_sd.png")
-```
-<div align="center">
-<img width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209322401-6ecfeaaa-6878-4302-b592-07a31de4e590.png">
-</div>
-
-</details>
-
-<details><summary>&emsp;文本引导的图像放大（Text-Guided Image Upscaling）</summary>
-
-- stable_diffusion_2
-
-```python
-from ppdiffusers import StableDiffusionUpscalePipeline
-from ppdiffusers.utils import load_image
-
-pipe = StableDiffusionUpscalePipeline.from_pretrained("stabilityai/stable-diffusion-x4-upscaler")
-
-url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/low_res_cat.png"
-low_res_img = load_image(url).resize((128, 128))
-
-prompt = "a white cat"
-upscaled_image = pipe(prompt=prompt, image=low_res_img).images[0]
-upscaled_image.save("upsampled_cat_sd2.png")
-```
-<div align="center">
-<img alt="image" src="https://user-images.githubusercontent.com/20476674/209324085-0d058b70-89b0-43c2-affe-534eedf116cf.png">
-<center>原图像</center>
-<img alt="image" src="https://user-images.githubusercontent.com/20476674/209323862-ce2d8658-a52b-4f35-90cb-aa7d310022e7.png">
-<center>生成图像</center>
-</div>
-</details>
-
-<details><summary>&emsp;文本引导的图像编辑（Text-Guided Image Inpainting）</summary>
-
-- stable_diffusion_2
-
-```python
-from ppdiffusers import StableDiffusionUpscalePipeline
-from ppdiffusers.utils import load_image
-
-pipe = StableDiffusionUpscalePipeline.from_pretrained("stabilityai/stable-diffusion-x4-upscaler")
-
-url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/low_res_cat.png"
-low_res_img = load_image(url).resize((128, 128))
-
-prompt = "a white cat"
-upscaled_image = pipe(prompt=prompt, image=low_res_img).images[0]
-upscaled_image.save("upsampled_cat_sd2.png")
-```
-<div align="center">
-<img alt="image" src="https://user-images.githubusercontent.com/20476674/209324085-0d058b70-89b0-43c2-affe-534eedf116cf.png">
-<center>原图像</center>
-<img alt="image" src="https://user-images.githubusercontent.com/20476674/209323862-ce2d8658-a52b-4f35-90cb-aa7d310022e7.png">
-<center>生成图像</center>
-</div>
-</details>
-
-
-<details><summary>&emsp;文本引导的图像变换（Image-to-Image Text-Guided Generation）</summary>
-
-- stable_diffusion
-```python
-import paddle
-
-from ppdiffusers import StableDiffusionImg2ImgPipeline
-from ppdiffusers.utils import load_image
-
-# 加载pipeline
-pipe = StableDiffusionImg2ImgPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
-
-# 下载初始图片
-url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
-
-init_image = load_image(url).resize((768, 512))
-
-prompt = "A fantasy landscape, trending on artstation"
-# 使用fp16加快生成速度
-with paddle.amp.auto_cast(True):
-    image = pipe(prompt=prompt, image=init_image, strength=0.75, guidance_scale=7.5).images[0]
-
-image.save("fantasy_landscape.png")
-```
-<div align="center">
-<img width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209327142-d8e1d0c7-3bf8-4a08-a0e8-b11451fc84d8.png">
-<center>原图像</center>
-<img width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209325799-d9ff279b-0d57-435f-bda7-763e3323be23.png">
-<center>生成图像</center>
-</div>
-</details>
-</details>
-
-<details><summary>&emsp;文本图像双引导图像生成（Dual Text and Image Guided Generation）</summary>
-
-- versatile_diffusion
-```python
-from ppdiffusers import VersatileDiffusionDualGuidedPipeline
-from ppdiffusers.utils import load_image
-
-url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/benz.jpg"
-image = load_image(url)
-text = "a red car in the sun"
-
-pipe = VersatileDiffusionDualGuidedPipeline.from_pretrained("shi-labs/versatile-diffusion")
-pipe.remove_unused_weights()
-
-text_to_image_strength = 0.75
-image = pipe(prompt=text, image=image, text_to_image_strength=text_to_image_strength).images[0]
-image.save("versatile-diffusion-red_car.png")
-```
-<div align="center">
-<img width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209325965-2475e9c4-a524-4970-8498-dfe10ff9cf24.jpg" >
-<center>原图像</center>
-<img width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209325293-049098d0-d591-4abc-b151-9291ac2636da.png">
-<center>生成图像</center>
-</div>
-</details>
-
-### 图像
-
-<details><summary>&emsp;无条件图像生成（Unconditional Image Generation）</summary>
-
-- latent_diffusion_uncond
-
-```python
-from ppdiffusers import LDMPipeline
-
-# 加载模型和scheduler
-pipe = LDMPipeline.from_pretrained("CompVis/ldm-celebahq-256")
-
-# 执行pipeline进行推理
-image = pipe(num_inference_steps=200).images[0]
-
-# 保存图片
-image.save("ldm_generated_image.png")
-```
-<div align="center">
-<img width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209327936-7fe914e0-0ea0-4e21-a433-24eaed6ee94c.png">
-</div>
-</details>
-
-<details><summary>&emsp;超分（Super Superresolution）</summary>
-
-- latent_diffusion
-```python
-import paddle
-
-from ppdiffusers import LDMSuperResolutionPipeline
-from ppdiffusers.utils import load_image
-
-# 加载pipeline
-pipe = LDMSuperResolutionPipeline.from_pretrained("CompVis/ldm-super-resolution-4x-openimages")
-
-# 下载初始图片
-url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
-
-init_image = load_image(url).resize((128, 128))
-init_image.save("original-image.png")
-
-# 使用fp16加快生成速度
-with paddle.amp.auto_cast(True):
-    image = pipe(init_image, num_inference_steps=100, eta=1).images[0]
-
-image.save("super-resolution-image.png")
-```
-<div align="center">
-<img  alt="image" src="https://user-images.githubusercontent.com/20476674/209328660-9700fdc3-72b3-43bd-9a00-23b370ba030b.png">
-<center>原图像</center>
-<img  alt="image" src="https://user-images.githubusercontent.com/20476674/209328479-4eaea5d8-aa4a-4f31-aa2a-b47e3c730f15.png">
-<center>生成图像</center>
-</div>
-</details>
-
-
-<details><summary>&emsp;图像编辑（Image Inpainting）</summary>
-
-- repaint
-```python
-from ppdiffusers import RePaintPipeline, RePaintScheduler
-from ppdiffusers.utils import load_image
-
-img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/celeba_hq_256.png"
-mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/mask_256.png"
-
-# Load the original image and the mask as PIL images
-original_image = load_image(img_url).resize((256, 256))
-mask_image = load_image(mask_url).resize((256, 256))
-
-scheduler = RePaintScheduler.from_pretrained("google/ddpm-ema-celebahq-256", subfolder="scheduler")
-pipe = RePaintPipeline.from_pretrained("google/ddpm-ema-celebahq-256", scheduler=scheduler)
-
-output = pipe(
-    original_image=original_image,
-    mask_image=mask_image,
-    num_inference_steps=250,
-    eta=0.0,
-    jump_length=10,
-    jump_n_sample=10,
-)
-inpainted_image = output.images[0]
-
-inpainted_image.save("repaint-image.png")
-```
-<div align="center">
-<img  alt="image" src="https://user-images.githubusercontent.com/20476674/209329052-b6fc2aaf-1a59-49a3-92ef-60180fdffd81.png">
-<center>原图像</center>
-<img  alt="image" src="https://user-images.githubusercontent.com/20476674/209329048-4fe12176-32a0-4800-98f2-49bd8d593799.png">
-<center>mask图像</center>
-<img  alt="image" src="https://user-images.githubusercontent.com/20476674/209329241-b7e4d99e-468a-4b95-8829-d77ee14bfe98.png">
-<center>生成图像</center>
-</div>
-</details>
-
-
-
-<details><summary>&emsp;图像变化（Image Variation）</summary>
-
-- versatile_diffusion
-```
-from ppdiffusers import VersatileDiffusionImageVariationPipeline
-from ppdiffusers.utils import load_image
-
-url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/benz.jpg"
-image = load_image(url)
-
-pipe = VersatileDiffusionImageVariationPipeline.from_pretrained("shi-labs/versatile-diffusion")
-
-image = pipe(image).images[0]
-image.save("versatile-diffusion-car_variation.png")
-```
-<div align="center">
-<img  width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209331434-51f6cdbd-b8e4-4faa-8e49-1cc852e35603.jpg">
-<center>原图像</center>
-<img  width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209331591-f6cc4cd8-8430-4627-8d22-bf404fb2bfdd.png">
-<center>生成图像</center>
-</div>
-</details>
-
-
-
-
-
-### 音频
-
-<details><summary>&emsp;无条件音频生成（Unconditional Audio Generation）</summary>
-
-- audio_diffusion
-
-```
-from scipy.io.wavfile import write
-from ppdiffusers import AudioDiffusionPipeline
-import paddle
-
-# 加载模型和scheduler
-pipe = AudioDiffusionPipeline.from_pretrained("teticio/audio-diffusion-ddim-256")
-pipe.set_progress_bar_config(disable=None)
-generator = paddle.Generator().manual_seed(42)
-
-output = pipe(generator=generator)
-audio = output.audios[0]
-image = output.images[0]
-
-# 保存音频到本地
-for i, audio in enumerate(audio):
-    write(f"audio_diffusion_test{i}.wav", pipe.mel.sample_rate, audio.transpose())
-
-# 保存图片
-image.save("audio_diffusion_test.png")
-```
-<div align = "center">
-  <thead>
-  </thead>
-  <tbody>
-   <tr>
-      <td align = "center">
-      <a href="https://paddlenlp.bj.bcebos.com/models/community/teticio/data/audio_diffusion_test0.wav" rel="nofollow">
-            <img align="center" src="https://user-images.githubusercontent.com/20476674/209344877-edbf1c24-f08d-4e3b-88a4-a27e1fd0a858.png" width="200 style="max-width: 100%;"></a><br>
-      </td>
-    </tr>
-  </tbody>
-</div>
-
-<div align="center">
-<img  width="300" alt="image" src="https://user-images.githubusercontent.com/20476674/209342125-93e8715e-895b-4115-9e1e-e65c6c2cd95a.png">
-</div>
-</details>

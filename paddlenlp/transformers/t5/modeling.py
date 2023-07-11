@@ -212,7 +212,10 @@ class T5LayerFF(nn.Layer):
     def forward(self, hidden_states):
         forwarded_states = self.layer_norm(hidden_states)
         forwarded_states = self.DenseReluDense(forwarded_states)
-        hidden_states = hidden_states + self.dropout(forwarded_states)
+        # hidden_states maybe FP16
+        # self.dropout(forwarded_states) maybe FP32
+        # FP32 + FP16 = FP32, FP16 + FP32 = FP16
+        hidden_states = self.dropout(forwarded_states) + hidden_states
         return hidden_states
 
 
@@ -308,8 +311,8 @@ class T5Attention(nn.Layer):
 
     def compute_bias(self, query_length, key_length):
         """Compute binned relative position bias"""
-        context_position = paddle.arange(query_length).unsqueeze(-1)
-        memory_position = paddle.arange(key_length).unsqueeze(0)
+        context_position = paddle.arange(query_length, dtype="int64").unsqueeze(-1)
+        memory_position = paddle.arange(key_length, dtype="int64").unsqueeze(0)
         relative_position = memory_position - context_position  # shape (query_length, key_length)
         relative_position_bucket = self._relative_position_bucket(
             relative_position,  # shape (query_length, key_length)
@@ -1139,7 +1142,7 @@ class T5Stack(T5PretrainedModel):
             # - if the model is an encoder, make the mask broadcastable to [batch_size, num_heads, seq_length, seq_length]
             if self.is_decoder:
                 batch_size, seq_length = input_shape
-                seq_ids = paddle.arange(seq_length)
+                seq_ids = paddle.arange(seq_length, dtype="int64")
                 causal_mask = paddle.tile(
                     seq_ids.unsqueeze(axis=[0, 1]), [batch_size, seq_length, 1]
                 ) <= seq_ids.unsqueeze(axis=[0, 2])
@@ -1164,7 +1167,7 @@ class T5Stack(T5PretrainedModel):
         elif attention_mask.ndim == 4:
             if self.is_decoder:
                 batch_size, seq_length = input_shape
-                seq_ids = paddle.arange(seq_length)
+                seq_ids = paddle.arange(seq_length, dtype="int64")
                 causal_mask = paddle.tile(
                     seq_ids.unsqueeze(axis=[0, 1]), [batch_size, seq_length, 1]
                 ) <= seq_ids.unsqueeze(axis=[0, 2])
@@ -1788,7 +1791,9 @@ class T5ForConditionalGeneration(T5PretrainedModel):
 
     @staticmethod
     def expand_inputs_for_generation(input_ids, expand_size, attention_mask=None, **model_kwargs):
-        index = paddle.tile(paddle.arange(input_ids.shape[0]).unsqueeze(-1), [1, expand_size]).reshape([-1])
+        index = paddle.tile(paddle.arange(input_ids.shape[0], dtype="int64").unsqueeze(-1), [1, expand_size]).reshape(
+            [-1]
+        )
 
         input_ids = paddle.index_select(input_ids, index)
 
@@ -1840,16 +1845,11 @@ class T5EncoderModel(T5PretrainedModel):
 
     def __init__(self, config: T5Config):
         super().__init__(config)
-
         encoder_config = copy.deepcopy(config)
         encoder_config.use_cache = False
         encoder_config.is_encoder_decoder = False
         self.shared = nn.Embedding(encoder_config.vocab_size, encoder_config.d_model)
         self.encoder = T5Stack(encoder_config, embed_tokens=self.shared)
-
-    @property
-    def t5(self):
-        return self
 
     def get_input_embeddings(self) -> nn.Embedding:
         return self.shared

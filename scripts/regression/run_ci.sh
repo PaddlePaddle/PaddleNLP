@@ -13,12 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-#param:
-#docker imagename= registry.baidubce.com/paddlepaddle/paddle_manylinux_devel:cuda10.2-cudnn7
-#paddle= develop_0.0.0
-#paddlenlp= nlp1_install\nlp2_build
-#python= 37
 ####################################
 export python=$1
 export paddle=$2
@@ -38,34 +32,8 @@ all_P0case_dic=(["waybill_ie"]=3 ["msra_ner"]=15 ["glue"]=2 ["bert"]=2 ["skep"]=
 ["ofa"]=2 ["albert"]=2   ["SQuAD"]=20 ["tinybert"]=5 ["lexical_analysis"]=5 ["seq2seq"]=5 ["word_embedding"]=5 \
 ["ernie-ctm"]=5 ["distilbert"]=5  ["stacl"]=5 ["transformer"]=5 ["pet"]=5 ["efl"]=5 ["p-tuning"]=5 ["simbert"]=5 ["ernie-doc"]=20 ["transformer-xl"]=5 \
 ["pointer_summarizer"]=5 ["question_matching"]=5 ["ernie-csc"]=5 ["nptag"]=5 ["ernie-m"]=5 ["taskflow"]=5 ["clue"]=5 ["textcnn"]=5 \
-["fast_generation"]=10 ["ernie-3.0"]=5 ["ernie-layout"]=5 ["uie"]=5 ["ernie-health"]=5 \
+["fast_generation"]=10 ["ernie-3.0"]=5 ["ernie-layout"]=5 ["uie"]=5 ["ernie-health"]=5 ["llama"]=5 \
 ["ernie"]=2 ["ernie_m"]=5 ["ernie_layout"]=5 ["ernie_csc"]=5 ["ernie_ctm"]=5 ["ernie_doc"]=20 ["ernie_health"]=5 ["gpt-3"]=5)
-####################################
-# set python env
-case ${python} in
-27)
-export LD_LIBRARY_PATH=/opt/_internal/cpython-2.7.15-ucs2/lib/:${LD_LIBRARY_PATH}
-export PATH=/opt/_internal/cpython-2.7.15-ucs2/bin/:${PATH}
-;;
-35)
-export LD_LIBRARY_PATH=/opt/_internal/cpython-3.5.1/lib/:${LD_LIBRARY_PATH}
-export PATH=/opt/_internal/cpython-3.5.1/bin/:${PATH}
-;;
-36)
-export LD_LIBRARY_PATH=/opt/_internal/cpython-3.6.0/lib/:${LD_LIBRARY_PATH}
-export PATH=/opt/_internal/cpython-3.6.0/bin/:${PATH}
-;;
-37)
-export LD_LIBRARY_PATH=/opt/_internal/cpython-3.7.0/lib/:${LD_LIBRARY_PATH}
-export PATH=/opt/_internal/cpython-3.7.0/bin/:${PATH}
-;;
-38)
-export LD_LIBRARY_PATH=/opt/_internal/cpython-3.8.0/lib/:${LD_LIBRARY_PATH}
-export PATH=/opt/_internal/cpython-3.8.0/bin/:${PATH}
-;;
-esac
-python -c 'import sys; print(sys.version_info[:])'
-echo "python="${python}
 ####################################
 # Insatll paddlepaddle-gpu
 install_paddle(){
@@ -88,6 +56,10 @@ nlp_build (){
     rm -rf dist/
 
     python -m pip install -r requirements.txt
+    python -m pip uninstall protobuf -y
+    python -m pip uninstall protobuf -y
+    python -m pip install protobuf==3.20.2
+
     python setup.py bdist_wheel
     # python -m pip install --ignore-installed  dist/p****.whl
 }
@@ -149,7 +121,7 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
         elif [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
             P0case_list[${#P0case_list[*]}]=${dir2}
         elif [[ ${dir2} =~ "transformers" ]];then
-            P0case_list[${#P0case_list[*]}]=transformers
+            # P0case_list[${#P0case_list[*]}]=transformers
             if [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
                 P0case_list[${#P0case_list[*]}]=${dir3}
             fi
@@ -273,9 +245,9 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     echo -e "\033[35m ---- unittest length: ${#APIcase_list[*]}, unittest cases: ${APIcase_list[*]} \033[0m"
     for apicase in ${APIcase_list[*]};do
         if [[ ${apicase} =~ "taskflow" ]] ; then
-            pytest tests/taskflow/test_*.py >${nlp_dir}/unittest_logs/${apicase}_unittest.log 2>&1
+            python -m pytest tests/taskflow/test_*.py >${nlp_dir}/unittest_logs/${apicase}_unittest.log 2>&1
         else
-            pytest tests/transformers/${apicase}/test_*.py  >${nlp_dir}/unittest_logs/${apicase}_unittest.log 2>&1
+            python -m pytest tests/transformers/${apicase}/test_*.py  >${nlp_dir}/unittest_logs/${apicase}_unittest.log 2>&1
             # sh run_coverage.sh paddlenlp.transformers.${apicase} >unittest_logs/${apicase}_coverage.log 2>&1
         fi
         UT_EXCODE=$? || true

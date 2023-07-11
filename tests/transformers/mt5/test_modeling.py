@@ -739,27 +739,6 @@ class MT5CompatibilityTest(unittest.TestCase):
 
     @require_package("transformers", "torch")
     @slow
-    def test_mt5_converter_from_local_dir_with_enable_torch(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            model_id = "google/mt5-small"
-            # 1. forward the torch  model
-            from transformers import MT5Model
-
-            torch_model = MT5Model.from_pretrained(model_id)
-            torch_model.save_pretrained(tempdir)
-
-            # 2. forward the paddle model
-            from paddlenlp.transformers import MT5Model, model_utils
-
-            model_utils.ENABLE_TORCH_CHECKPOINT = False
-
-            with self.assertRaises(ValueError) as error:
-                MT5Model.from_pretrained(tempdir)
-                self.assertIn("conversion is been disabled" in str(error.exception))
-            model_utils.ENABLE_TORCH_CHECKPOINT = True
-
-    @require_package("transformers", "torch")
-    @slow
     def test_mt5_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "google/mt5-small"
@@ -780,7 +759,7 @@ class MT5CompatibilityTest(unittest.TestCase):
             # 2. forward the paddle model
             from paddlenlp.transformers import MT5Model
 
-            paddle_model = MT5Model.from_pretrained(tempdir)
+            paddle_model = MT5Model.from_pretrained(tempdir, convert_from_torch=True)
             paddle_model.eval()
             paddle_logit = paddle_model(
                 input_ids=paddle.to_tensor(input_ids), decoder_input_ids=paddle.to_tensor(input_ids)

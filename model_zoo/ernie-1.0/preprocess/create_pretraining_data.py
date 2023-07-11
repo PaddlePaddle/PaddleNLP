@@ -46,6 +46,7 @@ def get_args():
             "BertTokenizer",
             "GPTTokenizer",
             "GPTChineseTokenizer",
+            "LlamaTokenizer",
             "ElectraTokenizer",
             "T5Tokenizer",
         ],
@@ -92,6 +93,7 @@ def get_args():
     group.add_argument("--append_eos", action="store_true", help="Append an <eos> token to the end of a document.")
     group.add_argument("--log_interval", type=int, default=100, help="Interval between progress updates")
     group.add_argument("--workers", type=int, default=1, help="Number of worker processes to launch")
+    group.add_argument("--max_doc_num", type=int, default=sys.maxsize, help="Number of worker processes to launch")
 
     args = parser.parse_args()
     return args
@@ -129,13 +131,6 @@ def jieba_segmentation_fn():
         return list(words)
 
     return process
-
-
-CHINESE_SEG_FUNC = {
-    "lac": lexical_analysis_fn(),
-    "seg": chinese_segmentation_fn(),
-    "jieba": jieba_segmentation_fn(),
-}
 
 
 def get_whole_word_mask_tokens(tokens, words, max_word_length=6):
@@ -241,6 +236,11 @@ class Converter(object):
             if self.args.cn_splited:
                 Converter.segment_func = lambda text: text.split(self.args.cn_split_dimer)
             else:
+                CHINESE_SEG_FUNC = {
+                    "lac": lexical_analysis_fn(),
+                    "seg": chinese_segmentation_fn(),
+                    "jieba": jieba_segmentation_fn(),
+                }
                 Converter.segment_func = CHINESE_SEG_FUNC[self.args.cn_seg_func]
             Converter.whole_word_mask = get_whole_word_mask_tokens
         else:
@@ -361,6 +361,11 @@ def main():
                 elapsed = current - startup_start
                 mbs = total_bytes_processed / elapsed / 1024 / 1024
                 print(f"Processed {step} documents", f"({step/elapsed:.2f} docs/s, {mbs:.4f} MB/s).", file=sys.stderr)
+            if step >= args.max_doc_num:
+                break
+
+        if step >= args.max_doc_num:
+            break
 
     pool.close()
     print("Saving tokens to files...")

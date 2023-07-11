@@ -24,8 +24,13 @@ def read_local_dataset(path):
 
 
 def convert_example(example, tokenizer, data_args, is_test=True):
-    query = example["content"]
-    response = example["summary"]
+
+    if "content" in example:
+        query = example["content"]
+        response = example["summary"]
+    elif "src" in example:
+        query = example["src"][0] if isinstance(example["src"], list) else example["src"]
+        response = example["tgt"][0] if isinstance(example["tgt"], list) else example["tgt"]
     history = example.get("history", None)
 
     if history is None or len(history) == 0:
@@ -39,8 +44,8 @@ def convert_example(example, tokenizer, data_args, is_test=True):
     # dataset for evaluation
     if is_test:
         inputs = {
-            **tokenizer(prompt, max_length=data_args.src_length, truncation=True, padding="max_length"),
-            "labels": tokenizer(response, max_length=data_args.tgt_length, truncation=True, padding="max_length")[
+            **tokenizer(prompt, max_length=data_args.src_length, truncation=True, truncation_side="left"),
+            "labels": tokenizer(response, max_length=data_args.tgt_length, truncation=True, truncation_side="right")[
                 "input_ids"
             ],
         }
@@ -72,6 +77,9 @@ def convert_example(example, tokenizer, data_args, is_test=True):
         attention_mask = (attention_mask < 0.5).astype("int64")
 
         labels = [-100] * context_length + input_ids[mask_position + 1 :]
+
+        # shift labels
+        input_ids, labels = input_ids[:-1], labels[1:]
 
         inputs = {
             "input_ids": input_ids,
@@ -98,8 +106,8 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Tr
     # dataset for evaluation
     if is_test:
         inputs = {
-            **tokenizer(prompt, max_length=data_args.src_length, truncation=True, padding="max_length"),
-            "labels": tokenizer(response, max_length=data_args.tgt_length, truncation=True, padding="max_length")[
+            **tokenizer(prompt, max_length=data_args.src_length, truncation=True, truncation_side="left"),
+            "labels": tokenizer(response, max_length=data_args.tgt_length, truncation=True, truncation_side="right")[
                 "input_ids"
             ],
         }
@@ -131,6 +139,9 @@ def custom_instruction_convert_example(example, tokenizer, data_args, is_test=Tr
         attention_mask = (attention_mask < 0.5).astype("int64")
 
         labels = [-100] * context_length + input_ids[mask_position + 1 :]
+
+        # shift labels
+        input_ids, labels = input_ids[:-1], labels[1:]
 
         inputs = {
             "input_ids": input_ids,

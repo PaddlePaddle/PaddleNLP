@@ -12,22 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import math
 import os
 import time
-import math
-import argparse
 
 import paddle
 import paddle.distributed as dist
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.optimizer.lr import NoamDecay
-from paddle.optimizer import AdamW
-
-from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
 from datasets import load_dataset
+from paddle.optimizer import AdamW
+from paddle.optimizer.lr import NoamDecay
+from utils import create_data_loader, print_args, set_seed
 
-from utils import print_args, set_seed, create_data_loader
+from paddlenlp.transformers import (
+    UnifiedTransformerLMHeadModel,
+    UnifiedTransformerTokenizer,
+)
 
 
 # yapf: disable
@@ -146,7 +148,7 @@ def evaluation(model, data_loader):
         logits = model(*inputs[:-1])
         loss = F.cross_entropy(logits, labels, reduction="sum")
 
-        total_loss += loss.numpy().item()
+        total_loss += loss.item()
         total_tokens += labels.shape[0]
 
     avg_loss = total_loss / total_tokens

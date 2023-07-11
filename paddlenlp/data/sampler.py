@@ -46,14 +46,14 @@ class SamplerHelper(object):
     def __init__(self, dataset, iterable=None):
         self.data_source = dataset
         self.iterable = iterable
-        if isinstance(dataset, collections.Iterable) and iterable is None:
+        if isinstance(dataset, collections.abc.Iterable) and iterable is None:
             # iterable-style datasets
             self.iterable = dataset
 
     def __iter__(self):
         if self.iterable is None:
             return iter(range(len(self.data_source)))
-        elif isinstance(self.iterable, collections.Iterable):
+        elif isinstance(self.iterable, collections.abc.Iterable):
             return iter(self.iterable)
         elif callable(self.iterable):
             return self.iterable()

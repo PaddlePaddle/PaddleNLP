@@ -24,7 +24,7 @@ from pkg_resources import parse_version
 def read_version_of_remote_package(name: str) -> str:
     """get version of remote package,
 
-    apdapted from: https://stackoverflow.com/a/58649262/6894382
+    adapted from: https://stackoverflow.com/a/58649262/6894382
 
     Args:
         name (str): the name of package

@@ -1746,6 +1746,7 @@ Tensor(shape=[2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
   | `rocketqa-zh-dureader-para-encoder`  | 12 | 768 | 中文|
   | `rocketqa-zh-base-query-encoder`  | 12 | 768 | 中文|
   | `rocketqa-zh-base-para-encoder`  | 12 | 768 | 中文|
+  | `moka-ai/m3e-base`  | 12 | 768 | 中文|
   | `rocketqa-zh-medium-query-encoder`  | 6 | 768 | 中文|
   | `rocketqa-zh-medium-para-encoder`  | 6 | 768 | 中文|
   | `rocketqa-zh-mini-query-encoder`  | 6 | 384 | 中文|
@@ -1763,7 +1764,7 @@ Tensor(shape=[2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
 * `max_seq_len`：文本序列的最大长度，默认为128。
 * `return_tensors`: 返回的类型，有pd和np，默认为pd。
 * `model`：选择任务使用的模型，默认为`PaddlePaddle/ernie_vil-2.0-base-zh`。
-
+* `pooling_mode`：选择句向量获取方式，有'max_tokens','mean_tokens','mean_sqrt_len_tokens','cls_token'，默认为'cls_token'（`moka-ai/m3e-base`）。
 
 </div></details>
 

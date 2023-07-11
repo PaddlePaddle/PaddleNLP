@@ -68,13 +68,27 @@ python gradio_hough2image.py
 ```
 ![image](https://user-images.githubusercontent.com/31800336/236171830-f9254b66-9fbd-46d3-a3bc-e905c87d0ec3.jpg)
 
+## Pix2Pix to Image
+(ControlNet V1.1) InstructPix2Pix根据指令修改图像
+```
+python gradio_ip2p2image.py
+```
+![image](https://github.com/Submerge-Gu/Images/raw/main/4.png)
+
+## Shuffle to Image
+(ControlNet V1.1) Shuffle打乱图像进行重构。
+```
+python gradio_shuffle2image.py
+```
+![image](https://github.com/Submerge-Gu/Images/raw/main/control.png)
+
 # ControlNet模型训练
 
 ## Fill50K 训练例子
 
 作为案例，我们将使用 Fill50K 数据集，带领大家训练 ControlNet 模型。首先我们需要下载数据集。
 ```sh
-wget https://huggingface.co/lllyasviel/ControlNet/resolve/main/training/fill50k.zip
+wget https://paddlenlp.bj.bcebos.com/models/community/junnyu/develop/fill50k.zip
 unzip -o fill50k.zip
 ```
 注意：下面的代码需要在32G V100上才可以正常运行。
@@ -193,3 +207,5 @@ img.save("demo.png")
 # 参考资料
 - https://github.com/lllyasviel/ControlNet/edit/main/docs/train.md
 - https://github.com/huggingface/diffusers
+
+[https://github.com/Submerge-Gu/Images/blob/main/8.png]: https://github.com/Submerge-Gu/Images/raw/main/8.png

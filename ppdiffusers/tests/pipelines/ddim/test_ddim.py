@@ -17,14 +17,15 @@ import unittest
 
 import numpy as np
 import paddle
-from ppdiffusers_test.pipeline_params import (
-    UNCONDITIONAL_IMAGE_GENERATION_BATCH_PARAMS,
-    UNCONDITIONAL_IMAGE_GENERATION_PARAMS,
-)
-from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
 
 from ppdiffusers import DDIMPipeline, DDIMScheduler, UNet2DModel
 from ppdiffusers.utils.testing_utils import require_paddle_gpu, slow
+
+from ..pipeline_params import (
+    UNCONDITIONAL_IMAGE_GENERATION_BATCH_PARAMS,
+    UNCONDITIONAL_IMAGE_GENERATION_PARAMS,
+)
+from ..test_pipelines_common import PipelineTesterMixin
 
 
 class DDIMPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
@@ -99,5 +100,7 @@ class DDIMPipelineIntegrationTests(unittest.TestCase):
         image = ddim(generator=generator, output_type="numpy").images
         image_slice = image[0, -3:, -3:, -1]
         assert image.shape == (1, 256, 256, 3)
-        expected_slice = np.array([0.1546, 0.1561, 0.1595, 0.1564, 0.1569, 0.1585, 0.1554, 0.1550, 0.1575])
+        expected_slice = np.array(
+            [0.19830778, 0.18826014, 0.18584034, 0.1927332, 0.18754855, 0.17855307, 0.18288234, 0.16375086, 0.1497818]
+        )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01

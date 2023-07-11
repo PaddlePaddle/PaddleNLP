@@ -2,7 +2,7 @@
 model_name:bert_base_text_cls
 python:python
 gpu_list:0|0,1
---device:gpu
+--device:gpu|gpu
 null:null
 --epoch:lite_train_lite_infer=1|lite_train_whole_infer=1|whole_train_whole_infer=3
 --save_dir:null
@@ -38,7 +38,7 @@ infer_model:null
 infer_export:null
 infer_quant:null
 inference:./test_tipc/bert_base_text_cls/predict.py --max_steps 50
---device:cpu|gpu
+--device:cpu|npu
 --enable_mkldnn:False
 --cpu_threads:1|6
 --batch_size:32
@@ -47,5 +47,5 @@ inference:./test_tipc/bert_base_text_cls/predict.py --max_steps 50
 --model_dir:null
 null:null
 --save_log_path:null
---benchmark:True
+--benchmark:False
 null:null

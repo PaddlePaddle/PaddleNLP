@@ -144,6 +144,7 @@ class AdapterLDM(nn.Layer):
             self.use_preconfig_latents = True
             self.register_buffer("preconfig_latents", paddle.load(model_args.latents_path))
         self.random_alignment = model_args.random_alignment
+        self.timestep_sample_schedule = model_args.timestep_sample_schedule
 
     @contextlib.contextmanager
     def ema_scope(self, context=None):
@@ -164,6 +165,40 @@ class AdapterLDM(nn.Layer):
         if self.use_ema:
             self.model_ema(self.adapter)
 
+    def get_time_with_schedule(self, timestep_sample_schedule, bs):
+        if timestep_sample_schedule == "linear":
+            t = paddle.randint(low=0, high=self.noise_scheduler.num_train_timesteps, shape=(bs,)).astype(dtype="int64")
+        elif timestep_sample_schedule == "cosine":
+            t = paddle.rand(shape=(bs,))
+            t = paddle.cos(x=np.pi / 2.0 * t) * self.noise_scheduler.num_train_timesteps
+            t = t.astype(dtype="int64")
+        elif timestep_sample_schedule == "cubic":
+            t = paddle.rand(shape=(bs,))
+            t = (1 - t**3) * self.noise_scheduler.num_train_timesteps
+            t = t.astype(dtype="int64")
+        else:
+            raise NotImplementedError
+        t = paddle.clip(x=t, min=0, max=self.noise_scheduler.num_train_timesteps - 1)
+        return t
+
+    def get_time_with_schedule_and_numpy_generator(self, timestep_sample_schedule, bs):
+        if timestep_sample_schedule == "linear":
+            t = paddle.to_tensor(
+                generator.randint(0, self.noise_scheduler.num_train_timesteps, size=(bs,)), dtype="int64"
+            )
+        elif timestep_sample_schedule == "cosine":
+            t = paddle.to_tensor(generator.rand(bs))
+            t = paddle.cos(x=np.pi / 2.0 * t) * self.noise_scheduler.num_train_timesteps
+            t = t.astype(dtype="int64")
+        elif timestep_sample_schedule == "cubic":
+            t = paddle.to_tensor(generator.rand(bs))
+            t = (1 - t**3) * self.noise_scheduler.num_train_timesteps
+            t = t.astype(dtype="int64")
+        else:
+            raise NotImplementedError
+        t = paddle.clip(x=t, min=0, max=self.noise_scheduler.num_train_timesteps - 1)
+        return t
+
     def forward(self, input_ids=None, pixel_values=None, adapter_cond=None, **kwargs):
         with paddle.no_grad():
             adapter_cond = self.control_image_processor.process_model_forward(adapter_cond)
@@ -175,15 +210,12 @@ class AdapterLDM(nn.Layer):
                 latents = self.vae.encode(pixel_values).latent_dist.sample()
                 latents = latents * 0.18215
                 if self.random_alignment:
-                    timesteps = paddle.to_tensor(
-                        generator.randint(0, self.noise_scheduler.num_train_timesteps, size=(latents.shape[0],)),
-                        dtype="int64",
+                    timesteps = self.get_time_with_schedule_and_numpy_generator(
+                        self.timestep_sample_schedule, latents.shape[0]
                     )
                     noise = paddle.to_tensor(generator.randn(*latents.shape), dtype="float32")
                 else:
-                    timesteps = paddle.randint(
-                        0, self.noise_scheduler.num_train_timesteps, (latents.shape[0],)
-                    ).astype("int64")
+                    timesteps = self.get_time_with_schedule(self.timestep_sample_schedule, latents.shape[0])
                     noise = paddle.randn(latents.shape)
                 noisy_latents = self.noise_scheduler.add_noise(latents, noise, timesteps)
                 encoder_hidden_states = self.text_encoder(input_ids)[0]

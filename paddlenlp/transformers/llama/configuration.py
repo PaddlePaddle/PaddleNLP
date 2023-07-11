@@ -23,14 +23,31 @@ __all__ = [
 ]
 
 LLAMA_PRETRAINED_INIT_CONFIGURATION = {
-    # Hypothetical model weights (tiny-random-llama) for test only
-    "facebook/tiny-random-llama": {
+    # Hypothetical model weights (tiny-random-llama & micro-random-llama) for test only
+    "__internal_testing__/micro-random-llama": {
+        "hidden_size": 64,
+        "initializer_range": 0.02,
+        "intermediate_size": 1000,
+        "max_position_embeddings": 2048,
+        "model_type": "llama",
+        "num_attention_heads": 8,
+        "num_hidden_layers": 1,
+        "rms_norm_eps": 1e-06,
+        "vocab_size": 32000,
+        "bos_token_id": 1,
+        "eos_token_id": 2,
+        "pad_token_id": 0,
+        "use_cache": False,
+        "use_recompute": False,
+        "use_flash_attention": False,
+    },
+    "__internal_testing__/tiny-random-llama": {
         "hidden_size": 768,
         "initializer_range": 0.02,
         "intermediate_size": 11008,
         "max_position_embeddings": 2048,
         "model_type": "llama",
-        "num_attention_heads": 2,
+        "num_attention_heads": 8,
         "num_hidden_layers": 2,
         "rms_norm_eps": 1e-06,
         "vocab_size": 32000,
@@ -114,7 +131,8 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
 # Hypothetical model weights (tiny-random-llama) for test only
 LLAMA_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
-        "facebook/tiny-random-llama": "https://bj.bcebos.com/paddlenlp/models/community/facebook/tiny-random-llama/model_state.pdparams",
+        "__internal_testing__/micro-random-llama": "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/micro-random-llama/model_state.pdparams",
+        "__internal_testing__/tiny-random-llama": "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-llama/model_state.pdparams",
         "facebook/llama-7b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-7b/model_state.pdparams",
         "facebook/llama-13b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-13b/model_state.pdparams",
         "facebook/llama-30b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-30b/model_state.pdparams",
@@ -189,7 +207,9 @@ class LlamaConfig(PretrainedConfig):
         rms_norm_eps=1e-6,
         use_cache=True,
         use_recompute=False,
+        recompute_granularity="full",
         use_flash_attention=False,
+        use_fused_rms_norm=False,
         tensor_parallel_output=True,
         lm_shift_labels=True,
         pad_token_id=0,
@@ -206,11 +226,15 @@ class LlamaConfig(PretrainedConfig):
         self.num_attention_heads = num_attention_heads
         self.initializer_range = initializer_range
         self.rms_norm_eps = rms_norm_eps
+
         self.use_cache = use_cache
         self.use_recompute = use_recompute
+        self.recompute_granularity = recompute_granularity
         self.use_flash_attention = use_flash_attention
+        self.use_fused_rms_norm = use_fused_rms_norm
         self.tensor_parallel_output = tensor_parallel_output
         self.lm_shift_labels = lm_shift_labels
+
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id

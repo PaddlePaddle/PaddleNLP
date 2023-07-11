@@ -115,7 +115,10 @@ class DPMSolverMultistepScheduler(SchedulerMixin, ConfigMixin):
         lower_order_final (`bool`, default `True`):
             whether to use lower-order solvers in the final steps. Only valid for < 15 inference steps. We empirically
             find this trick can stabilize the sampling of DPM-Solver for steps < 15, especially for steps <= 10.
-
+        use_karras_sigmas (`bool`, *optional*, defaults to `False`):
+             This parameter controls whether to use Karras sigmas (Karras et al. (2022) scheme) for step sizes in the
+             noise schedule during the sampling process. If True, the sigmas will be determined according to a sequence
+             of noise levels {σi} as defined in Equation (5) of the paper https://arxiv.org/pdf/2206.00364.pdf.
     """
 
     _compatibles = [e.name for e in KarrasDiffusionSchedulers]
@@ -137,6 +140,7 @@ class DPMSolverMultistepScheduler(SchedulerMixin, ConfigMixin):
         algorithm_type: str = "dpmsolver++",
         solver_type: str = "midpoint",
         lower_order_final: bool = True,
+        use_karras_sigmas: Optional[bool] = False,
     ):
         if trained_betas is not None:
             self.betas = paddle.to_tensor(trained_betas, dtype=paddle.float32)
@@ -166,12 +170,13 @@ class DPMSolverMultistepScheduler(SchedulerMixin, ConfigMixin):
         # settings for DPM-Solver
         if algorithm_type not in ["dpmsolver", "dpmsolver++"]:
             if algorithm_type == "deis":
-                algorithm_type = "dpmsolver++"
+                self.register_to_config(algorithm_type="dpmsolver++")
             else:
                 raise NotImplementedError(f"{algorithm_type} does is not implemented for {self.__class__}")
+
         if solver_type not in ["midpoint", "heun"]:
             if solver_type in ["logrho", "bh1", "bh2"]:
-                solver_type = "midpoint"
+                self.register_to_config(solver_type="midpoint")
             else:
                 raise NotImplementedError(f"{solver_type} does is not implemented for {self.__class__}")
 
@@ -181,6 +186,7 @@ class DPMSolverMultistepScheduler(SchedulerMixin, ConfigMixin):
         self.timesteps = paddle.to_tensor(timesteps)
         self.model_outputs = [None] * solver_order
         self.lower_order_nums = 0
+        self.use_karras_sigmas = use_karras_sigmas
 
     def set_timesteps(self, num_inference_steps: int):
         """
@@ -190,18 +196,106 @@ class DPMSolverMultistepScheduler(SchedulerMixin, ConfigMixin):
             num_inference_steps (`int`):
                 the number of diffusion steps used when generating samples with a pre-trained model.
         """
-        self.num_inference_steps = num_inference_steps
         timesteps = (
-            np.linspace(0, self.num_train_timesteps - 1, num_inference_steps + 1)
+            np.linspace(0, self.config.num_train_timesteps - 1, num_inference_steps + 1)
             .round()[::-1][:-1]
             .copy()
             .astype(np.int64)
         )
+        if self.use_karras_sigmas:
+            sigmas = np.array(((1 - self.alphas_cumprod) / self.alphas_cumprod) ** 0.5)
+            log_sigmas = np.log(sigmas)
+            sigmas = self._convert_to_karras(in_sigmas=sigmas, num_inference_steps=num_inference_steps)
+            timesteps = np.array([self._sigma_to_t(sigma, log_sigmas) for sigma in sigmas]).round()
+            timesteps = np.flip(timesteps).copy().astype(np.int64)
+
+        # when num_inference_steps == num_train_timesteps, we can end up with
+        # duplicates in timesteps.
+        _, unique_indices = np.unique(timesteps, return_index=True)
+        timesteps = timesteps[np.sort(unique_indices)]
+
         self.timesteps = paddle.to_tensor(timesteps)
+
+        self.num_inference_steps = len(timesteps)
+
         self.model_outputs = [
             None,
         ] * self.config.solver_order
         self.lower_order_nums = 0
+
+    def _threshold_sample(self, sample: paddle.Tensor) -> paddle.Tensor:
+        """
+        "Dynamic thresholding: At each sampling step we set s to a certain percentile absolute pixel value in xt0 (the
+        prediction of x_0 at timestep t), and if s > 1, then we threshold xt0 to the range [-s, s] and then divide by
+        s. Dynamic thresholding pushes saturated pixels (those near -1 and 1) inwards, thereby actively preventing
+        pixels from saturation at each step. We find that dynamic thresholding results in significantly better
+        photorealism as well as better image-text alignment, especially when using very large guidance weights."
+        https://arxiv.org/abs/2205.11487
+        """
+        dtype = sample.dtype
+        batch_size, channels, height, width = sample.shape
+
+        if dtype not in (paddle.float32, paddle.float64):
+            sample = paddle.cast(
+                sample, "float32"
+            )  # upcast for quantile calculation, and clamp not implemented for cpu half
+
+        # Flatten sample for doing quantile calculation along each image
+        sample = paddle.reshape(sample, [batch_size, channels * height * width])
+
+        abs_sample = sample.abs()  # "a certain percentile absolute pixel value"
+
+        s = paddle.quantile(abs_sample, self.config.dynamic_thresholding_ratio, axis=1)
+        # paddle.clip donot support min > max
+        if self.config.sample_max_value < 1:
+            s = paddle.ones_like(s) * self.config.sample_max_value
+        else:
+            s = paddle.clip(
+                s, min=1, max=self.config.sample_max_value
+            )  # When clip to min=1, equivalent to standard clipping to [-1, 1]
+        s = s.unsqueeze(1)  # (batch_size, 1) because clip will broadcast along axis=0
+        sample = paddle.clip(sample, -s, s) / s  # "we threshold xt0 to the range [-s, s] and then divide by s"
+
+        sample = paddle.reshape(sample, [batch_size, channels, height, width])
+        sample = paddle.cast(sample, dtype)
+
+        return sample
+
+    def _sigma_to_t(self, sigma, log_sigmas):
+        # get log sigma
+        log_sigma = np.log(sigma)
+
+        # get distribution
+        dists = log_sigma - log_sigmas[:, np.newaxis]
+
+        # get sigmas range
+        low_idx = np.cumsum((dists >= 0), axis=0).argmax(axis=0).clip(max=log_sigmas.shape[0] - 2)
+        high_idx = low_idx + 1
+
+        low = log_sigmas[low_idx]
+        high = log_sigmas[high_idx]
+
+        # interpolate sigmas
+        w = (low - log_sigma) / (low - high)
+        w = np.clip(w, 0, 1)
+
+        # transform interpolation to time range
+        t = (1 - w) * low_idx + w * high_idx
+        t = t.reshape(sigma.shape)
+        return t
+
+    def _convert_to_karras(self, in_sigmas: paddle.Tensor, num_inference_steps) -> paddle.Tensor:
+        """Constructs the noise schedule of Karras et al. (2022)."""
+
+        sigma_min = in_sigmas[-1].item()
+        sigma_max = in_sigmas[0].item()
+
+        rho = 7.0  # 7.0 is the value used in the paper
+        ramp = np.linspace(0, 1, num_inference_steps)
+        min_inv_rho = sigma_min ** (1 / rho)
+        max_inv_rho = sigma_max ** (1 / rho)
+        sigmas = (max_inv_rho + ramp * (min_inv_rho - max_inv_rho)) ** rho
+        return sigmas
 
     def convert_model_output(self, model_output: paddle.Tensor, timestep: int, sample: paddle.Tensor) -> paddle.Tensor:
         """
@@ -240,19 +334,8 @@ class DPMSolverMultistepScheduler(SchedulerMixin, ConfigMixin):
                 )
 
             if self.config.thresholding:
-                # Dynamic thresholding in https://arxiv.org/abs/2205.11487
-                orig_dtype = x0_pred.dtype
-                if orig_dtype not in [paddle.float32, paddle.float64]:
-                    x0_pred = x0_pred.cast("float32")
-                dynamic_max_val = paddle.quantile(
-                    paddle.abs(x0_pred).reshape((x0_pred.shape[0], -1)), self.config.dynamic_thresholding_ratio, axis=1
-                )
-                dynamic_max_val = paddle.maximum(
-                    dynamic_max_val,
-                    self.config.sample_max_value * paddle.ones_like(dynamic_max_val),
-                )[(...,) + (None,) * (x0_pred.ndim - 1)]
-                x0_pred = paddle.clip(x0_pred, -dynamic_max_val, dynamic_max_val) / dynamic_max_val
-                x0_pred = x0_pred.cast(orig_dtype)
+                x0_pred = self._threshold_sample(x0_pred)
+
             return x0_pred
         # DPM-Solver needs to solve an integral of the noise prediction model.
         elif self.config.algorithm_type == "dpmsolver":
@@ -504,14 +587,14 @@ class DPMSolverMultistepScheduler(SchedulerMixin, ConfigMixin):
         timesteps: paddle.Tensor,
     ) -> paddle.Tensor:
         # Make sure alphas_cumprod and timestep have same dtype as original_samples
-        self.alphas_cumprod = self.alphas_cumprod.cast(original_samples.dtype)
+        alphas_cumprod = self.alphas_cumprod.cast(original_samples.dtype)
 
-        sqrt_alpha_prod = self.alphas_cumprod[timesteps] ** 0.5
+        sqrt_alpha_prod = alphas_cumprod[timesteps] ** 0.5
         sqrt_alpha_prod = sqrt_alpha_prod.flatten()
         while len(sqrt_alpha_prod.shape) < len(original_samples.shape):
             sqrt_alpha_prod = sqrt_alpha_prod.unsqueeze(-1)
 
-        sqrt_one_minus_alpha_prod = (1 - self.alphas_cumprod[timesteps]) ** 0.5
+        sqrt_one_minus_alpha_prod = (1 - alphas_cumprod[timesteps]) ** 0.5
         sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten()
         while len(sqrt_one_minus_alpha_prod.shape) < len(original_samples.shape):
             sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)
