@@ -14,46 +14,37 @@
 
 import argparse
 import glob
-import time
 
 from pipelines.document_stores import FAISSDocumentStore
-from pipelines.nodes import (
-    CharacterTextSplitter,
-    DensePassageRetriever,
-    ErnieBot,
-    ErnieRanker,
-    MarkdownConverter,
-    PromptTemplate,
-    TruncatedConversationHistory,
-)
-from pipelines.nodes.file_converter.markdown import MarkdownRawTextConverter
-from pipelines.nodes.preprocessor.text_splitter import MarkdownHeaderTextSplitter
+from pipelines.nodes import DensePassageRetriever, ErnieBot, ErnieRanker, PromptTemplate
+from pipelines.nodes.file_converter.docx import DocxTotxtConverter
+from pipelines.nodes.preprocessor.text_splitter import SpacyTextSplitter
 from pipelines.pipelines import Pipeline
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to run dense_qa system, defaults to gpu.")
 parser.add_argument("--index_name", default='dureader_index', type=str, help="The ann index name of ANN.")
-parser.add_argument("--file_paths", default='./data/md_files', type=str, help="The PDF file path.")
+parser.add_argument("--file_paths", default='./data/pdf_files', type=str, help="The PDF file path.")
 parser.add_argument("--max_seq_len_query", default=64, type=int, help="The maximum total length of query after tokenization.")
 parser.add_argument("--max_seq_len_passage", default=256, type=int, help="The maximum total length of passage after tokenization.")
 parser.add_argument("--retriever_batch_size", default=16, type=int, help="The batch size of retriever to extract passage embedding for building ANN index.")
-parser.add_argument("--query_embedding_model", default="rocketqa-zh-nano-query-encoder", type=str, help="The query_embedding_model path")
-parser.add_argument("--passage_embedding_model", default="rocketqa-zh-nano-query-encoder", type=str, help="The passage_embedding_model path")
+parser.add_argument("--query_embedding_model", default="rocketqa-zh-base-query-encoder", type=str, help="The query_embedding_model path")
+parser.add_argument("--passage_embedding_model", default="rocketqa-zh-base-query-encoder", type=str, help="The passage_embedding_model path")
 parser.add_argument("--params_path", default="checkpoints/model_40/model_state.pdparams", type=str, help="The checkpoint path")
-parser.add_argument("--embedding_dim", default=312, type=int, help="The embedding_dim of index")
-parser.add_argument("--chunk_size", default=300, type=int, help="The length of data for indexing by retriever")
+parser.add_argument("--embedding_dim", default=768, type=int, help="The embedding_dim of index")
+parser.add_argument("--chunk_size", default=384, type=int, help="The length of data for indexing by retriever")
 parser.add_argument('--host', type=str, default="localhost", help='host ip of ANN search engine')
 parser.add_argument('--embed_title', default=False, type=bool, help="The title to be  embedded into embedding")
 parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search'], default="ernie", help="the ernie model types")
-parser.add_argument('--title_split', default=False, type=bool, help='the markdown file is split by titles')
 parser.add_argument("--api_key", default=None, type=str, help="The API Key.")
 parser.add_argument("--secret_key", default=None, type=str, help="The secret key.")
 args = parser.parse_args()
 # yapf: enable
 
 
-def chat_markdown_tutorial():
+def chat_docx_tutorial():
+
     document_store = FAISSDocumentStore(
         embedding_dim=args.embedding_dim,
         duplicate_documents="skip",
@@ -74,56 +65,31 @@ def chat_markdown_tutorial():
         embed_title=args.embed_title,
     )
 
-    # Indexing Markdowns
-    if args.title_split is True:
-        markdown_converter = MarkdownRawTextConverter()
-        headers_to_split_on = [
-            ("#", "Header 1"),
-            ("##", "Header 2"),
-            ("###", "Header 3"),
-            ("####", "Header 4"),
-            ("#####", "Header 5"),
-            ("######", "Header 6"),
-        ]
-        text_splitter = MarkdownHeaderTextSplitter(
-            separator="\n",
-            chunk_size=args.chunk_size,
-            headers_to_split_on=headers_to_split_on,
-            return_each_line=False,
-            filters=["\n"],
-        )
-    else:
-        markdown_converter = MarkdownConverter()
-        text_splitter = CharacterTextSplitter(
-            separator="\n", chunk_size=args.chunk_size, chunk_overlap=0, filters=["\n"]
-        )
+    docx_converter = DocxTotxtConverter()
+    text_splitter = SpacyTextSplitter(separator="\n", chunk_size=args.chunk_size, chunk_overlap=0, filters=["\n"])
     indexing_pipeline = Pipeline()
-    indexing_pipeline.add_node(component=markdown_converter, name="MarkdownConverter", inputs=["File"])
-    indexing_pipeline.add_node(component=text_splitter, name="Splitter", inputs=["MarkdownConverter"])
+    indexing_pipeline.add_node(component=docx_converter, name="docx_converter", inputs=["File"])
+    indexing_pipeline.add_node(component=text_splitter, name="Splitter", inputs=["docx_converter"])
     indexing_pipeline.add_node(component=retriever, name="Retriever", inputs=["Splitter"])
     indexing_pipeline.add_node(component=document_store, name="DocumentStore", inputs=["Retriever"])
-    files = glob.glob(args.file_paths + "/**/*.md", recursive=True)
-    indexing_pipeline.run(file_paths=files)
+    files_paths = glob.glob(args.file_paths + "/*.docx")
+    indexing_pipeline.run(file_paths=files_paths)
 
-    # Query Markdowns
+    # Query docxs
     ernie_bot = ErnieBot(api_key=args.api_key, secret_key=args.secret_key)
     ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
     query_pipeline = Pipeline()
     query_pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
     query_pipeline.add_node(component=ranker, name="Ranker", inputs=["Retriever"])
-    query_pipeline.add_node(component=PromptTemplate("背景：{documents} 问题：{query}"), name="Template", inputs=["Ranker"])
     query_pipeline.add_node(
-        component=TruncatedConversationHistory(max_length=256), name="TruncateHistory", inputs=["Template"]
+        component=PromptTemplate("请根据以下背景资料回答问题：\n 背景资料：{documents} \n问题：{query}"), name="Template", inputs=["Ranker"]
     )
-    query_pipeline.add_node(component=ernie_bot, name="ErnieBot", inputs=["TruncateHistory"])
-    query = "Jupyter 和 AI Studio Notebook 有什么区别？如何使用Jupyter？"
-    start_time = time.time()
-    prediction = query_pipeline.run(query=query, params={"Retriever": {"top_k": 30}, "Ranker": {"top_k": 2}})
-    end_time = time.time()
-    print("Time cost for query markdown conversion:", end_time - start_time)
+    query_pipeline.add_node(component=ernie_bot, name="ErnieBot", inputs=["Template"])
+    query = "Tensorflow和Pytorch有哪些区别？"
+    prediction = query_pipeline.run(query=query, params={"Retriever": {"top_k": 10}, "Ranker": {"top_k": 2}})
     print("user: {}".format(query))
     print("assistant: {}".format(prediction["result"]))
 
 
 if __name__ == "__main__":
-    chat_markdown_tutorial()
+    chat_docx_tutorial()
