@@ -16,6 +16,19 @@
 | Bloomz-7b1-mt | Finetune | 4        | 8          | MP 4         | 2873.13                   | ZeRO 3      | 1702.00                  | **69%**    |
 | Bloomz-7b1-mt | Finetune | 4        | 16         | MP 4         | 2853.83                   | ZeRO 3      | 2849.90                  | **0%**     |
 
+###### 多卡分布式实验记录
+
+- Finetuning with 4 GPUs
+
+| Model          | Setup           | Paddle Effective Tokens /s | Torch Effective Tokens /s  |  Speedup  |
+|----------------|-----------------|----------------------------|----------------------------|-----------|
+| Bloomz-7b1-mt  | bsz 8 MP4     |       2873.13           |         N/A                |   N/A     |
+| Bloomz-7b1-mt  | bsz 8 ZeRO 3  |       N/A               |     1702.00                |   N/A     |
+| Bloomz-7b1-mt  | bsz 8 ZeRO 2  |      2172.40            |     1891.16                |   15%     |
+| Bloomz-7b1-mt  | bsz 16 MP4    |      2853.83            |         N/A                |   N/A     |
+| Bloomz-7b1-mt  | bsz 16 ZeRO 3 |      N/A                |      2849.90               |   N/A     |
+| Bloomz-7b1-mt  | bsz 16 ZeRO 2 |    2604.56 (accumulations 2) |  2719.92              |   -4%     |
+
 
 ### Llama
 
