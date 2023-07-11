@@ -205,6 +205,7 @@ else:
     from .pipelines import (
         FastDeployCycleDiffusionPipeline,
         FastDeployStableDiffusionControlNetPipeline,
+        FastDeployStableDiffusionImageVariationPipeline,
         FastDeployStableDiffusionImg2ImgPipeline,
         FastDeployStableDiffusionInpaintPipeline,
         FastDeployStableDiffusionInpaintPipelineLegacy,
