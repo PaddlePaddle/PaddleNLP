@@ -150,17 +150,15 @@ def main():
     # Load the pretrained language model.
     model = model_class.from_pretrained(
         model_args.model_name_or_path,
-        load_state_as_np=True,
-        low_cpu_mem_usage=True,
-        dtype=dtype,  # todo enable set dtype to avoid additional mem usage
+        tensor_parallel_output=False,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         fp16_opt_level=training_args.fp16_opt_level,
         use_flash_attention=model_args.use_flash_attention,
         use_recompute=training_args.recompute,
+        dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         lm_shift_labels=False,
     )
-
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
         lora_config = LoRAConfig(
