@@ -18,9 +18,9 @@ from functools import partial
 
 import numpy as np
 import paddle
-from data import convert_example, custom_instruction_convert_example, read_local_dataset
+from data import convert_example, read_local_dataset
 from sklearn.metrics import accuracy_score
-from utils import ChatGLMTrainer, save_infer_result
+from utils import ChatGLMTrainer
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
@@ -37,11 +37,11 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class DataArgument:
-    task_name_or_path: str = field(default="./data/", metadata={"help": "Path to data"})
-    src_length: int = field(default=128, metadata={"help": "The max length of source text."})
-    tgt_length: int = field(default=180, metadata={"help": "The max length of target text."})
+    data_name: str = field(default=None, metadata={"help": "The name of data."})
+    task_name_or_path: str = field(default=None, metadata={"help": "Path or name for dataset"})
+    src_length: int = field(default=512, metadata={"help": "The max length of source text."})
+    tgt_length: int = field(default=512, metadata={"help": "The max length of target text."})
     num_beams: int = field(default=5, metadata={"help": "The number of beams."})
-    generate_num: int = field(default=0, metadata={"help": "Save first k examples generation result in dev dataset"})
 
 
 @dataclass
@@ -49,20 +49,21 @@ class ModelArgument:
     model_name_or_path: str = field(
         default="THUDM/chatglm-6b", metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
+    eval_with_do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
+    # lora
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
+    lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
     lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
     merge_weights: bool = field(
         default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
     )
+    # prefix
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
     num_prefix_tokens: int = field(default=64, metadata={"help": "Number of prefix tokens"})
     prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
-    do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
-    lora_all_linear: bool = field(default=False, metadata={"help": "Whether to use LoRA technique for all linear."})
+    # qat
     qat: bool = field(default=False, metadata={"help": "Whether to use QAT technique"})
-    qat_bit_length: int = field(
-        default=8, metadata={"help": "Number of bits to represent an quantized integer in binary"}
-    )
+    qat_type: str = field(default="A8W8", metadata={"help": "Quantization type. Supported values: A8W8, W4,A8W4"})
 
 
 def main():
@@ -101,7 +102,6 @@ def main():
     # Load the pretrained language model.
     model = ChatGLMForConditionalGeneration.from_pretrained(
         model_args.model_name_or_path,
-        load_state_as_np=True,
         dtype=dtype,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
@@ -126,56 +126,65 @@ def main():
         model.mark_only_prefix_as_trainable()
         model.print_trainable_parameters()
     if model_args.lora:
-        if model_args.lora_all_linear:
+        if model_args.lora_path is None:
             # Not yet support RowParallelLinear
             if training_args.tensor_parallel_degree > 1:
-                target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
-            else:
                 target_modules = [".*query_key_value.*", ".*dense_h_to_4h.*"]
+            else:
+                target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
+            lora_config = LoRAConfig(
+                target_modules=target_modules,
+                r=model_args.lora_rank,
+                lora_alpha=2 * model_args.lora_rank,
+                merge_weights=model_args.merge_weights,
+                tensor_parallel_degree=training_args.tensor_parallel_degree,
+                dtype=dtype,
+                head_dim=model.config.hidden_size // model.config.num_attention_heads,
+            )
+            model = LoRAModel(model, lora_config)
         else:
-            target_modules = [".*query_key_value.*"]
-        lora_config = LoRAConfig(
-            target_modules=target_modules,
-            r=model_args.lora_rank,
-            lora_alpha=2 * model_args.lora_rank,
-            merge_weights=model_args.merge_weights,
-            tensor_parallel_degree=training_args.tensor_parallel_degree,
-            dtype=dtype,
-            head_dim=model.config.hidden_size // model.config.num_attention_heads,
-        )
-        model = LoRAModel(model, lora_config)
+            model = LoRAModel.from_pretrained(mode=model, lora_path=model_args.lora_path)
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
 
     if model_args.qat:
         from paddle import nn
         from paddle.quantization import QAT, QuantConfig
-        from paddle.quantization.quanters import (
-            FakeQuanterChannelWiseAbsMaxObserver,
-            FakeQuanterWithAbsMaxObserver,
-        )
 
+        # FakeQuanterChannelWiseAbsMaxObserver not yet merge in Paddle develop
+        from paddle.quantization.quanters import FakeQuanterChannelWiseAbsMaxObserver
+        from paddle.quantization.quanters.abs_max import (
+            FakeQuanterWithAbsMaxObserverLayer,
+        )
+        from paddleslim.quant.quanters import PACTQuanter
+
+        # from paddle.quantization.quanters import FakeQuanterWithAbsMaxObserver
         from paddlenlp.peft.lora import LoRALinear
         from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
 
         q_config = QuantConfig(activation=None, weight=None)
         q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
-        q_config.add_type_config(
-            LoRALinear,
-            weight=FakeQuanterChannelWiseAbsMaxObserver(bit_length=model_args.qat_bit_length, dtype=dtype),
-            activation=FakeQuanterWithAbsMaxObserver(
-                moving_rate=0.9, bit_length=model_args.qat_bit_length, dtype=dtype
-            ),
-        )
-        q_config.add_type_config(
-            nn.Linear,
-            weight=FakeQuanterChannelWiseAbsMaxObserver(bit_length=model_args.qat_bit_length, dtype=dtype),
-            activation=FakeQuanterWithAbsMaxObserver(
-                moving_rate=0.9, bit_length=model_args.qat_bit_length, dtype=dtype
-            ),
-        )
+
+        if model_args.qat_type == "A8W8":
+            activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
+            # activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
+            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype=dtype)
+        elif model_args.qat_type == "W4":
+            activation = None
+            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype=dtype)
+        elif model_args.qat_type == "A8W4":
+            activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
+            # activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
+            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype=dtype)
+        else:
+            raise ValueError("qat_type should be one of ['A8W8', 'W4', 'A8W4']")
+
+        q_config.add_type_config(LoRALinear, weight=weight, activation=activation)
+        q_config.add_type_config(nn.Linear, weight=weight, activation=activation)
+
         qat = QAT(q_config)
         model = qat.quantize(model, inplace=True)
+
     tokenizer = ChatGLMTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load the dataset.
@@ -188,16 +197,14 @@ def main():
         dev_ds = load_dataset(
             read_local_dataset, path=os.path.join(data_args.task_name_or_path, "dev.json"), lazy=False
         )
-        trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
+    elif data_args.data_name is not None:
+        train_ds, dev_ds = load_dataset(data_args.data_name, data_args.task_name_or_path, splits=["train", "dev"])
     else:
-        train_ds, dev_ds = load_dataset("bellegroup", data_args.task_name_or_path, splits=["train", "dev"])
-        trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
-    if model_args.do_generation:
-        train_ds = train_ds.map(partial(trans_func, is_test=False))
-        test_ds = dev_ds.map(trans_func)
-    else:
-        train_ds = train_ds.map(partial(trans_func, is_test=False))
-        test_ds = dev_ds.map(partial(trans_func, is_test=False))
+        train_ds, dev_ds = load_dataset(data_args.task_name_or_path, splits=["train", "dev"])
+
+    trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
+    train_ds = train_ds.map(partial(trans_func, is_test=False))
+    dev_ds = dev_ds.map(partial(trans_func, is_test=model_args.eval_with_do_generation))
 
     collate_fn = DataCollatorForSeq2Seq(
         tokenizer=tokenizer, max_length=data_args.src_length + data_args.tgt_length, padding=True
@@ -242,10 +249,10 @@ def main():
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics_do_generation if model_args.do_generation else compute_metrics,
+        compute_metrics=compute_metrics_do_generation if model_args.eval_with_do_generation else compute_metrics,
         data_collator=collate_fn,
         data_args=data_args,
-        do_generation=model_args.do_generation,
+        do_generation=model_args.eval_with_do_generation,
     )
     # if training_args.fp16_opt_level == "O2":
     #     trainer.disable_autocast_context_manager()
@@ -258,13 +265,8 @@ def main():
         trainer.save_state()
 
     if training_args.do_eval:
-        eval_result = trainer.evaluate(test_ds)
+        eval_result = trainer.evaluate()
         trainer.log_metrics("test", eval_result)
-
-    if data_args.generate_num > 0:
-        save_infer_result(
-            trainer, dev_ds, k=data_args.generate_num, src_length=data_args.src_length, tgt_length=data_args.tgt_length
-        )
 
 
 if __name__ == "__main__":

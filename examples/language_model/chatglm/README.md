@@ -23,29 +23,32 @@ ChatGLM-6B 模型的权重的使用则需要遵循[License](../../../paddlenlp/t
 
 ```
 python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
---model_name_or_path THUDM/chatglm-6b \
---task_name_or_path AdvertiseGen/ \
---max_steps 3000 \
---learning_rate 3e-5 \
---warmup_steps 20 \
---eval_steps 100 \
---logging_steps 1 \
---save_steps 1000 \
---save_total_limit 1 \
---output_dir ./checkpoints/chatglm-6b \
---src_length 64 \
---tgt_length 64 \
---per_device_eval_batch_size 4 \
---per_device_train_batch_size 4 \
---gradient_accumulation_steps 32 \
---fp16 \
---fp16_opt_level O2 \
---recompute True \
---do_train \
---do_eval \
---load_best_model_at_end True \
---tensor_parallel_degree 4 \
---do_generation True
+    --model_name_or_path THUDM/chatglm-6b \
+    --task_name_or_path AdvertiseGen/ \
+    --output_dir ./checkpoints/chatglm-6b \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 2 \
+    --per_device_eval_batch_size 8 \
+    --num_train_epochs 1 \
+    --learning_rate 3e-5 \
+    --warmup_steps 30 \
+    --logging_steps 1 \
+    --evaluation_strategy epoch \
+    --save_strategy epoch \
+    --src_length 1024 \
+    --tgt_length 1024 \
+    --fp16 \
+    --fp16_opt_level O2 \
+    --do_train \
+    --do_eval \
+    --disable_tqdm True \
+    --load_best_model_at_end True \
+    --metric_for_best_model accuracy \
+    --eval_with_do_generation False \
+    --tensor_parallel_degree 4 \
+    --recompute \
+    --save_total_limit 1 \
+    --overwrite_output_dir
 ```
 
 其中参数释义如下：
@@ -69,110 +72,81 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py \
 - `do_train`: 是否训练模型。
 - `do_eval`: 是否评估模型。
 - `tensor_parallel_degree`: 模型并行数量。
-- `do_generation`: 在评估的时候是否调用model.generate,默认为False。
-
-## BelleGroup/school_math_0.25M
-
-```
-python -m paddle.distributed.launch --gpus "0,1,2,3" --log_dir chatglm_log finetune_generation.py \
---output_dir ./checkpoints/chatglm-6b \
---per_device_train_batch_size 32 \
---per_device_eval_batch_size 32 \
---gradient_accumulation_steps 1 \
---model_name_or_path THUDM/chatglm-6b \
---task_name_or_path school_math_0.25M \
---num_train_epochs 2 \
---learning_rate 3e-5 \
---warmup_ratio 0.03 \
---logging_steps 1 \
---eval_steps 500 \
---save_steps 500 \
---src_length 128 \
---tgt_length 512 \
---fp16 \
---fp16_opt_level O2 \
---recompute True \
---do_train \
---do_eval \
---disable_tqdm True \
---save_total_limit 1 \
---metric_for_best_model accuracy \
---load_best_model_at_end True \
---do_generation False \
---tensor_parallel_degree 4
-```
+- `eval_with_do_generation`: 在评估的时候是否调用model.generate,默认为False。
 
 ### 单卡LoRA微调
 
 ```
 python finetune_generation.py \
---output_dir ./checkpoints/chatglm-6b \
---per_device_train_batch_size 32 \
---per_device_eval_batch_size 32 \
---gradient_accumulation_steps 1 \
---model_name_or_path THUDM/chatglm-6b \
---task_name_or_path school_math_0.25M \
---num_train_epochs 2 \
---learning_rate 3e-4 \
---warmup_ratio 0.03 \
---logging_steps 1 \
---eval_steps 500 \
---save_steps 500 \
---src_length 128 \
---tgt_length 512 \
---fp16 \
---fp16_opt_level O2 \
---recompute True \
---do_train \
---do_eval \
---disable_tqdm True \
---metric_for_best_model accuracy \
---load_best_model_at_end True \
---do_generation False \
---save_total_limit 1 \
---lora True \
---lora_rank 8 \
---lora_all_linear
+    --output_dir ./checkpoints/chatglm-6b \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 2 \
+    --per_device_eval_batch_size 8 \
+    --model_name_or_path THUDM/chatglm-6b \
+    --task_name_or_path AdvertiseGen/ \
+    --num_train_epochs 2 \
+    --learning_rate 3e-4 \
+    --warmup_steps 30 \
+    --logging_steps 1 \
+    --evaluation_strategy epoch \
+    --save_strategy epoch \
+    --src_length 1024 \
+    --tgt_length 1024 \
+    --fp16 \
+    --fp16_opt_level O2 \
+    --do_train \
+    --do_eval \
+    --disable_tqdm True \
+    --load_best_model_at_end True \
+    --metric_for_best_model accuracy \
+    --eval_with_do_generation False \
+    --recompute \
+    --save_total_limit 1 \
+    --overwrite_output_dir \
+    --lora True \
+    --lora_rank 8
 ```
 
 ### 单卡Prefix微调
 
 ```
 python finetune_generation.py \
---output_dir ./checkpoints/chatglm-6b \
---per_device_train_batch_size 32 \
---per_device_eval_batch_size 32 \
---gradient_accumulation_steps 1 \
---model_name_or_path THUDM/chatglm-6b \
---task_name_or_path school_math_0.25M \
---num_train_epochs 2 \
---learning_rate 3e-2 \
---warmup_ratio 0.03 \
---logging_steps 1 \
---eval_steps 500 \
---save_steps 500 \
---src_length 128 \
---tgt_length 512 \
---fp16 \
---fp16_opt_level O2 \
---recompute True \
---do_train \
---do_eval \
---disable_tqdm True \
---metric_for_best_model accuracy \
---load_best_model_at_end True \
---do_generation False \
---prefix_tuning True \
---save_total_limit 1 \
---num_prefix_tokens 64
+    --output_dir ./checkpoints/chatglm-6b \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 2 \
+    --per_device_eval_batch_size 8 \
+    --model_name_or_path THUDM/chatglm-6b \
+    --task_name_or_path AdvertiseGen/ \
+    --num_train_epochs 2 \
+    --learning_rate 3e-4 \
+    --warmup_steps 30 \
+    --logging_steps 1 \
+    --evaluation_strategy epoch \
+    --save_strategy epoch \
+    --src_length 1024 \
+    --tgt_length 1024 \
+    --fp16 \
+    --fp16_opt_level O2 \
+    --do_train \
+    --do_eval \
+    --disable_tqdm True \
+    --load_best_model_at_end True \
+    --metric_for_best_model accuracy \
+    --eval_with_do_generation False \
+    --recompute \
+    --save_total_limit 1 \
+    --overwrite_output_dir \
+    --prefix_tuning True \
+    --num_prefix_tokens 64
 ```
 
 其中新增参数释义如下：
 
 - `lora`: 是否使用LoRA技术。
-- `prefix_tuning`: 是否使用Prefix技术。
-- `merge_weights`: 是否合并原始模型和Lora模型的权重。
+- `lora_path`: 初始化lora参数和配置文件路径。
 - `lora_rank`: lora 算法中rank（秩）的值。
+- `merge_weights`: 是否合并原始模型和Lora模型的权重。
+- `prefix_tuning`: 是否使用Prefix技术。
 - `num_prefix_tokens`: prefix tuning算法中前缀token数量。
 
 ## 模型预测
