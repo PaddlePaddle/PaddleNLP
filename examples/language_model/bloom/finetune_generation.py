@@ -75,6 +75,7 @@ def convert_example(
     tokenizer,
     max_source_length,
     max_target_length,
+    is_test=False,
 ):
     """Convert all examples into necessary features."""
     if "source" in example:
@@ -119,25 +120,27 @@ def convert_example(
         max_length=max_target_length,
         truncation=True,
     )
-    target_input_ids_len = (np.array(target_tokenized["input_ids"]) != tokenizer.pad_token_id).sum()
 
     source_tokenized = tokenizer(
         source,
-        max_length=(max_source_length + max_target_length - target_input_ids_len - 1),
-        padding="max_length",
+        max_length=max_source_length,
         truncation=True,
     )
+    if is_test:
+        return dict(
+            input_ids=source_tokenized["input_ids"],
+            labels=target_tokenized["input_ids"],
+        )
+    else:
+        input_ids = source_tokenized["input_ids"] + target_tokenized["input_ids"]
+        labels = len(source_tokenized["input_ids"]) * [tokenizer.pad_token_id] + target_tokenized["input_ids"]
 
-    input_ids = source_tokenized["input_ids"] + [tokenizer.eos_token_id] + target_tokenized["input_ids"]
-    labels = (len(input_ids) - target_input_ids_len) * [tokenizer.pad_token_id] + target_tokenized["input_ids"]
-
-    # shift labels
-    input_ids, labels = input_ids[:-1], labels[1:]
-
-    return dict(
-        input_ids=input_ids,
-        labels=labels,
-    )
+        # shift labels
+        input_ids, labels = input_ids[:-1], labels[1:]
+        return dict(
+            input_ids=input_ids,
+            labels=labels,
+        )
 
 
 def main():
@@ -210,17 +213,17 @@ def main():
             )
             model = LoRAModel(model, lora_config)
         else:
-            model = LoRAModel.from_pretrained(mode=model, lora_path=model_args.lora_path)
+            model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
 
     if model_args.qat:
         from paddle import nn
         from paddle.quantization import QAT, QuantConfig
-        from paddle.quantization.quanters import FakeQuanterWithAbsMaxObserver
 
+        # from paddle.quantization.quanters import FakeQuanterWithAbsMaxObserver
         # FakeQuanterChannelWiseAbsMaxObserver not yet merge in Paddle develop
-        # from paddle.quantization.quanters import FakeQuanterChannelWiseAbsMaxObserver
+        from paddle.quantization.quanters import FakeQuanterChannelWiseAbsMaxObserver
         from paddle.quantization.quanters.abs_max import (
             FakeQuanterWithAbsMaxObserverLayer,
         )
@@ -235,17 +238,17 @@ def main():
         if model_args.qat_type == "A8W8":
             activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
             # activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
-            # weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype=dtype)
-            weight = FakeQuanterWithAbsMaxObserver(bit_length=8, dtype=dtype)
+            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype="float32")
+            # weight = FakeQuanterWithAbsMaxObserver(bit_length=8, dtype=dtype)
         elif model_args.qat_type == "W4":
             activation = None
-            # weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype=dtype)
-            weight = FakeQuanterWithAbsMaxObserver(bit_length=4, dtype=dtype)
+            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
+            # weight = FakeQuanterWithAbsMaxObserver(bit_length=4, dtype=dtype)
         elif model_args.qat_type == "A8W4":
             activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
             # activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
-            # weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype=dtype)
-            weight = FakeQuanterWithAbsMaxObserver(bit_length=8, dtype=dtype)
+            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
+            # weight = FakeQuanterWithAbsMaxObserver(bit_length=8, dtype=dtype)
         else:
             raise ValueError("qat_type should be one of ['A8W8', 'W4', 'A8W4']")
 
@@ -300,7 +303,7 @@ def main():
     )
 
     train_ds = train_ds.map(trans_func, lazy=False)
-    dev_ds = dev_ds.map(trans_func, lazy=False)
+    dev_ds = dev_ds.map(partial(trans_func, is_test=model_args.eval_with_do_generation), lazy=False)
 
     collate_fn = DataCollatorForSeq2Seq(
         tokenizer=tokenizer,
@@ -350,9 +353,6 @@ def main():
         data_collator=collate_fn,
         data_args=data_args,
     )
-
-    if training_args.fp16_opt_level == "O2" and not training_args.bf16:
-        trainer.disable_autocast_context_manager()
 
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
