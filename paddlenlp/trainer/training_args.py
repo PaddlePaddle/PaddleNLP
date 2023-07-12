@@ -970,6 +970,18 @@ class TrainingArguments:
             return None
 
     @property
+    def old_weight_name_suffix(self):
+        if self.use_hybrid_parallel:
+            name = []
+            if self.tensor_parallel_degree > 1:
+                name.append(f"tp{self.tensor_parallel_rank:0>2d}")
+            if self.pipeline_parallel_degree > 1:
+                name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
+            return "_".join(name)
+        else:
+            return None
+
+    @property
     def weight_name_suffix(self):
         if self.use_hybrid_parallel:
             name = []
@@ -1043,7 +1055,7 @@ class TrainingArguments:
         else:
             if self.save_sharding_stage1_model:
                 return True
-            elif self.use_hybrid_parallel > 1:
+            elif self.use_hybrid_parallel:
                 # save on dataset rank 0
                 return self.sharding_parallel_rank == 0 and self.data_parallel_rank == 0
             else:

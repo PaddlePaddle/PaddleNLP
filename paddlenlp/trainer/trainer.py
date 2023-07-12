@@ -437,7 +437,7 @@ class Trainer:
                 state_dict = self.recover_params_from_master_weights(state_dict)
         else:
             if self.args.dataset_rank == 0:
-                state_dict = self.load_one_state_dict_from_checkpoint(resume_from_checkpoint, self.args.weight_name_suffix)
+                state_dict = self.load_one_state_dict_from_checkpoint(resume_from_checkpoint, self.args.old_weight_name_suffix)
             else:
                 logger.info(f"not loading ckpt :{self.args.dataset_rank}")
 
