@@ -570,6 +570,9 @@ class GenerationMixin(object):
         pass
 
     def _build_fast(self, kwargs):
+        if getattr(self, "_has_build_fast", False):
+            return
+
         self._fast_entry = False
         if kwargs["num_beam_groups"] != 1:
             # not support for group_beam_search yet in the fast version
@@ -580,6 +583,7 @@ class GenerationMixin(object):
             )
             kwargs["use_fp16_decoding"] = True
         self.prepare_fast_entry(kwargs)
+        self._has_build_fast = True
 
     @paddle.no_grad()
     def generate(
@@ -826,39 +830,42 @@ class GenerationMixin(object):
         if is_tracing:
             self._fast_entry = None
 
-        if getattr(self, "_fast_entry", None) is not False and use_fast:
-            args = locals()
-            args.pop("self")
-            args.pop("__class__", None)
-            model_kwargs = args.pop("model_kwargs")
-            args.update(model_kwargs)
-            try:
-                if getattr(self, "_fast_entry", None) is None:
-                    self._build_fast(args)
-                if self._fast_entry:
-                    output = self._fast_entry(**args)
-                    if isinstance(output, tuple):
-                        output_ids, dummy_srore = output
-                    else:
-                        output_ids = output
-                        # make result and fast result oneconsistent
-                        dummy_srore = None
-                    if decode_strategy == "beam_search":
-                        output_ids = output_ids.transpose([1, 2, 0])
-                        output_ids = output_ids[:, :num_return_sequences, :].reshape([-1, output_ids.shape[-1]])
-                        if dummy_srore is not None:
-                            dummy_srore = dummy_srore[:, :num_return_sequences].flatten()
-                    else:
-                        output_ids = output_ids.transpose([1, 0])
-                    return output_ids, dummy_srore
+        if use_fast:
+            if getattr(self, "_fast_entry", None) is not False:
+                args = locals()
+                args.pop("self")
+                args.pop("__class__", None)
+                model_kwargs = args.pop("model_kwargs")
+                args.update(model_kwargs)
+                try:
+                    if getattr(self, "_fast_entry", None) is None:
+                        self._build_fast(args)
+                    if self._fast_entry:
+                        output = self._fast_entry(**args)
+                        if isinstance(output, tuple):
+                            output_ids, dummy_srore = output
+                        else:
+                            output_ids = output
+                            # make result and fast result oneconsistent
+                            dummy_srore = None
+                        if decode_strategy == "beam_search":
+                            output_ids = output_ids.transpose([1, 2, 0])
+                            output_ids = output_ids[:, :num_return_sequences, :].reshape([-1, output_ids.shape[-1]])
+                            if dummy_srore is not None:
+                                dummy_srore = dummy_srore[:, :num_return_sequences].flatten()
+                        else:
+                            output_ids = output_ids.transpose([1, 0])
+                        return output_ids, dummy_srore
 
-            except Exception as e:
-                args["model_kwargs"] = model_kwargs
-                # TODO
-                # Prevent self._convert_to_fast to throw Exception
-                self._convert_to_fast(args)
-                logger.warning(e)
-                logger.warning("FastGeneration is not available, " "and the original version would be used instead.")
+                except Exception as e:
+                    args["model_kwargs"] = model_kwargs
+                    # TODO
+                    # Prevent self._convert_to_fast to throw Exception
+                    self._convert_to_fast(args)
+                    logger.warning(e)
+                    logger.warning(
+                        "FastGeneration is not available, " "and the original version would be used instead."
+                    )
 
         # params check
         if input_ids is None and "inputs_embeds" not in model_kwargs:

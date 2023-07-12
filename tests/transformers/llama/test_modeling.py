@@ -22,6 +22,7 @@ import paddle
 from parameterized import parameterized
 
 from paddlenlp.transformers import LlamaConfig, LlamaForCausalLM, LlamaModel
+from paddlenlp.transformers.llama.modeling import FusedLlamaModel
 from tests.testing_utils import require_package, slow
 from tests.transformers.test_configuration_common import ConfigTester
 from tests.transformers.test_modeling_common import (
@@ -303,6 +304,44 @@ class LlamaModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
             ]
         )
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+    def test_fused_model(self):
+        model = LlamaForCausalLM.from_pretrained("__internal_testing__/micro-random-llama")
+        fused_model = FusedLlamaModel.from_pretrained_model(model)
+        fused_model.eval()
+
+        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = fused_model(input_ids, attention_mask=attention_mask)[0]
+
+        expected_shape = [1, 11, 64]
+        self.assertEqual(output.shape, expected_shape)
+        expected_slice = paddle.to_tensor(
+            [
+                [
+                    [0.08663182, 0.08711195, 1.02873409],
+                    [0.89613110, 0.50597161, -1.37855554],
+                    [1.58324170, -0.46832055, 0.35964745],
+                ]
+            ]
+        )
+        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+    def test_fast_generation(self):
+        model = LlamaForCausalLM.from_pretrained("__internal_testing__/micro-random-llama")
+        model.eval()
+
+        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+
+        with paddle.no_grad():
+            output = model.generate(input_ids, attention_mask=attention_mask, max_length=10, use_fast=True)[0]
+
+        expected_shape = [1, 10]
+        self.assertEqual(output.shape, expected_shape)
+        expected_ids = [[20762, 3825, 3009, 24082, 23694, 30334, 3557, 19503, 20577, 15480]]
+        self.assertListEqual(output.tolist(), expected_ids)
 
 
 class LlamaCompatibilityTest(unittest.TestCase):

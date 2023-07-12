@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import math
 from functools import partial
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Type
 
 import numpy as np
 import paddle
@@ -894,10 +894,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         super().__init__(config)
         self.config = config
 
-        if config.use_fast:
-            self.llama = FusedLlamaModel(config)
-        else:
-            self.llama = LlamaModel(config)
+        self.llama = LlamaModel(config)
 
         self.lm_head = LlamaLMHead(config)
         self.criterion = LlamaPretrainingCriterion(config)
@@ -919,6 +916,10 @@ class LlamaForCausalLM(LlamaPretrainedModel):
 
     def get_decoder(self):
         return self.llama
+
+    def prepare_fast_entry(self, **kwargs):
+        """create `FusedLlamaModel` model by `LlamaModel` and re-use the lm-head layer"""
+        self.llma = FusedLlamaModel.from_pretrained_model(self)
 
     def prepare_inputs_for_generation(
         self, input_ids, use_cache=False, past_key_values=None, inputs_embeds=None, **kwargs
@@ -1112,6 +1113,12 @@ class FusedLlamaModel(LlamaPretrainedModel):
     def set_input_embeddings(self, value):
         self.embed_tokens = value
 
+    @classmethod
+    def from_pretrained_model(cls: Type[PretrainedModel], model: PretrainedModel):
+        fused_model = cls(model.config)
+        fused_model.set_state_dict(model.state_dict())
+        return fused_model
+
     def _prepare_decoder_attention_mask(self, attention_mask, input_shape, past_key_values_length, dtype):
         # create causal mask
         # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
@@ -1219,7 +1226,7 @@ class FusedLlamaModel(LlamaPretrainedModel):
                     shape=[
                         2,
                         -1,
-                        self.config.num_attention_heads // self.config.tensor_parallel_degree,
+                        self.config.num_attention_heads // max(self.config.tensor_parallel_degree, 1),
                         max_seq_length,
                         self.hidden_size // self.config.num_attention_heads,
                     ],
@@ -1242,7 +1249,6 @@ class FusedLlamaModel(LlamaPretrainedModel):
             batch_size, self.max_position_embeddings, 10000, head_dim, seq_length, offset
         )
 
-        print("inputs_embeds", inputs_embeds)
         hidden_states, presents = self.transformer_block(
             hidden_states,
             attn_mask=paddle.cast(causal_mask, dtype=hidden_states.dtype),
@@ -1251,10 +1257,7 @@ class FusedLlamaModel(LlamaPretrainedModel):
             rotary_emb_dims=1,
             time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
         )
-        print("last-layer-hidden_states", hidden_states)
-
         hidden_states = self.norm(hidden_states)
-        print("norm-output-hidden_states", hidden_states)
 
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
