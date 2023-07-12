@@ -161,9 +161,6 @@ if __name__ == "__main__":
 
     try:
         # Read ground-truth
-        import pdb
-
-        pdb.set_trace()
         reference = read_reference(standard_path)
 
         # Read predictions
