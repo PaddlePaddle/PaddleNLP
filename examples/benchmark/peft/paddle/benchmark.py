@@ -17,13 +17,16 @@ from typing import Optional
 
 import paddle.profiler as profiler
 from datasets import load_dataset
-from utils import CustomTrainer, ProfilerCallback
+from utils import CustomTrainer, DataCollatorForSupervisedDataset, ProfilerCallback
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
-from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, ChatGLMForConditionalGeneration
-
+from paddlenlp.transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    ChatGLMForConditionalGeneration,
+)
 
 """
 单卡
@@ -60,6 +63,9 @@ class ModelArguments:
     lora: Optional[bool] = field(default=False, metadata={"help": "whether to use LoRA"})
     english: Optional[bool] = field(default=False, metadata={"help": "whether to english benchmark dataset"})
     profiler: Optional[bool] = field(default=False, metadata={"help": "whether to use profiler"})
+    padding_to_max_length: Optional[bool] = field(
+        default=False, metadata={"help": "whether to padding to  fixd max length"}
+    )
 
 
 def main():
@@ -74,12 +80,12 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
     else:
-        dtype="float32"
+        dtype = "float32"
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     if "llama" in model_args.model_name_or_path:
         tokenizer.pad_token = tokenizer.unk_token
-    if 'chatglm' in model_args.model_name_or_path:
+    if "chatglm" in model_args.model_name_or_path:
         model = ChatGLMForConditionalGeneration.from_pretrained(
             model_args.model_name_or_path,
             load_state_as_np=True,
@@ -131,14 +137,14 @@ def main():
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
 
         return model_inputs
-    
+
     if model_args.english:
         dataset = load_dataset("tatsu-lab/alpaca")
     else:
         dataset = load_dataset("Chinese-Vicuna/guanaco_belle_merge_v1.0")
 
     # select first 10k examples for benchmarking
-    dataset = dataset["train"].select(range(10000))
+    dataset = dataset["train"].select(range(1000))
     dataset = dataset.map(
         lambda example: preprocess_function(example), remove_columns=["instruction", "input", "output"]
     )
@@ -146,29 +152,32 @@ def main():
 
     if model_args.profiler:
         prof = profiler.Profiler(
-            targets=[profiler.ProfilerTarget.CPU, profiler.ProfilerTarget.GPU],profile_memory=True,
-            scheduler = profiler.make_scheduler(closed=1, ready=2, record=1, repeat=1),
-            on_trace_ready = profiler.export_chrome_tracing('./log'),
+            targets=[profiler.ProfilerTarget.CPU, profiler.ProfilerTarget.GPU],
+            profile_memory=True,
+            scheduler=profiler.make_scheduler(closed=1, ready=2, record=1, repeat=1),
+            on_trace_ready=profiler.export_chrome_tracing("./log"),
         )
+    if model_args.padding_to_max_length:
+        data_collator = DataCollatorForSupervisedDataset(
+            return_tensors="pd", tokenizer=tokenizer, padding="max_length", max_length=768
+        )
+    else:
+        data_collator = DataCollatorForSeq2Seq(return_tensors="pd", tokenizer=tokenizer)
 
-    
     trainer = CustomTrainer(
         model=model,
         tokenizer=tokenizer,
         train_dataset=dataset,
         callbacks=[ProfilerCallback(prof)] if model_args.profiler else [],
         args=training_args,
-        data_collator=DataCollatorForSeq2Seq(return_tensors="pd", tokenizer=tokenizer),
+        data_collator=data_collator,
     )
-
 
     train_metrics = trainer.train()
     tokens_per_second = trainer.total_observed_tokens / train_metrics.metrics["train_runtime"]
     effective_tokens_per_second = total_effective_tokens / train_metrics.metrics["train_runtime"]
     print(f"Tokens per second: {tokens_per_second:.2f}")
     print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
-
-
 
 
 if __name__ == "__main__":
