@@ -17,6 +17,7 @@
 import argparse
 import json
 
+import pandas
 from tqdm import tqdm
 
 # yapf: disable
@@ -27,18 +28,32 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
     t2i_record = dict()
-
-    with open(args.input, "r", encoding="utf-8") as fin:
-        for line in tqdm(fin):
-            obj = json.loads(line.strip())
-            text_id = obj["text_id"]
-            image_ids = obj["image_ids"]
+    input_path = args.input
+    if input_path[-4:] == ".csv":
+        data = pandas.read_csv(input_path)
+        for index in range(len(data)):
+            image_ids = data.iloc[index, 5]
+            text_id = data.iloc[index, 2].item()
+            if type(image_ids) == str:
+                image_ids = [image_ids]
             for image_id in image_ids:
                 if image_id not in t2i_record:
                     t2i_record[image_id] = []
                 t2i_record[image_id].append(text_id)
+    elif input_path[-6:] == ".jsonl":
+        with open(input_path, "r", encoding="utf-8") as fin:
+            for line in tqdm(fin):
+                obj = json.loads(line.strip())
+                text_id = obj["text_id"]
+                image_ids = obj["image_ids"]
+                for image_id in image_ids:
+                    if image_id not in t2i_record:
+                        t2i_record[image_id] = []
+                    t2i_record[image_id].append(text_id)
 
-    with open(args.input.replace(".jsonl", "") + ".tr.jsonl", "w", encoding="utf-8") as fout:
+    with open(
+        input_path.replace(".jsonl", "").replace("_updata.csv", "_texts") + ".tr.jsonl", "w", encoding="utf-8"
+    ) as fout:
         for image_id, text_ids in t2i_record.items():
             out_obj = {"image_id": image_id, "text_ids": text_ids}
             fout.write("{}\n".format(json.dumps(out_obj)))

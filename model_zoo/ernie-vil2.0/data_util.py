@@ -19,6 +19,7 @@ from math import ceil
 
 import numpy as np
 import paddle
+import pandas
 import pyarrow as pa
 from paddle.io import Dataset
 from paddle.vision.transforms import (
@@ -179,18 +180,24 @@ def create_dataloader(dataset, mode="train", batch_size=1, num_workers=1, batchi
 
 
 class EvalTxtDataset(Dataset):
-    def __init__(self, jsonl_filename, max_txt_length=24, tokenizer=None):
-        assert os.path.exists(jsonl_filename), "The annotation datafile {} not exists!".format(jsonl_filename)
-
-        logging.debug(f"Loading jsonl data from {jsonl_filename}.")
-        self.texts = []
-        with open(jsonl_filename, "r", encoding="utf-8") as fin:
-            for line in fin:
-                obj = json.loads(line.strip())
-                text_id = obj["text_id"]
-                text = obj["text"]
-                self.texts.append((text_id, text))
-        logging.debug(f"Finished loading jsonl data from {jsonl_filename}.")
+    def __init__(self, filename, max_txt_length=24, tokenizer=None):
+        assert os.path.exists(filename), "The annotation datafile {} not exists!".format(filename)
+        if filename[-6:] == "jsonl":
+            jsonl_filename = filename
+            logging.debug(f"Loading jsonl data from {jsonl_filename}.")
+            self.texts = []
+            with open(jsonl_filename, "r", encoding="utf-8") as fin:
+                for line in fin:
+                    obj = json.loads(line.strip())
+                    text_id = obj["text_id"]
+                    text = obj["text"]
+                    self.texts.append((text_id, text))
+            logging.debug(f"Finished loading jsonl data from {jsonl_filename}.")
+        elif filename[-4:] == ".csv":
+            self.texts = []
+            data = pandas.read_csv(filename)
+            for i in range(len(data)):
+                self.texts.append((data.iloc[i, 2], data.iloc[i, 3]))
 
         self.max_txt_length = max_txt_length
         self.tokenizer = tokenizer
@@ -237,7 +244,7 @@ class EvalImgDataset(Dataset):
         image_bytes.seek(0)
         image = Image.open(image_bytes)
         image = self.transform(image)
-        if type(img_id) != int:
+        if img_id.isnumeric():
             img_id = int(img_id)
 
         return img_id, image

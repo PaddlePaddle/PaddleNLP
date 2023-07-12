@@ -44,10 +44,10 @@ def path2rest(path, iid2captions, iid2photo):
     name = path.split("/")[-1]
     with open(path, "rb") as fp:
         binary = fp.read()
-    text_index = iid2photo[int(name.split("/")[-1][:-4])]
+    text_index = iid2photo[name.split("/")[-1]]
     bs_item = []
     for index in text_index:
-        bs_item.append([binary, iid2captions[index], int(name.split("/")[-1][:-4])])
+        bs_item.append([binary, iid2captions[index], name.split("/")[-1]])
     return bs_item
 
 
@@ -55,7 +55,7 @@ def valid_img(path, iid2photo):
     name = path.split("/")[-1]
     with open(path, "rb") as fp:
         binary = fp.read()
-    return [binary, int(name.split("/")[-1][:-4])]
+    return [binary, name.split("/")[-1]]
 
 
 parser = argparse.ArgumentParser()
@@ -116,27 +116,34 @@ if __name__ == "__main__":
                     else:
                         iid2captions[index] = obj["text"]
                         iid2photo[image_ids[0]].append(index)
-        elif specified_splits == "csv":
+        elif specified_type == "csv":
             txt_path = datasplit_path + "." + specified_type
             assert os.path.exists(txt_path) is True
-            fin_data = pd.read_csv(txt_path, header=None)
+            fin_data = pd.read_csv(txt_path)
             for index in range(len(fin_data)):
-                raw_txt, photo_path = fin_data.iloc[index, 0], fin_data.iloc[index, 1]
-                iid2captions[index] = raw_txt
-                iid2photo[photo_path.split("/")[-1]].append(index)
+                raw_txt, photo_path = fin_data.iloc[index, 3], fin_data.iloc[index, 5]
+                if type(photo_path[0]) == str and photo_path.isnumeric() is True:
+                    iid2captions[index] = raw_txt
+                    iid2photo[int(photo_path)].append(index)
+                else:
+                    iid2captions[index] = raw_txt
+                    iid2photo[photo_path].append(index)
         paths = (
-            list(glob(f"{args.image_dir}/*jpg"))
-            + list(glob(f"{args.image_dir}/*.png"))
-            + list(glob(f"{args.image_dir}/*.JPG"))
-            + list(glob(f"{args.image_dir}/*.gif"))
+            list(glob(f"{args.image_dir}/*/*jpg"))
+            + list(glob(f"{args.image_dir}/*/*.png"))
+            + list(glob(f"{args.image_dir}/*/*.JPG"))
+            + list(glob(f"{args.image_dir}/*/*.gif"))
         )
         random.shuffle(paths)
+        # 有效图片路径
         if type(list(iid2photo.keys())[0]) == int:
-            caption_paths = [path for path in paths if int(path.split("/")[-1][:-4]) in iid2photo]  # 有效图片路径
+            caption_paths = [path for path in paths if int(path.split("/")[-1][:-4]) in iid2photo]
         elif type(list(iid2photo.keys())[0]) == str and "." not in list(iid2photo.keys())[0]:
-            caption_paths = [path for path in paths if path.split("/")[-1][:-4] in iid2photo]  # 有效图片路径
+            caption_paths = [path for path in paths if path.split("/")[-1][:-4] in iid2photo]
         else:
-            caption_paths = [path for path in paths if path.split("/")[-1] in iid2photo]  # 有效图片路径
+            caption_paths = [path for path in paths if path.split("/")[-1] in iid2photo]
+        # csv文件包含的图片不存在
+        invalid_photo = [path for path in iid2photo if path not in [i.split("/")[-1] for i in caption_paths]]
         bs = []
         for path in tqdm(caption_paths):
             bs += path2rest(path, iid2captions, iid2photo)
@@ -152,6 +159,11 @@ if __name__ == "__main__":
             with pa.RecordBatchFileWriter(sink, table.schema) as writer:
                 writer.write_table(table)
         if split in ["valid", "test"]:
+            # 如果csv包含无效图片，则更新csv
+            if len(invalid_photo) > 0 and specified_type == "csv":
+                valid_index = [i for i in range(len(fin_data)) if fin_data.iloc[i, 5] not in invalid_photo]
+                fin_data_updata = fin_data.iloc[valid_index, :]
+                fin_data_updata.to_csv(datasplit_path + "_updata." + specified_type, index=False)
             bs_img = [valid_img(path, iid2captions) for path in tqdm(caption_paths)]
             dataframe_img = pd.DataFrame(bs_img, columns=["image", "image_id"])
             table_img = pa.Table.from_pandas(dataframe_img)
