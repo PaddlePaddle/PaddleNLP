@@ -193,6 +193,9 @@ fi
 if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     # Install paddlenlp
     cd ${nlp_dir}
+    python -m pip uninstall protobuf -y
+    python -m pip uninstall protobuf -y
+    python -m pip install protobuf==3.20.2
     if [ ! -f ./dist/p****.whl ];then
         install_paddle
         echo "install_nlp_develop"
