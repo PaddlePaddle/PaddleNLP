@@ -479,7 +479,11 @@ class LlamaAttention(nn.Layer):
             kv_seq_len += offset
 
         if self.config.rope:
-            if past_key_value is None and fused_rotary_position_embedding is not None:
+            if (
+                "gpu" in paddle.device.get_device()
+                and past_key_value is None
+                and fused_rotary_position_embedding is not None
+            ):
                 query_states, key_states, _ = fused_rotary_position_embedding(query_states, key_states, None)
             else:
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
