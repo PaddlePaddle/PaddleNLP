@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-import os
 import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -21,7 +19,6 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle.optimizer.lr import LambdaDecay
-from predict_generation import Predictor, batchfy_text
 from rouge import Rouge
 from sklearn.metrics import accuracy_score
 
@@ -29,40 +26,6 @@ from paddlenlp.metrics import BLEU
 from paddlenlp.trainer import PrinterCallback, ProgressCallback, Trainer
 from paddlenlp.trainer.integrations import TrainerCallback
 from paddlenlp.utils.log import logger
-
-
-def save_infer_result(trainer, dev_ds, k=100, src_length=256, tgt_length=512):
-    all_instructions = []
-    all_answers = []
-    all_output = []
-
-    # top k instruction from dev_ds
-    for i, ds in enumerate(dev_ds.data):
-        if i == k:
-            break
-        all_instructions.append(ds["instruction"])
-        all_answers.append(ds["output"])
-    batch_texts = batchfy_text(all_instructions, trainer.args.per_device_eval_batch_size)
-    predictor = Predictor(
-        tokenizer=trainer.tokenizer, model=trainer.model, src_length=src_length, tgt_length=tgt_length
-    )
-
-    # infer results
-    for bs, texts in enumerate(batch_texts):
-        outputs = predictor.predict(texts)
-        for i, (text, result) in enumerate(zip(texts, outputs["result"])):
-            out = {
-                "instruction": text,
-                "answer": all_answers[bs * trainer.args.per_device_eval_batch_size + i],
-                "output": result,
-            }
-            all_output.append(out)
-
-    # save results
-    if trainer.args.tensor_parallel_rank == 0:
-        with open(os.path.join(trainer.args.output_dir, "infer_result.json"), "w") as f:
-            for out in all_output:
-                f.write(json.dumps(out, ensure_ascii=False) + "\n")
 
 
 class AverageStatistical(object):
@@ -181,7 +144,7 @@ class LlamaTrainer(Trainer):
         preds = model.generate(
             input_ids=inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
-            max_length=50,
+            max_length=self.args.tgt_length,
             min_length=0,
             use_cache=True,
             temperature=1.0,

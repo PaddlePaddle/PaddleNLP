@@ -1278,28 +1278,30 @@ gpt-3() {
     print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'`
 }
 llama(){
-cd ${nlp_dir}/examples/language_model/llama/
-# lora tuning 
-python finetune_generation.py \
-    --model_name_or_path facebook/tiny-random-llama \
-    --do_train \
-    --num_train_epochs 2 \
-    --per_device_train_batch_size 2 \
-    --per_device_eval_batch_size 2 \
-    --overwrite_output_dir \
-    --output_dir ./checkpoints/ \
-    --logging_steps 1 \
-    --max_steps 1 \
-    --fp16 \
-    --fp16_opt_level O2 \
-    --gradient_accumulation_steps 2 \
-    --recompute \
-    --learning_rate 3e-4 \
-    --lr_scheduler_type linear \
-    --max_grad_norm 1.0 \
-    --warmup_steps 20 \
-    --lora True \
-    --r 1 >${log_path}/llama_finetune>>${log_path}/llama_finetune 2>&1
-print_info $? llama_finetune
+    cd ${nlp_dir}/examples/language_model/llama/
+    # install the dependency packages
+    pip install -r requirements.txt
+    # lora tuning 
+    python finetune_generation.py \
+        --model_name_or_path facebook/tiny-random-llama \
+        --do_train \
+        --num_train_epochs 2 \
+        --per_device_train_batch_size 2 \
+        --per_device_eval_batch_size 2 \
+        --overwrite_output_dir \
+        --output_dir ./checkpoints/ \
+        --logging_steps 1 \
+        --max_steps 1 \
+        --fp16 \
+        --fp16_opt_level O2 \
+        --gradient_accumulation_steps 2 \
+        --recompute \
+        --learning_rate 3e-4 \
+        --lr_scheduler_type linear \
+        --max_grad_norm 1.0 \
+        --warmup_steps 20 \
+        --lora True \
+        --r 1 >${log_path}/llama_finetune>>${log_path}/llama_finetune 2>&1
+    print_info $? llama_finetune
 }
 $1
