@@ -800,7 +800,7 @@ class ChatGLMv2ForConditionalGeneration(ChatGLMv2PretrainedModel):
             loss = paddle.sum(loss.reshape([-1]).cast(paddle.float32) * loss_mask.reshape([-1]).cast(paddle.float32))
             loss = loss / loss_mask.sum()
 
-            # lm_logits = lm_logits.astype(hidden_states.dtype)
+            lm_logits = lm_logits.astype(hidden_states.dtype)
             loss = loss.astype(hidden_states.dtype)
 
         if not return_dict:
