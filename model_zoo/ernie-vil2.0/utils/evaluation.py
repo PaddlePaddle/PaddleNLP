@@ -22,6 +22,8 @@ import json
 import os
 import sys
 
+import pandas
+
 NUM_K = 10
 
 
@@ -62,13 +64,13 @@ def read_submission(submit_path, reference, k=5):
                     )
                 )
             # Check whether there exist an invalid prediction for any text
-            for rank, image_id in enumerate(image_ids):
-                if not isinstance(image_id, int):
-                    raise Exception(
-                        "Text_id {} has an invalid predicted image_id {} at rank {}, it should be an integer (not string), please check your schema".format(
-                            qid, image_id, rank + 1
-                        )
-                    )
+            # for rank, image_id in enumerate(image_ids):
+            #     if not isinstance(image_id, int):
+            #         raise Exception(
+            #             "Text_id {} has an invalid predicted image_id {} at rank {}, it should be an integer (not string), please check your schema".format(
+            #                 qid, image_id, rank + 1
+            #             )
+            #         )
             # Check whether there are duplicate predicted products for a single text
             if len(set(image_ids)) != k:
                 raise Exception(
@@ -120,12 +122,20 @@ def report_score(r1, r5, r10, out_p):
 
 
 def read_reference(path):
-    fin = open(path, encoding="utf-8")
-    reference = dict()
-    for line in fin:
-        line = line.strip()
-        obj = json.loads(line)
-        reference[obj["text_id"]] = obj["image_ids"]
+    if path[-4:] == ".csv":
+        reference = dict()
+        data = pandas.read_csv(path)
+        for i in range(len(data)):
+            line = data.iloc[i, 3]
+            line = line.strip()
+            reference[data.iloc[i, 2]] = data.iloc[i, 5]
+    elif path[-6:] == ".jsonl":
+        fin = open(path, encoding="utf-8")
+        reference = dict()
+        for line in fin:
+            line = line.strip()
+            obj = json.loads(line)
+            reference[obj["text_id"]] = obj["image_ids"]
     return reference
 
 
@@ -178,7 +188,10 @@ if __name__ == "__main__":
         # Compute score for each text
         r1_stat, r5_stat, r10_stat = 0, 0, 0
         for qid in reference.keys():
-            ground_truth_ids = set(reference[qid])
+            if type(reference[qid]) == str:
+                ground_truth_ids = set([reference[qid]])
+            elif type(reference[qid]) == int:
+                ground_truth_ids = set(reference[qid])
             top10_pred_ids = predictions[qid]
             if any([idx in top10_pred_ids[:1] for idx in ground_truth_ids]):
                 r1_stat += 1
