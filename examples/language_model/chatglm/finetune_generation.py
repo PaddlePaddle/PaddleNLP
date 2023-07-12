@@ -168,14 +168,14 @@ def main():
         if model_args.qat_type == "A8W8":
             activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
             # activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
-            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype=dtype)
+            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype="float32")
         elif model_args.qat_type == "W4":
             activation = None
-            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype=dtype)
+            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
         elif model_args.qat_type == "A8W4":
             activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
             # activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
-            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype=dtype)
+            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
         else:
             raise ValueError("qat_type should be one of ['A8W8', 'W4', 'A8W4']")
 
