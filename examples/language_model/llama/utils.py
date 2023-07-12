@@ -228,9 +228,6 @@ def compute_metrics_not_do_generation(eval_preds):
     flattened_labels = np.array(eval_preds.label_ids).flatten()
     filtered_preds = flattened_preds[flattened_labels != -100]
     filtered_labels = flattened_labels[flattened_labels != -100]
-    import pdb
-
-    pdb.set_trace()
     accuracy = accuracy_score(y_true=filtered_labels, y_pred=filtered_preds)
     return {
         "accuracy": accuracy,
