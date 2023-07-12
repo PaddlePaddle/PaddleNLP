@@ -14,10 +14,7 @@
 # limitations under the License.
 
 import unittest
-import os
-import numpy as np
-import paddle
-from parameterized import parameterized_class, parameterized
+from parameterized import parameterized_class
 
 from paddlenlp.transformers.rw.modeling import (
     RWModel,
@@ -25,7 +22,6 @@ from paddlenlp.transformers.rw.modeling import (
 )
 from paddlenlp.transformers.rw.configuration import RWConfig
 from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
-from ...testing_utils import require_package, slow
 
 class RWModelTester:
     def __init__(

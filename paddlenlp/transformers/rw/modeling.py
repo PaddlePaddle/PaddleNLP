@@ -26,7 +26,6 @@ from typing import Optional, Tuple, Union, List
 
 from .. import PretrainedModel
 from ...utils.converter import StateDictNameMapping, init_name_mappings
-from paddlenlp.utils.log import logger
 
 from .configuration import (
     RWConfig,
@@ -510,7 +509,7 @@ class RWPreTrainedModel(PretrainedModel):
         if config.architectures is not None and "RWModel" not in config.architectures:
             for mapping in mappings:
                 mapping[0] = "transformer." + mapping[0]
-                if len(mapping) > 1 and mapping[1] != None:
+                if len(mapping) > 1 and mapping[1] is not None:
                     mapping[1] = "transformer." + mapping[1]
 
         if config.architectures is not None:

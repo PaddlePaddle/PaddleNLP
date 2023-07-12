@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ...utils.log import logger
 from ..configuration_utils import PretrainedConfig
 
 RW_PRETRAINED_INIT_CONFIGURATION = {
     "model_state": {
         "tiiuae/falcon-7b": "https://bj.bcebos.com/paddlenlp/models/community/tiiuae/falcon-7b/model_state.pdparams",
+        "tiiuae/falcon-7b-instruct": "https://bj.bcebos.com/paddlenlp/models/community/tiiuae/falcon-7b-instruct/model_state.pdparams",
     },
 }
 
