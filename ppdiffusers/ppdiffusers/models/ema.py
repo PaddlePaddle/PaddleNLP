@@ -86,7 +86,7 @@ class LitEma(nn.Layer):
           parameters: Iterable of `EagerParamBase`; the parameters to be
             temporarily stored.
         """
-        self.collected_params = [param.clone() for param in parameters]
+        self.collected_params = [param.detach().cpu().clone() for param in parameters]
 
     def restore(self, parameters):
         """
@@ -101,3 +101,4 @@ class LitEma(nn.Layer):
         """
         for c_param, param in zip(self.collected_params, parameters):
             param.copy_(c_param, True)
+        self.collected_params = None
