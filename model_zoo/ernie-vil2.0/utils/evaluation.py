@@ -22,8 +22,6 @@ import json
 import os
 import sys
 
-import pandas
-
 NUM_K = 10
 
 
@@ -122,20 +120,12 @@ def report_score(r1, r5, r10, out_p):
 
 
 def read_reference(path):
-    if path[-4:] == ".csv":
-        reference = dict()
-        data = pandas.read_csv(path)
-        for i in range(len(data)):
-            line = data.iloc[i, 3]
-            line = line.strip()
-            reference[data.iloc[i, 2]] = data.iloc[i, 5]
-    elif path[-6:] == ".jsonl":
-        fin = open(path, encoding="utf-8")
-        reference = dict()
-        for line in fin:
-            line = line.strip()
-            obj = json.loads(line)
-            reference[obj["text_id"]] = obj["image_ids"]
+    fin = open(path, encoding="utf-8")
+    reference = dict()
+    for line in fin:
+        line = line.strip()
+        obj = json.loads(line)
+        reference[obj["text_id"]] = obj["image_ids"]
     return reference
 
 
@@ -179,6 +169,9 @@ if __name__ == "__main__":
 
     try:
         # Read ground-truth
+        import pdb
+
+        pdb.set_trace()
         reference = read_reference(standard_path)
 
         # Read predictions
@@ -188,10 +181,7 @@ if __name__ == "__main__":
         # Compute score for each text
         r1_stat, r5_stat, r10_stat = 0, 0, 0
         for qid in reference.keys():
-            if type(reference[qid]) == str:
-                ground_truth_ids = set([reference[qid]])
-            elif type(reference[qid]) == int:
-                ground_truth_ids = set(reference[qid])
+            ground_truth_ids = set(reference[qid])
             top10_pred_ids = predictions[qid]
             if any([idx in top10_pred_ids[:1] for idx in ground_truth_ids]):
                 r1_stat += 1

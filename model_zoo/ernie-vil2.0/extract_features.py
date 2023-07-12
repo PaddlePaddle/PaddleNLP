@@ -55,13 +55,7 @@ def main():
         my_collate = DataCollatorWithPadding(tokenizer)
         text_loader = DataLoader(eval_dataset, collate_fn=my_collate, batch_size=args.text_batch_size)
         print("Make inference for texts...")
-        if args.text_feat_output_path is None:
-            if args.text_data[-4:] == ".csv":
-                args.text_feat_output_path = "{}_texts.txt_feat.jsonl".format(
-                    args.text_data[:-4].replace("_updata", "")
-                )
-            else:
-                args.text_feat_output_path = "{}.txt_feat.jsonl".format(args.text_data[:-6])
+        args.text_feat_output_path = "{}.txt_feat.jsonl".format(args.text_data[:-6])
         write_cnt = 0
         with open(args.text_feat_output_path, "w") as fout:
             model.eval()
@@ -82,15 +76,7 @@ def main():
         print("Make inference for images...")
         if args.image_feat_output_path is None:
             # by default, we store the image features under the same directory with the text features
-            print(args.text_data)
-            if args.text_data[-4:] == ".csv":
-                args.image_feat_output_path = "{}.img_feat.jsonl".format(
-                    args.text_data.replace("_updata", "").replace(".csv", "_imgs")
-                )
-            else:
-                args.image_feat_output_path = "{}.img_feat.jsonl".format(
-                    args.text_data.replace("_texts.jsonl", "_imgs")
-                )
+            args.image_feat_output_path = "{}.img_feat.jsonl".format(args.text_data.replace("_texts.jsonl", "_imgs"))
         write_cnt = 0
         with open(args.image_feat_output_path, "w") as fout:
             model.eval()
