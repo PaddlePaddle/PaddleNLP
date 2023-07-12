@@ -22,6 +22,7 @@ compared with TSV and Jsonl data files.
 import argparse
 import base64
 import json
+import logging
 import os
 import random
 from collections import defaultdict
@@ -86,6 +87,11 @@ parser.add_argument(
     help="the directory which stores the images['png','jpg','JPG']",
 )
 args = parser.parse_args()
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s -%(module)s:  %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S %p",
+    level=10,
+)
 # yapf: enable
 if __name__ == "__main__":
     assert os.path.isdir(args.data_dir), "The data_dir does not exist! Please check the input args..."
@@ -130,7 +136,6 @@ if __name__ == "__main__":
             caption_paths = [path for path in paths if path.split("/")[-1][:-4] in iid2photo]
         else:
             caption_paths = [path for path in paths if path.split("/")[-1] in iid2photo]
-        # jsonl文件包含的图片不存在
         invalid_photo = [path for path in iid2photo if path not in [i.split("/")[-1] for i in caption_paths]]
         bs = []
         for path in tqdm(caption_paths):
@@ -148,6 +153,7 @@ if __name__ == "__main__":
                 writer.write_table(table)
         if split in ["valid", "test"]:
             if len(invalid_photo) > 0:
+                logging.info("The jsonl file contains invalid images")
                 data_valid = []
                 with open(txt_path, "r", encoding="utf-8") as fin_pairs:
                     for line in fin_pairs:

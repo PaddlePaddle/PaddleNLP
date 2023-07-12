@@ -55,7 +55,8 @@ def main():
         my_collate = DataCollatorWithPadding(tokenizer)
         text_loader = DataLoader(eval_dataset, collate_fn=my_collate, batch_size=args.text_batch_size)
         print("Make inference for texts...")
-        args.text_feat_output_path = "{}.txt_feat.jsonl".format(args.text_data[:-6])
+        if args.text_feat_output_path is None:
+            args.text_feat_output_path = "{}.txt_feat.jsonl".format(args.text_data[:-6])
         write_cnt = 0
         with open(args.text_feat_output_path, "w") as fout:
             model.eval()
