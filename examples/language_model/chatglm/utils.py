@@ -69,7 +69,9 @@ class ChatGLMTrainer(Trainer):
         model.eval()
         with paddle.no_grad():
             generated_tokens = model.generate(
-                **inputs,
+                input_ids=inputs["input_ids"],
+                attention_mask=inputs["attention_mask"] if "attention_mask" in inputs else None,
+                position_ids=inputs["position_ids"] if "position_ids" in inputs else None,
                 **self._gen_kwargs.copy(),
                 decode_strategy="sampling",
                 top_k=1,
