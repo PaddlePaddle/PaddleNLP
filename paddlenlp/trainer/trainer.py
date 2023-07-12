@@ -436,10 +436,7 @@ class Trainer:
             if self.args.bf16:
                 state_dict = self.recover_params_from_master_weights(state_dict)
         else:
-            if self.args.dataset_rank == 0:
-                state_dict = self.load_one_state_dict_from_checkpoint(resume_from_checkpoint, self.args.old_weight_name_suffix)
-            else:
-                logger.info(f"not loading ckpt :{self.args.dataset_rank}")
+            state_dict = self.load_one_state_dict_from_checkpoint(resume_from_checkpoint, self.args.old_weight_name_suffix)
 
         # If the model is on the GPU, it still works!
         if state_dict is not None:
