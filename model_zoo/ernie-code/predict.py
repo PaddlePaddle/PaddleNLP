@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import argparse
+
 import numpy as np
 import paddle
 
@@ -58,7 +58,6 @@ def predict():
         "length_penalty": 0,
         "min_length": 0,
     }
-    print(model_inputs)
     generated_tokens, _ = model.generate(
         paddle.to_tensor(np.array(model_inputs["input_ids"]).reshape(1, -1).astype("int64")),
         attention_mask=paddle.to_tensor(np.array(model_inputs["attention_mask"]).reshape(1, -1).astype("int64")),
