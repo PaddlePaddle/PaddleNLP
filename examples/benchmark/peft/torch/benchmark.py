@@ -17,6 +17,8 @@ from typing import Optional
 
 from datasets import load_dataset
 from peft import LoraConfig, TaskType, get_peft_model
+import torch
+import torch.profiler as profiler
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -24,8 +26,11 @@ from transformers import (
     LlamaTokenizer,
     HfArgumentParser,
     TrainingArguments,
+    AutoModel,
 )
-from utils import CustomTrainer
+import numpy as np
+from utils import CustomTrainer, ProfilerCallback
+
 
 """
 单卡
@@ -54,17 +59,30 @@ class ModelArguments:
     model_name_or_path: str = field(default=None, metadata={"help": "model name or local path"})
     lora: Optional[bool] = field(default=False, metadata={"help": "whether to use LoRA"})
     english: Optional[bool] = field(default=False, metadata={"help": "whether to english benchmark dataset"})
+    profiler: Optional[bool] = field(default=False, metadata={"help": "whether to use profiler"})
 
 
 def main():
     parser = HfArgumentParser((ModelArguments, TrainingArguments))
     model_args, training_args = parser.parse_args_into_dataclasses()
+
     if "llama" in model_args.model_name_or_path:
-        tokenizer = LlamaTokenizer.from_pretrained(model_args.model_name_or_path)
+        tokenizer = LlamaTokenizer.from_pretrained(model_args.model_name_or_path,
+                                                    use_fast=False)
         tokenizer.pad_token_id = 0
+    elif "chatglm" in model_args.model_name_or_path:
+        tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
     else:
         tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path)
+
+    if 'chatglm' in model_args.model_name_or_path:
+        # Add empty_init=False for zero3 training, refer to https://github.com/THUDM/ChatGLM-6B/issues/530
+        model = AutoModel.from_pretrained(model_args.model_name_or_path, 
+                                        empty_init=False if training_args.deepspeed is not None else True,
+                                        trust_remote_code=True, torch_dtype="auto")
+       
+    else:
+        model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path, torch_dtype="auto")
 
     if model_args.lora:
         if "llama" in model_args.model_name_or_path:
@@ -95,11 +113,12 @@ def main():
             inputs += example["input"]
         targets = example["output"]
         model_inputs = tokenizer(inputs, max_length=max_src_length, truncation=True, return_attention_mask=False)
+        
         labels = tokenizer(targets, max_length=max_tgt_length, truncation=True, return_attention_mask=False)
         labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
+        
         model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
-
         return model_inputs
 
     
@@ -107,6 +126,7 @@ def main():
         dataset = load_dataset("tatsu-lab/alpaca")
     else:
         dataset = load_dataset("Chinese-Vicuna/guanaco_belle_merge_v1.0")
+
     # select first 10k examples for benchmarking
     dataset = dataset["train"].select(range(10000))
     dataset = dataset.map(
@@ -114,9 +134,29 @@ def main():
     )
     total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
 
+
+
+    if model_args.profiler:
+        prof = profiler.profile(
+                activities=[
+                    torch.profiler.ProfilerActivity.CPU,
+                    torch.profiler.ProfilerActivity.CUDA,
+                ],
+                schedule=torch.profiler.schedule(
+                    wait=1,
+                    warmup=1,
+                    active=2,
+                    repeat=1),
+                on_trace_ready=torch.profiler.tensorboard_trace_handler('hf-training-trainer'),
+                profile_memory=True,
+                with_stack=True,
+            )
+
     trainer = CustomTrainer(
         model=model,
+        tokenizer=tokenizer, 
         train_dataset=dataset,
+        callbacks=[ProfilerCallback(prof=prof)] if model_args.profiler else [],
         args=training_args,
         data_collator=DataCollatorForSeq2Seq(return_tensors="pt", tokenizer=tokenizer),
     )

@@ -27,7 +27,6 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
     t2i_record = dict()
-
     with open(args.input, "r", encoding="utf-8") as fin:
         for line in tqdm(fin):
             obj = json.loads(line.strip())
