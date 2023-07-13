@@ -574,6 +574,30 @@ class Trainer:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
         return resume_from_checkpoint
 
+    def _load_check_point(self, resume_from_checkpoint, delay_optimizer_creation, max_steps):
+        # Check if saved optimizer or scheduler states exist
+        self._load_optimizer_and_scheduler(resume_from_checkpoint)
+        self.load_state_dict_from_checkpoint(resume_from_checkpoint)
+        model = self._wrap_model(self.model_wrapped)
+        # for the rest of this function `model` is the outside model, whether it was wrapped or not
+        if model is not self.model:
+            self.model_wrapped = model
+        if delay_optimizer_creation:
+            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+        return model
+
+    def _load_sharded_check_point(self, resume_from_checkpoint, delay_optimizer_creation, max_steps):
+        model = self._wrap_model(self.model_wrapped)
+        # for the rest of this function `model` is the outside model, whether it was wrapped or not
+        if model is not self.model:
+            self.model_wrapped = model
+        if delay_optimizer_creation:
+            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+        # Check if saved optimizer or scheduler states exist
+        self._load_optimizer_and_scheduler(resume_from_checkpoint)
+        self.load_state_dict_from_checkpoint(resume_from_checkpoint)
+        return model
+
     def train(
         self,
         resume_from_checkpoint: Optional[Union[str, bool]] = None,
@@ -642,25 +666,15 @@ class Trainer:
         #     and ShardingOption.SHARD_OP in self.args.sharding
         # )
         delay_optimizer_creation = False
-
         if not delay_optimizer_creation:
             self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
         self.state = TrainerState()
 
-        # Check if saved optimizer or scheduler states exist
-        self._load_optimizer_and_scheduler(resume_from_checkpoint)
-
-        self.load_state_dict_from_checkpoint(resume_from_checkpoint)
-
-        model = self._wrap_model(self.model_wrapped)
-
-        # for the rest of this function `model` is the outside model, whether it was wrapped or not
-        if model is not self.model:
-            self.model_wrapped = model
-
-        if delay_optimizer_creation:
-            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+        if self.args.load_sharding_stage1_model:
+            model = self._load_sharded_check_point(resume_from_checkpoint, delay_optimizer_creation, max_steps)
+        else:
+            model = self._load_check_point(resume_from_checkpoint, delay_optimizer_creation, max_steps)
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples}")
