@@ -34,7 +34,7 @@ class ChatGLMv2Tester:
         seq_length=10,
         batch_size=2,
         vocab_size=123,
-        kv_channels=16,
+        kv_channels=4,
         hidden_size=8,
         ffn_hidden_size=8,
         num_attention_heads=2,

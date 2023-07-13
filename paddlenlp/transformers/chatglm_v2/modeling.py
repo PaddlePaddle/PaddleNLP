@@ -215,12 +215,12 @@ class SelfAttention(nn.Layer):
     def __init__(self, config: ChatGLMv2Config, layer_number, device=None):
         super(SelfAttention, self).__init__()
         self.layer_number = max(1, layer_number)
-
-        self.projection_size = config.kv_channels * config.num_attention_heads
+        assert (
+            config.kv_channels * config.num_attention_heads == config.hidden_size
+        ), "`kv_channels` * `num_attention_heads` must equal to `hidden_size`"
 
         # Per attention head and per partition values.
-        self.hidden_size_per_attention_head = self.projection_size // config.num_attention_heads
-        self.multi_query_attention = config.multi_query_attention
+        self.hidden_size_per_attention_head = config.hidden_size // config.num_attention_heads
         self.core_attention = CoreAttention(config, self.layer_number)
         self.num_multi_query_groups_per_partition = config.multi_query_group_num
 
@@ -246,23 +246,33 @@ class SelfAttention(nn.Layer):
                 config.hidden_size,
                 bias_attr=config.add_bias_linear or config.add_qkv_bias,
             )
-            self.dense = nn.Linear(self.projection_size, config.hidden_size, bias_attr=config.add_bias_linear)
+            self.dense = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=config.add_bias_linear)
             self.num_attention_heads_per_partition = config.num_attention_heads
-            self.num_multi_query_groups_per_partition = config.multi_query_group_num
 
         self.key = nn.Linear(
-            self.projection_size,
+            config.hidden_size,
             self.hidden_size_per_attention_head * config.multi_query_group_num,
             bias_attr=config.add_qkv_bias,
         )
         self.value = nn.Linear(
-            self.projection_size,
+            config.hidden_size,
             self.hidden_size_per_attention_head * config.multi_query_group_num,
             bias_attr=config.add_qkv_bias,
         )
 
     def assign_kv_heads(self, num_kv_heads, num_gpus):
         # Initialize the assignment list
+        """
+        Assign kv heads to different GPUs in the Tensor Parallel Setup
+
+        Examples:
+            assign_kv_heads(num_kv_heads=1, num_gpus=2): [[0], [0]]
+            assign_kv_heads(num_kv_heads=2, num_gpus=2): [[0], [1]]
+            assign_kv_heads(num_kv_heads=4, num_gpus=2): [[0,1], [2,3]]
+            assign_kv_heads(num_kv_heads=1, num_gpus=4): [[0],[0],[0],[0]]
+            assign_kv_heads(num_kv_heads=2, num_gpus=4): [[0],[0],[1],[1]]
+            assign_kv_heads(num_kv_heads=4, num_gpus=4): [[0],[1],[2],[3]]
+        """
         assignment_list = [[] for _ in range(num_gpus)]
         # Case 1: more heads than cards
         if num_kv_heads > num_gpus:
