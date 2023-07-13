@@ -56,7 +56,7 @@ class ChatGLMv2Tester:
         self.use_cache = use_cache
 
     def prepare_config_and_inputs(self):
-        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
+        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size, dtype="int64")
 
         labels = None
         context_length = self.seq_length // 2
@@ -93,7 +93,7 @@ class ChatGLMv2Tester:
         outputs = model(input_ids, return_dict=self.parent.return_dict)
         past_key_values = outputs.past_key_values[0] if self.parent.return_dict else outputs[1][0]
 
-        next_tokens = ids_tensor([self.batch_size, 3], self.vocab_size)
+        next_tokens = ids_tensor([self.batch_size, 3], self.vocab_size, dtype="int64")
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
         next_attention_mask = model.get_masks(next_input_ids)
 
@@ -109,7 +109,7 @@ class ChatGLMv2Tester:
         output_from_past = outputs.past_key_values[0] if self.parent.return_dict else outputs[1][0]
 
         # select random slice
-        random_slice_idx = ids_tensor((1,), output_from_past.shape[-1]).item()
+        random_slice_idx = ids_tensor((1,), output_from_past.shape[-1], dtype="int64").item()
         output_from_no_past_slice = output_from_no_past[:, -3:, random_slice_idx].detach()
         output_from_past_slice = output_from_past[:, :, random_slice_idx].detach()
 
@@ -177,6 +177,7 @@ class ChatGLMv2Test(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
 
         input_ids = inputs_dict[self.input_name]
+        print(input_ids)
         attention_mask = paddle.ones_like(input_ids)
 
         max_batch_size = 2
