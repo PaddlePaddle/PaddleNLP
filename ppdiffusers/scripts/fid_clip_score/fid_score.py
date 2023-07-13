@@ -255,7 +255,7 @@ def compute_statistics_of_path(path, model, batch_size, dims, num_workers=1, res
         files = sorted([file for ext in IMAGE_EXTENSIONS for file in path.glob("*.{}".format(ext))])
         FLAG_IMAGE_NUM = os.getenv("FLAG_IMAGE_NUM", None)
         if FLAG_IMAGE_NUM is not None:
-            files = files[:FLAG_IMAGE_NUM]
+            files = files[: int(FLAG_IMAGE_NUM)]
         m, s = calculate_activation_statistics(files, model, batch_size, dims, num_workers, resolution=resolution)
 
     return m, s
