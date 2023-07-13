@@ -1774,6 +1774,7 @@ class Trainer:
                 state[k] = v
             for (k, v) in optimizer_state_dict.items():
                 state[k] = v
+            return state
 
         if self.args.use_hybrid_parallel:
             if self.dp_group.rank <= 0:
