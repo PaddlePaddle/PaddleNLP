@@ -704,7 +704,7 @@ class Trainer:
             else:
                 steps_trained_in_current_epoch = 0
             # save right away
-            self._save_checkpoint(model)
+            self._save_checkpoint(self.model)
             logger.info("  Continuing training from checkpoint, will skip to saved global_step")
             logger.info(f"  Continuing training from epoch {epochs_trained}")
             logger.info(f"  Continuing training from global step {self.state.global_step}")
