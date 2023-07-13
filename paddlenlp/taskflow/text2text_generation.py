@@ -164,18 +164,29 @@ class ChatGLMTask(Task):
                     import numpy as np
 
                     pre_caches_numpy = kwargs.get("pre_caches_numpy", None)
+
                     if pre_caches_numpy is None:
-                        raise Exception("prefix numpy sholud be provided")
-                    pre_caches = np.split(pre_caches_numpy, 28)
-                    for i in range(28):
-                        tokenized_output["pre_cache_{}".format(i)] = (
-                            pre_caches[i].transpose(1, 0, 2, 3, 4).astype("float16")
-                        )
+                        # raise Exception("prefix numpy sholud be provided")
+                        use_pre_caches = False
+                        print("prefix numpy sholud be provided")
+                        for i in range(28):
+                            tokenized_output["pre_cache_{}".format(i)] = np.ones([1]).astype("float16")
+
+                    else:
+                        use_pre_caches = True
+                        pre_caches = np.split(pre_caches_numpy, 28)
+                        for i in range(28):
+                            tokenized_output["pre_cache_{}".format(i)] = (
+                                pre_caches[i].transpose(1, 0, 2, 3, 4).astype("float16")
+                            )
+
+                    tokenized_output["use_pre_caches"] = np.array([use_pre_caches])
                     input_ids_shape = tokenized_output["input_ids"].shape
                     prefix_attention_mask = np.zeros([input_ids_shape[0], 1, input_ids_shape[-1], 64], dtype="int64")
-                    tokenized_output["attention_mask"] = np.concatenate(
-                        (prefix_attention_mask, tokenized_output["attention_mask"]), axis=3
-                    )
+                    if use_pre_caches:
+                        tokenized_output["attention_mask"] = np.concatenate(
+                            (prefix_attention_mask, tokenized_output["attention_mask"]), axis=3
+                        )
 
             else:
                 tokenized_output = self._tokenizer(
