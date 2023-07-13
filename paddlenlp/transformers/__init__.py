@@ -247,6 +247,9 @@ from .blip_2.processing import *
 from .chatglm.configuration import *
 from .chatglm.modeling import *
 from .chatglm.tokenizer import *
+from .chatglm_v2.configuration import *
+from .chatglm_v2.modeling import *
+from .chatglm_v2.tokenizer import *
 from .speecht5.configuration import *
 from .speecht5.modeling import *
 from .speecht5.tokenizer import *
@@ -264,6 +267,9 @@ from .visualglm.modeling import *
 from .visualglm.configuration import *
 from .visualglm.processing import *
 from .visualglm.image_processing import *
+from .rw.modeling import *
+from .rw.configuration import *
+from .rw.tokenizer import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available

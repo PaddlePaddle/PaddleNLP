@@ -88,72 +88,96 @@ python -u  -m paddle.distributed.launch \
 ```shell
 python -u  -m paddle.distributed.fleet.launch \
     --gpus "0,1,2,3" finetune_generation.py \
-    --model_name_or_path facebook/llama-7b \
-    --do_train \
-    --do_eval \
-    --num_train_epochs 1 \
-    --per_device_train_batch_size 4 \
-    --per_device_eval_batch_size 4 \
-    --tensor_parallel_degree 4 \
-    --overwrite_output_dir \
     --output_dir ./checkpoints/ \
-    --logging_steps 10 \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 2 \
+    --per_device_eval_batch_size 8 \
+    --model_name_or_path facebook/llama-7b \
+    --task_name squad \
+    --num_train_epochs 2 \
+    --learning_rate 3e-5 \
+    --warmup_steps 30 \
+    --logging_steps 1 \
+    --evaluation_strategy epoch \
+    --save_strategy epoch \
+    --src_length 1024 \
+    --tgt_length 1024 \
     --fp16 \
     --fp16_opt_level O2 \
-    --gradient_accumulation_steps 32 \
+    --do_train \
+    --do_eval \
+    --disable_tqdm True \
+    --load_best_model_at_end True \
+    --metric_for_best_model accuracy \
+    --eval_with_do_generation False \
     --recompute \
-    --learning_rate 3e-5 \
-    --lr_scheduler_type linear \
-    --max_grad_norm 1.0 \
-    --warmup_steps 20
+    --save_total_limit 1 \
+    --overwrite_output_dir \
+    --tensor_parallel_degree 4
 ```
 
 ### 单卡LoRA微调
 
 ```shell
 python finetune_generation.py \
-    --model_name_or_path facebook/llama-7b \
-    --do_train \
-    --do_eval \
-    --num_train_epochs 2 \
-    --per_device_train_batch_size 4 \
-    --per_device_eval_batch_size 4 \
-    --overwrite_output_dir \
     --output_dir ./checkpoints/ \
-    --logging_steps 10 \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 2 \
+    --per_device_eval_batch_size 8 \
+    --model_name_or_path facebook/llama-7b \
+    --task_name squad \
+    --num_train_epochs 2 \
+    --learning_rate 3e-4 \
+    --warmup_steps 30 \
+    --logging_steps 1 \
+    --evaluation_strategy epoch \
+    --save_strategy epoch \
+    --src_length 1024 \
+    --tgt_length 1024 \
     --fp16 \
     --fp16_opt_level O2 \
-    --gradient_accumulation_steps 4 \
+    --do_train \
+    --do_eval \
+    --disable_tqdm True \
+    --load_best_model_at_end True \
+    --metric_for_best_model accuracy \
+    --eval_with_do_generation False \
     --recompute \
-    --learning_rate 3e-4 \
-    --lr_scheduler_type linear \
-    --max_grad_norm 1.0 \
-    --warmup_steps 20 \
+    --save_total_limit 1 \
+    --overwrite_output_dir \
     --lora True \
-    --r 8
+    --lora_rank 8
 ```
 
 ### 单卡Prefix微调
 
 ```shell
 python finetune_generation.py \
-    --model_name_or_path facebook/llama-7b \
-    --do_train \
-    --do_eval \
-    --num_train_epochs 2 \
-    --per_device_train_batch_size 4 \
-    --per_device_eval_batch_size 4 \
-    --overwrite_output_dir \
     --output_dir ./checkpoints/ \
-    --logging_steps 10 \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 2 \
+    --per_device_eval_batch_size 8 \
+    --model_name_or_path facebook/llama-7b \
+    --task_name squad \
+    --num_train_epochs 2 \
+    --learning_rate 3e-5 \
+    --warmup_steps 30 \
+    --logging_steps 1 \
+    --evaluation_strategy epoch \
+    --save_strategy epoch \
+    --src_length 1024 \
+    --tgt_length 1024 \
     --fp16 \
     --fp16_opt_level O2 \
-    --gradient_accumulation_steps 4 \
+    --do_train \
+    --do_eval \
+    --disable_tqdm True \
+    --load_best_model_at_end True \
+    --metric_for_best_model accuracy \
+    --eval_with_do_generation False \
     --recompute \
-    --learning_rate 3e-2 \
-    --lr_scheduler_type linear \
-    --max_grad_norm 1.0 \
-    --warmup_steps 20 \
+    --save_total_limit 1 \
+    --overwrite_output_dir \
     --prefix_tuning True \
     --num_prefix_tokens 64
 ```
@@ -180,12 +204,18 @@ python finetune_generation.py \
 - `do_train`: 是否训练模型。
 - `do_eval`: 是否评估模型。
 - `tensor_parallel_degree`: 模型并行数量。
-- `do_generation`: 在评估的时候是否调用model.generate,默认为False。
+- `eval_with_do_generation`: 在评估的时候是否调用model.generate,默认为False。
 - `lora`: 是否使用LoRA技术。
-- `prefix_tuning`: 是否使用Prefix技术。
 - `merge_weights`: 是否合并原始模型和Lora模型的权重。
-- `r`: lora 算法中rank（秩）的值。
+- `lora_rank`: lora 算法中rank（秩）的值，默认为8。
+- `lora_path`: lora参数和配置路径，对lora参数进行初始化。
+- `qat`: 是否使用qat对模型进行量化
+- `qat_type`: qat量化类型，支持A8W8, W4, A8W4。默认为A8W8。
+- `prefix_tuning`: 是否使用Prefix技术。
 - `num_prefix_tokens`: prefix tuning算法中前缀token数量。
+- `task_name`: 内置数据集任务名
+- `data_name`: 内置数据集名，定义数据集名必须同时定义数据集任务名
+- `dataset_path`: 自定义数据集路径。
 
 ## 流水线并行
 ```shell
@@ -211,32 +241,6 @@ python -u  -m paddle.distributed.launch \
     --fp16 0\
     --fp16_opt_level O2 \
     --recompute 0 \
-    --learning_rate 3e-5 \
-    --lr_scheduler_type linear \
-    --max_grad_norm 1.0 \
-    --warmup_steps 20
-```
-
-## 指令微调
-
-```shell
-python -u  -m paddle.distributed.fleet.launch \
-    --gpus "0,1,2,3" finetune_generation.py \
-    --model_name_or_path facebook/llama-7b \
-    --do_train \
-    --do_eval \
-    --instruction_generation \
-    --num_train_epochs 1 \
-    --per_device_train_batch_size 4 \
-    --per_device_eval_batch_size 4 \
-    --tensor_parallel_degree 4 \
-    --overwrite_output_dir \
-    --output_dir ./checkpoints/ \
-    --logging_steps 10 \
-    --fp16 \
-    --fp16_opt_level O2 \
-    --gradient_accumulation_steps 32 \
-    --recompute \
     --learning_rate 3e-5 \
     --lr_scheduler_type linear \
     --max_grad_norm 1.0 \
@@ -344,3 +348,4 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" server.py \
     --flask_port 8011 \
     --src_length 100
 ```
+python predict_generation.py --model_name_or_path idea-ccnl/ziya-llama-13b-v1 --data_file /root/paddlejob/work/eb_data/hcg/dev.json
