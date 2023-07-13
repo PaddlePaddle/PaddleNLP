@@ -313,7 +313,7 @@ class UViTModel(ModelMixin, ConfigMixin):
         t_img: paddle.Tensor,
         t_text: paddle.Tensor,
         data_type: paddle.Tensor,
-        return_dict=False,  # TODO: nf
+        return_dict=True,
     ):
         _, _, H, W = img.shape
         # TODO junnyu, support float16
@@ -384,3 +384,162 @@ class UViTModel(ModelMixin, ConfigMixin):
             return (sample_img, sample_clip_img, sample_text)
 
         return UViTModelOutput(sample_img=sample_img, sample_clip_img=sample_clip_img, sample_text=sample_text)
+
+
+@dataclass
+class UViTModelT2IOutput(BaseOutput):
+    """
+    Args:
+        sample (`paddle.Tensor` of shape `(batch_size, num_channels, height, width)`):
+            Hidden states output. Output of last layer of model.
+    """
+
+    sample: paddle.Tensor
+
+
+class UViTModel_T2I(ModelMixin, ConfigMixin):
+    r"""
+    UViTModel_T2I is a simple version of U-ViT for text to image
+    """
+
+    @register_to_config
+    def __init__(
+        self,
+        sample_size=1,
+        img_size=32,
+        in_channels=4,
+        patch_size=2,
+        embed_dim=1152,
+        depth=28,
+        num_heads=16,
+        mlp_ratio=4.0,
+        qkv_bias=False,
+        qk_scale=None,
+        pos_drop_rate=0.0,
+        drop_rate=0.0,
+        attn_drop_rate=0.0,
+        norm_type="layer_norm",
+        clip_dim=768,
+        num_text_tokens=77,
+        conv=True,
+    ):
+        super().__init__()
+        self.sample_size = sample_size
+        self.in_channels = in_channels
+        self.patch_size = patch_size
+        self.embed_dim = embed_dim
+
+        self.img_size = (img_size, img_size) if isinstance(img_size, int) else img_size
+        self.patch_embed = PatchEmbed(
+            height=self.img_size[0],
+            width=self.img_size[1],
+            patch_size=patch_size,
+            in_channels=in_channels,
+            embed_dim=embed_dim,
+            add_pos_embed=False,
+        )
+        num_patches = (self.img_size[0] // patch_size) * (self.img_size[1] // patch_size)
+
+        self.context_embed = nn.Linear(clip_dim, embed_dim)
+        self.extras = 1 + num_text_tokens
+        self.pos_embed = self.create_parameter(
+            shape=(1, self.extras + num_patches, embed_dim),
+            default_initializer=nn.initializer.Constant(0.0),
+        )
+        assert norm_type == "layer_norm", "only support norm_type == layer_norm. "
+        norm_layer = nn.LayerNorm
+        self.pos_drop = nn.Dropout(p=pos_drop_rate)
+
+        self.in_blocks = nn.LayerList(
+            [
+                Block(
+                    dim=embed_dim,
+                    num_heads=num_heads,
+                    mlp_ratio=mlp_ratio,
+                    qkv_bias=qkv_bias,
+                    qk_scale=qk_scale,
+                    drop=drop_rate,
+                    attn_drop=attn_drop_rate,
+                    norm_layer=norm_layer,
+                )
+                for _ in range(depth // 2)
+            ]
+        )
+
+        self.mid_block = Block(
+            dim=embed_dim,
+            num_heads=num_heads,
+            mlp_ratio=mlp_ratio,
+            qkv_bias=qkv_bias,
+            qk_scale=qk_scale,
+            drop=drop_rate,
+            attn_drop=attn_drop_rate,
+            norm_layer=norm_layer,
+        )
+
+        self.out_blocks = nn.LayerList(
+            [
+                Block(
+                    dim=embed_dim,
+                    num_heads=num_heads,
+                    mlp_ratio=mlp_ratio,
+                    qkv_bias=qkv_bias,
+                    qk_scale=qk_scale,
+                    drop=drop_rate,
+                    attn_drop=attn_drop_rate,
+                    norm_layer=norm_layer,
+                    skip=True,
+                )
+                for _ in range(depth // 2)
+            ]
+        )
+
+        self.norm = norm_layer(embed_dim)
+        self.patch_dim = patch_size**2 * in_channels
+        self.decoder_pred = nn.Linear(embed_dim, self.patch_dim, bias_attr=True)
+        self.final_layer = nn.Conv2D(self.in_channels, self.in_channels, 3, padding=1) if conv else nn.Identity()
+
+    def forward(
+        self,
+        img: paddle.Tensor,
+        timesteps: paddle.Tensor,
+        context: paddle.Tensor,
+        return_dict=True,
+    ):
+        img = img.cast(self.dtype)
+        x = self.patch_embed(img)
+        B, L, D = x.shape
+
+        timesteps = timesteps.expand(
+            [
+                img.shape[0],
+            ]
+        )
+        time_token = get_timestep_embedding(timesteps, self.embed_dim, True, 0).unsqueeze(axis=1)
+        context_token = self.context_embed(context)
+        x = paddle.concat((time_token, context_token, x), 1)
+
+        x = x + self.pos_embed
+        x = self.pos_drop(x)
+        skips = []
+        for blk in self.in_blocks:
+            x = blk(x)
+            skips.append(x)
+
+        x = self.mid_block(x)
+
+        for blk in self.out_blocks:
+            x = blk(x, skips.pop())
+
+        x = self.norm(x)
+        x = self.decoder_pred(x)
+        assert x.shape[1] == self.extras + L
+
+        x = x[:, self.extras :, :]
+        x = unpatchify(x, self.in_channels)
+        x = self.final_layer(x)
+
+        if not return_dict:
+            return (x,)
+
+        return UViTModelT2IOutput(sample=x)

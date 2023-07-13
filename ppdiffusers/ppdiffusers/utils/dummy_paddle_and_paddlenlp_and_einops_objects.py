@@ -30,3 +30,18 @@ class UniDiffuserPipeline(metaclass=DummyObject):
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
         requires_backends(cls, ["paddle", "paddlenlp", "einops"])
+
+
+class UViTTextToImagePipeline(metaclass=DummyObject):
+    _backends = ["paddle", "paddlenlp", "einops"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle", "paddlenlp", "einops"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp", "einops"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp", "einops"])

@@ -13,15 +13,17 @@
 # limitations under the License.
 
 import base64
+import glob
 import gzip
 import io
 import json
+import os
 import random
 
 import numpy as np
 import paddle
 import paddle.distributed as dist
-from paddle.io import IterableDataset, get_worker_info
+from paddle.io import Dataset, IterableDataset, get_worker_info
 from paddle.vision import transforms
 from paddle.vision.transforms.transforms import _get_image_size
 from PIL import Image
@@ -234,3 +236,123 @@ def worker_init_fn(_):
             f"dataset {i}, local_rank: {local_rank}, worker_id: {worker_id}, worker_global_id: {worker_global_id}, file_range: ({begin_id}, {end_id})"
         )
     return np.random.seed(np.random.get_state()[1][0] + worker_id)
+
+
+class DatasetFactory(object):
+    # for COCO t2i
+
+    def __init__(self):
+        self.train = None
+        self.test = None
+
+    def get_split(self, split, labeled=False):
+        if split == "train":
+            dataset = self.train
+        elif split == "test":
+            dataset = self.test
+        else:
+            raise ValueError
+
+        if self.has_label:
+            return dataset  # if labeled else UnlabeledDataset(dataset)
+        else:
+            assert not labeled
+            return dataset
+
+    def unpreprocess(self, v):  # to B C H W and [0, 1]
+        v = 0.5 * (v + 1.0)
+        v.clamp_(0.0, 1.0)
+        return v
+
+    @property
+    def has_label(self):
+        return True
+
+    @property
+    def data_shape(self):
+        raise NotImplementedError
+
+    @property
+    def data_dim(self):
+        return int(np.prod(self.data_shape))
+
+    @property
+    def fid_stat(self):
+        return None
+
+    def sample_label(self, n_samples, device):
+        raise NotImplementedError
+
+    def label_prob(self, k):
+        raise NotImplementedError
+
+
+class CFGDataset(Dataset):
+    # for classifier free guidance
+
+    def __init__(self, dataset, p_uncond, empty_token):
+        self.dataset = dataset
+        self.p_uncond = p_uncond
+        self.empty_token = empty_token
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, item):
+        x, y = self.dataset[item]
+        if random.random() < self.p_uncond:
+            y = self.empty_token
+        return x, y
+
+
+def get_feature_dir_info(root):
+    files = glob.glob(os.path.join(root, "*.npy"))
+    files_caption = glob.glob(os.path.join(root, "*_*.npy"))
+    num_data = len(files) - len(files_caption)
+    n_captions = {k: 0 for k in range(num_data)}
+    for f in files_caption:
+        name = os.path.split(f)[-1]
+        k1, k2 = os.path.splitext(name)[0].split("_")
+        n_captions[int(k1)] += 1
+    return num_data, n_captions
+
+
+class MSCOCOFeatureDataset(Dataset):
+    # the image features are got through sample
+
+    def __init__(self, root):
+        self.root = root
+        self.num_data, self.n_captions = get_feature_dir_info(root)
+
+    def __len__(self):
+        return self.num_data
+
+    def __getitem__(self, index):
+        z = np.load(os.path.join(self.root, f"{index}.npy"))
+        k = random.randint(0, self.n_captions[index] - 1)
+        c = np.load(os.path.join(self.root, f"{index}_{k}.npy"))
+        return z, c
+
+
+class MSCOCO256Features(DatasetFactory):
+    # the moments calculated by Stable Diffusion image encoder & the contexts calculated by clip
+
+    def __init__(self, path="assets/datasets/coco256_features", cfg=True, p_uncond=0.1):
+        super().__init__()
+        print("Prepare dataset...")
+        self.train = MSCOCOFeatureDataset(os.path.join(path, "train"))
+        self.test = MSCOCOFeatureDataset(os.path.join(path, "val"))
+        assert len(self.train) == 82783
+        assert len(self.test) == 40504
+        print("Prepare dataset ok")
+
+        self.empty_context = np.load(os.path.join(path, "empty_context.npy"))
+
+        if cfg:  # classifier free guidance
+            assert p_uncond is not None
+            print(f"prepare the dataset for classifier free guidance with p_uncond={p_uncond}")
+            self.train = CFGDataset(self.train, p_uncond, self.empty_context)  # cfg
+
+    @property
+    def data_shape(self):
+        return 4, 32, 32

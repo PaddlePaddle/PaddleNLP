@@ -43,4 +43,4 @@ try:
 except OptionalDependencyNotAvailable:
     from ..utils.dummy_paddle_and_einops_objects import *  # noqa F403
 else:
-    from .uvit import UViTModel
+    from .uvit import UViTModel, UViTModel_T2I

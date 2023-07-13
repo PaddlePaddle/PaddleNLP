@@ -26,6 +26,7 @@ from ppdiffusers import (
     DDPMScheduler,
     LDMBertModel,
     UNet2DConditionModel,
+    UViTModel_T2I,
     is_ppxformers_available,
 )
 from ppdiffusers.models.attention import AttentionBlock
@@ -43,6 +44,7 @@ import json
 from paddlenlp.utils.log import logger
 from ppdiffusers.initializer import normal_, reset_initialized_parameter, zeros_
 from ppdiffusers.models.resnet import ResnetBlock2D
+from ppdiffusers.models.vae import DiagonalGaussianDistribution
 
 
 def read_json(file):
@@ -93,23 +95,32 @@ class LatentDiffusionModel(nn.Layer):
                     f"The tokenizer's model_max_length {self.tokenizer.model_max_length}, while the text encoder's max_position_embeddings is {max_position_embeddings}, we will use {self.tokenizer.model_max_length} as max_position_embeddings!"
                 )
                 text_encoder_config["max_position_embeddings"] = self.tokenizer.model_max_length
-            config = LDMBertConfig(**text_encoder_config)
-            self.text_encoder = LDMBertModel(config)
-            self.text_encoder_is_pretrained = False
-            # init unet2d
-            self.unet = UNet2DConditionModel(**read_json(model_args.unet_config_file))
+            if "unet" in model_args.unet_config_file:
+                config = LDMBertConfig(**text_encoder_config)
+                self.text_encoder = LDMBertModel(config)
+                self.text_encoder_is_pretrained = False
+                # init unet2d
+                self.unet = UNet2DConditionModel(**read_json(model_args.unet_config_file))
+                self.arch = "unet"
+            else:
+                self.unet = UViTModel_T2I(**read_json(model_args.unet_config_file))
+                self.arch = "uvit"
             self.unet_is_pretrained = False
         else:
-            # init text_encoder
-            self.text_encoder = LDMBertModel.from_pretrained(
-                model_args.pretrained_model_name_or_path, subfolder="bert"
-            )
-
-            self.text_encoder_is_pretrained = True
-            # init unet2d
-            self.unet = UNet2DConditionModel.from_pretrained(
-                model_args.pretrained_model_name_or_path, subfolder="unet"
-            )
+            if "unet" in model_args.unet_config_file:
+                # init text_encoder
+                self.text_encoder = LDMBertModel.from_pretrained(
+                    model_args.pretrained_model_name_or_path, subfolder="bert"
+                )
+                self.text_encoder_is_pretrained = True
+                # init unet2d
+                self.unet = UNet2DConditionModel.from_pretrained(
+                    model_args.pretrained_model_name_or_path, subfolder="unet"
+                )
+                self.arch = "unet"
+            else:
+                self.unet = UViTModel_T2I(**read_json(model_args.unet_config_file))
+                self.arch = "uvit"
             self.unet_is_pretrained = True
 
         assert model_args.prediction_type in ["epsilon", "v_prediction"]
@@ -135,7 +146,8 @@ class LatentDiffusionModel(nn.Layer):
                 prediction_type=self.prediction_type,
             )
             self.eval_scheduler.set_timesteps(model_args.num_inference_steps)
-        self.init_weights()
+        if self.arch == "unet":
+            self.init_weights()
         self.use_ema = model_args.use_ema
         self.noise_offset = model_args.noise_offset
         if self.use_ema:
@@ -152,7 +164,8 @@ class LatentDiffusionModel(nn.Layer):
 
         # make sure unet text_encoder in train mode, vae in eval mode
         self.unet.train()
-        self.text_encoder.train()
+        if self.arch == "unet":
+            self.text_encoder.train()
         self.vae.eval()
 
     def add_noise(
@@ -234,7 +247,10 @@ class LatentDiffusionModel(nn.Layer):
             # TODO add this
             # with paddle.amp.auto_cast(enable=False):
             self.vae.eval()
-            latents = self.vae.encode(pixel_values).latent_dist.sample()
+            if self.arch == "unet":
+                latents = self.vae.encode(pixel_values).latent_dist.sample()
+            else:
+                latents = DiagonalGaussianDistribution(pixel_values).sample()
             latents = latents * 0.18215
             noise = paddle.randn(latents.shape)
             if self.noise_offset:
@@ -247,8 +263,11 @@ class LatentDiffusionModel(nn.Layer):
             )
             noisy_latents = self.add_noise(latents, noise, timesteps)
 
-        encoder_hidden_states = self.text_encoder(input_ids)[0]
-        noise_pred = self.unet(noisy_latents, timesteps, encoder_hidden_states).sample
+        if self.arch == "unet":
+            encoder_hidden_states = self.text_encoder(input_ids)[0]
+            noise_pred = self.unet(noisy_latents, timesteps, encoder_hidden_states).sample
+        else:
+            noise_pred = self.unet(noisy_latents, timesteps, input_ids)
 
         # Get the target for loss depending on the prediction type
         if self.prediction_type == "epsilon":
@@ -265,9 +284,12 @@ class LatentDiffusionModel(nn.Layer):
     @paddle.no_grad()
     def decode_image(self, pixel_values=None, **kwargs):
         self.eval()
-        if pixel_values.shape[0] > 8:
-            pixel_values = pixel_values[:8]
-        latents = self.vae.encode(pixel_values).latent_dist.sample()
+        if self.arch == "unet":
+            if pixel_values.shape[0] > 8:
+                pixel_values = pixel_values[:8]
+            latents = self.vae.encode(pixel_values).latent_dist.sample()
+        else:
+            latents = DiagonalGaussianDistribution(pixel_values).sample()
         image = self.vae.decode(latents).sample
         image = (image / 2 + 0.5).clip(0, 1).transpose([0, 2, 3, 1])
         image = (image * 255.0).cast("float32").numpy().round()
@@ -279,11 +301,13 @@ class LatentDiffusionModel(nn.Layer):
         with self.ema_scope():
             if height % 8 != 0 or width % 8 != 0:
                 raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
-            # only log 8 image
-            if input_ids.shape[0] > 8:
-                input_ids = input_ids[:8]
-
-            text_embeddings = self.text_encoder(input_ids)[0]
+            if self.arch == "unet":
+                # only log 8 image
+                if input_ids.shape[0] > 8:
+                    input_ids = input_ids[:8]
+                text_embeddings = self.text_encoder(input_ids)
+            else:
+                text_embeddings = input_ids
             do_classifier_free_guidance = guidance_scale > 1.0
             if do_classifier_free_guidance:
                 batch_size, max_length = input_ids.shape

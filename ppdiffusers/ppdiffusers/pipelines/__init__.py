@@ -151,7 +151,7 @@ try:
 except OptionalDependencyNotAvailable:
     from ..utils.dummy_paddle_and_paddlenlp_and_einops_objects import *  # noqa F403
 else:
-    from .unidiffuser import UniDiffuserPipeline
+    from .unidiffuser import UniDiffuserPipeline, UViTTextToImagePipeline
 
 try:
     if not (is_paddle_available() and is_paddlenlp_available() and is_note_seq_available()):

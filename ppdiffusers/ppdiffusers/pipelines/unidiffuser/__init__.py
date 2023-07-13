@@ -49,8 +49,9 @@ try:
 except OptionalDependencyNotAvailable:
     from ...utils.dummy_paddle_and_paddlenlp_and_einops_objects import (
         UniDiffuserPipeline,
+        UViTTextToImagePipeline,
     )
     from ...utils.dummy_paddle_and_paddlenlp_objects import CaptionDecoder
 else:
     from .caption_decoder import CaptionDecoder
-    from .pipeline_unidiffuser import UniDiffuserPipeline
+    from .pipeline_unidiffuser import UniDiffuserPipeline, UViTTextToImagePipeline

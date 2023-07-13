@@ -179,6 +179,7 @@ else:
         UnCLIPImageVariationPipeline,
         UnCLIPPipeline,
         UniDiffuserPipeline,
+        UViTTextToImagePipeline,
         VersatileDiffusionDualGuidedPipeline,
         VersatileDiffusionImageVariationPipeline,
         VersatileDiffusionPipeline,
@@ -237,7 +238,7 @@ try:
 except OptionalDependencyNotAvailable:
     from .utils.dummy_paddle_and_paddlenlp_and_einops_objects import *  # noqa F403
 else:
-    from .pipelines import UniDiffuserPipeline
+    from .pipelines import UniDiffuserPipeline, UViTTextToImagePipeline
 
 try:
     if not (is_paddle_available() and is_einops_available()):
@@ -245,7 +246,7 @@ try:
 except OptionalDependencyNotAvailable:
     from .utils.dummy_paddle_and_einops_objects import *  # noqa F403
 else:
-    from .models import UViTModel
+    from .models import UViTModel, UViTModel_T2I
 
 try:
     if not (is_note_seq_available()):

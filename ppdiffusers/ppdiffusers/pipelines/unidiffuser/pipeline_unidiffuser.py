@@ -29,8 +29,8 @@ from paddlenlp.transformers import (
     GPTTokenizer,
 )
 
-from ...models import AutoencoderKL, UViTModel
-from ...pipeline_utils import DiffusionPipeline
+from ...models import AutoencoderKL, UViTModel, UViTModel_T2I
+from ...pipeline_utils import DiffusionPipeline, ImagePipelineOutput
 from ...schedulers import DPMSolverUniDiffuserScheduler
 from ...utils import logging, randn_tensor
 from . import ImageTextPipelineOutput
@@ -383,7 +383,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 t_img=t,
                 t_text=t,
                 data_type=paddle.zeros_like(t, dtype=paddle.int32) + data_type,
-            )
+            ).sample
             x_out = self._combine_joint(img_vae_out, img_clip_out, text_out)
 
             if guidance_scale == 0.0:
@@ -398,7 +398,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 t_img=paddle.ones_like(t) * N,
                 t_text=t,
                 data_type=paddle.zeros_like(t, dtype=paddle.int32) + data_type,
-            )
+            ).sample
             text_T = randn_tensor(prompt_embeds.shape, generator=generator, dtype=dtype)
             img_vae_out_uncond, img_clip_out_uncond, _ = self.unet(
                 img=img_vae_latents,
@@ -407,7 +407,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 t_img=t,
                 t_text=paddle.ones_like(t) * N,
                 data_type=paddle.zeros_like(t, dtype=paddle.int32) + data_type,
-            )
+            ).sample
             x_out_uncond = self._combine_joint(img_vae_out_uncond, img_clip_out_uncond, text_out_uncond)
 
             return x_out + guidance_scale * (x_out - x_out_uncond)
@@ -422,7 +422,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 t_img=t,
                 t_text=t_text,
                 data_type=paddle.zeros_like(t_text, dtype=paddle.int32) + data_type,
-            )
+            ).sample
             img_out = self._combine(img_vae_out, img_clip_out)
 
             if guidance_scale == 0.0:
@@ -436,7 +436,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 t_img=t,
                 t_text=paddle.ones_like(t) * N,
                 data_type=paddle.zeros_like(t_text, dtype=paddle.int32) + data_type,
-            )
+            ).sample
             img_out_uncond = self._combine(img_vae_out_uncond, img_clip_out_uncond)
 
             return img_out + guidance_scale * (img_out - img_out_uncond)
@@ -450,7 +450,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 t_img=t_img,
                 t_text=t,
                 data_type=paddle.zeros_like(t_img, dtype=paddle.int32) + data_type,
-            )
+            ).sample
             if guidance_scale == 0.0:
                 return text_out
 
@@ -463,7 +463,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 t_img=paddle.ones_like(t) * N,
                 t_text=t,
                 data_type=paddle.zeros_like(t, dtype=paddle.int32) + data_type,
-            )
+            ).sample
             return text_out + guidance_scale * (text_out - text_out_uncond)
 
         elif mode == "t":
@@ -474,7 +474,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 t_img=paddle.ones_like(t) * N,
                 t_text=t,
                 data_type=paddle.zeros_like(t, dtype=paddle.int32) + data_type,
-            )
+            ).sample
             return text_out
 
         elif mode == "i":
@@ -487,7 +487,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 t_img=t,
                 t_text=t_text,
                 data_type=paddle.zeros_like(t_text, dtype=paddle.int32) + data_type,
-            )
+            ).sample
             img_out = self._combine(img_vae_out, img_clip_out)
             return img_out
 
@@ -824,3 +824,279 @@ class UniDiffuserPipeline(DiffusionPipeline):
             return (gen_image, gen_text)
 
         return ImageTextPipelineOutput(images=gen_image, texts=gen_text)
+
+
+class UViTTextToImagePipeline(DiffusionPipeline):
+
+    text_encoder: CLIPTextModel
+    tokenizer: CLIPTokenizer
+    unet: UViTModel_T2I
+    vae: AutoencoderKL
+    scheduler: DPMSolverUniDiffuserScheduler
+
+    def __init__(
+        self,
+        text_encoder: CLIPTextModel,
+        tokenizer: CLIPTokenizer,
+        unet: UViTModel_T2I,
+        vae: AutoencoderKL,
+        scheduler: DPMSolverUniDiffuserScheduler,
+    ):
+        super().__init__()
+        self.register_modules(
+            text_encoder=text_encoder,
+            tokenizer=tokenizer,
+            unet=unet,
+            vae=vae,
+            scheduler=scheduler,
+        )
+        self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
+
+        self.num_channels_latents = vae.latent_channels
+        self.text_encoder_seq_len = tokenizer.model_max_length
+        self.text_encoder_text_dim = text_encoder.config.hidden_size // text_encoder.config.num_attention_heads
+
+    # Copied from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.check_inputs
+    def check_inputs(
+        self,
+        prompt,
+        height,
+        width,
+        callback_steps,
+        negative_prompt=None,
+        prompt_embeds=None,
+        negative_prompt_embeds=None,
+    ):
+        if height % 8 != 0 or width % 8 != 0:
+            raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
+
+        if (callback_steps is None) or (
+            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
+        ):
+            raise ValueError(
+                f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
+                f" {type(callback_steps)}."
+            )
+
+        if prompt is not None and prompt_embeds is not None:
+            raise ValueError(
+                f"Cannot forward both `prompt`: {prompt} and `prompt_embeds`: {prompt_embeds}. Please make sure to"
+                " only forward one of the two."
+            )
+        elif prompt is None and prompt_embeds is None:
+            raise ValueError(
+                "Provide either `prompt` or `prompt_embeds`. Cannot leave both `prompt` and `prompt_embeds` undefined."
+            )
+        elif prompt is not None and (not isinstance(prompt, str) and not isinstance(prompt, list)):
+            raise ValueError(f"`prompt` has to be of type `str` or `list` but is {type(prompt)}")
+
+        if negative_prompt is not None and negative_prompt_embeds is not None:
+            raise ValueError(
+                f"Cannot forward both `negative_prompt`: {negative_prompt} and `negative_prompt_embeds`:"
+                f" {negative_prompt_embeds}. Please make sure to only forward one of the two."
+            )
+
+        if prompt_embeds is not None and negative_prompt_embeds is not None:
+            if prompt_embeds.shape != negative_prompt_embeds.shape:
+                raise ValueError(
+                    "`prompt_embeds` and `negative_prompt_embeds` must have the same shape when passed directly, but"
+                    f" got: `prompt_embeds` {prompt_embeds.shape} != `negative_prompt_embeds`"
+                    f" {negative_prompt_embeds.shape}."
+                )
+
+    # Modified from ppdiffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline._encode_prompt
+    def encode_text_latents(
+        self,
+        prompt,
+        num_images_per_prompt,
+        negative_prompt=None,
+        prompt_embeds: Optional[paddle.Tensor] = None,
+        negative_prompt_embeds: Optional[paddle.Tensor] = None,
+    ):
+        if prompt_embeds is None:
+            text_inputs = self.tokenizer(
+                prompt,
+                padding="max_length",
+                max_length=self.tokenizer.model_max_length,
+                truncation=True,
+                return_tensors="pd",
+            )
+            prompt_embeds = self.text_encoder(text_inputs.input_ids)[0]
+
+        return prompt_embeds
+
+    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.decode_latents
+    def decode_image_latents(self, latents):
+        latents = 1 / self.vae.config.scaling_factor * latents
+        image = self.vae.decode(latents).sample
+        image = (image / 2 + 0.5).clip(0, 1)
+        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
+        image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
+        return image
+
+    def prepare_latents(self, batch_size, num_channels_latents, height, width, dtype, generator, latents=None):
+        shape = [batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor]
+        if isinstance(generator, list) and len(generator) != batch_size:
+            raise ValueError(
+                f"You have passed a list of generators of length {len(generator)}, but requested an effective batch"
+                f" size of {batch_size}. Make sure the batch size matches the length of the generators."
+            )
+
+        if latents is None:
+            latents = randn_tensor(shape, generator=generator, dtype=dtype)
+
+        # scale the initial noise by the standard deviation required by the scheduler
+        latents = latents * self.scheduler.init_noise_sigma
+        return latents
+
+    def get_noise_pred(self, latents, timesteps, prompt_embeds, guidance_scale, generator=None):
+        dtype = self.unet.dtype
+        img_out = self.unet(latents, timesteps, prompt_embeds).sample
+
+        if guidance_scale == 0.0:
+            return img_out
+
+        _empty_context = randn_tensor(prompt_embeds.shape, generator=generator, dtype=dtype)
+        img_out_uncond = self.unet(latents, timesteps, _empty_context).sample
+
+        return img_out + guidance_scale * (img_out - img_out_uncond)
+
+    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_extra_step_kwargs
+    def prepare_extra_step_kwargs(self, generator, eta):
+        # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
+        # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
+        # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
+        # and should be between [0, 1]
+
+        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
+        extra_step_kwargs = {}
+        if accepts_eta:
+            extra_step_kwargs["eta"] = eta
+
+        # check if the scheduler accepts generator
+        accepts_generator = "generator" in set(inspect.signature(self.scheduler.step).parameters.keys())
+        if accepts_generator:
+            extra_step_kwargs["generator"] = generator
+        return extra_step_kwargs
+
+    def _denoising_sample_fn(
+        self,
+        latents,
+        prompt_embeds,
+        num_inference_steps,
+        extra_step_kwargs,
+        guidance_scale,
+        height,
+        width,
+        callback,
+        callback_steps,
+    ):
+        # Set timesteps
+        self.scheduler.set_timesteps(num_inference_steps)
+        timesteps = self.scheduler.timesteps
+        N = self.scheduler.config.num_train_timesteps
+
+        num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
+        with self.progress_bar(total=num_inference_steps) as progress_bar:
+            for i, t in enumerate(timesteps):
+                noise_pred = self.get_noise_pred(
+                    latents,
+                    t * N,
+                    prompt_embeds,
+                    guidance_scale,
+                )
+
+                # compute the previous noisy sample x_t -> x_t-1
+                latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
+
+                # call the callback, if provided
+                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
+                    progress_bar.update()
+                    if callback is not None and i % callback_steps == 0:
+                        callback(i, t, latents)
+        return latents
+
+    @paddle.no_grad()
+    def __call__(
+        self,
+        prompt: Union[str, List[str]] = None,
+        height: Optional[int] = None,
+        width: Optional[int] = None,
+        num_inference_steps: int = 50,
+        guidance_scale: float = 1.0,
+        negative_prompt: Optional[Union[str, List[str]]] = None,
+        num_images_per_prompt: Optional[int] = 1,
+        eta: float = 0.0,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
+        latents: Optional[paddle.Tensor] = None,
+        prompt_embeds: Optional[paddle.Tensor] = None,
+        negative_prompt_embeds: Optional[paddle.Tensor] = None,
+        output_type: Optional[str] = "pil",
+        return_dict: bool = True,
+        callback: Optional[Callable[[int, int, paddle.Tensor], None]] = None,
+        callback_steps: Optional[int] = 1,
+    ):
+        # 0. Default height and width to unet
+        height = height or self.unet.config.img_size * self.vae_scale_factor
+        width = width or self.unet.config.img_size * self.vae_scale_factor
+
+        # 1. Check inputs. Raise error if not correct
+        self.check_inputs([prompt], height, width, callback_steps)
+
+        # 2. Define call parameters
+        if prompt is not None and isinstance(prompt, str):
+            batch_size = 1
+        elif prompt is not None and isinstance(prompt, list):
+            batch_size = len(prompt)
+        else:
+            batch_size = prompt_embeds.shape[0]
+
+        # 3. Encode input prompt
+        assert prompt is not None or prompt_embeds is not None
+        prompt_embeds = self.encode_text_latents(
+            prompt,
+            num_images_per_prompt,
+            negative_prompt,
+            prompt_embeds=prompt_embeds,
+            negative_prompt_embeds=negative_prompt_embeds,
+        )
+
+        # 4. Prepare latent variables
+        num_channels_latents = self.unet.config.in_channels
+        latents = self.prepare_latents(
+            batch_size * num_images_per_prompt,
+            num_channels_latents,
+            height,
+            width,
+            prompt_embeds.dtype,
+            generator,
+            latents,
+        )
+
+        # 5. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
+        extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
+
+        # 6. Prepare timesteps and Denoising loop
+        outs = self._denoising_sample_fn(
+            latents,
+            prompt_embeds,
+            num_inference_steps,
+            extra_step_kwargs,
+            guidance_scale,
+            height,
+            width,
+            callback,
+            callback_steps,
+        )
+
+        # 7. Generate image or text and Post-processing
+        image = self.decode_image_latents(outs)
+
+        # 8. Convert to PIL
+        if output_type == "pil":
+            image = self.numpy_to_pil(image)
+
+        if not return_dict:
+            return (image,)
+
+        return ImagePipelineOutput(images=image)
