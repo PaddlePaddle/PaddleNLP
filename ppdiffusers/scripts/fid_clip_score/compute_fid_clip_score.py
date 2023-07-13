@@ -17,7 +17,6 @@ import json
 import math
 import os
 import pathlib
-import tempfile
 
 import paddle
 import pandas as pd
@@ -107,8 +106,14 @@ if __name__ == "__main__":
     text_file_name = args.text_file_name
     # dont change
     image_num = text_file_name.replace("coco", "")
+    if image_num == "30k":
+        os.environ["FLAG_IMAGE_NUM"] = "30000"
+    elif image_num == "10k":
+        os.environ["FLAG_IMAGE_NUM"] = "10000"
+    else:
+        os.environ["FLAG_IMAGE_NUM"] = "1000"
     dataset_name = f"coco_{args.resolution}_{image_num}.npz"
-    fid_target_file = get_path_from_url(base_url + dataset_name, cache_path)
+    fid_target_file = get_path_from_url(base_url + dataset_name, cache_path) + ".npz"
 
     text_file = get_path_from_url(base_url + text_file_name + ".tsv", cache_path)
     df = pd.read_csv(text_file, sep="\t")
@@ -124,13 +129,12 @@ if __name__ == "__main__":
     for path in all_path:
         results["file"].append(path)
         # fid score
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            fid_value = calculate_fid_given_paths(
-                [fid_target_file, path],
-                batch_size=args.fid_batch_size,
-                dims=2048,
-                num_workers=4,
-            )
+        fid_value = calculate_fid_given_paths(
+            [fid_target_file, path],
+            batch_size=args.fid_batch_size,
+            dims=2048,
+            num_workers=4,
+        )
         results["fid"].append(fid_value)
 
         if not args.only_fid:
@@ -141,12 +145,14 @@ if __name__ == "__main__":
             clip_score = compute_clip_score(model, processor, texts, images_path, args.clip_batch_size)
             if "clip_score" not in results:
                 results["clip_score"] = []
-            results["clip_score"].append(clip_score.mean().item())
+            _clip_score = clip_score.mean().item()
+            results["clip_score"].append()
             if image_num == "30k":
                 print(f"=====> clip_score 1k: {clip_score[:1000].mean().item()}")
                 print(f"=====> clip_score 10k: {clip_score[:10000].mean().item()}")
-            print(f"fid: {fid_value}, clip_score: {clip_score}")
+            print(f"fid: {fid_value}, clip_score: {_clip_score}")
         else:
             print(f"fid: {fid_value}")
     # save json file results
     save_json(results)
+    print(results)
