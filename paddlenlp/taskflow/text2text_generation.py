@@ -166,9 +166,8 @@ class ChatGLMTask(Task):
                     pre_caches_numpy = kwargs.get("pre_caches_numpy", None)
 
                     if pre_caches_numpy is None:
-                        # raise Exception("prefix numpy sholud be provided")
+                        logger.info("pre_caches_numpy is not provided.")
                         use_pre_caches = False
-                        print("prefix numpy sholud be provided")
                         for i in range(28):
                             tokenized_output["pre_cache_{}".format(i)] = np.ones([1]).astype("float16")
 
