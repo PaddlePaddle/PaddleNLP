@@ -14,14 +14,14 @@
 # limitations under the License.
 
 import unittest
+
 from parameterized import parameterized_class
 
-from paddlenlp.transformers.rw.modeling import (
-    RWModel,
-    RWForCausalLM,
-)
 from paddlenlp.transformers.rw.configuration import RWConfig
+from paddlenlp.transformers.rw.modeling import RWForCausalLM, RWModel
+
 from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
+
 
 class RWModelTester:
     def __init__(
@@ -139,10 +139,10 @@ class RWModelTester:
             num_class=self.num_classes,
             num_labels=self.num_labels,
             num_choices=self.num_choices,
-            multi_query = self.multi_query,
-            bias = self.bias,
-            parallel_attn = self.parallel_attn,
-            output_attentions = self.output_attentions,
+            multi_query=self.multi_query,
+            bias=self.bias,
+            parallel_attn=self.parallel_attn,
+            output_attentions=self.output_attentions,
         )
 
     def create_and_check_model(
@@ -158,13 +158,21 @@ class RWModelTester:
         model = RWModel(config)
         model.eval()
         result = model(
-            input_ids, attention_mask=input_mask, return_dict=self.parent.return_dict,
+            input_ids,
+            attention_mask=input_mask,
+            return_dict=self.parent.return_dict,
         )
         result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
         result = model(input_ids, use_cache=True, output_attentions=True, return_dict=self.parent.return_dict)
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
-        result = model(input_ids, use_cache=True, output_attentions=True, output_hidden_states=True, return_dict=self.parent.return_dict)
+        result = model(
+            input_ids,
+            use_cache=True,
+            output_attentions=True,
+            output_hidden_states=True,
+            return_dict=self.parent.return_dict,
+        )
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
 
     def create_and_check_for_causal_model(
@@ -180,21 +188,24 @@ class RWModelTester:
         model = RWForCausalLM(config)
         model.eval()
         result = model(
-            input_ids, attention_mask=input_mask, labels=input_ids, return_dict=self.parent.return_dict,
+            input_ids,
+            attention_mask=input_mask,
+            labels=input_ids,
+            return_dict=self.parent.return_dict,
         )
         self.parent.assertEqual(result[0].shape, [])
         self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
 
 @parameterized_class(
-     ("return_dict", "use_labels"),
-     [
+    ("return_dict", "use_labels"),
+    [
         [False, False],
         [False, True],
         [True, False],
         [True, True],
     ],
- )
+)
 class RWModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = RWModel
     return_dict: bool = False

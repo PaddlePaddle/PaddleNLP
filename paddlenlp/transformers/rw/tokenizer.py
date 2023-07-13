@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+
 from paddlenlp.transformers.gpt.tokenizer import GPTTokenizer
 
 __all__ = ["RWTokenizer"]
@@ -57,7 +58,7 @@ class RWTokenizer(GPTTokenizer):
 
     resource_files_names = {"vocab_file": "vocab.json", "merges_file": "merges.txt"}  # for save_pretrained
     model_input_names = ["input_ids"]
-    
+
     pretrained_resource_files_map = {
         "vocab_file": {
             "falcon-7b": "https://bj.bcebos.com/paddlenlp/models/community/tiiuae/falcon-7b/vocab.json",
@@ -66,16 +67,11 @@ class RWTokenizer(GPTTokenizer):
         "merges_file": {
             "falcon-7b": "https://bj.bcebos.com/paddlenlp/models/community/tiiuae/falcon-7b/merges.txt",
             "falcon-7b-instruct": "https://bj.bcebos.com/paddlenlp/models/community/tiiuae/falcon-7b-instruct/merges.txt",
-        }
+        },
     }
     padding_side = "right"
 
-    def __init__(
-        self,
-        vocab_file,
-        merges_file,
-        **kwargs  # The token of newline.
-    ):
+    def __init__(self, vocab_file, merges_file, **kwargs):  # The token of newline.
         if not os.path.isfile(vocab_file):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "

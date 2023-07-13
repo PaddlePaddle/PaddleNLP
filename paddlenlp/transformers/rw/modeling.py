@@ -12,25 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
+import warnings
+from typing import List, Optional, Tuple, Union
+
 import paddle
 from paddle import Tensor, nn
 
+from ...utils.converter import StateDictNameMapping, init_name_mappings
+from .. import PretrainedModel
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
 )
+from .configuration import RW_PRETRAINED_INIT_CONFIGURATION, RWConfig
 
-import math
-import warnings
-from typing import Optional, Tuple, Union, List
-
-from .. import PretrainedModel
-from ...utils.converter import StateDictNameMapping, init_name_mappings
-
-from .configuration import (
-    RWConfig,
-    RW_PRETRAINED_INIT_CONFIGURATION,
-)
 
 # rotary pos emb helpers (paddle.jit.script does not seem to support staticmethod...)
 def rotate_half(x):
@@ -87,9 +83,7 @@ class RotaryEmbedding(paddle.nn.Layer):
         return (q * cos) + (rotate_half(q) * sin), (k * cos) + (rotate_half(k) * sin)
 
 
-def _make_causal_mask(
-    input_ids_shape: paddle.shape, past_key_values_length: int
-):
+def _make_causal_mask(input_ids_shape: paddle.shape, past_key_values_length: int):
     batch_size, target_length = input_ids_shape
     mask = paddle.empty((target_length, target_length + past_key_values_length), dtype=paddle.bool)
     # ONNX doesn't support `Tensor.triu` properly, thus we use this workaround
@@ -99,7 +93,9 @@ def _make_causal_mask(
     if past_key_values_length > 0:
         mask[:, :past_key_values_length] = False
 
-    expanded_mask = mask[None, None, :, :].expand(shape=(batch_size, 1, target_length, target_length + past_key_values_length))
+    expanded_mask = mask[None, None, :, :].expand(
+        shape=(batch_size, 1, target_length, target_length + past_key_values_length)
+    )
     return expanded_mask
 
 
@@ -120,9 +116,7 @@ def build_alibi_tensor(attention_mask: Tensor, num_heads: int, dtype: paddle.dty
     slopes = paddle.pow(base, powers)
 
     if closest_power_of_2 != num_heads:
-        extra_base = Tensor(
-            2 ** (-(2 ** -(math.log2(2 * closest_power_of_2) - 3))), dtype=paddle.float32
-        )
+        extra_base = Tensor(2 ** (-(2 ** -(math.log2(2 * closest_power_of_2) - 3))), dtype=paddle.float32)
         num_remaining_heads = min(closest_power_of_2, num_heads - closest_power_of_2)
         extra_powers = paddle.arange(1, 1 + 2 * num_remaining_heads, 2, dtype=paddle.int32)
         slopes = paddle.concat([slopes, paddle.pow(extra_base, extra_powers)], axis=0)
@@ -225,7 +219,7 @@ class Attention(nn.Layer):
         head_mask: Optional[Tensor] = None,
         use_cache: bool = False,
         output_attentions: bool = False,
-        i: int=0,
+        i: int = 0,
     ):
         fused_qkv = self.query_key_value(hidden_states)  # [batch_size, seq_length, 3 x hidden_size]
 
@@ -235,12 +229,16 @@ class Attention(nn.Layer):
         batch_size, q_length, _, _ = query_layer.shape
 
         # [batch_size, seq_length, num_heads, head_dim]
-        query_layer = query_layer.transpose([0, 2, 1, 3]).reshape([batch_size * self.num_heads, q_length, self.head_dim])
-        key_layer = key_layer.transpose([0, 2, 1, 3]).reshape([
-            batch_size * self.num_kv,
-            q_length,
-            self.head_dim,
-        ])
+        query_layer = query_layer.transpose([0, 2, 1, 3]).reshape(
+            [batch_size * self.num_heads, q_length, self.head_dim]
+        )
+        key_layer = key_layer.transpose([0, 2, 1, 3]).reshape(
+            [
+                batch_size * self.num_kv,
+                q_length,
+                self.head_dim,
+            ]
+        )
         value_layer = value_layer.transpose([0, 2, 1, 3]).reshape([batch_size * self.num_kv, q_length, self.head_dim])
 
         query_layer, key_layer = self.maybe_rotary(query_layer, key_layer)
@@ -269,13 +267,16 @@ class Attention(nn.Layer):
             attn_output = query_layer_ @ key_layer_.transpose([0, 1, 3, 2])
             attention_scores = attn_output.reshape([batch_size, self.num_heads, q_length, kv_length])
 
-
             # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
             input_dtype = attention_scores.dtype
             # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
             if input_dtype == paddle.float16 or input_dtype == paddle.bfloat16:
                 attention_scores = paddle.cast(attention_scores, paddle.float32)
-            attention_scores = paddle.where(attention_mask > 0, paddle.full_like(attention_scores, paddle.finfo(attention_scores.dtype).min), attention_scores)
+            attention_scores = paddle.where(
+                attention_mask > 0,
+                paddle.full_like(attention_scores, paddle.finfo(attention_scores.dtype).min),
+                attention_scores,
+            )
             attention_probs = nn.functional.softmax(
                 attention_scores * self.inv_norm_factor,
                 axis=-1,
@@ -311,7 +312,11 @@ class Attention(nn.Layer):
             attention_scores = query_layer_ @ key_layer_.transpose([0, 1, 3, 2])
 
             attention_mask_float = paddle.zeros_like(attention_mask, dtype=attention_scores.dtype)
-            attention_mask_float = paddle.where(attention_mask > 0, paddle.full_like(attention_scores, paddle.finfo(attention_scores.dtype).min), attention_mask_float)
+            attention_mask_float = paddle.where(
+                attention_mask > 0,
+                paddle.full_like(attention_scores, paddle.finfo(attention_scores.dtype).min),
+                attention_mask_float,
+            )
 
             # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
             input_dtype = attention_scores.dtype
@@ -329,7 +334,6 @@ class Attention(nn.Layer):
 
             if head_mask is not None:
                 attention_probs = attention_probs * head_mask
-
 
             # matmul: [batch_size, num_heads, q_length, kv_length] * [batch_size, num_kv, kv_length, head_dim]
             context_layer = attention_probs @ value_layer_
@@ -387,14 +391,14 @@ class DecoderLayer(nn.Layer):
 
     def forward(
         self,
-        hidden_states: Tensor=None,
-        alibi: Tensor=None,
-        attention_mask: Tensor=None,
+        hidden_states: Tensor = None,
+        alibi: Tensor = None,
+        attention_mask: Tensor = None,
         layer_past: Optional[Tuple[Tensor, Tensor]] = None,
         head_mask: Optional[Tensor] = None,
         use_cache: bool = False,
         output_attentions: bool = False,
-        i: int=0,
+        i: int = 0,
     ):
 
         layernorm_output = self.input_layernorm(hidden_states)
@@ -561,9 +565,7 @@ class RWPreTrainedModel(PretrainedModel):
         )
 
     @staticmethod
-    def _convert_to_rw_cache(
-        past_key_value: Tuple[Tuple[Tensor, Tensor]]
-    ) -> Tuple[Tuple[Tensor, Tensor]]:
+    def _convert_to_rw_cache(past_key_value: Tuple[Tuple[Tensor, Tensor]]) -> Tuple[Tuple[Tensor, Tensor]]:
         batch_size, num_heads, head_dim, seq_length = past_key_value[0][0].shape
         batch_size_times_num_heads = batch_size * num_heads
         # key:  [batch_size, num_heads, head_dim, seq_length] -> [batch_size * num_heads, head_dim, seq_length]
@@ -599,19 +601,15 @@ class RWModel(RWPreTrainedModel):
     def get_input_embeddings(self):
         return self.word_embeddings
 
-    def _prepare_attn_mask(
-        self, attention_mask: Tensor, input_shape: Tuple[int, int], past_key_values_length: int
-    ):
+    def _prepare_attn_mask(self, attention_mask: Tensor, input_shape: Tuple[int, int], past_key_values_length: int):
         # create causal mask
         # [batch_size, seq_length] -> [batch_size, 1, tgt_length, src_length]
         combined_attention_mask = None
-        #device = attention_mask.device
+        # device = attention_mask.device
         _, src_length = input_shape
 
         if src_length > 1:
-            combined_attention_mask = _make_causal_mask(
-                input_shape, past_key_values_length=past_key_values_length
-            )
+            combined_attention_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
 
         # [batch_size, seq_length] -> [batch_size, 1, tgt_length, src_length]
         expanded_attn_mask = _expand_mask(attention_mask, tgt_length=src_length)
@@ -785,6 +783,7 @@ class CausalLMHead(nn.Linear):
         ret = input @ self.weight.T
         return ret
 
+
 class RWForCausalLM(RWPreTrainedModel):
     _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
 
@@ -883,7 +882,8 @@ class RWForCausalLM(RWPreTrainedModel):
             # Flatten the tokens
             loss_fct = nn.CrossEntropyLoss()
             loss = loss_fct(
-                shift_logits.reshape([batch_size * seq_length, vocab_size]), shift_labels.reshape([batch_size * seq_length])
+                shift_logits.reshape([batch_size * seq_length, vocab_size]),
+                shift_labels.reshape([batch_size * seq_length]),
             )
 
         if not return_dict:

@@ -14,11 +14,7 @@
 
 import paddle
 
-from paddlenlp.transformers import (
-    RWConfig,
-    RWForCausalLM,
-    RWTokenizer,
-)
+from paddlenlp.transformers import RWConfig, RWForCausalLM, RWTokenizer
 
 
 def parse_arguments():

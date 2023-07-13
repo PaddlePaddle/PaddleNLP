@@ -21,6 +21,7 @@ RW_PRETRAINED_INIT_CONFIGURATION = {
     },
 }
 
+
 class RWConfig(PretrainedConfig):
     model_type = "RefinedWeb"
     keys_to_ignore_at_inference = ["past_key_values"]
