@@ -437,7 +437,7 @@ class Trainer:
                 state_dict = self.recover_params_from_master_weights(state_dict)
         else:
             if self.args.dataset_rank == 0:
-                state_dict = self.load_one_state_dict_from_checkpoint(resume_from_checkpoint, self.args.weight_name_suffix)
+                state_dict = self.load_one_state_dict_from_checkpoint(resume_from_checkpoint, self.args.old_weight_name_suffix)
             else:
                 logger.info(f"not loading ckpt :{self.args.dataset_rank}")
 
@@ -645,6 +645,11 @@ class Trainer:
 
         self.state = TrainerState()
 
+        # Check if saved optimizer or scheduler states exist
+        self._load_optimizer_and_scheduler(resume_from_checkpoint)
+
+        self.load_state_dict_from_checkpoint(resume_from_checkpoint)
+
         model = self._wrap_model(self.model_wrapped)
 
         # for the rest of this function `model` is the outside model, whether it was wrapped or not
@@ -653,11 +658,6 @@ class Trainer:
 
         if delay_optimizer_creation:
             self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-
-        # Check if saved optimizer or scheduler states exist
-        self._load_optimizer_and_scheduler(resume_from_checkpoint)
-
-        self.load_state_dict_from_checkpoint(resume_from_checkpoint)
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples}")
