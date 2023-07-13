@@ -886,10 +886,14 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                 print(self.tokenizer.decode(l[l != -100].tolist()))
             """
 
-            shift_logits = lm_logits[..., :-1, :]
-            shift_logits = shift_logits.reshape([-1, shift_logits.shape[-1]])
-            shift_logits = shift_logits.astype("float32")
-            shift_labels = labels[..., 1:].reshape([-1])
+            if self.config.lm_shift_labels:
+                shift_logits = lm_logits[..., :-1, :]
+                shift_logits = shift_logits.reshape([-1, shift_logits.shape[-1]])
+                shift_logits = shift_logits.astype("float32")
+                shift_labels = labels[..., 1:].reshape([-1])
+            else:
+                shift_logits = lm_logits
+                shift_labels = labels
 
             if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
                 self.parallel_loss_func = fleet.meta_parallel.ParallelCrossEntropy()
