@@ -703,7 +703,8 @@ class Trainer:
                 steps_trained_in_current_epoch *= args.gradient_accumulation_steps
             else:
                 steps_trained_in_current_epoch = 0
-
+            # save right away
+            self._save_checkpoint(model)
             logger.info("  Continuing training from checkpoint, will skip to saved global_step")
             logger.info(f"  Continuing training from epoch {epochs_trained}")
             logger.info(f"  Continuing training from global step {self.state.global_step}")
@@ -1762,14 +1763,26 @@ class Trainer:
 
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
+        def get_optimizer_state():
+            optimizer_state_dict = self.optimizer.state_dict()
+            optimizer = self.optimizer
+            while hasattr(optimizer, "_inner_opt"):
+                optimizer = optimizer._inner_opt
+            unused = optimizer._accumulators_holder
+            state = OrderedDict()
+            for (k, v) in unused.items():
+                state[k] = v
+            for (k, v) in optimizer_state_dict.items():
+                state[k] = v
+
         if self.args.use_hybrid_parallel:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
-                self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, optimizer_name))
+                self.save_func(get_optimizer_state(), os.path.join(output_dir, optimizer_name))
 
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
-                self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+                self.save_func(get_optimizer_state(), os.path.join(output_dir, OPTIMIZER_NAME))
 
             # FIXME: manybe only save one copy
             self.save_func(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
