@@ -524,8 +524,8 @@ class Task(metaclass=abc.ABCMeta):
         """
         print("Examples:\n{}".format(self._usage))
 
-    def __call__(self, *args):
-        inputs = self._preprocess(*args)
+    def __call__(self, *args, **kwargs):
+        inputs = self._preprocess(*args, **kwargs)
         outputs = self._run_model(inputs)
         results = self._postprocess(outputs)
         return results

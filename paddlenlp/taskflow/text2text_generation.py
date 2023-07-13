@@ -37,6 +37,7 @@ class ChatGLMTask(Task):
         self._dtype = kwargs.get("dtype", "float16")
         self.kwargs["generation_task"] = task
         self._tgt_length = kwargs.get("tgt_length", 2048)
+        self._prefix = kwargs.get("prefix", False)
         # Token max length
         self._max_seq_length = kwargs.get("max_seq_length", 2048)
         self._top_k = kwargs.get("top_k", 1)
@@ -138,7 +139,7 @@ class ChatGLMTask(Task):
         if one_batch:
             yield one_batch
 
-    def _preprocess(self, inputs, padding=True, add_special_tokens=True):
+    def _preprocess(self, inputs, padding=True, add_special_tokens=True, **kwargs):
         """
         Transform the raw text to the model inputs, two steps involved:
            1) Transform the raw text to token ids.
@@ -159,6 +160,23 @@ class ChatGLMTask(Task):
                     truncation=True,
                     truncation_side="left",
                 )
+                if self._prefix:
+                    import numpy as np
+
+                    pre_caches_numpy = kwargs.get("pre_caches_numpy", None)
+                    if pre_caches_numpy is None:
+                        raise Exception("prefix numpy sholud be provided")
+                    pre_caches = np.split(pre_caches_numpy, 28)
+                    for i in range(28):
+                        tokenized_output["pre_cache_{}".format(i)] = (
+                            pre_caches[i].transpose(1, 0, 2, 3, 4).astype("float16")
+                        )
+                    input_ids_shape = tokenized_output["input_ids"].shape
+                    prefix_attention_mask = np.zeros([input_ids_shape[0], 1, input_ids_shape[-1], 64], dtype="int64")
+                    tokenized_output["attention_mask"] = np.concatenate(
+                        (prefix_attention_mask, tokenized_output["attention_mask"]), axis=3
+                    )
+
             else:
                 tokenized_output = self._tokenizer(
                     input_text,
@@ -182,12 +200,10 @@ class ChatGLMTask(Task):
         if self._static_mode:
             with static_mode_guard():
                 for batch in inputs["data_loader"]:
-                    input_ids = batch["input_ids"]
-                    attention_mask = batch["attention_mask"]
-                    position_ids = batch["position_ids"]
-                    self.input_handles[0].copy_from_cpu(input_ids)
-                    self.input_handles[1].copy_from_cpu(attention_mask)
-                    self.input_handles[2].copy_from_cpu(position_ids)
+                    input_handles = {}
+                    for name in self.predictor.get_input_names():
+                        input_handles[name] = self.predictor.get_input_handle(name)
+                        input_handles[name].copy_from_cpu(batch[name])
                     self.predictor.run()
                     output_names = self.predictor.get_output_names()
                     output_handle = self.predictor.get_output_handle(output_names[0])
