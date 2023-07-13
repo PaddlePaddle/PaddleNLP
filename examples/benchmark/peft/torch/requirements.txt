@@ -4,4 +4,5 @@ peft @ git+https://github.com/huggingface/peft.git
 transformers==4.30.2
 torch==2.0.1
 sentencepiece
+bitsandbytes==0.39.0
 # CUDA VERSION 11.7
