@@ -22,6 +22,7 @@ from paddlenlp.transformers import (
     ChatGLMv2ForConditionalGeneration,
     ChatGLMv2Model,
 )
+from tests.transformers.test_generation_utils import GenerationTesterMixin
 from tests.transformers.test_modeling_common import ModelTesterMixin, ids_tensor
 
 
@@ -160,26 +161,37 @@ class ChatGLMv2Tester:
         [True, False],
     ],
 )
-class ChatGLMv2Test(ModelTesterMixin, unittest.TestCase):
+class ChatGLMv2Test(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     base_model_class = ChatGLMv2Model
     return_dict: bool = True
     use_labels: bool = False
     use_test_model_name_list = False
 
     all_model_classes = (ChatGLMv2Model, ChatGLMv2ForConditionalGeneration)
+    all_generative_model_classes = {ChatGLMv2ForConditionalGeneration: (ChatGLMv2Model, "chatglm_v2")}
 
     def setUp(self):
         self.model_tester = ChatGLMv2Tester(self)
 
+    def _get_input_ids_and_config(self):
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+
+        input_ids = inputs_dict[self.input_name]
+        attention_mask = paddle.ones_like(input_ids)
+
+        max_batch_size = 2
+        sequence_length = input_ids.shape[-1] // 2
+        input_ids = input_ids[:max_batch_size, :sequence_length]
+        attention_mask = attention_mask[:max_batch_size, :sequence_length]
+
+        # generate max 3 tokens
+        max_length = 3
+
+        return config, input_ids, attention_mask, max_length
+
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_model(*config_and_inputs)
-
-    def test_model_name_list(self):
-        pass
-
-    def test_resize_tokens_embeddings(self):
-        pass
 
     def test_ChatGLMv2_lm_head_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()

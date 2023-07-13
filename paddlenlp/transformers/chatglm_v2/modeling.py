@@ -30,6 +30,35 @@ from ..model_outputs import (
 from .configuration import CHATGLM_V2_PRETRAINED_RESOURCE_FILES_MAP, ChatGLMv2Config
 
 
+def assign_kv_heads(num_kv_heads, num_gpus):
+    # Initialize the assignment list
+    """
+    Assign kv heads to different GPUs in the Tensor Parallel Setup
+
+    Examples:
+        assign_kv_heads(num_kv_heads=1, num_gpus=2): [[0], [0]]
+        assign_kv_heads(num_kv_heads=2, num_gpus=2): [[0], [1]]
+        assign_kv_heads(num_kv_heads=4, num_gpus=2): [[0,1], [2,3]]
+        assign_kv_heads(num_kv_heads=1, num_gpus=4): [[0],[0],[0],[0]]
+        assign_kv_heads(num_kv_heads=2, num_gpus=4): [[0],[0],[1],[1]]
+        assign_kv_heads(num_kv_heads=4, num_gpus=4): [[0],[1],[2],[3]]
+    """
+    assignment_list = [[] for _ in range(num_gpus)]
+    # Case 1: more heads than cards
+    if num_kv_heads > num_gpus:
+        num_heads_per_card = num_kv_heads // num_gpus
+        for i in range(num_gpus):
+            for j in range(num_heads_per_card):
+                assignment_list[i].append(i * num_heads_per_card + j)
+    # Case 2: more cards than heads. each card get only 1 head.
+    else:
+        num_card_per_heads = num_gpus // num_kv_heads
+        for i in range(num_kv_heads):
+            for j in range(num_card_per_heads):
+                assignment_list[i * num_card_per_heads + j].append(i)
+    return assignment_list
+
+
 class RotaryEmbedding(nn.Layer):
     def __init__(self, dim, original_impl=False):
         super().__init__()
@@ -236,7 +265,7 @@ class SelfAttention(nn.Layer):
             )
             self.num_attention_heads_per_partition = config.num_attention_heads // config.tensor_parallel_degree
             self.kv_indices = paddle.to_tensor(
-                self.assign_kv_heads(config.multi_query_group_num, config.tensor_parallel_degree)[
+                assign_kv_heads(config.multi_query_group_num, config.tensor_parallel_degree)[
                     config.tensor_parallel_rank
                 ]
             )
@@ -248,6 +277,7 @@ class SelfAttention(nn.Layer):
             )
             self.dense = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=config.add_bias_linear)
             self.num_attention_heads_per_partition = config.num_attention_heads
+            self.kv_indices = None
 
         self.key = nn.Linear(
             config.hidden_size,
@@ -259,34 +289,6 @@ class SelfAttention(nn.Layer):
             self.hidden_size_per_attention_head * config.multi_query_group_num,
             bias_attr=config.add_qkv_bias,
         )
-
-    def assign_kv_heads(self, num_kv_heads, num_gpus):
-        # Initialize the assignment list
-        """
-        Assign kv heads to different GPUs in the Tensor Parallel Setup
-
-        Examples:
-            assign_kv_heads(num_kv_heads=1, num_gpus=2): [[0], [0]]
-            assign_kv_heads(num_kv_heads=2, num_gpus=2): [[0], [1]]
-            assign_kv_heads(num_kv_heads=4, num_gpus=2): [[0,1], [2,3]]
-            assign_kv_heads(num_kv_heads=1, num_gpus=4): [[0],[0],[0],[0]]
-            assign_kv_heads(num_kv_heads=2, num_gpus=4): [[0],[0],[1],[1]]
-            assign_kv_heads(num_kv_heads=4, num_gpus=4): [[0],[1],[2],[3]]
-        """
-        assignment_list = [[] for _ in range(num_gpus)]
-        # Case 1: more heads than cards
-        if num_kv_heads > num_gpus:
-            num_heads_per_card = num_kv_heads // num_gpus
-            for i in range(num_gpus):
-                for j in range(num_heads_per_card):
-                    assignment_list[i].append(i * num_heads_per_card + j)
-        # Case 2: more cards than heads. each card get only 1 head.
-        else:
-            num_card_per_heads = num_gpus // num_kv_heads
-            for i in range(num_kv_heads):
-                for j in range(num_card_per_heads):
-                    assignment_list[i * num_card_per_heads + j].append(i)
-        return assignment_list
 
     def forward(self, hidden_states, attention_mask, rotary_pos_emb, kv_cache=None, use_cache=True):
         seq_length, batch_size, hidden_size = hidden_states.shape
@@ -315,7 +317,7 @@ class SelfAttention(nn.Layer):
         else:
             kv_cache = None
 
-        if hasattr(self, "kv_indices"):
+        if self.kv_indices is not None:
             key_layer = paddle.index_select(key_layer, self.kv_indices, axis=2)
             value_layer = paddle.index_select(value_layer, self.kv_indices, axis=2)
             multiplier = self.num_attention_heads_per_partition // self.kv_indices.shape[0]
@@ -543,6 +545,7 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
             full_attention_mask = paddle.concat(
                 [paddle.ones([batch_size, seq_length, past_length]), full_attention_mask], axis=-1
             )
+        print(full_attention_mask.shape, padding_mask.shape)
         if padding_mask is not None:
             full_attention_mask = full_attention_mask * padding_mask.unsqueeze(1)
         if not past_length and padding_mask is not None:
