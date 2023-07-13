@@ -116,7 +116,7 @@ class ArrowDataset(Dataset):
         image = Image.open(image_bytes)
         image = self.transform(image)
         texts = self.tokenizer(
-            [_preprocess_text(txt_raw)], max_seq_len=self.max_txt_length, truncation=True, padding="max_length"
+            [_preprocess_text(txt_raw)], max_length=self.max_txt_length, truncation=True, padding="max_length"
         )
         text = texts["input_ids"][0]
 
@@ -179,9 +179,9 @@ def create_dataloader(dataset, mode="train", batch_size=1, num_workers=1, batchi
 
 
 class EvalTxtDataset(Dataset):
-    def __init__(self, jsonl_filename, max_txt_length=24, tokenizer=None):
-        assert os.path.exists(jsonl_filename), "The annotation datafile {} not exists!".format(jsonl_filename)
-
+    def __init__(self, filename, max_txt_length=24, tokenizer=None):
+        assert os.path.exists(filename), "The annotation datafile {} not exists!".format(filename)
+        jsonl_filename = filename
         logging.debug(f"Loading jsonl data from {jsonl_filename}.")
         self.texts = []
         with open(jsonl_filename, "r", encoding="utf-8") as fin:
@@ -237,7 +237,7 @@ class EvalImgDataset(Dataset):
         image_bytes.seek(0)
         image = Image.open(image_bytes)
         image = self.transform(image)
-        if type(img_id) != int:
+        if img_id.isnumeric():
             img_id = int(img_id)
 
         return img_id, image
