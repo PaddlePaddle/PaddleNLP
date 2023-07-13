@@ -30,4 +30,5 @@ try:
     relevant_modified_files = [x for x in modified_files if regex.match(x)]
     print(" ".join(relevant_modified_files), end="")
 except Exception as e:
-    print(e.output)
+    print("error!")
+    print(e)
