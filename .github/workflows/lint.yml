@@ -26,5 +26,7 @@ jobs:
           python -m pip install --upgrade pip
           make install
       - name: run the command
-        run: make lint
+        run: |
+          git merge-base develop HEAD
+          make lint
     
