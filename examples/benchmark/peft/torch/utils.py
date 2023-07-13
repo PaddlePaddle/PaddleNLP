@@ -12,20 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
-from dataclasses import dataclass
-
-import numpy as np
 from transformers import (
-    DataCollatorForSeq2Seq,
     Trainer,
     TrainerCallback,
     TrainerControl,
     TrainerState,
     TrainingArguments,
 )
-
-IGNORE_INDEX = -100
 
 
 class CustomTrainer(Trainer):
@@ -48,52 +41,3 @@ class ProfilerCallback(TrainerCallback):
 
     def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
         self.prof.step()
-
-
-@dataclass
-class DataCollatorForSupervisedDataset(DataCollatorForSeq2Seq):
-    """Collate examples for supervised fine-tuning."""
-
-    def __call__(self, features, return_tensors=None):
-        # Deep copy to avoid modifying features in-place
-        batch = copy.deepcopy(features)
-        if return_tensors is None:
-            return_tensors = self.return_tensors
-        labels = [feature["labels"] for feature in batch] if "labels" in batch[0].keys() else None
-        # We have to pad the labels before calling `tokenizer.pad` as this method won't pad them and needs them of the
-        # same length to return tensors.
-        if labels is not None:
-            # Note(gongenlei): In pipeline, max_label_length = self.max_length
-            if self.padding == "max_length" and self.max_length is not None:
-                max_label_length = self.max_length
-            else:
-                max_label_length = max(len(l) for l in labels)
-            if self.pad_to_multiple_of is not None:
-                max_label_length = (
-                    (max_label_length + self.pad_to_multiple_of - 1)
-                    // self.pad_to_multiple_of
-                    * self.pad_to_multiple_of
-                )
-
-            padding_side = self.tokenizer.padding_side
-            for feature in batch:
-                remainder = [IGNORE_INDEX] * (max_label_length - len(feature["labels"]))
-                if isinstance(feature["labels"], list):
-                    feature["labels"] = (
-                        feature["labels"] + remainder if padding_side == "right" else remainder + feature["labels"]
-                    )
-                elif padding_side == "right":
-                    feature["labels"] = np.concatenate([feature["labels"], remainder]).astype(np.int64)
-                else:
-                    feature["labels"] = np.concatenate([remainder, feature["labels"]]).astype(np.int64)
-
-        batch = self.tokenizer.pad(
-            batch,
-            padding=self.padding,
-            max_length=self.max_length,
-            pad_to_multiple_of=self.pad_to_multiple_of,
-            return_tensors=return_tensors,
-            return_attention_mask=True,
-        )
-
-        return batch

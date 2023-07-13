@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from dataclasses import dataclass, field
 from typing import Optional
 
 import paddle.profiler as profiler
 from datasets import load_dataset
-from utils import CustomTrainer, DataCollatorForSupervisedDataset, ProfilerCallback
+from utils import CustomTrainer, ProfilerCallback
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.peft import LoRAConfig, LoRAModel
@@ -27,6 +28,9 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     ChatGLMForConditionalGeneration,
 )
+
+os.environ["http_proxy"] = "http://172.19.56.199:3128"
+os.environ["https_proxy"] = "http://172.19.56.199:3128"
 
 """
 单卡
@@ -63,9 +67,7 @@ class ModelArguments:
     lora: Optional[bool] = field(default=False, metadata={"help": "whether to use LoRA"})
     english: Optional[bool] = field(default=False, metadata={"help": "whether to english benchmark dataset"})
     profiler: Optional[bool] = field(default=False, metadata={"help": "whether to use profiler"})
-    padding_to_max_length: Optional[bool] = field(
-        default=False, metadata={"help": "whether to padding to  fixd max length"}
-    )
+    train_data_size: int = field(default=1000, metadata={"help": "Number of dataset for training"})
 
 
 def main():
@@ -144,7 +146,7 @@ def main():
         dataset = load_dataset("Chinese-Vicuna/guanaco_belle_merge_v1.0")
 
     # select first 10k examples for benchmarking
-    dataset = dataset["train"].select(range(1000))
+    dataset = dataset["train"].select(range(model_args.train_data_size))
     dataset = dataset.map(
         lambda example: preprocess_function(example), remove_columns=["instruction", "input", "output"]
     )
@@ -157,12 +159,8 @@ def main():
             scheduler=profiler.make_scheduler(closed=1, ready=2, record=1, repeat=1),
             on_trace_ready=profiler.export_chrome_tracing("./log"),
         )
-    if model_args.padding_to_max_length:
-        data_collator = DataCollatorForSupervisedDataset(
-            return_tensors="pd", tokenizer=tokenizer, padding="max_length", max_length=768
-        )
-    else:
-        data_collator = DataCollatorForSeq2Seq(return_tensors="pd", tokenizer=tokenizer)
+
+    data_collator = DataCollatorForSeq2Seq(return_tensors="pd", tokenizer=tokenizer)
 
     trainer = CustomTrainer(
         model=model,

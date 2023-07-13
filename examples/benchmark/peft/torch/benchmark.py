@@ -29,7 +29,7 @@ from transformers import (
     LlamaTokenizer,
     TrainingArguments,
 )
-from utils import CustomTrainer, DataCollatorForSupervisedDataset, ProfilerCallback
+from utils import CustomTrainer, ProfilerCallback
 
 """
 单卡
@@ -68,9 +68,7 @@ class ModelArguments:
     )
     bits: int = field(default=4, metadata={"help": "How many bits to use."})
     max_memory_MB: int = field(default=80000, metadata={"help": "Free memory per gpu."})
-    padding_to_max_length: Optional[bool] = field(
-        default=False, metadata={"help": "whether to padding to  fixd max length"}
-    )
+    train_data_size: int = field(default=1000, metadata={"help": "Number of dataset for training"})
 
 
 def main():
@@ -80,10 +78,8 @@ def main():
     if "llama" in model_args.model_name_or_path:
         tokenizer = LlamaTokenizer.from_pretrained(model_args.model_name_or_path, use_fast=False)
         tokenizer.pad_token_id = 0
-    elif "chatglm" in model_args.model_name_or_path:
-        tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
     else:
-        tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+        tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, trust_remote_code=True)
 
     compute_dtype = torch.float16 if training_args.fp16 else (torch.bfloat16 if training_args.bf16 else torch.float32)
     if "chatglm" in model_args.model_name_or_path:
@@ -176,7 +172,7 @@ def main():
         dataset = load_dataset("Chinese-Vicuna/guanaco_belle_merge_v1.0")
 
     # select first 10k examples for benchmarking
-    dataset = dataset["train"].select(range(1000))
+    dataset = dataset["train"].select(range(model_args.train_data_size))
     dataset = dataset.map(
         lambda example: preprocess_function(example), remove_columns=["instruction", "input", "output"]
     )
@@ -194,12 +190,7 @@ def main():
             with_stack=True,
         )
 
-    if model_args.padding_to_max_length:
-        data_collator = DataCollatorForSupervisedDataset(
-            return_tensors="pt", tokenizer=tokenizer, padding="max_length", max_length=768
-        )
-    else:
-        data_collator = DataCollatorForSeq2Seq(return_tensors="pt", tokenizer=tokenizer)
+    data_collator = DataCollatorForSeq2Seq(return_tensors="pt", tokenizer=tokenizer)
 
     trainer = CustomTrainer(
         model=model,
