@@ -55,6 +55,7 @@ python predict.py \
 ![zh_code-to-text_examples-1](https://github.com/KB-Ding/PaddleNLP/assets/13767887/2d1ba091-f43c-4f3e-95c6-0038ede9e63e)
 
 - 计算机术语翻译（zero-shot）
+
 ![zero-shot-mt-examples](https://github.com/KB-Ding/PaddleNLP/assets/13767887/8be1a977-fa21-4a46-86ba-136fa8276a1a)
 
 

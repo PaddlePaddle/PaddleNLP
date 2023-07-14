@@ -50,6 +50,7 @@ Explanation of parameters in the configuration file:
 ![zh_code-to-text_examples-1](https://github.com/KB-Ding/PaddleNLP/assets/13767887/2d1ba091-f43c-4f3e-95c6-0038ede9e63e)
 
 - Multilingual text-to-text translation (zero-shot)
+
 ![zero-shot-mt-examples](https://github.com/KB-Ding/PaddleNLP/assets/13767887/8be1a977-fa21-4a46-86ba-136fa8276a1a)
 
 
