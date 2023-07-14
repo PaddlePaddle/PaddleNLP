@@ -198,6 +198,7 @@ class CoreAttention(nn.Layer):
             attention_mask = ~attention_mask
 
         if attention_mask is not None:
+            print("paddle.where", attention_mask)
             attention_scores = paddle.where(
                 attention_mask > 0,
                 paddle.full_like(attention_scores, paddle.finfo(attention_scores.dtype).min),
@@ -545,14 +546,15 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
             full_attention_mask = paddle.concat(
                 [paddle.ones([batch_size, seq_length, past_length]), full_attention_mask], axis=-1
             )
-        print(full_attention_mask.shape, padding_mask.shape)
         if padding_mask is not None:
             full_attention_mask = full_attention_mask * padding_mask.unsqueeze(1)
         if not past_length and padding_mask is not None:
+            print("we are here yo")
+            print(full_attention_mask)
             full_attention_mask -= padding_mask.unsqueeze(-1) - 1
+            print(full_attention_mask)
         full_attention_mask = (full_attention_mask < 0.5).astype("bool")
-        full_attention_mask.unsqueeze(1)
-        return full_attention_mask
+        return full_attention_mask.unsqueeze(1)
 
     def get_position_ids(self, input_ids):
         batch_size, seq_length = input_ids.shape
@@ -678,6 +680,8 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
             if (attention_mask is not None and not attention_mask.astype("bool").all()) or (
                 past_key_values and seq_length != 1
             ):
+                print("we got here!")
+                print(attention_mask)
                 full_attention_mask = self.get_masks(input_ids, past_key_values, padding_mask=attention_mask)
 
         # Rotary positional embeddings
@@ -779,6 +783,7 @@ class ChatGLMv2ForConditionalGeneration(ChatGLMv2PretrainedModel):
     ):
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        print("attention_mask", attention_mask.shape)
 
         transformer_outputs = self.chatglm_v2(
             input_ids=input_ids,

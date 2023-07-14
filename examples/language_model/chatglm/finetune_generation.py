@@ -18,7 +18,7 @@ from functools import partial
 
 import numpy as np
 import paddle
-from data import convert_example, read_local_dataset
+from data import convert_chatglm_example, convert_chatglm_v2_example, read_local_dataset
 from sklearn.metrics import accuracy_score
 from utils import ChatGLMTrainer
 
@@ -31,7 +31,7 @@ from paddlenlp.peft.prefix import (
     chatglm_postprocess_past_key_value,
 )
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
-from paddlenlp.transformers import ChatGLMForConditionalGeneration, ChatGLMTokenizer
+from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -100,7 +100,7 @@ def main():
             dtype = "float16"
 
     # Load the pretrained language model.
-    model = ChatGLMForConditionalGeneration.from_pretrained(
+    model = AutoModelForConditionalGeneration.from_pretrained(
         model_args.model_name_or_path,
         dtype=dtype,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
@@ -185,7 +185,7 @@ def main():
         qat = QAT(q_config)
         model = qat.quantize(model, inplace=True)
 
-    tokenizer = ChatGLMTokenizer.from_pretrained(model_args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load the dataset.
     if os.path.exists(os.path.join(data_args.task_name_or_path, "train.json")) and os.path.exists(
@@ -202,6 +202,9 @@ def main():
     else:
         train_ds, dev_ds = load_dataset(data_args.task_name_or_path, splits=["train", "dev"])
 
+    convert_example = (
+        convert_chatglm_v2_example if "chatglm2" in model_args.model_name_or_path else convert_chatglm_example
+    )
     trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
     train_ds = train_ds.map(partial(trans_func, is_test=False))
     dev_ds = dev_ds.map(partial(trans_func, is_test=model_args.eval_with_do_generation))
