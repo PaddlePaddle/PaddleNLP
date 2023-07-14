@@ -20,7 +20,6 @@ from abc import abstractmethod
 from multiprocessing import cpu_count
 
 import paddle
-from custom_setup_ops import save_with_output  # noqa F401
 from paddle.dataset.common import md5file
 
 from ..utils.env import PPNLP_HOME
