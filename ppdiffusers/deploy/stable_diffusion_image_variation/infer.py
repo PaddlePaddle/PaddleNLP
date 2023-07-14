@@ -242,9 +242,9 @@ def main(args):
     bs = 2
 
     image_encoder_dynamic_shape = {
-        "input_ids": {
-            "min_shape": [1, 3, 128, 128],
-            "max_shape": [1, 3, 512, 512],
+        "pixel_values": {
+            "min_shape": [1, 3, 224, 224],
+            "max_shape": [1, 3, 224, 224],
             "opt_shape": [1, 3, 224, 224],
         }
     }
@@ -277,9 +277,9 @@ def main(args):
             "opt_shape": [1],
         },
         "encoder_hidden_states": {
-            "min_shape": [1, 3, 128, 128],
-            "max_shape": [bs, 3, 512, 512],
-            "opt_shape": [2, 3, 512, 512],
+            "min_shape": [1, 1, 768],
+            "max_shape": [bs, 1, 768],
+            "opt_shape": [2, 1, 768],
         },
     }
     # 4. Init runtime

@@ -58,7 +58,7 @@ def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
     image_encoder = paddle.jit.to_static(
         pipeline.image_encoder,
         input_spec=[
-            paddle.static.InputSpec(shape=[None, 3, None, None], dtype="float32", name="pixel_values")
+            paddle.static.InputSpec(shape=[None, 3, 224, 224], dtype="float32", name="pixel_values")
         ],  # pixel_values
     )
     save_path = os.path.join(args.output_path, "image_encoder", "inference")
