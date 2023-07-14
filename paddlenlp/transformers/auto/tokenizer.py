@@ -54,6 +54,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("ErnieGramTokenizer", "ernie_gram"),
         ("ErnieLayoutTokenizer", "ernie_layout"),
         ("ErnieMTokenizer", "ernie_m"),
+        ("ErnieCodeTokenizer", "ernie_code"),
         ("ErnieTokenizer", "ernie"),
         ("FNetTokenizer", "fnet"),
         ("FunnelTokenizer", "funnel"),

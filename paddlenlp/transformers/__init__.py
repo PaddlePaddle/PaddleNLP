@@ -173,6 +173,9 @@ from .transformer.modeling import *
 from .unified_transformer.modeling import *
 from .unified_transformer.tokenizer import *
 from .unified_transformer.configuration import *
+from .ernie_code.tokenizer import *
+from .ernie_code.modeling import *
+from .ernie_code.configuration import *
 from .ernie_vil.configuration import *
 from .ernie_vil.modeling import *
 from .ernie_vil.feature_extraction import *
