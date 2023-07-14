@@ -496,7 +496,7 @@ class Trainer:
 
         meta_dict_list = self._all_gather_simple_object(meta_dict, group)
         meta_list = [(k, v) for meta in meta_dict_list for (k, v) in meta.items()]
-        meta_list = sorted(meta_list, key=lambda x: x[1])
+        meta_list = sorted(meta_list, key=lambda x: x[0])
         for (k, meta) in meta_list:
             dtype, shape, rank = meta
             if rank == group.rank:
