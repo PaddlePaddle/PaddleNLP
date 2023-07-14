@@ -96,7 +96,7 @@ for line in `cat scripts/regression/model_list.txt`;do
 done
 cd ${nlp_dir}
 get_diff_TO_P0case(){
-for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
+for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
     arr_file_name=(${file_name//// })
     dir1=${arr_file_name[0]}
     dir2=${arr_file_name[1]}
@@ -107,6 +107,8 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
         continue
     elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
         continue
+    elif [[ "${AGILE_COMPILE_BRANCH}" == "refactor-training-loop" ]];then
+        P0case_list[${#P0case_list[*]}]=gpt
     elif [[ ${dir1} =~ "scripts" ]];then # API 升级
         if [[ ${dir2} =~ "should_deploy" ]];then # 针对发版mini test
             P0case_list[${#P0case_list[*]}]=transformer
