@@ -31,6 +31,7 @@ from paddlenlp.utils.log import logger
 def main():
     parser = PdArgumentParser((SDModelArguments, SDDataArguments, SDTrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    training_args.train_text_encoder = model_args.train_text_encoder
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
 
@@ -86,7 +87,21 @@ def main():
     )
 
     if model_args.train_text_encoder:
-        params_to_train = itertools.chain(model.text_encoder.parameters(), model.unet.parameters())
+        if training_args.text_encoder_learning_rate == training_args.unet_learning_rate:
+            params_to_train = itertools.chain(model.text_encoder.parameters(), model.unet.parameters())
+        else:
+            # overwrite default learning rate with 1.0
+            training_args.learning_rate = 1.0
+            params_to_train = [
+                {
+                    "params": model.text_encoder.parameters(),
+                    "learning_rate": training_args.text_encoder_learning_rate,
+                },
+                {
+                    "params": model.unet.parameters(),
+                    "learning_rate": training_args.unet_learning_rate,
+                },
+            ]
     else:
         params_to_train = model.unet.parameters()
     trainer.set_optimizer_grouped_parameters(params_to_train)

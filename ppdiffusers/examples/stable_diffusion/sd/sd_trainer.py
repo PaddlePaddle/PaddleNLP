@@ -77,6 +77,16 @@ class VisualDLWithImageCallback(VisualDLCallback):
         if self.vdl_writer is None:
             self._init_summary_writer(args)
 
+        base_learning_rate = logs.get("learning_rate", None)
+        if base_learning_rate is not None:
+            logs["unet_lr"] = base_learning_rate
+            if args.train_text_encoder:
+                if args.text_encoder_learning_rate != args.unet_learning_rate:
+                    logs["unet_lr"] = base_learning_rate * args.unet_learning_rate
+                    logs["text_encoder_lr"] = base_learning_rate * args.text_encoder_learning_rate
+                else:
+                    logs["text_encoder_lr"] = base_learning_rate
+
         if self.vdl_writer is not None:
             logs = rewrite_logs(logs)
             for k, v in logs.items():
