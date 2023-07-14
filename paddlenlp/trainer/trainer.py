@@ -480,34 +480,41 @@ class Trainer:
     def _all_gather_state_dict(self, state_dict, filter_func, group=None):
         if group is None:
             group = self.hcg.get_sharding_parallel_group()
-        state_list = list(state_dict.items())
+        res = OrderedDict()
 
         def map_func(weight):
             if isinstance(weight, paddle.Tensor):
                 weight = weight.numpy()
             return weight
 
-        state_list = [(e[0], map_func(e[1])) for e in state_list]
-        len_res = []
-        obj_len = paddle.to_tensor(len(state_list))
-        gather_res = OrderedDict()
-        paddle.distributed.all_gather(len_res, obj_len, group=group)
-        max_len = int(max(len_res).item())
-        for i in range(max_len):
-            tmp = []
-            if i >= obj_len:
-                send_item = ("pack", np.array([]))
+        state_dict = {k: map_func(v) for (k, v) in state_dict.items()}
+
+        meta_dict = {}
+        for (k, v) in state_dict.items():
+            v = map_func(v)
+            # src rank
+            meta_dict[k] = (v.dtype, v.shape, group.rank)
+
+        meta_dict_list = self._all_gather_simple_object(meta_dict, group)
+        meta_list = [(k, v) for meta in meta_dict_list for (k, v) in meta]
+        meta_list = sorted(meta_list, key=lambda x: x[1])
+        for (k, meta) in meta_list:
+            dtype, shape, rank = meta
+            if rank == group.rank:
+                assert k in state_dict
+                tensor = paddle.to_tensor(v)
             else:
-                send_item = state_list[i]
-            paddle.distributed.all_gather_object(tmp, send_item, group=group)
-            for recv_item in tmp:
-                if recv_item[0] == "pack" and recv_item[1].size == 0:
-                    continue
-                if not filter_func(recv_item[0]):
-                    continue
-                gather_res[recv_item[0]] = paddle.to_tensor(recv_item[1], place=paddle.CPUPlace())
-                print(f"{i} gather {recv_item[0]} ")
-        return gather_res
+                tensor = paddle.to_tensor(np.zero(shape, dtype))
+            # broadcast the tensor
+            paddle.distributed.broadcast(
+                tensor,
+                src=group.ranks[rank],
+                group=group,
+                sync_op=True,
+            )
+            if filter_func(k):
+                res[k] = tensor.cpu()
+        return res
 
     def load_state_dict_from_checkpoint_with_reshard(self, resume_from_checkpoint):
         """load state_dict from_checkpoint with reshard, Only load model state dict."""
@@ -2168,7 +2175,7 @@ class Trainer:
 
         if not need_reshard():
             logger.info("do not need reshard")
-            return self._load_optimizer_state_of_one_shard(checkpoint, self.args.optimizer_name_suffix)
+            #return self._load_optimizer_state_of_one_shard(checkpoint, self.args.optimizer_name_suffix)
         logger.info("reshard optimizer state")
         state_dict = OrderedDict()
         master_weights = OrderedDict()
@@ -2212,14 +2219,24 @@ class Trainer:
         optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
         param2rank = optimizer._param2rank
 
+        def all_gather_state_dict(state_dict, filter_func):
+            remote_state_dict_keys = [k for k in state_dict.keys() if not filter_func(k)]
+            tmp_state_dict = OrderedDict()
+            for k in remote_state_dict_keys:
+                tmp_state_dict[k] = state_dict[k]
+                state_dict.pop(k)
+            tmp_state_dict = self._all_gather_state_dict(tmp_state_dict, opt_filter_func)
+            for (k, v) in tmp_state_dict.items():
+                state_dict[k] = v
+            return state_dict
+
         def opt_filter_func(name):
             assert name in opt_to_p, f"name {name} not in opt_to_p"
             param_name = opt_to_p[name]
             assert param_name in param2rank, f"param_name {param_name} not in param2rank param2"
             return param2rank[param_name] == self.args.sharding_parallel_rank
 
-        # state dict
-        state_dict = self._all_gather_state_dict(state_dict, opt_filter_func)
+        state_dict = all_gather_state_dict(state_dict, opt_filter_func)
 
         def master_weights_filter_func(name):
             assert (name in param2rank) or (name in opt_to_p), f"name {name} not in param2rank or opt_to_p"
@@ -2228,7 +2245,7 @@ class Trainer:
             return param2rank[name] == self.args.sharding_parallel_rank
 
         # master weights
-        master_weights = self._all_gather_state_dict(master_weights, master_weights_filter_func)
+        master_weights = all_gather_state_dict(master_weights, master_weights_filter_func)
         state_dict["master_weights"] = master_weights
 
         # lr scheduler
