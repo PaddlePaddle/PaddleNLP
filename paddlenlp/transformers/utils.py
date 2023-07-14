@@ -684,11 +684,24 @@ def paddlenlp_load(path, map_location="cpu"):
     else:
         with device_guard(map_location):
             if map_location == "cpu":
-                # Hack for zero copy for saving loading time. for paddle.load there need copy to create paddle.Tensor
+                from paddle.framework.io import (
+                    _parse_every_object,
+                    _to_LodTensor,
+                    _transformed_from_lodtensor,
+                )
+
+                def _ndarray_to_tensor(obj, return_numpy=False):
+                    if return_numpy:
+                        return obj
+                    if paddle.fluid.framework.in_dygraph_mode():
+                        return paddle.Tensor(obj, zero_copy=True)
+                    else:
+                        return _to_LodTensor(obj)
+
                 state_dict = paddle.load(path, return_numpy=True)
-                for key in list(state_dict.keys()):
-                    if isinstance(state_dict[key], np.ndarray):
-                        state_dict[key] = paddle.Tensor(state_dict.pop(key), zero_copy=True)
+                # Hack for zero copy for saving loading time. for paddle.load there need copy to create paddle.Tensor
+                _parse_every_object(state_dict, _transformed_from_lodtensor, _ndarray_to_tensor)
+
                 return state_dict
             else:
                 return paddle.load(path)
