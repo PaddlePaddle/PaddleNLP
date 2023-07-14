@@ -17,6 +17,7 @@ import os
 import random
 
 import paddle
+import pandas as pd
 from tqdm.auto import tqdm
 
 from ppdiffusers import (
@@ -42,7 +43,7 @@ def batchify(data, batch_size=16):
 def generate_images(
     model_name_or_path,
     batch_size=16,
-    file="./data/mscoco.en.1k",
+    file="coco30k.csv",
     save_path="output",
     seed=42,
     scheduler_type="ddim",
@@ -88,9 +89,8 @@ def generate_images(
         raise ValueError(f"Scheduler of type {scheduler_type} doesn't exist!")
     pipe.scheduler = scheduler
     # read file
-    with open(file, "r") as f:
-        all_prompt = [p.strip() for p in f.readlines()]
-
+    df = pd.read_csv(file, sep="\t")
+    all_prompt = df["caption_en"].tolist()
     for cfg in guidance_scales:
         new_save_path = os.path.join(save_path, f"mscoco.en_g{cfg}")
         os.makedirs(new_save_path, exist_ok=True)
@@ -119,7 +119,7 @@ if __name__ == "__main__":
     parser.add_argument("--model_name_or_path", default=None, type=str, required=True, help="model_name_or_path.")
     parser.add_argument(
         "--file",
-        default="./mscoco.en.1k",
+        default="./coco30k.tsv",
         type=str,
         help="eval file.",
     )
