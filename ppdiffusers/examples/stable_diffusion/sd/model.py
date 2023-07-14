@@ -111,6 +111,29 @@ class StableDiffusionModel(nn.Layer):
         self.use_ema = False
         self.model_ema = None
 
+    def compute_snr(self, timesteps):
+        """
+        Computes SNR as per https://github.com/TiankaiHang/Min-SNR-Diffusion-Training/blob/521b624bd70c67cee4bdf49225915f5945a872e3/guided_diffusion/gaussian_diffusion.py#L847-L849
+        """
+        sqrt_alphas_cumprod = self.alphas_cumprod**0.5
+        sqrt_one_minus_alphas_cumprod = (1.0 - self.alphas_cumprod) ** 0.5
+
+        # Expand the tensors.
+        # Adapted from https://github.com/TiankaiHang/Min-SNR-Diffusion-Training/blob/521b624bd70c67cee4bdf49225915f5945a872e3/guided_diffusion/gaussian_diffusion.py#L1026
+        sqrt_alphas_cumprod = sqrt_alphas_cumprod[timesteps].cast("float32")
+        while len(sqrt_alphas_cumprod.shape) < len(timesteps.shape):
+            sqrt_alphas_cumprod = sqrt_alphas_cumprod[..., None]
+        alpha = sqrt_alphas_cumprod.expand(timesteps.shape)
+
+        sqrt_one_minus_alphas_cumprod = sqrt_one_minus_alphas_cumprod[timesteps].cast("float32")
+        while len(sqrt_one_minus_alphas_cumprod.shape) < len(timesteps.shape):
+            sqrt_one_minus_alphas_cumprod = sqrt_one_minus_alphas_cumprod[..., None]
+        sigma = sqrt_one_minus_alphas_cumprod.expand(timesteps.shape)
+
+        # Compute SNR.
+        snr = (alpha / sigma) ** 2
+        return snr
+
     def forward(self, input_ids=None, pixel_values=None, **kwargs):
         self.vae.eval()
         if not self.model_args.train_text_encoder:
@@ -119,22 +142,32 @@ class StableDiffusionModel(nn.Layer):
         # vae encode
         latents = self.vae.encode(pixel_values).latent_dist.sample()
         latents = latents * self.vae.config.scaling_factor
+
+        # Sample noise that we'll add to the latents
         noise = paddle.randn(latents.shape)
         if self.model_args.noise_offset:
             # https://www.crosslabs.org//blog/diffusion-with-offset-noise
             noise += self.model_args.noise_offset * paddle.randn(
                 (latents.shape[0], latents.shape[1], 1, 1), dtype=noise.dtype
             )
+        if self.model_args.input_perturbation:
+            new_noise = noise + self.model_args.input_perturbation * paddle.randn(noise.shape, dtype=noise.dtype)
+
         timesteps = paddle.randint(0, self.noise_scheduler.config.num_train_timesteps, (latents.shape[0],)).cast(
             "int64"
         )
-        noisy_latents = self.add_noise(latents, noise, timesteps)
+        # Add noise to the latents according to the noise magnitude at each timestep
+        # (this is the forward diffusion process)
+        if self.model_args.input_perturbation:
+            noisy_latents = self.add_noise(latents, new_noise, timesteps)
+        else:
+            noisy_latents = self.add_noise(latents, noise, timesteps)
 
         # text encode
         encoder_hidden_states = self.text_encoder(input_ids)[0]
 
         # unet
-        noise_pred = self.unet(
+        model_pred = self.unet(
             sample=noisy_latents, timestep=timesteps, encoder_hidden_states=encoder_hidden_states
         ).sample
 
@@ -147,8 +180,25 @@ class StableDiffusionModel(nn.Layer):
             raise ValueError(f"Unknown prediction type {self.model_args.prediction_type}")
 
         # compute loss
-        loss = F.mse_loss(noise_pred.cast("float32"), target.cast("float32"), reduction="none").mean([1, 2, 3]).mean()
-
+        if self.model_args.snr_gamma is None:
+            loss = (
+                F.mse_loss(model_pred.cast("float32"), target.cast("float32"), reduction="none").mean([1, 2, 3]).mean()
+            )
+        else:
+            # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
+            # Since we predict the noise instead of x_0, the original formulation is slightly changed.
+            # This is discussed in Section 4.2 of the same paper.
+            snr = self.compute_snr(timesteps)
+            mse_loss_weights = (
+                paddle.stack([snr, self.model_args.snr_gamma * paddle.ones_like(timesteps)], axis=1).min(axis=1)[0]
+                / snr
+            )
+            # We first calculate the original loss. Then we mean over the non-batch dimensions and
+            # rebalance the sample-wise losses with their respective loss weights.
+            # Finally, we take the mean of the rebalanced loss.
+            loss = F.mse_loss(model_pred.cast("float32"), target.cast("float32"), reduction="none")
+            loss = loss.mean(list(range(1, len(loss.shape)))) * mse_loss_weights
+            loss = loss.mean()
         return loss
 
     def add_noise(
@@ -276,6 +326,9 @@ class StableDiffusionModel(nn.Layer):
             self.unet.enable_gradient_checkpointing()
             if self.model_args.train_text_encoder and hasattr(self.text_encoder, "gradient_checkpointing_enable"):
                 self.text_encoder.gradient_checkpointing_enable()
+
+    def gradient_checkpointing_enable(self):
+        self.set_recompute(True)
 
     def set_xformers(self, use_xformers=False):
         if use_xformers:
