@@ -600,7 +600,7 @@ def main():
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()
         if args.train_text_encoder:
-            text_encoder.recompute_enable()
+            set_recompute(text_encoder, True)
 
     if args.enable_xformers_memory_efficient_attention and is_ppxformers_available():
         try:
