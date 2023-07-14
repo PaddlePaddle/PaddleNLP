@@ -259,7 +259,8 @@ class FastDeployStableDiffusionTilingPipeline(
         if seed_tiles is not None:
             for row in range(grid_rows):
                 for col in range(grid_cols):
-                    if (seed_tile := seed_tiles[row][col]) is not None:
+                    seed_tile = seed_tiles[row][col]
+                    if seed_tile is not None:
                         mode = seed_tiles_mode[row][col]
                         if mode == self.SeedTilesMode.FULL.value:
                             row_init, row_end, col_init, col_end = _tile2latent_indices(
