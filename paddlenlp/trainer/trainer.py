@@ -480,34 +480,41 @@ class Trainer:
     def _all_gather_state_dict(self, state_dict, filter_func, group=None):
         if group is None:
             group = self.hcg.get_sharding_parallel_group()
-        state_list = list(state_dict.items())
+        res = OrderedDict()
 
         def map_func(weight):
             if isinstance(weight, paddle.Tensor):
                 weight = weight.numpy()
             return weight
 
-        state_list = [(e[0], map_func(e[1])) for e in state_list]
-        len_res = []
-        obj_len = paddle.to_tensor(len(state_list))
-        gather_res = OrderedDict()
-        paddle.distributed.all_gather(len_res, obj_len, group=group)
-        max_len = int(max(len_res).item())
-        for i in range(max_len):
-            tmp = []
-            if i >= obj_len:
-                send_item = ("pack", np.array([]))
+        state_dict = {k: map_func(v) for (k, v) in state_dict.items()}
+
+        meta_dict = {}
+        for (k, v) in state_dict.items():
+            # src rank
+            meta_dict[k] = (v.dtype, v.shape, group.rank)
+
+        meta_dict_list = self._all_gather_simple_object(meta_dict, group)
+        meta_list = [(k, v) for meta in meta_dict_list for (k, v) in meta.items()]
+        meta_list = sorted(meta_list, key=lambda x: x[1])
+        for (k, meta) in meta_list:
+            dtype, shape, rank = meta
+            if rank == group.rank:
+                assert k in state_dict
+                tensor = paddle.to_tensor(state_dict[k])
             else:
-                send_item = state_list[i]
-            paddle.distributed.all_gather_object(tmp, send_item, group=group)
-            for recv_item in tmp:
-                if recv_item[0] == "pack" and recv_item[1].size == 0:
-                    continue
-                if not filter_func(recv_item[0]):
-                    continue
-                gather_res[recv_item[0]] = paddle.to_tensor(recv_item[1], place=paddle.CPUPlace())
-                print(f"{i} gather {recv_item[0]} ")
-        return gather_res
+                tensor = paddle.to_tensor(np.zeros(shape, dtype))
+            logger.info(f"broadcast {k} from {rank}")
+            # broadcast the tensor
+            paddle.distributed.broadcast(
+                tensor,
+                src=group.ranks[rank],
+                group=group,
+                sync_op=True,
+            )
+            if filter_func(k):
+                res[k] = tensor.cpu()
+        return res
 
     def load_state_dict_from_checkpoint_with_reshard(self, resume_from_checkpoint):
         """load state_dict from_checkpoint with reshard, Only load model state dict."""
@@ -573,6 +580,30 @@ class Trainer:
             if resume_from_checkpoint is None:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
         return resume_from_checkpoint
+
+    def _load_check_point(self, resume_from_checkpoint, delay_optimizer_creation, max_steps):
+        # Check if saved optimizer or scheduler states exist
+        self._load_optimizer_and_scheduler(resume_from_checkpoint)
+        self.load_state_dict_from_checkpoint(resume_from_checkpoint)
+        model = self._wrap_model(self.model_wrapped)
+        # for the rest of this function `model` is the outside model, whether it was wrapped or not
+        if model is not self.model:
+            self.model_wrapped = model
+        if delay_optimizer_creation:
+            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+        return model
+
+    def _load_sharded_check_point(self, resume_from_checkpoint, delay_optimizer_creation, max_steps):
+        model = self._wrap_model(self.model_wrapped)
+        # for the rest of this function `model` is the outside model, whether it was wrapped or not
+        if model is not self.model:
+            self.model_wrapped = model
+        if delay_optimizer_creation:
+            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+        # Check if saved optimizer or scheduler states exist
+        self._load_optimizer_and_scheduler(resume_from_checkpoint)
+        self.load_state_dict_from_checkpoint(resume_from_checkpoint)
+        return model
 
     def train(
         self,
@@ -642,25 +673,15 @@ class Trainer:
         #     and ShardingOption.SHARD_OP in self.args.sharding
         # )
         delay_optimizer_creation = False
-
         if not delay_optimizer_creation:
             self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
         self.state = TrainerState()
 
-        model = self._wrap_model(self.model_wrapped)
-
-        # for the rest of this function `model` is the outside model, whether it was wrapped or not
-        if model is not self.model:
-            self.model_wrapped = model
-
-        if delay_optimizer_creation:
-            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-
-        # Check if saved optimizer or scheduler states exist
-        self._load_optimizer_and_scheduler(resume_from_checkpoint)
-
-        self.load_state_dict_from_checkpoint(resume_from_checkpoint)
+        if self.args.load_sharding_stage1_model:
+            model = self._load_sharded_check_point(resume_from_checkpoint, delay_optimizer_creation, max_steps)
+        else:
+            model = self._load_check_point(resume_from_checkpoint, delay_optimizer_creation, max_steps)
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples}")
@@ -703,7 +724,8 @@ class Trainer:
                 steps_trained_in_current_epoch *= args.gradient_accumulation_steps
             else:
                 steps_trained_in_current_epoch = 0
-
+            # save right away
+            self._save_checkpoint(self.model)
             logger.info("  Continuing training from checkpoint, will skip to saved global_step")
             logger.info(f"  Continuing training from epoch {epochs_trained}")
             logger.info(f"  Continuing training from global step {self.state.global_step}")
@@ -1762,14 +1784,27 @@ class Trainer:
 
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
+        def get_optimizer_state():
+            optimizer_state_dict = self.optimizer.state_dict()
+            optimizer = self.optimizer
+            while hasattr(optimizer, "_inner_opt"):
+                optimizer = optimizer._inner_opt
+            unused = optimizer._accumulators_holder
+            state = OrderedDict()
+            for (k, v) in unused.items():
+                state[k] = v
+            for (k, v) in optimizer_state_dict.items():
+                state[k] = v
+            return state
+
         if self.args.use_hybrid_parallel:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
-                self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, optimizer_name))
+                self.save_func(get_optimizer_state(), os.path.join(output_dir, optimizer_name))
 
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
-                self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+                self.save_func(get_optimizer_state(), os.path.join(output_dir, OPTIMIZER_NAME))
 
             # FIXME: manybe only save one copy
             self.save_func(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
@@ -2184,14 +2219,24 @@ class Trainer:
         optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
         param2rank = optimizer._param2rank
 
+        def all_gather_state_dict(state_dict, filter_func):
+            remote_state_dict_keys = [k for k in state_dict.keys() if not filter_func(k)]
+            tmp_state_dict = OrderedDict()
+            for k in remote_state_dict_keys:
+                tmp_state_dict[k] = state_dict[k]
+                state_dict.pop(k)
+            tmp_state_dict = self._all_gather_state_dict(tmp_state_dict, filter_func)
+            for (k, v) in tmp_state_dict.items():
+                state_dict[k] = v
+            return state_dict
+
         def opt_filter_func(name):
             assert name in opt_to_p, f"name {name} not in opt_to_p"
             param_name = opt_to_p[name]
             assert param_name in param2rank, f"param_name {param_name} not in param2rank param2"
             return param2rank[param_name] == self.args.sharding_parallel_rank
 
-        # state dict
-        state_dict = self._all_gather_state_dict(state_dict, opt_filter_func)
+        state_dict = all_gather_state_dict(state_dict, opt_filter_func)
 
         def master_weights_filter_func(name):
             assert (name in param2rank) or (name in opt_to_p), f"name {name} not in param2rank or opt_to_p"
@@ -2200,7 +2245,7 @@ class Trainer:
             return param2rank[name] == self.args.sharding_parallel_rank
 
         # master weights
-        master_weights = self._all_gather_state_dict(master_weights, master_weights_filter_func)
+        master_weights = all_gather_state_dict(master_weights, master_weights_filter_func)
         state_dict["master_weights"] = master_weights
 
         # lr scheduler
