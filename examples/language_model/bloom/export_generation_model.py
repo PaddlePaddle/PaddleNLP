@@ -56,7 +56,6 @@ def main():
     args = parse_args()
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     config = BloomConfig.from_pretrained(args.model_name_or_path)
-    config.use_recompute = False
     if args.lora_path is not None:
         lora_config = LoRAConfig.from_pretrained(args.lora_path)
         dtype = lora_config.dtype
