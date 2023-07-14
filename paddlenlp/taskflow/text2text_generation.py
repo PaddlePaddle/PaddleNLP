@@ -108,7 +108,10 @@ class ChatGLMTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        tokenizer_instance = ChatGLMTokenizer.from_pretrained(model)
+        if self.is_static_model:
+            tokenizer_instance = ChatGLMTokenizer.from_pretrained(self._task_path)
+        else:
+            tokenizer_instance = ChatGLMTokenizer.from_pretrained(model)
 
         self._tokenizer = tokenizer_instance
 
