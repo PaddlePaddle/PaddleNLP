@@ -1279,29 +1279,52 @@ gpt-3() {
 }
 llama(){
     cd ${nlp_dir}/examples/language_model/llama/
-    # install the dependency packages
-    pip install -r requirements.txt
     # lora tuning 
-    python finetune_generation.py \
-        --model_name_or_path facebook/tiny-random-llama \
-        --do_train \
-        --num_train_epochs 2 \
-        --per_device_train_batch_size 2 \
-        --per_device_eval_batch_size 2 \
-        --overwrite_output_dir \
+    python -u  -m paddle.distributed.fleet.launch finetune_generation.py \
         --output_dir ./checkpoints/ \
+        --per_device_train_batch_size 2 \
+        --gradient_accumulation_steps 2 \
+        --per_device_eval_batch_size 4 \
+        --model_name_or_path facebook/tiny-random-llama  \
+        --task_name squad \
+        --warmup_steps 30 \
         --logging_steps 1 \
         --max_steps 1 \
+        --save_steps 1 \
+        --evaluation_strategy epoch \
+        --save_strategy epoch \
+        --src_length 1024 \
+        --tgt_length 1024 \
         --fp16 \
         --fp16_opt_level O2 \
-        --gradient_accumulation_steps 2 \
+        --do_train \
+        --disable_tqdm True \
+        --load_best_model_at_end True \
+        --metric_for_best_model accuracy \
+        --eval_with_do_generation False \
         --recompute \
-        --learning_rate 3e-4 \
-        --lr_scheduler_type linear \
-        --max_grad_norm 1.0 \
-        --warmup_steps 20 \
-        --lora True \
-        --r 1 >${log_path}/llama_finetune>>${log_path}/llama_finetune 2>&1
+        --save_total_limit 1 \
+        --overwrite_output_dir  >${log_path}/llama_finetune>>${log_path}/llama_finetune 2>&1
     print_info $? llama_finetune
+}
+bloom(){
+cd ${nlp_dir}examples/language_model/bloom
+python -m paddle.distributed.launch finetune_generation.py \
+    --model_name_or_path bigscience/bloom-560m \
+    --task_name_or_path "dureader_qg" \
+    --output_dir ./checkpoints/bloom-560m \
+    --per_device_train_batch_size 2 \
+    --gradient_accumulation_steps 2 \
+    --per_device_eval_batch_size 4 \
+    --logging_steps 1 \
+    --max_steps 1 \
+    --save_steps 1 \
+    --evaluation_strategy epoch \
+    --save_strategy epoch \
+    --tensor_parallel_degree 2 \
+    --recompute \
+    --save_total_limit 1 \
+    --scale_loss 32768 \
+    --overwrite_output_dir
 }
 $1
