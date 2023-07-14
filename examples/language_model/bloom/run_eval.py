@@ -331,13 +331,13 @@ def do_generation():
                 if not args.cloze_eval:
                     masked_lm_loss = paddle.nn.functional.cross_entropy(preds, labels, reduction="none")
                     loss = paddle.sum(masked_lm_loss * loss_mask)
-                    total_score += loss.numpy() / (args.num_tokenized_tokens - 1)
+                    total_score += float(loss.numpy()) / (args.num_tokenized_tokens - 1)
                 else:
                     outputs = paddle.argmax(preds, -1)
                     acc = paddle.cast(outputs == labels, "float32")
                     acc = paddle.where(paddle.cast(loss_mask, "bool"), acc, paddle.ones_like(acc))
                     acc = paddle.sum(paddle.prod(acc, -1))
-                    total_score += acc.numpy()
+                    total_score += float(acc.numpy())
 
                 if step % args.logging_steps == 0:
                     logger.info(
