@@ -495,7 +495,14 @@ class Trainer:
             meta_dict[k] = (v.dtype, v.shape, group.rank)
 
         meta_dict_list = self._all_gather_simple_object(meta_dict, group)
-        meta_list = [(k, v) for meta in meta_dict_list for (k, v) in meta.items()]
+
+        total_meta_dict = {}
+        for meta_dict in meta_dict_list:
+            for (k, v) in meta_dict.items():
+                assert k not in total_meta_dict
+                total_meta_dict[k] = v
+
+        meta_list = list(total_meta_dict.items())
         meta_list = sorted(meta_list, key=lambda x: x[0])
         for (k, meta) in meta_list:
             dtype, shape, rank = meta
