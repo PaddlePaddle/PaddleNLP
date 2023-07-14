@@ -2224,7 +2224,7 @@ class Trainer:
             for k in remote_state_dict_keys:
                 tmp_state_dict[k] = state_dict[k]
                 state_dict.pop(k)
-            tmp_state_dict = self._all_gather_state_dict(tmp_state_dict, opt_filter_func)
+            tmp_state_dict = self._all_gather_state_dict(tmp_state_dict, filter_func)
             for (k, v) in tmp_state_dict.items():
                 state_dict[k] = v
             return state_dict
