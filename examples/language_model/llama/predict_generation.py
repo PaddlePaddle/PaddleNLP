@@ -42,6 +42,7 @@ def get_parser():
     parser.add_argument(
         "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
     )
+    parser.add_argument("--device", type=str, default="gpu", help="Device")
     return parser
 
 
@@ -174,6 +175,7 @@ class Predictor(object):
 
 if __name__ == "__main__":
     args = parse_arguments()
+    paddle.set_device(args.device)
     predictor = Predictor(args)
     if args.data_file is None:
         all_texts = [

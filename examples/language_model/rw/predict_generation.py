@@ -13,20 +13,15 @@
 # limitations under the License.
 
 import paddle
-from paddle.distributed import fleet
 
-from paddlenlp.transformers import (
-    ChatGLMv2Config,
-    ChatGLMv2ForConditionalGeneration,
-    ChatGLMv2Tokenizer,
-)
+from paddlenlp.transformers import RWConfig, RWForCausalLM, RWTokenizer
 
 
 def parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name_or_path", default="THUDM/chatglm2-6b", help="The directory of model.")
+    parser.add_argument("--model_name_or_path", default="tiiuae/falcon-7b", help="The directory of model.")
     parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
     parser.add_argument("--src_length", type=int, default=128, help="The batch size of data.")
     parser.add_argument("--tgt_length", type=int, default=128, help="The batch size of data.")
@@ -50,33 +45,17 @@ class Predictor(object):
             self.src_length = kwargs["src_length"]
             self.tgt_length = kwargs["tgt_length"]
         else:
-            self.tokenizer = ChatGLMv2Tokenizer.from_pretrained(args.model_name_or_path)
+            self.tokenizer = RWTokenizer.from_pretrained(args.model_name_or_path)
             self.batch_size = args.batch_size
             self.args = args
             self.src_length = self.args.src_length
             self.tgt_length = self.args.tgt_length
 
-            tensor_parallel_degree = paddle.distributed.get_world_size()
-            tensor_parallel_rank = 0
-            if tensor_parallel_degree > 1:
-                strategy = fleet.DistributedStrategy()
-                strategy.hybrid_configs = {
-                    "dp_degree": 1,
-                    "mp_degree": tensor_parallel_degree,
-                    "pp_degree": 1,
-                    "sharding_degree": 1,
-                }
-                fleet.init(is_collective=True, strategy=strategy)
-                hcg = fleet.get_hybrid_communicate_group()
-                tensor_parallel_rank = hcg.get_model_parallel_rank()
-
-            config = ChatGLMv2Config.from_pretrained(args.model_name_or_path)
+            config = RWConfig.from_pretrained(args.model_name_or_path)
             dtype = config.dtype if config.dtype is not None else config.paddle_dtype
 
-            self.model = ChatGLMv2ForConditionalGeneration.from_pretrained(
+            self.model = RWForCausalLM.from_pretrained(
                 args.model_name_or_path,
-                tensor_parallel_degree=tensor_parallel_degree,
-                tensor_parallel_rank=tensor_parallel_rank,
                 dtype=dtype,
             )
         self.model.eval()
@@ -84,13 +63,16 @@ class Predictor(object):
     def preprocess(self, input_text):
         inputs = self.tokenizer(
             input_text,
-            return_tensors="pd",
+            return_tensors="np",
             padding=True,
             max_length=self.src_length,
             truncation=True,
             truncation_side="left",
         )
-        return inputs
+        inputs_tensor = {}
+        for key in inputs:
+            inputs_tensor[key] = paddle.to_tensor(inputs[key])
+        return inputs_tensor
 
     def infer(self, inputs):
         result = self.model.generate(
@@ -126,8 +108,8 @@ if __name__ == "__main__":
     args = parse_arguments()
     predictor = Predictor(args)
     all_texts = [
-        "你好",
-        "[Round 0]\n问：你好\n答：你好👋!我是人工智能助手 ChatGLM-6B,很高兴见到你,欢迎问我任何问题。\n[Round 1]\n问：晚上睡不着应该怎么办\n答：",
+        "Hello!",
+        "Please introduce yourself, ",
     ]
     batch_texts = batchfy_text(all_texts, args.batch_size)
     for bs, texts in enumerate(batch_texts):
