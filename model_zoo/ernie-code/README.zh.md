@@ -1,11 +1,10 @@
 # ERNIE-Code
 
 [ACL 2023 (Findings)](https://aclanthology.org/2023.findings-acl.676/) | [arXiv](https://arxiv.org/pdf/2212.06742) | [BibTex](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-code/README.md#bibtex) | [英文版](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-code/README.zh.md)
- 
+
 ![ernie-code-comp](https://github.com/KB-Ding/PaddleNLP/assets/13767887/2a550b46-a7d5-416d-b300-83cce7044be4)
 
 [ERNIE-Code: Beyond English-Centric Cross-lingual Pretraining for Programming Languages](https://aclanthology.org/2023.findings-acl.676.pdf)
-
 
 
 ERNIE-Code是一个多自然语言、多编程语言的统一代码语言模型（Code LLM），支持116种自然语言和6+种编程语言。采用了两种预训练方法来进行跨语言预训练：

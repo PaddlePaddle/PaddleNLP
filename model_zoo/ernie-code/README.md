@@ -1,14 +1,13 @@
 # ERNIE-Code
 
-[ACL 2023 (Findings)](https://aclanthology.org/2023.findings-acl.676/) | [arXiv](https://arxiv.org/pdf/2212.06742) | [BibTex](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-code/README.md#bibtex) | [中文版](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-code/README.zh.md) 
- 
+[ACL 2023 (Findings)](https://aclanthology.org/2023.findings-acl.676/) | [arXiv](https://arxiv.org/pdf/2212.06742) | [BibTex](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-code/README.md#bibtex) | [中文版](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-code/README.zh.md)
+
 ![ernie-code-comp](https://github.com/KB-Ding/PaddleNLP/assets/13767887/2a550b46-a7d5-416d-b300-83cce7044be4)
 
 [ERNIE-Code: Beyond English-Centric Cross-lingual Pretraining for Programming Languages](https://aclanthology.org/2023.findings-acl.676.pdf)
 
 
-
-ERNIE-Code is a unified large language model (LLM) that connects 116 natural languages with 6 programming languages. We employ two pre-training methods for universal cross-lingual pre-training: span-corruption language modeling that learns patterns from monolingual NL or PL; and pivot-based translation language modeling that relies on parallel data of many NLs and PLs. Extensive results show that ERNIE-Code outperforms previous multilingual LLMs for PL or NL across a wide range of end tasks of code intelligence, including multilingual code-to-text, text-to-code, code-to-code, and text-to-text generation. We further show its advantage of zero-shot prompting on multilingual code summarization and text-to-text translation. 
+ERNIE-Code is a unified large language model (LLM) that connects 116 natural languages with 6 programming languages. We employ two pre-training methods for universal cross-lingual pre-training: span-corruption language modeling that learns patterns from monolingual NL or PL; and pivot-based translation language modeling that relies on parallel data of many NLs and PLs. Extensive results show that ERNIE-Code outperforms previous multilingual LLMs for PL or NL across a wide range of end tasks of code intelligence, including multilingual code-to-text, text-to-code, code-to-code, and text-to-text generation. We further show its advantage of zero-shot prompting on multilingual code summarization and text-to-text translation.
 
 ## Quick Start
 
