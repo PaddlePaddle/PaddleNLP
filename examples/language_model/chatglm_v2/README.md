@@ -15,6 +15,9 @@ WIP
 ## 推理
 
 ```
-python predict_generation.py \
-    --model_name_or_path THUDM/chatglm2-6b
+# 单卡
+python predict_generation.py --model_name_or_path THUDM/chatglm2-6b
+
+# 多卡
+python -m paddle.distributed.launch --gpus "0,1" predict_generation.py --model_name_or_path THUDM/chatglm2-6b
 ```

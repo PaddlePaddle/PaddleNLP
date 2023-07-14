@@ -58,14 +58,20 @@ class ChatGLMTrainer(Trainer):
             loss, logits, labels = super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
             # argmax here to avoid gather all logits, which is too memory-consuming.
             # keepdim in order to maintain the same shape as logits
-            return (loss, logits[0][..., :-1, :].argmax(axis=-1, keepdim=True), labels[..., 1:])
+            if model.config.lm_shift_labels:
+                return (loss, logits[0][..., :-1, :].argmax(axis=-1, keepdim=True), labels[..., 1:])
+            else:
+                return (loss, logits[0].argmax(axis=-1, keepdim=True), labels)
+
         loss = None
 
         n_token_id = self.tokenizer.convert_tokens_to_ids("<n>")
         model.eval()
         with paddle.no_grad():
             generated_tokens = model.generate(
-                **inputs,
+                input_ids=inputs["input_ids"],
+                attention_mask=inputs["attention_mask"] if "attention_mask" in inputs else None,
+                position_ids=inputs["position_ids"] if "position_ids" in inputs else None,
                 **self._gen_kwargs.copy(),
                 decode_strategy="sampling",
                 top_k=1,

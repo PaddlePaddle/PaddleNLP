@@ -59,7 +59,7 @@ python fid_score.py path/to/dataset1 path/to/dataset2 --device cpu
 ```shell
 python compute_fid_clip_score.py \
     --image_path outputs/mscoco.en_g3 outputs/mscoco.en_g4 outputs/mscoco.en_g5 outputs/mscoco.en_g6 outputs/mscoco.en_g7 outputs/mscoco.en_g8 \
-    --text_file_name mscoco.en.1k \
+    --text_file_name coco30k \
     --clip_model_name_or_path openai/clip-vit-base-patch32 \
     --resolution 256 \
     --fid_batch_size 32 \
@@ -69,7 +69,7 @@ python compute_fid_clip_score.py \
 
 参数说明
 - `image_path`：我们需要评估的图片文件夹地址，两个地址之间需要用空格分隔。
-- `text_file_name`： clip评估所需要的文件名称，可从`["mscoco.en.1k", "mscoco.en.30k"]`选择，1k表示1k图片，30k表示30k图片。
+- `text_file_name`： clip评估所需要的文件名称，可从`["coco1k", "coco10k", "coco30k"]`选择，1k表示1k图片，30k表示30k图片。
 - `clip_model_name_or_path`：clip评估所使用的模型。
 - `resolution`：fid评估时候所使用的图片的分辨率。
 - `fid_batch_size`：fid评估时候所使用的批次。

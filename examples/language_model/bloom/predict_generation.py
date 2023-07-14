@@ -39,6 +39,7 @@ def parse_arguments():
     )
     parser.add_argument("--data_file", default=None, help="data file directory")
     parser.add_argument("--predict_file", default="prediction.json", help="predict result file directory")
+    parser.add_argument("--device", type=str, default="gpu", help="Device")
     return parser.parse_args()
 
 
@@ -171,6 +172,7 @@ class Predictor(object):
 
 def predict():
     args = parse_arguments()
+    paddle.set_device(args.device)
     predictor = Predictor(args)
 
     if args.data_file is None:

@@ -75,7 +75,7 @@ class LitEma(nn.Layer):
         shadow_params = dict(self.named_buffers())
         for key in m_param:
             if not m_param[key].stop_gradient:
-                m_param[key].copy_(shadow_params[self.m_name2s_name[key]], True)
+                m_param[key].copy_(shadow_params[self.m_name2s_name[key]], False)
             else:
                 assert key not in self.m_name2s_name
 
@@ -86,7 +86,7 @@ class LitEma(nn.Layer):
           parameters: Iterable of `EagerParamBase`; the parameters to be
             temporarily stored.
         """
-        self.collected_params = [param.clone() for param in parameters]
+        self.collected_params = [param.detach().cpu().clone() for param in parameters]
 
     def restore(self, parameters):
         """
@@ -100,4 +100,5 @@ class LitEma(nn.Layer):
             updated with the stored parameters.
         """
         for c_param, param in zip(self.collected_params, parameters):
-            param.copy_(c_param, True)
+            param.copy_(c_param, False)
+        self.collected_params = None
