@@ -125,7 +125,9 @@ class StableDiffusionModel(nn.Layer):
             noise += self.model_args.noise_offset * paddle.randn(
                 (latents.shape[0], latents.shape[1], 1, 1), dtype=noise.dtype
             )
-        timesteps = paddle.randint(0, self.noise_scheduler.num_train_timesteps, (latents.shape[0],)).cast("int64")
+        timesteps = paddle.randint(0, self.noise_scheduler.config.num_train_timesteps, (latents.shape[0],)).cast(
+            "int64"
+        )
         noisy_latents = self.add_noise(latents, noise, timesteps)
 
         # text encode
@@ -217,10 +219,10 @@ class StableDiffusionModel(nn.Layer):
             self.model_ema(self.unet)
 
     @paddle.no_grad()
-    def decode_image(self, pixel_values=None, **kwargs):
+    def decode_image(self, pixel_values=None, max_batch=8, **kwargs):
         self.eval()
-        if pixel_values.shape[0] > 8:
-            pixel_values = pixel_values[:8]
+        if pixel_values.shape[0] > max_batch:
+            pixel_values = pixel_values[:max_batch]
         latents = self.vae.encode(pixel_values).latent_dist.sample()
         image = self.vae.decode(latents).sample
         image = (image / 2 + 0.5).clip(0, 1).transpose([0, 2, 3, 1])
@@ -228,9 +230,8 @@ class StableDiffusionModel(nn.Layer):
         return image
 
     @paddle.no_grad()
-    def log_image(self, input_ids=None, height=256, width=256, eta=0.0, guidance_scale=7.5, **kwargs):
+    def log_image(self, input_ids=None, height=256, width=256, eta=0.0, guidance_scale=7.5, max_batch=8, **kwargs):
         self.eval()
-        max_batch = 4 if height > 256 or width > 256 else 8
         with self.ema_scope():
             if height % 8 != 0 or width % 8 != 0:
                 raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")

@@ -54,12 +54,21 @@ class VisualDLWithImageCallback(VisualDLCallback):
             and args.image_logging_steps > 0
             and state.global_step % args.image_logging_steps == 0
         ):
-            image_logs["reconstruction"] = model.decode_image(pixel_values=inputs["pixel_values"])
+            max_batch = 4 if args.resolution > 256 else 8
+            image_logs["reconstruction"] = model.decode_image(pixel_values=inputs["pixel_values"], max_batch=max_batch)
             image_logs["ddim-samples-1.0"] = model.log_image(
-                input_ids=inputs["input_ids"], guidance_scale=1.0, height=args.resolution, width=args.resolution
+                input_ids=inputs["input_ids"],
+                guidance_scale=1.0,
+                height=args.resolution,
+                width=args.resolution,
+                max_batch=max_batch,
             )
             image_logs["ddim-samples-7.5"] = model.log_image(
-                input_ids=inputs["input_ids"], guidance_scale=7.5, height=args.resolution, width=args.resolution
+                input_ids=inputs["input_ids"],
+                guidance_scale=7.5,
+                height=args.resolution,
+                width=args.resolution,
+                max_batch=max_batch,
             )
 
         if not state.is_world_process_zero:
