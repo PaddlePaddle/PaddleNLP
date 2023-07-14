@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import glob
 import os
 import tempfile
+import unittest
 
 import paddle
 from paddle.distributed import fleet
@@ -38,6 +40,7 @@ if tp_size > 1:
 def prepare_config(config):
     config.hidden_size = 512
     config.num_layers = 2
+    config.num_hidden_layers = 2
     config.num_attention_heads = 16
     config.intermediate_size = config.hidden_size * 3
     config.tensor_parallel_degree = tp_size
@@ -45,7 +48,7 @@ def prepare_config(config):
     return config
 
 
-def test_load(model_class, tempdir):
+def common_test_load(model_class, tempdir):
     paddle.distributed.barrier()
     if model_class is not None:
         model_class.from_pretrained(tempdir)
@@ -54,64 +57,75 @@ def test_load(model_class, tempdir):
             files = glob.glob(tempdir + "/*")
             for f in files:
                 os.remove(f)
+        paddle.distributed.barrier()
 
 
-def test_merge(model, model_class=None):
+def common_test_merge(model, model_class=None):
+    rank = paddle.distributed.get_rank()
+    is_main_process = rank == 0
     object_list = []
     with tempfile.TemporaryDirectory() as tempdir:
         paddle.distributed.all_gather_object(object_list, tempdir, group=mp_group)
         tempdir = object_list[0]
         # test merge one
-        model.save_pretrained(save_dir=tempdir, merge_tensor_parallel=True)
-        test_load(model_class, tempdir)
+        model.save_pretrained(save_dir=tempdir, merge_tensor_parallel=True, is_main_process=is_main_process)
+        common_test_load(model_class, tempdir)
         # test merge shard
-        model.save_pretrained(tempdir, merge_tensor_parallel=True, variant="tp00", max_shard_size="5MB")
-        test_load(model_class, tempdir)
+        model.save_pretrained(
+            tempdir,
+            merge_tensor_parallel=True,
+            variant=f"tp{rank:0>2d}",
+            max_shard_size="5MB",
+            is_main_process=is_main_process,
+        )
+        common_test_load(model_class, tempdir)
         # test save tp
-        model.save_pretrained(tempdir, max_shard_size="5MB")
-        test_load(model_class, tempdir)
+        model.save_pretrained(tempdir, max_shard_size="5MB", is_main_process=is_main_process)
+        common_test_load(model_class, tempdir)
         # test save shard safe
-        model.save_pretrained(tempdir, max_shard_size="5MB", safe_serialization=True)
-        test_load(model_class, tempdir)
+        model.save_pretrained(tempdir, max_shard_size="5MB", safe_serialization=True, is_main_process=is_main_process)
+        common_test_load(model_class, tempdir)
+        # test save safe tensor
+        model.save_pretrained(tempdir, safe_serialization=True, is_main_process=is_main_process)
+        common_test_load(model_class, tempdir)
         paddle.distributed.barrier()
-        # print( "\n".join(sorted(os.listdir(tempdir)) ))
 
 
-def test_llama():
+def _test_llama():
     from paddlenlp.transformers import LlamaConfig, LlamaForCausalLM
 
     config = LlamaConfig()
     config = prepare_config(config)
     model = LlamaForCausalLM._from_config(config)
-    test_merge(model, LlamaForCausalLM)
+    common_test_merge(model, LlamaForCausalLM)
 
 
-def test_chatglm():
+def _test_chatglm():
     from paddlenlp.transformers import ChatGLMConfig, ChatGLMForConditionalGeneration
 
     config = ChatGLMConfig()
     config = prepare_config(config)
     model = ChatGLMForConditionalGeneration._from_config(config)
-    # print("\n".join(list(model.state_dict().keys())) )
-    test_merge(model, ChatGLMForConditionalGeneration)
+    common_test_merge(model, ChatGLMForConditionalGeneration)
 
 
-def test_bloom():
+def _test_bloom():
     from paddlenlp.transformers import BloomConfig, BloomForCausalLM
 
     config = BloomConfig()
     config = prepare_config(config)
     model = BloomForCausalLM._from_config(config)
-    # print("\n".join(list(model.state_dict().keys())) )
-    test_merge(model, BloomForCausalLM)
+    common_test_merge(model, BloomForCausalLM)
 
 
-# test_llama()
-test_chatglm()
-test_bloom()
+# _test_llama()
+# _test_chatglm()
+# _test_bloom()
 
-# from transformers import BloomForCausalLM, BloomConfig
-# config = BloomConfig()
-# config = prepare_config(config)
-# model = BloomForCausalLM._from_config(config)
-# print("\n".join(list(model.state_dict().keys())))
+
+class TestTensorParallel(unittest.TestCase):
+    @unittest.skipIf(tp_size < 2, "Need muti-gpu to run this test!")
+    def test_model_load_merge(self):
+        _test_llama()
+        _test_chatglm()
+        _test_bloom()

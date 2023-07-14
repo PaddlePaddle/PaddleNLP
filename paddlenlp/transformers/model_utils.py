@@ -1297,6 +1297,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     # Load from a safetensors checkpoint
                     archive_file = get_file_path(pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_NAME, variant)
                 elif use_safetensors is not False and os.path.isfile(
+                    get_file_path(pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_NAME, weight_name_suffix())
+                ):
+                    # Load from a safetensors checkpoint
+                    archive_file = get_file_path(
+                        pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_NAME, weight_name_suffix()
+                    )
+                elif use_safetensors is not False and os.path.isfile(
                     get_file_path(pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_INDEX_NAME, variant)
                 ):
                     # Load from a sharded safetensors checkpoint
