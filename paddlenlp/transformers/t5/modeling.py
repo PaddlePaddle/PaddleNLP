@@ -231,6 +231,7 @@ class T5Attention(nn.Layer):
         self.n_heads = config.num_heads
         self.dropout = config.dropout_rate
         self.inner_dim = self.n_heads * self.key_value_proj_dim
+        # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
 
         # Mesh TensorFlow initialization to avoid scaling before softmax
@@ -927,7 +928,8 @@ class T5Stack(T5PretrainedModel):
         )
         self.final_layer_norm = T5LayerNorm(config.d_model, eps=config.layer_norm_epsilon)
         self.dropout = nn.Dropout(config.dropout_rate)
-        self.enable_recompute = config.enable_recompute
+        # Recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
 
     def get_input_embeddings(self):
         return self.embed_tokens

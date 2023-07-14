@@ -38,7 +38,6 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "eos_token_id": 2,
         "pad_token_id": 0,
         "use_cache": False,
-        "use_recompute": False,
         "use_flash_attention": False,
     },
     "__internal_testing__/tiny-random-llama": {
@@ -55,7 +54,6 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "eos_token_id": 2,
         "pad_token_id": 0,
         "use_cache": False,
-        "use_recompute": False,
         "use_flash_attention": False,
     },
     "facebook/llama-7b": {
@@ -72,7 +70,6 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "eos_token_id": 2,
         "pad_token_id": 0,
         "use_cache": False,
-        "use_recompute": False,
         "use_flash_attention": False,
     },
     "facebook/llama-13b": {
@@ -89,7 +86,6 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "eos_token_id": 2,
         "pad_token_id": 0,
         "use_cache": False,
-        "use_recompute": False,
         "use_flash_attention": False,
     },
     "facebook/llama-30b": {
@@ -106,7 +102,6 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "eos_token_id": 2,
         "pad_token_id": 0,
         "use_cache": False,
-        "use_recompute": False,
         "use_flash_attention": False,
     },
     "facebook/llama-65b": {
@@ -123,7 +118,6 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "eos_token_id": 2,
         "pad_token_id": 0,
         "use_cache": False,
-        "use_recompute": False,
         "use_flash_attention": False,
     },
 }
@@ -206,7 +200,6 @@ class LlamaConfig(PretrainedConfig):
         initializer_range=0.02,
         rms_norm_eps=1e-6,
         use_cache=True,
-        use_recompute=False,
         recompute_granularity="full",
         use_flash_attention=False,
         use_fused_rms_norm=False,
@@ -228,7 +221,6 @@ class LlamaConfig(PretrainedConfig):
         self.rms_norm_eps = rms_norm_eps
 
         self.use_cache = use_cache
-        self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
         self.use_flash_attention = use_flash_attention
         self.use_fused_rms_norm = use_fused_rms_norm

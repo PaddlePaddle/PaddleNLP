@@ -415,7 +415,8 @@ class ChatGLMStack(nn.Layer):
         self.config = config
         self.position_encoding_2d = config.position_encoding_2d
         self.hidden_size = config.hidden_size
-        self.enable_recompute = config.recompute
+        # Recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
         self.num_attention_heads = config.num_attention_heads
         self.rotary_embeddings = RotaryEmbeddings(
             self.hidden_size // (self.num_attention_heads * 2)
