@@ -31,7 +31,6 @@ from paddlenlp.utils.log import logger
 def main():
     parser = PdArgumentParser((SDModelArguments, SDDataArguments, SDTrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    training_args.train_text_encoder = model_args.train_text_encoder
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
 

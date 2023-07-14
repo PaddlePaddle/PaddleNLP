@@ -64,7 +64,6 @@ class SDTrainingArguments(TrainingArguments):
     only_save_updated_model: bool = field(
         default=True, metadata={"help": "Whether or not save only_save_updated_model"}
     )
-    train_text_encoder: bool = field(default=False, metadata={"help": "Whether or not train text encoder"})
     unet_learning_rate: float = field(default=None, metadata={"help": "The initial learning rate for Unet Model."})
     text_encoder_learning_rate: float = field(
         default=None, metadata={"help": "The initial learning rate for Text Encoder Model."}
@@ -120,6 +119,7 @@ class SDModelArguments:
         },
     )
     num_inference_steps: int = field(default=50, metadata={"help": "num_inference_steps"})
+    train_text_encoder: bool = field(default=False, metadata={"help": "Whether or not train text encoder"})
 
     noise_offset: float = field(default=0, metadata={"help": "The scale of noise offset."})
     snr_gamma: Optional[float] = field(
