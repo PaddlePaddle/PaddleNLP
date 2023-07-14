@@ -20,6 +20,7 @@ import paddle
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.distributed.fleet.utils import recompute
 
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -198,7 +199,6 @@ class CoreAttention(nn.Layer):
             attention_mask = ~attention_mask
 
         if attention_mask is not None:
-            print("paddle.where", attention_mask)
             attention_scores = paddle.where(
                 attention_mask > 0,
                 paddle.full_like(attention_scores, paddle.finfo(attention_scores.dtype).min),
@@ -468,7 +468,7 @@ class GLMTransformer(nn.Layer):
 
     def __init__(self, config: ChatGLMv2Config):
         super(GLMTransformer, self).__init__()
-
+        self.enable_recompute = False
         self.fp32_residual_connection = config.fp32_residual_connection
         self.post_layer_norm = config.post_layer_norm
 
@@ -488,6 +488,33 @@ class GLMTransformer(nn.Layer):
 
     def _get_layer(self, layer_number):
         return self.layers[layer_number]
+
+    @paddle.jit.not_to_static
+    def recompute_training(
+        self,
+        layer_module: nn.Layer,
+        hidden_states: paddle.Tensor,
+        attention_mask: paddle.Tensor,
+        rotary_embeds: paddle.Tensor,
+        kv_cache: paddle.Tensor,
+        use_cache: bool,
+    ):
+        def create_custom_forward(module):
+            def custom_forward(*inputs):
+                return module(*inputs)
+
+            return custom_forward
+
+        hidden_states, kv_cache = recompute(
+            create_custom_forward(layer_module),
+            hidden_states,
+            attention_mask,
+            rotary_embeds,
+            kv_cache,
+            use_cache,
+            use_reentrant=False,
+        )
+        return hidden_states, kv_cache
 
     def forward(
         self,
@@ -509,9 +536,19 @@ class GLMTransformer(nn.Layer):
 
             layer = self._get_layer(index)
 
-            hidden_states, kv_cache = layer(
-                hidden_states, attention_mask, rotary_pos_emb, kv_cache=kv_caches[index], use_cache=use_cache
-            )
+            if self.enable_recompute and not hidden_states.stop_gradient:
+                hidden_states, kv_cache = self.recompute_training(
+                    layer,
+                    hidden_states,
+                    attention_mask,
+                    rotary_pos_emb,
+                    kv_cache=kv_caches[index],
+                    use_cache=use_cache,
+                )
+            else:
+                hidden_states, kv_cache = layer(
+                    hidden_states, attention_mask, rotary_pos_emb, kv_cache=kv_caches[index], use_cache=use_cache
+                )
 
             if use_cache:
                 presents = presents + (kv_cache,)
@@ -549,10 +586,7 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
         if padding_mask is not None:
             full_attention_mask = full_attention_mask * padding_mask.unsqueeze(1)
         if not past_length and padding_mask is not None:
-            print("we are here yo")
-            print(full_attention_mask)
             full_attention_mask -= padding_mask.unsqueeze(-1) - 1
-            print(full_attention_mask)
         full_attention_mask = (full_attention_mask < 0.5).astype("bool")
         return full_attention_mask.unsqueeze(1)
 
@@ -680,8 +714,6 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
             if (attention_mask is not None and not attention_mask.astype("bool").all()) or (
                 past_key_values and seq_length != 1
             ):
-                print("we got here!")
-                print(attention_mask)
                 full_attention_mask = self.get_masks(input_ids, past_key_values, padding_mask=attention_mask)
 
         # Rotary positional embeddings
@@ -783,7 +815,6 @@ class ChatGLMv2ForConditionalGeneration(ChatGLMv2PretrainedModel):
     ):
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-        print("attention_mask", attention_mask.shape)
 
         transformer_outputs = self.chatglm_v2(
             input_ids=input_ids,

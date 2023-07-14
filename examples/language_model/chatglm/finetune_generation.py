@@ -103,6 +103,7 @@ def main():
     model = AutoModelForConditionalGeneration.from_pretrained(
         model_args.model_name_or_path,
         dtype=dtype,
+        low_cpu_mem_usage=True,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         lm_shift_labels=False,
@@ -127,11 +128,24 @@ def main():
         model.print_trainable_parameters()
     if model_args.lora:
         if model_args.lora_path is None:
-            # Not yet support RowParallelLinear
-            if training_args.tensor_parallel_degree > 1:
-                target_modules = [".*query_key_value.*", ".*dense_h_to_4h.*"]
+            # RowParallelLinear doesn't support LoRA yet
+            if "chatglm2" in model_args.model_name_or_path:
+                if training_args.tensor_parallel_degree > 1:
+                    target_modules = [".*query.*", ".*key.*", ".*value.*", ".*dense_h_to_4h.*"]
+                else:
+                    target_modules = [
+                        ".*query.*",
+                        ".*key.*",
+                        ".*value.*",
+                        ".*dense.*",
+                        ".*dense_h_to_4h.*",
+                        ".*dense_4h_to_h.*",
+                    ]
             else:
-                target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
+                if training_args.tensor_parallel_degree > 1:
+                    target_modules = [".*query_key_value.*", ".*dense_h_to_4h.*"]
+                else:
+                    target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
             lora_config = LoRAConfig(
                 target_modules=target_modules,
                 r=model_args.lora_rank,
