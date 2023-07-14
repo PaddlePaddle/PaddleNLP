@@ -80,7 +80,7 @@ class VisualDLWithImageCallback(VisualDLCallback):
         base_learning_rate = logs.get("learning_rate", None)
         if base_learning_rate is not None:
             logs["unet_lr"] = base_learning_rate
-            if args.train_text_encoder:
+            if model.train_text_encoder:
                 if args.text_encoder_learning_rate != args.unet_learning_rate:
                     logs["unet_lr"] = base_learning_rate * args.unet_learning_rate
                     logs["text_encoder_lr"] = base_learning_rate * args.text_encoder_learning_rate
