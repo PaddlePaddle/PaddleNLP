@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from contextlib import contextmanager
 from typing import Tuple
 
 import paddle
@@ -27,6 +28,8 @@ from ppdiffusers.models.autoencoder_kl import (
     DiagonalGaussianDistribution,
     Encoder,
 )
+
+# from ppdiffusers.models.ema import LitEma
 from ppdiffusers.models.modeling_utils import ModelMixin
 
 from .losses import LPIPSWithDiscriminator
@@ -41,6 +44,8 @@ def count_params(model, verbose=True):
 
 # regist a new model
 class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
+    _supports_gradient_checkpointing = True
+
     @register_to_config
     def __init__(
         self,
@@ -81,6 +86,8 @@ class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
         use_actnorm=False,
         disc_conditional=False,
         disc_loss="hinge",
+        use_ema=False,
+        ema_decay=None,
     ):
         super().__init__()
         self.input_size = [int(_) for _ in input_size] if input_size is not None else None
@@ -131,6 +138,13 @@ class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
         )
         count_params(self)
         self.init_weights()
+        self.use_ema = use_ema
+        # if use_ema:
+        #     self.model_ema = LitEma(self, decay=ema_decay)
+
+    def _set_gradient_checkpointing(self, module, value=False):
+        if isinstance(module, (Encoder, Decoder)):
+            module.gradient_checkpointing = value
 
     def init_weights(self):
         reset_initialized_parameter(self.encoder)
@@ -153,6 +167,26 @@ class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
 
     def get_last_layer(self):
         return self.decoder.conv_out.weight
+
+    def on_train_batch_end(self, *args, **kwargs):
+        # for EMA computation
+        if self.use_ema:
+            self.model_ema(self)
+
+    @contextmanager
+    def ema_scope(self, context=None):
+        if self.use_ema:
+            self.model_ema.store(self.parameters())
+            self.model_ema.copy_to(self)
+            if context is not None:
+                print(f"{context}: Switched to EMA weights")
+        try:
+            yield None
+        finally:
+            if self.use_ema:
+                self.model_ema.restore(self.parameters())
+                if context is not None:
+                    print(f"{context}: Restored training weights")
 
     def forward(self, pixel_values, optimizer_idx=0, global_step=0):
         # make sure we are in train mode
@@ -203,6 +237,13 @@ class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
             xrec, posterior = self.custom_forward(encoder_inputs)
             log["samples"] = self.decode_image(self.decode(paddle.randn(posterior.sample().shape)).sample)
             log["reconstructions"] = self.decode_image(xrec)
+            if self.use_ema:
+                with self.ema_scope():
+                    xrec_ema, posterior_ema = self.custom_forward(encoder_inputs)
+                    log["samples_ema"] = self.decode_image(
+                        self.decode(paddle.randn(posterior_ema.sample().shape)).sample
+                    )
+                    log["reconstructions_ema"] = self.decode_image(xrec_ema)
         # update
         log["encoder_inputs"] = self.decode_image(encoder_inputs)
         self.train()
@@ -215,6 +256,16 @@ class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
 
     @paddle.no_grad()
     def validation_step(self, pixel_values, global_step=0):
+        log_dict_ae, log_dict_disc = self._validation_step(pixel_values, global_step)
+        if self.use_ema:
+            with self.ema_scope():
+                log_dict_ae_ema, log_dict_disc_ema = self._validation_step(pixel_values, global_step, postfix="_ema")
+                log_dict_ae.update(log_dict_ae_ema)
+                log_dict_disc.update(log_dict_disc_ema)
+
+        return log_dict_ae, log_dict_disc
+
+    def _validation_step(self, pixel_values, global_step=0, postfix=""):
         self.eval()
         if self.input_size is None:
             encoder_inputs = pixel_values
@@ -229,7 +280,7 @@ class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
             0,
             global_step,
             last_layer=self.get_last_layer(),
-            split="val",
+            split="val" + postfix,
         )
 
         discloss, log_dict_disc = self.loss(
@@ -239,7 +290,7 @@ class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
             1,
             global_step,
             last_layer=self.get_last_layer(),
-            split="val",
+            split="val" + postfix,
         )
         self.train()
         return log_dict_ae, log_dict_disc
