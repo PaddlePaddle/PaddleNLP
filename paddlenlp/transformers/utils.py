@@ -683,7 +683,15 @@ def paddlenlp_load(path, map_location="cpu"):
         return paddle.load(path, return_numpy=True)
     else:
         with device_guard(map_location):
-            return paddle.load(path)
+            if map_location == "cpu":
+                # Hack for zero copy for saving loading time. for paddle.load there need copy to create paddle.Tensor
+                state_dict = paddle.load(path, return_numpy=True)
+                for key in list(state_dict.keys()):
+                    if isinstance(state_dict[key], np.ndarray):
+                        state_dict[key] = paddle.Tensor(state_dict.pop(key), zero_copy=True)
+                return state_dict
+            else:
+                return paddle.load(path)
 
 
 def is_paddle_support_lazy_init():
