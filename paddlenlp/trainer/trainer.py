@@ -510,7 +510,7 @@ class Trainer:
                 assert k in state_dict
                 tensor = paddle.to_tensor(state_dict[k])
             else:
-                tensor = paddle.to_tensor(np.zeros(shape, dtype))
+                tensor = paddle.to_tensor(np.empty(shape, dtype))
             logger.info(f"broadcast {k} from {rank}")
             # broadcast the tensor
             paddle.distributed.broadcast(
