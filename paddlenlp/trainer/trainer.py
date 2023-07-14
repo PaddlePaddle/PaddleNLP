@@ -682,7 +682,6 @@ class Trainer:
             model = self._load_sharded_check_point(resume_from_checkpoint, delay_optimizer_creation, max_steps)
         else:
             model = self._load_check_point(resume_from_checkpoint, delay_optimizer_creation, max_steps)
-
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples}")
         logger.info(f"  Num Epochs = {num_train_epochs}")
