@@ -491,20 +491,20 @@ class Trainer:
 
         meta_dict = {}
         for (k, v) in state_dict.items():
-            v = map_func(v)
             # src rank
             meta_dict[k] = (v.dtype, v.shape, group.rank)
 
         meta_dict_list = self._all_gather_simple_object(meta_dict, group)
-        meta_list = [(k, v) for meta in meta_dict_list for (k, v) in meta]
+        meta_list = [(k, v) for meta in meta_dict_list for (k, v) in meta.items()]
         meta_list = sorted(meta_list, key=lambda x: x[1])
         for (k, meta) in meta_list:
             dtype, shape, rank = meta
             if rank == group.rank:
                 assert k in state_dict
-                tensor = paddle.to_tensor(v)
+                tensor = paddle.to_tensor(state_dict[k])
             else:
-                tensor = paddle.to_tensor(np.zero(shape, dtype))
+                tensor = paddle.to_tensor(np.zeros(shape, dtype))
+            logger.info(f"broadcast {k} from {rank}")    
             # broadcast the tensor
             paddle.distributed.broadcast(
                 tensor,
@@ -2175,7 +2175,7 @@ class Trainer:
 
         if not need_reshard():
             logger.info("do not need reshard")
-            #return self._load_optimizer_state_of_one_shard(checkpoint, self.args.optimizer_name_suffix)
+            return self._load_optimizer_state_of_one_shard(checkpoint, self.args.optimizer_name_suffix)
         logger.info("reshard optimizer state")
         state_dict = OrderedDict()
         master_weights = OrderedDict()
