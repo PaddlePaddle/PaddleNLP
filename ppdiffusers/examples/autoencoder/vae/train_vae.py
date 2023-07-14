@@ -27,6 +27,7 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import set_seed
 from paddlenlp.utils.log import logger
+from ppdiffusers.models.ema import LitEma
 from ppdiffusers.training_utils import freeze_params, main_process_first, unwrap_model
 
 
@@ -222,6 +223,14 @@ def parse_args():
     parser.add_argument(
         "--disc_loss", type=str, choices=["hinge", "vanilla"], default="hinge", help="The type of discriminator loss."
     )
+    parser.add_argument("--use_ema", action="store_true", help="Whether to use_ema.")
+    parser.add_argument(
+        "--enable_xformers_memory_efficient_attention",
+        action="store_true",
+        help="Whether to enable_xformers_memory_efficient_attention.",
+    )
+    parser.add_argument("--recompute", action="store_true", help="Whether to recompute.")
+    parser.add_argument("--ema_decay", type=float, default=0.9999, help="The value of ema_decay.")
     args = parser.parse_args()
 
     args.logging_dir = os.path.join(args.output_dir, args.logging_dir)
@@ -286,6 +295,8 @@ def main():
             use_actnorm=args.use_actnorm,
             disc_conditional=args.disc_conditional,
             disc_loss=args.disc_loss,
+            ema_decay=args.ema_decay,
+            use_ema=args.use_ema,
             **model_kwargs,
         )
     else:
@@ -306,6 +317,8 @@ def main():
             use_actnorm=args.use_actnorm,
             disc_conditional=args.disc_conditional,
             disc_loss=args.disc_loss,
+            ema_decay=args.ema_decay,
+            use_ema=args.use_ema,
         )
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
@@ -335,6 +348,12 @@ def main():
         beta1=0.5,
         beta2=0.9,
     )
+    if args.use_ema:
+        vae.model_ema = LitEma(vae, decay=args.ema_decay)
+    if args.recompute:
+        vae.enable_gradient_checkpointing()
+    if args.enable_xformers_memory_efficient_attention:
+        vae.enable_xformers_memory_efficient_attention()
 
     optimizers = [opt_ae, opt_disc]
 
@@ -430,7 +449,7 @@ def main():
                 # ref: https://github.com/Lightning-AI/lightning/blob/a58639ce7e864dd70484e7d34c37730ae204183c/src/pytorch_lightning/core/module.py#L1449-L1464
                 unwrap_model(vae).untoggle_optimizer(optimizers, optimizer_idx)
                 logs.update(log_dict)
-
+            unwrap_model(vae).on_train_batch_end()
             progress_bar.update(1)
             global_step += 1
             # progress_bar.set_postfix(**logs)
