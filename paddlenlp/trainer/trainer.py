@@ -514,6 +514,7 @@ class Trainer:
             )
             if filter_func(k):
                 res[k] = tensor.cpu()
+            del tensor
         return res
 
     def load_state_dict_from_checkpoint_with_reshard(self, resume_from_checkpoint):
