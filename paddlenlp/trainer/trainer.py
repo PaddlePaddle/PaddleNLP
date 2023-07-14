@@ -330,7 +330,7 @@ class Trainer:
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
 
         if args.recompute:
-            model.enable_recompute()
+            model.recompute_enable()
 
         default_label_names = (
             ["start_positions", "end_positions"]

@@ -939,7 +939,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             return False
         return True
 
-    def enable_recompute(self):
+    def recompute_enable(self):
         r"""
         Enable Recompute.
         All layers with the `enable_recompute` attribute will be set to `True`
@@ -951,7 +951,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         self.apply(fn)
 
-    def disable_recompute(self):
+    def recompute_disable(self):
         r"""
         Disable Recompute.
         All layers with the `enable_recompute` attribute will be set to `False`

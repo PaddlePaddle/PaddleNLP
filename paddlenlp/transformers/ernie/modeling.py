@@ -213,9 +213,7 @@ class ErnieModel(ErniePretrainedModel):
             weight_attr=weight_attr,
             normalize_before=False,
         )
-        self.encoder = nn.TransformerEncoder(
-            encoder_layer, config.num_hidden_layers, enable_recompute=config.enable_recompute
-        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
         self.pooler = ErniePooler(config, weight_attr)
 
     def get_input_embeddings(self):

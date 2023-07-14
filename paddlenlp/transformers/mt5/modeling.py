@@ -936,10 +936,7 @@ class MT5Stack(nn.Layer):
 
             if self.enable_recompute and self.training:
                 if use_cache:
-                    logger.warning(
-                        "`use_cache=True` is incompatible with `config.enable_recompute=True`. Setting "
-                        "`use_cache=False`..."
-                    )
+                    logger.warning("`use_cache=True` is incompatible with Recompute. Setting " "`use_cache=False`...")
                     use_cache = False
 
                 layer_outputs = self.recompute_training(

@@ -58,19 +58,6 @@ def convert_encoder_output(encoder_output):
     )
 
 
-def layer_init_wrapper(func):
-    @functools.wraps(func)
-    def _impl(self, *args, **kwargs):
-        enable_recompute = kwargs.pop("enable_recompute", False)
-        func(self, *args, **kwargs)
-        if paddle.in_dynamic_mode():
-            self.enable_recompute = enable_recompute
-        else:
-            self.enable_recompute = False
-
-    return _impl
-
-
 @paddle.jit.not_to_static
 def _transformer_encoder_layer_fwd(self, src, src_mask=None, cache=None, output_attentions=False):
     self.self_attn.need_weights = output_attentions
@@ -207,7 +194,7 @@ def _transformer_decoder_fwd(
             # if output has no gradient, recompute is unnecessary
             memory_stop_gradient = memory is not None and memory.stop_gradient
             has_gradient = (not tgt.stop_gradient) or (not memory_stop_gradient)
-            if self.enable_recompute and has_gradient:
+            if getattr(self, "enable_recompute", False) and has_gradient:
                 outputs = recompute(mod, tgt, memory, tgt_mask, memory_mask, None, output_attentions)
             else:
                 outputs = mod(
@@ -287,7 +274,8 @@ def _transformer_encoder_fwd(
     for i, mod in enumerate(self.layers):
         # if output has no gradient, recompute is unnecessary
         has_gradient = not output.stop_gradient
-        if self.enable_recompute and has_gradient:
+
+        if getattr(self, "enable_recompute", False) and has_gradient:
             # Note: recompute do not support pass as **kwargs yet.
             layer_outputs = recompute(
                 mod,
@@ -364,8 +352,6 @@ paddle.nn.TransformerDecoder.forward = _transformer_decoder_fwd
 
 _encoder_init = paddle.nn.TransformerEncoder.__init__
 _decoder_init = paddle.nn.TransformerDecoder.__init__
-paddle.nn.TransformerEncoder.__init__ = layer_init_wrapper(_encoder_init)
-paddle.nn.TransformerDecoder.__init__ = layer_init_wrapper(_decoder_init)
 
 
 def _get_wrap_setattr(cls):
