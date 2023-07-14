@@ -700,9 +700,8 @@ def paddlenlp_load(path, map_location="cpu"):
 
                 state_dict = paddle.load(path, return_numpy=True)
                 # Hack for zero copy for saving loading time. for paddle.load there need copy to create paddle.Tensor
-                _parse_every_object(state_dict, _transformed_from_lodtensor, _ndarray_to_tensor)
+                return _parse_every_object(state_dict, _transformed_from_lodtensor, _ndarray_to_tensor)
 
-                return state_dict
             else:
                 return paddle.load(path)
 
