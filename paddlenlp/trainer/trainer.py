@@ -439,7 +439,7 @@ class Trainer:
         sharding_group_param_names = [v for item in tmp for v in item]
         logger.info("sharding_group_param_names:{}".format(sharding_group_param_names))
         model_state_dict = self.model.state_dict()
-        logger.info("before recover, model_state_dict: {}".format(model_state_dict))
+        logger.info("before recover, model_state_dict number: {}".format(len(model_state_dict)))
         for key, param in model_state_dict.items():
             if param.name in master_weigths:
                 assert param.shape == master_weigths[param.name].shape
@@ -451,7 +451,7 @@ class Trainer:
                     group=self.sharding_group,
                     sync_op=True,
                 )
-        logger.info("after recover, casted model_state_dict: {}".format(model_state_dict))
+        logger.info("after recover, casted model_state_dict number: {}".format(len(model_state_dict)))
         state_dict.update(model_state_dict)
         return state_dict
 
