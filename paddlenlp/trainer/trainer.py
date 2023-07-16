@@ -547,17 +547,17 @@ class Trainer:
         self._load_optimizer_and_scheduler(resume_from_checkpoint)
 
         logger.info("***** Running training *****")
-        logger.info(f"  Num examples = {num_examples}")
+        logger.info(f"  Num examples = {num_examples:,}")
         logger.info(f"  Num Epochs = {num_train_epochs}")
         logger.info(f"  Instantaneous batch size per device = {args.per_device_train_batch_size}")
         logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}")
         logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
-        logger.info(f"  Total optimization steps = {max_steps}")
-        logger.info(f"  Total num train samples = {num_train_samples}")
+        logger.info(f"  Total optimization steps = {max_steps:,}")
+        logger.info(f"  Total num train samples = {num_train_samples:,}")
         # per_device_trainable_numel = sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)
         # TODO: Temporary fix since Tensor.numel() not supported in distributed mode
         per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
-        logger.info(f"  Number of trainable parameters = {per_device_trainable_numel} (per device)")
+        logger.info(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
         if self.args.use_hybrid_parallel:
             # todo fix for pipeline_parallel_degree
             parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
@@ -571,7 +571,7 @@ class Trainer:
                 trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
                 # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
                 # so, the trainable numel is a little bigger than real.
-                logger.info(f"  Number of trainable parameters = {trainable_numel} (all devices, roughly)")
+                logger.info(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
 
         start_time = time.time()
         self._globalstep_last_start_time = time.time()
