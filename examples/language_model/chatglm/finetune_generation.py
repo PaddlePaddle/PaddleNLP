@@ -29,6 +29,7 @@ from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCa
 from paddlenlp.peft.prefix import (
     chatglm_pad_attention_mask,
     chatglm_postprocess_past_key_value,
+    chatglm_v2_pad_attention_mask,
 )
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
@@ -113,16 +114,25 @@ def main():
             num_prefix_tokens=model_args.num_prefix_tokens,
             num_attention_heads=model.config.num_attention_heads,
             num_hidden_layers=model.config.num_hidden_layers,
+            # ChatGLM2 uses MQA, setting `multi_query_group_num` attribute
+            multi_query_group_num=model.config.multi_query_group_num
+            if "chatglm2" in model_args.model_name_or_path
+            else None,
             hidden_size=model.config.hidden_size,
             prefix_projection=model_args.prefix_projection,
             prefix_projection_hidden_size=model.config.hidden_size,
             dtype=dtype,
         )
+        attention_mask_pad_fn = (
+            chatglm_v2_pad_attention_mask
+            if "chatglm2" in model_args.model_name_or_path
+            else chatglm_pad_attention_mask
+        )
         model = PrefixModelForCausalLM(
             model=model,
             prefix_config=prefix_config,
             postprocess_past_key_value=chatglm_postprocess_past_key_value,
-            pad_attention_mask=chatglm_pad_attention_mask,
+            pad_attention_mask=attention_mask_pad_fn,
         )
         model.mark_only_prefix_as_trainable()
         model.print_trainable_parameters()

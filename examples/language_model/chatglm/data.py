@@ -115,7 +115,9 @@ def convert_chatglm_v2_example(example, tokenizer, data_args, is_test=True):
         labels = tokenizer(response, max_length=data_args.tgt_length, truncation=True, truncation_side="right")[
             "input_ids"
         ]
-        return {"input_ids": input_ids, "labels": labels}
+        # pass in position_ids explicitly because of left padding
+        position_ids = list(range(len(input_ids)))
+        return {"input_ids": input_ids, "labels": labels, "position_ids": position_ids}
     else:
         a_ids = tokenizer(text=prompt, add_special_tokens=True, truncation=True, max_length=data_args.src_length - 1)[
             "input_ids"
@@ -129,4 +131,6 @@ def convert_chatglm_v2_example(example, tokenizer, data_args, is_test=True):
 
         # shift input_ids and labels
         input_ids, labels = input_ids[:-1], labels[1:]
-        return {"input_ids": input_ids, "labels": labels}
+        # pass in position_ids explicitly because of left padding
+        position_ids = list(range(len(input_ids)))
+        return {"input_ids": input_ids, "labels": labels, "position_ids": position_ids}
