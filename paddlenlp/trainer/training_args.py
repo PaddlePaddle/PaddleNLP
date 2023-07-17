@@ -820,6 +820,9 @@ class TrainingArguments:
 
                 # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
                 strategy.hybrid_configs = hybrid_configs
+                if hasattr(self, "sharding_stage_1_tensor_fusion"):
+                    # need to separate set sharing configs to bypass `Assignment not allowed` error
+                    strategy.hybrid_configs["sharding_configs"].tensor_fusion = self.sharding_stage_1_tensor_fusion
                 fleet.init(is_collective=True, strategy=strategy)
 
                 logger.info(strategy)
