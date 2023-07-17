@@ -78,4 +78,17 @@ class RWTokenizer(GPTTokenizer):
                 "vocabulary from a pretrained model please use "
                 "`tokenizer = RWTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`".format(vocab_file)
             )
+
+        self.is_Chinese = kwargs.get("is_Chinese", False)
         super().__init__(vocab_file, merges_file, **kwargs)
+
+    def decode(
+        self, token_ids, skip_special_tokens: bool = False, clean_up_tokenization_spaces: bool = True, **kwargs
+    ) -> str:
+        return super(RWTokenizer, self).decode(
+            token_ids=token_ids,
+            skip_special_tokens=skip_special_tokens,
+            clean_up_tokenization_spaces=clean_up_tokenization_spaces,
+            spaces_between_special_tokens=not self.is_Chinese,
+            **kwargs,
+        )
