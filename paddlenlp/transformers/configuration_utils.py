@@ -523,8 +523,6 @@ class PretrainedConfig:
         # If set to True, this option is used with fleet.meta_parallel.ParallelCrossEntropy
         # to calculate cross-entropy loss for parallel model.
         self.tensor_parallel_output = kwargs.pop("tensor_parallel_output", False)
-        # Whether to shift input_ids and labels by 1 in model's forward function
-        self.lm_shift_labels = kwargs.pop("lm_shift_labels", False)
 
         # Is decoder is used in encoder-decoder models to differentiate encoder from decoder
         self.is_encoder_decoder = kwargs.pop("is_encoder_decoder", False)

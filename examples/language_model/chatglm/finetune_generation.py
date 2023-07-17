@@ -107,17 +107,20 @@ def main():
         low_cpu_mem_usage=True,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
-        lm_shift_labels=False,
     )
+    if "chatglm2" in model_args.model_name_or_path:
+        multi_query_group_num = model.config.multi_query_group_num
+    else:
+        multi_query_group_num = None
+        # If ChatGLM, set lm_shift_labels to False
+        model.config.lm_shift_labels = False
+
     if model_args.prefix_tuning:
         prefix_config = PrefixConfig(
             num_prefix_tokens=model_args.num_prefix_tokens,
             num_attention_heads=model.config.num_attention_heads,
             num_hidden_layers=model.config.num_hidden_layers,
-            # ChatGLM2 uses MQA, setting `multi_query_group_num` attribute
-            multi_query_group_num=model.config.multi_query_group_num
-            if "chatglm2" in model_args.model_name_or_path
-            else None,
+            multi_query_group_num=multi_query_group_num,
             hidden_size=model.config.hidden_size,
             prefix_projection=model_args.prefix_projection,
             prefix_projection_hidden_size=model.config.hidden_size,
