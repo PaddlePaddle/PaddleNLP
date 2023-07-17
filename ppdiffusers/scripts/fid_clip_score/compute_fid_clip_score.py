@@ -80,6 +80,7 @@ def compute_clip_score(model, processor, texts, images_path, batch_size=64):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--image_path", default=None, nargs="+", type=str, help="image_path")
+    parser.add_argument("--output_file", default="statistic_results.json", type=str, help="output file name")
     parser.add_argument(
         "--text_file_name",
         default="coco30k",
@@ -125,7 +126,7 @@ if __name__ == "__main__":
         # pad_token_id must be set to zero!
         processor.tokenizer.pad_token_id = 0
 
-    results = {"file": [], "fid": []}
+    results = {"file": [], "fid": [], "others": []}
     for path in all_path:
         results["file"].append(path)
         # fid score
@@ -148,8 +149,11 @@ if __name__ == "__main__":
             _clip_score = clip_score.mean().item()
             results["clip_score"].append()
             if image_num == "30k":
-                print(f"=====> clip_score 1k: {clip_score[:1000].mean().item()}")
-                print(f"=====> clip_score 10k: {clip_score[:10000].mean().item()}")
+                clip_score_1k = clip_score[:1000].mean().item()
+                clip_score_10k = clip_score[:10000].mean().item()
+                results["others"].append([clip_score_1k, clip_score_10k])
+                print(f"=====> clip_score 1k: {clip_score_1k}")
+                print(f"=====> clip_score 10k: {clip_score_10k}")
             print(f"fid: {fid_value}, clip_score: {_clip_score}")
         else:
             print(f"fid: {fid_value}")
