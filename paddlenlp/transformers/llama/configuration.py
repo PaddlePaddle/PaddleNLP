@@ -208,6 +208,7 @@ class LlamaConfig(PretrainedConfig):
         use_cache=True,
         use_recompute=False,
         recompute_granularity="full",
+        fuse_attn_qkv=False,
         use_flash_attention=False,
         use_fused_rms_norm=False,
         tensor_parallel_output=True,
@@ -230,6 +231,7 @@ class LlamaConfig(PretrainedConfig):
         self.use_cache = use_cache
         self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
+        self.fuse_attn_qkv = fuse_attn_qkv
         self.use_flash_attention = use_flash_attention
         self.use_fused_rms_norm = use_fused_rms_norm
         self.tensor_parallel_output = tensor_parallel_output

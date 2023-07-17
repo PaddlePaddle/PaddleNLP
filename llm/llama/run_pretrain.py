@@ -132,9 +132,9 @@ class ModelArguments:
         default=False,
         metadata={"help": "llama, use_fused_rms_norm"},
     )
-    fuse_attention_qkv: bool = field(
+    fuse_attn_qkv: bool = field(
         default=True,
-        metadata={"help": "gpt, fuse_attention_qkv"},
+        metadata={"help": "whether to fuse attn qkv"},
     )
     recompute_granularity: str = field(
         default="full",
@@ -403,7 +403,7 @@ def main():
     config.lm_shift_labels = False
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
-    config.fuse_attention_qkv = model_args.fuse_attention_qkv
+    config.fuse_attn_qkv = model_args.fuse_attn_qkv
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
     config.use_recompute = training_args.recompute

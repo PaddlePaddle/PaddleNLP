@@ -316,11 +316,13 @@ class LlamaMLP(nn.Layer):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
+        self.tensor_parallel_degree = config.tensor_parallel_degree
 
         if config.tensor_parallel_degree > 1:
-            self.gate_proj = mpu.ColumnParallelLinear(
+            # 为了减少张量并行的通信量，将两个linear合并成一个
+            self.gate_up_fused_proj = mpu.ColumnParallelLinear(
                 self.hidden_size,
-                self.intermediate_size,
+                self.intermediate_size * 2,
                 gather_output=False,
                 has_bias=False,
             )
@@ -330,19 +332,18 @@ class LlamaMLP(nn.Layer):
                 input_is_parallel=True,
                 has_bias=False,
             )
-            self.up_proj = mpu.ColumnParallelLinear(
-                self.hidden_size,
-                self.intermediate_size,
-                gather_output=False,
-                has_bias=False,
-            )
         else:
             self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
             self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
 
     def forward(self, x):
-        return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+        if self.tensor_parallel_degree > 1:
+            gate_out, up_out = paddle.chunk(self.gate_up_fused_proj(x), chunks=2, axis=-1)
+            out = self.down_proj(F.silu(gate_out) * up_out)
+        else:
+            out = self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+        return out
 
 
 class LlamaAttention(nn.Layer):
@@ -354,6 +355,7 @@ class LlamaAttention(nn.Layer):
         self.num_heads = config.num_attention_heads
         self.head_dim = self.hidden_size // self.num_heads
         self.max_position_embeddings = config.max_position_embeddings
+        self.fuse_attn_qkv = config.fuse_attn_qkv
         if config.tensor_parallel_degree > 1:
             assert (
                 self.num_heads % config.tensor_parallel_degree == 0
@@ -361,40 +363,55 @@ class LlamaAttention(nn.Layer):
             self.num_heads = self.num_heads // config.tensor_parallel_degree
 
         if config.tensor_parallel_degree > 1:
-            self.q_proj = mpu.ColumnParallelLinear(
-                self.hidden_size,
-                self.hidden_size,
-                has_bias=False,
-                gather_output=False,
-            )
-            self.k_proj = mpu.ColumnParallelLinear(
-                self.hidden_size,
-                self.hidden_size,
-                has_bias=False,
-                gather_output=False,
-            )
-            self.v_proj = mpu.ColumnParallelLinear(
-                self.hidden_size,
-                self.hidden_size,
-                has_bias=False,
-                gather_output=False,
-            )
+            if self.fuse_attn_qkv:
+                self.qkv_proj = mpu.ColumnParallelLinear(
+                    self.hidden_size,
+                    3 * self.hidden_size,
+                    has_bias=False,
+                    gather_output=False,
+                )
+            else:
+                self.q_proj = mpu.ColumnParallelLinear(
+                    self.hidden_size,
+                    self.hidden_size,
+                    has_bias=False,
+                    gather_output=False,
+                )
+                self.k_proj = mpu.ColumnParallelLinear(
+                    self.hidden_size,
+                    self.hidden_size,
+                    has_bias=False,
+                    gather_output=False,
+                )
+                self.v_proj = mpu.ColumnParallelLinear(
+                    self.hidden_size,
+                    self.hidden_size,
+                    has_bias=False,
+                    gather_output=False,
+                )
         else:
-            self.q_proj = nn.Linear(
-                self.hidden_size,
-                self.hidden_size,
-                bias_attr=False,
-            )
-            self.k_proj = nn.Linear(
-                self.hidden_size,
-                self.hidden_size,
-                bias_attr=False,
-            )
-            self.v_proj = nn.Linear(
-                self.hidden_size,
-                self.hidden_size,
-                bias_attr=False,
-            )
+            if self.fuse_attn_qkv:
+                self.qkv_proj = nn.Linear(
+                    self.hidden_size,
+                    3 * self.hidden_size,
+                    bias_attr=False,
+                )
+            else:
+                self.q_proj = nn.Linear(
+                    self.hidden_size,
+                    self.hidden_size,
+                    bias_attr=False,
+                )
+                self.k_proj = nn.Linear(
+                    self.hidden_size,
+                    self.hidden_size,
+                    bias_attr=False,
+                )
+                self.v_proj = nn.Linear(
+                    self.hidden_size,
+                    self.hidden_size,
+                    bias_attr=False,
+                )
 
         if config.tensor_parallel_degree > 1:
             self.o_proj = mpu.RowParallelLinear(
@@ -422,9 +439,14 @@ class LlamaAttention(nn.Layer):
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         bsz, q_len, _ = hidden_states.shape
-        query_states = self.q_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
-        key_states = self.k_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
-        value_states = self.v_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
+        if self.fuse_attn_qkv:
+            mix_layer = self.qkv_proj(hidden_states)
+            mix_layer = paddle.reshape_(mix_layer, [0, 0, self.num_heads, 3 * self.head_dim])
+            query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
+        else:
+            query_states = self.q_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
+            key_states = self.k_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
+            value_states = self.v_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
 
         kv_seq_len = key_states.shape[-3]
         offset = 0
