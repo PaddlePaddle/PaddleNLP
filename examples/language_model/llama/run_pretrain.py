@@ -17,6 +17,7 @@ GPT/Llama pretraining scripts.
 import math
 import os
 import random
+import sys
 import time
 from dataclasses import dataclass, field
 from typing import Optional
@@ -344,7 +345,11 @@ class PretrainingTrainer(Trainer):
 
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    else:
+        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
 
