@@ -36,12 +36,14 @@ import paddle
 import paddle.amp.auto_cast as autocast
 import paddle.distributed as dist
 import paddle.nn as nn
+import paddle.profiler as profiler
 from packaging import version
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
+from paperf import profile_paddle
 from tqdm.auto import tqdm
 
 from ..data import DataCollator, DataCollatorWithPadding, default_data_collator
@@ -644,6 +646,10 @@ class Trainer:
 
             npu_accelerate_plugin(self.optimizer)
 
+        # profile_paddle.register_profile_hook(model)
+
+        #        prof = profiler.Profiler(scheduler=[10, 12], timer_only=True)
+        #        prof.start()
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
                 train_dataloader.batch_sampler, DistributedBatchSampler
@@ -680,6 +686,7 @@ class Trainer:
                     steps_trained_progress_bar = None
 
                 if step % args.gradient_accumulation_steps == 0:
+                    profile_paddle.switch_profile(self.state.global_step, 10, 13, enable_layerwise_event=True)
                     self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
 
                 dp_enabled = (
@@ -720,21 +727,26 @@ class Trainer:
                     steps_in_epoch <= args.gradient_accumulation_steps
                     and (step + 1) == steps_in_epoch
                 ):
+                    profile_paddle.push_record_event("optimizer")
                     # Maunally collect gradients when group_sharded_parallel can't accept dp_group
                     # Case 1: Use sharding stage 2/3 with dp
                     # Case 2: Use recompute and dp
                     # local_rank != -1 don't means dp in networks.
                     if self.sharding and ShardingOption.SHARD_OP not in self.args.sharding:
                         if self.args.data_parallel_degree > 1 and not is_dp_group_support_in_group_sharded_parallel():
+                            profile_paddle.push_record_event("fused_allreduce_gradients")
                             fused_allreduce_gradients(model.parameters(), fleet.get_hybrid_communicate_group())
+                            profile_paddle.pop_record_event()
                             if ShardingOption.FULL_SHARD in self.args.sharding:
                                 # Why need sync on parm again ?
                                 # TODO: fix this.
+                                profile_paddle.push_record_event("full_shard")
                                 for p in model.parameters():
                                     if hasattr(p, "bw_storage"):
                                         assert p.grad is None, "This case shouldn't happen."
                                         p.bw_storage.scale_(1.0 / self.dp_group.nranks)
                                         paddle.distributed.all_reduce(p.bw_storage, group=self.dp_group)
+                                profile_paddle.pop_record_event()
 
                     # Case 2: Use recompute and dp / sharding stage1,
                     # manualy collect gradient for dp.
@@ -756,22 +768,26 @@ class Trainer:
                     )
                     optimizer_was_run = True
                     if self.do_grad_scaling:
-                        scale_before = self.scaler._scale.numpy()
+                        scale_before = paddle.assign(self.scaler._scale)
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
-                        scale_after = self.scaler._scale.numpy()
                         optimizer_was_run = not self.scaler._cache_founf_inf
                         if not optimizer_was_run:
+                            scale_before_value = scale_before.numpy()
+                            scale_after_value = self.scaler._scale.numpy()
                             logger.warning(
-                                f"optimizer not run, scale_before: {scale_before[0]}, scale_after: {scale_after[0]}"
+                                f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
                             )
                     else:
                         self.optimizer.step()
+                    profile_paddle.pop_record_event()
 
                     if optimizer_was_run:
                         self.lr_scheduler.step()
 
+                    profile_paddle.push_record_event("clear_grad")
                     self.optimizer.clear_grad()
+                    profile_paddle.pop_record_event()
                     self.callback_handler.on_optimizer_end(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
                     )
@@ -781,6 +797,13 @@ class Trainer:
 
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+
+                #                    prof.step()
+                #                    print(f"[BENCHMARK][{step}/{self.state.global_step}] {prof.step_info()}")
+                #                    if self.state.global_step == 30:
+                #                        prof.stop()
+                #                        prof.summary(op_detail=True)
+                #                        exit()
                 else:
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
 
@@ -1534,16 +1557,20 @@ class Trainer:
         model.train()
         inputs = self._prepare_inputs(inputs)
 
+        profile_paddle.push_record_event("forward")
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
 
         if self.args.gradient_accumulation_steps > 1:
             loss = loss / self.args.gradient_accumulation_steps
+        profile_paddle.pop_record_event()
 
+        profile_paddle.push_record_event("backward")
         if self.do_grad_scaling:
             self.scaler.scale(loss).backward()
         else:
             loss.backward()
+        profile_paddle.pop_record_event()
 
         return loss.detach()
 
