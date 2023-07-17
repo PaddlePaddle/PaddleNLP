@@ -208,7 +208,7 @@ class TrainingArguments:
             default -1 means sharding parameters between all workers.
         tensor_parallel_degree (`int`, *optional*, defaults to `-1`)
             Tensor parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.3 Tensor Model Parallelism).
-            This techique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts)
+            This technique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts)
             tensor_parallel_degree means split the transformer layer to how many parts.
             default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better proformance.
             Note, this need model support in source code, currently GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM is supported.
@@ -225,6 +225,10 @@ class TrainingArguments:
               disable_partial_send_recv, optmize send speed for tensor parallel.
               enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
               enable_dp_comm_overlap, fuse data parallel gradient communication.
+        sequence_parallel (`bool`, *optional*, defaults to `False`)
+            Sequence parallelism is a parallel technique proposed in (https://arxiv.org/pdf/2205.05198.pdf see 4.2.2 Sequence Parallelism).
+            This technique partitions the non-tensor parallel regions of a transformer layer, whose operations are independent along the sequence dimension.
+            Notes, this can only be True when model_parallel_world_size is larger than 1.
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -521,6 +525,22 @@ class TrainingArguments:
             )
         },
     )
+
+    sequence_parallel: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "Sequence parallelism is a parallel technique proposed in (https://arxiv.org/pdf/2205.05198.pdf see 4.2.2 Sequence Parallelism)."
+                "This technique partitions the non-tensor parallel regions of a transformer layer, whose operations are independent along the sequence dimension."
+                "Notes, this can only be True when model_parallel_world_size is larger than 1."
+            )
+        },
+    )
+
+    fuse_sequence_parallel_allreduce: bool = field(
+        default=False, metadata={"help": "Whether fuse allreduce gradident when using sequence parallel."}
+    )
+
     recompute: bool = field(
         default=False,
         metadata={
@@ -714,6 +734,10 @@ class TrainingArguments:
         if len(self.sharding) == 0 and self.sharding_parallel_degree > 0:
             warnings.warn("`--sharding_parallel_degree` is useful only when `--sharding` is specified.")
 
+        if self.tensor_parallel_degree <= 1 and self.sequence_parallel is True:
+            logger.warning("If tensor_parallel_degree <= 1, sequence_parallel will be force to False")
+            self.sequence_parallel = False
+
         if len(self.sharding) > 0 or self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1:
             self.use_hybrid_parallel = True
 
@@ -727,6 +751,9 @@ class TrainingArguments:
             if not (self.bf16 or self.fp16):
                 logger.warning("set amp_master_grad to false since amp is disabled.")
                 self.amp_master_grad = False
+            if self.sequence_parallel and self.fuse_sequence_parallel_allreduce:
+                logger.warning("If amp_master_grad is True, fuse_sequence_parallel_allreduce will be forced to False.")
+                self.fuse_sequence_parallel_allreduce = False
 
         if self.use_hybrid_parallel:
             world_size = paddle.distributed.get_world_size()
