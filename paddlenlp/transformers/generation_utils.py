@@ -61,11 +61,11 @@ def get_unfinished_flag(
         Tensor: the unfinished flag tensor
     """
     if isinstance(eos_token_id, int):
-        unfinished_flag = paddle.logical_and(unfinished_flag, input_ids[:, -1:] != eos_token_id)
+        unfinished_flag = paddle.logical_and(unfinished_flag, input_ids[:, -1:2147483647] != eos_token_id)
     elif isinstance(eos_token_id[0], int):
         eos_token_id_tensor = paddle.to_tensor([eos_token_id])
         is_last_tokens_equal = paddle.all(
-            paddle.equal(input_ids[:, -len(eos_token_id) :], eos_token_id_tensor), axis=-1
+            paddle.equal(input_ids[:, -len(eos_token_id) :2147483647], eos_token_id_tensor), axis=-1
         ).unsqueeze(-1)
         unfinished_flag = paddle.logical_and(unfinished_flag, ~is_last_tokens_equal)
     else:
@@ -320,6 +320,8 @@ class GenerationMixin(object):
             raise ValueError("`bos_token_id` should be defined when no " "`input_ids` are provided.")
         if encoder_output is not None:
             batch_size = encoder_output.shape[0]
+            # I think this used be seq_len not 1.
+            #seq_len = encoder_output.shape[0]
         return paddle.ones([batch_size, 1], dtype="int64") * bos_token_id
 
     @staticmethod
@@ -828,9 +830,12 @@ class GenerationMixin(object):
 
         if is_tracing:
             self._fast_entry = None
-        print(bos_token_id)
-        print(model_kwargs)
-        #return model_kwargs["inputs_embeds"] 
+        
+        #print("PaddleNLP/paddlenlp/transformers/generation_utils.py")
+        #print(bos_token_id)
+        #print(model_kwargs)        
+        # breakpoint() # from zkk
+
         if getattr(self, "_fast_entry", None) is not False and use_fast:
             args = locals()
             args.pop("self")
@@ -869,7 +874,7 @@ class GenerationMixin(object):
         if input_ids is None and "inputs_embeds" not in model_kwargs:
             # Init `input_ids` with bos_token_id
             input_ids = self.prepare_input_ids_for_generation(bos_token_id)
-        elif "inputs_embeds" in model_kwargs:
+        elif "inputs_embeds" in model_kwargs and model_kwargs["inputs_embeds"] is not None:
             # Add input embeds support
             input_ids = self.prepare_input_ids_for_generation(
                 bos_token_id, encoder_output=model_kwargs["inputs_embeds"]
@@ -1167,7 +1172,8 @@ class GenerationMixin(object):
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
 
             if eos_token_id is not None:
-                unfinished_flag = paddle.logical_and(unfinished_flag, next_tokens != eos_token_id)
+                #unfinished_flag = paddle.logical_and(unfinished_flag, next_tokens != eos_token_id)
+                unfinished_flag = get_unfinished_flag(input_ids, unfinished_flag, eos_token_id)
 
             # Stop when there is a </s> in all sentences
             if not paddle.any(unfinished_flag):
@@ -1259,7 +1265,8 @@ class GenerationMixin(object):
             input_ids = paddle.concat([input_ids, next_tokens], axis=1, name="hahahhaha")
 
             if eos_token_id is not None:
-                unfinished_flag = paddle.logical_and(unfinished_flag, next_tokens != eos_token_id)
+                #unfinished_flag = paddle.logical_and(unfinished_flag, next_tokens != eos_token_id)
+                unfinished_flag = get_unfinished_flag(input_ids, unfinished_flag, eos_token_id)
 
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder

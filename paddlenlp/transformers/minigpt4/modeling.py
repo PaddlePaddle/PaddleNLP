@@ -1790,8 +1790,9 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
 
         attention_mask = paddle.concat([first_attention_mask, image_attention_mask, second_attention_mask], axis=1)
 
-        outputs = self.language_model.generate(
-            inputs_embeds=inputs_embeds, attention_mask=attention_mask, **generate_kwargs
-        )
+        outputs = self.language_model.generate(inputs_embeds=inputs_embeds, attention_mask=attention_mask, **generate_kwargs)
+
+        # 现在假设让他全部输入id，看看是否报错
+        # outputs = self.language_model.generate(input_ids=first_input_ids, attention_mask=first_attention_mask, **generate_kwargs)
 
         return outputs
