@@ -822,7 +822,12 @@ class TrainingArguments:
                 strategy.hybrid_configs = hybrid_configs
                 if hasattr(self, "sharding_stage_1_tensor_fusion"):
                     # need to separate set sharing configs to bypass `Assignment not allowed` error
-                    strategy.hybrid_configs["sharding_configs"].tensor_fusion = self.sharding_stage_1_tensor_fusion
+                    try:
+                        strategy.hybrid_configs["sharding_configs"].tensor_fusion = self.sharding_stage_1_tensor_fusion
+                    except KeyError:
+                        warnings.warn(
+                            "The sharding_stage_1_tensor_fusion is not supported by current version of Paddle. Please try lateset develop Paddle."
+                        )
                 fleet.init(is_collective=True, strategy=strategy)
 
                 logger.info(strategy)
