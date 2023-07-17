@@ -42,7 +42,3 @@ The following hyperparameters were used during training:
 - ema_inv_gamma: {{ ema_power }}
 - ema_inv_gamma: {{ ema_max_decay }}
 - mixed_precision: {{ mixed_precision }}
-
-### Training results
-
-📈 [TensorBoard logs](https://huggingface.co/{{ repo_name }}/tensorboard?#scalars)
