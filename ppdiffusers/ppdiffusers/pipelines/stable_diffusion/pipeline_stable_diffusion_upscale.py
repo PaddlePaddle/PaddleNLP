@@ -513,7 +513,7 @@ class StableDiffusionUpscalePipeline(DiffusionPipeline):
 
                 # concat latents, mask, masked_image_latents in the channel dimension
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
-                latent_model_input = paddle.concat([latent_model_input, image], axis=1)
+                latent_model_input = paddle.concat([latent_model_input, image.cast(latent_model_input.dtype)], axis=1)
 
                 # predict the noise residual
                 noise_pred = self.unet(
@@ -535,7 +535,8 @@ class StableDiffusionUpscalePipeline(DiffusionPipeline):
                         callback(i, t, latents)
         # 10. Post-processing
         # make sure the VAE is in float32 mode, as it overflows in float16
-        self.vae.to(dtype=paddle.float32)
+        if self.vae.dtype != paddle.float32:
+            self.vae.to(dtype=paddle.float32)
         image = self.decode_latents(latents.cast("float32"))
 
         # 11. Convert to PIL

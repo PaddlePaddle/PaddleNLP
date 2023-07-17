@@ -56,6 +56,7 @@ python -u  -m paddle.distributed.launch \
     --scale_loss 1024 \
     --learning_rate 0.00001 \
     --min_learning_rate 0.000005 \
+    --lr_scheduler_type "cosine" \
     --max_steps 10000 \
     --save_steps 5000 \
     --weight_decay 0.01 \
@@ -73,6 +74,12 @@ python -u  -m paddle.distributed.launch \
     --do_eval \
     --device "gpu"
 ```
+注意：
+1. 需要paddle develop版本训练，需要安装`pip install tool_helpers visualdl==2.5.3`等相关缺失whl包
+2. `use_flash_attention` 需要在A100机器开启，否则loss可能不正常（很快变成0.00x,非常小不正常）。建议使用cuda11.8环境。
+3. `continue_training` 表示从现有的预训练模型加载训练。7b模型初始loss大概为1.99x, 随机初始化模型loss从11.x左右下降。
+4. `use_fused_rms_norm` 需要安装[此目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt-3/external_ops)下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置PYTHONPATH
+5. 当前脚本为sharding版本，需要4D并行训练（数据、sharding、张量、流水线并行）的用户，请参考 `run_trainer_tp4pp2.sh`脚本。
 
 <a name="1"></a>
 
@@ -81,72 +88,96 @@ python -u  -m paddle.distributed.launch \
 ```shell
 python -u  -m paddle.distributed.fleet.launch \
     --gpus "0,1,2,3" finetune_generation.py \
-    --model_name_or_path facebook/llama-7b \
-    --do_train \
-    --do_eval \
-    --num_train_epochs 1 \
-    --per_device_train_batch_size 4 \
-    --per_device_eval_batch_size 4 \
-    --tensor_parallel_degree 4 \
-    --overwrite_output_dir \
     --output_dir ./checkpoints/ \
-    --logging_steps 10 \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 2 \
+    --per_device_eval_batch_size 8 \
+    --model_name_or_path facebook/llama-7b \
+    --task_name squad \
+    --num_train_epochs 2 \
+    --learning_rate 3e-5 \
+    --warmup_steps 30 \
+    --logging_steps 1 \
+    --evaluation_strategy epoch \
+    --save_strategy epoch \
+    --src_length 1024 \
+    --tgt_length 1024 \
     --fp16 \
     --fp16_opt_level O2 \
-    --gradient_accumulation_steps 32 \
+    --do_train \
+    --do_eval \
+    --disable_tqdm True \
+    --load_best_model_at_end True \
+    --metric_for_best_model accuracy \
+    --eval_with_do_generation False \
     --recompute \
-    --learning_rate 3e-5 \
-    --lr_scheduler_type linear \
-    --max_grad_norm 1.0 \
-    --warmup_steps 20
+    --save_total_limit 1 \
+    --overwrite_output_dir \
+    --tensor_parallel_degree 4
 ```
 
 ### 单卡LoRA微调
 
 ```shell
 python finetune_generation.py \
-    --model_name_or_path facebook/llama-7b \
-    --do_train \
-    --do_eval \
-    --num_train_epochs 2 \
-    --per_device_train_batch_size 4 \
-    --per_device_eval_batch_size 4 \
-    --overwrite_output_dir \
     --output_dir ./checkpoints/ \
-    --logging_steps 10 \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 2 \
+    --per_device_eval_batch_size 8 \
+    --model_name_or_path facebook/llama-7b \
+    --task_name squad \
+    --num_train_epochs 2 \
+    --learning_rate 3e-4 \
+    --warmup_steps 30 \
+    --logging_steps 1 \
+    --evaluation_strategy epoch \
+    --save_strategy epoch \
+    --src_length 1024 \
+    --tgt_length 1024 \
     --fp16 \
     --fp16_opt_level O2 \
-    --gradient_accumulation_steps 4 \
+    --do_train \
+    --do_eval \
+    --disable_tqdm True \
+    --load_best_model_at_end True \
+    --metric_for_best_model accuracy \
+    --eval_with_do_generation False \
     --recompute \
-    --learning_rate 3e-4 \
-    --lr_scheduler_type linear \
-    --max_grad_norm 1.0 \
-    --warmup_steps 20 \
+    --save_total_limit 1 \
+    --overwrite_output_dir \
     --lora True \
-    --r 8
+    --lora_rank 8
 ```
 
 ### 单卡Prefix微调
 
 ```shell
 python finetune_generation.py \
-    --model_name_or_path facebook/llama-7b \
-    --do_train \
-    --do_eval \
-    --num_train_epochs 2 \
-    --per_device_train_batch_size 4 \
-    --per_device_eval_batch_size 4 \
-    --overwrite_output_dir \
     --output_dir ./checkpoints/ \
-    --logging_steps 10 \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 2 \
+    --per_device_eval_batch_size 8 \
+    --model_name_or_path facebook/llama-7b \
+    --task_name squad \
+    --num_train_epochs 2 \
+    --learning_rate 3e-5 \
+    --warmup_steps 30 \
+    --logging_steps 1 \
+    --evaluation_strategy epoch \
+    --save_strategy epoch \
+    --src_length 1024 \
+    --tgt_length 1024 \
     --fp16 \
     --fp16_opt_level O2 \
-    --gradient_accumulation_steps 4 \
+    --do_train \
+    --do_eval \
+    --disable_tqdm True \
+    --load_best_model_at_end True \
+    --metric_for_best_model accuracy \
+    --eval_with_do_generation False \
     --recompute \
-    --learning_rate 3e-2 \
-    --lr_scheduler_type linear \
-    --max_grad_norm 1.0 \
-    --warmup_steps 20 \
+    --save_total_limit 1 \
+    --overwrite_output_dir \
     --prefix_tuning True \
     --num_prefix_tokens 64
 ```
@@ -173,18 +204,24 @@ python finetune_generation.py \
 - `do_train`: 是否训练模型。
 - `do_eval`: 是否评估模型。
 - `tensor_parallel_degree`: 模型并行数量。
-- `do_generation`: 在评估的时候是否调用model.generate,默认为False。
+- `eval_with_do_generation`: 在评估的时候是否调用model.generate,默认为False。
 - `lora`: 是否使用LoRA技术。
-- `prefix_tuning`: 是否使用Prefix技术。
 - `merge_weights`: 是否合并原始模型和Lora模型的权重。
-- `r`: lora 算法中rank（秩）的值。
+- `lora_rank`: lora 算法中rank（秩）的值，默认为8。
+- `lora_path`: lora参数和配置路径，对lora参数进行初始化。
+- `qat`: 是否使用qat对模型进行量化
+- `qat_type`: qat量化类型，支持A8W8, W4, A8W4。默认为A8W8。
+- `prefix_tuning`: 是否使用Prefix技术。
 - `num_prefix_tokens`: prefix tuning算法中前缀token数量。
+- `task_name`: 内置数据集任务名
+- `data_name`: 内置数据集名，定义数据集名必须同时定义数据集任务名
+- `dataset_path`: 自定义数据集路径。
 
 ## 流水线并行
 ```shell
 python -u  -m paddle.distributed.launch \
     --gpus "4,5,6,7"   finetune_generation.py \
-    --model_name_or_path facebook/tiny-random-llama \
+    --model_name_or_path __internal_testing__/tiny-random-llama \
     --do_train \
     --do_eval \
     --num_train_epochs 1 \
@@ -208,33 +245,6 @@ python -u  -m paddle.distributed.launch \
     --lr_scheduler_type linear \
     --max_grad_norm 1.0 \
     --warmup_steps 20
-```
-
-## 指令微调
-
-```shell
-python -u  -m paddle.distributed.fleet.launch \
-    --gpus "0,1,2,3" finetune_instruction_generation.py \
-    --model_name_or_path facebook/llama-7b \
-    --do_train \
-    --do_eval \
-    --num_train_epochs 1 \
-    --per_device_train_batch_size 4 \
-    --per_device_eval_batch_size 4 \
-    --tensor_parallel_degree 4 \
-    --overwrite_output_dir \
-    --output_dir ./checkpoints/ \
-    --logging_steps 10 \
-    --fp16 \
-    --fp16_opt_level O2 \
-    --recompute \
-    --learning_rate 3e-5 \
-    --lr_scheduler_type linear \
-    --max_grad_norm 1.0 \
-    --warmup_steps 20 \
-    --gradient_accumulation_steps 32 \
-    --logging_steps 1 \
-    --eval_steps 1000
 ```
 
 <a name="2"></a>
@@ -322,3 +332,20 @@ answer: five context: The Broncos took an early lead in Super Bowl 50 and never 
 question: How many total tackles did von Miller get in the Super Bowl?
 --------------------
 ```
+
+## 服务化推理
+
+提供基于 UI 服务化推理，以下命令将会：
+
+1. 启动多卡模型服务，并让其常驻显存，等待执行。
+2. 启动 Flask 服务，监听外部请求。
+3. 启动 Gradio UI 服务，提供可视化交互界面。
+
+```shell
+python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" server.py \
+    --model_name_or_path facebook/llama-7b \
+    --port 8010 \
+    --flask_port 8011 \
+    --src_length 100
+```
+python predict_generation.py --model_name_or_path idea-ccnl/ziya-llama-13b-v1 --data_file /root/paddlejob/work/eb_data/hcg/dev.json

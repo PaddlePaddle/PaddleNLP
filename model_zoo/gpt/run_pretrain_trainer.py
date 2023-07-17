@@ -195,7 +195,7 @@ def create_pretrained_dataset(
     def build_dataset(index, name):
         dataset = GPTDataset(
             file_prefix=input_prefix,
-            build_data_file=training_args.local_rank == 0,
+            build_data_file=training_args.local_process_index == 0,
             micro_batch_size=training_args.per_device_train_batch_size
             if name == "train"
             else training_args.per_device_eval_batch_size,

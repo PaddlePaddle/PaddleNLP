@@ -41,7 +41,7 @@ class ModelArguments:
     )
     model_max_length: Optional[int] = field(default=77, metadata={"help": "Pretrained tokenizer model_max_length"})
     num_inference_steps: Optional[int] = field(default=200, metadata={"help": "num_inference_steps"})
-    use_ema: Optional[bool] = field(default=False, metadata={"help": "Whether or not use ema"})
+    use_ema: bool = field(default=False, metadata={"help": "Whether or not use ema"})
     pretrained_model_name_or_path: str = field(
         default=None, metadata={"help": "Path to pretrained model or model, when we want to resume training."}
     )
@@ -49,14 +49,14 @@ class ModelArguments:
     enable_xformers_memory_efficient_attention: bool = field(
         default=False, metadata={"help": "enable_xformers_memory_efficient_attention."}
     )
-    to_static: Optional[bool] = field(default=False, metadata={"help": "Whether or not to_static"})
+    to_static: bool = field(default=False, metadata={"help": "Whether or not to_static"})
     prediction_type: Optional[str] = field(
         default="epsilon",
         metadata={
             "help": "prediction_type, prediction type of the scheduler function, one of `epsilon` (predicting the noise of the diffusion process), `sample` (directly predicting the noisy sample`) or `v_prediction` (see section 2.4 https://imagen.research.google/video/paper.pdf)"
         },
     )
-    benchmark: Optional[bool] = field(
+    benchmark: bool = field(
         default=False,
         metadata={"help": "Whether or not run benchmark."},
     )
@@ -64,6 +64,7 @@ class ModelArguments:
         default=None,
         metadata={"help": "profiler_options."},
     )
+    noise_offset: Optional[int] = field(default=0, metadata={"help": "The scale of noise offset."})
 
 
 @dataclass

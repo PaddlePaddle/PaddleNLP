@@ -23,7 +23,7 @@ import paddle
 import paddle.distributed as dist
 import reader
 import yaml
-from attrdict import AttrDict
+from easydict import EasyDict as AttrDict
 from tls.record import AverageStatistical
 from tls.to_static import apply_to_static
 

@@ -46,15 +46,15 @@ from tqdm.auto import tqdm
 
 from ..data import DataCollator, DataCollatorWithPadding, default_data_collator
 from ..peft import LoRAModel, PrefixModelForCausalLM
-from ..transformers.model_utils import PretrainedModel, _add_variant, unwrap_model
-from ..transformers.tokenizer_utils import PretrainedTokenizer
-from ..utils import device_guard
-from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
-from ..utils.env import (
-    LORA_WEIGHT_FILE_NAME,
-    PADDLE_WEIGHT_FILE_NAME,
-    PREFIX_WEIGHT_FILE_NAME,
+from ..transformers.model_utils import (
+    PretrainedModel,
+    _add_variant,
+    paddlenlp_load,
+    unwrap_model,
 )
+from ..transformers.tokenizer_utils import PretrainedTokenizer
+from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
+from ..utils.env import LORA_WEIGHTS_NAME, PADDLE_WEIGHTS_NAME, PREFIX_WEIGHTS_NAME
 from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
@@ -115,13 +115,10 @@ try:
 except:
     mix_precision_utils = None
 
-
-def paddlenlp_load(path, return_numpy=False):
-    if return_numpy:
-        with device_guard():
-            return paddle.load(path)
-    else:
-        return paddle.load(path, return_numpy=return_numpy)
+try:
+    from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
+except:
+    from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
 
 
 def is_dp_group_support_in_group_sharded_parallel():
@@ -319,18 +316,11 @@ class Trainer:
                         self.scaler = fleet.distributed_scaler(self.scaler)
                     else:
                         # scaler for stage2 and stage3
-                        if paddle.framework.in_dygraph_mode():
-                            from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
-                                GroupShardedScaler,
-                            )
+                        from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
+                            GroupShardedScaler,
+                        )
 
-                            self.scaler = GroupShardedScaler(self.scaler)
-                        else:
-                            from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import (
-                                ShardingScaler,
-                            )
-
-                            self.scaler = ShardingScaler(self.scaler)
+                        self.scaler = GroupShardedScaler(self.scaler)
                 else:
                     self.do_grad_scaling = False
                     self.use_cuda_amp = False
@@ -415,11 +405,11 @@ class Trainer:
 
         if resume_from_checkpoint is not None:
             if isinstance(self.model, LoRAModel):
-                weight_name = LORA_WEIGHT_FILE_NAME
+                weight_name = LORA_WEIGHTS_NAME
             elif isinstance(self.model, PrefixModelForCausalLM):
-                weight_name = PREFIX_WEIGHT_FILE_NAME
+                weight_name = PREFIX_WEIGHTS_NAME
             else:
-                weight_name = PADDLE_WEIGHT_FILE_NAME
+                weight_name = PADDLE_WEIGHTS_NAME
 
             if not os.path.isfile(
                 os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
@@ -471,11 +461,11 @@ class Trainer:
 
         if resume_from_checkpoint is not None:
             if isinstance(self.model, LoRAModel):
-                weight_name = LORA_WEIGHT_FILE_NAME
+                weight_name = LORA_WEIGHTS_NAME
             elif isinstance(self.model, PrefixModelForCausalLM):
-                weight_name = PREFIX_WEIGHT_FILE_NAME
+                weight_name = PREFIX_WEIGHTS_NAME
             else:
-                weight_name = PADDLE_WEIGHT_FILE_NAME
+                weight_name = PADDLE_WEIGHTS_NAME
             if not os.path.isfile(
                 os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
             ):
@@ -557,27 +547,31 @@ class Trainer:
         self._load_optimizer_and_scheduler(resume_from_checkpoint)
 
         logger.info("***** Running training *****")
-        logger.info(f"  Num examples = {num_examples}")
+        logger.info(f"  Num examples = {num_examples:,}")
         logger.info(f"  Num Epochs = {num_train_epochs}")
         logger.info(f"  Instantaneous batch size per device = {args.per_device_train_batch_size}")
         logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}")
         logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
-        logger.info(f"  Total optimization steps = {max_steps}")
-        logger.info(f"  Total num train samples = {num_train_samples}")
+        logger.info(f"  Total optimization steps = {max_steps:,}")
+        logger.info(f"  Total num train samples = {num_train_samples:,}")
         # per_device_trainable_numel = sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)
         # TODO: Temporary fix since Tensor.numel() not supported in distributed mode
         per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
-        logger.info(f"  Number of trainable parameters = {per_device_trainable_numel} (per device)")
+        logger.info(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
         if self.args.use_hybrid_parallel:
             # todo fix for pipeline_parallel_degree
             parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
             if parts_num > 1:
-                trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype="int64")
+                all_reduce_dtype = "int64"
+                if paddle.get_device().split(":")[0] == "npu":
+                    # TODO(duanyanhui): fix when NPU all_reduce supports int64
+                    all_reduce_dtype = "float32"
+                trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
                 paddle.distributed.all_reduce(trainable_numel_tensor)
-                trainable_numel = trainable_numel_tensor.item() // self.args.dataset_world_size
+                trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
                 # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
                 # so, the trainable numel is a little bigger than real.
-                logger.info(f"  Number of trainable parameters = {trainable_numel} (all devices, roughly)")
+                logger.info(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
 
         start_time = time.time()
         self._globalstep_last_start_time = time.time()
@@ -657,10 +651,10 @@ class Trainer:
                 train_dataloader.batch_sampler.set_epoch(epoch)
 
             step = -1
-
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
+                self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
                 # Skip past any already trained steps if resuming training
                 # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
                 # We use consumed_samples to reset the status
@@ -752,11 +746,14 @@ class Trainer:
                         for p in model._layers.parameters():
                             if hasattr(p, "main_grad") and p.main_grad is not None:
                                 assert p.grad is None
-                                p.main_grad = p.main_grad.scale(1.0 / model.accumulate_steps)
+                                p.main_grad = p.main_grad.scale(1.0 / self.args.gradient_accumulation_steps)
                             elif p.grad is not None:
-                                p.grad = p.grad.scale(1.0 / model.accumulate_steps)
+                                p.grad = p.grad.scale(1.0 / self.args.gradient_accumulation_steps)
 
                     # Optimizer step
+                    self.callback_handler.on_optimizer_begin(
+                        args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                    )
                     optimizer_was_run = True
                     if self.do_grad_scaling:
                         scale_before = self.scaler._scale.numpy()
@@ -775,6 +772,9 @@ class Trainer:
                         self.lr_scheduler.step()
 
                     self.optimizer.clear_grad()
+                    self.callback_handler.on_optimizer_end(
+                        args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                    )
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
@@ -814,11 +814,11 @@ class Trainer:
                 f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
             )
             if isinstance(self.model, LoRAModel):
-                weight_name = LORA_WEIGHT_FILE_NAME
+                weight_name = LORA_WEIGHTS_NAME
             elif isinstance(self.model, PrefixModelForCausalLM):
-                weight_name = PREFIX_WEIGHT_FILE_NAME
+                weight_name = PREFIX_WEIGHTS_NAME
             else:
-                weight_name = PADDLE_WEIGHT_FILE_NAME
+                weight_name = PADDLE_WEIGHTS_NAME
             best_model_path = os.path.join(
                 self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
             )
@@ -1184,6 +1184,14 @@ class Trainer:
             for i in range(core.get_cuda_device_count()):
                 core.default_cuda_generator(i).manual_seed(checkpoint_rng_state["cuda"][i])
 
+        if paddle.device.get_all_custom_device_type() is not None:
+            custom_device_type = paddle.device.get_all_custom_device_type()
+            for device in custom_device_type:
+                if not len(checkpoint_rng_state["cuda"]) == core.get_custom_device_count(device):
+                    raise ValueError("Length of custom device state list shoule be equal to the custom device count")
+                for i in range(core.get_custom_device_count(device)):
+                    core.default_custom_device_generator(i).manual_seed(checkpoint_rng_state["cuda"][i])
+
         if self.args.use_hybrid_parallel:
             fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
                 checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
@@ -1449,10 +1457,15 @@ class Trainer:
                 # c_embedding not support bf16 yet
                 custom_black_list.append("c_embedding")
 
+            if self.args.amp_custom_white_list is not None:
+                custom_white_list.extend(self.args.amp_custom_white_list)
+            if self.args.amp_custom_black_list is not None:
+                custom_black_list.extend(self.args.amp_custom_black_list)
+
             ctx_manager = autocast(
                 True,
-                custom_black_list=custom_black_list,
-                custom_white_list=custom_white_list,
+                custom_black_list=set(custom_black_list),
+                custom_white_list=set(custom_white_list),
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
             )
@@ -1624,6 +1637,10 @@ class Trainer:
 
         output_dir = os.path.join(run_dir, checkpoint_folder)
 
+        if ShardingOption.FULL_SHARD in self.args.sharding:
+            # TODO(ZHUI) fix it and set convert2cpu=True to save gpu memory
+            model.get_all_parameters(convert2cpu=False)
+
         self.save_model(output_dir)
 
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
@@ -1670,7 +1687,7 @@ class Trainer:
         rng_states = {
             "python": random.getstate(),
             "numpy": np.random.get_state(),
-            "cuda": [k.current_seed() for k in paddle.get_cuda_rng_state()],
+            "cuda": [k.current_seed() for k in paddle.get_rng_state()],
             "cpu": paddle.framework.core.default_cpu_generator().get_state().current_seed(),
         }
         if self.args.use_hybrid_parallel:
@@ -1789,7 +1806,7 @@ class Trainer:
                     state_dict = self.model.state_dict()
                 paddle.save(
                     state_dict,
-                    os.path.join(output_dir, _add_variant(PADDLE_WEIGHT_FILE_NAME, self.args.weight_name_suffix)),
+                    os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix)),
                 )
         else:
             self.model.save_pretrained(
@@ -1817,7 +1834,7 @@ class Trainer:
             os.path.join(checkpoint, SCHEDULER_NAME)
         ):
             # Load in optimizer and scheduler states
-            self.optimizer.set_state_dict(paddlenlp_load(os.path.join(checkpoint, optimizer_name), return_numpy=True))
+            self.optimizer.set_state_dict(paddlenlp_load(os.path.join(checkpoint, optimizer_name), map_location="cpu"))
 
             self.lr_scheduler.set_state_dict(paddle.load(os.path.join(checkpoint, SCHEDULER_NAME)))
             if self.do_grad_scaling and os.path.isfile(os.path.join(checkpoint, SCALER_NAME)):
@@ -1884,6 +1901,7 @@ class Trainer:
             prediction_loss_only=True if self.compute_metrics is None else None,
             ignore_keys=ignore_keys,
             metric_key_prefix=metric_key_prefix,
+            max_eval_iters=self.args.max_evaluate_steps,
         )
 
         total_batch_size = self.args.eval_batch_size * self.args.dataset_world_size
@@ -1930,7 +1948,7 @@ class Trainer:
 
         if isinstance(dataloader, paddle.io.DataLoader):
             batch_size = dataloader.batch_sampler.batch_size
-        elif isinstance(dataloader, paddle.fluid.dataloader.dataloader_iter._DataLoaderIterBase):
+        elif isinstance(dataloader, _DataLoaderIterBase):
             # support for inner dataloader
             batch_size = dataloader._batch_sampler.batch_size
             # alias for inner dataloader
@@ -1942,7 +1960,7 @@ class Trainer:
         if max_eval_iters > 0:
             # on eval limit steps
             num_samples = batch_size * self.args.dataset_world_size * max_eval_iters
-            if isinstance(dataloader, paddle.fluid.dataloader.dataloader_iter._DataLoaderIterBase) and isinstance(
+            if isinstance(dataloader, _DataLoaderIterBase) and isinstance(
                 dataloader._batch_sampler, NlpDistributedBatchSampler
             ):
                 consumed_samples = (
@@ -2130,7 +2148,11 @@ class Trainer:
 
         eval_loop = self.evaluation_loop
         output = eval_loop(
-            test_dataloader, description="Prediction", ignore_keys=ignore_keys, metric_key_prefix=metric_key_prefix
+            test_dataloader,
+            description="Prediction",
+            ignore_keys=ignore_keys,
+            metric_key_prefix=metric_key_prefix,
+            max_eval_iters=self.args.max_evaluate_steps,
         )
         total_batch_size = self.args.per_device_eval_batch_size * self.args.dataset_world_size
         output.metrics.update(

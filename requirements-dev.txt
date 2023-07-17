@@ -1,4 +1,4 @@
-paddlepaddle>=2.4.1
+paddlepaddle==2.5.0rc1
 paddleocr
 pre-commit
 pytest
@@ -14,3 +14,4 @@ unidecode
 soundfile
 librosa
 numpy==1.23.5
+rouge

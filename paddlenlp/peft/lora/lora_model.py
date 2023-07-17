@@ -26,7 +26,7 @@ from paddle.distributed.fleet.meta_parallel import ColumnParallelLinear
 from ...transformers.conversion_utils import ConversionMixin
 from ...transformers.model_utils import PretrainedModel, _add_variant, dtype_guard
 from ...utils.distributed import distributed_gather
-from ...utils.env import LORA_WEIGHT_FILE_NAME
+from ...utils.env import LORA_WEIGHTS_NAME
 from ...utils.log import logger
 from .lora_config import LoRAConfig
 from .lora_layers import (
@@ -71,9 +71,9 @@ class LoRAModel(nn.Layer):
 
         # define lora weight name
         if lora_config_tensor_parallel_degree > 1:
-            lora_weight_name = _add_variant(LORA_WEIGHT_FILE_NAME, f"tp{model.config.tensor_parallel_rank:0>2d}")
+            lora_weight_name = _add_variant(LORA_WEIGHTS_NAME, f"tp{model.config.tensor_parallel_rank:0>2d}")
         else:
-            lora_weight_name = LORA_WEIGHT_FILE_NAME
+            lora_weight_name = LORA_WEIGHTS_NAME
 
         # load and set lora weight parameter
         lora_weight_path = os.path.join(lora_path, lora_weight_name)
@@ -102,6 +102,11 @@ class LoRAModel(nn.Layer):
         return lora_model
 
     def set_state_dict(self, state_dict):
+        import warnings
+
+        warnings.filterwarnings(
+            action="ignore", message=".*Skip loading for.*", category=Warning, lineno=0, append=False
+        )
         self.model.set_state_dict(state_dict)
         logger.info("Load lora weight successfully")
 
@@ -193,7 +198,7 @@ class LoRAModel(nn.Layer):
                     variant = f"tp{self.model.config.tensor_parallel_rank:0>2d}"
 
         # save lora weight
-        lora_weight_name = _add_variant(LORA_WEIGHT_FILE_NAME, variant)
+        lora_weight_name = _add_variant(LORA_WEIGHTS_NAME, variant)
         weight_filename = os.path.join(save_directory, lora_weight_name)
         paddle.save(trainable_state_dict, weight_filename)
 
@@ -208,6 +213,7 @@ class LoRAModel(nn.Layer):
         for name in attribute_chain[:-1]:
             parent_module = getattr(parent_module, name)
         module = getattr(parent_module, attribute_chain[-1])
+        lora_module = None
         if enable_lora is None:
             if isinstance(module, nn.Linear):
                 lora_module = LoRALinear(
@@ -246,6 +252,7 @@ class LoRAModel(nn.Layer):
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
                     enable_lora=enable_lora,
+                    head_dim=lora_config.head_dim,
                 )
             elif isinstance(module, ColumnParallelLinear):
                 # recover the original output_features
@@ -259,12 +266,17 @@ class LoRAModel(nn.Layer):
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
                     enable_lora=enable_lora,
+                    head_dim=lora_config.head_dim,
                     lora_A_weight_attr=paddle.ParamAttr(
                         initializer=nn.initializer.KaimingUniform(
                             negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
                         )
                     ),
                 )
+        if lora_module is None:
+            raise ValueError(
+                f"LoRA strategy only supports paddle.nn.Linear or paddle.distributed.fleet.meta_parallel.ColumnParallelLinear. {module}({module_name}) is not supported。"
+            )
 
         lora_module.weight = module.weight
         if module.bias is not None:
@@ -287,7 +299,8 @@ class LoRAModel(nn.Layer):
     def get_trainable_state_dict(self):
         trainable_state_dict = OrderedDict()
         for name, weight in self.model.state_dict().items():
-            if not weight.stop_gradient:
+            # get lora parameter & QAT scale parameter
+            if not weight.stop_gradient or "activation_quanter" in name or "weight_quanter" in name:
                 trainable_state_dict[name] = weight
         return trainable_state_dict
 
@@ -399,12 +412,14 @@ class LoRAModel(nn.Layer):
             return getattr(self.model, name)
 
     def train(self):
+        self.training = True
         self.model.training = True
         for layer in self.model.sublayers():
             layer.training = True
             layer.train()
 
     def eval(self):
+        self.training = False
         self.model.training = False
         for layer in self.model.sublayers():
             layer.training = False

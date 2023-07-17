@@ -424,7 +424,6 @@ class Pipeline(BasePipeline):
             queue[self.root_node]["documents"] = documents
         if meta:
             queue[self.root_node]["meta"] = meta
-
         i = 0  # the first item is popped off the queue unless it is a "join" node with unprocessed predecessors
         while queue:
             node_id = list(queue.keys())[i]

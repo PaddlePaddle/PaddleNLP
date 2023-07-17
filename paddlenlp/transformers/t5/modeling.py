@@ -212,7 +212,10 @@ class T5LayerFF(nn.Layer):
     def forward(self, hidden_states):
         forwarded_states = self.layer_norm(hidden_states)
         forwarded_states = self.DenseReluDense(forwarded_states)
-        hidden_states = hidden_states + self.dropout(forwarded_states)
+        # hidden_states maybe FP16
+        # self.dropout(forwarded_states) maybe FP32
+        # FP32 + FP16 = FP32, FP16 + FP32 = FP16
+        hidden_states = self.dropout(forwarded_states) + hidden_states
         return hidden_states
 
 
@@ -1842,16 +1845,11 @@ class T5EncoderModel(T5PretrainedModel):
 
     def __init__(self, config: T5Config):
         super().__init__(config)
-
         encoder_config = copy.deepcopy(config)
         encoder_config.use_cache = False
         encoder_config.is_encoder_decoder = False
         self.shared = nn.Embedding(encoder_config.vocab_size, encoder_config.d_model)
         self.encoder = T5Stack(encoder_config, embed_tokens=self.shared)
-
-    @property
-    def t5(self):
-        return self
 
     def get_input_embeddings(self) -> nn.Embedding:
         return self.shared

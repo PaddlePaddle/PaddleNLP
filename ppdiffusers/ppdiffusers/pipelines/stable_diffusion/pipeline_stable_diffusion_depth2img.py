@@ -29,6 +29,7 @@ from paddlenlp.transformers import (
 )
 
 from ...configuration_utils import FrozenDict
+from ...loaders import LoraLoaderMixin, TextualInversionLoaderMixin
 from ...models import AutoencoderKL, UNet2DConditionModel
 from ...schedulers import KarrasDiffusionSchedulers
 from ...utils import PIL_INTERPOLATION, deprecate, logging, randn_tensor
@@ -46,7 +47,7 @@ def preprocess(image):
 
     if isinstance(image[0], PIL.Image.Image):
         w, h = image[0].size
-        w, h = map(lambda x: x - x % 8, (w, h))  # resize to integer multiple of 8
+        w, h = (x - x % 8 for x in (w, h))  # resize to integer multiple of 8
 
         image = [np.array(i.resize((w, h), resample=PIL_INTERPOLATION["lanczos"]))[None, :] for i in image]
         image = np.concatenate(image, axis=0)
@@ -59,12 +60,18 @@ def preprocess(image):
     return image
 
 
-class StableDiffusionDepth2ImgPipeline(DiffusionPipeline):
+class StableDiffusionDepth2ImgPipeline(DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMixin):
     r"""
     Pipeline for text-guided image to image generation using Stable Diffusion.
 
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
     library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
+
+    In addition the pipeline inherits the following loading methods:
+        - *Textual-Inversion*: [`loaders.TextualInversionLoaderMixin.load_textual_inversion`]
+        - *LoRA*: [`loaders.LoraLoaderMixin.load_lora_weights`]
+    as well as the following saving methods:
+        - *LoRA*: [`loaders.LoraLoaderMixin.save_lora_weights`]
 
     Args:
         vae ([`AutoencoderKL`]):
@@ -148,8 +155,8 @@ class StableDiffusionDepth2ImgPipeline(DiffusionPipeline):
                 whether to use classifier free guidance or not
             negative_prompt (`str` or `List[str]`, *optional*):
                 The prompt or prompts not to guide the image generation. If not defined, one has to pass
-                `negative_prompt_embeds`. instead. If not defined, one has to pass `negative_prompt_embeds`. instead.
-                Ignored when not using guidance (i.e., ignored if `guidance_scale` is less than `1`).
+                `negative_prompt_embeds` instead. Ignored when not using guidance (i.e., ignored if `guidance_scale` is
+                less than `1`).
             prompt_embeds (`paddle.Tensor`, *optional*):
                 Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
                 provided, text embeddings will be generated from `prompt` input argument.
@@ -166,6 +173,10 @@ class StableDiffusionDepth2ImgPipeline(DiffusionPipeline):
             batch_size = prompt_embeds.shape[0]
 
         if prompt_embeds is None:
+            # textual inversion: procecss multi-vector tokens if necessary
+            if isinstance(self, TextualInversionLoaderMixin):
+                prompt = self.maybe_convert_prompt(prompt, self.tokenizer)
+
             text_inputs = self.tokenizer(
                 prompt,
                 padding="max_length",
@@ -225,6 +236,10 @@ class StableDiffusionDepth2ImgPipeline(DiffusionPipeline):
                 )
             else:
                 uncond_tokens = negative_prompt
+
+            # textual inversion: procecss multi-vector tokens if necessary
+            if isinstance(self, TextualInversionLoaderMixin):
+                uncond_tokens = self.maybe_convert_prompt(uncond_tokens, self.tokenizer)
 
             max_length = prompt_embeds.shape[1]
             uncond_input = self.tokenizer(
@@ -347,7 +362,7 @@ class StableDiffusionDepth2ImgPipeline(DiffusionPipeline):
         init_timestep = min(int(num_inference_steps * strength), num_inference_steps)
 
         t_start = max(num_inference_steps - init_timestep, 0)
-        timesteps = self.scheduler.timesteps[t_start:]
+        timesteps = self.scheduler.timesteps[t_start * self.scheduler.order :]
 
         return timesteps, num_inference_steps - t_start
 
@@ -408,12 +423,12 @@ class StableDiffusionDepth2ImgPipeline(DiffusionPipeline):
         if isinstance(image, PIL.Image.Image):
             image = [image]
         else:
-            image = [img for img in image]
+            image = list(image)
 
         if isinstance(image[0], PIL.Image.Image):
             width, height = image[0].size
         else:
-            width, height = image[0].shape[-2:]
+            height, width = image[0].shape[-2:]
 
         if depth_map is None:
             pixel_values = self.feature_extractor(images=image, return_tensors="pd").pixel_values
@@ -439,7 +454,8 @@ class StableDiffusionDepth2ImgPipeline(DiffusionPipeline):
 
         # duplicate mask and masked_image_latents for each generation per prompt, using mps friendly method
         if depth_map.shape[0] < batch_size:
-            depth_map = depth_map.tile([batch_size, 1, 1, 1])
+            repeat_by = batch_size // depth_map.shape[0]
+            depth_map = depth_map.tile([repeat_by, 1, 1, 1])
 
         depth_map = paddle.concat([depth_map] * 2) if do_classifier_free_guidance else depth_map
         return depth_map
@@ -628,6 +644,7 @@ class StableDiffusionDepth2ImgPipeline(DiffusionPipeline):
                 # compute the previous noisy sample x_t -> x_t-1
                 latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
 
+                latents = latents.cast(prompt_embeds.dtype)
                 # call the callback, if provided
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()

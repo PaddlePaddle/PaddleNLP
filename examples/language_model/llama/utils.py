@@ -12,58 +12,116 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-import os
+import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle.optimizer.lr import LambdaDecay
-from predict_generation import Predictor, batchfy_text
 from rouge import Rouge
+from sklearn.metrics import accuracy_score
 
 from paddlenlp.metrics import BLEU
-from paddlenlp.trainer import Trainer
+from paddlenlp.trainer import PrinterCallback, ProgressCallback, Trainer
+from paddlenlp.trainer.integrations import TrainerCallback
+from paddlenlp.utils.log import logger
 
 
-def save_infer_result(trainer, dev_ds, k=100, src_length=256, tgt_length=512):
-    all_instructions = []
-    all_answers = []
-    all_output = []
+class AverageStatistical(object):
+    def __init__(self):
+        self.reset()
 
-    # top k instruction from dev_ds
-    for i, ds in enumerate(dev_ds.data):
-        if i == k:
-            break
-        all_instructions.append(ds["instruction"])
-        all_answers.append(ds["output"])
-    batch_texts = batchfy_text(all_instructions, trainer.args.per_device_eval_batch_size)
-    predictor = Predictor(
-        tokenizer=trainer.tokenizer, model=trainer.model, src_length=src_length, tgt_length=tgt_length
-    )
+    def reset(self):
+        self.total_cnt = 0
+        self.time = 0
 
-    # infer results
-    for bs, texts in enumerate(batch_texts):
-        outputs = predictor.predict(texts)
-        for i, (text, result) in enumerate(zip(texts, outputs["result"])):
-            out = {
-                "instruction": text,
-                "answer": all_answers[bs * trainer.args.per_device_eval_batch_size + i],
-                "output": result,
-            }
-            all_output.append(out)
+    def record(self, val, cnt=1):
+        self.time += val
+        self.total_cnt += cnt
 
-    # save results
-    if trainer.args.tensor_parallel_rank == 0:
-        with open(os.path.join(trainer.args.output_dir, "infer_result.json"), "w") as f:
-            for out in all_output:
-                f.write(json.dumps(out, ensure_ascii=False) + "\n")
+    def get_average(self):
+        if self.total_cnt == 0:
+            return 0
+
+        return self.time / self.total_cnt
+
+    def get_average_per_sec(self):
+        if self.time == 0.0:
+            return 0.0
+
+        return float(self.total_cnt) / self.time
+
+    def get_total_cnt(self):
+        return self.total_cnt
+
+    def get_total_time(self):
+        return self.time
+
+
+class BenchmarkCallback(TrainerCallback):
+    def __init__(self, benchmark=True, profiler_options=None):
+        self.benchmark = benchmark
+        self.profiler_options = profiler_options
+
+    def on_train_begin(self, args, state, control, **kwargs):
+        assert args.gradient_accumulation_steps == 1 and not args.do_eval and not args.do_predict
+        if self.benchmark:
+            self.reader_cost_avg = AverageStatistical()
+
+    def on_epoch_begin(self, args, state, control, **kwargs):
+        if self.benchmark:
+            self.epoch_start = time.time()
+            self.batch_start = time.time()
+
+    def on_step_begin(self, args, state, control, **kwargs):
+        if self.benchmark:
+            self.reader_cost_avg.record(time.time() - self.batch_start)
+
+    def on_step_end(self, args, state, control, **kwargs):
+        if self.benchmark:
+            self.batch_start = time.time()
+            if control.should_log:
+                self.maybe_log_save_evaluate_start = time.time()
+
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if self.benchmark:
+            if logs is not None and "interval_steps_per_second" in logs:
+                self.batch_start = self.batch_start + (time.time() - self.maybe_log_save_evaluate_start)
+                ips = logs["interval_steps_per_second"] * args.train_batch_size
+                avg_batch_cost = 1 / logs["interval_steps_per_second"]
+                logger.info(
+                    "global step %d / %d, loss: %f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sample/sec"
+                    % (
+                        state.global_step,
+                        state.max_steps,
+                        logs["loss"],
+                        self.reader_cost_avg.get_average(),
+                        avg_batch_cost,
+                        args.train_batch_size,
+                        ips,
+                    )
+                )
+                self.reader_cost_avg.reset()
+
+    def on_epoch_end(self, args, state, control, **kwargs):
+        if self.benchmark:
+            train_epoch_cost = time.time() - self.epoch_start
+            logger.info("train epoch: %d, epoch_cost: %.5f s" % (state.epoch, train_epoch_cost))
 
 
 class LlamaTrainer(Trainer):
     def __init__(self, do_generation: bool, **kwargs):
         super().__init__(**kwargs)
+        if self.args.benchmark or self.args.profiler_options is not None:
+            self.add_callback(
+                BenchmarkCallback(benchmark=self.args.benchmark, profiler_options=self.args.profiler_options)
+            )
+            if self.args.benchmark:
+                if self.args.disable_tqdm:
+                    self.pop_callback(PrinterCallback)
+                else:
+                    self.pop_callback(ProgressCallback)
         self.do_generation = do_generation
 
     def prediction_step(
@@ -80,13 +138,17 @@ class LlamaTrainer(Trainer):
             loss, logits, labels = super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
             # argmax here to avoid gather all logits, which is too memory-consuming.
             # keepdim in order to maintain the same shape as logits
-            return (loss, logits[..., :-1, :].argmax(axis=-1, keepdim=True), labels[..., 1:])
+            if model.config.lm_shift_labels:
+                return (loss, logits[..., :-1, :].argmax(axis=-1, keepdim=True), labels[..., 1:])
+            else:
+                return (loss, logits.argmax(axis=-1, keepdim=True), labels)
+
         model.eval()
 
         preds = model.generate(
             input_ids=inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
-            max_length=50,
+            max_length=self.args.tgt_length,
             min_length=0,
             use_cache=True,
             temperature=1.0,
@@ -159,3 +221,14 @@ def compute_metrics(preds, targets):
         rougel=rougel,
         bleu4=bleu4,
     )
+
+
+def compute_metrics_not_do_generation(eval_preds):
+    flattened_preds = np.array(eval_preds.predictions).flatten()
+    flattened_labels = np.array(eval_preds.label_ids).flatten()
+    filtered_preds = flattened_preds[flattened_labels != -100]
+    filtered_labels = flattened_labels[flattened_labels != -100]
+    accuracy = accuracy_score(y_true=filtered_labels, y_pred=filtered_preds)
+    return {
+        "accuracy": accuracy,
+    }

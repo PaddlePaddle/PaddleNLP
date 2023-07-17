@@ -21,6 +21,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 import paddle
+import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
@@ -48,7 +49,7 @@ from paddlenlp.transformers.model_utils import PretrainedModel, register_base_mo
 from .configuration import LlamaConfig
 
 LLAMA_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "facebook/tiny-random-llama",
+    "__internal_testing__/tiny-random-llama",
     "facebook/llama-7b",
     "facebook/llama-13b",
 ]
@@ -296,19 +297,19 @@ class LlamaMLP(nn.Layer):
         self.intermediate_size = config.intermediate_size
 
         if config.tensor_parallel_degree > 1:
-            self.gate_proj = fleet.meta_parallel.ColumnParallelLinear(
+            self.gate_proj = mpu.ColumnParallelLinear(
                 self.hidden_size,
                 self.intermediate_size,
                 gather_output=False,
                 has_bias=False,
             )
-            self.down_proj = fleet.meta_parallel.RowParallelLinear(
+            self.down_proj = mpu.RowParallelLinear(
                 self.intermediate_size,
                 self.hidden_size,
                 input_is_parallel=True,
                 has_bias=False,
             )
-            self.up_proj = fleet.meta_parallel.ColumnParallelLinear(
+            self.up_proj = mpu.ColumnParallelLinear(
                 self.hidden_size,
                 self.intermediate_size,
                 gather_output=False,
@@ -339,19 +340,19 @@ class LlamaAttention(nn.Layer):
             self.num_heads = self.num_heads // config.tensor_parallel_degree
 
         if config.tensor_parallel_degree > 1:
-            self.q_proj = fleet.meta_parallel.ColumnParallelLinear(
+            self.q_proj = mpu.ColumnParallelLinear(
                 self.hidden_size,
                 self.hidden_size,
                 has_bias=False,
                 gather_output=False,
             )
-            self.k_proj = fleet.meta_parallel.ColumnParallelLinear(
+            self.k_proj = mpu.ColumnParallelLinear(
                 self.hidden_size,
                 self.hidden_size,
                 has_bias=False,
                 gather_output=False,
             )
-            self.v_proj = fleet.meta_parallel.ColumnParallelLinear(
+            self.v_proj = mpu.ColumnParallelLinear(
                 self.hidden_size,
                 self.hidden_size,
                 has_bias=False,
@@ -375,7 +376,7 @@ class LlamaAttention(nn.Layer):
             )
 
         if config.tensor_parallel_degree > 1:
-            self.o_proj = fleet.meta_parallel.RowParallelLinear(
+            self.o_proj = mpu.RowParallelLinear(
                 self.hidden_size,
                 self.hidden_size,
                 has_bias=False,
@@ -581,7 +582,17 @@ class LlamaPretrainedModel(PretrainedModel):
 
     def _init_weights(self, layer):
         """Initialization hook"""
-        if isinstance(layer, (nn.Linear, nn.Embedding)):
+        if isinstance(
+            layer,
+            (
+                nn.Linear,
+                nn.Embedding,
+                mpu.VocabParallelEmbedding,
+                mpu.ColumnParallelLinear,
+                mpu.RowParallelLinear,
+                LlamaLMHead,
+            ),
+        ):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
@@ -594,6 +605,16 @@ class LlamaPretrainedModel(PretrainedModel):
                         shape=layer.weight.shape,
                     )
                 )
+        # Layer.apply is DFS https://github.com/PaddlePaddle/Paddle/blob/a6f5021fcc58b21f4414bae6bf4731ef6971582c/python/paddle/nn/layer/layers.py#L527-L530
+        # sublayer is init first
+        # scale RowParallelLinear weight
+        with paddle.no_grad():
+            if isinstance(layer, LlamaMLP):
+                factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
+                layer.down_proj.weight.scale_(factor)
+            if isinstance(layer, LlamaAttention):
+                factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
+                layer.o_proj.weight.scale_(factor)
 
 
 @register_base_model
@@ -610,7 +631,7 @@ class LlamaModel(LlamaPretrainedModel):
         self.hidden_size = config.hidden_size
 
         if config.tensor_parallel_degree > 1:
-            self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
+            self.embed_tokens = mpu.VocabParallelEmbedding(
                 self.vocab_size,
                 self.hidden_size,
                 weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
@@ -802,7 +823,7 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
 
         if self.enable_parallel_cross_entropy:  # and False: # and lm_head is distributed
-            self.loss_func = fleet.meta_parallel.ParallelCrossEntropy(ignore_index=self.ignore_index)
+            self.loss_func = mpu.ParallelCrossEntropy(ignore_index=self.ignore_index)
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
@@ -855,6 +876,8 @@ class LlamaLMHead(nn.Layer):
 
 
 class LlamaForCausalLM(LlamaPretrainedModel):
+    enable_to_static_method = True
+
     def __init__(self, config):
         super().__init__(config)
         self.config = config
@@ -912,11 +935,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
 
         if isinstance(outputs, CausalLMOutputWithCrossAttentions) and "past_key_values" in outputs:
             model_kwargs["past_key_values"] = outputs.past_key_values
-
-        # update token_type_ids with last value
-        if "token_type_ids" in model_kwargs and model_kwargs["token_type_ids"] is not None:
-            token_type_ids = model_kwargs["token_type_ids"]
-            model_kwargs["token_type_ids"] = paddle.concat([token_type_ids, token_type_ids[:, -1:]], axis=-1)
 
         if not is_encoder_decoder and "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]

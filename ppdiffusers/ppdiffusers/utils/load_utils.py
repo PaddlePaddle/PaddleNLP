@@ -23,6 +23,7 @@ from zipfile import ZipFile
 
 import numpy as np
 
+from .constants import get_map_location_default
 from .import_utils import (
     is_paddle_available,
     is_safetensors_available,
@@ -58,6 +59,13 @@ if is_paddle_available():
 
 
 MZ_ZIP_LOCAL_DIR_HEADER_SIZE = 30
+
+
+def is_torch_file(filename=None):
+    if filename is None:
+        return False
+    suffix = Path(str(filename)).suffix.lower()
+    return suffix in torch_suffix + safetensors_suffix
 
 
 def read_prefix_key(path):
@@ -244,7 +252,8 @@ def convert_to_paddle(state_dict, return_numpy=False, return_global_step=False):
     if "global_step" in state_dict and "state_dict" in state_dict:
         if return_global_step:
             pd_state_dict["global_step"] = state_dict.pop("global_step", -1)
-        state_dict = state_dict.get("state_dict", state_dict)
+    while "state_dict" in state_dict:
+        state_dict = state_dict["state_dict"]
 
     for k, v in state_dict.items():
         # maybe position id is bfloat32
@@ -302,7 +311,16 @@ def safetensors_load(path: str):
     return data
 
 
-def smart_load(path: str, map_location: str = "cpu", return_numpy=False, return_global_step=False):
+def smart_load(
+    path: str,
+    map_location: str = None,
+    return_numpy: bool = False,
+    return_global_step: bool = False,
+    return_is_torch_weight: bool = False,
+):
+    if map_location is None:
+        map_location = get_map_location_default()
+
     suffix = Path(path).suffix
     name = Path(path).name
     state_dict = None
@@ -313,20 +331,28 @@ def smart_load(path: str, map_location: str = "cpu", return_numpy=False, return_
 
         if suffix in torch_suffix:
             state_dict = convert_to_paddle(torch_load(path), return_numpy, return_global_step)
+            if return_is_torch_weight:
+                state_dict["is_torch_weight"] = True
             return state_dict
 
         if suffix in safetensors_suffix:
             state_dict = convert_to_paddle(safetensors_load(path), return_numpy, return_global_step)
+            if return_is_torch_weight:
+                state_dict["is_torch_weight"] = True
             return state_dict
 
         # must use safetensors_load first
         try:
             state_dict = convert_to_paddle(safetensors_load(path), return_numpy, return_global_step)
+            if return_is_torch_weight:
+                state_dict["is_torch_weight"] = True
             return state_dict
         except Exception:
             logger.info(f"Cant load file {name} with safetensors!")
         try:
             state_dict = convert_to_paddle(torch_load(path), return_numpy, return_global_step)
+            if return_is_torch_weight:
+                state_dict["is_torch_weight"] = True
             return state_dict
         except Exception:
             logger.info(f"Cant load file {name} with torch! We will try to load this with safetensors!")

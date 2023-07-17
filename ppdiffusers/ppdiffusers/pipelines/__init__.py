@@ -19,6 +19,7 @@ from ..utils import (
     is_fastdeploy_available,
     is_k_diffusion_available,
     is_librosa_available,
+    is_note_seq_available,
     is_paddle_available,
     is_paddlenlp_available,
 )
@@ -61,6 +62,15 @@ except OptionalDependencyNotAvailable:
     from ..utils.dummy_paddle_and_paddlenlp_objects import *  # noqa F403
 else:
     from .alt_diffusion import AltDiffusionImg2ImgPipeline, AltDiffusionPipeline
+    from .audioldm import AudioLDMPipeline
+    from .deepfloyd_if import (
+        IFImg2ImgPipeline,
+        IFImg2ImgSuperResolutionPipeline,
+        IFInpaintingPipeline,
+        IFInpaintingSuperResolutionPipeline,
+        IFPipeline,
+        IFSuperResolutionPipeline,
+    )
     from .latent_diffusion import LDMTextToImagePipeline
     from .paint_by_example import PaintByExamplePipeline
     from .semantic_stable_diffusion import SemanticStableDiffusionPipeline
@@ -77,6 +87,7 @@ else:
         StableDiffusionInstructPix2PixPipeline,
         StableDiffusionLatentUpscalePipeline,
         StableDiffusionMegaPipeline,
+        StableDiffusionModelEditingPipeline,
         StableDiffusionPanoramaPipeline,
         StableDiffusionPipeline,
         StableDiffusionPipelineAllinOne,
@@ -87,7 +98,7 @@ else:
         StableUnCLIPPipeline,
     )
     from .stable_diffusion_safe import StableDiffusionPipelineSafe
-    from .text_to_video_synthesis import TextToVideoSDPipeline
+    from .text_to_video_synthesis import TextToVideoSDPipeline, TextToVideoZeroPipeline
     from .unclip import UnCLIPImageVariationPipeline, UnCLIPPipeline
     from .versatile_diffusion import (
         VersatileDiffusionDualGuidedPipeline,
@@ -103,7 +114,10 @@ try:
 except OptionalDependencyNotAvailable:
     from ..utils.dummy_fastdeploy_objects import *  # noqa F403
 else:
-    from .fastdeploy_utils import FastDeployRuntimeModel
+    from .fastdeploy_utils import (
+        FastDeployDiffusionPipelineMixin,
+        FastDeployRuntimeModel,
+    )
 
 try:
     if not (is_paddle_available() and is_paddlenlp_available() and is_fastdeploy_available()):
@@ -119,6 +133,7 @@ else:
         FastDeployStableDiffusionInpaintPipelineLegacy,
         FastDeployStableDiffusionMegaPipeline,
         FastDeployStableDiffusionPipeline,
+        FastDeployStableDiffusionUpscalePipeline,
     )
 
 try:
@@ -137,3 +152,11 @@ except OptionalDependencyNotAvailable:
     from ..utils.dummy_paddle_and_paddlenlp_and_einops_objects import *  # noqa F403
 else:
     from .unidiffuser import UniDiffuserPipeline
+
+try:
+    if not (is_paddle_available() and is_paddlenlp_available() and is_note_seq_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from ..utils.dummy_paddle_and_paddlenlp_and_note_seq_objects import *  # noqa F403
+else:
+    from .spectrogram_diffusion import MidiProcessor, SpectrogramDiffusionPipeline

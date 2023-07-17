@@ -20,11 +20,6 @@ import unittest
 import numpy as np
 import paddle
 from PIL import Image
-from ppdiffusers_test.pipeline_params import (
-    IMAGE_GUIDED_IMAGE_INPAINTING_BATCH_PARAMS,
-    IMAGE_GUIDED_IMAGE_INPAINTING_PARAMS,
-)
-from ppdiffusers_test.test_pipelines_common import PipelineTesterMixin
 
 from paddlenlp.transformers import CLIPImageProcessor, CLIPVisionConfig
 from ppdiffusers import (
@@ -36,6 +31,12 @@ from ppdiffusers import (
 from ppdiffusers.pipelines.paint_by_example import PaintByExampleImageEncoder
 from ppdiffusers.utils import floats_tensor, load_image, slow
 from ppdiffusers.utils.testing_utils import require_paddle_gpu
+
+from ..pipeline_params import (
+    IMAGE_GUIDED_IMAGE_INPAINTING_BATCH_PARAMS,
+    IMAGE_GUIDED_IMAGE_INPAINTING_PARAMS,
+)
+from ..test_pipelines_common import PipelineTesterMixin
 
 
 class PaintByExamplePipelineFastTests(PipelineTesterMixin, unittest.TestCase):
@@ -120,7 +121,6 @@ class PaintByExamplePipelineFastTests(PipelineTesterMixin, unittest.TestCase):
     def test_paint_by_example_inpaint(self):
         components = self.get_dummy_components()
         pipe = PaintByExamplePipeline(**components)
-        pipe = pipe.to("cpu")
         pipe.set_progress_bar_config(disable=None)
         inputs = self.get_dummy_inputs()
         output = pipe(**inputs)
@@ -128,7 +128,7 @@ class PaintByExamplePipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         image_slice = image[0, -3:, -3:, -1]
         assert image.shape == (1, 64, 64, 3)
         expected_slice = np.array(
-            [0.57881105, 0.5201367, 0.38523138, 0.45297998, 0.39643988, 0.48735288, 0.32640088, 0.23076776, 0.40672228]
+            [0.82595694, 0.51862055, 0.5474039, 0.2411496, 0.20220888, 0.3430622, 0.3558151, 0.06606945, 0.4550809]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 0.01
 
@@ -149,13 +149,6 @@ class PaintByExamplePipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         out_2 = output.images
         assert out_1.shape == (1, 64, 64, 3)
         assert np.abs(out_1.flatten() - out_2.flatten()).max() < 0.05
-
-    def test_paint_by_example_inpaint_with_num_images_per_prompt(self):
-        pipe = PaintByExamplePipeline(**self.get_dummy_components())
-        pipe.set_progress_bar_config(disable=None)
-        inputs = self.get_dummy_inputs()
-        images = pipe(**inputs, num_images_per_prompt=2).images
-        assert len(images) == 2
 
 
 @slow

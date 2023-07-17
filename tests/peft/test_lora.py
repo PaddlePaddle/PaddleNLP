@@ -27,6 +27,10 @@ from paddlenlp.transformers import AutoModel, BertModel
 
 
 class TestLoraLayer(unittest.TestCase):
+    def test_r_raise_exception(self):
+        with self.assertRaises(ValueError):
+            LoRALinear(in_features=16, out_features=8, r=0, lora_dropout=0.1, lora_alpha=8)
+
     def test_forward(self):
         lora_layer = LoRALinear(in_features=16, out_features=8, r=4, lora_dropout=0.1, lora_alpha=8)
         x = paddle.randn([2, 4, 16], "float32")
@@ -67,19 +71,19 @@ class TestLoraLayer(unittest.TestCase):
             paddle.save(regular_linear.state_dict(), weights_path)
             state_dict = paddle.load(weights_path)
             # should be identical to regular linear
-            lora_layer_r0 = LoRALinear(in_features=16, out_features=8, r=0)
+            lora_layer_r8 = LoRALinear(in_features=16, out_features=8, r=8)
             lora_layer_r4 = LoRALinear(in_features=16, out_features=8, r=4)
-            lora_layer_r0.set_dict(state_dict)
+            lora_layer_r8.set_dict(state_dict)
             lora_layer_r4.set_dict(state_dict)
             x = paddle.randn([2, 4, 16], "float32")
-            self.assertTrue(paddle.allclose(lora_layer_r0(x), regular_linear(x)))
+            self.assertTrue(paddle.allclose(lora_layer_r8(x), regular_linear(x)))
             self.assertTrue(paddle.allclose(lora_layer_r4(x), regular_linear(x)))
 
 
 class TestLoRAMergedLayer(unittest.TestCase):
     def test_forward(self):
         lora_layer = LoRAMergedLinear(
-            in_features=16, out_features=8, r=4, lora_dropout=0.1, lora_alpha=8, enable_lora=[True, False]
+            in_features=16, out_features=8, r=4, lora_dropout=0.1, lora_alpha=8, enable_lora=[True, False], head_dim=2
         )
         x = paddle.randn([2, 4, 16], "float32")
         output = lora_layer(x)
@@ -91,7 +95,9 @@ class TestLoRAMergedLayer(unittest.TestCase):
 
     def test_train_eval(self):
         x = paddle.randn([2, 4, 16], "float32")
-        lora_layer = LoRAMergedLinear(in_features=16, out_features=8, r=4, lora_alpha=8, enable_lora=[True, False])
+        lora_layer = LoRAMergedLinear(
+            in_features=16, out_features=8, r=4, lora_alpha=8, enable_lora=[True, False], head_dim=2
+        )
         lora_layer.train()
         train_result = lora_layer(x)
         train_weight = copy.deepcopy(lora_layer.weight)  # deep copy since this is a pointer
@@ -103,11 +109,13 @@ class TestLoRAMergedLayer(unittest.TestCase):
 
     def test_save_load(self):
         with TemporaryDirectory() as tempdir:
-            lora_layer = LoRAMergedLinear(in_features=16, out_features=8, r=4, lora_alpha=8, enable_lora=[True, False])
+            lora_layer = LoRAMergedLinear(
+                in_features=16, out_features=8, r=4, lora_alpha=8, enable_lora=[True, False], head_dim=2
+            )
             weights_path = os.path.join(tempdir, "model.pdparams")
             paddle.save(lora_layer.state_dict(), weights_path)
             new_lora_layer = LoRAMergedLinear(
-                in_features=16, out_features=8, r=4, lora_alpha=8, enable_lora=[True, False]
+                in_features=16, out_features=8, r=4, lora_alpha=8, enable_lora=[True, False], head_dim=2
             )
             state_dict = paddle.load(weights_path)
             new_lora_layer.set_dict(state_dict)
@@ -121,12 +129,12 @@ class TestLoRAMergedLayer(unittest.TestCase):
             paddle.save(regular_linear.state_dict(), weights_path)
             state_dict = paddle.load(weights_path)
             # should be identical to regular linear
-            lora_layer_r0 = LoRAMergedLinear(in_features=16, out_features=8, r=0)
-            lora_layer_r4 = LoRAMergedLinear(in_features=16, out_features=8, r=4)
-            lora_layer_r0.set_dict(state_dict)
+            lora_layer_r8 = LoRAMergedLinear(in_features=16, out_features=8, r=8, head_dim=2)
+            lora_layer_r4 = LoRAMergedLinear(in_features=16, out_features=8, r=4, head_dim=2)
+            lora_layer_r8.set_dict(state_dict)
             lora_layer_r4.set_dict(state_dict)
             x = paddle.randn([2, 4, 16], "float32")
-            self.assertTrue(paddle.allclose(lora_layer_r0(x), regular_linear(x)))
+            self.assertTrue(paddle.allclose(lora_layer_r8(x), regular_linear(x)))
             self.assertTrue(paddle.allclose(lora_layer_r4(x), regular_linear(x)))
 
 
@@ -138,6 +146,7 @@ class TestLoraModel(unittest.TestCase):
             lora_alpha=8,
             merge_weights=True,
             enable_lora_list=[None, [True, False]],
+            head_dim=2,
         )
         model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
         input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 20]))
@@ -161,6 +170,7 @@ class TestLoraModel(unittest.TestCase):
             merge_weights=True,
             enable_lora_list=[None, [True, False]],
             trainable_bias=bias,
+            head_dim=2,
         )
         # turn off plm dropout for to test train vs test
         model = AutoModel.from_pretrained(
@@ -214,6 +224,18 @@ class TestLoraModel(unittest.TestCase):
             config_loaded_lora_model.eval()
             config_loaded_results = config_loaded_lora_model(input_ids)
             self.assertTrue(paddle.allclose(original_results[0], config_loaded_results[0]))
+
+    def test_lora_module_raise_exception(self):
+        lora_config = LoRAConfig(
+            target_modules=[".*norm1.*"],
+            r=4,
+            lora_alpha=8,
+            merge_weights=True,
+            enable_lora_list=None,
+        )
+        model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
+        with self.assertRaises(ValueError):
+            LoRAModel(model, lora_config)
 
 
 class TestLoRAConfig(unittest.TestCase):
