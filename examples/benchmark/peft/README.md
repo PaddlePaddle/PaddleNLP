@@ -41,6 +41,8 @@
 | Llama-7b  | Finetune | 4        | 8           | MP4          |  2213.46                  | ZeRO 2      | 1621.52                  |  **36%**  |
 | Llama-7b  | Finetune | 4        | 16          | sharding 2   |  2804.19                  | ZeRO 2      | 2465.55                  |  **14%**  |
 | Llama-13b | Finetune | 4        | 8           | MP4 recompute|  1651.50                  | ZeRO 3      | 736.19                   |  **124%**  |
+| Llama-65b | LoRA     | 4        | 8           | MP4 recompute|  474.36                   | gradient ckpt, bits 4, max_memory_MB 50000, qlora        | 327.75          |  **45%** |
+| Llama-65b | LoRA     | 4        | 16          | MP4 recompute|  452.20                   | gradient ckpt, bits 4, max_memory_MB 50000, qlora        | 405.90          |  **11%** |
 
 
 ###### 多卡分布式实验记录
@@ -84,5 +86,4 @@
 
 ### TODOs
 
-- Add Llama-30b and Llama-65b
 - Enable Flash Attention

@@ -50,12 +50,11 @@ class ChatGLMv2Config(PretrainedConfig):
         attention_softmax_in_fp32=True,
         fp32_residual_connection=False,
         quantization_bit=0,
-        bos_token_id=130004,
-        eos_token_id=130005,
-        pad_token_id=3,
+        eos_token_id=2,
+        pad_token_id=0,
         **kwargs
     ):
-        super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
+        super().__init__(pad_token_id=pad_token_id, eos_token_id=eos_token_id, **kwargs)
         self.num_hidden_layers = num_hidden_layers
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size

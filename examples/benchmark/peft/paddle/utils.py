@@ -12,7 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddlenlp.trainer import Trainer, TrainerCallback, TrainingArguments, TrainerState, TrainerControl
+from paddlenlp.trainer import (
+    Trainer,
+    TrainerCallback,
+    TrainerControl,
+    TrainerState,
+    TrainingArguments,
+)
 
 
 class CustomTrainer(Trainer):
@@ -26,6 +32,7 @@ class CustomTrainer(Trainer):
 
 class ProfilerCallback(TrainerCallback):
     "A callback that prints a message at the beginning of training"
+
     def __init__(self, prof):
         self.prof = prof
         self.prof.start()
