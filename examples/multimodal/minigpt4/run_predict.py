@@ -15,7 +15,7 @@
 import argparse
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 os.environ["FLAGS_use_cuda_managed_memory"] = "true"
 import requests
 from PIL import Image
@@ -25,6 +25,7 @@ from paddlenlp.transformers import MiniGPT4ForConditionalGeneration, MiniGPT4Pro
 
 def predict(args):
     # load MiniGPT4 moel and processor
+    print(args.pretrained_name_or_path)
     model = MiniGPT4ForConditionalGeneration.from_pretrained(args.pretrained_name_or_path)
     model.eval()
     processor = MiniGPT4Processor.from_pretrained(args.pretrained_name_or_path)
@@ -50,8 +51,25 @@ def predict(args):
         "decode_strategy": "greedy_search",
         "eos_token_id": [[835], [2277, 29937]],
     }
-    outputs = model.generate(**inputs, **generate_kwargs)
-    msg = processor.batch_decode(outputs[0])
+
+    for i in range(5):
+        outputs = model.generate(**inputs, **generate_kwargs)
+        msg = processor.batch_decode(outputs[0])
+
+    import datetime
+    import time
+    starttime = datetime.datetime.now()
+    for i in range(50):
+        outputs = model.generate(**inputs, **generate_kwargs)
+        print(type(outputs[0]))
+        print(outputs[0].shape)
+        print("钩子")
+        msg = processor.batch_decode(outputs[0])
+    
+    endtime = datetime.datetime.now()
+    duringtime = endtime - starttime
+    
+    print (duringtime.seconds * 1000 + duringtime.microseconds / 1000.0)# 单位是毫秒
     print("Inference result: ", msg)
 
 
@@ -59,7 +77,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--pretrained_name_or_path",
-        default="your directory of minigpt4",
+        default="/zhoukangkang/2023-06-06minigpt/minigpt13/",
         type=str,
         help="The dir name of minigpt4 checkpoint.",
     )
