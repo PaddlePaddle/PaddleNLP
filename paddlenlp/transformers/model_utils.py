@@ -1619,12 +1619,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
 
                 if config.tensor_parallel_degree > 1 and ".tp" not in shard_file and not pre_tensor_parallel_split:
-                    logger.info("convert tp")
+                    logger.info("Converting state_dict to Tensor Parallel Format")
                     # ignore error for multi shard, since only parts of data
                     state_dict = cls.convert_tensor_parallel(
                         None, config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
                     )
-                    logger.info("conver tp over!")
+                    logger.info("Converted state_dict to Tensor Parallel Format")
 
                 if low_cpu_mem_usage:
                     new_error_msgs = _load_state_dict_into_meta_model(
@@ -1854,7 +1854,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 else:
                     state_dict = load_state_dict(resolved_archive_file)
 
-                logger.info("loaded weights file from disk, setting weights to model.")
+                logger.info("Loaded weights file from disk, setting weights to model.")
 
         # Check if `_keep_in_fp32_modules` is not None
         use_keep_in_fp32_modules = (cls._keep_in_fp32_modules is not None) and dtype == "float16"
