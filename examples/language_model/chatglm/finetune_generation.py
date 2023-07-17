@@ -110,8 +110,10 @@ def main():
     )
     if "chatglm2" in model_args.model_name_or_path:
         multi_query_group_num = model.config.multi_query_group_num
+        attention_mask_pad_fn = chatglm_v2_pad_attention_mask
     else:
         multi_query_group_num = None
+        attention_mask_pad_fn = chatglm_pad_attention_mask
         # If ChatGLM, set lm_shift_labels to False
         model.config.lm_shift_labels = False
 
@@ -125,11 +127,6 @@ def main():
             prefix_projection=model_args.prefix_projection,
             prefix_projection_hidden_size=model.config.hidden_size,
             dtype=dtype,
-        )
-        attention_mask_pad_fn = (
-            chatglm_v2_pad_attention_mask
-            if "chatglm2" in model_args.model_name_or_path
-            else chatglm_pad_attention_mask
         )
         model = PrefixModelForCausalLM(
             model=model,
