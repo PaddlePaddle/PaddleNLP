@@ -21,9 +21,8 @@ import paddle
 
 from ppdiffusers import (
     FastDeployRuntimeModel,
-    FastDeployStableDiffusionInpaintPipeline,
-    FastDeployStableDiffusionMegaPipeline,
-    StableDiffusionPipeline,
+    FastDeployStableDiffusionImageVariationPipeline,
+    StableDiffusionImageVariationPipeline,
     UNet2DConditionModel,
 )
 
@@ -37,9 +36,7 @@ def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
 ):
     # specify unet model with unet pre_temb_act opt enabled.
     unet_model = UNet2DConditionModel.from_pretrained(model_path, resnet_pre_temb_non_linearity=True, subfolder="unet")
-    pipeline = StableDiffusionPipeline.from_pretrained(
-        model_path, unet=unet_model, safety_checker=None, feature_extractor=None
-    )
+    pipeline = StableDiffusionImageVariationPipeline.from_pretrained(model_path, unet=unet_model, safety_checker=None)
     # make sure we disable xformers
     pipeline.disable_xformers_memory_efficient_attention()
     output_path = Path(output_path)
@@ -57,15 +54,17 @@ def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
         f"vae_encoder_in_channels: {vae_in_channels}\n",
         f"vae_decoder_latent_channels: {vae_latent_channels}",
     )
-    # 1. Convert text_encoder
-    text_encoder = paddle.jit.to_static(
-        pipeline.text_encoder,
-        input_spec=[paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids")],  # input_ids
+    # 1. Convert image_encoder
+    image_encoder = paddle.jit.to_static(
+        pipeline.image_encoder,
+        input_spec=[
+            paddle.static.InputSpec(shape=[None, 3, 224, 224], dtype="float32", name="pixel_values")
+        ],  # pixel_values
     )
-    save_path = os.path.join(args.output_path, "text_encoder", "inference")
-    paddle.jit.save(text_encoder, save_path)
-    print(f"Save text_encoder model in {save_path} successfully.")
-    del pipeline.text_encoder
+    save_path = os.path.join(args.output_path, "image_encoder", "inference")
+    paddle.jit.save(image_encoder, save_path)
+    print(f"Save image_encoder model in {save_path} successfully.")
+    del pipeline.image_encoder
 
     # 2. Convert unet
     unet = paddle.jit.to_static(
@@ -134,20 +133,16 @@ def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
     print(f"Save vae_decoder model in {save_path} successfully.")
     del pipeline.vae
 
-    if "inpainting" in model_path:
-        fd_pipe_cls = FastDeployStableDiffusionInpaintPipeline
-    else:
-        fd_pipe_cls = FastDeployStableDiffusionMegaPipeline
+    fd_pipe_cls = FastDeployStableDiffusionImageVariationPipeline
 
     fastdeploy_pipeline = fd_pipe_cls(
         vae_encoder=FastDeployRuntimeModel.from_pretrained(output_path / "vae_encoder"),
         vae_decoder=FastDeployRuntimeModel.from_pretrained(output_path / "vae_decoder"),
-        text_encoder=FastDeployRuntimeModel.from_pretrained(output_path / "text_encoder"),
+        image_encoder=FastDeployRuntimeModel.from_pretrained(output_path / "image_encoder"),
         unet=FastDeployRuntimeModel.from_pretrained(output_path / "unet"),
-        tokenizer=pipeline.tokenizer,
         scheduler=pipeline.scheduler,
         safety_checker=None,
-        feature_extractor=None,
+        feature_extractor=pipeline.feature_extractor,
         requires_safety_checker=False,
     )
     fastdeploy_pipeline.save_pretrained(output_path)
