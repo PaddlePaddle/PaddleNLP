@@ -129,7 +129,7 @@ class TestPrefixModelMultiQuery(unittest.TestCase):
         cls.prefix_model = PrefixModelForCausalLM(
             model=cls.model,
             prefix_config=cls.prefix_config,
-            postprocess_past_key_value=llama_postprocess_past_key_value,
+            postprocess_past_key_value=chatglm_postprocess_past_key_value,
         )
 
     def test_prefix_config(self):

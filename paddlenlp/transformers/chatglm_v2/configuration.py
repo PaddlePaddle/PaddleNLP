@@ -37,6 +37,7 @@ class ChatGLMv2Config(PretrainedConfig):
         hidden_dropout=0.0,
         attention_dropout=0.0,
         layernorm_epsilon=1e-5,
+        use_cache=True,
         rmsnorm=True,
         apply_residual_connection_post_layernorm=False,
         post_layer_norm=True,
@@ -63,6 +64,7 @@ class ChatGLMv2Config(PretrainedConfig):
         self.hidden_dropout = hidden_dropout
         self.attention_dropout = attention_dropout
         self.layernorm_epsilon = layernorm_epsilon
+        self.use_cache = use_cache
         self.rmsnorm = rmsnorm
         self.apply_residual_connection_post_layernorm = apply_residual_connection_post_layernorm
         self.post_layer_norm = post_layer_norm
