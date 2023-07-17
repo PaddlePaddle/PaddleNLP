@@ -679,6 +679,8 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
         resize_mode: int = 0,
         # ["Just resize", "Crop and resize", "Resize and fill", "Do nothing"]
         #         0              1                   2               -1
+        starting_control_step: float = 0.0,
+        ending_control_step: float = 1.0,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -838,6 +840,7 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
             num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
             with self.progress_bar(total=num_inference_steps) as progress_bar:
                 for i, t in enumerate(timesteps):
+                    current_control_step = i / len(timesteps)
                     step = i // self.scheduler.order
                     do_batch = False
                     conds_list, cond_tensor = reconstruct_multicond_batch(prompt_embeds, step)
@@ -856,7 +859,7 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
                     if do_batch:
                         encoder_hidden_states = paddle.concat([uncond_tensor, cond_tensor])
                         control_kwargs = {}
-                        if enable_control:
+                        if enable_control and starting_control_step < current_control_step < ending_control_step:
                             down_block_res_samples, mid_block_res_sample = self.controlnet(
                                 latent_model_input,
                                 t,
