@@ -346,7 +346,7 @@ def create_ldm_bert_config(original_config):
     return LDMBertConfig(**config)
 
 
-def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False, controlnet=False):
+def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False, controlnet=False, no_unet_key=False):
     """
     Takes a state dict and a config, and returns a converted checkpoint.
     """
@@ -355,10 +355,13 @@ def convert_ldm_unet_checkpoint(checkpoint, config, path=None, extract_ema=False
     unet_state_dict = {}
     keys = list(checkpoint.keys())
 
-    if controlnet:
-        unet_key = "control_model."
+    if no_unet_key:
+        unet_key = ""
     else:
-        unet_key = "model.diffusion_model."
+        if controlnet:
+            unet_key = "control_model."
+        else:
+            unet_key = "model.diffusion_model."
 
     # at least a 100 parameters have to start with `model_ema` in order for the checkpoint to be EMA
     if sum(k.startswith("model_ema") for k in keys) > 100 and extract_ema:
@@ -995,7 +998,7 @@ def stable_unclip_image_noising_components(
 
 
 def convert_controlnet_checkpoint(
-    checkpoint, original_config, checkpoint_path, image_size, upcast_attention, extract_ema
+    checkpoint, original_config, checkpoint_path, image_size, upcast_attention, extract_ema, no_unet_key=False
 ):
     ctrlnet_config = create_unet_diffusers_config(original_config, image_size=image_size, controlnet=True)
     ctrlnet_config["upcast_attention"] = upcast_attention
@@ -1005,7 +1008,12 @@ def convert_controlnet_checkpoint(
     controlnet_model = ControlNetModel(**ctrlnet_config)
 
     converted_ctrl_checkpoint = convert_ldm_unet_checkpoint(
-        checkpoint, ctrlnet_config, path=checkpoint_path, extract_ema=extract_ema, controlnet=True
+        checkpoint,
+        ctrlnet_config,
+        path=checkpoint_path,
+        extract_ema=extract_ema,
+        controlnet=True,
+        no_unet_key=no_unet_key,
     )
 
     controlnet_model.load_dict(convert_diffusers_vae_unet_to_ppdiffusers(controlnet_model, converted_ctrl_checkpoint))
@@ -1373,6 +1381,7 @@ def download_controlnet_from_original_ckpt(
     extract_ema: bool = False,
     num_in_channels: Optional[int] = None,
     upcast_attention: Optional[bool] = None,
+    no_unet_key: Optional[bool] = False,
 ) -> DiffusionPipeline:
     if not is_omegaconf_available():
         raise ValueError(BACKENDS_MAPPING["omegaconf"][1])
@@ -1406,7 +1415,7 @@ def download_controlnet_from_original_ckpt(
         raise ValueError("`control_stage_config` not present in original config")
 
     controlnet_model = convert_controlnet_checkpoint(
-        checkpoint, original_config, checkpoint_path, image_size, upcast_attention, extract_ema
+        checkpoint, original_config, checkpoint_path, image_size, upcast_attention, extract_ema, no_unet_key
     )
 
     return controlnet_model
