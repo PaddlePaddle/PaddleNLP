@@ -146,7 +146,7 @@ class TextSplitter(BaseComponent):
         separator: Optional[str] = None,
         chunk_size: Optional[int] = None,
         chunk_overlap: Optional[int] = None,
-        filters: Optional[list[str]] = None,
+        filters: Optional[List[str]] = None,
     ):
         if separator is None:
             separator = self._separator
