@@ -212,7 +212,7 @@ class LlamaConfig(PretrainedConfig):
         use_fused_rms_norm=False,
         tensor_parallel_output=True,
         sequence_parallel=False,
-        seq_len=False,
+        seq_len=1024,
         lm_shift_labels=True,
         pad_token_id=0,
         bos_token_id=1,
