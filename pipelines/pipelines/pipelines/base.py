@@ -407,7 +407,6 @@ class Pipeline(BasePipeline):
                     raise ValueError(
                         f"No node(s) or global parameter(s) named {', '.join(invalid_keys)} found in pipeline."
                     )
-
         node_output = None
         queue = {
             self.root_node: {"root_node": self.root_node, "params": params}

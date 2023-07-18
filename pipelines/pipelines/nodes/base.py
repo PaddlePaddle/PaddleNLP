@@ -137,7 +137,6 @@ class BaseComponent:
         """
         arguments = deepcopy(kwargs)
         params = arguments.get("params") or {}
-
         run_signature_args = inspect.signature(run_method).parameters.keys()
 
         run_params: Dict[str, Any] = {}
@@ -162,7 +161,6 @@ class BaseComponent:
                 run_inputs[key] = value
 
         output, stream = run_method(**run_inputs, **run_params)
-
         # Collect debug information
         debug_info = {}
         if getattr(self, "debug", None):
