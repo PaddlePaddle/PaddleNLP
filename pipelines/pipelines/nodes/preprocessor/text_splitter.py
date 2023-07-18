@@ -540,7 +540,7 @@ class MarkdownHeaderTextSplitter(BaseComponent):
         self,
         documents: Union[dict, List[dict]],
         meta: Optional[Union[Dict[str, str], List[Dict[str, str]]]] = None,
-        filters: Optional[list[str]] = None,
+        filters: Optional[List[str]] = None,
         chunk_size: Optional[int] = None,
         chunk_overlap: Optional[int] = None,
         separator: Optional[str] = None,
