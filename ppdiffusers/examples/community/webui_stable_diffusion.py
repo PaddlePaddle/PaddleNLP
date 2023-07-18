@@ -19,7 +19,7 @@
 import inspect
 import shutil
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import paddle
 import paddle.nn as nn
@@ -28,6 +28,8 @@ import PIL.Image
 
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from ppdiffusers.models import AutoencoderKL, ControlNetModel, UNet2DConditionModel
+from ppdiffusers.models.controlnet import ControlNetOutput
+from ppdiffusers.models.modeling_utils import ModelMixin
 from ppdiffusers.pipelines.pipeline_utils import DiffusionPipeline
 from ppdiffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from ppdiffusers.pipelines.stable_diffusion.safety_checker import (
@@ -263,6 +265,61 @@ def load_lora(
     return pipeline
 
 
+class MultiControlNetModel(ModelMixin):
+    r"""
+    Multiple `ControlNetModel` wrapper class for Multi-ControlNet
+    This module is a wrapper for multiple instances of the `ControlNetModel`. The `forward()` API is designed to be
+    compatible with `ControlNetModel`.
+    Args:
+        controlnets (`List[ControlNetModel]`):
+            Provides additional conditioning to the unet during the denoising process. You must set multiple
+            `ControlNetModel` as a list.
+    """
+
+    def __init__(self, controlnets: Union[List[ControlNetModel], Tuple[ControlNetModel]]):
+        super().__init__()
+        self.nets = nn.LayerList(controlnets)
+
+    def forward(
+        self,
+        sample: paddle.Tensor,
+        timestep: Union[paddle.Tensor, float, int],
+        encoder_hidden_states: paddle.Tensor,
+        controlnet_cond: List[paddle.Tensor],
+        conditioning_scale: Union[List[List[float]], List[float]],
+        class_labels: Optional[paddle.Tensor] = None,
+        timestep_cond: Optional[paddle.Tensor] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
+        cross_attention_kwargs: Optional[Dict[str, Any]] = None,
+        return_dict: bool = True,
+    ) -> Union[ControlNetOutput, Tuple]:
+        for i, (image, scale, controlnet) in enumerate(zip(controlnet_cond, conditioning_scale, self.nets)):
+            down_samples, mid_sample = controlnet(
+                sample,
+                timestep,
+                encoder_hidden_states,
+                image,
+                scale,
+                class_labels,
+                timestep_cond,
+                attention_mask,
+                cross_attention_kwargs,
+                return_dict,
+            )
+
+            # merge samples
+            if i == 0:
+                down_block_res_samples, mid_block_res_sample = down_samples, mid_sample
+            else:
+                down_block_res_samples = [
+                    samples_prev + samples_curr
+                    for samples_prev, samples_curr in zip(down_block_res_samples, down_samples)
+                ]
+                mid_block_res_sample += mid_sample
+
+        return down_block_res_samples, mid_block_res_sample
+
+
 class WebUIStableDiffusionPipeline(DiffusionPipeline):
     r"""
     Pipeline for text-to-image generation using Stable Diffusion.
@@ -281,8 +338,10 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
             Tokenizer of class
             [CLIPTokenizer](https://huggingface.co/docs/transformers/v4.21.0/en/model_doc/clip#transformers.CLIPTokenizer).
         unet ([`UNet2DConditionModel`]): Conditional U-Net architecture to denoise the encoded image latents.
-        controlnet ([`ControlNetModel`]):
-            Provides additional conditioning to the unet during the denoising process.
+        controlnet ([`ControlNetModel`] or `List[ControlNetModel]`):
+            Provides additional conditioning to the unet during the denoising process. If you set multiple ControlNets
+            as a list, the outputs from each ControlNet are added together to create one combined additional
+            conditioning.
         scheduler ([`SchedulerMixin`]):
             A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
             [`DDIMScheduler`], [`LMSDiscreteScheduler`], [`PNDMScheduler`], [`EulerDiscreteScheduler`], [`EulerAncestralDiscreteScheduler`]
@@ -305,7 +364,7 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
         text_encoder: CLIPTextModel,
         tokenizer: CLIPTokenizer,
         unet: UNet2DConditionModel,
-        controlnet: ControlNetModel,
+        controlnet: Union[ControlNetModel, List[ControlNetModel], Tuple[ControlNetModel], MultiControlNetModel],
         scheduler: KarrasDiffusionSchedulers,
         safety_checker: StableDiffusionSafetyChecker,
         feature_extractor: CLIPFeatureExtractor,
@@ -328,6 +387,9 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
                 f"Make sure to define a feature extractor when loading {self.__class__} if you want to use the safety"
                 " checker. If you do not want to use the safety checker, you can pass `'safety_checker=None'` instead."
             )
+
+        if isinstance(controlnet, (list, tuple)):
+            controlnet = MultiControlNetModel(controlnet)
 
         self.register_modules(
             vae=vae,
@@ -547,10 +609,34 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
         if negative_prompt is not None and not isinstance(negative_prompt, str):
             raise ValueError(f"`negative_prompt` has to be of type `str` but is {type(negative_prompt)}")
 
+        # `prompt` needs more sophisticated handling when there are multiple
+        # conditionings.
+        if isinstance(self.controlnet, MultiControlNetModel):
+            if isinstance(prompt, list):
+                logger.warning(
+                    f"You have {len(self.controlnet.nets)} ControlNets and you have passed {len(prompt)}"
+                    " prompts. The conditionings will be fixed across the prompts."
+                )
+
         # Check `image`
         if image is not None and self.controlnet is not None:
             if isinstance(self.controlnet, ControlNetModel):
                 self.check_image(image, prompt)
+            elif isinstance(self.controlnet, MultiControlNetModel):
+                if not isinstance(image, list):
+                    raise TypeError("For multiple controlnets: `image` must be type `list`")
+
+                # When `image` is a nested list:
+                # (e.g. [[canny_image_1, pose_image_1], [canny_image_2, pose_image_2]])
+                elif any(isinstance(i, list) for i in image):
+                    raise ValueError("A single batch of multiple conditionings are supported at the moment.")
+                elif len(image) != len(self.controlnet.nets):
+                    raise ValueError(
+                        "For multiple controlnets: `image` must have the same length as the number of controlnets."
+                    )
+
+                for image_ in image:
+                    self.check_image(image_, prompt)
             else:
                 assert False
 
@@ -560,6 +646,19 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
                     raise TypeError(
                         "For single controlnet: `controlnet_conditioning_scale` must be type `float, list(float) or tuple(float)`."
                     )
+            elif isinstance(self.controlnet, MultiControlNetModel):
+                if isinstance(controlnet_conditioning_scale, list):
+                    if any(isinstance(i, list) for i in controlnet_conditioning_scale):
+                        raise ValueError("A single batch of multiple conditionings are supported at the moment.")
+                elif isinstance(controlnet_conditioning_scale, list) and len(controlnet_conditioning_scale) != len(
+                    self.controlnet.nets
+                ):
+                    raise ValueError(
+                        "For multiple controlnets: When `controlnet_conditioning_scale` is specified as `list`, it must have"
+                        " the same length as the number of controlnets"
+                    )
+            else:
+                assert False
 
     def check_image(self, image, prompt):
         image_is_pil = isinstance(image, PIL.Image.Image)
@@ -758,14 +857,31 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
         try:
             # 0. Default height and width to unet
             if enable_control:
-                height, width = self._default_height_width(height, width, image)
-                image = self.prepare_image(
-                    image=image,
-                    width=width,
-                    height=height,
-                    dtype=self.controlnet.dtype,
-                    resize_mode=resize_mode,
-                )
+                if isinstance(self.controlnet, ControlNetModel):
+                    height, width = self._default_height_width(height, width, image)
+                    image = self.prepare_image(
+                        image=image,
+                        width=width,
+                        height=height,
+                        dtype=self.controlnet.dtype,
+                        resize_mode=resize_mode,
+                    )
+                elif isinstance(self.controlnet, MultiControlNetModel):
+                    height, width = self._default_height_width(height, width, image)
+                    images = []
+
+                    for image_ in image:
+                        image_ = self.prepare_image(
+                            image=image_,
+                            width=width,
+                            height=height,
+                            dtype=self.controlnet.dtype,
+                            resize_mode=resize_mode,
+                        )
+
+                        images.append(image_)
+
+                    image = images
             else:
                 height = height or max(self.unet.config.sample_size * self.vae_scale_factor, 512)
                 width = width or max(self.unet.config.sample_size * self.vae_scale_factor, 512)
@@ -781,6 +897,7 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
                 controlnet_conditioning_scale,
             )
 
+            # 2. Define call parameters
             batch_size = 1
 
             # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
@@ -809,6 +926,10 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
                         print(f"{self.LORA_DIR} not exists, so we cant load loras!")
 
             self.sj.clip.CLIP_stop_at_last_layers = clip_skip
+
+            if isinstance(self.controlnet, MultiControlNetModel) and isinstance(controlnet_conditioning_scale, float):
+                controlnet_conditioning_scale = [controlnet_conditioning_scale] * len(self.controlnet.nets)
+
             # 3. Encode input prompt
             prompt_embeds, negative_prompt_embeds = self._encode_prompt(
                 prompts,
@@ -850,7 +971,10 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
                         weight = 1.0
                     if do_classifier_free_guidance:
                         uncond_tensor = reconstruct_cond_batch(negative_prompt_embeds, step)
-                        do_batch = cond_tensor.shape[1] == uncond_tensor.shape[1]
+                        # do_batch = cond_tensor.shape[1] == uncond_tensor.shape[1]
+                        do_batch = cond_tensor.shape[1] == uncond_tensor.shape[1] and not isinstance(
+                            self.controlnet, MultiControlNetModel
+                        )
 
                     # expand the latents if we are doing classifier free guidance
                     latent_model_input = paddle.concat([latents] * 2) if do_batch else latents
@@ -883,7 +1007,7 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
                         )
                     else:
                         control_kwargs = {}
-                        if enable_control:
+                        if enable_control and starting_control_step < current_control_step < ending_control_step:
                             down_block_res_samples, mid_block_res_sample = self.controlnet(
                                 latent_model_input,
                                 t,
@@ -956,8 +1080,8 @@ class WebUIStableDiffusionPipeline(DiffusionPipeline):
                 return (image, has_nsfw_concept)
 
             return StableDiffusionPipelineOutput(images=image, nsfw_content_detected=has_nsfw_concept)
-        except Exception as e:
-            raise ValueError(e)
+        # except Exception as e:
+        #     raise ValueError(e)
         finally:
             if enable_lora and self.weights_has_changed:
                 for sub_layer in self.text_encoder.sublayers(include_self=True):
