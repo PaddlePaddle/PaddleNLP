@@ -73,9 +73,6 @@ class PreTrainingArguments(TrainingArguments):
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
         },
     )
-    sharding_stage_1_tensor_fusion: bool = field(
-        default=False, metadata={"help": "Tensor fusion for sharding stage 1's optimizer step."}
-    )
 
 
 @dataclass
