@@ -8,6 +8,8 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 100
       - name: checkout develop
         run: |
           if ! git show-ref --quiet refs/heads/develop; then \

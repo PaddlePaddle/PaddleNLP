@@ -117,7 +117,13 @@ class RotaryEmbeddings(nn.Layer):
             self.max_seq_len_cached = seq_len
 
             # x.shape = [b, s, n, h/n/2]
-            t = paddle.arange(seq_len, dtype=self.inv_freq.dtype)
+            # TODO(duanyanhui): npu arange kernel don't support fp16, and
+            # it can't be fallbacked to cpu. It will be fixed in future.
+            if paddle.get_device().split(":")[0] == "npu":
+                t = paddle.arange(start=0, end=seq_len, dtype="float32")
+                t = t.cast(self.inv_freq.dtype)
+            else:
+                t = paddle.arange(start=0, end=seq_len, dtype=self.inv_freq.dtype)
             # [s, h/n/2]
             # TODO: Failed for fp16 when converting to static graph.
             freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
@@ -501,7 +507,8 @@ class ChatGLMStack(nn.Layer):
     ):
 
         if input_ids is not None and inputs_embeds is not None:
-            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+            input_ids = None
+            logger.warning("Specify both input_ids and inputs_embeds at the same time, will use inputs_embeds")
         elif input_ids is not None:
             batch_size, seq_length = input_ids.shape[:2]
         elif inputs_embeds is not None:
@@ -737,6 +744,9 @@ class ChatGLMModel(ChatGLMPretrainedModel):
 
 
 class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
+    _keys_to_ignore_on_save = [r"lm_head.weight"]
+    _tied_weights_keys = ["lm_head.weight"]
+
     def __init__(self, config: ChatGLMConfig):
         super(ChatGLMForConditionalGeneration, self).__init__(config)
 
@@ -791,6 +801,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                 "position_ids": position_ids,
                 "use_cache": True,
                 "attention_mask": attention_mask,
+                **kwargs,
             }
         else:
             if attention_mask is not None and attention_mask.dtype != paddle.int64:
@@ -807,6 +818,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                 "position_ids": position_ids,
                 "use_cache": True,
                 "attention_mask": attention_mask,
+                **kwargs,
             }
 
     def update_model_kwargs_for_generation(
@@ -877,10 +889,14 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                 print(self.tokenizer.decode(l[l != -100].tolist()))
             """
 
-            shift_logits = lm_logits[..., :-1, :]
-            shift_logits = shift_logits.reshape([-1, shift_logits.shape[-1]])
-            shift_logits = shift_logits.astype("float32")
-            shift_labels = labels[..., 1:].reshape([-1])
+            if self.config.lm_shift_labels:
+                shift_logits = lm_logits[..., :-1, :]
+                shift_logits = shift_logits.reshape([-1, shift_logits.shape[-1]])
+                shift_logits = shift_logits.astype("float32")
+                shift_labels = labels[..., 1:].reshape([-1])
+            else:
+                shift_logits = lm_logits
+                shift_labels = labels
 
             if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
                 self.parallel_loss_func = fleet.meta_parallel.ParallelCrossEntropy()

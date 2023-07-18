@@ -22,11 +22,13 @@ compared with TSV and Jsonl data files.
 import argparse
 import base64
 import json
+import logging
 import os
 import random
 from collections import defaultdict
 from glob import glob
 
+import jsonlines
 import pandas as pd
 import pyarrow as pa
 from tqdm import tqdm
@@ -44,10 +46,10 @@ def path2rest(path, iid2captions, iid2photo):
     name = path.split("/")[-1]
     with open(path, "rb") as fp:
         binary = fp.read()
-    text_index = iid2photo[int(name.split("/")[-1][:-4])]
+    text_index = iid2photo[name.split("/")[-1]]
     bs_item = []
     for index in text_index:
-        bs_item.append([binary, iid2captions[index], int(name.split("/")[-1][:-4])])
+        bs_item.append([binary, iid2captions[index], name.split("/")[-1]])
     return bs_item
 
 
@@ -55,7 +57,7 @@ def valid_img(path, iid2photo):
     name = path.split("/")[-1]
     with open(path, "rb") as fp:
         binary = fp.read()
-    return [binary, int(name.split("/")[-1][:-4])]
+    return [binary, name.split("/")[-1]]
 
 
 parser = argparse.ArgumentParser()
@@ -85,6 +87,11 @@ parser.add_argument(
     help="the directory which stores the images['png','jpg','JPG']",
 )
 args = parser.parse_args()
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s -%(module)s:  %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S %p",
+    level=10,
+)
 # yapf: enable
 if __name__ == "__main__":
     assert os.path.isdir(args.data_dir), "The data_dir does not exist! Please check the input args..."
@@ -97,46 +104,39 @@ if __name__ == "__main__":
         iid2photo = defaultdict(list)
         image_dir = args.image_dir
         assert os.path.isdir(image_dir), "The image_dir does not exist! Please check the input args..."
-        if specified_type == "jsonl" or specified_type == "json":
-            txt_path = datasplit_path + "_texts.jsonl"
-            assert os.path.exists(txt_path) is True
-            with open(txt_path, "r", encoding="utf-8") as fin_pairs:
-                for index, line in tqdm(enumerate(fin_pairs)):
-                    line = line.strip()
-                    obj = json.loads(line)
-                    for field in ("text_id", "text", "image_ids"):
-                        assert (
-                            field in obj
-                        ), "Field {} does not exist in line {}. \
+        assert specified_type == "jsonl", "the type of file is not jsonl"
+        txt_path = datasplit_path + "_texts.jsonl"
+        assert os.path.exists(txt_path) is True
+        with open(txt_path, "r", encoding="utf-8") as fin_pairs:
+            for index, line in tqdm(enumerate(fin_pairs)):
+                line = line.strip()
+                obj = json.loads(line)
+                for field in ("text_id", "text", "image_ids"):
+                    assert (
+                        field in obj
+                    ), "Field {} does not exist in line {}. \
                             Please check the integrity of the text annotation Jsonl file."
-                    image_ids = obj["image_ids"]
-                    if type(image_ids[0]) == str and image_ids[0].isnumeric() is True:
-                        iid2captions[index] = obj["text"]
-                        iid2photo[int(image_ids[0])].append(index)
-                    else:
-                        iid2captions[index] = obj["text"]
-                        iid2photo[image_ids[0]].append(index)
-        elif specified_splits == "csv":
-            txt_path = datasplit_path + "." + specified_type
-            assert os.path.exists(txt_path) is True
-            fin_data = pd.read_csv(txt_path, header=None)
-            for index in range(len(fin_data)):
-                raw_txt, photo_path = fin_data.iloc[index, 0], fin_data.iloc[index, 1]
-                iid2captions[index] = raw_txt
-                iid2photo[photo_path.split("/")[-1]].append(index)
+                image_ids = obj["image_ids"]
+                if type(image_ids[0]) == str and image_ids[0].isnumeric() is True:
+                    iid2captions[index] = obj["text"]
+                    iid2photo[int(image_ids[0])].append(index)
+                else:
+                    iid2captions[index] = obj["text"]
+                    iid2photo[image_ids[0]].append(index)
         paths = (
-            list(glob(f"{args.image_dir}/*jpg"))
-            + list(glob(f"{args.image_dir}/*.png"))
-            + list(glob(f"{args.image_dir}/*.JPG"))
-            + list(glob(f"{args.image_dir}/*.gif"))
+            list(glob(f"{args.image_dir}/*/*jpg"))
+            + list(glob(f"{args.image_dir}/*/*.png"))
+            + list(glob(f"{args.image_dir}/*/*.JPG"))
         )
         random.shuffle(paths)
+        # 有效图片路径
         if type(list(iid2photo.keys())[0]) == int:
-            caption_paths = [path for path in paths if int(path.split("/")[-1][:-4]) in iid2photo]  # 有效图片路径
+            caption_paths = [path for path in paths if int(path.split("/")[-1][:-4]) in iid2photo]
         elif type(list(iid2photo.keys())[0]) == str and "." not in list(iid2photo.keys())[0]:
-            caption_paths = [path for path in paths if path.split("/")[-1][:-4] in iid2photo]  # 有效图片路径
+            caption_paths = [path for path in paths if path.split("/")[-1][:-4] in iid2photo]
         else:
-            caption_paths = [path for path in paths if path.split("/")[-1] in iid2photo]  # 有效图片路径
+            caption_paths = [path for path in paths if path.split("/")[-1] in iid2photo]
+        invalid_photo = [path for path in iid2photo if path not in [i.split("/")[-1] for i in caption_paths]]
         bs = []
         for path in tqdm(caption_paths):
             bs += path2rest(path, iid2captions, iid2photo)
@@ -152,6 +152,20 @@ if __name__ == "__main__":
             with pa.RecordBatchFileWriter(sink, table.schema) as writer:
                 writer.write_table(table)
         if split in ["valid", "test"]:
+            if len(invalid_photo) > 0:
+                logging.info("The jsonl file contains invalid images")
+                data_valid = []
+                with open(txt_path, "r", encoding="utf-8") as fin_pairs:
+                    for line in fin_pairs:
+                        line = line.strip()
+                        obj = json.loads(line)
+                        obj["image_ids"] = [i for i in obj["image_ids"] if i not in invalid_photo]
+                        if len(obj["image_ids"]) == 0:
+                            continue
+                        data_valid.append(obj)
+                with jsonlines.open(datasplit_path + "_updata_texts.jsonl", mode="w") as writer:
+                    for row in data_valid:
+                        writer.write({"text_id": row["text_id"], "text": row["text"], "image_ids": row["image_ids"]})
             bs_img = [valid_img(path, iid2captions) for path in tqdm(caption_paths)]
             dataframe_img = pd.DataFrame(bs_img, columns=["image", "image_id"])
             table_img = pa.Table.from_pandas(dataframe_img)

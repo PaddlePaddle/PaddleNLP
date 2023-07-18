@@ -29,7 +29,11 @@ from ppdiffusers import (
 
 
 def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(
-    model_path: str, output_path: str, sample: bool = False, height: int = None, width: int = None
+    model_path: str,
+    output_path: str,
+    sample: bool = False,
+    height: int = None,
+    width: int = None,
 ):
     # specify unet model with unet pre_temb_act opt enabled.
     unet_model = UNet2DConditionModel.from_pretrained(model_path, resnet_pre_temb_non_linearity=True, subfolder="unet")

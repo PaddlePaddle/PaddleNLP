@@ -852,13 +852,11 @@ class PretrainedConfig:
             raise FileNotFoundError(f"configuration file<{CONFIG_NAME}> or <{LEGACY_CONFIG_NAME}> not found")
 
         try:
-            logger.info(f"loading configuration file {resolved_config_file}")
+            logger.info(f"Loading configuration file {resolved_config_file}")
             # Load config dict
             config_dict = cls._dict_from_json_file(resolved_config_file)
         except (json.JSONDecodeError, UnicodeDecodeError):
-            raise EnvironmentError(
-                f"It looks like the config file<'{resolved_config_file}'> is not a valid JSON file."
-            )
+            raise EnvironmentError(f"Config file<'{resolved_config_file}'> is not a valid JSON file.")
 
         return config_dict, kwargs
 

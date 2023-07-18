@@ -284,7 +284,7 @@ def split_tensor_parallel_weight(weight, tensor_parallel_degree, tensor_parallel
     Returns:
         tensor (numpy.ndarray): splited weight.
     """
-    dim = 1 if is_column else 0
+    dim = -1 if is_column else 0
     if "PySafeSlice" in str(type(weight)):
         size = weight.get_shape()[dim]
         block_size = size // tensor_parallel_degree
@@ -294,9 +294,9 @@ def split_tensor_parallel_weight(weight, tensor_parallel_degree, tensor_parallel
             size % tensor_parallel_degree == 0
         ), f"The choosen size {size} is not compatible with sharding on {tensor_parallel_degree} shards"
 
-        if dim == 0:
+        if dim == 0 or len(weight.get_shape()) == 1:
             tensor = weight[start:stop]
-        elif dim == 1:
+        elif dim == -1:
             tensor = weight[:, start:stop]
         else:
             raise NotImplementedError("Let's make that generic when needed")
@@ -1014,6 +1014,11 @@ class ConversionMixin:
             else:
                 tensor = tensor.numpy() if is_dst else None
 
+            # keep state dict use paddle.tensor
+            if isinstance(tensor, np.ndarray):
+                with device_guard("cpu"):
+                    tensor = paddle.Tensor(tensor, zero_copy=True)
+
             state_dict_to_save[key] = tensor
 
         if len(name_action_mappings) > 0:
@@ -1052,7 +1057,7 @@ class ConversionMixin:
                     break
             if key not in state_keys_map:
                 if not ignore_error:
-                    logger.error(f"could not find name {key} in loaded state dict!")
+                    logger.error(f"tensor parallel conversion: could not find name {key} in loaded state dict!")
             else:
                 state_keys_real.remove(state_keys_map[key])
 

@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 
 import paddle
 from paddle.distributed import fleet
@@ -20,7 +21,7 @@ from paddlenlp.peft.prefix import llama_postprocess_past_key_value
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaConfig
 
 
-def parse_arguments():
+def get_parser():
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -28,13 +29,25 @@ def parse_arguments():
     parser.add_argument(
         "--merge_tensor_parallel_path", default=None, help="The directory of model to merge tensor parallel parts."
     )
-    parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
-    parser.add_argument("--src_length", type=int, default=50, help="The batch size of data.")
-    parser.add_argument("--tgt_length", type=int, default=100, help="The batch size of data.")
+    parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
+    parser.add_argument("--src_length", type=int, default=50, help="the max length of source text")
+    parser.add_argument("--tgt_length", type=int, default=100, help="the max length of decoding length")
+
+    parser.add_argument("--top_k", type=int, default=1, help="top_k parameter for generation")
+    parser.add_argument("--top_p", type=float, default=1.0, help="top_p parameter for generation")
+    parser.add_argument("--temperature", type=float, default=0.95, help="top_p parameter for generation")
+    parser.add_argument("--data_file", default=None, help="data file directory")
+    parser.add_argument("--predict_file", default="prediction.json", help="predict result file directory")
     parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     parser.add_argument(
         "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
     )
+    parser.add_argument("--device", type=str, default="gpu", help="Device")
+    return parser
+
+
+def parse_arguments():
+    parser = get_parser()
     return parser.parse_args()
 
 
@@ -75,6 +88,8 @@ class Predictor(object):
                 fleet.init(is_collective=True, strategy=strategy)
                 hcg = fleet.get_hybrid_communicate_group()
                 tensor_parallel_rank = hcg.get_model_parallel_rank()
+
+            self.rank = tensor_parallel_rank
 
             if self.args.lora_path is not None:
                 lora_config = LoRAConfig.from_pretrained(self.args.lora_path)
@@ -123,9 +138,9 @@ class Predictor(object):
                     **inputs,
                     max_length=self.tgt_length,
                     decode_strategy="sampling",
-                    temperature=1.0,
-                    top_k=1,
-                    top_p=1.0,
+                    temperature=self.args.temperature,
+                    top_k=self.args.top_k,
+                    top_p=self.args.top_p,
                     repetition_penalty=1.0,
                 )
         else:
@@ -135,9 +150,9 @@ class Predictor(object):
                         **inputs,
                         max_length=self.tgt_length,
                         decode_strategy="sampling",
-                        temperature=1.0,
-                        top_k=1,
-                        top_p=1.0,
+                        temperature=self.args.temperature,
+                        top_k=self.args.top_k,
+                        top_p=self.args.top_p,
                         repetition_penalty=1.0,
                     )
         result = result[0]
@@ -160,16 +175,29 @@ class Predictor(object):
 
 if __name__ == "__main__":
     args = parse_arguments()
+    paddle.set_device(args.device)
     predictor = Predictor(args)
-    all_texts = [
-        "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
-        "answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
-    ]
+    if args.data_file is None:
+        all_texts = [
+            "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
+            "answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
+        ]
+    else:
+        all_texts = []
+        with open(args.data_file, "r", encoding="utf-8") as f:
+            for line in f:
+                example = json.loads(line)
+                context = example["src"][0] if isinstance(example["src"], list) else example["src"]
+                all_texts.append(context)
     batch_texts = batchfy_text(all_texts, args.batch_size)
-    for bs, texts in enumerate(batch_texts):
-        outputs = predictor.predict(texts)
-        for text, result in zip(texts, outputs["result"]):
-            print("{}\n{}".format(text, result))
+    with open(args.predict_file, "w", encoding="utf-8") as f:
+        for bs, texts in enumerate(batch_texts):
+            outputs = predictor.predict(texts)
+            for text, result in zip(texts, outputs["result"]):
+                print("{}\n{}".format(text, result))
+                out = {"src": text, "output": result}
+                f.write(json.dumps(out, ensure_ascii=False) + "\n")
+
     if args.merge_tensor_parallel_path is not None:
         predictor.model.save_pretrained(
             save_dir=args.merge_tensor_parallel_path,

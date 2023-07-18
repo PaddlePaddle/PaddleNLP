@@ -94,9 +94,7 @@ class ModelArguments:
     lora_rank: int = field(default=8, metadata={"help": "Lora rank"})
     lora_alpha: int = field(default=16, metadata={"help": "Lora alpha"})
     qat: bool = field(default=False, metadata={"help": "Whether to use QAT technique"})
-    qat_bit_length: int = field(
-        default=8, metadata={"help": "Number of bits to represent an quantized integer in binary"}
-    )
+    qat_type: str = field(default="A8W8", metadata={"help": "Quantization type. Supported values: A8W8, W4,A8W4"})
 
 
 def convert_example(example, tokenizer, label_list, max_seq_length=512, is_test=False):
@@ -195,11 +193,18 @@ def main():
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
         lora_config = LoRAConfig(
-            target_modules=[".*q_proj.*", ".*v_proj.*"],
+            target_modules=[
+                ".*self_attn.q_proj.*",
+                ".*self_attn.k_proj.*",
+                ".*self_attn.v_proj.*",
+                ".*self_attn.out_proj.*",
+                ".*linear1.*",
+                ".*linear2.*",
+            ],
             trainable_modules=[".*classifier.*"],
             r=model_args.lora_rank,
             lora_alpha=model_args.lora_alpha,
-            merge_weights=True,
+            merge_weights=False,
             dtype=dtype,
         )
         model = LoRAModel(model, lora_config)
@@ -214,24 +219,27 @@ def main():
             FakeQuanterWithAbsMaxObserver,
         )
 
-        from paddlenlp.peft.lora import LoRALinear, QuantedLoRALinear
+        from paddlenlp.peft.lora import LoRALinear
+        from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
 
         q_config = QuantConfig(activation=None, weight=None)
         q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
-        q_config.add_type_config(
-            LoRALinear,
-            weight=FakeQuanterChannelWiseAbsMaxObserver(bit_length=model_args.qat_bit_length, dtype=dtype),
-            activation=FakeQuanterWithAbsMaxObserver(
-                moving_rate=0.9, bit_length=model_args.qat_bit_length, dtype=dtype
-            ),
-        )
-        q_config.add_type_config(
-            nn.Linear,
-            weight=FakeQuanterChannelWiseAbsMaxObserver(bit_length=model_args.qat_bit_length, dtype=dtype),
-            activation=FakeQuanterWithAbsMaxObserver(
-                moving_rate=0.9, bit_length=model_args.qat_bit_length, dtype=dtype
-            ),
-        )
+
+        if model_args.qat_type == "A8W8":
+            activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
+            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype=dtype)
+        elif model_args.qat_type == "W4":
+            activation = None
+            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype=dtype)
+        elif model_args.qat_type == "A8W4":
+            activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
+            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype=dtype)
+        else:
+            raise ValueError("qat_type should be one of ['A8W8', 'W4', 'A8W4']")
+
+        q_config.add_type_config(LoRALinear, weight=weight, activation=activation)
+        q_config.add_type_config(nn.Linear, weight=weight, activation=activation)
+
         qat = QAT(q_config)
         model = qat.quantize(model, inplace=True)
 

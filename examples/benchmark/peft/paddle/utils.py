@@ -12,7 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddlenlp.trainer import Trainer
+from paddlenlp.trainer import (
+    Trainer,
+    TrainerCallback,
+    TrainerControl,
+    TrainerState,
+    TrainingArguments,
+)
 
 
 class CustomTrainer(Trainer):
@@ -22,3 +28,21 @@ class CustomTrainer(Trainer):
         input_ids = inputs["input_ids"]
         self.total_observed_tokens += float(input_ids.shape[0] * input_ids.shape[1])
         return super().training_step(model, inputs)
+
+
+class ProfilerCallback(TrainerCallback):
+    "A callback that prints a message at the beginning of training"
+
+    def __init__(self, prof):
+        self.prof = prof
+        self.prof.start()
+
+    def on_train_begin(self, args, state, control, **kwargs):
+        print("Starting training")
+
+    def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        self.prof.step()
+
+    def on_train_end(self, args, state, control, **kwargs):
+        self.prof.stop()
+        self.prof.summary()
