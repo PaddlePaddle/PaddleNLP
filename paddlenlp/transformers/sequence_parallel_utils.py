@@ -81,10 +81,11 @@ def reduce_scatter(input):
     )
     output_shape[0] = output_shape[0] // parallelism
     output = paddle.empty(shape=output_shape, dtype=input.dtype)
-    dist.stream.reduce_scatter(output, input, op=dist.ReduceOp.SUM, sync_op=True)
+    dist.stream.reduce_scatter(output, input, op=dist.ReduceOp.SUM, group=group, sync_op=True)
+    return output
 
 
-def ScatterOp(PyLayer):
+class ScatterOp(PyLayer):
     # input shape: [s, b, h], n is mp parallelism
     # after forward, shape: [s / n, b, h]
     @staticmethod
@@ -209,7 +210,7 @@ def register_sequence_parallel_allreduce_hooks(model, accumulation_steps, fuse_s
     else:
         for p in params:
             hook = create_non_fused_allreduce_gradient_hook(p, accumulation_steps)
-            p.p._register_backward_hook(hook)
+            p._register_backward_hook(hook)
 
 
 def is_fused_matmul_bias_supported():

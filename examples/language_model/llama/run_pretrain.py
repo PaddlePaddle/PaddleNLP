@@ -402,7 +402,8 @@ def main():
 
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
-
+    config.sequence_parallel = training_args.sequence_parallel
+   
     print("Final pre-training config:", config)
 
     # Set the dtype for loading model

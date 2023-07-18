@@ -471,10 +471,11 @@ class LlamaAttention(nn.Layer):
             value_states = self.v_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
             kv_seq_len = key_states.shape[-3]  # seq_len
         else:
+            # after proj, [s/n, b, h] -> [s, b, h]
             q_len, bsz, _ = hidden_states.shape
-            query_states = self.q_proj(hidden_states).reshape(shape=[q_len, bsz, self.num_heads, self.head_dim])
-            key_states = self.k_proj(hidden_states).reshape(shape=[q_len, bsz, self.num_heads, self.head_dim])
-            value_states = self.v_proj(hidden_states).reshape(shape=[q_len, bsz, self.num_heads, self.head_dim])
+            query_states = self.q_proj(hidden_states).reshape(shape=[0, 0, self.num_heads, self.head_dim])
+            key_states = self.k_proj(hidden_states).reshape(shape=[0, 0, self.num_heads, self.head_dim])
+            value_states = self.v_proj(hidden_states).reshape(shape=[0, 0, self.num_heads, self.head_dim])
             kv_seq_len = key_states.shape[0]  # seq_len
 
         offset = 0
@@ -504,6 +505,7 @@ class LlamaAttention(nn.Layer):
             attention_mask=attention_mask,
             output_attentions=output_attentions,
         )
+
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
         attn_output = self.o_proj(attn_output)
@@ -830,19 +832,11 @@ class LlamaModel(LlamaPretrainedModel):
         # embed positions
         if attention_mask is None:
             # [bs, seq_len]
-            if not self.sequence_parallel:
-                attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
-            else:
-                attention_mask = paddle.ones((batch_size, inputs_embeds.shape[0]), dtype=paddle.bool)
+            attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
 
-        if not self.sequence_parallel:
-            attention_mask = self._prepare_decoder_attention_mask(  # 2. get attention_mask
-                attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
-            )  # [bs, 1, seq_len, seq_len]
-        else:
-            attention_mask = self._prepare_decoder_attention_mask(
-                attention_mask, (batch_size, inputs_embeds.shape[0]), 0, inputs_embeds.dtype
-            )
+        attention_mask = self._prepare_decoder_attention_mask(  # 2. get attention_mask
+            attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
+        )  # [bs, 1, seq_len, seq_len]
         hidden_states = inputs_embeds
 
         # decoder layers
@@ -885,11 +879,7 @@ class LlamaModel(LlamaPretrainedModel):
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
 
             if output_attentions:
-                if not self.sequence_parallel:
-                    all_self_attns += (layer_outputs[1],)
-                else:
-                    # sequence parallel 下分不同 sequence 片段计算，attn_weights 已经不具备参考性
-                    all_self_attns += (GatherOp.apply(layer_outputs[1]),)
+                all_self_attns += (layer_outputs[1],)
 
         hidden_states = self.norm(hidden_states)
 
