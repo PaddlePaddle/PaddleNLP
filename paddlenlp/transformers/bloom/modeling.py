@@ -1107,7 +1107,9 @@ class BloomForPretraining(BloomPreTrainedModel):
 
 
 class BloomForCausalLM(BloomPreTrainedModel):
-    _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.weight"]
+    _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.decoder_weight"]
+    _keys_to_ignore_on_save = [r"lm_head.decoder_weight"]
+    _tied_weights_keys = ["lm_head.decoder_weight"]
 
     def __init__(self, config):
         super().__init__(config)
@@ -1211,9 +1213,14 @@ class BloomForCausalLM(BloomPreTrainedModel):
 
         loss = None
         if labels is not None:
-            # Shift so that tokens < n predict n
-            shift_logits = lm_logits[..., :-1, :]
-            shift_labels = labels[..., 1:]
+            if self.config.lm_shift_labels:
+                # Shift so that tokens < n predict n
+                shift_logits = lm_logits[..., :-1, :]
+                shift_labels = labels[..., 1:]
+            else:
+                shift_logits = lm_logits
+                shift_labels = labels
+
             # Flatten the tokens
             loss = self.criterion(shift_logits, shift_labels)
 

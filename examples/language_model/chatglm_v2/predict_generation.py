@@ -59,7 +59,6 @@ class Predictor(object):
             tensor_parallel_degree = paddle.distributed.get_world_size()
             tensor_parallel_rank = 0
             if tensor_parallel_degree > 1:
-                raise ValueError("multi-gpu inference is WIP")
                 strategy = fleet.DistributedStrategy()
                 strategy.hybrid_configs = {
                     "dp_degree": 1,
@@ -85,16 +84,13 @@ class Predictor(object):
     def preprocess(self, input_text):
         inputs = self.tokenizer(
             input_text,
-            return_tensors="np",
+            return_tensors="pd",
             padding=True,
             max_length=self.src_length,
             truncation=True,
             truncation_side="left",
         )
-        inputs_tensor = {}
-        for key in inputs:
-            inputs_tensor[key] = paddle.to_tensor(inputs[key])
-        return inputs_tensor
+        return inputs
 
     def infer(self, inputs):
         result = self.model.generate(
