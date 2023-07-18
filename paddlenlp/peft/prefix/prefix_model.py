@@ -302,7 +302,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
                 2,
                 self.prefix_config.num_hidden_layers,
                 self.prefix_config.num_attention_heads,
-                self.prefix_config.prefix_projection_hidden_size // self.prefix_config.num_attention_heads,  # head_dim
+                self.prefix_config.hidden_size // self.prefix_config.num_attention_heads,  # head_dim
             ]
         )
         # (num_layers, 2, num_heads, prefixlen, head_dim)

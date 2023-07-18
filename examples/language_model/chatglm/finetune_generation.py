@@ -31,7 +31,7 @@ from paddlenlp.peft.prefix import (
     chatglm_postprocess_past_key_value,
 )
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
-from paddlenlp.transformers import ChatGLMForConditionalGeneration, ChatGLMTokenizer
+from paddlenlp.transformers import ChatGLMForCausalLM, ChatGLMTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -100,7 +100,7 @@ def main():
             dtype = "float16"
 
     # Load the pretrained language model.
-    model = ChatGLMForConditionalGeneration.from_pretrained(
+    model = ChatGLMForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         dtype=dtype,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
