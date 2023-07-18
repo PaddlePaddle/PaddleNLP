@@ -8,13 +8,14 @@ ChatFile 带有一个内置的聊天机器人，它使用 文心一言 ErnieBot 
 
 ChatFile 的使用非常简单。用户只需将文件上传到应用程序中，然后即可开始与它们进行聊天。当用户发送消息时，聊天机器人会自动解析消息并做出相应的回答。
 
+Chatfile 具备丰富落地场景，包括 1）出海场景：凭借翻译及多语言交互能力，能够根据中文产品说明书分析总结，用当地语言进行回复海外经销商；2）文档客服机器人：能够快速在公司资料中获取问题答案，快速响应客服，与客服人员实现良好互补；3）项目场景：凭借总结归纳、跨文档能力汇总项目运营各阶段文档，随时向关系人提供项目进度、风险及阶段性成果咨询以及分析总结支持；4）生成报告：通过旧版报告文件和新数据，生成新报告并进行润色。
 
 ## 2. 产品功能介绍
 
-本项目提供了低成本搭建端到端聊天机器人系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的聊天机器人系统模型(召回模型、排序模型、文心一言 ErnieBot)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。以下是使用预置模型的教程，如果用户想训练并接入自己训练的模型，模型训练可以参考[Neural Search](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/neural_search),接入流程可以参考[Neural Search的流程](./Neural_Search.md)。
+本项目提供了低成本搭建端到端聊天机器人系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的聊天机器人系统模型(召回模型、排序模型、文心一言 ErnieBot)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/12107462/190302765-663ba441-9dd3-470a-8fee-f7a6f81da615.gif" width="500px">
+    <img src="https://github.com/PaddlePaddle/PaddleNLP/assets/137043369/978b6d88-355f-4e63-91e0-874e9bcb8012" width="500px">
 </div>
 
 
@@ -29,7 +30,7 @@ ChatFile 的使用非常简单。用户只需将文件上传到应用程序中�
 
 ## 3. 快速开始: 快速搭建聊天机器人系统
 
-以下是针对mac和linux的安装流程，windows的安装和使用流程请参考[windows](./Install_windows.md)
+以下是针对mac和linux的安装流程
 
 ### 3.1 运行环境和安装说明
 
@@ -37,9 +38,9 @@ ChatFile 的使用非常简单。用户只需将文件上传到应用程序中�
 
 a. 软件环境：
 - python >= 3.7.3
-- paddlenlp >= 2.2.1
-- paddlepaddle-gpu >=2.3
-- CUDA Version: 10.2
+- paddlenlp >= 2.6
+- paddlepaddle-gpu >=2.5
+- CUDA Version: 11.2
 - NVIDIA Driver Version: 440.64.00
 - Ubuntu 16.04.6 LTS (Docker)
 
@@ -67,13 +68,13 @@ cd PaddleNLP/pipelines
 【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
 
 ### 3.2 数据说明
-聊天机器人数据库的数据来自于[esg-企业社会责任](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)，共包含 3个pdf文本。
+聊天机器人数据库的数据来自于[enterprise_responsibility_report](https://paddlenlp.bj.bcebos.com/applications/enterprise_responsibility_report.zip)，共包含 3个pdf文件和3个docx文件。如果有版权问题，请第一时间联系，并删除数据。
 
 ### 3.3 一键体验聊天机器人系统
 
 #### 3.3.1 快速一键启动
 
-我们预置了基于[esg-企业社会责任](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)搭建聊天机器人的代码示例，您可以通过如下命令快速体验聊天机器人系统的效果
+我们预置了基于[enterprise_responsibility_report](https://paddlenlp.bj.bcebos.com/applications/enterprise_responsibility_report.zip)搭建聊天机器人的代码示例，您可以通过如下命令快速体验聊天机器人系统的效果
 ```bash
 # 我们建议在 GPU 环境下运行本示例，运行速度较快
 # 设置 1 个空闲的 GPU 卡，此处假设 0 卡为空闲 GPU
@@ -111,9 +112,9 @@ curl http://localhost:9200/_aliases?pretty=true
 
 #### 3.4.2 文档数据写入 ANN 索引库
 ```
-# 以esg-企业社会责任数据集为例建立 ANN 索引库
+# 以enterprise_responsibility_report数据集为例建立 ANN 索引库
 python utils/offline_ann_chatfile.py --index_name esg_example \
-                            --doc_dir data/esg-企业社会责任 \
+                            --doc_dir data/enterprise_responsibility_report \
                             --search_engine elastic \
                             --embed_title True \
                             --delete_index
@@ -181,8 +182,8 @@ sh examples/chatbot/run_chatfile_wb.sh
 数据更新的方法有两种，第一种使用前面的 `utils/offline_ann_chatfile.py`进行数据更新，第二种是使用前端界面的文件上传（在界面的左侧）进行数据更新。对于第一种使用脚本的方式，可以使用多种文件更新数据，示例的文件更新建索引的命令如下，里面包含了图片（目前仅支持把图中所有的文字合并建立索引），docx（纯文本），txt，pdf，markdown五种格式的文件建索引：
 
 ```
-python utils/offline_ann_chatfile.py --index_name markdown_aistudio_example \
-                            --doc_dir data/markdown_aistudio \
+python utils/offline_ann_chatfile.py --index_name esg_example \
+                            --doc_dir data/enterprise_responsibility_report \
                             --port 9200 \
                             --search_engine elastic \
                             --delete_index
@@ -212,10 +213,9 @@ python utils/offline_ann_chatfile.py --index_name markdown_aistudio_example \
 
 [2]Y. Qu et al., “[RocketQA: An Optimized Training Approach to Dense Passage Retrieval for Open-Domain Question Answering](https://arxiv.org/abs/2010.08191),” arXiv:2010.08191 [cs], May 2021, Accessed: Aug. 16, 2021. [Online]. Available: http://arxiv.org/abs/2010.08191
 
-[3]H. Tang, H. Li, J. Liu, Y. Hong, H. Wu, and H. Wang, “[DuReader_robust: A Chinese Dataset Towards Evaluating Robustness and Generalization of Machine Reading Comprehension in Real-World Applications](https://arxiv.org/pdf/2004.11142.pdf).” arXiv, Jul. 21, 2021. Accessed: May 15, 2022. [Online]. Available: http://arxiv.org/abs/2004.11142
 
 ## Acknowledge
 
-我们借鉴了 Deepset.ai [Haystack](https://github.com/deepset-ai/haystack) 优秀的框架设计，在此对[Haystack](https://github.com/deepset-ai/haystack)作者及其开源社区表示感谢。
+我们借鉴了 Deepset.ai [Haystack](https://github.com/deepset-ai/haystack) 和 langchain(https://github.com/hwchase17/langchain)优秀的框架设计，在此对[Haystack](https://github.com/deepset-ai/haystack)和langchain(https://github.com/hwchase17/langchain)作者及其开源社区表示感谢。
 
-We learn form the excellent framework design of Deepset.ai [Haystack](https://github.com/deepset-ai/haystack), and we would like to express our thanks to the authors of Haystack and their open source community.
+We learn form the excellent framework design of Deepset.ai [Haystack](https://github.com/deepset-ai/haystack) and langchain(https://github.com/hwchase17/langchain), and we would like to express our thanks to the authors of Haystack and langchain and their open source community.

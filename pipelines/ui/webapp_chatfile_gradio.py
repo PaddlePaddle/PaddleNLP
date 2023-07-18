@@ -19,8 +19,6 @@ from pathlib import Path
 from typing import NamedTuple
 
 import gradio as gr
-
-# from utils import upload_doc
 from utils import ChatFile, upload_chatfile
 
 parser = argparse.ArgumentParser()
@@ -68,7 +66,6 @@ def predict(
         api_key=api_key,
         secret_key=secret_key,
     )
-    # api_key=api_key,secret_key=api_key
     history.append(["user: {}".format(query), "assistant: {}".format(result["result"])])
 
     return " ", history, history

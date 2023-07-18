@@ -81,7 +81,7 @@ components:    # define all the building-blocks for Pipeline
     type: ErnieBot
     params: 
       api_key: 
-      secret_key: 
+      secret_key:  # the api_key and secret_key are from ERNIE-Bot
 
 pipelines:
   - name: query  

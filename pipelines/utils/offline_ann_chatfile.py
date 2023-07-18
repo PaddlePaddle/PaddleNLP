@@ -17,7 +17,7 @@ import argparse
 from pipelines.document_stores import ElasticsearchDocumentStore, MilvusDocumentStore
 from pipelines.nodes import DensePassageRetriever
 from pipelines.utils import fetch_archive_from_http, launch_es
-from pipelines.utils.preprocessing_chatfile import convert_files_to_dicts
+from pipelines.utils.preprocessing import convert_files_to_dicts_splitter
 
 data_dict = {
     "data/dureader_dev": "https://paddlenlp.bj.bcebos.com/applications/dureader_dev.zip",
@@ -77,7 +77,7 @@ def offline_ann(index_name, doc_dir):
             search_fields=args.search_fields,  # 当使用了多路召回并且搜索字段设置了除content的其他字段，构建索引时其他字段也需要设置，例如：['content', 'name']。
         )
     # 将每篇文档按照段落进行切分
-    dicts = convert_files_to_dicts(
+    dicts = convert_files_to_dicts_splitter(
         dir_path=doc_dir,
         split_paragraphs=True,
         split_answers=args.split_answers,

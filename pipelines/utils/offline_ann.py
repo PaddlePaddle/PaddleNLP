@@ -78,9 +78,6 @@ def offline_ann(index_name, doc_dir):
 
     # 文档数据写入数据库
     document_store.write_documents(dicts)
-    import pdb
-
-    pdb.set_trace()
     # 语义索引模型
     retriever = DensePassageRetriever(
         document_store=document_store,
