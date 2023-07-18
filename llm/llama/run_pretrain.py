@@ -391,7 +391,11 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
 
     config = config_class.from_pretrained(model_args.model_name_or_path)
-    config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
+
+    # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
+    if not model_args.continue_training:
+        config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
+
     if not model_args.continue_training:
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
         logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
