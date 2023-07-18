@@ -87,6 +87,7 @@ def run_torch():
 
 def run_generate():
     import paddle
+
     from modeling import ChatGLMForConditionalGeneration
 
     paddle.set_default_dtype("float16")
