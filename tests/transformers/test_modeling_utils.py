@@ -18,6 +18,8 @@ import unittest
 from multiprocessing import Pool
 from tempfile import TemporaryDirectory
 
+import paddle
+
 from paddlenlp.transformers import BertModel, TinyBertModel
 from paddlenlp.utils.env import CONFIG_NAME, MODEL_HOME, PADDLE_WEIGHTS_NAME
 from tests.testing_utils import slow
@@ -100,3 +102,25 @@ class TestModeling(unittest.TestCase):
         # 2. downloaing tinybert modeling using multi-processing
         with Pool(num_process_in_pool) as pool:
             pool.starmap(download_bert_model, [(model_name,) for _ in range(num_jobs)])
+
+
+class SimplePredictor:
+    def __init__(self, model_dir: str, model_name: str = "model"):
+        model_path = os.path.join(model_dir, model_name + ".pdmodel")
+        params_path = os.path.join(model_dir, model_name + ".pdiparams")
+        config = paddle.inference.Config(model_path, params_path)
+        config.disable_gpu()
+        self.predictor = paddle.inference.create_predictor(config)
+
+    def infer(self, inputs):
+        input_handles = {}
+        print("names => ", list(self.predictor.get_input_names()))
+        for name in self.predictor.get_input_names():
+            input_handles[name] = self.predictor.get_input_handle(name)
+            input_handles[name].copy_from_cpu(inputs[name])
+
+        self.predictor.run()
+        output_names = self.predictor.get_output_names()
+        output_handle = self.predictor.get_output_handle(output_names[0])
+        results = output_handle.copy_to_cpu()
+        return results

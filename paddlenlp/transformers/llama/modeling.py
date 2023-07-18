@@ -917,9 +917,11 @@ class LlamaForCausalLM(LlamaPretrainedModel):
     def get_decoder(self):
         return self.llama
 
-    def prepare_fast_entry(self, **kwargs):
+    def prepare_fast_entry(self, kwargs):
         """create `FusedLlamaModel` model by `LlamaModel` and re-use the lm-head layer"""
-        self.llma = FusedLlamaModel.from_pretrained_model(self)
+        model = FusedLlamaModel.from_pretrained_model(self)
+        self.llama.forward = model.forward
+        self.llama = model
 
     def prepare_inputs_for_generation(
         self, input_ids, use_cache=False, past_key_values=None, inputs_embeds=None, **kwargs

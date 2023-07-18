@@ -574,10 +574,10 @@ class GenerationMixin(object):
             return
 
         self._fast_entry = False
-        if kwargs["num_beam_groups"] != 1:
+        if kwargs.get("num_beam_groups", 1) != 1:
             # not support for group_beam_search yet in the fast version
             raise AttributeError("'num_beam_groups != 1' is not supported yet in the fast version")
-        if paddle.get_default_dtype() == "float16" and kwargs["use_fp16_decoding"] is False:
+        if paddle.get_default_dtype() == "float16" and kwargs.get("use_fp16_decoding", False) is False:
             logger.info(
                 "Since the default dtype is float16, float16 would be used " "though 'use_fp16_decoding=False'."
             )
@@ -1178,7 +1178,7 @@ class GenerationMixin(object):
             )
         return input_ids[:, origin_len:], scores
 
-    def to_static(self, path: str, config: dict):
+    def to_static(self, path: str, config: dict = None):
         """export generation model to static
 
         Args:
@@ -1189,6 +1189,7 @@ class GenerationMixin(object):
                 pad_token_id (int): token id of pad token
                 use_top_p (bool): whether use top_p decoding strategy
         """
+        config = config or {}
 
         use_top_p = config.get("use_top_p", True)
 

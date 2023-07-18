@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import math
 from functools import partial
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Type, Union
 
 import numpy as np
 import paddle
@@ -1113,11 +1113,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
 
     def __init__(self, config: BloomConfig):
         super().__init__(config)
-        if config.use_fast:
-            self.bloom = FusedBloomModel(config)
-        else:
-            self.bloom = BloomModel(config)
-
+        self.bloom = BloomModel(config)
         self.lm_head = BloomLMHead(config, self.bloom.word_embeddings.weight)
         self.criterion = BloomPretrainingCriterion(
             pad_token_id=config.pad_token_id,
@@ -1130,6 +1126,12 @@ class BloomForCausalLM(BloomPreTrainedModel):
 
     def set_output_embeddings(self, new_embeddings):
         self.lm_head = new_embeddings
+
+    def prepare_fast_entry(self, kwargs):
+        """create `FusedLlamaModel` model by `LlamaModel` and re-use the lm-head layer"""
+        model = FusedBloomModel.from_pretrained_model(self)
+        self.bloom.forwrad = model.forward
+        self.bloom = model
 
     @staticmethod
     def update_model_kwargs_for_generation(outputs, model_kwargs, is_encoder_decoder=False):
@@ -1985,6 +1987,16 @@ class FusedBloomModel(BloomPreTrainedModel):
     def get_input_embeddings(self):
         return self.word_embeddings
 
+    @classmethod
+    def from_pretrained_model(cls: Type[PretrainedModel], model: PretrainedModel) -> FusedBloomModel:
+        print("start to init fused-model from pretrained model")
+        model.config.tensor_parallel_degree = max(model.config.tensor_parallel_degree, 1)
+
+        fused_model = cls(model.config)
+        state_dict = model.state_dict()
+        fused_model.set_state_dict(state_dict)
+        return fused_model
+
     def _prepare_attn_mask(
         self,
         attention_mask: Tensor,
@@ -2098,7 +2110,7 @@ class FusedBloomModel(BloomPreTrainedModel):
                     shape=[
                         2,
                         -1,
-                        self.config.n_head // self.config.tensor_parallel_degree,
+                        self.config.n_head // max(self.config.tensor_parallel_degree, 1),
                         max_seq_len,
                         self.embed_dim // self.config.n_head,
                     ],
@@ -2194,6 +2206,8 @@ class FusedBloomModel(BloomPreTrainedModel):
     @paddle.no_grad()
     def set_state_dict(self, state_dict, use_structured_name=True):
         for k, v in state_dict.items():
+            if k.startswith("lm_head"):
+                continue
             if k.find("word_embeddings.weight") >= 0:
                 self.word_embeddings.weight.set_value(paddle.to_tensor(v))
             elif k.find("word_embeddings_layernorm.weight") >= 0:

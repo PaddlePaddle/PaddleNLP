@@ -17,7 +17,7 @@ from __future__ import annotations
 import math
 import re
 from functools import partial
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Type
 
 import paddle
 import paddle.nn as nn
@@ -500,7 +500,6 @@ class FusedChatGLMStack(nn.Layer):
             base=10000.0,
             learnable=False,
         )
-        paddle.get_default_dtype()
         self.cache_kvs = []
         self.input_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
         ln_scale_attrs = [paddle.ParamAttr(name="fusemt.{}.ln_scale".format(i)) for i in range(config.num_layers)]
@@ -561,6 +560,12 @@ class FusedChatGLMStack(nn.Layer):
             self.prefix_tokens = paddle.arange(self.config.pre_seq_len, dtype="int64")
             self.prefix_encoder = PrefixEncoder(config)
             self.dropout = nn.Dropout(0.1)
+
+    @classmethod
+    def from_pretrained_model(cls: Type[PretrainedModel], model: PretrainedModel):
+        fused_model = cls(model.config)
+        fused_model.set_state_dict(model.state_dict())
+        return fused_model
 
     def get_prompt(self, batch_size, dtype=paddle.float16):
         prefix_tokens = self.prefix_tokens.unsqueeze(0).expand([batch_size, -1])
@@ -690,7 +695,8 @@ class FusedChatGLMStack(nn.Layer):
         sines = paddle.concat([position_sin, block_position_sin], axis=-1).unsqueeze(0)
         rotary_embeds = paddle.concat([coses, sines])
 
-        attention_mask = attention_mask * -10000
+        attention_mask = (1 - attention_mask) * -10000
+
         new_cache = [None]
         hidden_states = hidden_states.transpose([1, 0, 2])
         hidden_states = self.input_layernorm(hidden_states)
@@ -709,30 +715,27 @@ class FusedChatGLMStack(nn.Layer):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict, use_structured_name=True):
-        import pdb
-
-        pdb.set_trace()
         config = self.config
         embed_dim = config.hidden_size
         mp_degree = config.tensor_parallel_degree
         num_attention_heads = config.num_attention_heads // mp_degree
         head_dim = embed_dim // config.num_attention_heads
         dtype = "float16" if self.word_embeddings.weight.dtype.name == "FP16" else "float32"
-        print("dtype:", dtype)
+
         for k, v in state_dict.items():
-            if k.startswith("transformer.word_embeddings.weight"):
+            if k.endswith("transformer.word_embeddings.weight"):
                 self.word_embeddings.weight.set_value(v.astype(dtype))
                 continue
-            elif k.startswith("transformer.final_layernorm.weight"):
+            elif k.endswith("transformer.final_layernorm.weight"):
                 self.transformer_block.ffn_ln_scales[config.num_hidden_layers - 1].set_value(v.astype("float32"))
                 continue
-            elif k.startswith("transformer.final_layernorm.bias"):
+            elif k.endswith("transformer.final_layernorm.bias"):
                 self.transformer_block.ffn_ln_biases[config.num_hidden_layers - 1].set_value(v.astype("float32"))
                 continue
             elif k.startswith("lm_head.weight"):
                 # model.chatglm.lm_head.weight.set_value(v.astype(dtype))
                 continue
-            elif k.endswith("attention.rotary_emb.inv_freq"):
+            elif k.endswith("rotary_embeddings.inv_freq"):
                 continue
             idx = int(k.split(".")[2])
             if k.endswith("input_layernorm.weight"):
@@ -1056,10 +1059,7 @@ class ChatGLMModel(ChatGLMPretrainedModel):
     def __init__(self, config: ChatGLMConfig):
         super(ChatGLMModel, self).__init__(config)
         self.config = config
-        if config.use_fast:
-            self.transformer = FusedChatGLMStack(config)
-        else:
-            self.transformer = ChatGLMStack(config)
+        self.transformer = ChatGLMStack(config)
         self.apply(self.init_weights)
 
     def get_input_embeddings(self):
@@ -1113,12 +1113,8 @@ class ChatGLMModel(ChatGLMPretrainedModel):
         return BaseModelOutputWithPastAndCrossAttentions(last_hidden_state=logits, past_key_values=new_caches)
 
     def set_state_dict(self, state_dict):
-        import pdb
-
-        pdb.set_trace()
         if not self.config.use_fast:
             return super().set_state_dict(state_dict)
-
         self.transformer.set_state_dict(state_dict)
 
 
@@ -1134,6 +1130,13 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
         self.lm_head = self.chatglm.get_input_embeddings()
         # from paddlenlp.transformers import ChatGLMTokenizer
         # self.tokenizer = ChatGLMTokenizer.from_pretrained("THUDM/chatglm-6b")
+
+    def prepare_fast_entry(self, kwargs):
+        """create `FusedLlamaModel` model by `LlamaModel` and re-use the lm-head layer"""
+        self.chatglm.config.tensor_parallel_degree = max(self.chatglm.config.tensor_parallel_degree, 1)
+        model = FusedChatGLMStack.from_pretrained_model(self.chatglm)
+        self.chatglm.transformer.forward = model.forward
+        self.chatglm.transformer = model
 
     def prepare_inputs_for_generation(
         self, input_ids, position_ids=None, attention_mask=None, past_key_values=None, cache=None, **kwargs

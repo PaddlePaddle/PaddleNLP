@@ -16,13 +16,16 @@
 from __future__ import annotations
 
 import collections
+from typing import Type
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
+from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 from paddle.fluid import layers
+from paddle.incubate.nn import FusedMultiTransformer
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
@@ -491,14 +494,22 @@ class GPTEmbeddings(nn.Layer):
         hidden_dropout_prob=0.1,
         max_position_embeddings=512,
         type_vocab_size=16,
+        tensor_parallel_degree=1,
         initializer_range=0.02,
     ):
         super(GPTEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(
-            vocab_size,
-            hidden_size,
-            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=initializer_range)),
-        )
+        if tensor_parallel_degree > 1:
+            self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
+                vocab_size,
+                hidden_size,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=initializer_range)),
+            )
+        else:
+            self.word_embeddings = nn.Embedding(
+                vocab_size,
+                hidden_size,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=initializer_range)),
+            )
 
         self.position_embeddings = nn.Embedding(
             max_position_embeddings,
@@ -632,6 +643,317 @@ class GPTPretrainedModel(PretrainedModel):
                         shape=layer.weight.shape,
                     )
                 )
+
+
+class FusedGPTModel(GPTPretrainedModel):
+    def __init__(self, config: GPTConfig):
+        super(FusedGPTModel, self).__init__(config)
+
+        self.pad_token_id = config.pad_token_id
+        self.eos_token_id = config.eos_token_id
+        self.bos_token_id = config.bos_token_id
+        self.eol_token_id = config.eol_token_id
+        self.initializer_range = config.initializer_range
+        self.hidden_size = config.hidden_size
+        self.vocab_size = config.vocab_size
+        self.n_head = config.num_attention_heads
+
+        self.embeddings = GPTEmbeddings(
+            config.vocab_size,
+            config.hidden_size,
+            config.hidden_dropout_prob,
+            config.max_position_embeddings,
+            config.type_vocab_size,
+            config.tensor_parallel_degree,
+            self.initializer_range,
+        )
+
+        self.bias = paddle.tril(
+            paddle.ones(
+                [1, 1, config.max_position_embeddings, config.max_position_embeddings],
+                dtype="int64",
+            )
+        )
+
+        # get ring_id
+        ring_id = -1
+        try:
+            hcg = fleet.get_hybrid_communicate_group()
+            model_parallel_group = hcg.get_model_parallel_group()
+            ring_id = model_parallel_group.id
+        except:
+            pass
+
+        ln_scale_attrs = [
+            paddle.ParamAttr(name="fusemt.{}.ln_scale".format(i)) for i in range(config.num_hidden_layers)
+        ]
+        ln_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ln_bias".format(i)) for i in range(config.num_hidden_layers)]
+        qkv_weight_attrs = [
+            paddle.ParamAttr(name="fusemt.{}.qkv_weight".format(i)) for i in range(config.num_hidden_layers)
+        ]
+        qkv_bias_attrs = [
+            paddle.ParamAttr(name="fusemt.{}.qkv_bias".format(i)) for i in range(config.num_hidden_layers)
+        ]
+        linear_weight_attrs = [
+            paddle.ParamAttr(name="fusemt.{}.linear_weight".format(i)) for i in range(config.num_hidden_layers)
+        ]
+        linear_bias_attrs = [
+            paddle.ParamAttr(name="fusemt.{}.linear_bias".format(i)) for i in range(config.num_hidden_layers)
+        ]
+        ffn_ln_scale_attrs = [
+            paddle.ParamAttr(name="fusemt.{}.ffn_ln_scale".format(i)) for i in range(config.num_hidden_layers)
+        ]
+        ffn_ln_bias_attrs = [
+            paddle.ParamAttr(name="fusemt.{}.ffn_ln_bias".format(i)) for i in range(config.num_hidden_layers)
+        ]
+        ffn1_weight_attrs = [
+            paddle.ParamAttr(name="fusemt.{}.ffn1_weight".format(i)) for i in range(config.num_hidden_layers)
+        ]
+        ffn1_bias_attrs = [
+            paddle.ParamAttr(name="fusemt.{}.ffn1_bias".format(i)) for i in range(config.num_hidden_layers)
+        ]
+        ffn2_weight_attrs = [
+            paddle.ParamAttr(name="fusemt.{}.ffn2_weight".format(i)) for i in range(config.num_hidden_layers)
+        ]
+        ffn2_bias_attrs = [
+            paddle.ParamAttr(name="fusemt.{}.ffn2_bias".format(i)) for i in range(config.num_hidden_layers)
+        ]
+
+        self.norm = nn.LayerNorm(self.hidden_size, epsilon=1e-5)
+        self.transformer_block = FusedMultiTransformer(
+            self.hidden_size,
+            self.n_head,
+            4 * self.hidden_size,
+            activation="gelu",
+            nranks=config.tensor_parallel_degree,
+            ring_id=ring_id,
+            num_layers=config.num_hidden_layers,
+            ln_scale_attrs=ln_scale_attrs,
+            ln_bias_attrs=ln_bias_attrs,
+            qkv_weight_attrs=qkv_weight_attrs,
+            qkv_bias_attrs=qkv_bias_attrs,
+            linear_weight_attrs=linear_weight_attrs,
+            linear_bias_attrs=linear_bias_attrs,
+            ffn_ln_scale_attrs=ffn_ln_scale_attrs,
+            ffn_ln_bias_attrs=ffn_ln_bias_attrs,
+            ffn1_weight_attrs=ffn1_weight_attrs,
+            ffn1_bias_attrs=ffn1_bias_attrs,
+            ffn2_weight_attrs=ffn2_weight_attrs,
+            ffn2_bias_attrs=ffn2_bias_attrs,
+        )
+
+        self.checkpoints = []
+        self.cache_kvs = []
+        self.gradient_checkpointing = False
+
+    def get_input_embeddings(self):
+        return self.embeddings.word_embeddings
+
+    def set_input_embeddings(self, value):
+        self.embeddings.word_embeddings = value
+
+    @classmethod
+    def from_pretrained_model(cls: Type[PretrainedModel], model: PretrainedModel):
+        fused_model = cls(model.config)
+        fused_model.set_state_dict(model.state_dict())
+        return fused_model
+
+    def forward(
+        self,
+        input_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        use_cache=False,
+        cache=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+        **kwargs,
+    ):
+        r"""
+        The GPTModel forward method, overrides the `__call__()` special method.
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import GPTModel, GPTTokenizer
+
+                tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
+                model = GPTModel.from_pretrained('gpt2-medium-en')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                output = model(**inputs)
+        """
+        self.checkpoints = []
+        cache = kwargs.get("cache", cache)
+        is_decoder = cache is not None
+
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        elif input_ids is not None:
+            input_shape = paddle.shape(input_ids)
+            input_ids = input_ids.reshape((-1, input_shape[-1]))
+            batch_size, seq_length = input_ids.shape
+        elif inputs_embeds is not None:
+            input_shape = paddle.shape(inputs_embeds)[:-1]
+            batch_size, seq_length, _ = inputs_embeds.shape
+        else:
+            raise ValueError("You have to specify either input_ids or inputs_embeds")
+
+        if cache is None:
+            cache = tuple([None] * self.config.num_hidden_layers)
+
+        # embed positions
+        if attention_mask is None:
+            attention_mask = paddle.ones((batch_size, seq_length), dtype=paddle.bool)
+
+        if position_ids is None:
+            past_length = 0
+            if is_decoder:
+                past_length = paddle.shape(attention_mask)[-1] - 1
+            position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype="int64")
+            position_ids = position_ids.unsqueeze(0)
+            position_ids = paddle.expand(position_ids, input_shape)
+        inputs_embeds = self.embeddings(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            inputs_embeddings=inputs_embeds,
+        )
+
+        # TODO, use registered buffer
+        length = input_shape[-1]
+        if is_decoder:
+            cache_length = paddle.shape(attention_mask)[-1] - 1
+            length = length + cache_length
+        else:
+            cache_length = 0
+        causal_mask = self.bias[:, :, cache_length:length, :length]
+
+        attention_mask = (1.0 - causal_mask) * -1e4
+
+        # The tensor returned by triu not in static graph.
+        attention_mask.stop_gradient = True
+
+        if len(self.cache_kvs) == 0:
+            max_seq_length = 1024
+            self.cache_kvs = [
+                paddle.fluid.layers.fill_constant_batch_size_like(
+                    input_ids,
+                    shape=[
+                        2,
+                        -1,
+                        self.config.num_attention_heads // self.config.tensor_parallel_degree,
+                        max_seq_length,
+                        self.hidden_size // self.config.num_attention_heads,
+                    ],
+                    input_dim_idx=0,
+                    output_dim_idx=1,
+                    value=0.0,
+                    dtype=paddle.get_default_dtype(),
+                )
+                for _ in range(self.config.num_hidden_layers)
+            ]
+
+        all_hidden_states = () if output_hidden_states else None
+        all_self_attns = () if output_attentions else None
+        hidden_states = inputs_embeds
+        hidden_states, presents = self.transformer_block(
+            hidden_states,
+            attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
+            caches=self.cache_kvs,
+            time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
+        )
+        hidden_states = self.norm(hidden_states)
+
+        if output_hidden_states:
+            all_hidden_states = all_hidden_states + (hidden_states,)
+
+        if not return_dict:
+            temp_list = [hidden_states, presents, all_hidden_states, all_self_attns]
+            if not (use_cache or output_attentions or output_hidden_states):
+                return hidden_states
+            return tuple(v for v in temp_list if v is not None)
+
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=hidden_states,
+            past_key_values=presents,
+            hidden_states=all_hidden_states,
+            attentions=all_self_attns,
+            cross_attentions=None,
+        )
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict, use_structured_name=True):
+        dtype = paddle.get_default_dtype()
+
+        for k, v in state_dict.items():
+            print("process -> ", k)
+            if k.startswith("gpt."):
+                k = str(k.split("gpt.")[1])
+            if k.find("embeddings.word_embeddings.weight") >= 0:
+                self.embeddings.word_embeddings.weight.set_value(paddle.cast(v, dtype))
+            elif k.find("decoder.norm.weight") >= 0:
+                self.norm.weight.set_value(paddle.cast(v, dtype))
+            elif k.find("decoder.norm.bias") >= 0:
+                self.norm.bias.set_value(paddle.cast(v, dtype))
+            else:
+                if not k.startswith("decoder.layers."):
+                    continue
+                idx = int(k.split(".")[2])
+                if k.endswith("norm1.weight"):
+                    self.transformer_block.ln_scales[idx].set_value(paddle.cast(v, "float32"))
+                elif k.endswith("norm1.bias"):
+                    self.transformer_block.ln_biases[idx].set_value(paddle.cast(v, "float32"))
+                elif k.endswith("self_attn.qkv_proj.weight"):
+                    self.transformer_block.qkv_weights[idx].set_value(
+                        paddle.cast(
+                            v.reshape(
+                                [
+                                    self.hidden_size,
+                                    self.n_head // self.config.tensor_parallel_degree,
+                                    3,
+                                    self.hidden_size // self.n_head,
+                                ]
+                            ).transpose([2, 1, 3, 0]),
+                            dtype,
+                        )
+                    )
+                elif k.endswith("self_attn.qkv_proj.bias"):
+                    self.transformer_block.qkv_biases[idx].set_value(
+                        paddle.cast(
+                            v.reshape(
+                                [self.n_head // self.config.tensor_parallel_degree, 3, self.hidden_size // self.n_head]
+                            ).transpose([1, 0, 2]),
+                            dtype,
+                        )
+                    )
+                elif k.endswith("self_attn.out_proj.weight"):
+                    self.transformer_block.linear_weights[idx].set_value(paddle.cast(v, dtype))
+                elif k.endswith("self_attn.out_proj.bias"):
+                    self.transformer_block.linear_biases[idx].set_value(paddle.cast(v, dtype))
+                elif k.endswith("norm2.weight"):
+                    self.transformer_block.ffn_ln_scales[idx].set_value(paddle.cast(v, "float32"))
+                elif k.endswith("norm2.bias"):
+                    self.transformer_block.ffn_ln_biases[idx].set_value(paddle.cast(v, "float32"))
+                elif k.endswith("linear1.weight"):
+                    self.transformer_block.ffn1_weights[idx].set_value(paddle.cast(v, dtype))
+                elif k.endswith("linear1.bias"):
+                    self.transformer_block.ffn1_biases[idx].set_value(paddle.cast(v, dtype))
+                elif k.endswith("linear2.weight"):
+                    self.transformer_block.ffn2_weights[idx].set_value(paddle.cast(v, dtype))
+                elif k.endswith("linear2.bias"):
+                    self.transformer_block.ffn2_biases[idx].set_value(paddle.cast(v, dtype))
+                else:
+                    raise ValueError("Unknow weight {}".format(k))
 
 
 @register_base_model
@@ -1223,26 +1545,11 @@ class GPTLMHeadModel(GPTPretrainedModel):
         )
 
     def prepare_fast_entry(self, kwargs):
-        from paddlenlp.ops import FasterGPT
-
-        use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
-        decode_strategy = kwargs.get("decode_strategy")
-        if decode_strategy == "beam_search":
-            raise AttributeError("'beam_search' is not supported yet in the fast version of GPT")
-        # Currently, FasterTransformer only support restricted size_per_head.
-        size_per_head = self.gpt.config["hidden_size"] // self.gpt.config["num_attention_heads"]
-        if size_per_head not in [32, 64, 80, 96, 128]:
-            raise AttributeError(
-                "'size_per_head = %d' is not supported yet in the fast version of GPT" % size_per_head
-            )
-        if kwargs["forced_bos_token_id"] is not None:
-            # not support for min_length yet in the fast version
-            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the fast version")
-        if kwargs["min_length"] != 0:
-            # not support for min_length yet in the fast version
-            raise AttributeError("'min_length != 0' is not supported yet in the fast version")
-        self._fast_entry = FasterGPT(self, use_fp16_decoding=use_fp16_decoding).forward
-        return self._fast_entry
+        """create `FusedGPTModel` model by `GPTModel` and re-use the lm-head layer"""
+        self.config.tensor_parallel_degree = max(self.config.tensor_parallel_degree, 1)
+        model = FusedGPTModel.from_pretrained_model(self)
+        self.gpt.forward = model.forward
+        self.gpt = model
 
     def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs

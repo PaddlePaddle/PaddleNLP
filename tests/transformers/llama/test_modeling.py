@@ -14,6 +14,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 
@@ -31,6 +32,7 @@ from tests.transformers.test_modeling_common import (
     ids_tensor,
     random_attention_mask,
 )
+from tests.transformers.test_modeling_utils import SimplePredictor
 
 
 class LlamaModelTester:
@@ -306,7 +308,7 @@ class LlamaModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
     def test_fused_model(self):
-        model = LlamaForCausalLM.from_pretrained("__internal_testing__/micro-random-llama")
+        model = LlamaForCausalLM.from_pretrained("__internal_testing__/tiny-random-llama")
         fused_model = FusedLlamaModel.from_pretrained_model(model)
         fused_model.eval()
 
@@ -315,14 +317,14 @@ class LlamaModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
         with paddle.no_grad():
             output = fused_model(input_ids, attention_mask=attention_mask)[0]
 
-        expected_shape = [1, 11, 64]
+        expected_shape = [1, 11, 768]
         self.assertEqual(output.shape, expected_shape)
         expected_slice = paddle.to_tensor(
             [
                 [
-                    [0.08663182, 0.08711195, 1.02873409],
-                    [0.89613110, 0.50597161, -1.37855554],
-                    [1.58324170, -0.46832055, 0.35964745],
+                    [0.20424680, 0.18634382, -0.75255555],
+                    [0.37669501, -0.38723028, -1.21922004],
+                    [0.31110007, -0.40123510, -0.64165694],
                 ]
             ]
         )
@@ -342,6 +344,29 @@ class LlamaModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
         self.assertEqual(output.shape, expected_shape)
         expected_ids = [[20762, 3825, 3009, 24082, 23694, 30334, 3557, 19503, 20577, 15480]]
         self.assertListEqual(output.tolist(), expected_ids)
+
+    def test_static_fast_generation(self):
+        model = LlamaForCausalLM.from_pretrained("__internal_testing__/micro-random-llama")
+        model.eval()
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            model_path = os.path.join(tempdir, "model")
+            config = dict(use_top_p=False)
+            model.to_static(model_path, config)
+
+            predictor = SimplePredictor(tempdir)
+            inputs = {
+                "input_ids": np.array([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]]),
+                "attention_mask": np.array([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]]),
+                "max_length": np.array(10),
+                "top_k": np.array(1),
+            }
+            outputs = predictor.infer(inputs)
+            expected_shape = [1, 10]
+            self.assertEqual(list(outputs.shape), expected_shape)
+
+            expected_ids = [[20762, 3825, 3009, 24082, 23694, 30334, 3557, 19503, 20577, 15480]]
+            self.assertListEqual(outputs.tolist(), expected_ids)
 
 
 class LlamaCompatibilityTest(unittest.TestCase):
