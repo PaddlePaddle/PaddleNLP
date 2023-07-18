@@ -135,25 +135,14 @@ def scaled_dot_product_attention(
     output_attentions,
     is_causal=True,
 ):
-    sequence_parallel = config.sequence_parallel
-
-    if not sequence_parallel:
-        bsz, q_len, num_heads, head_dim = query_states.shape
-        _, kv_seq_len, _, _ = value_states.shape
-    else:
-        q_len, bsz, num_heads, head_dim = query_states.shape
-        kv_seq_len, _, _, _ = value_states.shape
+    bsz, q_len, num_heads, head_dim = query_states.shape
+    _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention:
         # Flash Attention now ignore attention mask
-        # Current Flash Attention doesn't support attn mask
+        # Current Flash Attention doesn't support attn maskt
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
-        if sequence_parallel:
-            perm = [1, 0, 2, 3]
-            query_states = paddle.transpose(x=query_states, perm=perm)
-            key_states = paddle.transpose(x=key_states, perm=perm)
-            value_states = paddle.transpose(x=value_states, perm=perm)
         attn_output, attn_weights = flash_attention(
             query_states,
             key_states,
@@ -161,22 +150,18 @@ def scaled_dot_product_attention(
             causal=is_causal and query_states.shape[1] != 1,
             return_softmax=output_attentions,
         )
+
         attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
-        if sequence_parallel:
-            perm = [1, 0, 2]
-            attn_output = paddle.transpose(x=attn_output, perm=perm)
         return attn_output, attn_weights
     else:
-        # [bs, num_head, seq_len, head_dim]
-        perm = [1, 2, 0, 3] if sequence_parallel else [0, 2, 1, 3]
-        query_states = paddle.transpose(query_states, perm=perm)
+        query_states = paddle.transpose(query_states, [0, 2, 1, 3])
         # merge with the next tranpose
-        key_states = paddle.transpose(key_states, perm=perm)
-        value_states = paddle.transpose(value_states, perm=perm)
+        key_states = paddle.transpose(key_states, [0, 2, 1, 3])
+        value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
         attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
 
-        if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:  # q_len: tgt_len, kv_seq_len: src_len
+        if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
             raise ValueError(
                 f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
                 f" {attn_weights.shape}"
@@ -192,7 +177,7 @@ def scaled_dot_product_attention(
             raise ValueError(
                 f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
             )
-        attn_weights = attention_mask + attn_weights  # [bs, num_heads, q_len, kv_seq_len]
+        attn_weights = attention_mask + attn_weights
 
         attn_weights = paddle.maximum(
             attn_weights, paddle.full([1], float(finfo(query_states.dtype).min), dtype=attn_weights.dtype)
@@ -202,17 +187,11 @@ def scaled_dot_product_attention(
             with paddle.amp.auto_cast(False):
                 attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
         else:
-            # [bs, num_heads, q_len, kv_seq_len]
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
 
-        attn_output = paddle.matmul(attn_weights, value_states)  # [bs, num_head, q_len, head_dim]
-        if sequence_parallel:
-            attn_output = attn_output.transpose([2, 0, 1, 3])
-        else:
-            attn_output = attn_output.transpose([0, 2, 1, 3])  # [bs, q_len, num_head, head_dim]
-        attn_output = attn_output.reshape([0, 0, -1])
-        # If sequence_parallel is true, out shape is [q_len, bs, num_head * head_dim] after reshape
-        # else out shape is [bs, q_len, num_head * head_dim]
+        attn_output = paddle.matmul(attn_weights, value_states)
+        attn_output = attn_output.transpose([0, 2, 1, 3])
+        attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
         return attn_output, attn_weights
 
 
@@ -342,17 +321,8 @@ def rotate_half(x):
 
 
 def apply_rotary_pos_emb(q, k, cos, sin, offset: int = 0, sequence_parallel=False):
-    # sequence_parallel, seq_len = seq_len / n
-    # q: [seq_len, bs, num_head, head_dim]
-    # k: [seq_len, bs, num_head, head_dim]
-    if sequence_parallel:
-        cos = cos.reshape([-1, 1, 1, 0])
-        sin = sin.reshape([-1, 1, 1, 0])
-        cos = cos[offset : q.shape[0] + offset, :, :, :]
-        sin = sin[offset : q.shape[0] + offset, :, :, :]
-    else:
-        cos = cos[:, offset : q.shape[1] + offset, :, :]
-        sin = sin[:, offset : q.shape[1] + offset, :, :]
+    cos = cos[:, offset : q.shape[1] + offset, :, :]
+    sin = sin[:, offset : q.shape[1] + offset, :, :]
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
@@ -484,22 +454,17 @@ class LlamaAttention(nn.Layer):
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
-        if not self.sequence_parallel:
-            bsz, q_len, _ = hidden_states.shape
-            # [bs, seq_len, num_head, head_dim]
-            query_states = self.q_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
-            key_states = self.k_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
-            value_states = self.v_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
-            kv_seq_len = key_states.shape[-3]  # seq_len
-        else:
-            # after proj, [s/n, b, h] -> [s, b, h]
-            q_len, bsz, _ = hidden_states.shape
-            query_states = self.q_proj(hidden_states).reshape(shape=[0, 0, self.num_heads, self.head_dim])
-            key_states = self.k_proj(hidden_states).reshape(shape=[0, 0, self.num_heads, self.head_dim])
-            value_states = self.v_proj(hidden_states).reshape(shape=[0, 0, self.num_heads, self.head_dim])
-            kv_seq_len = key_states.shape[0]  # seq_len
+        query_states = self.q_proj(hidden_states).reshape(shape=[0, 0, self.num_heads, self.head_dim])
+        key_states = self.k_proj(hidden_states).reshape(shape=[0, 0, self.num_heads, self.head_dim])
+        value_states = self.v_proj(hidden_states).reshape(shape=[0, 0, self.num_heads, self.head_dim])
+
+        if self.sequence_parallel:
+            query_states = query_states.transpose([1, 0, 2, 3])
+            key_states = key_states.transpose([1, 0, 2, 3])
+            value_states = value_states.transpose([1, 0, 2, 3])
 
         offset = 0
+        kv_seq_len = key_states.shape[-3]
 
         if past_key_value is not None:  # do not consider about sequence_parallel
             offset = past_key_value[0].shape[-3]
@@ -526,6 +491,9 @@ class LlamaAttention(nn.Layer):
             attention_mask=attention_mask,
             output_attentions=output_attentions,
         )
+
+        if self.sequence_parallel:
+            attn_output = paddle.transpose(attn_output, [1, 0, 2])
 
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
