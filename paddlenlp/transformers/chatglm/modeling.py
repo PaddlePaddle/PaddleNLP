@@ -96,9 +96,9 @@ class PrefixEncoder(nn.Layer):
 class RotaryEmbeddings(nn.Layer):
     def __init__(self, hidden_size, base=10000.0, position_encoding_2d=True):
         super().__init__()
-        self.dtype = paddle.get_default_dtype()
+        self.default_dtype = paddle.get_default_dtype()
         inv_freq = 1.0 / (base ** (paddle.arange(0, hidden_size, 2).astype("float32") / hidden_size))
-        inv_freq = inv_freq.astype(self.dtype)
+        inv_freq = inv_freq.astype(self.default_dtype)
         self.position_encoding_2d = position_encoding_2d
         self.register_buffer("inv_freq", inv_freq)
         self.max_seq_len_cached = -1
@@ -127,18 +127,18 @@ class RotaryEmbeddings(nn.Layer):
             # [s, h/n/2]
             # TODO: Failed for fp16 when converting to static graph.
             freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
-            freqs = freqs.cast(self.dtype)
+            freqs = freqs.cast(self.default_dtype)
             # [s, h/n]
             emb = paddle.concat([freqs, freqs], axis=-1)
-            if self.dtype == paddle.bfloat16:
+            if self.default_dtype == paddle.bfloat16:
                 emb = emb.cast("float32")
             # [s, 1, h/n]
             cos_cached = emb.cos().unsqueeze(1)
             sin_cached = emb.sin().unsqueeze(1)
 
-            if self.dtype == paddle.bfloat16:
-                cos_cached = cos_cached.astype(self.dtype)
-                sin_cached = sin_cached.astype(self.dtype)
+            if self.default_dtype == paddle.bfloat16:
+                cos_cached = cos_cached.astype(self.default_dtype)
+                sin_cached = sin_cached.astype(self.default_dtype)
 
             self.cos_cached, self.sin_cached = cos_cached, sin_cached
 
@@ -175,7 +175,7 @@ class ChatGLMAttention(nn.Layer):
         self.hidden_size = config.hidden_size
         self.position_encoding_2d = config.position_encoding_2d
         self.scale_mask_softmax = False
-        self.dtype = paddle.get_default_dtype()
+        self.default_dtype = paddle.get_default_dtype()
 
         self.attention_scale = config.attention_scale
 
@@ -265,7 +265,7 @@ class ChatGLMAttention(nn.Layer):
         if self.attention_scale:
             # [s, b, n, h/n]
             q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
-            q_layer = q_layer.astype(self.dtype)
+            q_layer = q_layer.astype(self.default_dtype)
 
         # [b, n, s, s]
         output_shape = [q_layer.shape[1], q_layer.shape[2], q_layer.shape[0], k_layer.shape[0]]
@@ -293,8 +293,8 @@ class ChatGLMAttention(nn.Layer):
             attention_scores = attention_scores.astype("float32")
             attention_scores = attention_scores * attention_scale_coeff
             attention_probs = F.softmax(attention_scores, axis=-1)
-            attention_probs = attention_probs.astype(self.dtype)
-            v_layer = v_layer.astype(self.dtype)
+            attention_probs = attention_probs.astype(self.default_dtype)
+            v_layer = v_layer.astype(self.default_dtype)
 
         # [b, n, s, h/n]
         output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]
@@ -328,7 +328,7 @@ class ChatGLMBlock(nn.Layer):
         super(ChatGLMBlock, self).__init__()
         self.config = config
         self.layer_id = layer_id
-        self.dtype = paddle.get_default_dtype()
+        self.default_dtype = paddle.get_default_dtype()
         self.input_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
         self.attention = ChatGLMAttention(config)
         self.post_attention_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
