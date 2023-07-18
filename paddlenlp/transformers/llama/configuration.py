@@ -212,6 +212,7 @@ class LlamaConfig(PretrainedConfig):
         use_fused_rms_norm=False,
         tensor_parallel_output=True,
         sequence_parallel=False,
+        seq_len=False,
         lm_shift_labels=True,
         pad_token_id=0,
         bos_token_id=1,
@@ -235,6 +236,7 @@ class LlamaConfig(PretrainedConfig):
         self.use_fused_rms_norm = use_fused_rms_norm
         self.tensor_parallel_output = tensor_parallel_output
         self.sequence_parallel = sequence_parallel
+        self.seq_len = seq_len
         self.lm_shift_labels = lm_shift_labels
 
         self.pad_token_id = pad_token_id

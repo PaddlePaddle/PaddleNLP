@@ -320,7 +320,7 @@ def rotate_half(x):
     return paddle.concat([-x2, x1], axis=-1)  # shape is the same as x
 
 
-def apply_rotary_pos_emb(q, k, cos, sin, offset: int = 0, sequence_parallel=False):
+def apply_rotary_pos_emb(q, k, cos, sin, offset: int = 0):
     cos = cos[:, offset : q.shape[1] + offset, :, :]
     sin = sin[:, offset : q.shape[1] + offset, :, :]
     q_embed = (q * cos) + (rotate_half(q) * sin)
@@ -472,9 +472,7 @@ class LlamaAttention(nn.Layer):
         cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)  # [1, kv_seq_len, 1, head_dim]
 
         # [bs, kv_seq_len, num_head, head_dim] -> [kv_seq_len, bs, num_head, head_dim] (seq parallel)
-        query_states, key_states = apply_rotary_pos_emb(
-            query_states, key_states, cos, sin, offset=offset, sequence_parallel=self.sequence_parallel
-        )
+        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, offset=offset)
 
         if past_key_value is not None:  # do not consider about sequence_paralle
             # reuse k, v, self_attention
@@ -835,10 +833,7 @@ class LlamaModel(LlamaPretrainedModel):
 
         for idx, (decoder_layer) in enumerate(self.layers):
             if output_hidden_states:
-                if self.sequence_parallel:
-                    all_hidden_states += GatherOp.apply(hidden_states)
-                else:
-                    all_hidden_states += (hidden_states,)
+                all_hidden_states += (hidden_states,)
             past_key_value = past_key_values[idx] if past_key_values is not None else None
 
             has_gradient = not hidden_states.stop_gradient
@@ -872,9 +867,6 @@ class LlamaModel(LlamaPretrainedModel):
 
         hidden_states = self.norm(hidden_states)
 
-        if self.sequence_parallel:
-            hidden_states = GatherOp.apply(hidden_states)
-
         # add hidden states from the last decoder layer
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
@@ -905,7 +897,6 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         self.config = config
         self.lm_shift_labels = config.lm_shift_labels
         self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
-        self.sequence_parallel = config.sequence_parallel
 
         if self.enable_parallel_cross_entropy:  # and False: # and lm_head is distributed
             self.loss_func = mpu.ParallelCrossEntropy(ignore_index=self.ignore_index)
@@ -913,9 +904,6 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
     def forward(self, prediction_scores, masked_lm_labels):
-        if self.sequence_parallel:
-            masked_lm_labels = masked_lm_labels.transpose([1, 0])
-
         if self.enable_parallel_cross_entropy:
             if prediction_scores.shape[-1] == self.config.vocab_size:
                 warnings.warn(
@@ -956,6 +944,10 @@ class LlamaLMHead(nn.Layer):
             self.weight.split_axis = 1
 
     def forward(self, hidden_states, tensor_parallel_output=None):
+        if self.config.sequence_parallel:
+            hidden_states = GatherOp.apply(hidden_states)
+            hidden_states = hidden_states.reshape([-1, self.config.seq_len, hidden_states.shape[-1]])
+
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
