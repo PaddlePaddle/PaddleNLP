@@ -63,10 +63,12 @@ class RWTokenizer(GPTTokenizer):
         "vocab_file": {
             "falcon-7b": "https://bj.bcebos.com/paddlenlp/models/community/tiiuae/falcon-7b/vocab.json",
             "falcon-7b-instruct": "https://bj.bcebos.com/paddlenlp/models/community/tiiuae/falcon-7b-instruct/vocab.json",
+            "OpenBuddy/openbuddy-falcon-7b-v5-fp16": "https://bj.bcebos.com/paddlenlp/models/community/OpenBuddy/openbuddy-falcon-7b-v5-fp16/vocab.json",
         },
         "merges_file": {
             "falcon-7b": "https://bj.bcebos.com/paddlenlp/models/community/tiiuae/falcon-7b/merges.txt",
             "falcon-7b-instruct": "https://bj.bcebos.com/paddlenlp/models/community/tiiuae/falcon-7b-instruct/merges.txt",
+            "OpenBuddy/openbuddy-falcon-7b-v5-fp16": "https://bj.bcebos.com/paddlenlp/models/community/OpenBuddy/openbuddy-falcon-7b-v5-fp16/merges.txt",
         },
     }
     padding_side = "right"
