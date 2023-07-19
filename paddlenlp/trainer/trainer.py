@@ -50,6 +50,7 @@ from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
     obtain_optimizer_parameters_list,
 )
+from paddle.distributed.fleet.utils.timer_helper import get_timers as paddle_get_timers
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from tqdm.auto import tqdm
 
@@ -74,6 +75,7 @@ from ..utils.env import (
 from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
+from .plugins.timer import get_timers, set_timers
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -272,6 +274,9 @@ class Trainer:
         self.train_dataset = train_dataset
         self.eval_dataset = eval_dataset
         self.tokenizer = tokenizer
+        if args.enable_timer:
+            set_timers()
+        self.timers = get_timers()
 
         self.model_wrapped = model
         self.model = model
@@ -789,6 +794,8 @@ class Trainer:
 
             npu_accelerate_plugin(self.optimizer)
 
+        self.timers and self.timers("read-data").start()
+
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
                 train_dataloader.batch_sampler, DistributedBatchSampler
@@ -799,6 +806,7 @@ class Trainer:
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for _, inputs in enumerate(epoch_iterator):
+                self.timers and self.timers("read-data").stop()
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
 
                 # Skip past any already trained steps if resuming training
@@ -827,7 +835,7 @@ class Trainer:
 
                 if step % args.gradient_accumulation_steps == 0:
                     self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
-
+                    self.timers and self.timers("forward-backward").start()
                 dp_enabled = (
                     self.args.data_parallel_degree > 1 if self.args.use_hybrid_parallel else args.local_rank != -1
                 )
@@ -861,10 +869,13 @@ class Trainer:
                 tr_loss += tr_loss_step
 
                 if (step + 1) % args.gradient_accumulation_steps == 0:
+                    self.timers and self.timers("forward-backward").stop()
                     # Maunally collect gradients when group_sharded_parallel can't accept dp_group
                     # Case 1: Use sharding stage 2/3 with dp
                     # Case 2: Use recompute and dp
                     # local_rank != -1 don't means dp in networks.
+                    self.timers and self.timers("all-reduce").start()
+
                     if self.sharding and ShardingOption.SHARD_OP not in self.args.sharding:
                         if self.args.data_parallel_degree > 1 and not is_dp_group_support_in_group_sharded_parallel():
                             fused_allreduce_gradients(model.parameters(), fleet.get_hybrid_communicate_group())
@@ -897,6 +908,9 @@ class Trainer:
                             assert not enable_dp_comm_overlap
                             fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
 
+                    self.timers and self.timers("all-reduce").stop()
+                    self.timers and self.timers("optimizer-step").start()
+
                     # pipeline parallel mode,  handle gradient merge here
                     if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
                         for p in model._layers.parameters():
@@ -927,6 +941,8 @@ class Trainer:
                     else:
                         self.optimizer.step()
 
+                    self.timers and self.timers("optimizer-step").stop()
+
                     if optimizer_was_run:
                         self.lr_scheduler.step()
 
@@ -937,9 +953,9 @@ class Trainer:
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + self.state.global_step / global_steps_in_epoch
-
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+                    self._print_timer()
                     step = 0
                 else:
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
@@ -947,6 +963,7 @@ class Trainer:
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
+                self.timers and self.timers("read-data").start()
 
             if step < 0:
                 logger.warning(
@@ -1035,6 +1052,26 @@ class Trainer:
     def _set_state_dict_in_model(self, state_dict):
         # TODO  @ZHUI paddle need return the results of set_state_dict.
         logger.info(f"set state-dict :{self.model.set_state_dict(state_dict)}")
+
+    def _print_timer(self):
+        """print timer and clear states"""
+        paddle_timer_info = ""
+        try:
+            paddle_pipeline_timers = paddle_get_timers()
+            for name, timer in paddle_pipeline_timers.timers.items():
+                elapsed_time = timer.elapsed(reset=False) * 1000.0
+                paddle_timer_info += f" | {name}: {elapsed_time:.2f}"
+            paddle_pipeline_timers.log(paddle_pipeline_timers.timers.keys(), reset=True)
+        except AssertionError:
+            pass
+
+        if self.timers is not None:
+            timer_info = self.timers.log(self.timers.timers.keys(), reset=True)
+        else:
+            timer_info = ""
+
+        if timer_info or paddle_timer_info:
+            logger.info(f"[Profile global_step: {self.state.global_step}] {timer_info} {paddle_timer_info}")
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
@@ -2327,9 +2364,15 @@ class Trainer:
             logs (`Dict[str, float]`):
                 The values to log.
         """
+
+        try:
+            paddle_pipeline_timers = paddle_get_timers()
+        except AssertionError:
+            paddle_pipeline_timers = None
+        kwargs.update(timer=self.timers, paddle_pipeline_timers=paddle_pipeline_timers)
+
         if self.state.epoch is not None:
             logs["epoch"] = round(self.state.epoch, 4)
-
         output = {**logs, **{"step": self.state.global_step}}
         self.state.log_history.append(output)
         self.control = self.callback_handler.on_log(self.args, self.state, self.control, logs, **kwargs)

@@ -294,6 +294,8 @@ class TrainingArguments:
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
         flatten_param_grads (`bool`, *optional*):
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
+        enable_timer (`bool`, *optional*):
+            Whether enable profile timer, will record time usage of forward/ backward/ step, etc.
     """
 
     output_dir: str = field(
@@ -602,6 +604,10 @@ class TrainingArguments:
     use_async_save: Optional[bool] = field(
         default=False,
         metadata={"help": "Whether to use paddle.async_save instead of paddle.save."},
+    )
+    enable_timer: Optional[bool] = field(
+        default=False,
+        metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl"},
     )
 
     def __post_init__(self):
@@ -1070,11 +1076,15 @@ class TrainingArguments:
 
     @property
     def save_sharding_stage1_model(self):
-        return ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.save_sharded_model
+        return (
+            ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.save_sharded_model
+        )
 
     @property
     def load_sharding_stage1_model(self):
-        return ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.load_sharded_model
+        return (
+            ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.load_sharded_model
+        )
 
     @contextlib.contextmanager
     def main_process_first(self, local=True, desc="work"):
