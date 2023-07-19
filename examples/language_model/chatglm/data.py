@@ -23,7 +23,7 @@ def read_local_dataset(path):
             yield json.loads(line.strip())
 
 
-def convert_example(example, tokenizer, data_args, is_test=True):
+def convert_chatglm_example(example, tokenizer, data_args, is_test=True):
 
     if "content" in example:
         query = example["content"]
@@ -92,3 +92,45 @@ def convert_example(example, tokenizer, data_args, is_test=True):
             "labels": labels,
         }
     return inputs
+
+
+def convert_chatglm_v2_example(example, tokenizer, data_args, is_test=True):
+    if "content" in example:
+        query = example["content"]
+        response = example["summary"]
+    elif "instruction" in example:
+        query = example["instruction"]
+        response = example["output"]
+    elif "src" in example:
+        query = example["src"][0] if isinstance(example["src"], list) else example["src"]
+        response = example["tgt"][0] if isinstance(example["tgt"], list) else example["tgt"]
+    history = example.get("history", None)
+
+    prompt = tokenizer.build_prompt(query, history)
+
+    if is_test:
+        input_ids = tokenizer(prompt, max_length=data_args.src_length, truncation=True, truncation_side="left")[
+            "input_ids"
+        ]
+        labels = tokenizer(response, max_length=data_args.tgt_length, truncation=True, truncation_side="right")[
+            "input_ids"
+        ]
+        # pass in position_ids explicitly because of left padding
+        position_ids = list(range(len(input_ids)))
+        return {"input_ids": input_ids, "labels": labels, "position_ids": position_ids}
+    else:
+        a_ids = tokenizer(text=prompt, add_special_tokens=True, truncation=True, max_length=data_args.src_length - 1)[
+            "input_ids"
+        ]
+        b_ids = tokenizer(text=response, add_special_tokens=False, truncation=True, max_length=data_args.tgt_length)[
+            "input_ids"
+        ]
+        context_length = len(a_ids)
+        input_ids = a_ids + b_ids + [tokenizer.eos_token_id]
+        labels = [-100] * context_length + b_ids + [tokenizer.eos_token_id]
+
+        # shift input_ids and labels
+        input_ids, labels = input_ids[:-1], labels[1:]
+        # pass in position_ids explicitly because of left padding
+        position_ids = list(range(len(input_ids)))
+        return {"input_ids": input_ids, "labels": labels, "position_ids": position_ids}
