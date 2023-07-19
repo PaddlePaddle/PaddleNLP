@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import numpy as np
+import paddle
 from paddle.io import Dataset
 
 from paddlenlp.trainer import (
@@ -26,10 +27,13 @@ from paddlenlp.trainer import (
 
 class CustomTrainer(Trainer):
     total_observed_tokens = 0.0
+    total_effective_tokens = 0.0
 
     def training_step(self, model, inputs):
         input_ids = inputs["input_ids"]
         self.total_observed_tokens += float(input_ids.shape[0] * input_ids.shape[1])
+        self.total_effective_tokens += paddle.sum(input_ids != 0).item()
+        # print(self.total_effective_tokens)
         return super().training_step(model, inputs)
 
 
@@ -70,24 +74,28 @@ class InTokensDataset(Dataset):
         self.index = self.index % len(self.records)
         cur_idx = self.index
         batch_records, max_len = [], 0
-
+        # print(cur_idx)
         for i in range(cur_idx, len(self.records)):
             # print(record)
             record = self.records[i]
             max_len = max(max_len, len(record["input_ids"]))
             to_append = (cur_len_so_far + len(record["input_ids"])) <= self.max_seq_len
-
+            self.index += 1
             if to_append:
                 batch_records.append(record)
                 cur_len_so_far += len(record["input_ids"])
-                self.index += 1
             else:
-                return _pad_batch_records(
-                    batch_records,
-                    pad_id=self.tokenizer.pad_token_id,
-                    start_id=self.tokenizer.bos_token_id,
-                    max_seq_len=self.max_seq_len,
-                )
+                # exceed max length
+                break
+        # print(self.index)
+        padded_list = _pad_batch_records(
+            batch_records,
+            pad_id=self.tokenizer.pad_token_id,
+            start_id=self.tokenizer.bos_token_id,
+            max_seq_len=self.max_seq_len,
+        )
+
+        return padded_list
 
     def __len__(self):
         return self.num_iter
@@ -171,6 +179,8 @@ def _pad_batch_records(batch_records, pad_id, start_id, max_seq_len=4096):
 
     # add in-batch mask
     input_mask = _gen_self_attn_mask_for_glm_flatten(batch_record_token_ids, start_id, max_seq_len)
+    # print(padded_token_ids)
+    # print(np.sum(padded_token_ids==0))
     return_list = {
         "input_ids": np.squeeze(padded_token_ids, axis=0).tolist(),
         #    "padded_position_ids_extra":np.squeeze(padded_position_ids_extra,axis=0),

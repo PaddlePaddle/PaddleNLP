@@ -65,6 +65,7 @@ class ModelArguments:
     english: Optional[bool] = field(default=False, metadata={"help": "whether to english benchmark dataset"})
     profiler: Optional[bool] = field(default=False, metadata={"help": "whether to use profiler"})
     train_data_size: int = field(default=1000, metadata={"help": "Number of dataset for training"})
+    max_seq_len: int = field(default=2048, metadata={"help": "Number of dataset for training"})
 
 
 def main():
@@ -148,15 +149,13 @@ def main():
         lambda example: preprocess_function(example), remove_columns=["instruction", "input", "output"]
     )
     raw_dataset = [{"input_ids": item["input_ids"], "labels": item["labels"]} for item in dataset]
-    total_effective_tokens = sum([len(i["input_ids"]) for i in raw_dataset]) * training_args.num_train_epochs
     avg_tokens_per_example = sum([len(i["input_ids"]) for i in raw_dataset]) // len(raw_dataset)
-    max_seq_len = 1024
-    num_iter = math.ceil(model_args.train_data_size * avg_tokens_per_example / max_seq_len)
-    print(num_iter)
+
+    num_iter = math.ceil(model_args.train_data_size * avg_tokens_per_example / model_args.max_seq_len)
     dataset = InTokensDataset(
         raw_dataset,
         tokenizer=tokenizer,
-        max_seq_len=max_seq_len,
+        max_seq_len=model_args.max_seq_len,
         num_iter=num_iter,
     )
 
@@ -181,7 +180,7 @@ def main():
 
     train_metrics = trainer.train()
     tokens_per_second = trainer.total_observed_tokens / train_metrics.metrics["train_runtime"]
-    effective_tokens_per_second = total_effective_tokens / train_metrics.metrics["train_runtime"]
+    effective_tokens_per_second = trainer.total_effective_tokens / train_metrics.metrics["train_runtime"]
     print(f"Tokens per second: {tokens_per_second:.2f}")
     print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
 
