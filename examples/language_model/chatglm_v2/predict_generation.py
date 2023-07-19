@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 import paddle
 from paddle.distributed import fleet
@@ -97,6 +99,33 @@ class Predictor(object):
         return inputs_tensor
 
     def infer(self, inputs):
+
+        # static_model = paddle.jit.to_static(
+        #     self.model.encoder.layers[0],
+        #     input_spec=[
+        #         paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+        #         paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
+        #         paddle.static.InputSpec(shape=[None, None], dtype="int64"),  #position_ids
+        #     ],
+            
+        # )
+        # paddle.jit.save(static_model, "./static_model/inference")
+
+        # static_model = paddle.jit.to_static(
+        #     self.model.haha,
+        #     input_spec=[
+        #         paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+        #         paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
+        #         paddle.static.InputSpec(shape=[None, None], dtype="int64"),  #position_ids
+        #     ],
+            
+        # )
+        # paddle.jit.save(static_model, "./static_model/inference")
+        # #exit(0)
+        # print(self.tgt_length)
+        # print(self.tokenizer.bos_token_id)
+        # print(self.tokenizer.eos_token_id)
+        # print(self.tokenizer.pad_token_id)
         result = self.model.generate(
             **inputs,
             decode_strategy="sampling",
@@ -105,7 +134,7 @@ class Predictor(object):
             bos_token_id=self.tokenizer.bos_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
             pad_token_id=self.tokenizer.pad_token_id,
-            use_cache=True,
+            use_cache=False,
         )
         result = result[0]
         return result
@@ -121,6 +150,7 @@ class Predictor(object):
 
     def predict(self, texts):
         input_map = self.preprocess(texts)
+        #print(input_map)
         infer_result = self.infer(input_map)
         output = self.postprocess(infer_result)
         return output
@@ -133,8 +163,26 @@ if __name__ == "__main__":
         "你好",
         "[Round 0]\n问：你好\n答：你好👋!我是人工智能助手 ChatGLM-6B,很高兴见到你,欢迎问我任何问题。\n[Round 1]\n问：晚上睡不着应该怎么办\n答：",
     ]
-    batch_texts = batchfy_text(all_texts, args.batch_size)
-    for bs, texts in enumerate(batch_texts):
-        outputs = predictor.predict(texts)
-        for text, result in zip(texts, outputs["result"]):
-            print("{}\n{}".format(text, result))
+    
+    for i in range (10):
+        batch_texts = batchfy_text(all_texts, args.batch_size)
+        for bs, texts in enumerate(batch_texts):
+            outputs = predictor.predict(texts)
+            for text, result in zip(texts, outputs["result"]):
+                print("{}\n{}".format(text, result))
+
+    import datetime
+    import time
+    starttime = datetime.datetime.now()
+
+    for i in range (10):
+        batch_texts = batchfy_text(all_texts, args.batch_size)
+        for bs, texts in enumerate(batch_texts):
+            outputs = predictor.predict(texts)
+            for text, result in zip(texts, outputs["result"]):
+                print("{}\n{}".format(text, result))
+    
+    endtime = datetime.datetime.now()
+    duringtime = endtime - starttime
+    print (duringtime.seconds * 1000 + duringtime.microseconds / 1000.0)# 单位是毫秒
+    # 104090

@@ -1252,7 +1252,10 @@ class GenerationMixin(object):
         min_tokens_to_keep=1,
         **model_kwargs
     ):
-
+        print(model_kwargs)
+        print(model_kwargs)
+        print("model_kwargs")
+        
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
         if paddle.is_tensor(top_k) and not paddle.is_tensor(top_p):
