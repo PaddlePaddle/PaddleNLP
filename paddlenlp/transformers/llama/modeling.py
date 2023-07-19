@@ -355,7 +355,7 @@ class LlamaAttention(nn.Layer):
         self.num_heads = config.num_attention_heads
         self.head_dim = self.hidden_size // self.num_heads
         self.max_position_embeddings = config.max_position_embeddings
-        self.fuse_attn_qkv = config.fuse_attn_qkv
+        self.fuse_attention_qkv = config.fuse_attention_qkv
         if config.tensor_parallel_degree > 1:
             assert (
                 self.num_heads % config.tensor_parallel_degree == 0
@@ -363,7 +363,7 @@ class LlamaAttention(nn.Layer):
             self.num_heads = self.num_heads // config.tensor_parallel_degree
 
         if config.tensor_parallel_degree > 1:
-            if self.fuse_attn_qkv:
+            if self.fuse_attention_qkv:
                 self.qkv_proj = mpu.ColumnParallelLinear(
                     self.hidden_size,
                     3 * self.hidden_size,
@@ -390,7 +390,7 @@ class LlamaAttention(nn.Layer):
                     gather_output=False,
                 )
         else:
-            if self.fuse_attn_qkv:
+            if self.fuse_attention_qkv:
                 self.qkv_proj = nn.Linear(
                     self.hidden_size,
                     3 * self.hidden_size,
@@ -439,7 +439,7 @@ class LlamaAttention(nn.Layer):
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         bsz, q_len, _ = hidden_states.shape
-        if self.fuse_attn_qkv:
+        if self.fuse_attention_qkv:
             mix_layer = self.qkv_proj(hidden_states)
             mix_layer = paddle.reshape_(mix_layer, [0, 0, self.num_heads, 3 * self.head_dim])
             query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
