@@ -412,7 +412,6 @@ def main():
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
     config.sequence_parallel = training_args.sequence_parallel
-    config.seq_len = data_args.max_seq_length
 
     print("Final pre-training config:", config)
 

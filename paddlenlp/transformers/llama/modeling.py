@@ -946,7 +946,7 @@ class LlamaLMHead(nn.Layer):
     def forward(self, hidden_states, tensor_parallel_output=None):
         if self.config.sequence_parallel:
             hidden_states = GatherOp.apply(hidden_states)
-            hidden_states = hidden_states.reshape([-1, self.config.seq_len, hidden_states.shape[-1]])
+            hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
 
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
