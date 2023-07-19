@@ -27,7 +27,7 @@ from paddlenlp.utils.log import logger
 from ...utils.initializer import normal_, ones_, zeros_
 from ..activations import ACT2FN
 from ..chatglm.configuration import ChatGLMConfig
-from ..chatglm.modeling import ChatGLMForConditionalGeneration
+from ..chatglm.modeling import ChatGLMForCausalLM
 from ..model_outputs import (
     BaseModelOutput,
     BaseModelOutputWithPastAndCrossAttentions,
@@ -1163,7 +1163,7 @@ class VisualGLMModel(VisualGLMPretrainedModel):
         self.qformer = VisualGLMQFormerModel(config.qformer_config)
 
         self.language_projection = nn.Linear(config.qformer_config.hidden_size, config.text_config.hidden_size)
-        self.language_model = ChatGLMForConditionalGeneration(config.text_config)
+        self.language_model = ChatGLMForCausalLM(config.text_config)
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.embeddings.patch_embedding
@@ -1413,7 +1413,7 @@ class VisualGLMModel(VisualGLMPretrainedModel):
         )
 
 
-class ChatGLMForConditionalGenerationWithImage(ChatGLMForConditionalGeneration):
+class ChatGLMForConditionalGenerationWithImage(ChatGLMForCausalLM):
     def __init__(self, config: ChatGLMConfig):
         super(ChatGLMForConditionalGenerationWithImage, self).__init__(config)
         self.config = config

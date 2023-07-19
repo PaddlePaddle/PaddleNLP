@@ -38,7 +38,7 @@ from .configuration import CHATGLM_PRETRAINED_RESOURCE_FILES_MAP, ChatGLMConfig
 __all__ = [
     "ChatGLMModel",
     "ChatGLMPretrainedModel",
-    "ChatGLMForConditionalGeneration",
+    "ChatGLMForCausalLM",
 ]
 
 
@@ -743,12 +743,12 @@ class ChatGLMModel(ChatGLMPretrainedModel):
         return BaseModelOutputWithPastAndCrossAttentions(last_hidden_state=logits, past_key_values=new_caches)
 
 
-class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
+class ChatGLMForCausalLM(ChatGLMPretrainedModel):
     _keys_to_ignore_on_save = [r"lm_head.weight"]
     _tied_weights_keys = ["lm_head.weight"]
 
     def __init__(self, config: ChatGLMConfig):
-        super(ChatGLMForConditionalGeneration, self).__init__(config)
+        super(ChatGLMForCausalLM, self).__init__(config)
 
         self.config = config
         self.max_sequence_length = config.max_sequence_length
