@@ -114,10 +114,11 @@ curl http://localhost:9200/_aliases?pretty=true
 #### 3.4.2 文档数据写入 ANN 索引库
 ```
 # 以enterprise_responsibility_report数据集为例建立 ANN 索引库
-python utils/offline_ann_chatfile.py --index_name esg_example \
+python utils/offline_ann.py --index_name esg_example \
                             --doc_dir data/enterprise_responsibility_report \
                             --search_engine elastic \
                             --embed_title True \
+                            --use_splitter  True \
                             --delete_index
 ```
 可以使用下面的命令来查看数据：
