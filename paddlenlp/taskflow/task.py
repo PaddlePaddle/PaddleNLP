@@ -208,12 +208,13 @@ class Task(metaclass=abc.ABCMeta):
                 logger.info(
                     ">>> [InferBackend] It is a INT8 model which is not yet supported on gpu, use FP32 to inference here ..."
                 )
-            self._config.enable_use_gpu(100, self.kwargs["device_id"])
+            self._config.enable_use_gpu(1000, self.kwargs["device_id"])
             # TODO(linjieccc): enable after fixed
             self._config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
             self._config.delete_pass("fused_multi_transformer_encoder_pass")
         self._config.set_cpu_math_library_num_threads(self._num_threads)
         self._config.switch_use_feed_fetch_ops(False)
+        self._config.switch_ir_optim(True)
         self._config.disable_glog_info()
         self._config.enable_memory_optim()
 
@@ -324,9 +325,9 @@ class Task(metaclass=abc.ABCMeta):
                 raise IOError(
                     f"{self._task_path} should include {self._static_model_name + '.pdmodel'} and {self._static_model_name + '.pdiparams'} while is_static_model is True"
                 )
-            if self.paddle_quantize_model(self.inference_model_path):
-                self._infer_precision = "int8"
-                self._predictor_type = "paddle-inference"
+            # if self.paddle_quantize_model(self.inference_model_path):
+            #     self._infer_precision = "int8"
+            #     self._predictor_type = "paddle-inference"
 
         else:
             # Since 'self._task_path' is used to load the HF Hub path when 'from_hf_hub=True', we construct the static model path in a different way
@@ -522,8 +523,8 @@ class Task(metaclass=abc.ABCMeta):
         """
         print("Examples:\n{}".format(self._usage))
 
-    def __call__(self, *args):
-        inputs = self._preprocess(*args)
+    def __call__(self, *args, **kwargs):
+        inputs = self._preprocess(*args, **kwargs)
         outputs = self._run_model(inputs)
         results = self._postprocess(outputs)
         return results
