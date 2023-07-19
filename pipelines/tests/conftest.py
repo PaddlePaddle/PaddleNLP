@@ -93,6 +93,7 @@ class MockRetriever(BaseRetriever):
         headers: Optional[Dict[str, str]] = None,
         scale_score: Optional[bool] = None,
         document_store: Optional[BaseDocumentStore] = None,
+        **kwargs,
     ) -> List[Document]:
         return []
 

@@ -16,7 +16,8 @@ import argparse
 
 from pipelines.document_stores import ElasticsearchDocumentStore, MilvusDocumentStore
 from pipelines.nodes import DensePassageRetriever
-from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http, launch_es
+from pipelines.utils import fetch_archive_from_http, launch_es
+from pipelines.utils.preprocessing import convert_files_to_dicts_splitter
 
 data_dict = {
     "data/dureader_dev": "https://paddlenlp.bj.bcebos.com/applications/dureader_dev.zip",
@@ -43,6 +44,12 @@ parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'n
 parser.add_argument('--embed_title', default=False, type=bool, help="The title to be  embedded into embedding")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select devices, defaults to gpu.")
 parser.add_argument('--search_fields', default=['content', 'name'], help="multi recall BM25Retriever set search_fields")
+parser.add_argument('--chunk_size', type=int, default=300, help="The length of data for indexing by retriever")
+parser.add_argument('--chunk_overlap', type=int, default=0, help="a larger chunk than the chunk overlap")
+parser.add_argument('--separator', type=str, default='\n', help="Use symbols to segment text, PDF, and image files, or connect some short chunks")
+parser.add_argument('--filters', type=list, default=['\n'], help="Filter special symbols")
+parser.add_argument('--language', type=str, default='chinese', help="the language of files")
+parser.add_argument('--pooling_mode', choices=['max_tokens', 'mean_tokens', 'mean_sqrt_len_tokens', 'cls_token'], default='cls_token', help='the type of sentence embedding')
 args = parser.parse_args()
 # yapf: enable
 
@@ -70,14 +77,22 @@ def offline_ann(index_name, doc_dir):
             search_fields=args.search_fields,  # 当使用了多路召回并且搜索字段设置了除content的其他字段，构建索引时其他字段也需要设置，例如：['content', 'name']。
         )
     # 将每篇文档按照段落进行切分
-    dicts = convert_files_to_dicts(
-        dir_path=doc_dir, split_paragraphs=True, split_answers=args.split_answers, encoding="utf-8"
+    dicts = convert_files_to_dicts_splitter(
+        dir_path=doc_dir,
+        split_paragraphs=True,
+        split_answers=args.split_answers,
+        encoding="utf-8",
+        separator=args.separator,
+        filters=args.filters,
+        chunk_size=args.chunk_size,
+        language=args.language,
+        chunk_overlap=args.chunk_overlap,
     )
 
     print(dicts[:3])
-
     # 文档数据写入数据库
     document_store.write_documents(dicts)
+
     # 语义索引模型
     retriever = DensePassageRetriever(
         document_store=document_store,
@@ -91,6 +106,7 @@ def offline_ann(index_name, doc_dir):
         batch_size=16,
         use_gpu=use_gpu,
         embed_title=args.embed_title,
+        pooling_mode=args.pooling_mode,
     )
 
     # 建立索引库
