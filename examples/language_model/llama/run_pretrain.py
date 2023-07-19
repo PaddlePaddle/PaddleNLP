@@ -17,6 +17,7 @@ GPT/Llama pretraining scripts.
 import math
 import os
 import random
+import sys
 import time
 from dataclasses import dataclass, field
 from typing import Optional
@@ -344,7 +345,11 @@ class PretrainingTrainer(Trainer):
 
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    else:
+        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
 
@@ -386,7 +391,11 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
 
     config = config_class.from_pretrained(model_args.model_name_or_path)
-    config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
+
+    # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
+    if not model_args.continue_training:
+        config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
+
     if not model_args.continue_training:
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
         logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")

@@ -2,8 +2,9 @@
 
 ChatGLM-6B 是一个开源的、支持中英双语问答的对话语言模型，基于 [General Language Model (GLM)](https://arxiv.org/abs/2103.10360) 架构，具有 62 亿参数。ChatGLM-6B 使用了和 ChatGLM 相同的技术，针对中文问答和对话进行了优化。经过约 1T 标识符的中英双语训练，辅以监督微调、反馈自助、人类反馈强化学习等技术的加持，62 亿参数的 ChatGLM-6B 已经能生成相当符合人类偏好的回答。
 
+ChatGLM**2**-6B 是开源中英双语对话模型 [ChatGLM-6B](https://github.com/THUDM/ChatGLM-6B) 的第二代版本，在保留了初代模型对话流畅、部署门槛较低等众多优秀特性的基础之上，ChatGLM**2**-6B 引入了[FlashAttention](https://github.com/HazyResearch/flash-attention)和[Multi-Query Attention]等新特性。更详细的模型介绍见[ChatGLM2-6B GitHub](https://github.com/THUDM/ChatGLM2-6B)
 
-本示例提供了 ChatGLM 模型的生成任务微调流程，适用于 THUDM/chatglm-6b 模型。
+本示例提供了 ChatGLM和ChatGLM2 模型的生成任务微调流程，适用于 `THUDM/chatglm-6b` 和 `THUDM/chatglm2-6b` 模型。
 
 ## 环境依赖
 目前版本支持的功能较多，建议使用 paddlepaddle develop 版本以获得较好体验。下面给出了 cuda 11.2 的 paddle 安装方法。更多其他版本，请参考[官网首页](https://www.paddlepaddle.org.cn/)下载。
@@ -13,7 +14,8 @@ python -m pip install paddlepaddle-gpu==0.0.0.post112 -f https://www.paddlepaddl
 
 ## 协议
 
-ChatGLM-6B 模型的权重的使用则需要遵循[License](../../../paddlenlp/transformers/chatglm/LICENSE)。
+ChatGLM-6B 模型的权重的使用需要遵循[License](../../../paddlenlp/transformers/chatglm/LICENSE)。
+ChatGLM2-6B 模型的权重的使用需要遵循[License](../../../paddlenlp/transformers/chatglm_v2/LICENSE)。
 
 ## AdvertiseGen 广告生成任务
 

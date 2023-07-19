@@ -255,6 +255,10 @@ class LlamaRMSNorm(nn.Layer):
 class LlamaRotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
+        self.dim = dim
+        self.base = base
+        self.max_seq_len_cached = max_position_embeddings
+
         dtype = paddle.get_default_dtype()
         inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, dim, 2), dtype="float32") / dim))
         self.register_buffer("inv_freq", inv_freq.cast(dtype))
@@ -269,6 +273,23 @@ class LlamaRotaryEmbedding(nn.Layer):
         self.sin_cached = emb.sin()[None, :, None, :]
 
     def forward(self, x, seq_len=None):
+        if seq_len > self.max_seq_len_cached:
+            # https://github.com/ymcui/Chinese-LLaMA-Alpaca/pull/705/files
+            inv_freq = self.inv_freq
+            dim = self.dim
+            alpha = seq_len / 1024 - 1
+            base = self.base * alpha ** (dim / (dim - 2))
+            inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, dim, 2), dtype="float32") / dim))
+
+            t = paddle.arange(seq_len, dtype="float32")
+            freqs = paddle.einsum("i,j->ij", t, inv_freq)
+            emb = paddle.concat([freqs, freqs], axis=-1)
+            cos_cached = emb.cos()[None, :, None, :]
+            sin_cached = emb.sin()[None, :, None, :]
+            return (
+                cos_cached[:, :seq_len, :, ...],
+                sin_cached[:, :seq_len, :, ...],
+            )
         return (
             self.cos_cached[:, :seq_len, :, ...],
             self.sin_cached[:, :seq_len, :, ...],
