@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional, Any, Dict
-
 import logging
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 from pipelines.nodes.file_converter import BaseConverter
 
 logger = logging.getLogger(__name__)
@@ -30,6 +30,7 @@ class TextConverter(BaseConverter):
         remove_numeric_tables: Optional[bool] = None,
         valid_languages: Optional[List[str]] = None,
         encoding: Optional[str] = "utf-8",
+        **kwargs: Any,
     ) -> List[Dict[str, Any]]:
         """
         Reads text from a txt file and executes optional preprocessing steps.

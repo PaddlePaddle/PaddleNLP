@@ -62,7 +62,9 @@ class ErnieBot(BaseComponent):
 
         return res["access_token"]
 
-    def predict(self, query, history=None, stream=False):
+    def predict(self, query, history=None, stream=False, api_key=None, secret_key=None):
+        if api_key is not None and secret_key is not None:
+            self.token = self._apply_token(api_key, secret_key)
         payload = {"messages": []}
         if history is not None:
             if len(history) % 2 == 0:
@@ -98,7 +100,7 @@ class ErnieBot(BaseComponent):
             print(response_json)
         return response_json
 
-    def run(self, query, history=None, stream=False):
+    def run(self, query, history=None, stream=False, api_key=None, secret_key=None):
         """
         Send a request to the Ernie Bot API with the given query and optional conversation history.
         Returns the chatbot response and updates the conversation history accordingly.

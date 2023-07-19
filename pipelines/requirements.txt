@@ -1,5 +1,5 @@
 paddlenlp>=2.5.2
-paddleocr
+paddleocr==2.6.1.3
 pdf2image>1.14
 requests
 pydantic

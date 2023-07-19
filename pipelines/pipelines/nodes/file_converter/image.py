@@ -60,6 +60,7 @@ class ImageToTextConverter(BaseConverter):
         remove_numeric_tables: Optional[bool] = None,
         valid_languages: Optional[List[str]] = None,
         encoding: Optional[str] = "utf-8",
+        **kwargs: Any,
     ) -> List[Dict[str, Any]]:
         """
         Extract text from image file using the pytesseract library (https://github.com/madmaze/pytesseract)
@@ -122,7 +123,7 @@ class ImageToTextConverter(BaseConverter):
         img_path = str(img_path)
         result = self.recognize.ocr(img_path, cls=True)
         texts = []
-        for line in result:
+        for line in result[0]:
             texts.append(line[-1][0])
         texts = ["".join(texts)]
         return texts
