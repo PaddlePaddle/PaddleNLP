@@ -24,6 +24,7 @@ from paddlenlp.peft.prefix import (
     bloom_postprocess_past_key_value,
     chatglm_pad_attention_mask,
     chatglm_postprocess_past_key_value,
+    chatglm_v2_pad_attention_mask,
 )
 from paddlenlp.trainer import Trainer
 from paddlenlp.trainer.trainer_utils import has_length
@@ -43,25 +44,38 @@ def compute_metrics(eval_preds):
 
 def get_prefix_tuning_params(model):
     if model.base_model_prefix == "chatglm":
-        return (
-            model.config.num_attention_heads,
-            model.config.num_hidden_layers,
-            model.config.hidden_size,
-            chatglm_pad_attention_mask,
-            chatglm_postprocess_past_key_value,
-        )
+        num_attention_heads = model.config.num_attention_heads
+        num_hidden_layers = model.config.num_hidden_layers
+        hidden_size = model.config.hidden_size
+        pad_attention_mask = chatglm_pad_attention_mask
+        postprocess_past_key_value = chatglm_postprocess_past_key_value
+        multi_query_group_num = None
+    elif model.base_model_prefix == "chatglm_v2":
+        num_attention_heads = model.config.num_attention_heads
+        num_hidden_layers = model.config.num_hidden_layers
+        hidden_size = model.config.hidden_size
+        pad_attention_mask = chatglm_v2_pad_attention_mask
+        postprocess_past_key_value = chatglm_postprocess_past_key_value
+        multi_query_group_num = model.config.multi_query_group_num
     elif model.base_model_prefix == "bloom":
-        return (
-            model.config.num_attention_heads,
-            model.config.n_layer,
-            model.config.n_embed,
-            None,
-            bloom_postprocess_past_key_value,
-        )
+        num_attention_heads = model.config.num_attention_heads
+        num_hidden_layers = model.config.n_layer
+        hidden_size = model.config.n_embed
+        pad_attention_mask = None
+        postprocess_past_key_value = bloom_postprocess_past_key_value
+        multi_query_group_num = None
     else:
         raise ValueError(
             f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama."
         )
+    return dict(
+        num_attention_heads=num_attention_heads,
+        num_hidden_layers=num_hidden_layers,
+        hidden_size=hidden_size,
+        pad_attention_mask=pad_attention_mask,
+        postprocess_past_key_value=postprocess_past_key_value,
+        multi_query_group_num=multi_query_group_num,
+    )
 
 
 def get_lora_params(model, is_tp=False):
@@ -72,6 +86,20 @@ def get_lora_params(model, is_tp=False):
         else:
             target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
         head_dim = model.config.hidden_size // model.config.num_attention_heads
+    elif model.base_model_prefix == "chatglm_v2":
+        if is_tp > 1:
+            target_modules = [".*query.*", ".*key.*", ".*value.*", ".*dense_h_to_4h.*"]
+        else:
+            target_modules = [
+                ".*query.*",
+                ".*key.*",
+                ".*value.*",
+                ".*dense.*",
+                ".*dense_h_to_4h.*",
+                ".*dense_4h_to_h.*",
+            ]
+        head_dim = model.config.hidden_size // model.config.num_attention_head
+
     elif model.base_model_prefix == "bloom":
         if is_tp > 1:
             target_modules = [".*query_key_value.*", ".*dense_h_to_4h.*"]
@@ -82,7 +110,7 @@ def get_lora_params(model, is_tp=False):
         raise ValueError(
             f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama."
         )
-    return target_modules, head_dim
+    return dict(target_modules=target_modules, head_dim=head_dim)
 
 
 def get_ptq_model_config(model):
@@ -93,6 +121,8 @@ def get_ptq_model_config(model):
 
     if base_model_prefix == "chatglm":
         model_config = {"fused_qkv": True, "parallel_ffn": False}
+    elif base_model_prefix == "chatglm_v2":
+        model_config = {"fused_qkv": False, "parallel_ffn": True}
     elif base_model_prefix == "bloom":
         model_config = {"fused_qkv": True, "parallel_ffn": False}
     elif base_model_prefix == "llama":
@@ -124,10 +154,7 @@ class CausalLMTrainer(Trainer):
             loss, logits, labels = super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
             # argmax here to avoid gather all logits, which is too memory-consuming.
             # keepdim in order to maintain the same shape as logits
-            if model.config.lm_shift_labels:
-                return (loss, logits[0][..., :-1, :].argmax(axis=-1, keepdim=True), labels[..., 1:])
-            else:
-                return (loss, logits[0].argmax(axis=-1, keepdim=True), labels)
+            return (loss, logits[0].argmax(axis=-1, keepdim=True), labels)
 
         loss = None
 

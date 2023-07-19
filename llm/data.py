@@ -26,6 +26,8 @@ def get_convert_example(model):
 
     if base_model_prefix == "chatglm":
         return convert_example_chatglm
+    elif base_model_prefix == "chatglm_v2":
+        return convert_example_chatglm_v2
     elif base_model_prefix == "bloom":
         return convert_example_bloom
 
@@ -54,6 +56,7 @@ def preprocess_example(example):
 
 def convert_example_bloom(example, tokenizer, data_args, is_test=True):
     source, target = preprocess_example(example)
+    target += tokenizer.eos_token
     tokenized_source = tokenizer(
         source,
         max_length=data_args.src_length,
@@ -70,10 +73,10 @@ def convert_example_bloom(example, tokenizer, data_args, is_test=True):
     if is_test:
         return dict(
             input_ids=tokenized_source["input_ids"],
-            labels=tokenized_target["input_ids"] + [tokenizer.eos_token_id],
+            labels=tokenized_target["input_ids"],
         )
     else:
-        input_ids = tokenized_source["input_ids"] + tokenized_target["input_ids"] + [tokenizer.eos_token_id]
+        input_ids = tokenized_source["input_ids"] + tokenized_target["input_ids"]
         source_length = len(tokenized_source["input_ids"])
         labels = [-100] * source_length + input_ids[source_length:]
 
@@ -88,6 +91,7 @@ def convert_example_bloom(example, tokenizer, data_args, is_test=True):
 def convert_example_chatglm(example, tokenizer, data_args, is_test=True):
 
     source, target = preprocess_example(example)
+    target += tokenizer.eos_token
     tokenized_source = tokenizer(
         source,
         add_special_tokens=True,
@@ -98,7 +102,7 @@ def convert_example_chatglm(example, tokenizer, data_args, is_test=True):
     tokenized_target = tokenizer(
         target,
         add_special_tokens=False,
-        max_length=data_args.tgt_length - 1,
+        max_length=data_args.tgt_length,
         truncation=True,
         truncation_side="right",
     )
@@ -107,10 +111,10 @@ def convert_example_chatglm(example, tokenizer, data_args, is_test=True):
             input_ids=tokenized_source["input_ids"],
             position_ids=tokenized_source["position_ids"],
             attention_mask=tokenized_source["attention_mask"],
-            labels=tokenized_target["input_ids"] + [tokenizer.eos_token_id],
+            labels=tokenized_target["input_ids"],
         )
     else:
-        input_ids = tokenized_source["input_ids"] + tokenized_target["input_ids"] + [tokenizer.eos_token_id]
+        input_ids = tokenized_source["input_ids"] + tokenized_target["input_ids"]
         bos_position = len(tokenized_source["input_ids"]) - 1
 
         attention_mask = np.tri(len(input_ids), len(input_ids))
@@ -125,3 +129,46 @@ def convert_example_chatglm(example, tokenizer, data_args, is_test=True):
         attention_mask = attention_mask[..., :-1, :-1]
 
         return dict(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+
+
+def convert_example_chatglm_v2(example, tokenizer, data_args, is_test=True):
+    source, target = preprocess_example(example)
+    target += tokenizer.eos_token
+    history = example.get("history", None)
+    source = tokenizer.build_prompt(source, history)
+    tokenized_source = tokenizer(
+        source,
+        max_length=data_args.src_length,
+        truncation=True,
+        truncation_side="left",
+    )
+    tokenized_target = tokenizer(
+        target,
+        max_length=data_args.tgt_length - 1,
+        truncation=True,
+        truncation_side="right",
+    )
+
+    if is_test:
+        return dict(
+            input_ids=tokenized_source["input_ids"],
+            position_ids=list(
+                range(len(tokenized_source["input_ids"]))
+            ),  # pass in position_ids explicitly because of left padding
+            labels=tokenized_target["input_ids"],
+        )
+    else:
+        input_ids = tokenized_source["input_ids"] + tokenized_target["input_ids"]
+
+        source_length = len(tokenized_source["input_ids"])
+        labels = [-100] * source_length + input_ids[source_length:]
+
+        # shift input_ids and labels
+        input_ids, labels = input_ids[:-1], labels[1:]
+        # pass in position_ids explicitly because of left padding
+        position_ids = list(range(len(input_ids)))
+        return dict(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            labels=labels,
+        )

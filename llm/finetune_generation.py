@@ -54,7 +54,9 @@ def main():
 
     # Load model
     if training_args.fp16_opt_level == "O2":
-        if training_args.fp16:
+        if quant_args.do_ptq:
+            dtype = "float32"
+        elif training_args.fp16:
             dtype = "float16"
         elif training_args.bf16:
             dtype = "bfloat16"
@@ -68,8 +70,10 @@ def main():
         dtype=dtype,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
-        lm_shift_labels=False,
     )
+    # Alreday shift label & logit in convert example
+    if hasattr(model.config, "lm_shift_labels"):
+        model.config.lm_shift_labels = False
 
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
@@ -101,16 +105,17 @@ def main():
         prefix_tuning_params = get_prefix_tuning_params(model)
         prefix_config = PrefixConfig(
             num_prefix_tokens=model_args.num_prefix_tokens,
-            num_attention_heads=prefix_tuning_params[0],
-            num_hidden_layers=prefix_tuning_params[1],
-            hidden_size=prefix_tuning_params[2],
+            num_attention_heads=prefix_tuning_params["num_attention_heads"],
+            num_hidden_layers=prefix_tuning_params["num_hidden_layers"],
+            hidden_size=prefix_tuning_params["hidden_size"],
+            multi_query_group_num=prefix_tuning_params["multi_query_group_num"],
             dtype=dtype,
         )
         model = PrefixModelForCausalLM(
             model=model,
             prefix_config=prefix_config,
-            pad_attention_mask=prefix_tuning_params[3],
-            postprocess_past_key_value=prefix_tuning_params[4],
+            pad_attention_mask=prefix_tuning_params["pad_attention_mask"],
+            postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
         )
         model.mark_only_prefix_as_trainable()
         model.print_trainable_parameters()
@@ -121,13 +126,13 @@ def main():
         if model_args.lora_path is None:
             lora_params = get_lora_params(model, is_tp=training_args.tensor_parallel_degree > 1)
             lora_config = LoRAConfig(
-                target_modules=lora_params[0],
+                target_modules=lora_params["target_modules"],
                 r=model_args.lora_rank,
                 lora_alpha=2 * model_args.lora_rank,
                 merge_weights=model_args.lora_merge_weights,
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 dtype=dtype,
-                head_dim=lora_params[1],
+                head_dim=lora_params["head_dim"],
             )
             model = LoRAModel(model, lora_config)
         else:
@@ -251,12 +256,12 @@ def main():
             ptq_ds = load_dataset(
                 read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "ptq.json"), lazy=False
             )
+            ptq_ds = ptq_ds.map(partial(trans_func, is_test=False))
         else:
             ptq_ds = train_ds
             logger.info(
                 f"Not found ptq.json in {data_args.dataset_name_or_path}. Set train dataset to PTQ dataset path."
             )
-        ptq_ds = ptq_ds.map(partial(trans_func, is_test=False))
         ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
         ptq_model_config = get_ptq_model_config(trainer.model)
 
@@ -277,7 +282,7 @@ def main():
             shift.update_weight()
             del shift, shift_sampler
 
-        if quant_args.do_smooth:
+        if quant_args.smooth:
             smooth_sampler = MultiStepSampler() if quant_args.smooth_sampler == "multi_step" else None
             if quant_args.smooth_piecewise_search:
                 search_func = PieceWiseSearch(
@@ -313,7 +318,6 @@ def main():
         q_config = QuantConfig(activation=None, weight=None)
         act_quanter = AbsmaxObserver()
         weight_quanter = AbsMaxChannelWiseWeightObserver()
-        q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
         q_config.add_qat_layer_mapping(ColumnParallelLinear, QuantizedColumnParallelLinear)
         q_config.add_qat_layer_mapping(RowParallelLinear, QuantizedRowParallelLinear)
         q_config.add_type_config(
@@ -348,5 +352,4 @@ def main():
 
 
 if __name__ == "__main__":
-
     main()
