@@ -228,7 +228,7 @@ class TrainingArguments:
         sharding_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
             following config is support:
-              sharding_stage_1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation
+              enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -531,7 +531,7 @@ class TrainingArguments:
             "help": (
                 "Some additional config it highly affect the useage of sharding parallel, we provide some option to config it."
                 "following config is support: \n"
-                "sharding_stage_1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation"
+                "enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation"
             )
         },
     )
@@ -840,19 +840,19 @@ class TrainingArguments:
                     for x in sharding_parallel_config:
                         if len(x) > 0:
                             if x not in [
-                                "sharding_stage_1_tensor_fusion",
+                                "enable_stage1_tensor_fusion",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, "
-                                    f"accpet config is sharding_stage_1_tensor_fusion."
+                                    f"accpet config is enable_stage1_tensor_fusion."
                                 )
                     try:
                         strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
-                            True if "sharding_stage_1_tensor_fusion" in sharding_parallel_config else False
+                            True if "enable_stage1_tensor_fusion" in sharding_parallel_config else False
                         )
                     except KeyError:
                         warnings.warn(
-                            "The sharding_stage_1_tensor_fusion is not supported by current version of Paddle. "
+                            "The enable_stage1_tensor_fusion is not supported by current version of Paddle. "
                             "Please try lateset develop Paddle."
                         )
                 fleet.init(is_collective=True, strategy=strategy)
