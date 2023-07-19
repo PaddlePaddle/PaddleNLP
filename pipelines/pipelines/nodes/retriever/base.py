@@ -70,6 +70,7 @@ class BaseRetriever(BaseComponent):
         top_k: Optional[int] = None,
         index: str = None,
         headers: Optional[Dict[str, str]] = None,
+        **kwargs,
     ) -> List[Document]:
         """
         Scan through documents in DocumentStore and return a small number documents
@@ -94,6 +95,7 @@ class BaseRetriever(BaseComponent):
         headers: Optional[Dict[str, str]] = None,
         batch_size: Optional[int] = None,
         scale_score: bool = None,
+        **kwargs,
     ) -> List[List[Document]]:
         pass
 
@@ -122,17 +124,24 @@ class BaseRetriever(BaseComponent):
         documents: Optional[List[dict]] = None,
         index: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
+        pooling_mode: Optional[str] = None,
     ):
         if root_node == "Query":
             self.query_count += 1
             run_query_timed = self.timing(self.run_query, "query_time")
             output, stream = run_query_timed(
-                query=query, query_type=query_type, filters=filters, top_k=top_k, index=index, headers=headers
+                query=query,
+                query_type=query_type,
+                filters=filters,
+                top_k=top_k,
+                index=index,
+                headers=headers,
+                pooling_mode=pooling_mode,
             )
         elif root_node == "File":
             self.index_count += len(documents)  # type: ignore
             run_indexing = self.timing(self.run_indexing, "index_time")
-            output, stream = run_indexing(documents=documents)
+            output, stream = run_indexing(documents=documents, pooling_mode=pooling_mode)
         else:
             raise Exception(f"Invalid root_node '{root_node}'.")
         return output, stream
@@ -147,17 +156,18 @@ class BaseRetriever(BaseComponent):
         documents: Optional[Union[List[Document], List[List[Document]]]] = None,
         index: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
+        **kwargs,
     ):
         if root_node == "Query":
             self.query_count += len(queries) if isinstance(queries, list) else 1
             run_query_batch_timed = self.timing(self.run_query_batch, "query_time")
             output, stream = run_query_batch_timed(
-                queries=queries, filters=filters, top_k=top_k, index=index, headers=headers
+                queries=queries, filters=filters, top_k=top_k, index=index, headers=headers, **kwargs
             )
         elif root_node == "File":
             self.index_count += len(documents)  # type: ignore
             run_indexing = self.timing(self.run_indexing, "index_time")
-            output, stream = run_indexing(documents=documents)
+            output, stream = run_indexing(documents=documents, **kwargs)
         else:
             raise Exception(f"Invalid root_node '{root_node}'.")
         return output, stream
@@ -188,6 +198,7 @@ class BaseRetriever(BaseComponent):
         index: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
         batch_size: Optional[int] = None,
+        **kwargs,
     ):
         documents = self.retrieve_batch(
             queries=queries,
@@ -197,6 +208,7 @@ class BaseRetriever(BaseComponent):
             index=index,
             headers=headers,
             batch_size=batch_size,
+            **kwargs,
         )
         if isinstance(queries, str):
             document_ids = []
@@ -210,11 +222,11 @@ class BaseRetriever(BaseComponent):
         output = {"documents": documents}
         return output, "output_1"
 
-    def run_indexing(self, documents: List[dict]):
+    def run_indexing(self, documents: List[dict], **kwargs):
         if self.__class__.__name__ in ["DensePassageRetriever", "EmbeddingRetriever"]:
             documents = deepcopy(documents)
             document_objects = [Document.from_dict(doc) for doc in documents]
-            embeddings = self.embed_documents(document_objects)  # type: ignore
+            embeddings = self.embed_documents(document_objects, **kwargs)  # type: ignore
             for doc, emb in zip(documents, embeddings):
                 doc["embedding"] = emb
         output = {"documents": documents}
