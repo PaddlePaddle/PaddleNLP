@@ -58,9 +58,6 @@ def process(
         control = paddle.to_tensor(detected_map.copy(), dtype=paddle.float32) / 255.0
         control = control.unsqueeze(0).transpose([0, 3, 1, 2])
 
-        control_scales = (
-            [strength * (0.825 ** float(12 - i)) for i in range(13)] if guess_mode else ([strength] * 13)
-        )  # Magic number. IDK why. Perhaps because 0.825**12<0.01 but 0.826**12>0.01
         if seed == -1:
             seed = random.randint(0, 65535)
         seed_everything(seed)
@@ -74,7 +71,7 @@ def process(
                 height=H,
                 width=W,
                 eta=eta,
-                controlnet_conditioning_scale=control_scales,
+                controlnet_conditioning_scale=1.0,
                 guidance_scale=scale,
             ).images[0]
             results.append(img)
@@ -128,4 +125,4 @@ with block:
     run_button.click(fn=process, inputs=ips, outputs=[result_gallery])
 
 
-block.launch(server_name="0.0.0.0")
+block.launch(server_name="0.0.0.0", server_port=8536)

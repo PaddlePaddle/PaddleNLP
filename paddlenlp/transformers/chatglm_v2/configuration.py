@@ -37,6 +37,7 @@ class ChatGLMv2Config(PretrainedConfig):
         hidden_dropout=0.0,
         attention_dropout=0.0,
         layernorm_epsilon=1e-5,
+        use_cache=True,
         rmsnorm=True,
         apply_residual_connection_post_layernorm=False,
         post_layer_norm=True,
@@ -44,18 +45,15 @@ class ChatGLMv2Config(PretrainedConfig):
         add_qkv_bias=False,
         interleaved_qkv=False,
         bias_dropout_fusion=True,
-        multi_query_attention=False,
         multi_query_group_num=1,
         apply_query_key_layer_scaling=True,
         attention_softmax_in_fp32=True,
         fp32_residual_connection=False,
-        quantization_bit=0,
-        bos_token_id=130004,
-        eos_token_id=130005,
-        pad_token_id=3,
+        eos_token_id=2,
+        pad_token_id=0,
         **kwargs
     ):
-        super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
+        super().__init__(pad_token_id=pad_token_id, eos_token_id=eos_token_id, **kwargs)
         self.num_hidden_layers = num_hidden_layers
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
@@ -66,15 +64,14 @@ class ChatGLMv2Config(PretrainedConfig):
         self.hidden_dropout = hidden_dropout
         self.attention_dropout = attention_dropout
         self.layernorm_epsilon = layernorm_epsilon
+        self.use_cache = use_cache
         self.rmsnorm = rmsnorm
         self.apply_residual_connection_post_layernorm = apply_residual_connection_post_layernorm
         self.post_layer_norm = post_layer_norm
         self.add_bias_linear = add_bias_linear
         self.add_qkv_bias = add_qkv_bias
         self.bias_dropout_fusion = bias_dropout_fusion
-        self.multi_query_attention = multi_query_attention
         self.multi_query_group_num = multi_query_group_num
         self.apply_query_key_layer_scaling = apply_query_key_layer_scaling
         self.attention_softmax_in_fp32 = attention_softmax_in_fp32
         self.fp32_residual_connection = fp32_residual_connection
-        self.quantization_bit = quantization_bit

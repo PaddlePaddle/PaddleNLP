@@ -137,49 +137,54 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
 
     def _create_prefix_encoder(self):
         prefix_dropout = nn.Dropout(p=self.prefix_config.prefix_dropout)
+        self.head_dim = self.prefix_config.hidden_size // self.prefix_config.num_attention_heads
+        if self.prefix_config.multi_query_group_num is not None:
+            self.num_heads = self.prefix_config.multi_query_group_num
+        else:
+            self.num_heads = self.prefix_config.num_attention_heads
         if self.prefix_config.prefix_projection:
             activation = nn.Tanh()
             if self.config.tensor_parallel_degree > 1:
                 prefix_embedding = fleet.meta_parallel.VocabParallelEmbedding(
                     self.prefix_config.num_prefix_tokens,
-                    self.prefix_config.hidden_size,
+                    self.head_dim * self.num_heads,
                 )
                 prefix_proj_0 = fleet.meta_parallel.ColumnParallelLinear(
-                    self.prefix_config.hidden_size,
+                    self.head_dim * self.num_heads,
                     self.prefix_config.prefix_projection_hidden_size,
                     has_bias=True,
                     gather_output=False,
                 )
                 prefix_proj_1 = fleet.meta_parallel.RowParallelLinear(
                     self.prefix_config.prefix_projection_hidden_size,
-                    self.prefix_config.hidden_size * self.prefix_config.num_hidden_layers * 2,
+                    self.head_dim * self.num_heads * self.prefix_config.num_hidden_layers * 2,
                     has_bias=True,
                     input_is_parallel=True,
                 )
             else:
                 prefix_embedding = nn.Embedding(
                     self.prefix_config.num_prefix_tokens,
-                    self.prefix_config.hidden_size,
+                    self.head_dim * self.num_heads,
                 )
                 prefix_proj_0 = nn.Linear(
-                    self.prefix_config.hidden_size,
+                    self.head_dim * self.num_heads,
                     self.prefix_config.prefix_projection_hidden_size,
                 )
                 prefix_proj_1 = nn.Linear(
                     self.prefix_config.prefix_projection_hidden_size,
-                    self.prefix_config.hidden_size * self.prefix_config.num_hidden_layers * 2,
+                    self.head_dim * self.num_heads * self.prefix_config.num_hidden_layers * 2,
                 )
             prefix_encoder = nn.Sequential(prefix_embedding, prefix_proj_0, activation, prefix_proj_1, prefix_dropout)
         else:
             if self.config.tensor_parallel_degree > 1:
                 prefix_embedding = fleet.meta_parallel.VocabParallelEmbedding(
                     self.prefix_config.num_prefix_tokens,
-                    self.prefix_config.hidden_size * self.prefix_config.num_hidden_layers * 2,
+                    self.head_dim * self.num_heads * self.prefix_config.num_hidden_layers * 2,
                 )
             else:
                 prefix_embedding = nn.Embedding(
                     self.prefix_config.num_prefix_tokens,
-                    self.prefix_config.hidden_size * self.prefix_config.num_hidden_layers * 2,
+                    self.head_dim * self.num_heads * self.prefix_config.num_hidden_layers * 2,
                 )
             prefix_encoder = nn.Sequential(prefix_embedding, prefix_dropout)
         return prefix_encoder
@@ -193,9 +198,9 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         if self.config.tensor_parallel_degree > 1:
             split_past_key_values = past_key_values.split(num_or_sections=self.config.tensor_parallel_degree, axis=2)
             past_key_values = split_past_key_values[self.model.config.tensor_parallel_rank]
-            num_attention_heads = self.prefix_config.num_attention_heads // self.config.tensor_parallel_degree
+            num_heads_per_partition = self.num_heads // self.config.tensor_parallel_degree
         else:
-            num_attention_heads = self.prefix_config.num_attention_heads
+            num_heads_per_partition = self.num_heads
 
         # (bs, prefixlen, layer_num*2, head_num/tensor_parallel_degree,  head_dim)
         past_key_values = past_key_values.reshape(
@@ -203,8 +208,8 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
                 batch_size,
                 self.prefix_config.num_prefix_tokens,
                 self.prefix_config.num_hidden_layers * 2,
-                num_attention_heads,
-                self.prefix_config.hidden_size // self.prefix_config.num_attention_heads,
+                num_heads_per_partition,
+                self.head_dim,
             ]
         )
 
@@ -301,8 +306,8 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
                 self.prefix_config.num_prefix_tokens,
                 2,
                 self.prefix_config.num_hidden_layers,
-                self.prefix_config.num_attention_heads,
-                self.prefix_config.prefix_projection_hidden_size // self.prefix_config.num_attention_heads,  # head_dim
+                self.num_heads,
+                self.head_dim,
             ]
         )
         # (num_layers, 2, num_heads, prefixlen, head_dim)
