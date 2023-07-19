@@ -13,7 +13,6 @@
 # limitations under the License.
 
 # pass
-import paddle
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import LayerDesc, PipelineLayer
@@ -22,11 +21,13 @@ from paddlenlp.transformers import PretrainedModel
 from paddlenlp.transformers.llama.modeling import (
     LlamaConfig,
     LlamaDecoderLayer,
+    LlamaEmbeddings,
     LlamaLMHead,
     LlamaModel,
     LlamaPretrainedModel,
     LlamaPretrainingCriterion,
     LlamaRMSNorm,
+    register_sequence_parallel_allreduce_hooks,
 )
 
 
@@ -73,10 +74,8 @@ class LlamaEmbeddingPipe(nn.Layer):
     def __init__(self, config):
         super(LlamaEmbeddingPipe, self).__init__()
         if config.tensor_parallel_degree > 1:
-            self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
-                config.vocab_size,
-                config.hidden_size,
-                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+            self.embed_tokens = LlamaEmbeddings(
+                config,
             )
         else:
             self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
@@ -111,6 +110,10 @@ class LlamaDecoderLayerPipe(LlamaDecoderLayer):
 
 
 class LlamaRMSNormPipe(LlamaRMSNorm):
+    def __init__(self, config, is_last=False, *args, **kwargs):
+        self.sequence_parallel = config.sequence_parallel
+        super().__init__(config, is_last, *args, **kwargs)
+
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
         return super().forward(hidden_states)
@@ -228,11 +231,16 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         config.tensor_parallel_degree = tensor_parallel_degree
         config.tensor_parallel_rank = tensor_parallel_rank
 
+        if tensor_parallel_degree <= 1:
+            assert (
+                config.sequence_parallel is False
+            ), "If tensor_parallel_degree <= 1, sequence_parallel strategy will be turned off."
+
         self.add_sequential_layer(LayerDesc(LlamaEmbeddingPipe, config=config), "llama")
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(LayerDesc(LlamaDecoderLayerPipe, config=config), f"llama.layers.{i}")
 
-        self.add_sequential_layer(LayerDesc(LlamaRMSNormPipe, config=config), "llama.norm")
+        self.add_sequential_layer(LayerDesc(LlamaRMSNormPipe, config=config, is_last=True), "llama.norm")
         self.add_sequential_layer(LayerDesc(LlamaLMHead, config=config), "lm_head")
 
         recompute_interval = 0
@@ -261,5 +269,10 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             num_virtual_pipeline_stages=virtual_pp_degree,
         )
         self.apply(self._init_weights)
+
+        if config.sequence_parallel:
+            register_sequence_parallel_allreduce_hooks(
+                self, config.accumulation_steps, config.fuse_sequence_parallel_allreduce
+            )
         # DON'T init PipelinePretrainedModel
         # PipelinePretrainedModel.__init__(self.super(), config=config)

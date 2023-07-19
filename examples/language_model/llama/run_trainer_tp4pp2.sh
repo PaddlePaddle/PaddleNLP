@@ -26,8 +26,8 @@ python -u  -m paddle.distributed.launch \
     --log_dir "output/$task_name""_log" \
     run_pretrain.py \
     --model_type "llama" \
-    --model_name_or_path "facebook/llama-7b" \
-    --tokenizer_name_or_path "facebook/llama-7b" \
+    --model_name_or_path "facebook/llama-13b" \
+    --tokenizer_name_or_path "facebook/llama-13b" \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --split 949,50,1 \
@@ -45,7 +45,7 @@ python -u  -m paddle.distributed.launch \
     --virtual_pp_degree 1 \
     --learning_rate 0.00001 \
     --min_learning_rate 0.000001 \
-    --max_steps 10000 \
+    --max_steps 600 \
     --save_steps 5000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
@@ -56,8 +56,9 @@ python -u  -m paddle.distributed.launch \
     --report_to "visualdl" \
     --sharding "stage1" \
     --disable_tqdm true \
-    --continue_training 1\
     --recompute 1 \
     --do_train \
     --do_eval \
-    --device "gpu"
+    --device "gpu" \
+    --overwrite_output_dir 1 \
+    --fuse_attn_qkv 1 

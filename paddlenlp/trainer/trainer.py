@@ -32,10 +32,12 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
+import nvtx
 import paddle
 import paddle.amp.auto_cast as autocast
 import paddle.distributed as dist
 import paddle.nn as nn
+from numba import cuda
 from packaging import version
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
@@ -654,6 +656,11 @@ class Trainer:
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
+                if step >= 200:
+                    cuda.profile_start()
+                if step >= 220:
+                    cuda.profile_stop()
+                nvtx.push_range("step")
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
                 # Skip past any already trained steps if resuming training
                 # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
@@ -786,6 +793,8 @@ class Trainer:
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
+
+                nvtx.pop_range()
 
             if step < 0:
                 logger.warning(

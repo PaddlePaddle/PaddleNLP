@@ -16,7 +16,7 @@ set -x
 unset CUDA_VISIBLE_DEVICES
 
 task_name="llama_hybid"
-rm -rf output/$task_name/
+# rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
 
@@ -26,12 +26,12 @@ python -u  -m paddle.distributed.launch \
     --log_dir "output/$task_name""_log" \
     run_pretrain.py \
     --model_type "llama" \
-    --model_name_or_path "facebook/llama-7b" \
-    --tokenizer_name_or_path "facebook/llama-7b" \
+    --model_name_or_path "facebook/llama-13b" \
+    --tokenizer_name_or_path "facebook/llama-13b" \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --split 949,50,1 \
-    --max_seq_length 2048 \
+    --max_seq_length 1024 \
     --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 1 \
     --use_flash_attention 1 \
@@ -41,7 +41,7 @@ python -u  -m paddle.distributed.launch \
     --scale_loss 1024 \
     --learning_rate 0.0001 \
     --min_learning_rate 0.00001 \
-    --max_steps 10000 \
+    --max_steps 340 \
     --save_steps 5000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
@@ -52,8 +52,10 @@ python -u  -m paddle.distributed.launch \
     --eval_steps 1000 \
     --report_to "visualdl" \
     --disable_tqdm true \
-    --continue_training 1\
     --recompute 1 \
-    --do_train \
-    --do_eval \
-    --device "gpu"
+    --do_train 1\
+    --device "gpu" \
+    --tensor_parallel_degree 8 \
+    --sequence_parallel 1 \
+    --overwrite_output_dir 1 \
+    --fuse_attn_qkv 1
