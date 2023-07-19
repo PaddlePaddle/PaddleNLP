@@ -17,7 +17,7 @@ from typing import Optional
 
 import paddle.profiler as profiler
 from datasets import load_dataset
-from utils import CustomTrainer, ProfilerCallback
+from utils import CustomTrainer, InTokensDataset, ProfilerCallback
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.peft import LoRAConfig, LoRAModel
@@ -146,7 +146,16 @@ def main():
     dataset = dataset.map(
         lambda example: preprocess_function(example), remove_columns=["instruction", "input", "output"]
     )
-    total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
+    raw_dataset = [{"input_ids": item["input_ids"], "labels": item["labels"]} for item in dataset]
+    total_effective_tokens = sum([len(i["input_ids"]) for i in raw_dataset]) * training_args.num_train_epochs
+    avg_tokens_per_example = sum([len(i["input_ids"]) for i in raw_dataset]) // len(raw_dataset)
+    max_seq_len = 2048
+    dataset = InTokensDataset(
+        raw_dataset,
+        tokenizer=tokenizer,
+        max_seq_len=max_seq_len,
+        num_iter=model_args.train_data_size * avg_tokens_per_example // max_seq_len,
+    )
 
     if model_args.profiler:
         prof = profiler.Profiler(
