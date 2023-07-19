@@ -139,6 +139,13 @@ class TrainingArguments:
             Ratio of total training steps used for a linear warmup from 0 to `learning_rate`.
         warmup_steps (`int`, *optional*, defaults to 0):
             Number of steps used for a linear warmup from 0 to `learning_rate`. Overrides any effect of `warmup_ratio`.
+        num_cycles (`float`, *optional*, defaults to 0.5):
+            The number of waves in the cosine scheduler.
+        lr_end (`float`, *optional*, defaults to 1e-7):
+            The end LR used in the polynomial scheduler.
+        power (`float`, *optional*, defaults to 1.0):
+            The power factor used in the polynomial scheduler.
+
         log_on_each_node (`bool`, *optional*, defaults to `True`):
             In multinode distributed training, whether to log using `log_level` once per node, or only on the main
             node.
@@ -363,6 +370,9 @@ class TrainingArguments:
         default=0.0, metadata={"help": "Linear warmup over warmup_ratio fraction of total steps."}
     )
     warmup_steps: int = field(default=0, metadata={"help": "Linear warmup over warmup_steps."})
+    num_cycles: float = field(default=0.5, metadata={"help": "The number of waves in the cosine scheduler."})
+    lr_end: float = field(default=1e-7, metadata={"help": "The end LR in the polynomial scheduler."})
+    power: float = field(default=1.0, metadata={"help": "The power factor in the polynomial scheduler."})
 
     log_on_each_node: bool = field(
         default=True,

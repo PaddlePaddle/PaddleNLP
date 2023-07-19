@@ -1241,6 +1241,9 @@ class Trainer:
                 learning_rate=self.args.learning_rate,
                 num_warmup_steps=warmup,
                 num_training_steps=num_training_steps,
+                num_cycles=self.args.num_cycles,
+                lr_end=self.args.lr_end,
+                power=self.args.power,
             )
 
         return self.lr_scheduler
