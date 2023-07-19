@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -149,12 +150,14 @@ def main():
     raw_dataset = [{"input_ids": item["input_ids"], "labels": item["labels"]} for item in dataset]
     total_effective_tokens = sum([len(i["input_ids"]) for i in raw_dataset]) * training_args.num_train_epochs
     avg_tokens_per_example = sum([len(i["input_ids"]) for i in raw_dataset]) // len(raw_dataset)
-    max_seq_len = 2048
+    max_seq_len = 1024
+    num_iter = math.ceil(model_args.train_data_size * avg_tokens_per_example / max_seq_len)
+    print(num_iter)
     dataset = InTokensDataset(
         raw_dataset,
         tokenizer=tokenizer,
         max_seq_len=max_seq_len,
-        num_iter=model_args.train_data_size * avg_tokens_per_example // max_seq_len,
+        num_iter=num_iter,
     )
 
     if model_args.profiler:

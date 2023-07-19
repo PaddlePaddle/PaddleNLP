@@ -70,7 +70,7 @@ class InTokensDataset(Dataset):
         self.index = self.index % len(self.records)
         cur_idx = self.index
         batch_records, max_len = [], 0
-        # print(self.records[cur_idx:])
+
         for i in range(cur_idx, len(self.records)):
             # print(record)
             record = self.records[i]
@@ -80,14 +80,14 @@ class InTokensDataset(Dataset):
             if to_append:
                 batch_records.append(record)
                 cur_len_so_far += len(record["input_ids"])
-            self.index += 1
-        batch_list = _pad_batch_records(
-            batch_records,
-            pad_id=self.tokenizer.pad_token_id,
-            start_id=self.tokenizer.bos_token_id,
-            max_seq_len=self.max_seq_len,
-        )
-        return batch_list
+                self.index += 1
+            else:
+                return _pad_batch_records(
+                    batch_records,
+                    pad_id=self.tokenizer.pad_token_id,
+                    start_id=self.tokenizer.bos_token_id,
+                    max_seq_len=self.max_seq_len,
+                )
 
     def __len__(self):
         return self.num_iter
