@@ -141,80 +141,88 @@ class CoreAttention(nn.Layer):
 
         self.attention_dropout = nn.Dropout(config.attention_dropout)
 
-    # def forward(self, query_layer, key_layer, value_layer, attention_mask):
-    #     # Raw attention scores
-    #     # [b, np, sq, sk]
-    #     output_size = (query_layer.shape[1], query_layer.shape[2], query_layer.shape[0], key_layer.shape[0])
-
-    #     # [sq, b, np, hn] -> [sq, b * np, hn]
-    #     query_layer = query_layer.reshape([output_size[2], output_size[0] * output_size[1], -1])
-    #     # [sk, b, np, hn] -> [sk, b * np, hn]
-    #     key_layer = key_layer.reshape([output_size[3], output_size[0] * output_size[1], -1])
-
-    #     # Raw attention scores. [b * np, sq, sk]
-    #     matmul_result = paddle.bmm(query_layer.transpose([1, 0, 2]), key_layer.transpose([1, 2, 0])) * (
-    #         1.0 / self.norm_factor
-    #     )
-
-    #     # change view to [b, np, sq, sk]
-    #     attention_scores = matmul_result.reshape(output_size)
-
-    #     # ===========================
-    #     # Attention probs and dropout
-    #     # ===========================
-
-    #     # attention scores and attention mask [b, np, sq, sk]
-    #     if self.attention_softmax_in_fp32:
-    #         attention_scores = attention_scores.astype("float32")
-    #     if self.coeff is not None:
-    #         attention_scores = attention_scores * self.coeff
-    #     if attention_mask is None and attention_scores.shape[2] == attention_scores.shape[3]:
-    #         attention_mask = paddle.tril(
-    #             paddle.ones((output_size[0], 1, output_size[2], output_size[3]), dtype="bool")
-    #         )
-    #         attention_mask = ~attention_mask
-
-    #     if attention_mask is not None:
-    #         attention_scores = paddle.where(
-    #             attention_mask > 0,
-    #             paddle.full_like(attention_scores, paddle.finfo(attention_scores.dtype).min),
-    #             attention_scores,
-    #         )
-
-    #     attention_probs = F.softmax(attention_scores.astype("float32"), axis=-1)
-    #     attention_probs = attention_probs.astype(self.dtype)
-
-    #     # This is actually dropping out entire tokens to attend to, which might
-    #     # seem a bit unusual, but is taken from the original Transformer paper.
-    #     attention_probs = self.attention_dropout(attention_probs)
-    #     # =========================
-    #     # Context layer. [sq, b, hp]
-    #     # =========================
-
-    #     # value_layer -> context layer.
-    #     # [sk, b, np, hn] --> [b, np, sq, hn]
-
-    #     # context layer shape: [b, np, sq, hn]
-    #     output_size = (value_layer.shape[1], value_layer.shape[2], query_layer.shape[0], value_layer.shape[3])
-    #     # change view [sk, b * np, hn]
-    #     value_layer = value_layer.reshape([value_layer.shape[0], output_size[0] * output_size[1], -1])
-    #     # change view [b * np, sq, sk]
-    #     attention_probs = attention_probs.reshape([output_size[0] * output_size[1], output_size[2], -1])
-    #     # matmul: [b * np, sq, hn]
-    #     context_layer = paddle.bmm(attention_probs, value_layer.transpose([1, 0, 2]))
-    #     # change view [b, np, sq, hn]
-    #     context_layer = context_layer.reshape(output_size)
-    #     # [b, np, sq, hn] --> [sq, b, np, hn]
-    #     context_layer = context_layer.transpose([2, 0, 1, 3])
-    #     # [sq, b, np, hn] --> [sq, b, hp]
-    #     new_context_shape = context_layer.shape[:-2] + [self.hidden_size_per_partition]
-    #     context_layer = context_layer.reshape(new_context_shape)
-
-    #     return context_layer
-
-
     def forward(self, query_layer, key_layer, value_layer, attention_mask):
+        # Raw attention scores
+        # [b, np, sq, sk]
+        output_size = (query_layer.shape[1], query_layer.shape[2], query_layer.shape[0], key_layer.shape[0])
+
+        # [sq, b, np, hn] -> [sq, b * np, hn]
+        query_layer = query_layer.reshape([output_size[2], output_size[0] * output_size[1], -1])
+        # [sk, b, np, hn] -> [sk, b * np, hn]
+        key_layer = key_layer.reshape([output_size[3], output_size[0] * output_size[1], -1])
+
+        # Raw attention scores. [b * np, sq, sk]
+        matmul_result = paddle.bmm(query_layer.transpose([1, 0, 2]), key_layer.transpose([1, 2, 0])) * (
+            1.0 / self.norm_factor
+        )
+
+        # change view to [b, np, sq, sk]
+        attention_scores = matmul_result.reshape(output_size)
+
+        # ===========================
+        # Attention probs and dropout
+        # ===========================
+
+        # attention scores and attention mask [b, np, sq, sk]
+        if self.attention_softmax_in_fp32:
+            attention_scores = attention_scores.astype("float32")
+        if self.coeff is not None:
+            attention_scores = attention_scores * self.coeff
+        if attention_mask is None and attention_scores.shape[2] == attention_scores.shape[3]:
+            attention_mask = paddle.tril(
+                paddle.ones((output_size[0], 1, output_size[2], output_size[3]), dtype="bool")
+            )
+            attention_mask = ~attention_mask
+
+        if attention_mask is not None:
+            attention_scores = paddle.where(
+                attention_mask > 0,
+                paddle.full_like(attention_scores, paddle.finfo(attention_scores.dtype).min),
+                attention_scores,
+            )
+
+        attention_probs = F.softmax(attention_scores.astype("float32"), axis=-1)
+        attention_probs = attention_probs.astype(self.dtype)
+
+        # This is actually dropping out entire tokens to attend to, which might
+        # seem a bit unusual, but is taken from the original Transformer paper.
+        attention_probs = self.attention_dropout(attention_probs)
+        # =========================
+        # Context layer. [sq, b, hp]
+        # =========================
+
+        # value_layer -> context layer.
+        # [sk, b, np, hn] --> [b, np, sq, hn]
+
+        # context layer shape: [b, np, sq, hn]
+        output_size = (value_layer.shape[1], value_layer.shape[2], query_layer.shape[0], value_layer.shape[3])
+        # change view [sk, b * np, hn]
+        value_layer = value_layer.reshape([value_layer.shape[0], output_size[0] * output_size[1], -1])
+        # change view [b * np, sq, sk]
+        attention_probs = attention_probs.reshape([output_size[0] * output_size[1], output_size[2], -1])
+        # matmul: [b * np, sq, hn]
+        context_layer = paddle.bmm(attention_probs, value_layer.transpose([1, 0, 2]))
+        # change view [b, np, sq, hn]
+        context_layer = context_layer.reshape(output_size)
+        # [b, np, sq, hn] --> [sq, b, np, hn]
+        context_layer = context_layer.transpose([2, 0, 1, 3])
+        # [sq, b, np, hn] --> [sq, b, hp]
+        new_context_shape = context_layer.shape[:-2] + [self.hidden_size_per_partition]
+        context_layer = context_layer.reshape(new_context_shape)
+
+        return context_layer
+
+
+    def forward1(self, query_layer, key_layer, value_layer, attention_mask):
         # 输入的都是[seq, batch ,head, head_dim]
+        assert(query_layer.shape[3] == key_layer.shape[3])
+        assert(query_layer.shape[3] == value_layer.shape[3])
+        assert(query_layer.shape[2] == key_layer.shape[2])
+        assert(query_layer.shape[2] == value_layer.shape[2])
+        assert(query_layer.shape[1] == key_layer.shape[1])
+        assert(query_layer.shape[1] == value_layer.shape[1])
+
+
         seq_q = query_layer.shape[0]
         seq_k = key_layer.shape[0]
         seq_v = value_layer.shape[0]
@@ -229,18 +237,18 @@ class CoreAttention(nn.Layer):
         # print(value_layer.shape)
         # Raw attention scores
 
-        if seq_q != seq_k and attention_mask is None and False:
-            causal= seq_q == seq_k
-            q = query_layer.transpose([1,0,2,3])
-            #return query_layer.reshape([seq_q,batch,-1])
-            k = key_layer.transpose([1,0,2,3])
-            v = value_layer.transpose([1,0,2,3])
-            context_layer = flash_attention(q, k, v, causal=causal)[0]
-            #context_layer = memory_efficient_attention(q,k,v,scale= 1.0 / self.norm_factor * self.coeff)
-            #context_layer = memory_efficient_attention(q,k,v)
-            context_layer = context_layer.transpose([1,0,2,3])
-            context_layer = context_layer.reshape([seq_q,batch,-1])
-            return context_layer
+        # if seq_q != seq_k and attention_mask is None and False:
+        #     causal= seq_q == seq_k
+        #     q = query_layer.transpose([1,0,2,3])
+        #     #return query_layer.reshape([seq_q,batch,-1])
+        #     k = key_layer.transpose([1,0,2,3])
+        #     v = value_layer.transpose([1,0,2,3])
+        #     context_layer = flash_attention(q, k, v, causal=causal)[0]
+        #     #context_layer = memory_efficient_attention(q,k,v,scale= 1.0 / self.norm_factor * self.coeff)
+        #     #context_layer = memory_efficient_attention(q,k,v)
+        #     context_layer = context_layer.transpose([1,0,2,3])
+        #     context_layer = context_layer.reshape([seq_q,batch,-1])
+        #     return context_layer
 
 
         query_layer = query_layer.reshape([seq_q, batch * head,head_dim])
