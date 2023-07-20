@@ -315,6 +315,8 @@ class TrainingArguments:
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
         flatten_param_grads (`bool`, *optional*):
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
+        skip_profile_timer (`bool`, *optional*):
+            Whether skip profile timer, timer will record time usage of forward/ backward/ step, etc.
     """
 
     output_dir: str = field(
@@ -642,6 +644,10 @@ class TrainingArguments:
         default=True,
         metadata={"help": "Whether use lazy data processing."},
     )
+    skip_profile_timer: Optional[bool] = field(
+        default=True,
+        metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl"},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -830,6 +836,8 @@ class TrainingArguments:
                         and self.sharding_parallel_degree > 1,
                         "enable_timer": "enable_timer" in pipeline_parallel_config,
                     }
+                    if dygraph_pp_configs["dp_comm_overlap"]:
+                        raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
 
                     if self.do_eval:
                         assert (
