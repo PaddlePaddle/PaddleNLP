@@ -1122,7 +1122,7 @@ class Trainer:
                 signature_keys = set(inspect.signature(DygraphShardingOptimizer).parameters.keys())
                 return "inner_optimizer_class" not in signature_keys
 
-            if ShardingOption.SHARD_OP in self.args.sharding and is_new_version_sharding_stage1_optimizer():
+            if ShardingOption.SHARD_OP in self.args.sharding and not is_new_version_sharding_stage1_optimizer():
                 # for backward compatibility.
                 # this call will raise, if sharding stage1 is supported in HybridParallelOptimizer,
                 # in which case, the logic follows will handle it
