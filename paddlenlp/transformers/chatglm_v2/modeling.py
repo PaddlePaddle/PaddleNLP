@@ -30,6 +30,12 @@ from ..model_outputs import (
 )
 from .configuration import CHATGLM_V2_PRETRAINED_RESOURCE_FILES_MAP, ChatGLMv2Config
 
+__all__ = [
+    "ChatGLMv2Model",
+    "ChatGLMv2PretrainedModel",
+    "ChatGLMv2ForCausalLM",
+]
+
 
 def assign_kv_heads(num_kv_heads, num_gpus):
     # Initialize the assignment list
@@ -745,7 +751,7 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         )
 
 
-class ChatGLMv2ForConditionalGeneration(ChatGLMv2PretrainedModel):
+class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
     def __init__(self, config: ChatGLMv2Config):
         super().__init__(config)
         self.max_sequence_length = config.max_sequence_length

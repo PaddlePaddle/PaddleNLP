@@ -18,11 +18,7 @@ import os
 import paddle
 
 from paddlenlp.peft import LoRAConfig, LoRAModel
-from paddlenlp.transformers import (
-    ChatGLMConfig,
-    ChatGLMForConditionalGeneration,
-    ChatGLMTokenizer,
-)
+from paddlenlp.transformers import ChatGLMConfig, ChatGLMForCausalLM, ChatGLMTokenizer
 
 
 def parse_args():
@@ -61,9 +57,7 @@ def main():
         config = ChatGLMConfig.from_pretrained(args.model_name_or_path)
         dtype = config.dtype if config.dtype is not None else config.paddle_dtype
 
-    model = ChatGLMForConditionalGeneration.from_pretrained(
-        args.model_name_or_path, load_state_as_np=True, dtype=dtype
-    )
+    model = ChatGLMForCausalLM.from_pretrained(args.model_name_or_path, load_state_as_np=True, dtype=dtype)
     if args.lora_path is not None:
         model = LoRAModel.from_pretrained(model, args.lora_path)
 
