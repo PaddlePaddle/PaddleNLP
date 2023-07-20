@@ -71,6 +71,7 @@ class ModelArgument:
     eval_with_do_generation: bool = field(
         default=True, metadata={"help": "Evaluate with generation, instead for calc loss."}
     )
+    lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
 
 
 def main():
@@ -78,6 +79,7 @@ def main():
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     # data_args.always_pad_to_max_length = False
     data_args.always_pad_to_max_length = training_args.pipeline_parallel_degree > 1
+    setattr(training_args, "lr_decay_ratio", model_args.lr_decay_ratio)
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -119,6 +121,7 @@ def main():
         model_class = GPTForCausalLMPipe
     # Load the tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    tokenizer.padding_side = "left"
 
     # Load and set the pretrained configuration
     config = config_class.from_pretrained(model_args.model_name_or_path)
@@ -126,10 +129,11 @@ def main():
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.use_flash_attn = model_args.use_flash_attn
     config.use_recompute = training_args.recompute
-    config.lm_shift_labels = False
+    config.lm_shift_labels = True
 
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
+    config.ignore_index = tokenizer.pad_token_id
 
     model = model_class.from_pretrained(
         model_args.model_name_or_path,

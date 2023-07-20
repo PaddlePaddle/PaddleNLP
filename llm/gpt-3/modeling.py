@@ -529,7 +529,7 @@ class TransformerDecoderLayer(nn.Layer):
 
         self.activation = getattr(F, activation)
 
-    def forward(self, tgt, memory=None, tgt_mask=None, use_cache=False, cache=None):
+    def forward(self, tgt, tgt_mask=None, memory=None, use_cache=False, cache=None):
         residual = tgt
 
         if self.normalize_before:
@@ -780,12 +780,11 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
     It calculates the final loss.
     """
 
-    def __init__(self, config, pad_token_id=None):
+    def __init__(self, config):
         super(GPTPretrainingCriterion, self).__init__()
         self.tensor_parallel_degree = config.tensor_parallel_degree
-        self.shift_labels = config.tensor_parallel_degree
         self.lm_shift_labels = config.lm_shift_labels
-        self.ignore_index = pad_token_id
+        self.ignore_index = getattr(config, "ignore_index", 0)
         if config.tensor_parallel_degree > 1 and config.tensor_parallel_output:
             self.loss_func = fleet.meta_parallel.ParallelCrossEntropy(ignore_index=self.ignore_index)
         else:
@@ -818,7 +817,7 @@ class GPTForCausalLM(GPTPretrainedModel):
         super(GPTForCausalLM, self).__init__(config)
         self.config = config
         self.gpt = GPTModel(config)
-        self.criterion = GPTPretrainingCriterion(config, pad_token_id=config.pad_token_id)
+        self.criterion = GPTPretrainingCriterion(config)
 
     def forward(
         self,

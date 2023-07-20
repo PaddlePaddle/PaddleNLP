@@ -217,7 +217,6 @@ def convert_example(
         final[k] = inputs[k] + outputs[k]
         if k == "input_ids":
             final["labels"] = [tokenizer.pad_token_id] * len(inputs["input_ids"]) + outputs[k]
-    print(final)
     return final
 
 

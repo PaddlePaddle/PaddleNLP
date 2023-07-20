@@ -364,7 +364,7 @@ def main():
     config.enable_fuse_transformer = model_args.enable_fuse_transformer
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.use_recompute = training_args.recompute
-    config.use_flash_attn = training_args.use_flash_attn
+    config.use_flash_attn = model_args.use_flash_attn
     config.lm_shift_labels = False
 
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
