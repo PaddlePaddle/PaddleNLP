@@ -1120,30 +1120,37 @@ class Trainer:
                     DygraphShardingOptimizer,
                 )
 
-                self.optimizer = DygraphShardingOptimizer(
-                    hcg=fleet.get_hybrid_communicate_group(),
-                    user_defined_strategy=None,
-                    params=params,
-                    inner_optimizer_class=optimizer_cls,
-                    learning_rate=self.lr_scheduler if lr_scheduler is None else lr_scheduler,
-                    apply_decay_param_fun=apply_decay_param_fun,
-                    weight_decay=self.args.weight_decay,
-                    grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm)
-                    if self.args.max_grad_norm > 0
-                    else None,
-                    **optimizer_kwargs,
-                )
-            else:
-                self.optimizer = optimizer_cls(
-                    learning_rate=self.lr_scheduler if lr_scheduler is None else lr_scheduler,
-                    apply_decay_param_fun=apply_decay_param_fun,
-                    parameters=params,
-                    weight_decay=self.args.weight_decay,
-                    grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm)
-                    if self.args.max_grad_norm > 0
-                    else None,
-                    **optimizer_kwargs,
-                )
+                def is_new_version_sharding_stage1_optimizer():
+                    signature_keys = set(inspect.signature(DygraphShardingOptimizer).parameters.keys())
+                    return "inner_optimizer_class" not in signature_keys
+
+                if not is_new_version_sharding_stage1_optimizer():
+                    # for backward compatibility.
+                    # this call will raise, if sharding stage1 is supported in HybridParallelOptimizer,
+                    # in which case, the logic follows will handle it
+                    self.optimizer = DygraphShardingOptimizer(
+                        hcg=fleet.get_hybrid_communicate_group(),
+                        user_defined_strategy=None,
+                        params=params,
+                        inner_optimizer_class=optimizer_cls,
+                        learning_rate=self.lr_scheduler if lr_scheduler is None else lr_scheduler,
+                        apply_decay_param_fun=apply_decay_param_fun,
+                        weight_decay=self.args.weight_decay,
+                        grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm)
+                        if self.args.max_grad_norm > 0
+                        else None,
+                        **optimizer_kwargs,
+                    )
+                    return self.optimizer
+
+            self.optimizer = optimizer_cls(
+                learning_rate=self.lr_scheduler if lr_scheduler is None else lr_scheduler,
+                apply_decay_param_fun=apply_decay_param_fun,
+                parameters=params,
+                weight_decay=self.args.weight_decay,
+                grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm) if self.args.max_grad_norm > 0 else None,
+                **optimizer_kwargs,
+            )
 
         return self.optimizer
 
