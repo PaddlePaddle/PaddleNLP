@@ -1,5 +1,5 @@
 paddlenlp>=2.5.2
-paddleocr
+paddleocr==2.6.1.3
 pdf2image>1.14
 requests
 pydantic
@@ -29,3 +29,4 @@ boilerpy3
 events
 sseclient-py==1.7.2
 typing_extensions==4.5
+spacy

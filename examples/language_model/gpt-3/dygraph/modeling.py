@@ -980,9 +980,7 @@ class GPTForGeneration(paddlenlp.transformers.GPTPretrainedModel):
         return paddle.ones([batch_size, 1], dtype="int64") * bos_token_id
 
     def prepare_attention_mask_for_generation(self, input_ids, pad_token_id, eos_token_id):
-        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
-            input_ids == pad_token_id
-        ).numpy().item()
+        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(input_ids == pad_token_id).item()
         is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
             (eos_token_id is not None) and (pad_token_id != eos_token_id)
         )

@@ -25,10 +25,13 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.transformers.clip.modeling import CLIPTextModelOutput
 
+from ...loaders import TextualInversionLoaderMixin
 from ...models import AutoencoderKL, PriorTransformer, UNet2DConditionModel
 from ...models.embeddings import get_timestep_embedding
 from ...schedulers import KarrasDiffusionSchedulers
 from ...utils import logging, randn_tensor, replace_example_docstring
+
+# from ...utils import is_accelerate_available, is_accelerate_version, logging, randn_tensor, replace_example_docstring
 from ..pipeline_utils import DiffusionPipeline, ImagePipelineOutput
 from .stable_unclip_image_normalizer import StableUnCLIPImageNormalizer
 
@@ -51,7 +54,7 @@ EXAMPLE_DOC_STRING = """
 """
 
 
-class StableUnCLIPPipeline(DiffusionPipeline):
+class StableUnCLIPPipeline(DiffusionPipeline, TextualInversionLoaderMixin):
     """
     Pipeline for text-to-image generation using stable unCLIP.
 
@@ -264,8 +267,8 @@ class StableUnCLIPPipeline(DiffusionPipeline):
                 whether to use classifier free guidance or not
             negative_prompt (`str` or `List[str]`, *optional*):
                 The prompt or prompts not to guide the image generation. If not defined, one has to pass
-                `negative_prompt_embeds`. instead. If not defined, one has to pass `negative_prompt_embeds`. instead.
-                Ignored when not using guidance (i.e., ignored if `guidance_scale` is less than `1`).
+                `negative_prompt_embeds` instead. Ignored when not using guidance (i.e., ignored if `guidance_scale` is
+                less than `1`).
             prompt_embeds (`paddle.Tensor`, *optional*):
                 Pre-generated text embeddings. Can be used to easily tweak text inputs, *e.g.* prompt weighting. If not
                 provided, text embeddings will be generated from `prompt` input argument.
@@ -282,6 +285,10 @@ class StableUnCLIPPipeline(DiffusionPipeline):
             batch_size = prompt_embeds.shape[0]
 
         if prompt_embeds is None:
+            # textual inversion: procecss multi-vector tokens if necessary
+            if isinstance(self, TextualInversionLoaderMixin):
+                prompt = self.maybe_convert_prompt(prompt, self.tokenizer)
+
             text_inputs = self.tokenizer(
                 prompt,
                 padding="max_length",
@@ -341,6 +348,10 @@ class StableUnCLIPPipeline(DiffusionPipeline):
                 )
             else:
                 uncond_tokens = negative_prompt
+
+            # textual inversion: procecss multi-vector tokens if necessary
+            if isinstance(self, TextualInversionLoaderMixin):
+                uncond_tokens = self.maybe_convert_prompt(uncond_tokens, self.tokenizer)
 
             max_length = prompt_embeds.shape[1]
             uncond_input = self.tokenizer(
@@ -588,8 +599,8 @@ class StableUnCLIPPipeline(DiffusionPipeline):
                 usually at the expense of lower image quality.
             negative_prompt (`str` or `List[str]`, *optional*):
                 The prompt or prompts not to guide the image generation. If not defined, one has to pass
-                `negative_prompt_embeds`. instead. If not defined, one has to pass `negative_prompt_embeds`. instead.
-                Ignored when not using guidance (i.e., ignored if `guidance_scale` is less than `1`).
+                `negative_prompt_embeds` instead. Ignored when not using guidance (i.e., ignored if `guidance_scale` is
+                less than `1`).
             num_images_per_prompt (`int`, *optional*, defaults to 1):
                 The number of images to generate per prompt.
             eta (`float`, *optional*, defaults to 0.0):
@@ -621,9 +632,9 @@ class StableUnCLIPPipeline(DiffusionPipeline):
                 The frequency at which the `callback` function will be called. If not specified, the callback will be
                 called at every step.
             cross_attention_kwargs (`dict`, *optional*):
-                A kwargs dictionary that if specified is passed along to the `AttnProcessor` as defined under
+                A kwargs dictionary that if specified is passed along to the `AttentionProcessor` as defined under
                 `self.processor` in
-                [diffusers.cross_attention](https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/cross_attention.py).
+                [ppdiffusers.cross_attention](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/cross_attention.py).
             noise_level (`int`, *optional*, defaults to `0`):
                 The amount of noise to add to the image embeddings. A higher `noise_level` increases the variance in
                 the final un-noised images. See `StableUnCLIPPipeline.noise_image_embeddings` for details.
@@ -776,7 +787,7 @@ class StableUnCLIPPipeline(DiffusionPipeline):
         timesteps = self.scheduler.timesteps
 
         # 11. Prepare latent variables
-        num_channels_latents = self.unet.in_channels
+        num_channels_latents = self.unet.config.in_channels
         shape = (batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor)
         latents = self.prepare_latents(
             shape=shape,

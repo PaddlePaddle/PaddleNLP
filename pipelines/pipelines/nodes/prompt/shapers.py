@@ -17,7 +17,12 @@ import logging
 import re
 from functools import reduce
 from string import Template
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+try:
+    from typing import Literal
+except ImportError:
+    from typing_extensions import Literal
 
 from pipelines.nodes.base import BaseComponent
 from pipelines.schema import Answer, Document, MultiLabel

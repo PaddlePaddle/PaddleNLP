@@ -9,6 +9,7 @@ tqdm
 paddlefsl
 sentencepiece
 huggingface_hub>=0.11.1
+onnx>=1.10.0
 protobuf==3.20.2     # onnx require: protobuf<4,>=3.20.2, paddle require different version on platforms, refer to: https://github.com/PaddlePaddle/Paddle/blob/cd88156a369bbfb83d6306f89e0ae6ebd78b8040/python/requirements.txt#L3
 paddle2onnx
 Flask-Babel

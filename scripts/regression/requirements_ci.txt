@@ -1,7 +1,9 @@
 opencv-python==4.6.0.66
 opencv-contrib-python==4.6.0.66
+protobuf==3.20.2
 regex
 attrdict==2.0.1
+easydict==1.10.0
 PyYAML==5.4.1
 subword_nmt==0.3.7
 visualdl
@@ -13,7 +15,7 @@ pybind11
 zstandard
 pypinyin
 pycryptodome
-bce-python-sdk
+bce-python-sdk==0.8.74
 packaging
 psutil
 pynvml

@@ -1107,7 +1107,9 @@ class BloomForPretraining(BloomPreTrainedModel):
 
 
 class BloomForCausalLM(BloomPreTrainedModel):
-    _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.weight"]
+    _keys_to_ignore_on_load_missing = [r"h.*.self_attention.scale_mask_softmax.causal_mask", r"lm_head.decoder_weight"]
+    _keys_to_ignore_on_save = [r"lm_head.decoder_weight"]
+    _tied_weights_keys = ["lm_head.decoder_weight"]
 
     def __init__(self, config):
         super().__init__(config)
@@ -1211,9 +1213,14 @@ class BloomForCausalLM(BloomPreTrainedModel):
 
         loss = None
         if labels is not None:
-            # Shift so that tokens < n predict n
-            shift_logits = lm_logits[..., :-1, :]
-            shift_labels = labels[..., 1:]
+            if self.config.lm_shift_labels:
+                # Shift so that tokens < n predict n
+                shift_logits = lm_logits[..., :-1, :]
+                shift_labels = labels[..., 1:]
+            else:
+                shift_logits = lm_logits
+                shift_labels = labels
+
             # Flatten the tokens
             loss = self.criterion(shift_logits, shift_labels)
 
@@ -1474,9 +1481,7 @@ class BloomForGeneration(BloomPreTrainedModel):
         return paddle.ones([batch_size, 1], dtype="int64") * bos_token_id
 
     def prepare_attention_mask_for_generation(self, input_ids, pad_token_id, eos_token_id):
-        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
-            input_ids == pad_token_id
-        ).numpy().item()
+        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(input_ids == pad_token_id).item()
         is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
             (eos_token_id is not None) and (pad_token_id != eos_token_id)
         )

@@ -449,6 +449,16 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         ['O0', 'O1', and 'O2']. See details at https://www.pad
                         dlepaddle.org.cn/documentation/docs/zh/develop/api/pad
                         dle/amp/auto_cast_cn.html (default: O1)
+  --amp_custom_black_list
+                       飞桨有默认的黑名单，可以根据模型特点设置自定义黑名单。自定义黑名单中的算子在计算时会被认为是数值危险的，它们的影响也可能会在下游算子中观察到。该名单中的算子不会转为 float16/bfloat16 计算。(可选，默认为None)
+
+                       The custom black_list. The set of ops that support fp16/bf16 calculation and are considered numerically-dangerous and whose effects may also be observed in downstream ops. These ops will not be converted to fp16/bf16. (default:None)
+
+  --amp_custom_white_list
+                       飞桨有默认的白名单，通常不需要设置自定义白名单。自定义白名单中的算子在计算时会被认为是数值安全的，并且对性能至关重要。如果设置了该名单，其中的算子会使用 float16/bfloat16 计算。(可选，默认为None)
+
+                       The custom white_list. It’s the set of ops that support fp16/bf16 calculation and are considered numerically-safe and performance-critical. These ops will be converted to fp16/bf16. (default:None)
+
   --amp_master_grad
                         当使用pure fp16/bf16的时候, 可能对梯度的数值精度有更高要求,
                         例如梯度裁剪, weight decay, 权重更新的时候.
@@ -575,6 +585,12 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         （`int`，可选，默认为 None）
 
                         Run an evaluation every X steps. (default: None)
+
+  --max_evaluate_steps
+                        如果设置为正数，则表示要执行的评估步骤的总数。
+                        （`int`，可选，默认为 -1)
+
+                        If set to a positive number, the total number of evaluation steps to perform. (default: -1)
 
   --dataloader_num_workers
                         用于数据加载的子进程数。 0 表示数据将在主进程制造。
