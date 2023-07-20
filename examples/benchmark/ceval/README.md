@@ -1,6 +1,6 @@
 # C-Eval评测脚本
 
-此C-Eval评测脚本修改自[ymcui/Chinese-LLaMA-Alpaca](C-Eval)项目。
+此C-Eval评测脚本修改自[ymcui/Chinese-LLaMA-Alpaca](https://github.com/ymcui/Chinese-LLaMA-Alpaca)项目。
 
 ## 数据准备
 
