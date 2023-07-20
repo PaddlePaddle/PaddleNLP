@@ -40,7 +40,7 @@ def reader(data_path):
             yield json_line
 
 
-def convert_example(example, tokenizer, data_args, is_test=False):
+def convert_example(example, tokenizer, data_args, model_max_length=512, is_test=False):
     """
     Convert an example into necessary features.
     """
@@ -76,7 +76,7 @@ def convert_example(example, tokenizer, data_args, is_test=False):
     source_tokenized = tokenizer(
         input_seq,
         return_tensors="pd",
-        max_length=data_args.src_length,
+        max_length=data_args.src_length if not data_args.always_pad_to_max_length else model_max_length,
         truncation=True,
     )
 
@@ -87,7 +87,9 @@ def convert_example(example, tokenizer, data_args, is_test=False):
     example_tokenized = tokenizer(
         input_seq + output_seq,
         return_tensors="pd",
-        max_length=data_args.src_length + data_args.tgt_length,
+        max_length=data_args.src_length + data_args.tgt_length
+        if not data_args.always_pad_to_max_length
+        else model_max_length,
         padding=False,
         truncation=True,
     )
