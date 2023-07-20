@@ -274,7 +274,7 @@ class Trainer:
         self.train_dataset = train_dataset
         self.eval_dataset = eval_dataset
         self.tokenizer = tokenizer
-        if args.enable_timer:
+        if not args.skip_profile_timer:
             set_timers()
         self.timers = get_timers()
 

@@ -294,8 +294,8 @@ class TrainingArguments:
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
         flatten_param_grads (`bool`, *optional*):
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
-        enable_timer (`bool`, *optional*):
-            Whether enable profile timer, will record time usage of forward/ backward/ step, etc.
+        skip_profile_timer (`bool`, *optional*):
+            Whether skip profile timer, timer will record time usage of forward/ backward/ step, etc.
     """
 
     output_dir: str = field(
@@ -605,8 +605,8 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Whether to use paddle.async_save instead of paddle.save."},
     )
-    enable_timer: Optional[bool] = field(
-        default=False,
+    skip_profile_timer: Optional[bool] = field(
+        default=True,
         metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl"},
     )
 
