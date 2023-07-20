@@ -779,6 +779,9 @@ class TrainingArguments:
             self.data_parallel_degree = world_size // (
                 sharding_parallel_degree * tensor_parallel_degree * pipeline_parallel_degree
             )
+            # TODO(liuzhenhai): remove this when framework is ready
+            if sharding_parallel_degree > 1 and ShardingOption.SHARD_OP in self.sharding:
+                assert self.data_parallel_degree == 1, "sharding stage1 can not coexist with dp for now"
 
             if ShardingOption.OFFLOAD in self.sharding or ShardingOption.FULL_SHARD in self.sharding:
                 warnings.warn("`offload` and `stage3` is not supported NOW!")
