@@ -21,11 +21,7 @@ from paddlenlp.peft.prefix import (
     chatglm_pad_attention_mask,
     chatglm_postprocess_past_key_value,
 )
-from paddlenlp.transformers import (
-    ChatGLMConfig,
-    ChatGLMForConditionalGeneration,
-    ChatGLMTokenizer,
-)
+from paddlenlp.transformers import ChatGLMConfig, ChatGLMForCausalLM, ChatGLMTokenizer
 
 
 def parse_arguments():
@@ -96,7 +92,7 @@ class Predictor(object):
                 config = ChatGLMConfig.from_pretrained(args.model_name_or_path)
                 dtype = config.dtype if config.dtype is not None else config.paddle_dtype
 
-            self.model = ChatGLMForConditionalGeneration.from_pretrained(
+            self.model = ChatGLMForCausalLM.from_pretrained(
                 args.model_name_or_path,
                 tensor_parallel_degree=tensor_parallel_degree,
                 tensor_parallel_rank=tensor_parallel_rank,
