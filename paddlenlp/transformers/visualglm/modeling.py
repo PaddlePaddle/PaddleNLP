@@ -1413,9 +1413,9 @@ class VisualGLMModel(VisualGLMPretrainedModel):
         )
 
 
-class ChatGLMForCausalLMWithImage(ChatGLMForCausalLM):
+class ChatGLMForConditionalGenerationWithImage(ChatGLMForCausalLM):
     def __init__(self, config: ChatGLMConfig):
-        super(ChatGLMForCausalLMWithImage, self).__init__(config)
+        super(ChatGLMForConditionalGenerationWithImage, self).__init__(config)
         self.config = config
 
     def forward(
@@ -1466,7 +1466,7 @@ class VisualGLMForConditionalGeneration(VisualGLMPretrainedModel):
         )
         self.qformer = VisualGLMQFormerModel(config.qformer_config)
         self.language_projection = nn.Linear(config.qformer_config.hidden_size, config.text_config.hidden_size)
-        self.language_model = ChatGLMForCausalLMWithImage(config.text_config)
+        self.language_model = ChatGLMForConditionalGenerationWithImage(config.text_config)
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.embeddings.patch_embedding

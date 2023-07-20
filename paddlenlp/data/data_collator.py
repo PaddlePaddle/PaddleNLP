@@ -351,6 +351,7 @@ class DataCollatorForSeq2Seq:
             The id to use when padding the labels (-100 will be automatically ignored by PaddlePaddle loss functions).
         return_tensors (`str`):
             The type of Tensor to return. Allowable values are "np", "pt" and "tf".
+        max_label_length (`int`, *optional*, Pad label to max_label_length. defaults to `None`):
     """
 
     tokenizer: PretrainedTokenizerBase
@@ -361,6 +362,7 @@ class DataCollatorForSeq2Seq:
     label_pad_token_id: int = -100
     return_tensors: str = "pd"
     return_attention_mask: Optional[bool] = None
+    max_label_length: Optional[int] = None
 
     def __call__(self, features, return_tensors=None):
         # Deep copy to avoid modifying features in-place
@@ -371,7 +373,11 @@ class DataCollatorForSeq2Seq:
         # We have to pad the labels before calling `tokenizer.pad` as this method won't pad them and needs them of the
         # same length to return tensors.
         if labels is not None:
-            max_label_length = max(len(l) for l in labels)
+            # Note(gongenlei): In pipeline, max_label_length = self.max_length
+            if self.max_label_length is not None:
+                max_label_length = self.max_label_length
+            else:
+                max_label_length = max(len(l) for l in labels)
             if self.pad_to_multiple_of is not None:
                 max_label_length = (
                     (max_label_length + self.pad_to_multiple_of - 1)

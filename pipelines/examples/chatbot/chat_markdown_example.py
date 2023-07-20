@@ -118,7 +118,7 @@ def chat_markdown_tutorial():
     query_pipeline.add_node(component=ernie_bot, name="ErnieBot", inputs=["TruncateHistory"])
     query = "Jupyter 和 AI Studio Notebook 有什么区别？如何使用Jupyter？"
     start_time = time.time()
-    prediction = query_pipeline.run(query=query, params={"Retriever": {"top_k": 30}, "Ranker": {"top_k": 2}})
+    prediction = query_pipeline.run(query=query, params={"Retriever": {"top_k": 30}, "Ranker": {"top_k": 3}})
     end_time = time.time()
     print("Time cost for query markdown conversion:", end_time - start_time)
     print("user: {}".format(query))
