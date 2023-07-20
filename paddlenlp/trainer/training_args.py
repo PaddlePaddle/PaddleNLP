@@ -232,6 +232,10 @@ class TrainingArguments:
               disable_partial_send_recv, optmize send speed for tensor parallel.
               enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
               enable_dp_comm_overlap, fuse data parallel gradient communication.
+        sharding_parallel_config (`str`, *optional*)(
+            Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
+            following config is support:
+              enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -528,6 +532,16 @@ class TrainingArguments:
                 "disable_partial_send_recv, optmize send speed for tensor parallel.\n"
                 "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
                 "enable_dp_comm_overlap, fuse data parallel gradient communication. \n"
+            )
+        },
+    )
+    sharding_parallel_config: str = field(
+        default="",
+        metadata={
+            "help": (
+                "Some additional config it highly affect the useage of sharding parallel, we provide some option to config it."
+                "following config is support: \n"
+                "enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation"
             )
         },
     )
@@ -830,6 +844,27 @@ class TrainingArguments:
 
                 # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
                 strategy.hybrid_configs = hybrid_configs
+
+                if sharding_parallel_degree > 1:
+                    sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
+                    for x in sharding_parallel_config:
+                        if len(x) > 0:
+                            if x not in [
+                                "enable_stage1_tensor_fusion",
+                            ]:
+                                raise ValueError(
+                                    f"Found unknown pipeline mode config {x}, "
+                                    f"accpet config is enable_stage1_tensor_fusion."
+                                )
+                    try:
+                        strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
+                            True if "enable_stage1_tensor_fusion" in sharding_parallel_config else False
+                        )
+                    except KeyError:
+                        warnings.warn(
+                            "The enable_stage1_tensor_fusion is not supported by current version of Paddle. "
+                            "Please try lateset develop Paddle."
+                        )
                 fleet.init(is_collective=True, strategy=strategy)
 
                 logger.info(strategy)
