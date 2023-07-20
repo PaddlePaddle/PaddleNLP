@@ -45,19 +45,18 @@ def apply(model, args, lr_scheduler, clip, decay_params, strategy):
             apply_decay_param_fun=lambda x: x in decay_params,
             multi_precision=args.use_pure_fp16,
         )
-        return optimizer
-
-    optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler if lr_scheduler is not None else args.max_lr,
-        beta1=args.adam_beta1,
-        beta2=args.adam_beta2,
-        epsilon=args.adam_epsilon,
-        parameters=model.parameters(),
-        weight_decay=args.weight_decay,
-        grad_clip=clip,
-        apply_decay_param_fun=lambda x: x in decay_params,
-        # TODO: remove 'multi_precision' in definition of optimizer
-        # and add it to 'paddle.amp.decorate'
-        multi_precision=args.use_pure_fp16,
-    )
+    else:
+        optimizer = paddle.optimizer.AdamW(
+            learning_rate=lr_scheduler if lr_scheduler is not None else args.max_lr,
+            beta1=args.adam_beta1,
+            beta2=args.adam_beta2,
+            epsilon=args.adam_epsilon,
+            parameters=model.parameters(),
+            weight_decay=args.weight_decay,
+            grad_clip=clip,
+            apply_decay_param_fun=lambda x: x in decay_params,
+            # TODO: remove 'multi_precision' in definition of optimizer
+            # and add it to 'paddle.amp.decorate'
+            multi_precision=args.use_pure_fp16,
+        )
     return optimizer
