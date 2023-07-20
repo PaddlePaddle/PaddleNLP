@@ -28,6 +28,7 @@ class ModelArgument:
     model_name_or_path: str = field(
         default=None, metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
+    use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
 
     # LoRA related parameters
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})

@@ -52,7 +52,7 @@ def get_prefix_tuning_params(model):
         multi_query_group_num = None
     elif model.base_model_prefix == "chatglm_v2":
         num_attention_heads = model.config.num_attention_heads
-        num_hidden_layers = model.config.num_hidden_layers
+        num_hidden_layers = model.config.num_layers
         hidden_size = model.config.hidden_size
         pad_attention_mask = chatglm_v2_pad_attention_mask
         postprocess_past_key_value = chatglm_postprocess_past_key_value
@@ -78,14 +78,13 @@ def get_prefix_tuning_params(model):
     )
 
 
-def get_lora_params(model, is_tp=False):
+def get_lora_target_modules(model, is_tp=False):
     # Not yet support RowParallelLinear
     if model.base_model_prefix == "chatglm":
         if is_tp > 1:
             target_modules = [".*query_key_value.*", ".*dense_h_to_4h.*"]
         else:
             target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
-        head_dim = model.config.hidden_size // model.config.num_attention_heads
     elif model.base_model_prefix == "chatglm_v2":
         if is_tp > 1:
             target_modules = [".*query.*", ".*key.*", ".*value.*", ".*dense_h_to_4h.*"]
@@ -98,19 +97,35 @@ def get_lora_params(model, is_tp=False):
                 ".*dense_h_to_4h.*",
                 ".*dense_4h_to_h.*",
             ]
-        head_dim = model.config.hidden_size // model.config.num_attention_head
-
     elif model.base_model_prefix == "bloom":
         if is_tp > 1:
             target_modules = [".*query_key_value.*", ".*dense_h_to_4h.*"]
         else:
             target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
-        head_dim = model.config.n_embed // model.config.num_attention_heads
+    elif model.base_model_prefix == "llama":
+        if is_tp > 1:
+            target_modules = [
+                ".*q_proj.*",
+                ".*v_proj.*",
+                ".*k_proj.*",
+                ".*gate_proj.*",
+                ".*up_proj.*",
+            ]
+        else:
+            target_modules = [
+                ".*q_proj.*",
+                ".*v_proj.*",
+                ".*k_proj.*",
+                ".*o_proj.*",
+                ".*gate_proj.*",
+                ".*down_proj.*",
+                ".*up_proj.*",
+            ]
     else:
         raise ValueError(
             f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama."
         )
-    return dict(target_modules=target_modules, head_dim=head_dim)
+    return target_modules
 
 
 def get_ptq_model_config(model):

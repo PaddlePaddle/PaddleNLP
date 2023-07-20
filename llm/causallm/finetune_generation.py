@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import os
+import sys
 from functools import partial
 
 import paddle
@@ -21,7 +21,7 @@ from data import get_convert_example, read_local_dataset
 from utils import (
     CausalLMTrainer,
     compute_metrics,
-    get_lora_params,
+    get_lora_target_modules,
     get_prefix_tuning_params,
     get_ptq_model_config,
 )
@@ -37,11 +37,17 @@ from paddlenlp.utils.log import logger
 def main():
     # Arguments
     parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
-    gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file(
+            json_file=os.path.abspath(sys.argv[1])
+        )
+    else:
+        gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
     training_args.print_config(quant_args, "Quant")
     training_args.print_config(gen_args, "Generation")
+
     if quant_args.do_ptq and quant_args.do_qat:
         raise ValueError("PTQ and QAT can not work at the same time.")
 
@@ -70,10 +76,21 @@ def main():
         dtype=dtype,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
+        tensor_parallel_output=False,
     )
+
     # Alreday shift label & logit in convert example
     if hasattr(model.config, "lm_shift_labels"):
         model.config.lm_shift_labels = False
+
+    # Only llama and gpt support flash_attention
+    if model_args.use_flash_attention:
+        if model.base_model_prefix not in ["llama", "gpt"]:
+            raise NotImplementedError(
+                "Only llama and gpt support flash_attention. Please set use_flash_attention to False"
+            )
+        if hasattr(model.config, "use_flash_attention"):
+            model.config.use_flash_attention = model_args.use_flash_attention
 
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
@@ -124,15 +141,14 @@ def main():
         from paddlenlp.peft import LoRAConfig, LoRAModel
 
         if model_args.lora_path is None:
-            lora_params = get_lora_params(model, is_tp=training_args.tensor_parallel_degree > 1)
+            target_modules = get_lora_target_modules(model, is_tp=training_args.tensor_parallel_degree > 1)
             lora_config = LoRAConfig(
-                target_modules=lora_params["target_modules"],
+                target_modules=target_modules,
                 r=model_args.lora_rank,
                 lora_alpha=2 * model_args.lora_rank,
                 merge_weights=model_args.lora_merge_weights,
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 dtype=dtype,
-                head_dim=lora_params["head_dim"],
             )
             model = LoRAModel(model, lora_config)
         else:
