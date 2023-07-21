@@ -19,12 +19,12 @@ import paddle
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from sklearn.metrics import accuracy_score
 
-from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 from paddlenlp.peft.prefix import (
     bloom_postprocess_past_key_value,
     chatglm_pad_attention_mask,
     chatglm_postprocess_past_key_value,
     chatglm_v2_pad_attention_mask,
+    llama_postprocess_past_key_value,
 )
 from paddlenlp.trainer import Trainer
 from paddlenlp.trainer.trainer_utils import has_length
@@ -63,6 +63,13 @@ def get_prefix_tuning_params(model):
         hidden_size = model.config.n_embed
         pad_attention_mask = None
         postprocess_past_key_value = bloom_postprocess_past_key_value
+        multi_query_group_num = None
+    elif model.base_model_prefix == "llama":
+        num_attention_heads = model.config.n_head
+        num_hidden_layers = model.config.n_layer
+        hidden_size = model.config.hidden_size
+        pad_attention_mask = None
+        postprocess_past_key_value = llama_postprocess_past_key_value
         multi_query_group_num = None
     else:
         raise ValueError(
@@ -126,27 +133,6 @@ def get_lora_target_modules(model, is_tp=False):
             f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama."
         )
     return target_modules
-
-
-def get_ptq_model_config(model):
-    if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
-        base_model_prefix = model.model.base_model_prefix
-    else:
-        base_model_prefix = model.base_model_prefix
-
-    if base_model_prefix == "chatglm":
-        model_config = {"fused_qkv": True, "parallel_ffn": False}
-    elif base_model_prefix == "chatglm_v2":
-        model_config = {"fused_qkv": False, "parallel_ffn": True}
-    elif base_model_prefix == "bloom":
-        model_config = {"fused_qkv": True, "parallel_ffn": False}
-    elif base_model_prefix == "llama":
-        model_config = {"fused_qkv": False, "parallel_ffn": True}
-    else:
-        raise ValueError(
-            f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama."
-        )
-    return model_config
 
 
 class CausalLMTrainer(Trainer):

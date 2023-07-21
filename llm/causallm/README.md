@@ -1,13 +1,12 @@
-# lora
 ```
 python  finetune_generation.py \
-    --model_name_or_path THUDM/chatglm2-6b  \
+    --model_name_or_path __internal_testing__/tiny-random-llama   \
     --dataset_name_or_path /root/paddlejob/work/eb_data/hcg \
     --output_dir ./checkpoints \
     --per_device_train_batch_size 4 \
     --gradient_accumulation_steps 2 \
     --per_device_eval_batch_size 8 \
-    --num_train_epochs 2 \
+    --num_train_epochs 1 \
     --learning_rate 3e-4 \
     --warmup_steps 30 \
     --logging_steps 1 \
@@ -30,13 +29,13 @@ python  finetune_generation.py \
 ```
 
 python  finetune_generation.py \
-    --model_name_or_path THUDM/chatglm2-6b  \
+    --model_name_or_path __internal_testing__/tiny-random-llama   \
     --dataset_name_or_path /root/paddlejob/work/eb_data/hcg \
     --output_dir ./checkpoints \
     --per_device_train_batch_size 4 \
     --gradient_accumulation_steps 2 \
     --per_device_eval_batch_size 8 \
-    --num_train_epochs 2 \
+    --num_train_epochs 1 \
     --learning_rate 3e-2 \
     --warmup_steps 30 \
     --logging_steps 1 \
@@ -54,5 +53,7 @@ python  finetune_generation.py \
     --eval_with_do_generation False \
     --recompute \
     --save_total_limit 1  \
-    --device gpu:2 \
+    --device gpu:1 \
     --prefix_tuning True
+
+bigscience/bloom-560m

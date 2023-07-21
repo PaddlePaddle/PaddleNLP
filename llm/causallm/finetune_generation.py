@@ -23,12 +23,12 @@ from utils import (
     compute_metrics,
     get_lora_target_modules,
     get_prefix_tuning_params,
-    get_ptq_model_config,
 )
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
+from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.log import logger
@@ -94,6 +94,9 @@ def main():
 
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    if model.base_model_prefix == "llama":
+        tokenizer.pad_token = tokenizer.unk_token
+
     if data_args.dataset_name_or_path is None:
         raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
     elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) and os.path.exists(
@@ -117,8 +120,6 @@ def main():
     dev_ds = dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
 
     if model_args.prefix_tuning:
-        from paddlenlp.peft import PrefixConfig, PrefixModelForCausalLM
-
         prefix_tuning_params = get_prefix_tuning_params(model)
         prefix_config = PrefixConfig(
             num_prefix_tokens=model_args.num_prefix_tokens,
@@ -137,9 +138,7 @@ def main():
         model.mark_only_prefix_as_trainable()
         model.print_trainable_parameters()
 
-    if model_args.lora or model_args.lora_path is not None:
-        from paddlenlp.peft import LoRAConfig, LoRAModel
-
+    if model_args.lora:
         if model_args.lora_path is None:
             target_modules = get_lora_target_modules(model, is_tp=training_args.tensor_parallel_degree > 1)
             lora_config = LoRAConfig(
@@ -155,39 +154,6 @@ def main():
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
-
-    if quant_args.do_qat:
-        from paddle import nn
-        from paddle.quantization import QAT, QuantConfig
-
-        # FakeQuanterChannelWiseAbsMaxObserver not yet merge in Paddle develop
-        from paddle.quantization.quanters import FakeQuanterChannelWiseAbsMaxObserver
-        from paddle.quantization.quanters.abs_max import (
-            FakeQuanterWithAbsMaxObserverLayer,
-        )
-        from paddleslim.quant.quanters import PACTQuanter
-
-        from paddlenlp.peft.lora import LoRALinear
-        from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
-
-        q_config = QuantConfig(activation=None, weight=None)
-        q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
-        if model_args.qat_type == "A8W8":
-            activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
-            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype="float32")
-        elif model_args.qat_type == "W4":
-            activation = None
-            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
-        elif model_args.qat_type == "A8W4":
-            activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
-            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
-        else:
-            raise ValueError("qat_type should be one of ['A8W8', 'W4', 'A8W4']")
-        q_config.add_type_config(LoRALinear, weight=weight, activation=activation)
-        q_config.add_type_config(nn.Linear, weight=weight, activation=activation)
-
-        qat = QAT(q_config)
-        model = qat.quantize(model, inplace=True)
 
     def compute_metrics_do_generation(eval_preds):
         rouge1 = Rouge1()
@@ -233,41 +199,37 @@ def main():
         data_args=data_args,
     )
 
-    # Train & QAT
-    if training_args.do_train or quant_args.do_qat:
+    # Train
+    if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
         trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
         trainer.log_metrics("train", train_result.metrics)
         trainer.save_metrics("train", train_result.metrics)
         trainer.save_state()
 
+    # QAT
+    if quant_args.do_qat:
+        if training_args.tensor_parallel_degree > 1:
+            raise NotImplementedError("Only support qat on single gpu.")
+        from quant import create_qat_model
+
+        trainer.model = create_qat_model(quant_args, trainer.model, dtype)
+        train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
+        trainer.save_model()
+        trainer.log_metrics("qat", train_result.metrics)
+        trainer.save_metrics("qat", train_result.metrics)
+        trainer.save_state()
+
     # PTQ
     if quant_args.do_ptq:
-        from paddle.distributed.fleet.meta_parallel import (
-            ColumnParallelLinear,
-            RowParallelLinear,
-        )
-        from paddle.quantization import PTQ, QuantConfig
-        from paddleslim.quant.advanced import (
-            EMASampler,
-            MultiStepSampler,
-            PieceWiseSearch,
-            Shift,
-            Smooth,
-        )
-        from paddleslim.quant.layers import (
-            QuantizedColumnParallelLinear,
-            QuantizedRowParallelLinear,
-        )
-        from paddleslim.quant.observers import (
-            AbsMaxChannelWiseWeightObserver,
-            AbsmaxObserver,
-        )
-
-        from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
+        if isinstance(model, LoRAModel):
+            raise NotImplementedError(
+                "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
+            )
+        from quant import apply_ptq, apply_shift, apply_smooth, get_ptq_model_config
 
         trainer.model.eval()
-        # prepare ptq dataloader
+        # Prepare ptq dataloader
         if os.path.exists(os.path.join(data_args.dataset_name_or_path, "ptq.json")):
             ptq_ds = load_dataset(
                 read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "ptq.json"), lazy=False
@@ -279,77 +241,16 @@ def main():
                 f"Not found ptq.json in {data_args.dataset_name_or_path}. Set train dataset to PTQ dataset path."
             )
         ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
-        ptq_model_config = get_ptq_model_config(trainer.model)
+        if quant_args.shift or quant_args.smooth:
+            ptq_model_config = get_ptq_model_config(trainer.model)
 
         if quant_args.shift:
-            shift_sampler = EMASampler() if quant_args.shift_sampler == "ema" else None
-            shift = Shift(
-                model=trainer.model,
-                model_config=ptq_model_config,
-                sample_function=shift_sampler,
-                shift_all_linears=quant_args.shift_all_linears,
-            )
-
-            trainer.ptq_loop(
-                ptq_dataloader,
-                description="Shift",
-                max_eval_iters=quant_args.shift_step,
-            )
-            shift.update_weight()
-            del shift, shift_sampler
+            apply_shift(quant_args, trainer, ptq_dataloader, ptq_model_config)
 
         if quant_args.smooth:
-            smooth_sampler = MultiStepSampler() if quant_args.smooth_sampler == "multi_step" else None
-            if quant_args.smooth_piecewise_search:
-                search_func = PieceWiseSearch(
-                    k_piece=quant_args.smooth_k_piece,
-                    bits_length=8,
-                    search_piece=quant_args.smooth_search_piece,
-                    search_alpha_min=0.2,
-                    search_alpha_max=0.8,
-                    search_scale_min=1.0,
-                    search_scale_max=5.0,
-                    weight_quant_method="abs_max_channel_wise",
-                    act_quant_method="abs_max",
-                )
-            else:
-                search_func = None
-            smooth = Smooth(
-                trainer.model,
-                ptq_model_config,
-                alpha=0.5,
-                smooth_all_linears=quant_args.smooth_all_linears,
-                sample_function=smooth_sampler,
-                search_function=search_func,
-            )
-            trainer.ptq_loop(
-                ptq_dataloader,
-                description="Smooth",
-                max_eval_iters=quant_args.smooth_step,
-            )
+            apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config)
 
-            smooth.update_weight()
-            del smooth, smooth_sampler, search_func
-
-        q_config = QuantConfig(activation=None, weight=None)
-        act_quanter = AbsmaxObserver()
-        weight_quanter = AbsMaxChannelWiseWeightObserver()
-        q_config.add_qat_layer_mapping(ColumnParallelLinear, QuantizedColumnParallelLinear)
-        q_config.add_qat_layer_mapping(RowParallelLinear, QuantizedRowParallelLinear)
-        q_config.add_type_config(
-            [paddle.nn.Linear, ColumnParallelLinear, RowParallelLinear, QuantedLoRALinear],
-            activation=act_quanter,
-            weight=weight_quanter,
-        )
-
-        ptq = PTQ(q_config)
-        trainer.model = ptq.quantize(trainer.model, inplace=True)
-        trainer.ptq_loop(
-            ptq_dataloader,
-            description="PTQ",
-            max_eval_iters=quant_args.ptq_step,
-        )
-        trainer.model = ptq.convert(trainer.model, inplace=True)
+        apply_ptq(quant_args, trainer, ptq_dataloader)
 
     # Evaluation
     if training_args.do_eval:
