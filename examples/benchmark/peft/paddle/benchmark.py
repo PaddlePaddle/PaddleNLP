@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
 from dataclasses import dataclass, field
 from typing import Optional
 
 import paddle.profiler as profiler
 from datasets import load_dataset
-from utils import CustomTrainer, InTokensDataset, ProfilerCallback
+from utils import CustomTrainer, ProfilerCallback
 
 from paddlenlp.data import DataCollatorForSeq2Seq
+from paddlenlp.datasets import InTokensMapDataset
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import (
@@ -135,7 +135,7 @@ def main():
         labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
         model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
-
+        model_inputs["position_ids"] = list(range(len(model_inputs["input_ids"])))
         return model_inputs
 
     if model_args.english:
@@ -148,15 +148,12 @@ def main():
     dataset = dataset.map(
         lambda example: preprocess_function(example), remove_columns=["instruction", "input", "output"]
     )
-    raw_dataset = [{"input_ids": item["input_ids"], "labels": item["labels"]} for item in dataset]
-    avg_tokens_per_example = sum([len(i["input_ids"]) for i in raw_dataset]) // len(raw_dataset)
+    total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
 
-    num_iter = math.ceil(model_args.train_data_size * avg_tokens_per_example / model_args.max_seq_len)
-    dataset = InTokensDataset(
-        raw_dataset,
+    dataset = InTokensMapDataset(
+        dataset,
         tokenizer=tokenizer,
         max_seq_len=model_args.max_seq_len,
-        num_iter=num_iter,
     )
 
     if model_args.profiler:
@@ -180,7 +177,7 @@ def main():
 
     train_metrics = trainer.train()
     tokens_per_second = trainer.total_observed_tokens / train_metrics.metrics["train_runtime"]
-    effective_tokens_per_second = trainer.total_effective_tokens / train_metrics.metrics["train_runtime"]
+    effective_tokens_per_second = total_effective_tokens / train_metrics.metrics["train_runtime"]
     print(f"Tokens per second: {tokens_per_second:.2f}")
     print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
 
