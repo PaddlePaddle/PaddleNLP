@@ -50,3 +50,11 @@ def chatglm_pad_attention_mask(input_ids_shape, num_prefix_tokens, attention_mas
     )
     prefix_attention_mask = (prefix_attention_mask < 0.5).astype("int64")
     return paddle.concat((prefix_attention_mask, attention_mask), axis=3)
+
+
+def chatglm_v2_pad_attention_mask(input_ids_shape, num_prefix_tokens, attention_mask):
+    # chatglm_v2 uses a padding_mask of shape [batch_size, seq_length] as the attention_mask
+    # 0 indicates the token is a pad token and 1 indicates the token is a real token
+    # chatglm_v2 creates the full attention_mask of shape [batch_size, num_head, seq_length, seq_length] in the model network
+    prefix_attention_mask = paddle.ones([input_ids_shape[0], num_prefix_tokens], dtype=attention_mask.dtype)
+    return paddle.concat((prefix_attention_mask, attention_mask), axis=-1)

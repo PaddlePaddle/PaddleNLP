@@ -20,6 +20,7 @@ import paddle
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.distributed.fleet.utils import recompute
 
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -28,6 +29,12 @@ from ..model_outputs import (
     ModelOutput,
 )
 from .configuration import CHATGLM_V2_PRETRAINED_RESOURCE_FILES_MAP, ChatGLMv2Config
+
+__all__ = [
+    "ChatGLMv2Model",
+    "ChatGLMv2PretrainedModel",
+    "ChatGLMv2ForCausalLM",
+]
 
 
 def assign_kv_heads(num_kv_heads, num_gpus):
@@ -62,7 +69,7 @@ def assign_kv_heads(num_kv_heads, num_gpus):
 class RotaryEmbedding(nn.Layer):
     def __init__(self, dim, original_impl=False):
         super().__init__()
-        self.dtype = paddle.get_default_dtype()
+        self.default_dtype = paddle.get_default_dtype()
         inv_freq = 1.0 / (10000 ** (paddle.arange(0, dim, 2, dtype="float32") / dim))
         self.register_buffer("inv_freq", inv_freq)
         self.dim = dim
@@ -81,13 +88,13 @@ class RotaryEmbedding(nn.Layer):
         seq_idx = paddle.arange(0, seq_len, dtype=theta.dtype)
 
         # Calculate the product of position index and $\theta_i$
-        idx_theta = paddle.outer(seq_idx, theta).astype(self.dtype)
+        idx_theta = paddle.outer(seq_idx, theta).astype(self.default_dtype)
 
         cache = paddle.stack([paddle.cos(idx_theta), paddle.sin(idx_theta)], axis=-1)
 
         # this is to mimic the behaviour of complex32, else we will get different results
-        if self.dtype in (paddle.float16, paddle.bfloat16, paddle.int8):
-            cache = cache.astype(self.dtype)
+        if self.default_dtype in (paddle.float16, paddle.bfloat16, paddle.int8):
+            cache = cache.astype(self.default_dtype)
             # cache = cache.bfloat16() if dtype == paddle.bfloat16 else cache.astype("float16")
         return cache
 
@@ -142,7 +149,7 @@ class CoreAttention(nn.Layer):
     def __init__(self, config: ChatGLMv2Config, layer_number):
         super(CoreAttention, self).__init__()
 
-        self.dtype = paddle.get_default_dtype()
+        self.default_dtype = paddle.get_default_dtype()
         self.apply_query_key_layer_scaling = config.apply_query_key_layer_scaling
         self.attention_softmax_in_fp32 = config.attention_softmax_in_fp32
         if self.apply_query_key_layer_scaling:
@@ -205,7 +212,7 @@ class CoreAttention(nn.Layer):
             )
 
         attention_probs = F.softmax(attention_scores.astype("float32"), axis=-1)
-        attention_probs = attention_probs.astype(self.dtype)
+        attention_probs = attention_probs.astype(self.default_dtype)
 
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
@@ -467,7 +474,7 @@ class GLMTransformer(nn.Layer):
 
     def __init__(self, config: ChatGLMv2Config):
         super(GLMTransformer, self).__init__()
-
+        self.enable_recompute = False
         self.fp32_residual_connection = config.fp32_residual_connection
         self.post_layer_norm = config.post_layer_norm
 
@@ -487,6 +494,33 @@ class GLMTransformer(nn.Layer):
 
     def _get_layer(self, layer_number):
         return self.layers[layer_number]
+
+    @paddle.jit.not_to_static
+    def recompute_training(
+        self,
+        layer_module: nn.Layer,
+        hidden_states: paddle.Tensor,
+        attention_mask: paddle.Tensor,
+        rotary_embeds: paddle.Tensor,
+        kv_cache: paddle.Tensor,
+        use_cache: bool,
+    ):
+        def create_custom_forward(module):
+            def custom_forward(*inputs):
+                return module(*inputs)
+
+            return custom_forward
+
+        hidden_states, kv_cache = recompute(
+            create_custom_forward(layer_module),
+            hidden_states,
+            attention_mask,
+            rotary_embeds,
+            kv_cache,
+            use_cache,
+            use_reentrant=False,
+        )
+        return hidden_states, kv_cache
 
     def forward(
         self,
@@ -508,9 +542,19 @@ class GLMTransformer(nn.Layer):
 
             layer = self._get_layer(index)
 
-            hidden_states, kv_cache = layer(
-                hidden_states, attention_mask, rotary_pos_emb, kv_cache=kv_caches[index], use_cache=use_cache
-            )
+            if self.enable_recompute and not hidden_states.stop_gradient:
+                hidden_states, kv_cache = self.recompute_training(
+                    layer,
+                    hidden_states,
+                    attention_mask,
+                    rotary_pos_emb,
+                    kv_cache=kv_caches[index],
+                    use_cache=use_cache,
+                )
+            else:
+                hidden_states, kv_cache = layer(
+                    hidden_states, attention_mask, rotary_pos_emb, kv_cache=kv_caches[index], use_cache=use_cache
+                )
 
             if use_cache:
                 presents = presents + (kv_cache,)
@@ -545,14 +589,12 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
             full_attention_mask = paddle.concat(
                 [paddle.ones([batch_size, seq_length, past_length]), full_attention_mask], axis=-1
             )
-        print(full_attention_mask.shape, padding_mask.shape)
         if padding_mask is not None:
             full_attention_mask = full_attention_mask * padding_mask.unsqueeze(1)
         if not past_length and padding_mask is not None:
             full_attention_mask -= padding_mask.unsqueeze(-1) - 1
         full_attention_mask = (full_attention_mask < 0.5).astype("bool")
-        full_attention_mask.unsqueeze(1)
-        return full_attention_mask
+        return full_attention_mask.unsqueeze(1)
 
     def get_position_ids(self, input_ids):
         batch_size, seq_length = input_ids.shape
@@ -709,7 +751,7 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         )
 
 
-class ChatGLMv2ForConditionalGeneration(ChatGLMv2PretrainedModel):
+class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
     def __init__(self, config: ChatGLMv2Config):
         super().__init__(config)
         self.max_sequence_length = config.max_sequence_length

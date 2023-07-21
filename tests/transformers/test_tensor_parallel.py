@@ -101,12 +101,12 @@ def _test_llama():
 
 
 def _test_chatglm():
-    from paddlenlp.transformers import ChatGLMConfig, ChatGLMForConditionalGeneration
+    from paddlenlp.transformers import ChatGLMConfig, ChatGLMForCausalLM
 
     config = ChatGLMConfig()
     config = prepare_config(config)
-    model = ChatGLMForConditionalGeneration._from_config(config)
-    common_test_merge(model, ChatGLMForConditionalGeneration)
+    model = ChatGLMForCausalLM._from_config(config)
+    common_test_merge(model, ChatGLMForCausalLM)
 
 
 def _test_bloom():

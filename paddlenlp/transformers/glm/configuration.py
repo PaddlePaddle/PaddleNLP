@@ -31,7 +31,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "attention_dropout_prob": 0.1,
         "attention_scale": 1.0,
         "block_position_encoding": True,
-        "checkpoint_activations": False,
         "checkpoint_num_layers": 1,
         "embedding_dropout_prob": 0.1,
         "hidden_size": 1152,
@@ -55,7 +54,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "attention_dropout_prob": 0.1,
         "attention_scale": 1.0,
         "block_position_encoding": True,
-        "checkpoint_activations": False,
         "checkpoint_num_layers": 1,
         "embedding_dropout_prob": 0.1,
         "hidden_size": 2048,
@@ -77,7 +75,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "attention_dropout_prob": 0.1,
         "attention_scale": 1.0,
         "block_position_encoding": True,
-        "checkpoint_activations": False,
         "checkpoint_num_layers": 1,
         "embedding_dropout_prob": 0.1,
         "hidden_size": 4096,
@@ -99,7 +96,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "attention_dropout_prob": 0.1,
         "attention_scale": 1.0,
         "block_position_encoding": True,
-        "checkpoint_activations": False,
         "checkpoint_num_layers": 1,
         "embedding_dropout_prob": 0.1,
         "hidden_size": 1024,
@@ -122,7 +118,6 @@ GLM_PRETRAINED_INIT_CONFIGURATION = {
         "attention_dropout_prob": 0.1,
         "attention_scale": 1.0,
         "block_position_encoding": True,
-        "checkpoint_activations": False,
         "checkpoint_num_layers": 1,
         "embedding_dropout_prob": 0.1,
         "hidden_size": 4096,
@@ -219,7 +214,6 @@ class GLMConfig(PretrainedConfig):
         attention_dropout_prob=0.1,
         output_dropout_prob=0.1,
         max_sequence_length=512,
-        checkpoint_activations=False,
         checkpoint_num_layers=1,
         parallel_output=True,
         relative_encoding=False,
@@ -243,7 +237,6 @@ class GLMConfig(PretrainedConfig):
         self.attention_dropout_prob = attention_dropout_prob
         self.output_dropout_prob = output_dropout_prob
         self.max_sequence_length = max_sequence_length
-        self.checkpoint_activations = checkpoint_activations
         self.checkpoint_num_layers = checkpoint_num_layers
         self.parallel_output = parallel_output
         self.relative_encoding = relative_encoding

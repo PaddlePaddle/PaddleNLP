@@ -22,11 +22,7 @@ from utils import CustomTrainer, ProfilerCallback
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
-from paddlenlp.transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    ChatGLMForConditionalGeneration,
-)
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 
 """
 单卡
@@ -83,29 +79,16 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     if "llama" in model_args.model_name_or_path:
         tokenizer.pad_token = tokenizer.unk_token
-    if "chatglm" in model_args.model_name_or_path:
-        model = ChatGLMForConditionalGeneration.from_pretrained(
-            model_args.model_name_or_path,
-            load_state_as_np=True,
-            low_cpu_mem_usage=True,
-            # use_flash_attention=True,
-            dtype=dtype,
-            tensor_parallel_degree=training_args.tensor_parallel_degree,
-            tensor_parallel_rank=training_args.tensor_parallel_rank,
-            recompute=training_args.recompute,
-        )
-
-    else:
-        model = AutoModelForCausalLM.from_pretrained(
-            model_args.model_name_or_path,
-            load_state_as_np=True,
-            low_cpu_mem_usage=True,
-            # use_flash_attention=True,
-            dtype=dtype,
-            tensor_parallel_degree=training_args.tensor_parallel_degree,
-            tensor_parallel_rank=training_args.tensor_parallel_rank,
-            use_recompute=training_args.recompute,
-        )
+    model = AutoModelForCausalLM.from_pretrained(
+        model_args.model_name_or_path,
+        load_state_as_np=True,
+        low_cpu_mem_usage=True,
+        # use_flash_attention=True,
+        dtype=dtype,
+        tensor_parallel_degree=training_args.tensor_parallel_degree,
+        tensor_parallel_rank=training_args.tensor_parallel_rank,
+        use_recompute=training_args.recompute,
+    )
 
     if model_args.lora:
         if "llama" in model_args.model_name_or_path:

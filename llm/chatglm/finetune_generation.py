@@ -18,7 +18,7 @@ from functools import partial
 
 import numpy as np
 import paddle
-from data import convert_example, read_local_dataset
+from data import convert_chatglm_example, convert_chatglm_v2_example, read_local_dataset
 from sklearn.metrics import accuracy_score
 from utils import ChatGLMTrainer
 
@@ -29,9 +29,10 @@ from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCa
 from paddlenlp.peft.prefix import (
     chatglm_pad_attention_mask,
     chatglm_postprocess_past_key_value,
+    chatglm_v2_pad_attention_mask,
 )
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
-from paddlenlp.transformers import ChatGLMForConditionalGeneration, ChatGLMTokenizer
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -100,18 +101,28 @@ def main():
             dtype = "float16"
 
     # Load the pretrained language model.
-    model = ChatGLMForConditionalGeneration.from_pretrained(
+    model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         dtype=dtype,
+        low_cpu_mem_usage=True,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
-        lm_shift_labels=False,
     )
+    if "chatglm2" in model_args.model_name_or_path:
+        multi_query_group_num = model.config.multi_query_group_num
+        attention_mask_pad_fn = chatglm_v2_pad_attention_mask
+    else:
+        multi_query_group_num = None
+        attention_mask_pad_fn = chatglm_pad_attention_mask
+        # If ChatGLM, set lm_shift_labels to False
+        model.config.lm_shift_labels = False
+
     if model_args.prefix_tuning:
         prefix_config = PrefixConfig(
             num_prefix_tokens=model_args.num_prefix_tokens,
             num_attention_heads=model.config.num_attention_heads,
             num_hidden_layers=model.config.num_hidden_layers,
+            multi_query_group_num=multi_query_group_num,
             hidden_size=model.config.hidden_size,
             prefix_projection=model_args.prefix_projection,
             prefix_projection_hidden_size=model.config.hidden_size,
@@ -121,17 +132,30 @@ def main():
             model=model,
             prefix_config=prefix_config,
             postprocess_past_key_value=chatglm_postprocess_past_key_value,
-            pad_attention_mask=chatglm_pad_attention_mask,
+            pad_attention_mask=attention_mask_pad_fn,
         )
         model.mark_only_prefix_as_trainable()
         model.print_trainable_parameters()
     if model_args.lora:
         if model_args.lora_path is None:
-            # Not yet support RowParallelLinear
-            if training_args.tensor_parallel_degree > 1:
-                target_modules = [".*query_key_value.*", ".*dense_h_to_4h.*"]
+            # RowParallelLinear doesn't support LoRA yet
+            if "chatglm2" in model_args.model_name_or_path:
+                if training_args.tensor_parallel_degree > 1:
+                    target_modules = [".*query.*", ".*key.*", ".*value.*", ".*dense_h_to_4h.*"]
+                else:
+                    target_modules = [
+                        ".*query.*",
+                        ".*key.*",
+                        ".*value.*",
+                        ".*dense.*",
+                        ".*dense_h_to_4h.*",
+                        ".*dense_4h_to_h.*",
+                    ]
             else:
-                target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
+                if training_args.tensor_parallel_degree > 1:
+                    target_modules = [".*query_key_value.*", ".*dense_h_to_4h.*"]
+                else:
+                    target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
             lora_config = LoRAConfig(
                 target_modules=target_modules,
                 r=model_args.lora_rank,
@@ -185,7 +209,7 @@ def main():
         qat = QAT(q_config)
         model = qat.quantize(model, inplace=True)
 
-    tokenizer = ChatGLMTokenizer.from_pretrained(model_args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load the dataset.
     if os.path.exists(os.path.join(data_args.task_name_or_path, "train.json")) and os.path.exists(
@@ -202,6 +226,9 @@ def main():
     else:
         train_ds, dev_ds = load_dataset(data_args.task_name_or_path, splits=["train", "dev"])
 
+    convert_example = (
+        convert_chatglm_v2_example if "chatglm2" in model_args.model_name_or_path else convert_chatglm_example
+    )
     trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
     train_ds = train_ds.map(partial(trans_func, is_test=False))
     dev_ds = dev_ds.map(partial(trans_func, is_test=model_args.eval_with_do_generation))
