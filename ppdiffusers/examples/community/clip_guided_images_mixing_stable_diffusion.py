@@ -20,6 +20,7 @@ import paddle
 import paddle.nn.functional as F
 import PIL
 from einops import rearrange
+from tqdm import tqdm
 
 from paddlenlp.transformers import (
     CLIPFeatureExtractor,
@@ -62,7 +63,6 @@ def preprocess(image, w, h):
 def slerp(t, v0, v1, DOT_THRESHOLD=0.9995):
     if not isinstance(v0, np.ndarray):
         inputs_are_paddle = True
-        # input_device = v0.place
         v0 = v0.cpu().numpy()
         v1 = v1.cpu().numpy()
     dot = np.sum(v0 * v1 / (np.linalg.norm(v0) * np.linalg.norm(v1)))
@@ -107,6 +107,9 @@ class CLIPGuidedImagesMixingStableDiffusion(DiffusionPipeline):
         unet: UNet2DConditionModel,
         scheduler: Union[PNDMScheduler, LMSDiscreteScheduler, DDIMScheduler, DPMSolverMultistepScheduler],
         feature_extractor: CLIPFeatureExtractor,
+        blip_model=None,
+        blip_processor=None,
+        clip_interrogator=None,
     ):
         super().__init__()
         self.register_modules(
@@ -117,6 +120,9 @@ class CLIPGuidedImagesMixingStableDiffusion(DiffusionPipeline):
             unet=unet,
             scheduler=scheduler,
             feature_extractor=feature_extractor,
+            blip_model=blip_model,
+            blip_processor=blip_processor,
+            clip_interrogator=clip_interrogator,
         )
         self.feature_extractor_size = (
             feature_extractor.size
@@ -174,6 +180,17 @@ class CLIPGuidedImagesMixingStableDiffusion(DiffusionPipeline):
         init_latents = self.scheduler.add_noise(init_latents, noise, timestep)
         latents = init_latents
         return latents
+
+    def get_image_description(self, image):
+        if self.clip_interrogator:
+            return self.clip_interrogator.interrogate(image)
+        else:
+            # with paddle.no_grad(), paddle.amp.auto_cast():
+            inputs = self.blip_processor(images=image, return_tensors="pd")
+            inputs["pixel_values"] = inputs["pixel_values"].cast(self.blip_model.dtype)
+            # out = self.blip_model.generate(**inputs, decode_strategy="beam_search", num_beams=2, length_penalty=0, max_length=5)
+            out = self.blip_model.generate(**inputs)
+            return self.blip_processor.decode(out[0][0], skip_special_tokens=True)
 
     def get_clip_image_embeddings(self, image, batch_size):
         clip_image_input = self.feature_extractor.preprocess(image)
@@ -267,6 +284,14 @@ class CLIPGuidedImagesMixingStableDiffusion(DiffusionPipeline):
             raise ValueError(f"You have passed {batch_size} batch_size, but only {len(generator)} generators.")
         if height % 8 != 0 or width % 8 != 0:
             raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
+
+        # generate prompts with blip model if prompt is
+        if content_prompt is None:
+            content_prompt = self.get_image_description(content_image)
+            print(content_prompt)
+        if style_prompt is None:
+            style_prompt = self.get_image_description(style_image)
+            print(style_prompt)
 
         content_text_input = self.tokenizer(
             content_prompt,
@@ -364,37 +389,37 @@ class CLIPGuidedImagesMixingStableDiffusion(DiffusionPipeline):
         accepts_generator = "generator" in set(inspect.signature(self.scheduler.step).parameters.keys())
         if accepts_generator:
             extra_step_kwargs["generator"] = generator
-        with self.progress_bar(total=num_inference_steps):
-            for i, t in enumerate(timesteps):
-                # expand the latents if we are doing classifier free guidance
-                latent_model_input = paddle.concat(x=[latents] * 2) if do_classifier_free_guidance else latents
-                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+        # with self.progress_bar(total=num_inference_steps):
+        for i, t in tqdm(enumerate(timesteps)):
+            # expand the latents if we are doing classifier free guidance
+            latent_model_input = paddle.concat(x=[latents] * 2) if do_classifier_free_guidance else latents
+            latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
-                # predict the noise residual
-                noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings).sample
+            # predict the noise residual
+            noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings).sample
 
-                # perform classifier free guidance
-                if do_classifier_free_guidance:
-                    noise_pred_uncond, noise_pred_text = noise_pred.chunk(chunks=2)
-                    noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+            # perform classifier free guidance
+            if do_classifier_free_guidance:
+                noise_pred_uncond, noise_pred_text = noise_pred.chunk(chunks=2)
+                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
-                # perform clip guidance
-                if clip_guidance_scale > 0:
-                    text_embeddings_for_guidance = (
-                        text_embeddings.chunk(chunks=2)[1] if do_classifier_free_guidance else text_embeddings
-                    )
-                    noise_pred, latents = self.cond_fn(
-                        latents,
-                        t,
-                        i,
-                        text_embeddings_for_guidance,
-                        noise_pred,
-                        clip_image_embeddings,
-                        clip_guidance_scale,
-                    )
+            # perform clip guidance
+            if clip_guidance_scale > 0:
+                text_embeddings_for_guidance = (
+                    text_embeddings.chunk(chunks=2)[1] if do_classifier_free_guidance else text_embeddings
+                )
+                noise_pred, latents = self.cond_fn(
+                    latents,
+                    t,
+                    i,
+                    text_embeddings_for_guidance,
+                    noise_pred,
+                    clip_image_embeddings,
+                    clip_guidance_scale,
+                )
 
-                # compute the previous noisy sample x_t -> x_t-1
-                latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
+            # compute the previous noisy sample x_t -> x_t-1
+            latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
 
         # Hardcode 0.18215 because stable-diffusion-2-base has not self.vae.config.scaling_factor
         latents = 1 / 0.18215 * latents
