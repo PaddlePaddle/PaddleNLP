@@ -1304,4 +1304,9 @@ llama(){
         --r 1 >${log_path}/llama_finetune>>${log_path}/llama_finetune 2>&1
     print_info $? llama_finetune
 }
+refactor_training_loop(){
+llama
+gpt
+transformers
+}
 $1
