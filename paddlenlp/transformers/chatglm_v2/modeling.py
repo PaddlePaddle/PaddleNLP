@@ -69,7 +69,7 @@ def assign_kv_heads(num_kv_heads, num_gpus):
 class RotaryEmbedding(nn.Layer):
     def __init__(self, dim, original_impl=False):
         super().__init__()
-        self.dtype = paddle.get_default_dtype()
+        self.default_dtype = paddle.get_default_dtype()
         inv_freq = 1.0 / (10000 ** (paddle.arange(0, dim, 2, dtype="float32") / dim))
         self.register_buffer("inv_freq", inv_freq)
         self.dim = dim
@@ -88,13 +88,13 @@ class RotaryEmbedding(nn.Layer):
         seq_idx = paddle.arange(0, seq_len, dtype=theta.dtype)
 
         # Calculate the product of position index and $\theta_i$
-        idx_theta = paddle.outer(seq_idx, theta).astype(self.dtype)
+        idx_theta = paddle.outer(seq_idx, theta).astype(self.default_dtype)
 
         cache = paddle.stack([paddle.cos(idx_theta), paddle.sin(idx_theta)], axis=-1)
 
         # this is to mimic the behaviour of complex32, else we will get different results
-        if self.dtype in (paddle.float16, paddle.bfloat16, paddle.int8):
-            cache = cache.astype(self.dtype)
+        if self.default_dtype in (paddle.float16, paddle.bfloat16, paddle.int8):
+            cache = cache.astype(self.default_dtype)
             # cache = cache.bfloat16() if dtype == paddle.bfloat16 else cache.astype("float16")
         return cache
 
@@ -149,7 +149,7 @@ class CoreAttention(nn.Layer):
     def __init__(self, config: ChatGLMv2Config, layer_number):
         super(CoreAttention, self).__init__()
 
-        self.dtype = paddle.get_default_dtype()
+        self.default_dtype = paddle.get_default_dtype()
         self.apply_query_key_layer_scaling = config.apply_query_key_layer_scaling
         self.attention_softmax_in_fp32 = config.attention_softmax_in_fp32
         if self.apply_query_key_layer_scaling:
@@ -212,7 +212,7 @@ class CoreAttention(nn.Layer):
             )
 
         attention_probs = F.softmax(attention_scores.astype("float32"), axis=-1)
-        attention_probs = attention_probs.astype(self.dtype)
+        attention_probs = attention_probs.astype(self.default_dtype)
 
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
