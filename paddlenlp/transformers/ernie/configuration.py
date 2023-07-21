@@ -979,7 +979,6 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
     "utc-large": {
         "attention_probs_dropout_prob": 0.1,
         "dtype": "float32",
-        "enable_recompute": False,
         "fuse": False,
         "hidden_act": "relu",
         "hidden_dropout_prob": 0.1,
@@ -1269,7 +1268,6 @@ class ErnieConfig(PretrainedConfig):
         layer_norm_eps=1e-12,
         use_cache=False,
         use_task_id=False,
-        enable_recompute=False,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -1291,4 +1289,3 @@ class ErnieConfig(PretrainedConfig):
         self.layer_norm_eps = layer_norm_eps
         self.use_cache = use_cache
         self.use_task_id = use_task_id
-        self.enable_recompute = enable_recompute

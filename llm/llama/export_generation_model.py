@@ -61,7 +61,6 @@ def main():
         args.model_path,
         load_state_as_np=True,
         low_cpu_mem_usage=True,
-        use_recompute=False,
         use_cache=True,
         dtype=dtype,
     )
