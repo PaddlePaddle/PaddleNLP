@@ -277,7 +277,7 @@ def main():
         # pipeline_parallel eval is the same as training.
         dev_ds = dev_ds.map(partial(trans_func, is_test=model_args.eval_with_do_generation))
 
-    model_max_length = 1024 if not training_args.benchmark else 512
+    model_max_length = data_args.src_length + data_args.tgt_length if not training_args.benchmark else 512
     collate_fn = DataCollatorForSeq2Seq(
         return_tensors="pd",
         tokenizer=tokenizer,
