@@ -748,9 +748,7 @@ class ChatGLMHead(nn.Layer):
     def __init__(self, config, embedding_weights=None):
         super(ChatGLMHead, self).__init__()
         self.decoder_weight = (
-            self.create_parameter(
-                shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype(), is_bias=True
-            )
+            self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype())
             if embedding_weights is None
             else embedding_weights
         )
