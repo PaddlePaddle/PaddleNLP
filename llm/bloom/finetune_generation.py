@@ -308,7 +308,6 @@ def main():
         tokenizer=tokenizer,
         padding=True,
         max_length=data_args.src_length + data_args.tgt_length,
-        label_pad_token_id=tokenizer.pad_token_id,
         return_tensors="np",
     )
 
