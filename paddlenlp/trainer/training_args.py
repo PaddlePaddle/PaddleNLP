@@ -870,8 +870,8 @@ class TrainingArguments:
                             ].accumulate_steps = self.gradient_accumulation_steps
                     except KeyError:
                         warnings.warn(
-                            "The enable_stage1_tensor_fusion or enable_stage1_overlap is not supported by current version of Paddle. "
-                            "Please try lateset develop Paddle."
+                            "The enable_stage1_tensor_fusion or enable_stage1_overlap is not supported "
+                            "by current version of Paddle. Please try lateset develop Paddle."
                         )
                 fleet.init(is_collective=True, strategy=strategy)
 
