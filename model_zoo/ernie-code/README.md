@@ -31,7 +31,7 @@ ERNIE-Code在代码智能的各种下游任务中，包括代码到多自然语�
 python predict.py \
   --input 'BadZipFileのAliasは、古い Python バージョンとの互換性のために。' \
   --target_lang 'code' \
-  --source_prefix '将日语翻译为Python：\n' \
+  --source_prefix 'translate Japanese to Python: \n' \
   --max_length 1024 \
   --num_beams 3 \
   --device 'gpu'
