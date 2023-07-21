@@ -145,7 +145,6 @@ def main():
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         use_flash_attention=model_args.use_flash_attention,
-        use_recompute=training_args.recompute,
         dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         lm_shift_labels=False,
     )

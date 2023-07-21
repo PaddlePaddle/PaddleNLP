@@ -286,7 +286,8 @@ class GLMStack(nn.Layer):
     def __init__(self, config: GLMConfig):
         super(GLMStack, self).__init__()
         self.hidden_size = config.hidden_size
-        self.enable_recompute = config.checkpoint_activations
+        # Recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
         self.checkpoint_num_layers = config.checkpoint_num_layers
 
         self.embedding_dropout = nn.Dropout(config.embedding_dropout_prob)

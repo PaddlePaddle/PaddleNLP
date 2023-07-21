@@ -193,7 +193,6 @@ def main():
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         lm_shift_labels=False,
-        use_recompute=training_args.recompute,
     )
 
     if model_args.lora:
