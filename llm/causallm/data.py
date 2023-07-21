@@ -28,8 +28,10 @@ def get_convert_example(model):
         return convert_example_chatglm
     elif base_model_prefix == "llama":
         return convert_example_llama
-    elif base_model_prefix in ["bloom", "chatglm_v2"]:
-        return convert_example_common
+    elif base_model_prefix == "chatglm_v2":
+        return convert_example_chatglm_v2
+    elif base_model_prefix == "bloom":
+        return convert_example_bloom
     else:
         raise ValueError(
             f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama."
@@ -72,7 +74,7 @@ def tokenize_example(tokenizer, example, data_args):
     return tokenized_source, tokenized_target
 
 
-def convert_example_common(example, tokenizer, data_args, is_test=True):
+def convert_example_bloom(example, tokenizer, data_args, is_test=True):
     tokenized_source, tokenized_target = tokenize_example(tokenizer, example, data_args)
 
     if is_test:
@@ -89,6 +91,30 @@ def convert_example_common(example, tokenizer, data_args, is_test=True):
         return dict(
             input_ids=input_ids,
             labels=labels,
+        )
+
+
+def convert_example_chatglm_v2(example, tokenizer, data_args, is_test=True):
+    tokenized_source, tokenized_target = tokenize_example(tokenizer, example, data_args)
+
+    if is_test:
+        position_ids = list(range(len(tokenized_source["input_ids"])))
+        return dict(
+            position_ids=position_ids,
+            input_ids=tokenized_source["input_ids"],
+            labels=tokenized_target["input_ids"],
+        )
+    else:
+        input_ids = tokenized_source["input_ids"] + tokenized_target["input_ids"]
+        source_length = len(tokenized_source["input_ids"])
+        labels = [-100] * source_length + input_ids[source_length:]
+        position_ids = list(range(len(input_ids)))
+        # shift labels
+        input_ids, labels = input_ids[:-1], labels[1:]
+        return dict(
+            input_ids=input_ids,
+            labels=labels,
+            position_ids=position_ids,
         )
 
 
