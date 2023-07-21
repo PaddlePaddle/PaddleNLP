@@ -809,6 +809,8 @@ class BloomModel(BloomPreTrainedModel):
         super().__init__(config)
         self.padding_idx = 0
 
+        # Recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
         self.embed_dim = config.hidden_size
         self.n_head = config.n_head
 
@@ -970,7 +972,7 @@ class BloomModel(BloomPreTrainedModel):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
-            if self.config.use_recompute and has_gradient:
+            if self.enable_recompute and has_gradient:
                 outputs = self.recompute_training(
                     block,
                     hidden_states,

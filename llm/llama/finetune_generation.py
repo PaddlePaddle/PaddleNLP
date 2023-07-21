@@ -144,9 +144,7 @@ def main():
         tensor_parallel_output=False,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
-        fp16_opt_level=training_args.fp16_opt_level,
         use_flash_attention=model_args.use_flash_attention,
-        use_recompute=training_args.recompute,
         dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         lm_shift_labels=False,
     )
@@ -279,7 +277,7 @@ def main():
         # pipeline_parallel eval is the same as training.
         dev_ds = dev_ds.map(partial(trans_func, is_test=model_args.eval_with_do_generation))
 
-    model_max_length = 1024 if not training_args.benchmark else 512
+    model_max_length = data_args.src_length + data_args.tgt_length if not training_args.benchmark else 512
     collate_fn = DataCollatorForSeq2Seq(
         return_tensors="pd",
         tokenizer=tokenizer,
