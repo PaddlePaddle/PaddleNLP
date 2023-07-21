@@ -61,7 +61,6 @@ class TestInTokensDataset(unittest.TestCase):
 
         # Test intokens
         inData = InTokensMapDataset(self.dataset, self.tokenizer, max_seq_len=16)
-        # breakpoint()
         expected_output = {
             "input_ids": [1, 29871, 30429, 1, 29871, 30429, 2, 1, 29871, 31427, 1, 29871, 31427, 2, 0, 0],
             "position_ids": [0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0, 0],
@@ -87,7 +86,6 @@ class TestInTokensDataset(unittest.TestCase):
                 ]
             ],
         }
-        # breakpoint()
         self.assertEqual(inData[0]["input_ids"], expected_output["input_ids"])
         self.assertEqual(inData[0]["position_ids"], expected_output["position_ids"])
         self.assertEqual(inData[0]["labels"], expected_output["labels"])
@@ -101,7 +99,6 @@ class TestInTokensDataset(unittest.TestCase):
             example.append(item)
             break
 
-        print(example)
         # Test shape
         self.assertEqual(list(example[0].keys()), ["input_ids", "position_ids", "labels", "attention_mask"])
         self.assertEqual(type(example[0]["input_ids"]), list)
