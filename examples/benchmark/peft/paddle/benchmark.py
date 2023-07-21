@@ -65,7 +65,7 @@ class ModelArguments:
     english: Optional[bool] = field(default=False, metadata={"help": "whether to english benchmark dataset"})
     profiler: Optional[bool] = field(default=False, metadata={"help": "whether to use profiler"})
     train_data_size: int = field(default=1000, metadata={"help": "Number of dataset for training"})
-    max_seq_len: int = field(default=2048, metadata={"help": "Number of dataset for training"})
+    intokens_length: int = field(default=2048, metadata={"help": "Intokens length"})
 
 
 def main():
@@ -153,7 +153,7 @@ def main():
     dataset = InTokensMapDataset(
         dataset,
         tokenizer=tokenizer,
-        max_seq_len=model_args.max_seq_len,
+        max_seq_len=model_args.intokens_length,
     )
 
     if model_args.profiler:
