@@ -504,13 +504,15 @@ class LlamaAttention(nn.Layer):
 
 
 class LlamaDecoderLayer(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config, pp_mode=False):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.self_attn = LlamaAttention(config)
         self.mlp = LlamaMLP(config)
         self.input_layernorm = LlamaRMSNorm(config)
         self.post_attention_layernorm = LlamaRMSNorm(config)
+        self.sequence_parallel = config.sequence_parallel
+        self.pp_mode = pp_mode
 
     def forward(
         self,
@@ -535,6 +537,9 @@ class LlamaDecoderLayer(nn.Layer):
         """
 
         # [bs, seq_len, embed_dim] -> [seq_len / n, bs, embed_dim]
+        if self.sequence_parallel and self.pp_mode:
+            hidden_states = ScatterOp.apply(hidden_states)
+
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
 
@@ -553,6 +558,9 @@ class LlamaDecoderLayer(nn.Layer):
         hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
+
+        if self.sequence_parallel and self.pp_mode:
+            hidden_states = GatherOp.apply(hidden_states)
 
         outputs = (hidden_states,)
 
@@ -904,6 +912,7 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
     def forward(self, prediction_scores, masked_lm_labels):
+
         if self.enable_parallel_cross_entropy:
             if prediction_scores.shape[-1] == self.config.vocab_size:
                 warnings.warn(
@@ -926,7 +935,7 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
 
 
 class LlamaLMHead(nn.Layer):
-    def __init__(self, config: LlamaConfig):
+    def __init__(self, config: LlamaConfig, pp_mode=False):
         super(LlamaLMHead, self).__init__()
         self.config = config
         if config.tensor_parallel_degree > 1:
@@ -942,10 +951,12 @@ class LlamaLMHead(nn.Layer):
         self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
         if self.weight.is_distributed:
             self.weight.split_axis = 1
+        self.pp_mode = pp_mode
 
     def forward(self, hidden_states, tensor_parallel_output=None):
         if self.config.sequence_parallel:
-            hidden_states = GatherOp.apply(hidden_states)
+            if not self.pp_mode:
+                hidden_states = GatherOp.apply(hidden_states)
             hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
 
         if tensor_parallel_output is None:
