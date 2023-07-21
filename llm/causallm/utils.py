@@ -155,7 +155,9 @@ class CausalLMTrainer(Trainer):
             loss, logits, labels = super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
             # argmax here to avoid gather all logits, which is too memory-consuming.
             # keepdim in order to maintain the same shape as logits
-            return (loss, logits[0].argmax(axis=-1, keepdim=True), labels)
+            if isinstance(logits, (list, tuple)):
+                logits = logits[0]
+            return (loss, logits.argmax(axis=-1, keepdim=True), labels)
 
         loss = None
 

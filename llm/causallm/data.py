@@ -26,7 +26,9 @@ def get_convert_example(model):
 
     if base_model_prefix == "chatglm":
         return convert_example_chatglm
-    elif base_model_prefix in ["bloom", "llama", "chatglm_v2"]:
+    elif base_model_prefix == "llama":
+        return convert_example_llama
+    elif base_model_prefix in ["bloom", "chatglm_v2"]:
         return convert_example_common
     else:
         raise ValueError(
@@ -116,3 +118,24 @@ def convert_example_chatglm(example, tokenizer, data_args, is_test=True):
         attention_mask = attention_mask[..., :-1, :-1]
 
         return dict(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+
+
+def convert_example_llama(example, tokenizer, data_args, is_test=True):
+    tokenized_source, tokenized_target = tokenize_example(tokenizer, example, data_args)
+
+    if is_test:
+        return dict(
+            input_ids=tokenized_source["input_ids"],
+            attention_mask=tokenized_source["attention_mask"],
+            labels=tokenized_target["input_ids"],
+        )
+    else:
+        input_ids = tokenized_source["input_ids"] + tokenized_target["input_ids"]
+        source_length = len(tokenized_source["input_ids"])
+        labels = [-100] * source_length + input_ids[source_length:]
+        # shift labels
+        input_ids, labels = input_ids[:-1], labels[1:]
+        return dict(
+            input_ids=input_ids,
+            labels=labels,
+        )
