@@ -20,6 +20,7 @@ import paddle
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.distributed.fleet.utils import recompute
 
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -28,6 +29,12 @@ from ..model_outputs import (
     ModelOutput,
 )
 from .configuration import CHATGLM_V2_PRETRAINED_RESOURCE_FILES_MAP, ChatGLMv2Config
+
+__all__ = [
+    "ChatGLMv2Model",
+    "ChatGLMv2PretrainedModel",
+    "ChatGLMv2ForCausalLM",
+]
 
 
 def assign_kv_heads(num_kv_heads, num_gpus):
@@ -467,7 +474,7 @@ class GLMTransformer(nn.Layer):
 
     def __init__(self, config: ChatGLMv2Config):
         super(GLMTransformer, self).__init__()
-
+        self.enable_recompute = False
         self.fp32_residual_connection = config.fp32_residual_connection
         self.post_layer_norm = config.post_layer_norm
 
@@ -487,6 +494,33 @@ class GLMTransformer(nn.Layer):
 
     def _get_layer(self, layer_number):
         return self.layers[layer_number]
+
+    @paddle.jit.not_to_static
+    def recompute_training(
+        self,
+        layer_module: nn.Layer,
+        hidden_states: paddle.Tensor,
+        attention_mask: paddle.Tensor,
+        rotary_embeds: paddle.Tensor,
+        kv_cache: paddle.Tensor,
+        use_cache: bool,
+    ):
+        def create_custom_forward(module):
+            def custom_forward(*inputs):
+                return module(*inputs)
+
+            return custom_forward
+
+        hidden_states, kv_cache = recompute(
+            create_custom_forward(layer_module),
+            hidden_states,
+            attention_mask,
+            rotary_embeds,
+            kv_cache,
+            use_cache,
+            use_reentrant=False,
+        )
+        return hidden_states, kv_cache
 
     def forward(
         self,
@@ -508,9 +542,19 @@ class GLMTransformer(nn.Layer):
 
             layer = self._get_layer(index)
 
-            hidden_states, kv_cache = layer(
-                hidden_states, attention_mask, rotary_pos_emb, kv_cache=kv_caches[index], use_cache=use_cache
-            )
+            if self.enable_recompute and not hidden_states.stop_gradient:
+                hidden_states, kv_cache = self.recompute_training(
+                    layer,
+                    hidden_states,
+                    attention_mask,
+                    rotary_pos_emb,
+                    kv_cache=kv_caches[index],
+                    use_cache=use_cache,
+                )
+            else:
+                hidden_states, kv_cache = layer(
+                    hidden_states, attention_mask, rotary_pos_emb, kv_cache=kv_caches[index], use_cache=use_cache
+                )
 
             if use_cache:
                 presents = presents + (kv_cache,)
@@ -545,14 +589,12 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
             full_attention_mask = paddle.concat(
                 [paddle.ones([batch_size, seq_length, past_length]), full_attention_mask], axis=-1
             )
-        print(full_attention_mask.shape, padding_mask.shape)
         if padding_mask is not None:
             full_attention_mask = full_attention_mask * padding_mask.unsqueeze(1)
         if not past_length and padding_mask is not None:
             full_attention_mask -= padding_mask.unsqueeze(-1) - 1
         full_attention_mask = (full_attention_mask < 0.5).astype("bool")
-        full_attention_mask.unsqueeze(1)
-        return full_attention_mask
+        return full_attention_mask.unsqueeze(1)
 
     def get_position_ids(self, input_ids):
         batch_size, seq_length = input_ids.shape
@@ -709,7 +751,7 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         )
 
 
-class ChatGLMv2ForConditionalGeneration(ChatGLMv2PretrainedModel):
+class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
     def __init__(self, config: ChatGLMv2Config):
         super().__init__(config)
         self.max_sequence_length = config.max_sequence_length

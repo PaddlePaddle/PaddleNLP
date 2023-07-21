@@ -17,11 +17,7 @@ import unittest
 import paddle
 from parameterized import parameterized_class
 
-from paddlenlp.transformers import (
-    ChatGLMv2Config,
-    ChatGLMv2ForConditionalGeneration,
-    ChatGLMv2Model,
-)
+from paddlenlp.transformers import ChatGLMv2Config, ChatGLMv2ForCausalLM, ChatGLMv2Model
 from tests.transformers.test_generation_utils import GenerationTesterMixin
 from tests.transformers.test_modeling_common import ModelTesterMixin, ids_tensor
 
@@ -125,7 +121,7 @@ class ChatGLMv2Tester:
         return config, inputs_dict
 
     def create_and_check_lm_head_model(self, config, input_ids, labels, *args):
-        model = ChatGLMv2ForConditionalGeneration(config)
+        model = ChatGLMv2ForCausalLM(config)
         model.eval()
 
         result = model(
@@ -167,8 +163,8 @@ class ChatGLMv2Test(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     use_labels: bool = False
     use_test_model_name_list = False
 
-    all_model_classes = (ChatGLMv2Model, ChatGLMv2ForConditionalGeneration)
-    all_generative_model_classes = {ChatGLMv2ForConditionalGeneration: (ChatGLMv2Model, "chatglm_v2")}
+    all_model_classes = (ChatGLMv2Model, ChatGLMv2ForCausalLM)
+    all_generative_model_classes = {ChatGLMv2ForCausalLM: (ChatGLMv2Model, "chatglm_v2")}
 
     def setUp(self):
         self.model_tester = ChatGLMv2Tester(self)

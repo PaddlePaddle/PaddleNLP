@@ -805,11 +805,11 @@ class Taskflow(object):
         # Add the lock for the concurrency requests
         self._lock = threading.Lock()
 
-    def __call__(self, *inputs):
+    def __call__(self, *inputs, **kwargs):
         """
         The main work function in the taskflow.
         """
-        results = self.task_instance(inputs)
+        results = self.task_instance(inputs, **kwargs)
         return results
 
     def help(self):

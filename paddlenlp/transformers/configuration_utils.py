@@ -447,8 +447,6 @@ class PretrainedConfig:
             `float16` weights. Since the config object is stored in plain text, this attribute contains just the
             floating type string without the `paddle.` prefix. For example, for `paddle.float16` ``dtype` is the
             `"float16"` string.
-        fp16_opt_level(`str`, *optional*):
-            The `level` of the amp level.
 
             This attribute is currently not being used during model loading time, but this may change in the future
             versions. But we can already start preparing for the future by saving the dtype with save_pretrained.
@@ -584,8 +582,6 @@ class PretrainedConfig:
         self.pad_token_id = kwargs.pop("pad_token_id", None)
         self.eos_token_id = kwargs.pop("eos_token_id", None)
         self.sep_token_id = kwargs.pop("sep_token_id", None)
-
-        self.fp16_opt_level = kwargs.pop("fp16_opt_level", None)
 
         self.decoder_start_token_id = kwargs.pop("decoder_start_token_id", None)
 
@@ -852,13 +848,11 @@ class PretrainedConfig:
             raise FileNotFoundError(f"configuration file<{CONFIG_NAME}> or <{LEGACY_CONFIG_NAME}> not found")
 
         try:
-            logger.info(f"loading configuration file {resolved_config_file}")
+            logger.info(f"Loading configuration file {resolved_config_file}")
             # Load config dict
             config_dict = cls._dict_from_json_file(resolved_config_file)
         except (json.JSONDecodeError, UnicodeDecodeError):
-            raise EnvironmentError(
-                f"It looks like the config file<'{resolved_config_file}'> is not a valid JSON file."
-            )
+            raise EnvironmentError(f"Config file<'{resolved_config_file}'> is not a valid JSON file.")
 
         return config_dict, kwargs
 
