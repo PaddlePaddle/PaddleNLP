@@ -1028,8 +1028,8 @@ class BloomLMHead(nn.Layer):
         )
         self.config = config
 
-    def forward(self, hidden_states):
-        logits = parallel_matmul(hidden_states, self.decoder_weight, parallel_output=False)
+    def forward(self, hidden_states, parallel_output):
+        logits = parallel_matmul(hidden_states, self.decoder_weight, parallel_output=parallel_output)
         return logits
 
 
@@ -1208,8 +1208,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
         parallel_output = True
         if hidden_states.stop_gradient:
             parallel_output = False
-        lm_logits = parallel_matmul(hidden_states, self.bloom.word_embeddings.weight, parallel_output=parallel_output)
-        # lm_logits = self.lm_head(hidden_states)
+        lm_logits = self.lm_head(hidden_states, parallel_output)
 
         loss = None
         if labels is not None:
