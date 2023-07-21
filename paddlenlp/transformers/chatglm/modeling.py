@@ -763,6 +763,7 @@ class ChatGLMHead(nn.Layer):
             logits = F.linear(hidden_states, self.decoder_weight.T)
         return logits
 
+
 class ChatGLMForCausalLM(ChatGLMPretrainedModel):
     _keys_to_ignore_on_save = [r"lm_head.weight"]
     _tied_weights_keys = ["lm_head.weight"]
