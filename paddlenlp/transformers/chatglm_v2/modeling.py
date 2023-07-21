@@ -13,11 +13,14 @@
 # limitations under the License.
 
 import math
+from functools import partial
 from typing import Any, Dict, Optional, Tuple
 
 import paddle
+import paddle.distributed.fleet as fleet
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.distributed.fleet.utils import recompute
 
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -27,16 +30,46 @@ from ..model_outputs import (
 )
 from .configuration import CHATGLM_V2_PRETRAINED_RESOURCE_FILES_MAP, ChatGLMv2Config
 
-CHATGLM_6B_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "THUDM/chatglm2-6b",
-    # See all ChatGLM models at https://huggingface.co/models?filter=chatglm
+__all__ = [
+    "ChatGLMv2Model",
+    "ChatGLMv2PretrainedModel",
+    "ChatGLMv2ForCausalLM",
 ]
+
+
+def assign_kv_heads(num_kv_heads, num_gpus):
+    # Initialize the assignment list
+    """
+    Assign kv heads to different GPUs in the Tensor Parallel Setup
+
+    Examples:
+        assign_kv_heads(num_kv_heads=1, num_gpus=2): [[0], [0]]
+        assign_kv_heads(num_kv_heads=2, num_gpus=2): [[0], [1]]
+        assign_kv_heads(num_kv_heads=4, num_gpus=2): [[0,1], [2,3]]
+        assign_kv_heads(num_kv_heads=1, num_gpus=4): [[0],[0],[0],[0]]
+        assign_kv_heads(num_kv_heads=2, num_gpus=4): [[0],[0],[1],[1]]
+        assign_kv_heads(num_kv_heads=4, num_gpus=4): [[0],[1],[2],[3]]
+    """
+    assignment_list = [[] for _ in range(num_gpus)]
+    # Case 1: more heads than cards
+    if num_kv_heads > num_gpus:
+        num_heads_per_card = num_kv_heads // num_gpus
+        for i in range(num_gpus):
+            for j in range(num_heads_per_card):
+                assignment_list[i].append(i * num_heads_per_card + j)
+    # Case 2: more cards than heads. each card get only 1 head.
+    else:
+        num_card_per_heads = num_gpus // num_kv_heads
+        for i in range(num_kv_heads):
+            for j in range(num_card_per_heads):
+                assignment_list[i * num_card_per_heads + j].append(i)
+    return assignment_list
 
 
 class RotaryEmbedding(nn.Layer):
     def __init__(self, dim, original_impl=False):
         super().__init__()
-        self.dtype = paddle.get_default_dtype()
+        self.default_dtype = paddle.get_default_dtype()
         inv_freq = 1.0 / (10000 ** (paddle.arange(0, dim, 2, dtype="float32") / dim))
         self.register_buffer("inv_freq", inv_freq)
         self.dim = dim
@@ -55,13 +88,13 @@ class RotaryEmbedding(nn.Layer):
         seq_idx = paddle.arange(0, seq_len, dtype=theta.dtype)
 
         # Calculate the product of position index and $\theta_i$
-        idx_theta = paddle.outer(seq_idx, theta).astype(self.dtype)
+        idx_theta = paddle.outer(seq_idx, theta).astype(self.default_dtype)
 
         cache = paddle.stack([paddle.cos(idx_theta), paddle.sin(idx_theta)], axis=-1)
 
         # this is to mimic the behaviour of complex32, else we will get different results
-        if self.dtype in (paddle.float16, paddle.bfloat16, paddle.int8):
-            cache = cache.astype(self.dtype)
+        if self.default_dtype in (paddle.float16, paddle.bfloat16, paddle.int8):
+            cache = cache.astype(self.default_dtype)
             # cache = cache.bfloat16() if dtype == paddle.bfloat16 else cache.astype("float16")
         return cache
 
@@ -116,19 +149,18 @@ class CoreAttention(nn.Layer):
     def __init__(self, config: ChatGLMv2Config, layer_number):
         super(CoreAttention, self).__init__()
 
-        self.dtype = paddle.get_default_dtype()
+        self.default_dtype = paddle.get_default_dtype()
         self.apply_query_key_layer_scaling = config.apply_query_key_layer_scaling
         self.attention_softmax_in_fp32 = config.attention_softmax_in_fp32
         if self.apply_query_key_layer_scaling:
             self.attention_softmax_in_fp32 = True
         self.layer_number = max(1, layer_number)
-
-        projection_size = config.kv_channels * config.num_attention_heads
-
-        # Per attention head and per partition values.
-        self.hidden_size_per_partition = projection_size
-        self.hidden_size_per_attention_head = projection_size // config.num_attention_heads
-        self.num_attention_heads_per_partition = config.num_attention_heads
+        if config.tensor_parallel_degree > 1:
+            self.num_attention_heads_per_partition = config.num_attention_heads // config.tensor_parallel_degree
+        else:
+            self.num_attention_heads_per_partition = config.num_attention_heads
+        self.hidden_size_per_partition = config.kv_channels * self.num_attention_heads_per_partition
+        self.hidden_size_per_attention_head = self.hidden_size_per_partition // self.num_attention_heads_per_partition
 
         coeff = None
         self.norm_factor = math.sqrt(self.hidden_size_per_attention_head)
@@ -141,27 +173,27 @@ class CoreAttention(nn.Layer):
 
     def forward(self, query_layer, key_layer, value_layer, attention_mask):
         # Raw attention scores
-        # [b, np, sq, sk]
+        # [batch_size, num_heads, query_length, key_length]
         output_size = (query_layer.shape[1], query_layer.shape[2], query_layer.shape[0], key_layer.shape[0])
 
-        # [sq, b, np, hn] -> [sq, b * np, hn]
+        # [query_length, batch_size, num_heads, hidden] -> [query_length, batch_size * num_heads, hidden]
         query_layer = query_layer.reshape([output_size[2], output_size[0] * output_size[1], -1])
-        # [sk, b, np, hn] -> [sk, b * np, hn]
+        # [key_length, batch_size, num_heads, hidden] -> [key_length, batch_size * num_heads, hidden]
         key_layer = key_layer.reshape([output_size[3], output_size[0] * output_size[1], -1])
 
-        # Raw attention scores. [b * np, sq, sk]
+        # Raw attention scores. [batch_size * num_heads, query_length, key_length]
         matmul_result = paddle.bmm(query_layer.transpose([1, 0, 2]), key_layer.transpose([1, 2, 0])) * (
             1.0 / self.norm_factor
         )
 
-        # change view to [b, np, sq, sk]
+        # change view to [batch_size, num_heads, query_length, key_length]
         attention_scores = matmul_result.reshape(output_size)
 
         # ===========================
         # Attention probs and dropout
         # ===========================
 
-        # attention scores and attention mask [b, np, sq, sk]
+        # attention scores and attention mask [batch_size, num_heads, query_length, key_length]
         if self.attention_softmax_in_fp32:
             attention_scores = attention_scores.astype("float32")
         if self.coeff is not None:
@@ -180,14 +212,12 @@ class CoreAttention(nn.Layer):
             )
 
         attention_probs = F.softmax(attention_scores.astype("float32"), axis=-1)
-        attention_probs = attention_probs.astype(self.dtype)
+        attention_probs = attention_probs.astype(self.default_dtype)
 
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
         attention_probs = self.attention_dropout(attention_probs)
-        # =========================
-        # Context layer. [sq, b, hp]
-        # =========================
+        # [batch_size, num_heads, query_length, key_length]
 
         # value_layer -> context layer.
         # [sk, b, np, hn] --> [b, np, sq, hn]
@@ -221,87 +251,63 @@ class SelfAttention(nn.Layer):
     def __init__(self, config: ChatGLMv2Config, layer_number, device=None):
         super(SelfAttention, self).__init__()
         self.layer_number = max(1, layer_number)
-
-        self.projection_size = config.kv_channels * config.num_attention_heads
+        assert (
+            config.kv_channels * config.num_attention_heads == config.hidden_size
+        ), "`kv_channels` * `num_attention_heads` must equal to `hidden_size`"
 
         # Per attention head and per partition values.
-        self.hidden_size_per_attention_head = self.projection_size // config.num_attention_heads
-        self.num_attention_heads_per_partition = config.num_attention_heads
-
-        self.multi_query_attention = config.multi_query_attention
-        self.qkv_hidden_size = 3 * self.projection_size
-        if self.multi_query_attention:
-            self.num_multi_query_groups_per_partition = config.multi_query_group_num
-            self.qkv_hidden_size = (
-                self.projection_size + 2 * self.hidden_size_per_attention_head * config.multi_query_group_num
-            )
-        self.query_key_value = nn.Linear(
-            config.hidden_size,
-            self.qkv_hidden_size,
-            bias_attr=config.add_bias_linear or config.add_qkv_bias,
-        )
-
+        self.hidden_size_per_attention_head = config.hidden_size // config.num_attention_heads
         self.core_attention = CoreAttention(config, self.layer_number)
+        self.num_multi_query_groups_per_partition = config.multi_query_group_num
 
-        # Output.
-        self.dense = nn.Linear(self.projection_size, config.hidden_size, bias_attr=config.add_bias_linear)
-
-    def _allocate_memory(self, inference_max_sequence_len, batch_size, device=None, dtype=None):
-        if self.multi_query_attention:
-            num_attention_heads = self.num_multi_query_groups_per_partition
+        if config.tensor_parallel_degree > 1:
+            self.query = fleet.meta_parallel.ColumnParallelLinear(
+                config.hidden_size,
+                config.hidden_size,
+                has_bias=config.add_bias_linear or config.add_qkv_bias,
+                gather_output=False,
+            )
+            self.dense = fleet.meta_parallel.RowParallelLinear(
+                config.hidden_size, config.hidden_size, input_is_parallel=True, has_bias=config.add_bias_linear
+            )
+            self.num_attention_heads_per_partition = config.num_attention_heads // config.tensor_parallel_degree
+            self.kv_indices = paddle.to_tensor(
+                assign_kv_heads(config.multi_query_group_num, config.tensor_parallel_degree)[
+                    config.tensor_parallel_rank
+                ]
+            )
         else:
-            num_attention_heads = self.num_attention_heads_per_partition
-        return paddle.empty(
-            inference_max_sequence_len,
-            batch_size,
-            num_attention_heads,
-            self.hidden_size_per_attention_head,
-            dtype=dtype,
-            device=device,
+            self.query = nn.Linear(
+                config.hidden_size,
+                config.hidden_size,
+                bias_attr=config.add_bias_linear or config.add_qkv_bias,
+            )
+            self.dense = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=config.add_bias_linear)
+            self.num_attention_heads_per_partition = config.num_attention_heads
+            self.kv_indices = None
+
+        self.key = nn.Linear(
+            config.hidden_size,
+            self.hidden_size_per_attention_head * config.multi_query_group_num,
+            bias_attr=config.add_qkv_bias,
+        )
+        self.value = nn.Linear(
+            config.hidden_size,
+            self.hidden_size_per_attention_head * config.multi_query_group_num,
+            bias_attr=config.add_qkv_bias,
         )
 
     def forward(self, hidden_states, attention_mask, rotary_pos_emb, kv_cache=None, use_cache=True):
-        # hidden_states: [seq_length, b, h]
+        seq_length, batch_size, hidden_size = hidden_states.shape
+        query_layer = self.query(hidden_states)
+        key_layer = self.key(hidden_states)
+        value_layer = self.value(hidden_states)
 
-        # =================================================
-        # Pre-allocate memory for key-values for inference.
-        # =================================================
-        # =====================
-        # Query, Key, and Value
-        # =====================
-
-        # Attention heads [seq_length, b, h] --> [seq_length, b, (np * 3 * hn)]
-
-        mixed_x_layer = self.query_key_value(hidden_states)
-
-        if self.multi_query_attention:
-            (query_layer, key_layer, value_layer) = mixed_x_layer.split(
-                [
-                    self.num_attention_heads_per_partition * self.hidden_size_per_attention_head,
-                    self.num_multi_query_groups_per_partition * self.hidden_size_per_attention_head,
-                    self.num_multi_query_groups_per_partition * self.hidden_size_per_attention_head,
-                ],
-                axis=-1,
-            )
-            query_layer = query_layer.reshape(
-                query_layer.shape[:-1] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
-            )
-            key_layer = key_layer.reshape(
-                key_layer.shape[:-1] + [self.num_multi_query_groups_per_partition, self.hidden_size_per_attention_head]
-            )
-            value_layer = value_layer.reshape(
-                value_layer.shape[:-1]
-                + [self.num_multi_query_groups_per_partition, self.hidden_size_per_attention_head]
-            )
-        else:
-            new_tensor_shape = mixed_x_layer.shape[:-1] + [
-                self.num_attention_heads_per_partition,
-                3 * self.hidden_size_per_attention_head,
-            ]
-            mixed_x_layer = mixed_x_layer.reshape(new_tensor_shape)
-
-            # [seq_length, b, np, 3 * hn] --> 3 [seq_length, b, np, hn]
-            (query_layer, key_layer, value_layer) = paddle.split(mixed_x_layer, 3, axis=-1)
+        query_layer = query_layer.reshape(
+            [seq_length, batch_size, self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
+        )
+        key_layer = key_layer.reshape([seq_length, batch_size, -1, self.hidden_size_per_attention_head])
+        value_layer = value_layer.reshape([seq_length, batch_size, -1, self.hidden_size_per_attention_head])
 
         # apply relative positional encoding (rotary embedding)
         if rotary_pos_emb is not None:
@@ -318,21 +324,21 @@ class SelfAttention(nn.Layer):
         else:
             kv_cache = None
 
-        if self.multi_query_attention:
-            key_layer = key_layer.unsqueeze(-2)
-            key_layer = key_layer.tile(
-                [1, 1, 1, self.num_attention_heads_per_partition // self.num_multi_query_groups_per_partition, 1]
-            )
-            key_layer = key_layer.reshape(
-                key_layer.shape[:2] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
-            )
-            value_layer = value_layer.unsqueeze(-2)
-            value_layer = value_layer.tile(
-                [1, 1, 1, self.num_attention_heads_per_partition // self.num_multi_query_groups_per_partition, 1]
-            )
-            value_layer = value_layer.reshape(
-                value_layer.shape[:2] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
-            )
+        if self.kv_indices is not None:
+            key_layer = paddle.index_select(key_layer, self.kv_indices, axis=2)
+            value_layer = paddle.index_select(value_layer, self.kv_indices, axis=2)
+            multiplier = self.num_attention_heads_per_partition // self.kv_indices.shape[0]
+        else:
+            multiplier = self.num_attention_heads_per_partition // self.num_multi_query_groups_per_partition
+
+        key_layer = key_layer.unsqueeze(-2).tile([1, 1, 1, multiplier, 1])
+        key_layer = key_layer.reshape(
+            key_layer.shape[:2] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
+        )
+        value_layer = value_layer.unsqueeze(-2).tile([1, 1, 1, multiplier, 1])
+        value_layer = value_layer.reshape(
+            value_layer.shape[:2] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
+        )
 
         # ==================================
         # core attention computation
@@ -345,7 +351,6 @@ class SelfAttention(nn.Layer):
         # =================
 
         output = self.dense(context_layer)
-
         return output, kv_cache
 
 
@@ -357,20 +362,27 @@ class MLP(nn.Layer):
     state back into h hidden dimension.
     """
 
-    def __init__(self, config: ChatGLMv2Config, device=None):
+    def __init__(self, config: ChatGLMv2Config):
         super(MLP, self).__init__()
 
         self.add_bias = config.add_bias_linear
 
-        # Project to 4h. If using swiglu double the output width, see https://arxiv.org/pdf/2002.05202.pdf
-        self.dense_h_to_4h = nn.Linear(config.hidden_size, config.ffn_hidden_size * 2, bias_attr=self.add_bias)
-
-        # Project back to h.
-        self.dense_4h_to_h = nn.Linear(
-            config.ffn_hidden_size,
-            config.hidden_size,
-            bias_attr=self.add_bias,
-        )
+        if config.tensor_parallel_degree > 1:
+            self.dense_h_to_4h = fleet.meta_parallel.ColumnParallelLinear(
+                config.hidden_size, config.ffn_hidden_size * 2, has_bias=self.add_bias, gather_output=False
+            )
+            self.dense_4h_to_h = fleet.meta_parallel.RowParallelLinear(
+                config.ffn_hidden_size, config.hidden_size, input_is_parallel=True, has_bias=self.add_bias
+            )
+        else:
+            # Project to 4h due to swiglu doubling the output width, see https://arxiv.org/pdf/2002.05202.pdf
+            self.dense_h_to_4h = nn.Linear(config.hidden_size, config.ffn_hidden_size * 2, bias_attr=self.add_bias)
+            # Project back to h.
+            self.dense_4h_to_h = nn.Linear(
+                config.ffn_hidden_size,
+                config.hidden_size,
+                bias_attr=self.add_bias,
+            )
 
     def forward(self, hidden_states):
         # [s, b, 4hp]
@@ -395,7 +407,6 @@ class GLMBlock(nn.Layer):
     def __init__(self, config: ChatGLMv2Config, layer_number):
         super(GLMBlock, self).__init__()
         self.layer_number = layer_number
-
         self.apply_residual_connection_post_layernorm = config.apply_residual_connection_post_layernorm
 
         self.fp32_residual_connection = config.fp32_residual_connection
@@ -455,7 +466,6 @@ class GLMBlock(nn.Layer):
 
         output = F.dropout(mlp_output, p=self.hidden_dropout, training=self.training)
         output = residual + output
-
         return output, kv_cache
 
 
@@ -464,7 +474,7 @@ class GLMTransformer(nn.Layer):
 
     def __init__(self, config: ChatGLMv2Config):
         super(GLMTransformer, self).__init__()
-
+        self.enable_recompute = False
         self.fp32_residual_connection = config.fp32_residual_connection
         self.post_layer_norm = config.post_layer_norm
 
@@ -484,6 +494,33 @@ class GLMTransformer(nn.Layer):
 
     def _get_layer(self, layer_number):
         return self.layers[layer_number]
+
+    @paddle.jit.not_to_static
+    def recompute_training(
+        self,
+        layer_module: nn.Layer,
+        hidden_states: paddle.Tensor,
+        attention_mask: paddle.Tensor,
+        rotary_embeds: paddle.Tensor,
+        kv_cache: paddle.Tensor,
+        use_cache: bool,
+    ):
+        def create_custom_forward(module):
+            def custom_forward(*inputs):
+                return module(*inputs)
+
+            return custom_forward
+
+        hidden_states, kv_cache = recompute(
+            create_custom_forward(layer_module),
+            hidden_states,
+            attention_mask,
+            rotary_embeds,
+            kv_cache,
+            use_cache,
+            use_reentrant=False,
+        )
+        return hidden_states, kv_cache
 
     def forward(
         self,
@@ -505,9 +542,20 @@ class GLMTransformer(nn.Layer):
 
             layer = self._get_layer(index)
 
-            hidden_states, kv_cache = layer(
-                hidden_states, attention_mask, rotary_pos_emb, kv_cache=kv_caches[index], use_cache=use_cache
-            )
+            if self.enable_recompute and not hidden_states.stop_gradient:
+                hidden_states, kv_cache = self.recompute_training(
+                    layer,
+                    hidden_states,
+                    attention_mask,
+                    rotary_pos_emb,
+                    kv_cache=kv_caches[index],
+                    use_cache=use_cache,
+                )
+            else:
+                hidden_states, kv_cache = layer(
+                    hidden_states, attention_mask, rotary_pos_emb, kv_cache=kv_caches[index], use_cache=use_cache
+                )
+
             if use_cache:
                 presents = presents + (kv_cache,)
 
@@ -546,13 +594,49 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
         if not past_length and padding_mask is not None:
             full_attention_mask -= padding_mask.unsqueeze(-1) - 1
         full_attention_mask = (full_attention_mask < 0.5).astype("bool")
-        full_attention_mask.unsqueeze(1)
-        return full_attention_mask
+        return full_attention_mask.unsqueeze(1)
 
     def get_position_ids(self, input_ids):
         batch_size, seq_length = input_ids.shape
         position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
         return position_ids
+
+    @classmethod
+    def _get_tensor_parallel_mappings(cls, config, is_split=True):
+
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+
+        fn = split_or_merge_func(
+            is_split=is_split,
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_rank=config.tensor_parallel_rank,
+            num_attention_heads=config.num_attention_heads,
+        )
+
+        def get_tensor_parallel_split_mappings(num_hidden_layers):
+            final_actions = {}
+            base_actions = {
+                # Column Linear
+                "encoder.layers.0.mlp.dense_h_to_4h.weight": partial(fn, is_column=True),
+                "encoder.layers.0.self_attention.query.bias": partial(fn, is_column=True),
+                "encoder.layers.0.self_attention.query.weight": partial(fn, is_column=True),
+                "output_layer.weight": partial(fn, is_column=True),
+                # Row Linear
+                "embedding.word_embeddings.weight": partial(fn, is_column=False),
+                "encoder.layers.0.self_attention.dense.weight": partial(fn, is_column=False),
+                "encoder.layers.0.mlp.dense_4h_to_h.weight": partial(fn, is_column=False),
+            }
+            for key, action in base_actions.items():
+                if "layers.0." in key:
+                    for i in range(num_hidden_layers):
+                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
+                final_actions[key] = action
+
+            return final_actions
+
+        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+
+        return mappings
 
 
 class Embedding(nn.Layer):
@@ -562,8 +646,10 @@ class Embedding(nn.Layer):
         super(Embedding, self).__init__()
 
         self.hidden_size = config.hidden_size
-        # Word embeddings (parallel).
-        self.word_embeddings = nn.Embedding(config.padded_vocab_size, self.hidden_size)
+        if config.tensor_parallel_degree > 1:
+            self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(config.vocab_size, config.hidden_size)
+        else:
+            self.word_embeddings = nn.Embedding(config.padded_vocab_size, self.hidden_size)
         self.fp32_residual_connection = config.fp32_residual_connection
 
     def forward(self, input_ids):
@@ -591,7 +677,15 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         )
         self.rotary_pos_emb = RotaryEmbedding(rotary_dim // 2)
         self.encoder = GLMTransformer(config)
-        self.output_layer = nn.Linear(config.hidden_size, config.padded_vocab_size, bias_attr=False)
+        if config.tensor_parallel_degree > 1:
+            self.output_layer = fleet.meta_parallel.ColumnParallelLinear(
+                config.hidden_size,
+                config.padded_vocab_size,
+                has_bias=False,
+                gather_output=not config.tensor_parallel_output,
+            )
+        else:
+            self.output_layer = nn.Linear(config.hidden_size, config.padded_vocab_size, bias_attr=False)
 
     def get_input_embeddings(self):
         return self.embedding.word_embeddings
@@ -609,13 +703,11 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         inputs_embeds: Optional[paddle.Tensor] = None,
         use_cache: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
-        # output_attentions: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ):
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
-        # output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
@@ -656,14 +748,12 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
             last_hidden_state=hidden_states,
             past_key_values=presents,
             hidden_states=all_hidden_states,
-            # attentions=all_self_attentions,
         )
 
 
-class ChatGLMv2ForConditionalGeneration(ChatGLMv2PretrainedModel):
+class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
     def __init__(self, config: ChatGLMv2Config):
         super().__init__(config)
-
         self.max_sequence_length = config.max_sequence_length
         self.chatglm_v2 = ChatGLMv2Model(config)
 
@@ -744,6 +834,7 @@ class ChatGLMv2ForConditionalGeneration(ChatGLMv2PretrainedModel):
         )
 
         hidden_states = transformer_outputs[0]
+
         if return_last_logit:
             hidden_states = hidden_states[-1:]
         lm_logits = self.chatglm_v2.output_layer(hidden_states)
@@ -751,14 +842,18 @@ class ChatGLMv2ForConditionalGeneration(ChatGLMv2PretrainedModel):
 
         loss = None
         if labels is not None:
-            lm_logits = lm_logits.astype("float32")
+            reshaped_logits = lm_logits.reshape([-1, lm_logits.shape[-1]]).astype("float32")
+            reshaped_labels = labels.reshape([-1])
 
-            # Shift so that tokens < n predict n and flatten the logits and labels
-            shift_logits = lm_logits[..., :-1, :]
-            shift_logits = shift_logits.reshape([-1, shift_logits.shape[-1]])
-            shift_labels = labels[..., 1:].reshape([-1])
+            if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
+                loss_fn = fleet.meta_parallel.ParallelCrossEntropy()
+            else:
+                loss_fn = nn.CrossEntropyLoss(reduction="none")
 
-            loss = F.cross_entropy(shift_logits, shift_labels, ignore_index=-100)
+            loss_mask = (labels != -100).astype("float32")
+            loss = loss_fn(reshaped_logits, reshaped_labels)
+            loss = paddle.sum(loss.reshape([-1]).cast(paddle.float32) * loss_mask.reshape([-1]).cast(paddle.float32))
+            loss = loss / loss_mask.sum()
 
             lm_logits = lm_logits.astype(hidden_states.dtype)
             loss = loss.astype(hidden_states.dtype)

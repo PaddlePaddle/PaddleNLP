@@ -139,6 +139,13 @@ class TrainingArguments:
             Ratio of total training steps used for a linear warmup from 0 to `learning_rate`.
         warmup_steps (`int`, *optional*, defaults to 0):
             Number of steps used for a linear warmup from 0 to `learning_rate`. Overrides any effect of `warmup_ratio`.
+        num_cycles (`float`, *optional*, defaults to 0.5):
+            The number of waves in the cosine scheduler.
+        lr_end (`float`, *optional*, defaults to 1e-7):
+            The end LR used in the polynomial scheduler.
+        power (`float`, *optional*, defaults to 1.0):
+            The power factor used in the polynomial scheduler.
+
         log_on_each_node (`bool`, *optional*, defaults to `True`):
             In multinode distributed training, whether to log using `log_level` once per node, or only on the main
             node.
@@ -225,6 +232,10 @@ class TrainingArguments:
               disable_partial_send_recv, optmize send speed for tensor parallel.
               enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
               enable_dp_comm_overlap, fuse data parallel gradient communication.
+        sharding_parallel_config (`str`, *optional*)(
+            Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
+            following config is support:
+              enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -363,6 +374,9 @@ class TrainingArguments:
         default=0.0, metadata={"help": "Linear warmup over warmup_ratio fraction of total steps."}
     )
     warmup_steps: int = field(default=0, metadata={"help": "Linear warmup over warmup_steps."})
+    num_cycles: float = field(default=0.5, metadata={"help": "The number of waves in the cosine scheduler."})
+    lr_end: float = field(default=1e-7, metadata={"help": "The end LR in the polynomial scheduler."})
+    power: float = field(default=1.0, metadata={"help": "The power factor in the polynomial scheduler."})
 
     log_on_each_node: bool = field(
         default=True,
@@ -518,6 +532,16 @@ class TrainingArguments:
                 "disable_partial_send_recv, optmize send speed for tensor parallel.\n"
                 "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
                 "enable_dp_comm_overlap, fuse data parallel gradient communication. \n"
+            )
+        },
+    )
+    sharding_parallel_config: str = field(
+        default="",
+        metadata={
+            "help": (
+                "Some additional config it highly affect the useage of sharding parallel, we provide some option to config it."
+                "following config is support: \n"
+                "enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation"
             )
         },
     )
@@ -755,6 +779,9 @@ class TrainingArguments:
             self.data_parallel_degree = world_size // (
                 sharding_parallel_degree * tensor_parallel_degree * pipeline_parallel_degree
             )
+            # TODO(liuzhenhai): remove this when framework is ready
+            if sharding_parallel_degree > 1 and ShardingOption.SHARD_OP in self.sharding:
+                assert self.data_parallel_degree == 1, "sharding stage1 can not coexist with dp for now"
 
             if ShardingOption.OFFLOAD in self.sharding or ShardingOption.FULL_SHARD in self.sharding:
                 warnings.warn("`offload` and `stage3` is not supported NOW!")
@@ -820,6 +847,27 @@ class TrainingArguments:
 
                 # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
                 strategy.hybrid_configs = hybrid_configs
+
+                if sharding_parallel_degree > 1:
+                    sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
+                    for x in sharding_parallel_config:
+                        if len(x) > 0:
+                            if x not in [
+                                "enable_stage1_tensor_fusion",
+                            ]:
+                                raise ValueError(
+                                    f"Found unknown pipeline mode config {x}, "
+                                    f"accpet config is enable_stage1_tensor_fusion."
+                                )
+                    try:
+                        strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
+                            True if "enable_stage1_tensor_fusion" in sharding_parallel_config else False
+                        )
+                    except KeyError:
+                        warnings.warn(
+                            "The enable_stage1_tensor_fusion is not supported by current version of Paddle. "
+                            "Please try lateset develop Paddle."
+                        )
                 fleet.init(is_collective=True, strategy=strategy)
 
                 logger.info(strategy)

@@ -42,7 +42,6 @@ from pipelines.pipelines.config import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
 try:
     pipeline_config = read_pipeline_config_from_yaml(Path(PIPELINE_YAML_PATH))
     pipeline_definition = get_pipeline_definition(
@@ -162,7 +161,6 @@ def upload_file(
     """
     if not INDEXING_PIPELINE:
         raise HTTPException(status_code=501, detail="Indexing Pipeline is not configured.")
-
     file_paths: list = []
     file_metas: list = []
     meta_form = json.loads(meta) or {}  # type: ignore
@@ -189,6 +187,38 @@ def upload_file(
             "PDFFileConverter": fileconverter_params.dict(),
             "Preprocessor": preprocessor_params.dict(),
         },
+    )
+    return {"message": "OK"}
+
+
+@router.post("/file-upload-splitter")
+def upload_file_splitter(
+    files: List[UploadFile] = File(),
+    # JSON serialized string
+    meta: Optional[str] = Form("null"),
+):
+    if not INDEXING_PIPELINE:
+        raise HTTPException(status_code=501, detail="Indexing Pipeline is not configured.")
+    file_paths: list = []
+    file_metas: list = []
+    meta_form = json.loads(meta) or {}  # type: ignore
+    if not isinstance(meta_form, dict):
+        raise HTTPException(status_code=500, detail=f"The meta field must be a dict or None, not {type(meta_form)}")
+
+    for file in files:
+        try:
+            file_path = Path(FILE_UPLOAD_PATH) / f"{uuid.uuid4().hex}_{file.filename}"
+            with file_path.open("wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+
+            file_paths.append(file_path)
+            file_metas.append(meta_form)
+        finally:
+            file.file.close()
+    INDEXING_PIPELINE.run(
+        file_paths=file_paths,
+        meta=file_metas,
+        params=meta_form,
     )
     return {"message": "OK"}
 

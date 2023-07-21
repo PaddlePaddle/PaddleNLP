@@ -14,7 +14,7 @@
 
 import paddle
 
-from ..transformers import ChatGLMForConditionalGeneration, ChatGLMTokenizer
+from ..transformers import ChatGLMForCausalLM, ChatGLMTokenizer
 from ..utils.log import logger
 from .task import Task
 from .utils import static_mode_guard
@@ -115,7 +115,7 @@ class ChatGLMTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = ChatGLMForConditionalGeneration.from_pretrained(
+        model_instance = ChatGLMForCausalLM.from_pretrained(
             self.model,
             load_state_as_np=True,
             dtype=self._dtype,
