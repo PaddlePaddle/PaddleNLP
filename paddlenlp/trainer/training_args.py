@@ -871,7 +871,7 @@ class TrainingArguments:
                     except KeyError:
                         warnings.warn(
                             "The enable_stage1_tensor_fusion or enable_stage1_overlap is not supported "
-                            "by current version of Paddle. Please try lateset develop Paddle."
+                            "by current version of Paddle. Please try latest develop Paddle."
                         )
                 fleet.init(is_collective=True, strategy=strategy)
 
