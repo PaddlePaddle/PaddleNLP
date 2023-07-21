@@ -333,7 +333,14 @@ class Trainer:
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
 
         if args.recompute:
-            model.recompute_enable()
+
+            def fn(layer):
+                if hasattr(layer, "enable_recompute") and (
+                    layer.enable_recompute is False or layer.enable_recompute == 0
+                ):
+                    layer.enable_recompute = True
+
+            model.apply(fn)
 
         default_label_names = (
             ["start_positions", "end_positions"]
