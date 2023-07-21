@@ -251,5 +251,5 @@ class LlamaConfig(PretrainedConfig):
         )
 
     @property
-    def rotary(self):
+    def rope(self):
         return not self.alibi

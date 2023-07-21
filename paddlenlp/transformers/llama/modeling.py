@@ -79,14 +79,14 @@ def _get_interleave(n):
 
 
 def build_alibi_tensor(
-    bool_attention_mask: Tensor, num_heads: int, dtype: paddle.dtype, slots=None, tensor_parallel_degree=1
+    bool_attention_mask: Tensor, num_heads: int, dtype: paddle.dtype, tensor_parallel_degree=1
 ) -> Tensor:
     attention_mask = bool_attention_mask.astype("float32")
     batch_size, seq_length = attention_mask.shape
     slopes = paddle.to_tensor(_get_interleave(num_heads), dtype="float32")
-    alibi = slopes.unsqueeze(1).unsqueeze(1) * paddle.arange(seq_length, dtype="float32").unsqueeze(0).unsqueeze(
-        0
-    ).expand([num_heads, -1, -1])
+    alibi = slopes.unsqueeze(axis=[1, 2]) * paddle.arange(seq_length, dtype="float32").unsqueeze(axis=[0, 1]).expand(
+        [num_heads, -1, -1]
+    )
     alibi = alibi.reshape(shape=(1, num_heads, 1, seq_length)).expand([batch_size, -1, -1, -1])
     return paddle.cast(alibi, dtype)
 
@@ -164,7 +164,7 @@ def scaled_dot_product_attention(
 
     if config.use_flash_attention and flash_attention:
         if alibi is not None:
-            raise ValueError("not support alibi in flash attention")
+            raise ValueError("Flash Attention does not support ALiBi yet")
 
         # Flash Attention now ignore attention mask
         # Current Flash Attention doesn't support attn maskt
@@ -446,7 +446,7 @@ class LlamaAttention(nn.Layer):
                 self.hidden_size,
                 bias_attr=False,
             )
-        if config.rotary:
+        if config.rope:
             self.rotary_emb = LlamaRotaryEmbedding(self.head_dim, max_position_embeddings=self.max_position_embeddings)
 
         self.config = config
@@ -473,7 +473,7 @@ class LlamaAttention(nn.Layer):
             offset = past_key_value[0].shape[-3]
             kv_seq_len += offset
 
-        if self.config.rotary:
+        if self.config.rope:
             cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
             query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, offset=offset)
             # [bsz, nh, t, hd]
