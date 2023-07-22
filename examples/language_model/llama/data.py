@@ -53,19 +53,29 @@ def convert_example(example, tokenizer, data_args, is_test=False):
     # context that overlaps a bit the context of the previous feature.
     # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
     # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
-    context = example["context"]
-    question = example["question"]
-    try:
-        answer = example["answers"][0]
-    except:
-        print(example["context"])
-        print(example["question"])
-        print(example["answers"])
-        print(example["answer_starts"])
-        print(example["is_impossible"])
-
-    input_seq = f"answer: {answer} context: {context} </s>"
-    output_seq = f"question: {question} </s>"
+    if "context" in example:
+        context = example["context"]
+        question = example["question"]
+        try:
+            answer = example["answers"][0]
+        except:
+            print(example["context"])
+            print(example["question"])
+            print(example["answers"])
+            print(example["answer_starts"])
+            print(example["is_impossible"])
+        input_seq = f"answer: {answer} context: {context}"
+        output_seq = f"question: {question} </s>"
+    elif "instruction" in example:
+        input_seq = f"{example['instruction']}"
+        output_seq = f"{example['output']} </s>"
+    elif "src" in example:
+        context = example["src"][0] if isinstance(example["src"], list) else example["src"]
+        question = example["tgt"][0] if isinstance(example["tgt"], list) else example["tgt"]
+        input_seq = f"{context}"
+        output_seq = f"{question} </s>"
+    else:
+        raise ValueError("Please check the dataset format.")
 
     source_tokenized = tokenizer(
         input_seq,
@@ -95,6 +105,9 @@ def convert_example(example, tokenizer, data_args, is_test=False):
             input_ids=source_tokenized["input_ids"][0],
             labels=labels,
         )
+
+    # shift labels
+    input_ids, labels = input_ids[:-1], labels[1:]
 
     return dict(
         input_ids=input_ids,
@@ -163,6 +176,9 @@ def custom_instruction_convert_example(
             input_ids=source_tokenized["input_ids"][0],
             labels=labels,
         )
+
+    # shift labels
+    input_ids, labels = input_ids[:-1], labels[1:]
 
     return dict(
         input_ids=input_ids,

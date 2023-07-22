@@ -22,6 +22,7 @@ from paddlenlp.transformers import (
     ChatGLMv2ForConditionalGeneration,
     ChatGLMv2Model,
 )
+from tests.transformers.test_generation_utils import GenerationTesterMixin
 from tests.transformers.test_modeling_common import ModelTesterMixin, ids_tensor
 
 
@@ -34,11 +35,10 @@ class ChatGLMv2Tester:
         seq_length=10,
         batch_size=2,
         vocab_size=123,
-        kv_channels=16,
+        kv_channels=4,
         hidden_size=8,
         ffn_hidden_size=8,
         num_attention_heads=2,
-        multi_query_attention=False,
         rmsnorm=True,
         use_cache=True,
     ):
@@ -52,12 +52,11 @@ class ChatGLMv2Tester:
         self.hidden_size = hidden_size
         self.ffn_hidden_size = ffn_hidden_size
         self.num_attention_heads = num_attention_heads
-        self.multi_query_attention = multi_query_attention
         self.rmsnorm = rmsnorm
         self.use_cache = use_cache
 
     def prepare_config_and_inputs(self):
-        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
+        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size, dtype="int64")
 
         labels = None
         context_length = self.seq_length // 2
@@ -78,7 +77,6 @@ class ChatGLMv2Tester:
             kv_channels=self.kv_channels,
             use_cache=self.use_cache,
             rmsnorm=self.rmsnorm,
-            multi_query_attention=self.multi_query_attention,
         )
 
     def create_and_check_model(self, config, input_ids, labels):
@@ -95,7 +93,7 @@ class ChatGLMv2Tester:
         outputs = model(input_ids, return_dict=self.parent.return_dict)
         past_key_values = outputs.past_key_values[0] if self.parent.return_dict else outputs[1][0]
 
-        next_tokens = ids_tensor([self.batch_size, 3], self.vocab_size)
+        next_tokens = ids_tensor([self.batch_size, 3], self.vocab_size, dtype="int64")
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
         next_attention_mask = model.get_masks(next_input_ids)
 
@@ -111,7 +109,7 @@ class ChatGLMv2Tester:
         output_from_past = outputs.past_key_values[0] if self.parent.return_dict else outputs[1][0]
 
         # select random slice
-        random_slice_idx = ids_tensor((1,), output_from_past.shape[-1]).item()
+        random_slice_idx = ids_tensor((1,), output_from_past.shape[-1], dtype="int64").item()
         output_from_no_past_slice = output_from_no_past[:, -3:, random_slice_idx].detach()
         output_from_past_slice = output_from_past[:, :, random_slice_idx].detach()
 
@@ -148,53 +146,53 @@ class ChatGLMv2Tester:
         self.parent.assertEqual(logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
         if config.use_cache:
             self.parent.assertTrue(isinstance(past_key_values, tuple))
-            if config.multi_query_attention:
-                self.parent.assertEqual(
-                    past_key_values[0].shape,
-                    [self.seq_length, self.batch_size, config.multi_query_group_num, config.kv_channels],
-                )
-            else:
-                self.parent.assertEqual(
-                    past_key_values[0].shape,
-                    [self.seq_length, self.batch_size, config.num_attention_heads, config.kv_channels],
-                )
-
+            self.parent.assertEqual(
+                past_key_values[0].shape,
+                [self.seq_length, self.batch_size, config.multi_query_group_num, config.kv_channels],
+            )
         else:
             self.parent.assertTrue(past_key_values is None)
 
 
 @parameterized_class(
-    ("return_dict", "multi_query_attention", "use_labels"),
+    ("return_dict", "use_labels"),
     [
-        [False, False, False],
-        [False, True, False],
-        [True, False, False],
-        [True, True, True],
+        [False, True],
+        [True, False],
     ],
 )
-class ChatGLMv2Test(ModelTesterMixin, unittest.TestCase):
+class ChatGLMv2Test(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     base_model_class = ChatGLMv2Model
     return_dict: bool = True
-    multi_query_attention = False
     use_labels: bool = False
     use_test_model_name_list = False
 
     all_model_classes = (ChatGLMv2Model, ChatGLMv2ForConditionalGeneration)
+    all_generative_model_classes = {ChatGLMv2ForConditionalGeneration: (ChatGLMv2Model, "chatglm_v2")}
 
     def setUp(self):
-        # super().setUp()
-        # self.assertFalse(self.multi_query_attention)
-        self.model_tester = ChatGLMv2Tester(self, multi_query_attention=self.multi_query_attention)
+        self.model_tester = ChatGLMv2Tester(self)
+
+    def _get_input_ids_and_config(self):
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+
+        input_ids = inputs_dict[self.input_name]
+        print(input_ids)
+        attention_mask = paddle.ones_like(input_ids)
+
+        max_batch_size = 2
+        sequence_length = input_ids.shape[-1] // 2
+        input_ids = input_ids[:max_batch_size, :sequence_length]
+        attention_mask = attention_mask[:max_batch_size, :sequence_length]
+
+        # generate max 3 tokens
+        max_length = 3
+
+        return config, input_ids, attention_mask, max_length
 
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_model(*config_and_inputs)
-
-    def test_model_name_list(self):
-        pass
-
-    def test_resize_tokens_embeddings(self):
-        pass
 
     def test_ChatGLMv2_lm_head_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()

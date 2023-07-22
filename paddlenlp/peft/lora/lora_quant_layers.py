@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import paddle
 from paddle import nn
 from paddle.nn import functional as F
 from paddle.nn.quant.format import ConvertibleQuantedLayer
@@ -66,6 +66,7 @@ class QuantedLoRALinear(ConvertibleQuantedLayer):
         return self._linear_forward(quant_input, quant_weight)
 
     def _linear_forward(self, input, weight):
+        weight = paddle.cast(weight, input.dtype)
         out = F.linear(x=input, weight=weight, bias=self.bias, name=self.name)
         return out
 

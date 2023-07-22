@@ -102,6 +102,11 @@ class LoRAModel(nn.Layer):
         return lora_model
 
     def set_state_dict(self, state_dict):
+        import warnings
+
+        warnings.filterwarnings(
+            action="ignore", message=".*Skip loading for.*", category=Warning, lineno=0, append=False
+        )
         self.model.set_state_dict(state_dict)
         logger.info("Load lora weight successfully")
 

@@ -72,6 +72,7 @@ MAPPING_NAMES = OrderedDict(
         ("ErnieGram", "ernie_gram"),
         ("ErnieLayout", "ernie_layout"),
         ("ErnieM", "ernie_m"),
+        ("ErnieCode", "ernie_code"),
         ("Ernie", "ernie"),
         ("FNet", "fnet"),
         ("Funnel", "funnel"),
