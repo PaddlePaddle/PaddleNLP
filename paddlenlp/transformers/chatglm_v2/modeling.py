@@ -260,18 +260,18 @@ class CoreAttention(nn.Layer):
         # print(value_layer.shape)
         # Raw attention scores
 
-        # if seq_q != seq_k and attention_mask is None and False:
-        #     causal= seq_q == seq_k
-        #     q = query_layer.transpose([1,0,2,3])
-        #     #return query_layer.reshape([seq_q,batch,-1])
-        #     k = key_layer.transpose([1,0,2,3])
-        #     v = value_layer.transpose([1,0,2,3])
-        #     context_layer = flash_attention(q, k, v, causal=causal)[0]
-        #     #context_layer = memory_efficient_attention(q,k,v,scale= 1.0 / self.norm_factor * self.coeff)
-        #     #context_layer = memory_efficient_attention(q,k,v)
-        #     context_layer = context_layer.transpose([1,0,2,3])
-        #     context_layer = context_layer.reshape([seq_q,batch,-1])
-        #     return context_layer
+        if attention_mask is None:
+            causal= seq_q == seq_k
+            q = query_layer.transpose([1,0,2,3])
+            #return query_layer.reshape([seq_q,batch,-1])
+            k = key_layer.transpose([1,0,2,3])
+            v = value_layer.transpose([1,0,2,3])
+            context_layer = flash_attention(q, k, v, causal=causal)[0]
+            #context_layer = memory_efficient_attention(q,k,v,scale= 1.0 / self.norm_factor * self.coeff)
+            #context_layer = memory_efficient_attention(q,k,v)
+            context_layer = context_layer.transpose([1,0,2,3])
+            context_layer = context_layer.reshape([seq_q,batch,-1])
+            return context_layer
 
 
         query_layer = query_layer.reshape([seq_q, batch * head,head_dim])
