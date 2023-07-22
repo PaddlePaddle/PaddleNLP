@@ -1,4 +1,4 @@
-# LLaMA inplementation
+# LLaMA
 
 **目录**
 
