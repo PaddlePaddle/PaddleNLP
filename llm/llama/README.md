@@ -19,14 +19,17 @@ Llama2 模型的权重的使用则需要遵循[License](../../../paddlenlp/trans
 
 ## 权重列表
 
-| Model                      |
-|----------------------------|
-| facebook/llama-7b          |
-| facebook/llama-13b         |
-| facebook/llama-30b         |
-| facebook/llama-65b         |
-| meta-llama/Llama-2-7b      |
-| meta-llama/Llama-2-7b-chat |
+| Model                                |
+|--------------------------------------|
+|     facebook/llama-7b                |
+|     facebook/llama-13b               |
+|     facebook/llama-30b               |
+|     facebook/llama-65b               |
+|     ziqingyang/chinese-llama-7b      |
+|     ziqingyang/chinese-llama-13b     |
+|     ziqingyang/chinese-alpaca-7b     |
+|     ziqingyang/chinese-alpaca-13b    |
+|     idea-ccnl/ziya-llama-13b-v1      |
 
 使用方法：
 
