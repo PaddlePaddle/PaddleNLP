@@ -110,25 +110,6 @@ class InTokensIterableDataset(IterableDataset):
             yield padded_list
 
 
-# def pad_batch_data(
-#     insts,
-#     pad_idx=0,
-#     return_pos=False,
-#     max_length=None,
-# ):
-#     """
-#     Pad the instances to the max sequence length in batch, and generate the
-#     corresponding position data and attention bias.
-#     """
-#     max_len = max_length if max_length is not None else max(len(inst) for inst in insts)
-#     # Any token included in dict can be used to pad, since the paddings' loss
-#     # will be masked out by weights and make no effect on parameter gradients.
-#     # [1,max_lengths]
-#     inst_data = [inst + list([pad_idx] * (max_len - len(inst))) for inst in insts]
-#     # [max_lengths]
-#     return inst_data[0]
-
-
 def _pad_batch_records(batch_records, pad_id, bos_token_id, label_pad_id=-100, max_length=4096):
 
     keys = batch_records[0].keys()
@@ -145,11 +126,7 @@ def _pad_batch_records(batch_records, pad_id, bos_token_id, label_pad_id=-100, m
     batch_map.update(data_map)
 
     batch_map.pop("token_type_ids")
-    # batch_map["input_ids"] = pad_batch_data(data_map["input_ids"], pad_idx=pad_id, max_length=max_length)
-    # batch_map["position_ids"] = pad_batch_data(data_map["position_ids"], pad_idx=0, max_length=max_length)
-    # batch_map["labels"] = pad_batch_data(data_map["labels"], pad_idx=label_pad_id, max_length=max_length)
     # input_mask
-
     # add in-batch mask
     batch_map["attention_mask"] = _gen_self_attn_mask_for_glm_flatten(
         data_batch_map["input_ids"], bos_token_id, max_length
