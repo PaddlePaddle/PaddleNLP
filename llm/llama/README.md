@@ -12,8 +12,29 @@
 
 Llama 模型的权重的使用则需要遵循[License](../../../paddlenlp/transformers/llama/LICENSE)。
 
+Llama2 模型的权重的使用则需要遵循[License](../../../paddlenlp/transformers/llama/Llama2.LICENSE)。
+
 
 <a name="0"></a>
+
+## 权重列表
+
+| Model                      |
+|----------------------------|
+| facebook/llama-7b          |
+| facebook/llama-13b         |
+| facebook/llama-30b         |
+| facebook/llama-65b         |
+| meta-llama/Llama-2-7b      |
+| meta-llama/Llama-2-7b-chat |
+
+使用方法：
+
+```python
+from paddlenlp.transformers import LlamaForCausalLM, LlamaTokenizer
+model: LlamaForCausalLM = LlamaForCausalLM.from_pretrained("meta-llama/Llama-2-7b-chat")
+tokenizer = LlamaTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat")
+```
 
 ## 预训练
 
