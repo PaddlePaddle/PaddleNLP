@@ -23,7 +23,6 @@ jobs:
           make install
       - name: run the command
         run: 
-          pip list
           make test
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3

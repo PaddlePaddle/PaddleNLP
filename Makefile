@@ -48,6 +48,7 @@ install:
 	pip install -r requirements-dev.txt
 	pip install -r requirements.txt
 	pip install -r paddlenlp/experimental/autonlp/requirements.txt
+	pip list
 	pre-commit install
 
 
