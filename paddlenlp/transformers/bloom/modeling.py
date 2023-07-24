@@ -1208,7 +1208,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
         parallel_output = True
         if hidden_states.stop_gradient:
             parallel_output = False
-        lm_logits = self.lm_head(hidden_states, parallel_output)
+        lm_logits = self.lm_head(hidden_states, self.config.tensor_parallel_output)
 
         loss = None
         if labels is not None:
