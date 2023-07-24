@@ -18,7 +18,7 @@ import paddle.distributed.fleet as fleet
 import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import LayerDesc, PipelineLayer
 
-from paddlenlp.transformers import PretrainedModel
+from paddlenlp.transformers import PretrainedModel, ScatterOp
 from paddlenlp.transformers.llama.modeling import (
     LlamaConfig,
     LlamaDecoderLayer,
@@ -95,6 +95,7 @@ class LlamaEmbeddingPipe(nn.Layer):
         input_embeds = self.embed_tokens(input_ids)
         if self.sequence_parallel:
             input_embeds = paddle.transpose(input_embeds, perm=[1, 0, 2])
+            input_embeds = ScatterOp.apply(input_embeds)
 
         batch_size, seq_length = input_ids.shape
         if attention_mask is not None:
@@ -107,8 +108,8 @@ class LlamaEmbeddingPipe(nn.Layer):
 
 
 class LlamaDecoderLayerPipe(LlamaDecoderLayer):
-    def __init__(self, config, pp_mode=True):
-        super().__init__(config, pp_mode=pp_mode)
+    def __init__(self, config):
+        super().__init__(config)
 
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
@@ -239,7 +240,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             self.add_sequential_layer(LayerDesc(LlamaDecoderLayerPipe, config=config), f"llama.layers.{i}")
 
         self.add_sequential_layer(LayerDesc(LlamaRMSNormPipe, config=config), "llama.norm")
-        self.add_sequential_layer(LayerDesc(LlamaLMHead, config=config, pp_mode=True), "lm_head")
+        self.add_sequential_layer(LayerDesc(LlamaLMHead, config=config), "lm_head")
 
         recompute_interval = 0
         if use_recompute and recompute_granularity == "full":

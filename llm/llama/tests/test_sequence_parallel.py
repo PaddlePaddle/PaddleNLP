@@ -41,6 +41,7 @@ class TestLlama(unittest.TestCase):
             "pp_degree": pp_degree,
             "sharding_degree": 1,
         }
+        strategy.pipeline_configs = {"enable_partial_send_recv": False}
         fleet.init(is_collective=True, strategy=strategy)
         hcg = fleet.get_hybrid_communicate_group()
         mp_group = hcg.get_model_parallel_group()
