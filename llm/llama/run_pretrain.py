@@ -136,6 +136,10 @@ class ModelArguments:
         default=False,
         metadata={"help": "whether to fuse attention qkv"},
     )
+    fuse_mlp_linear: bool = field(
+        default=False,
+        metadata={"help": "whether to fuse first up and gate proj in mlp block"},
+    )
     recompute_granularity: str = field(
         default="full",
         metadata={"help": "full core_attn"},
@@ -404,6 +408,7 @@ def main():
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
+    config.fuse_mlp_linear = model_args.fuse_mlp_linear
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
     config.use_recompute = training_args.recompute

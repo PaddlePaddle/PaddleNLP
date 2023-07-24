@@ -317,15 +317,31 @@ class LlamaMLP(nn.Layer):
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
         self.tensor_parallel_degree = config.tensor_parallel_degree
+        self.fuse_mlp_linear = config.fuse_mlp_linear
 
         if config.tensor_parallel_degree > 1:
             # 为了减少张量并行的通信量，将两个linear合并成一个
-            self.gate_up_fused_proj = mpu.ColumnParallelLinear(
-                self.hidden_size,
-                self.intermediate_size * 2,
-                gather_output=False,
-                has_bias=False,
-            )
+            if config.fuse_mlp_linear:
+                self.gate_up_fused_proj = mpu.ColumnParallelLinear(
+                    self.hidden_size,
+                    self.intermediate_size * 2,
+                    gather_output=False,
+                    has_bias=False,
+                )
+            else:
+                self.gate_proj = mpu.ColumnParallelLinear(
+                    self.hidden_size,
+                    self.intermediate_size,
+                    gather_output=False,
+                    has_bias=False,
+                )
+                self.up_proj = mpu.ColumnParallelLinear(
+                    self.hidden_size,
+                    self.intermediate_size,
+                    gather_output=False,
+                    has_bias=False,
+                )
+
             self.down_proj = mpu.RowParallelLinear(
                 self.intermediate_size,
                 self.hidden_size,
@@ -338,9 +354,16 @@ class LlamaMLP(nn.Layer):
             self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
 
     def forward(self, x):
-        if self.tensor_parallel_degree > 1:
-            gate_out, up_out = paddle.chunk(self.gate_up_fused_proj(x), chunks=2, axis=-1)
-            out = self.down_proj(F.silu(gate_out) * up_out)
+        if self.tensor_parallel_degree > 1 and self.fuse_mlp_linear:
+            # [s, b, 4hp]
+            intermediate_parallel = self.gate_up_fused_proj(x)
+            # Special Slicing to accomodate Tensor Parallel
+            # Even channels is ffc_fc, odd channels is gate
+            gate_out = intermediate_parallel[..., 0::2]
+            up_out = intermediate_parallel[..., 1::2]
+            intermediate_parallel = F.silu(gate_out) * up_out
+            # [s, b, h]
+            out = self.down_proj(intermediate_parallel)
         else:
             out = self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
         return out
