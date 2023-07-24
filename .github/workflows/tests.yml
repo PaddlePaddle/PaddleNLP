@@ -22,6 +22,8 @@ jobs:
           pip install -r tests/requirements.txt
           make install
       - name: run the command
-        run: make test
+        run: 
+          pip list
+          make test
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
