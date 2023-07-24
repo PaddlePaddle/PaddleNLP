@@ -43,7 +43,7 @@ def parse_arguments():
 def batchfy_text(texts, batch_size):
     batch_texts = []
     batch_start = 0
-    if batch_start < len(texts):
+    while batch_start < len(texts):
         batch_texts += [texts[batch_start : min(batch_start + batch_size, len(texts))]]
         batch_start += batch_size
     return batch_texts
