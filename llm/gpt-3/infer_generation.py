@@ -91,6 +91,7 @@ class Predictor(object):
     def postprocess(self, infer_data):
         result = []
         for x in infer_data.tolist():
+            print("The x:{}".format(x))
             sentence = self.tokenizer.convert_ids_to_string(x)
             result.append(sentence)
         out_dict = {"result": result}

@@ -89,9 +89,7 @@ class Predictor(object):
         )
         inputs_tensor = {}
         for key, value in inputs.items():
-            print("The key:{}, value:{}".format(key, value.sum()))
             inputs_tensor[key] = paddle.to_tensor(value)
-        print(inputs_tensor)
         return inputs_tensor
 
     def infer(self, inputs):
@@ -124,7 +122,6 @@ class Predictor(object):
     def postprocess(self, infer_data):
         result = []
         for x in infer_data.tolist():
-            print("The ids:{}".format(x))
             res = self.tokenizer.convert_ids_to_string(x)
             result.append(res)
         out_dict = {"result": result}

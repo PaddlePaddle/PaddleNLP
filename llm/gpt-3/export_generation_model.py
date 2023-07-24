@@ -17,7 +17,7 @@ import os
 
 import paddle
 from configuration import GPTConfig
-from modeling_static import GPTForCausalLM
+from modeling import GPTForCausalLM
 
 from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
 
