@@ -18,6 +18,7 @@ RW_PRETRAINED_INIT_CONFIGURATION = {
     "model_state": {
         "tiiuae/falcon-7b": "https://bj.bcebos.com/paddlenlp/models/community/tiiuae/falcon-7b/model_state.pdparams",
         "tiiuae/falcon-7b-instruct": "https://bj.bcebos.com/paddlenlp/models/community/tiiuae/falcon-7b-instruct/model_state.pdparams",
+        "OpenBuddy/openbuddy-falcon-7b-v5-fp16": "https://bj.bcebos.com/paddlenlp/models/community/OpenBuddy/openbuddy-falcon-7b-v5-fp16/model_state.pdparams",
     },
 }
 

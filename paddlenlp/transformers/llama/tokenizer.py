@@ -26,6 +26,7 @@ __all__ = ["LlamaTokenizer"]
 
 
 class LlamaTokenizer(PretrainedTokenizer):
+    model_input_names = ["input_ids", "attention_mask", "position_ids"]
     resource_files_names = {
         "vocab_file": "sentencepiece.bpe.model",
     }

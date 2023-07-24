@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,27 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 from dataclasses import dataclass, field
 from functools import partial
 
 import numpy as np
 import paddle
-from data import convert_chatglm_example, convert_chatglm_v2_example, read_local_dataset
 from sklearn.metrics import accuracy_score
-from utils import ChatGLMTrainer
+from utils import BloomTrainer, compute_metrics
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
-from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.peft.prefix import (
-    chatglm_pad_attention_mask,
-    chatglm_postprocess_past_key_value,
-    chatglm_v2_pad_attention_mask,
-)
+from paddlenlp.peft.prefix import bloom_postprocess_past_key_value
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
-from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
+from paddlenlp.transformers import AutoTokenizer, BloomForCausalLM
 from paddlenlp.utils.log import logger
 
 
@@ -42,15 +37,17 @@ class DataArgument:
     task_name_or_path: str = field(default=None, metadata={"help": "Path or name for dataset"})
     src_length: int = field(default=512, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=512, metadata={"help": "The max length of target text."})
-    num_beams: int = field(default=5, metadata={"help": "The number of beams."})
 
 
 @dataclass
 class ModelArgument:
     model_name_or_path: str = field(
-        default="THUDM/chatglm-6b", metadata={"help": "Build-in pretrained model name or the path to local model."}
+        default="bigscience/bloom-560m",
+        metadata={"help": "Build-in pretrained model name or the path to local model."},
     )
+    lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
     eval_with_do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
+
     # lora
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
     lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
@@ -58,29 +55,114 @@ class ModelArgument:
     merge_weights: bool = field(
         default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
     )
-    # prefix
+    # prefix tuning
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
-    num_prefix_tokens: int = field(default=64, metadata={"help": "Number of prefix tokens"})
+    num_prefix_tokens: int = field(default=10, metadata={"help": "Number of prefix tokens"})
     prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
     # qat
     qat: bool = field(default=False, metadata={"help": "Whether to use QAT technique"})
     qat_type: str = field(default="A8W8", metadata={"help": "Quantization type. Supported values: A8W8, W4,A8W4"})
 
 
+def read_local_dataset(path):
+    with open(path, "r", encoding="utf-8") as fp:
+        for line in fp:
+            yield json.loads(line.strip())
+
+
+def convert_example(
+    example,
+    tokenizer,
+    max_source_length,
+    max_target_length,
+    is_test=False,
+):
+    """Convert all examples into necessary features."""
+    if "source" in example:
+        source = None
+        title = None
+        target = None
+        if "source" in example and "title" in example:
+            source = example["source"]
+            if "title" in example.keys():
+                title = example["title"]
+        elif "context" in example and "answer" in example:
+            source = example["context"]
+            if "answer" in example.keys():
+                title = example["answer"]
+        else:
+            assert False, "Source and title are not in the input dictionary, nor are context and answer."
+
+        if "target" in example.keys():
+            target = example["target"]
+        elif "question" in example.keys():
+            target = example["question"]
+
+        # Add the eos token for the source and target
+        source = "答案：" + title + "，上下文：" + source + "在已知答案的前提下，问题："
+    elif "content" in example:
+        source = example["content"]
+        target = example["summary"]
+    elif "instruction" in example:
+        source = example["instruction"]
+        target = example["output"]
+    elif "src" in example:
+        source = example["src"][0] if isinstance(example["src"], list) else example["src"]
+        target = example["tgt"][0] if isinstance(example["tgt"], list) else example["tgt"]
+    else:
+        raise ValueError("Please check dataset format.")
+
+    target = target[: max_target_length - 1]
+    target = target + tokenizer.eos_token
+
+    target_tokenized = tokenizer(
+        target,
+        max_length=max_target_length,
+        truncation=True,
+    )
+
+    source_tokenized = tokenizer(
+        source,
+        max_length=max_source_length,
+        truncation=True,
+    )
+    if is_test:
+        return dict(
+            input_ids=source_tokenized["input_ids"],
+            labels=target_tokenized["input_ids"],
+        )
+    else:
+        input_ids = source_tokenized["input_ids"] + target_tokenized["input_ids"]
+        labels = len(source_tokenized["input_ids"]) * [tokenizer.pad_token_id] + target_tokenized["input_ids"]
+
+        # shift labels
+        input_ids, labels = input_ids[:-1], labels[1:]
+        return dict(
+            input_ids=input_ids,
+            labels=labels,
+        )
+
+
 def main():
+    # Parse the model and data  arguements
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
 
+    setattr(training_args, "lr_decay_ratio", model_args.lr_decay_ratio)
+
+    # Set the training device
     paddle.set_device(training_args.device)
 
+    # Log on each process the small summary:
     logger.warning(
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: {training_args.world_size}, "
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
 
+    # Detecting last checkpoint.
     last_checkpoint = None
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
@@ -95,67 +177,31 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
+    # Set the dtype for loading model
     dtype = paddle.get_default_dtype()
     if training_args.fp16_opt_level == "O2":
         if training_args.fp16:
             dtype = "float16"
+        if training_args.bf16:
+            dtype = "bfloat16"
 
     # Load the pretrained language model.
-    model = AutoModelForConditionalGeneration.from_pretrained(
+    model = BloomForCausalLM.from_pretrained(
         model_args.model_name_or_path,
-        dtype=dtype,
-        low_cpu_mem_usage=True,
+        low_cpu_mem_usage=True,  # todo enable low_cpu_mem_usage=True
+        dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
+        lm_shift_labels=False,
     )
-    if "chatglm2" in model_args.model_name_or_path:
-        multi_query_group_num = model.config.multi_query_group_num
-        attention_mask_pad_fn = chatglm_v2_pad_attention_mask
-    else:
-        multi_query_group_num = None
-        attention_mask_pad_fn = chatglm_pad_attention_mask
-        # If ChatGLM, set lm_shift_labels to False
-        model.config.lm_shift_labels = False
 
-    if model_args.prefix_tuning:
-        prefix_config = PrefixConfig(
-            num_prefix_tokens=model_args.num_prefix_tokens,
-            num_attention_heads=model.config.num_attention_heads,
-            num_hidden_layers=model.config.num_hidden_layers,
-            multi_query_group_num=multi_query_group_num,
-            hidden_size=model.config.hidden_size,
-            prefix_projection=model_args.prefix_projection,
-            prefix_projection_hidden_size=model.config.hidden_size,
-            dtype=dtype,
-        )
-        model = PrefixModelForCausalLM(
-            model=model,
-            prefix_config=prefix_config,
-            postprocess_past_key_value=chatglm_postprocess_past_key_value,
-            pad_attention_mask=attention_mask_pad_fn,
-        )
-        model.mark_only_prefix_as_trainable()
-        model.print_trainable_parameters()
     if model_args.lora:
         if model_args.lora_path is None:
-            # RowParallelLinear doesn't support LoRA yet
-            if "chatglm2" in model_args.model_name_or_path:
-                if training_args.tensor_parallel_degree > 1:
-                    target_modules = [".*query.*", ".*key.*", ".*value.*", ".*dense_h_to_4h.*"]
-                else:
-                    target_modules = [
-                        ".*query.*",
-                        ".*key.*",
-                        ".*value.*",
-                        ".*dense.*",
-                        ".*dense_h_to_4h.*",
-                        ".*dense_4h_to_h.*",
-                    ]
+            # Not yet support RowParallelLinear
+            if training_args.tensor_parallel_degree > 1:
+                target_modules = [".*query_key_value.*", ".*dense_h_to_4h.*"]
             else:
-                if training_args.tensor_parallel_degree > 1:
-                    target_modules = [".*query_key_value.*", ".*dense_h_to_4h.*"]
-                else:
-                    target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
+                target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
             lora_config = LoRAConfig(
                 target_modules=target_modules,
                 r=model_args.lora_rank,
@@ -163,7 +209,6 @@ def main():
                 merge_weights=model_args.merge_weights,
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 dtype=dtype,
-                head_dim=model.config.hidden_size // model.config.num_attention_heads,
             )
             model = LoRAModel(model, lora_config)
         else:
@@ -175,6 +220,7 @@ def main():
         from paddle import nn
         from paddle.quantization import QAT, QuantConfig
 
+        # from paddle.quantization.quanters import FakeQuanterWithAbsMaxObserver
         # FakeQuanterChannelWiseAbsMaxObserver not yet merge in Paddle develop
         from paddle.quantization.quanters import FakeQuanterChannelWiseAbsMaxObserver
         from paddle.quantization.quanters.abs_max import (
@@ -182,7 +228,6 @@ def main():
         )
         from paddleslim.quant.quanters import PACTQuanter
 
-        # from paddle.quantization.quanters import FakeQuanterWithAbsMaxObserver
         from paddlenlp.peft.lora import LoRALinear
         from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
 
@@ -193,13 +238,16 @@ def main():
             activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
             # activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
             weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype="float32")
+            # weight = FakeQuanterWithAbsMaxObserver(bit_length=8, dtype=dtype)
         elif model_args.qat_type == "W4":
             activation = None
             weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
+            # weight = FakeQuanterWithAbsMaxObserver(bit_length=4, dtype=dtype)
         elif model_args.qat_type == "A8W4":
             activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
             # activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
             weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
+            # weight = FakeQuanterWithAbsMaxObserver(bit_length=8, dtype=dtype)
         else:
             raise ValueError("qat_type should be one of ['A8W8', 'W4', 'A8W4']")
 
@@ -209,6 +257,25 @@ def main():
         qat = QAT(q_config)
         model = qat.quantize(model, inplace=True)
 
+    if model_args.prefix_tuning:
+        prefix_config = PrefixConfig(
+            num_prefix_tokens=model_args.num_prefix_tokens,
+            num_attention_heads=model.config.n_head,
+            num_hidden_layers=model.config.n_layer,
+            hidden_size=model.config.hidden_size,
+            prefix_projection=model_args.prefix_projection,
+            prefix_projection_hidden_size=model.config.hidden_size,
+            dtype=dtype,
+        )
+        model = PrefixModelForCausalLM(
+            model=model,
+            prefix_config=prefix_config,
+            postprocess_past_key_value=bloom_postprocess_past_key_value,
+        )
+        model.mark_only_prefix_as_trainable()
+        model.print_trainable_parameters()
+
+    # Load the Tokenzier
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load the dataset.
@@ -226,63 +293,64 @@ def main():
     else:
         train_ds, dev_ds = load_dataset(data_args.task_name_or_path, splits=["train", "dev"])
 
-    convert_example = (
-        convert_chatglm_v2_example if "chatglm2" in model_args.model_name_or_path else convert_chatglm_example
+    # Load the dataset.
+    trans_func = partial(
+        convert_example,
+        tokenizer=tokenizer,
+        max_source_length=data_args.src_length,
+        max_target_length=data_args.tgt_length,
     )
-    trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
-    train_ds = train_ds.map(partial(trans_func, is_test=False))
-    dev_ds = dev_ds.map(partial(trans_func, is_test=model_args.eval_with_do_generation))
+
+    train_ds = train_ds.map(trans_func, lazy=False)
+    dev_ds = dev_ds.map(partial(trans_func, is_test=model_args.eval_with_do_generation), lazy=False)
 
     collate_fn = DataCollatorForSeq2Seq(
-        tokenizer=tokenizer, max_length=data_args.src_length + data_args.tgt_length, padding=True
+        tokenizer=tokenizer,
+        padding=True,
+        max_length=data_args.src_length + data_args.tgt_length,
+        return_tensors="np",
     )
 
-    def compute_metrics_do_generation(eval_preds):
-        rouge1 = Rouge1()
-        rouge2 = Rouge2()
-        rougel = RougeL()
-        bleu4 = BLEU(n_size=4)
+    @paddle.no_grad()
+    def compute_metrics_trainer(eval_preds, tokenizer):
+        all_preds = []
+        all_labels = []
+        preds = [x[x != -100] for x in eval_preds.predictions]
+        all_preds.extend(tokenizer.batch_decode(preds, skip_special_tokens=True, clean_up_tokenization_spaces=False))
+        labels = [x[x != -100] for x in eval_preds.label_ids]
+        all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
+        eval_result = compute_metrics(all_preds, all_labels)
+        return eval_result
 
-        predictions = [x[x != -100].tolist() for x in eval_preds.predictions]
-        references = [x[x != -100].tolist() for x in eval_preds.label_ids]
-        predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
-        references = tokenizer.batch_decode(references, skip_special_tokens=True)
-        # for pred in predictions:
-        rouge1_score = rouge1.score(predictions, references)
-        rouge2_score = rouge2.score(predictions, references)
-        for pred, ref in zip(predictions, references):
-            rougel.add_inst(pred, [ref])
-            bleu4.add_inst(pred, [ref])
-        return {
-            "rouge1": rouge1_score,
-            "rouge2": rouge2_score,
-            "rougel": rougel.score(),
-            "bleu4": bleu4.score(),
-        }
+    compute_metrics_func = partial(
+        compute_metrics_trainer,
+        tokenizer=tokenizer,
+    )
 
-    def compute_metrics(eval_preds):
+    def compute_metrics_not_do_generation(eval_preds):
         flattened_preds = np.array(eval_preds.predictions).flatten()
         flattened_labels = np.array(eval_preds.label_ids).flatten()
-        filtered_preds = flattened_preds[flattened_labels != -100]
-        filtered_labels = flattened_labels[flattened_labels != -100]
+        cleaned_labels = [True if x != -100 and x != tokenizer.pad_token_id else False for x in flattened_labels]
+        filtered_preds = flattened_preds[cleaned_labels]
+        filtered_labels = flattened_labels[cleaned_labels]
         accuracy = accuracy_score(y_true=filtered_labels, y_pred=filtered_preds)
         return {
             "accuracy": accuracy,
         }
 
-    trainer = ChatGLMTrainer(
+    trainer = BloomTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics_do_generation if model_args.eval_with_do_generation else compute_metrics,
+        compute_metrics=compute_metrics_func
+        if model_args.eval_with_do_generation
+        else compute_metrics_not_do_generation,
+        do_generation=model_args.eval_with_do_generation,
         data_collator=collate_fn,
         data_args=data_args,
-        do_generation=model_args.eval_with_do_generation,
     )
-    # if training_args.fp16_opt_level == "O2":
-    #     trainer.disable_autocast_context_manager()
 
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
@@ -292,10 +360,9 @@ def main():
         trainer.save_state()
 
     if training_args.do_eval:
-        eval_result = trainer.evaluate()
+        eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("test", eval_result)
 
 
 if __name__ == "__main__":
-    with paddle.amp.auto_cast(enable=False):
-        main()
+    main()

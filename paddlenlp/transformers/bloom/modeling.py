@@ -809,6 +809,8 @@ class BloomModel(BloomPreTrainedModel):
         super().__init__(config)
         self.padding_idx = 0
 
+        # Recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
         self.embed_dim = config.hidden_size
         self.n_head = config.n_head
 
@@ -970,7 +972,7 @@ class BloomModel(BloomPreTrainedModel):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
-            if self.config.use_recompute and has_gradient:
+            if self.enable_recompute and has_gradient:
                 outputs = self.recompute_training(
                     block,
                     hidden_states,
@@ -1020,16 +1022,14 @@ class BloomLMHead(nn.Layer):
     def __init__(self, config, embedding_weights=None):
         super(BloomLMHead, self).__init__()
         self.decoder_weight = (
-            self.create_parameter(
-                shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype(), is_bias=True
-            )
+            self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype())
             if embedding_weights is None
             else embedding_weights
         )
         self.config = config
 
-    def forward(self, hidden_states):
-        logits = parallel_matmul(hidden_states, self.decoder_weight, parallel_output=False)
+    def forward(self, hidden_states, parallel_output):
+        logits = parallel_matmul(hidden_states, self.decoder_weight, parallel_output=parallel_output)
         return logits
 
 
@@ -1208,8 +1208,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
         parallel_output = True
         if hidden_states.stop_gradient:
             parallel_output = False
-        lm_logits = parallel_matmul(hidden_states, self.bloom.word_embeddings.weight, parallel_output=parallel_output)
-        # lm_logits = self.lm_head(hidden_states)
+        lm_logits = self.lm_head(hidden_states, self.config.tensor_parallel_output)
 
         loss = None
         if labels is not None:

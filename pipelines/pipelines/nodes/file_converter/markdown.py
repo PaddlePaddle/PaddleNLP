@@ -86,6 +86,7 @@ class MarkdownRawTextConverter(BaseConverter):
         remove_numeric_tables: Optional[bool] = None,
         valid_languages: Optional[List[str]] = None,
         encoding: Optional[str] = "utf-8",
+        **kwargs: Any,
     ) -> List[Dict[str, Any]]:
         """
         Reads text from a txt file and executes optional preprocessing steps.
@@ -114,4 +115,5 @@ class MarkdownRawTextConverter(BaseConverter):
         # extract text
         soup = BeautifulSoup(html, "html.parser")
         markdown_text = "".join(soup.findAll(text=True))
-        return [markdown_text]
+        document = {"content": markdown_text, "content_type": "text", "meta": meta}
+        return [document]

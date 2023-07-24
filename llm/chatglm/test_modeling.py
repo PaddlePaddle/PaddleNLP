@@ -25,7 +25,7 @@ inputs = [
 def run_mp_paddle():
     import paddle
 
-    from paddlenlp.transformers import ChatGLMForConditionalGeneration
+    from paddlenlp.transformers import ChatGLMForCausalLM
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
     strategy = paddle.distributed.fleet.DistributedStrategy()
@@ -42,7 +42,7 @@ def run_mp_paddle():
     tensor_parallel_rank = mp_group.rank
 
     paddle.set_default_dtype("float32")
-    model = ChatGLMForConditionalGeneration.from_pretrained(
+    model = ChatGLMForCausalLM.from_pretrained(
         "torch_cache",  # "/root/paddlejob/workspace/GLM/ChatGLM-6B/",
         load_state_as_np=True,
         low_cpu_mem_usage=True,
@@ -59,10 +59,10 @@ def run_mp_paddle():
 def run_paddle():
     import paddle
 
-    from paddlenlp.transformers import ChatGLMForConditionalGeneration
+    from paddlenlp.transformers import ChatGLMForCausalLM
 
     paddle.set_default_dtype("float32")
-    model = ChatGLMForConditionalGeneration.from_pretrained(
+    model = ChatGLMForCausalLM.from_pretrained(
         "torch_cache",  # "/root/paddlejob/workspace/GLM/ChatGLM-6B/",
         load_state_as_np=True,
         low_cpu_mem_usage=True,
@@ -87,10 +87,10 @@ def run_torch():
 
 def run_generate():
     import paddle
-    from modeling import ChatGLMForConditionalGeneration
+    from modeling import ChatGLMForCausalLM
 
     paddle.set_default_dtype("float16")
-    model = ChatGLMForConditionalGeneration.from_pretrained(
+    model = ChatGLMForCausalLM.from_pretrained(
         "torch_cache", load_state_as_np=True, low_cpu_mem_usage=True, dtype="float16"
     )
     model.eval()
