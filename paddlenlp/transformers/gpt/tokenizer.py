@@ -199,6 +199,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
             return [self._convert_token_to_id(token) for token in tokens]
     '''
 
+    '''
     def convert_ids_to_tokens(self, ids):
         """
         Converts a single index or a sequence of indices to a token or a
@@ -226,6 +227,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
             return self._convert_id_to_token(ids)
         tokens = [self._convert_id_to_token(_id) for _id in ids]
         return tokens
+    '''
 
     @property
     def vocab_size(self):

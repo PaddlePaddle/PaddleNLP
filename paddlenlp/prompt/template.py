@@ -251,7 +251,8 @@ class Template(nn.Layer):
         inputs = []
         for value in list(zip(*input_values)):
             inputs.append(dict(zip(input_names, value)))
-
+        if "labels" in example and isinstance(example["labels"], str):
+            inputs.append({"generator_labels": example["labels"], "do_truncate": False})
         input_dict = self.prompt_tokenizer(inputs)
         unused_example = {k: v for k, v in example.items() if k not in self.example_keys}
 

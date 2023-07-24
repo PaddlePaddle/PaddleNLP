@@ -43,6 +43,15 @@ class MLMPromptTokenizer(object):
             # Create input_ids.
             soft_token_ids = part.get("soft_tokens", None)
             if soft_token_ids is None or len(soft_token_ids) == 1 and soft_token_ids[0] == 0:
+                if "generator_labels" in part:
+                    # import pdb; pdb.set_trace()
+                    encoded_inputs["labels"].append(
+                        self.tokenizer.encode(
+                            part["generator_labels"], add_special_tokens=False, return_token_type_ids=False
+                        )["input_ids"]
+                    )
+                    inputs.remove(part)
+                    continue
                 orig_input_ids.append(
                     self.tokenizer.encode(part["text"], add_special_tokens=False, return_token_type_ids=False)[
                         "input_ids"
@@ -127,7 +136,7 @@ class MLMPromptTokenizer(object):
         Create the max sequence length of each part, where the longest part is truncated first.
         """
         text_length = sum([len(x) for x in part_text])
-        num_special_token = self.tokenizer.num_special_tokens_to_add()
+        num_special_token = self.tokenizer.num_special_tokens_to_add(pair=False)
         max_length = self.max_length - num_special_token
         if text_length <= max_length:
             return [None] * len(part_text)
