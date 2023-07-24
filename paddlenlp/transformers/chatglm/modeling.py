@@ -744,6 +744,24 @@ class ChatGLMModel(ChatGLMPretrainedModel):
         return BaseModelOutputWithPastAndCrossAttentions(last_hidden_state=logits, past_key_values=new_caches)
 
 
+class ChatGLMHead(nn.Layer):
+    def __init__(self, config, embedding_weights=None):
+        super(ChatGLMHead, self).__init__()
+        self.decoder_weight = (
+            self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype())
+            if embedding_weights is None
+            else embedding_weights
+        )
+        self.config = config
+
+    def forward(self, hidden_states):
+        if self.config.tensor_parallel_degree > 1:
+            logits = parallel_matmul(hidden_states, self.decoder_weight, self.config.tensor_parallel_output)
+        else:
+            logits = F.linear(hidden_states, self.decoder_weight.T)
+        return logits
+
+
 class ChatGLMForCausalLM(ChatGLMPretrainedModel):
     _keys_to_ignore_on_save = [r"lm_head.weight"]
     _tied_weights_keys = ["lm_head.weight"]
@@ -756,7 +774,7 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
         self.position_encoding_2d = config.position_encoding_2d
         self.chatglm = ChatGLMModel(config)
 
-        self.lm_head = self.chatglm.get_input_embeddings()
+        self.lm_head = ChatGLMHead(config, self.chatglm.transformer.word_embeddings.weight)
         # from paddlenlp.transformers import ChatGLMTokenizer
         # self.tokenizer = ChatGLMTokenizer.from_pretrained("THUDM/chatglm-6b")
 
@@ -875,10 +893,7 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
 
         hidden_states = transformer_outputs.last_hidden_state if return_dict else transformer_outputs[0]
 
-        if self.config.tensor_parallel_degree > 1:
-            lm_logits = parallel_matmul(hidden_states, self.lm_head.weight, self.config.tensor_parallel_output)
-        else:
-            lm_logits = F.linear(hidden_states, self.lm_head.weight.T)
+        lm_logits = self.lm_head(hidden_states)
         lm_logits = lm_logits.transpose([1, 0, 2])
         loss = None
         if labels is not None:
