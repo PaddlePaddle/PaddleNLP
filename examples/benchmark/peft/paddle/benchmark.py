@@ -15,6 +15,7 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
+import numpy as np
 import paddle.profiler as profiler
 from datasets import load_dataset
 from utils import CustomTrainer, ProfilerCallback
@@ -136,6 +137,9 @@ def main():
         model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
         model_inputs["position_ids"] = list(range(len(model_inputs["input_ids"])))
+        model_inputs["attention_mask"] = np.tril(
+            np.ones([len(model_inputs["input_ids"]), len(model_inputs["input_ids"])]), 0
+        ).tolist()
         return model_inputs
 
     if model_args.english:
@@ -153,7 +157,7 @@ def main():
     dataset = InTokensMapDataset(
         dataset,
         tokenizer=tokenizer,
-        max_seq_len=model_args.intokens_length,
+        max_length=model_args.intokens_length,
     )
 
     if model_args.profiler:
@@ -164,7 +168,9 @@ def main():
             on_trace_ready=profiler.export_chrome_tracing("./log"),
         )
 
-    data_collator = DataCollatorForSeq2Seq(return_tensors="pd", tokenizer=tokenizer)
+    data_collator = DataCollatorForSeq2Seq(
+        return_tensors="pd", padding="max_length", max_length=model_args.intokens_length, tokenizer=tokenizer
+    )
 
     trainer = CustomTrainer(
         model=model,

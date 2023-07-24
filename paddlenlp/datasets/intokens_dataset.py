@@ -14,6 +14,7 @@
 
 import numpy as np
 from paddle.io import Dataset, IterableDataset
+from scipy.linalg import block_diag
 
 
 class InTokensMapDataset(Dataset):
@@ -118,20 +119,24 @@ def _pad_batch_records(batch_records, pad_id, bos_token_id, label_pad_id=-100, m
     for key in keys:
         if isinstance(batch_records[0][key], list):
             batch_record_token_ids = [record[key] for record in batch_records]
-            batch_token_ids = [sum(batch_record_token_ids, [])]
+            batch_token_ids = sum(batch_record_token_ids, [])
             data_batch_map[key] = batch_record_token_ids
             data_map[key] = batch_token_ids
 
     batch_map = {}
     batch_map.update(data_map)
+    batch_map["attention_mask"] = [np.array(record["attention_mask"]) for record in batch_records]
+
+    batch_map["attention_mask"] = np.tril(block_diag(*batch_map["attention_mask"])).tolist()
+    # input_mask_data = np.zeros((1, max_length, max_length), dtype="float32")
 
     batch_map.pop("token_type_ids")
     # input_mask
     # add in-batch mask
-    batch_map["attention_mask"] = _gen_self_attn_mask_for_glm_flatten(
-        data_batch_map["input_ids"], bos_token_id, max_length
-    )
-    batch_map["attention_mask"] = np.squeeze(batch_map["attention_mask"], axis=0).tolist()
+    # batch_map["attention_mask"] = _gen_self_attn_mask_for_glm_flatten(
+    #     data_batch_map["input_ids"], bos_token_id, max_length
+    # )
+    # batch_map["attention_mask"] = np.squeeze(batch_map["attention_mask"], axis=0).tolist()
     return batch_map
 
 
@@ -140,7 +145,7 @@ def _gen_self_attn_mask_for_glm_flatten(batch_token_ids, bos_token_id, seq_len=N
     # Note(gongenlei): unsqueeze attention mask to 4 dims
     input_mask_data = np.zeros((1, 1, seq_len, seq_len), dtype="float32")
     offset = 0
-    for index, token_ids in enumerate(batch_token_ids):
+    for index, token_ids in enumerate([batch_token_ids]):
         cur_len = len(token_ids)
 
         b = np.tril(np.ones([cur_len, cur_len]), 0)
