@@ -1121,7 +1121,7 @@ class GenerationUtilsTestCase(unittest.TestCase):
         self.assertEqual(expected_output_ids, decoded_ids)
 
 
-# TODO (wujingjing: enable the unit test after fix)
+# TODO (wj-Mcat: enable the unit test after fix)
 # class GenerationD2STest(unittest.TestCase):
 #     def test_to_static_use_top_k(self):
 #         article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
