@@ -50,7 +50,10 @@ MODEL_CLASSES = {
 }
 
 from dataset import GPTDataset, get_train_valid_test_split_
+from fused_layers import mock_layers
 from modeling_pp import LlamaForCausalLMPipe
+
+mock_layers()
 
 
 def add_start_docstrings(*docstr):
