@@ -1204,10 +1204,6 @@ class BloomForCausalLM(BloomPreTrainedModel):
             return_dict=return_dict,
         )
         hidden_states = transformer_outputs[0]
-        # TODO(wj-Mcat): to enable lm_head
-        parallel_output = True
-        if hidden_states.stop_gradient:
-            parallel_output = False
         lm_logits = self.lm_head(hidden_states, self.config.tensor_parallel_output)
 
         loss = None
