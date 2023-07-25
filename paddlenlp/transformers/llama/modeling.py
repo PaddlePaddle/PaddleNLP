@@ -447,9 +447,10 @@ class LlamaAttention(nn.Layer):
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
-        query_states = self.q_proj(hidden_states).reshape(shape=[0, 0, self.num_heads, self.head_dim])
-        key_states = self.k_proj(hidden_states).reshape(shape=[0, 0, self.num_heads, self.head_dim])
-        value_states = self.v_proj(hidden_states).reshape(shape=[0, 0, self.num_heads, self.head_dim])
+        bsz, q_len, _ = hidden_states.shape  # Under sequence parallel mode, bsz -> q_len and q_len -> bsz instead.
+        query_states = self.q_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
+        key_states = self.k_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
+        value_states = self.v_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
 
         if self.sequence_parallel:
             query_states = query_states.transpose([1, 0, 2, 3])

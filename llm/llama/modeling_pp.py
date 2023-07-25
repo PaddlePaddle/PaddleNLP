@@ -108,9 +108,6 @@ class LlamaEmbeddingPipe(nn.Layer):
 
 
 class LlamaDecoderLayerPipe(LlamaDecoderLayer):
-    def __init__(self, config):
-        super().__init__(config)
-
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
         hidden_states = super().forward(hidden_states, attention_mask=attention_mask)

@@ -238,6 +238,15 @@ class ColumnSequenceParallelLinear(Layer):
         self.model_parallel_group = hcg.get_model_parallel_group() if mp_group is None else mp_group
         self.world_size = hcg.get_model_parallel_group().nranks if mp_group is None else mp_group.nranks
 
+        pp_degree = hcg.get_pipe_parallel_world_size()
+        if pp_degree >= 1:
+            strategy = fleet.fleet._user_defined_strategy
+            if strategy.pipeline_configs["enable_partial_send_recv"]:
+                raise ValueError(
+                    "If using sequence parallel in pipeline mode, please set "
+                    "enable_partial_send_recv in training args to be False."
+                )
+
         self._name = name
         self.is_mp = self.world_size > 1
 
@@ -342,6 +351,15 @@ class RowSequenceParallelLinear(Layer):
         self.model_parallel_group = hcg.get_model_parallel_group() if mp_group is None else mp_group
         self.world_size = hcg.get_model_parallel_group().nranks if mp_group is None else mp_group.nranks
         self.rank = hcg.get_model_parallel_group().rank if mp_group is None else mp_group.rank
+
+        pp_degree = hcg.get_pipe_parallel_world_size()
+        if pp_degree >= 1:
+            strategy = fleet.fleet._user_defined_strategy
+            if strategy.pipeline_configs["enable_partial_send_recv"]:
+                raise ValueError(
+                    "If using sequence parallel in pipeline mode, please set "
+                    "enable_partial_send_recv in training args to be False."
+                )
 
         self.is_mp = self.world_size > 1
         assert (

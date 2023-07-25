@@ -840,10 +840,17 @@ class TrainingArguments:
                     strategy.pipeline_configs = {
                         "accumulate_steps": self.gradient_accumulation_steps,
                         "micro_batch_size": self.per_device_train_batch_size,
-                        "enable_partial_send_recv": "disable_partial_send_recv" not in pipeline_parallel_config,
+                        "enable_partial_send_recv": "disable_partial_send_recv" not in pipeline_parallel_config
+                        or not self.sequence_parallel,
                         "p2p_cache_shape": False if "disable_p2p_cache_shape" in pipeline_parallel_config else True,
                         # "delay_scale_loss": True, Fix ME
                     }
+                    if self.sequence_parallel and strategy.pipeline_configs["enable_partial_send_recv"]:
+                        strategy.pipeline_configs["enable_partial_send_recv"] = False
+                        logger.warning(
+                            "if pipeline_parallel_degree > 1 and sequence_parallel is True, "
+                            "enable_partial_send_recv will be set False."
+                        )
                     logger.info(f"PP configs:{strategy.pipeline_configs}, use master_grad: {self.amp_master_grad}")
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
