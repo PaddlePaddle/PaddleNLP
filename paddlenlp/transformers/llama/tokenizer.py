@@ -244,6 +244,7 @@ class LlamaTokenizer(PretrainedTokenizer):
                 (optional) Set to False to avoid returning attention mask (default: set to model specifics)
         """
         # Load from model defaults
+        attention_mask = None
         if "attention_mask" in encoded_inputs:
             attention_mask = encoded_inputs["attention_mask"]
             encoded_inputs.pop("attention_mask")
@@ -252,7 +253,8 @@ class LlamaTokenizer(PretrainedTokenizer):
         encoded_inputs = super()._pad(
             encoded_inputs, max_length, padding_strategy, pad_to_multiple_of, return_attention_mask
         )
-        encoded_inputs["attention_mask"] = attention_mask
+        if return_attention_mask and attention_mask is not None:
+            encoded_inputs["attention_mask"] = attention_mask
         needs_to_be_padded = padding_strategy != PaddingStrategy.DO_NOT_PAD and len(required_input) != max_length
         if needs_to_be_padded:
             difference = max_length - len(required_input)
