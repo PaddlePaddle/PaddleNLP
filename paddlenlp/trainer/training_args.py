@@ -603,6 +603,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Whether to use paddle.async_save instead of paddle.save."},
     )
+    use_moe: Optional[bool] = field(
+        default=False,
+        metadata={"help": "开启moe训练"},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -962,11 +966,13 @@ class TrainingArguments:
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
-            if self.sharding_parallel_degree > 1:
+            if self.sharding_parallel_degree > 1 or self.use_moe:
                 name.append(f"shard{self.sharding_parallel_rank:0>2d}")
 
             return "_".join(name)
         else:
+            if self.use_moe:
+                return f"moe{self.data_parallel_rank:0>2d}"
             return None
 
     @property
@@ -989,10 +995,12 @@ class TrainingArguments:
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
-            if self.save_sharding_stage1_model:
+            if self.save_sharding_stage1_model or self.use_moe:
                 name.append(f"shard{self.sharding_parallel_rank:0>2d}")
             return "_".join(name)
         else:
+            if self.use_moe:
+                return f"moe{self.data_parallel_rank:0>2d}"
             return None
 
     @property
@@ -1050,6 +1058,8 @@ class TrainingArguments:
             work for data parallel, tensor parallel
             not work for sharding
         """
+        if self.use_moe:
+            return True
         if self.save_on_each_node:
             return self.local_process_index == 0
         else:
@@ -1070,11 +1080,15 @@ class TrainingArguments:
 
     @property
     def save_sharding_stage1_model(self):
-        return ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.save_sharded_model
+        return (
+            ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.save_sharded_model
+        )
 
     @property
     def load_sharding_stage1_model(self):
-        return ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.load_sharded_model
+        return (
+            ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.load_sharded_model
+        )
 
     @contextlib.contextmanager
     def main_process_first(self, local=True, desc="work"):
