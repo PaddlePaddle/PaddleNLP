@@ -1022,16 +1022,14 @@ class BloomLMHead(nn.Layer):
     def __init__(self, config, embedding_weights=None):
         super(BloomLMHead, self).__init__()
         self.decoder_weight = (
-            self.create_parameter(
-                shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype(), is_bias=True
-            )
+            self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype())
             if embedding_weights is None
             else embedding_weights
         )
         self.config = config
 
-    def forward(self, hidden_states):
-        logits = parallel_matmul(hidden_states, self.decoder_weight, parallel_output=False)
+    def forward(self, hidden_states, parallel_output):
+        logits = parallel_matmul(hidden_states, self.decoder_weight, parallel_output=parallel_output)
         return logits
 
 
@@ -1041,13 +1039,13 @@ class BloomPretrainingCriterion(paddle.nn.Layer):
     It calculates the final loss.
     """
 
-    def __init__(self, pad_token_id=None, tensor_parallel_degree=1, tensor_parallel_output=False):
+    def __init__(self, ignore_index=-100, tensor_parallel_degree=1, tensor_parallel_output=False):
         super(BloomPretrainingCriterion, self).__init__()
         if tensor_parallel_degree > 1 and tensor_parallel_output:
             self.loss_func = fleet.meta_parallel.ParallelCrossEntropy()
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
-        self.pad_token_id = pad_token_id
+        self.ignore_index = ignore_index
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask=None):
         masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
@@ -1058,8 +1056,7 @@ class BloomPretrainingCriterion(paddle.nn.Layer):
                 masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
                 loss = masked_lm_loss / loss_mask.sum()
             else:
-                assert self.pad_token_id is not None
-                masked_lm_loss = masked_lm_loss[masked_lm_labels != self.pad_token_id]
+                masked_lm_loss = masked_lm_loss[masked_lm_labels != self.ignore_index]
                 loss = paddle.mean(masked_lm_loss)
 
         return loss
@@ -1076,9 +1073,7 @@ class BloomForPretraining(BloomPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.bloom = BloomModel(config)
-        self.criterion = BloomPretrainingCriterion(
-            pad_token_id=config.pad_token_id, tensor_parallel_degree=config.tensor_parallel_degree
-        )
+        self.criterion = BloomPretrainingCriterion(tensor_parallel_degree=config.tensor_parallel_degree)
         self.extra_parameters = [self.bloom.word_embeddings.weight]
 
     def forward(
@@ -1118,7 +1113,6 @@ class BloomForCausalLM(BloomPreTrainedModel):
         self.bloom = BloomModel(config)
         self.lm_head = BloomLMHead(config, self.bloom.word_embeddings.weight)
         self.criterion = BloomPretrainingCriterion(
-            pad_token_id=config.pad_token_id,
             tensor_parallel_degree=config.tensor_parallel_degree,
             tensor_parallel_output=True,
         )
@@ -1206,12 +1200,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
             return_dict=return_dict,
         )
         hidden_states = transformer_outputs[0]
-        # TODO(wj-Mcat): to enable lm_head
-        parallel_output = True
-        if hidden_states.stop_gradient:
-            parallel_output = False
-        lm_logits = parallel_matmul(hidden_states, self.bloom.word_embeddings.weight, parallel_output=parallel_output)
-        # lm_logits = self.lm_head(hidden_states)
+        lm_logits = self.lm_head(hidden_states, self.config.tensor_parallel_output)
 
         loss = None
         if labels is not None:
