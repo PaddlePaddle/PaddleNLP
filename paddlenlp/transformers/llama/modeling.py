@@ -692,7 +692,6 @@ class LlamaModel(LlamaPretrainedModel):
 
     def __init__(self, config: LlamaConfig):
         super().__init__(config)
-        self.config = config
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
         # Recompute defaults to False and is controlled by Trainer
