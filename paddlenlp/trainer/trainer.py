@@ -900,13 +900,13 @@ class Trainer:
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
                         parameters_list = obtain_optimizer_parameters_list(self.optimizer._inner_opt)
 
-                        if self.optimizer._sharding_enable:
-                            assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
-                            self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
+                        if enable_dp_comm_overlap:
+                            if self.optimizer._sharding_enable:
+                                assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
+                                self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
-                        if self.optimizer._dp_enable:
-                            assert not enable_dp_comm_overlap
-                            fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
+                            if self.optimizer._dp_enable:
+                                fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
 
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
@@ -1773,10 +1773,6 @@ class Trainer:
         config_backup = model.micro_batch_size, model.accumulate_steps
         model.micro_batch_size = self.args.per_device_train_batch_size
         model.accumulate_steps = self.args.gradient_accumulation_steps
-
-        if model._dp_comm_overlap or model._sharding_comm_overlap:
-            for comm_buffer in model._comm_buffers:
-                comm_buffer._acc_steps = self.args.gradient_accumulation_steps
 
         inputs = model._prepare_training(
             inputs, self.optimizer, self.lr_scheduler
