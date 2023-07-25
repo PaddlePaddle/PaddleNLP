@@ -651,6 +651,8 @@ class LlamaPretrainedModel(PretrainedModel):
                 mpu.ColumnParallelLinear,
                 mpu.RowParallelLinear,
                 LlamaLMHead,
+                ColumnSequenceParallelLinear,
+                RowSequenceParallelLinear,
             ),
         ):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
