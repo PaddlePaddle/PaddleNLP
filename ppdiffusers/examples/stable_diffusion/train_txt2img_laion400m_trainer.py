@@ -24,6 +24,7 @@ from sd import (
     TextImagePair,
 )
 
+from paddlenlp.layers.fused_layers import mock_layers
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint, set_seed
 from paddlenlp.utils.log import logger
 
@@ -118,4 +119,8 @@ def main():
 
 
 if __name__ == "__main__":
+    # for higher ips
+    os.environ["USE_FUSED_LN"] = "1"
+    mock_layers()
+
     main()
