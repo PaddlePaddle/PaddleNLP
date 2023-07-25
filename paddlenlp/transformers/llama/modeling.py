@@ -460,14 +460,10 @@ class LlamaAttention(nn.Layer):
                 self.hidden_size,
                 bias_attr=False,
             )
-<<<<<<< HEAD
-        if config.rope:
+
+        if config.rope and self.rope_fusion_level != "full":
             self.rotary_emb = LlamaRotaryEmbedding(self.head_dim, max_position_embeddings=self.max_position_embeddings)
 
-=======
-        if self.rope_fusion_level != "full":
-            self.rotary_emb = LlamaRotaryEmbedding(self.head_dim, max_position_embeddings=self.max_position_embeddings)
->>>>>>> bd7a83cf (update rope fusion)
         self.config = config
 
     def forward(

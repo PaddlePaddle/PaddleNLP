@@ -221,11 +221,8 @@ class LlamaConfig(PretrainedConfig):
         bos_token_id=1,
         eos_token_id=2,
         tie_word_embeddings=False,
-<<<<<<< HEAD
         alibi=False,
-=======
         rope_fusion_level="",
->>>>>>> bd7a83cf (update rope fusion)
         **kwargs,
     ):
         self.vocab_size = vocab_size
