@@ -17,8 +17,20 @@ import os
 
 import paddle
 from paddle import _C_ops
+from paddle.fluid import core
 
-origin_linear = paddle.incubate.nn.functional.fused_linear
+
+def is_fused_matmul_bias_supported():
+    if paddle.is_compiled_with_cuda() and not paddle.is_compiled_with_rocm() or paddle.is_compiled_with_xpu():
+        return hasattr(core.eager.ops.legacy, "fused_gemm_epilogue")
+    else:
+        return False
+
+
+if is_fused_matmul_bias_supported():
+    origin_linear = paddle.incubate.nn.functional.fused_linear
+else:
+    origin_linear = paddle.nn.functional.linear
 
 
 class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
@@ -39,7 +51,7 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
                 return x_grad, None
             else:
                 if weight.grad is not None:
-                    weight_grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False)
+                    weight.grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, weight.grad, None, False)
                     return x_grad, None
                 else:
                     weight_grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False)
@@ -53,7 +65,7 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
         else:
             if weight.grad is not None:
                 assert bias.grad is not None
-                weight_grad, bias_grad = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False)
+                weight.grad, bias.grad = _C_ops.fused_linear_param_grad_add(x, y_grad, weight.grad, bias.grad, False)
                 return x_grad, None, None
             else:
                 weight_grad, bias_grad = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False)
@@ -71,4 +83,5 @@ def get_env(env_name, default_value=False):
 def mock_layers():
     if get_env("USE_LINEAR_WITH_GRAD_ADD"):
         paddle.nn.functional.linear = FusedLinearWithGradAdd.apply
-        paddle.incubate.nn.functional.fused_linear = FusedLinearWithGradAdd.apply
+        if is_fused_matmul_bias_supported():
+            paddle.incubate.nn.functional.fused_linear = FusedLinearWithGradAdd.apply
