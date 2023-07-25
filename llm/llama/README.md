@@ -35,6 +35,7 @@ Llama2 模型的权重的使用则需要遵循[License](../../../paddlenlp/trans
 | baichuan-inc/Baichuan-7B         |
 | baichuan-inc/Baichuan-13B-Base   |
 | baichuan-inc/Baichuan-13B-Chat   |
+
 使用方法：
 
 ```python
