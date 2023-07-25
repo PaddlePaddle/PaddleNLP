@@ -265,5 +265,4 @@ class LlamaTokenizer(PretrainedTokenizer):
                     mode="constant",
                     constant_values=0,
                 )
-        # print(encoded_inputs["attention_mask"])
         return encoded_inputs
