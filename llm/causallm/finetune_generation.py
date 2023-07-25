@@ -258,15 +258,6 @@ def main():
         eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("eval", eval_result)
 
-        test_ds = load_dataset(
-            read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "dev.json"), lazy=False
-        )
-        test_ds = test_ds.map(partial(trans_func, is_test=True))
-        trainer.do_generation = True
-        trainer.compute_metrics = compute_metrics_do_generation
-        eval_result = trainer.evaluate(test_ds)
-        trainer.log_metrics("test", eval_result)
-
 
 if __name__ == "__main__":
     main()
