@@ -32,6 +32,9 @@ from paddlenlp.utils.log import logger
 
 
 def compute_metrics(eval_preds):
+    np.save("pred.npy", np.array(eval_preds.predictions))
+    np.save("label.npy", np.array(eval_preds.label_ids))
+
     flattened_preds = np.array(eval_preds.predictions).flatten()
     flattened_labels = np.array(eval_preds.label_ids).flatten()
     filtered_preds = flattened_preds[flattened_labels != -100]
