@@ -21,7 +21,7 @@ from paddlenlp.peft.prefix import (
     chatglm_pad_attention_mask,
     chatglm_postprocess_past_key_value,
 )
-from paddlenlp.transformers import ChatGLMConfig, ChatGLMForCausalLM, ChatGLMTokenizer
+from paddlenlp.transformers import ChatGLMConfig, AutoTokenizer, AutoModelForCausalLM
 
 
 def parse_arguments():
@@ -62,7 +62,7 @@ class Predictor(object):
             self.src_length = kwargs["src_length"]
             self.tgt_length = kwargs["tgt_length"]
         else:
-            self.tokenizer = ChatGLMTokenizer.from_pretrained(args.model_name_or_path)
+            self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
             self.batch_size = args.batch_size
             self.args = args
             self.src_length = self.args.src_length
@@ -92,7 +92,7 @@ class Predictor(object):
                 config = ChatGLMConfig.from_pretrained(args.model_name_or_path)
                 dtype = config.dtype if config.dtype is not None else config.paddle_dtype
 
-            self.model = ChatGLMForCausalLM.from_pretrained(
+            self.model = AutoModelForCausalLM.from_pretrained(
                 args.model_name_or_path,
                 tensor_parallel_degree=tensor_parallel_degree,
                 tensor_parallel_rank=tensor_parallel_rank,
