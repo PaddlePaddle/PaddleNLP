@@ -900,7 +900,7 @@ class Trainer:
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
                         parameters_list = obtain_optimizer_parameters_list(self.optimizer._inner_opt)
 
-                        if enable_dp_comm_overlap:
+                        if not enable_dp_comm_overlap:
                             if self.optimizer._sharding_enable:
                                 assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
                                 self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
