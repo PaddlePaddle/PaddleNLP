@@ -145,12 +145,19 @@ class ModelArguments:
         default=1,
         metadata={"help": "virtual_pp_degree"},
     )
-
     continue_training: bool = field(
         default=False,
         metadata={
             "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
         },
+    )
+    sequence_parallel: bool = field(
+        default=False,
+        metadata={"help": "whether to use sequence parallel"},
+    )
+    fuse_sequence_parallel_allreduce: bool = field(
+        default=False,
+        metadata={"help": "whether to use fuse sequence parallel allreduce"},
     )
 
 
@@ -407,11 +414,12 @@ def main():
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
-    config.use_recompute = training_args.recompute
+    config.sequence_parallel = model_args.sequence_parallel
+    config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
 
+    config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
-    config.sequence_parallel = training_args.sequence_parallel
 
     print("Final pre-training config:", config)
 
@@ -436,9 +444,9 @@ def main():
     else:
         model = model_class._from_config(config, dtype=dtype)
 
-    if training_args.sequence_parallel:
+    if model_args.sequence_parallel:
         register_sequence_parallel_allreduce_hooks(
-            model, training_args.gradient_accumulation_steps, training_args.fuse_sequence_parallel_allreduce
+            model, training_args.gradient_accumulation_steps, model_args.fuse_sequence_parallel_allreduce
         )
 
     # Create the learning_rate sheduler and optimizer

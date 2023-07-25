@@ -236,10 +236,6 @@ class TrainingArguments:
             Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
             following config is support:
               enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation
-        sequence_parallel (`bool`, *optional*, defaults to `False`)
-            Sequence parallelism is a parallel technique proposed in (https://arxiv.org/pdf/2205.05198.pdf see 4.2.2 Sequence Parallelism).
-            This technique partitions the non-tensor parallel regions of a transformer layer, whose operations are independent along the sequence dimension.
-            Notes, this can only be True when model_parallel_world_size is larger than 1.
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -539,22 +535,6 @@ class TrainingArguments:
             )
         },
     )
-
-    sequence_parallel: bool = field(
-        default=False,
-        metadata={
-            "help": (
-                "Sequence parallelism is a parallel technique proposed in (https://arxiv.org/pdf/2205.05198.pdf see 4.2.2 Sequence Parallelism)."
-                "This technique partitions the non-tensor parallel regions of a transformer layer, whose operations are independent along the sequence dimension."
-                "Notes, this can only be True when model_parallel_world_size is larger than 1."
-            )
-        },
-    )
-
-    fuse_sequence_parallel_allreduce: bool = field(
-        default=False, metadata={"help": "Whether fuse allreduce gradident when using sequence parallel."}
-    )
-
     sharding_parallel_config: str = field(
         default="",
         metadata={
@@ -565,7 +545,6 @@ class TrainingArguments:
             )
         },
     )
-
     recompute: bool = field(
         default=False,
         metadata={
@@ -759,10 +738,6 @@ class TrainingArguments:
         if len(self.sharding) == 0 and self.sharding_parallel_degree > 0:
             warnings.warn("`--sharding_parallel_degree` is useful only when `--sharding` is specified.")
 
-        if self.tensor_parallel_degree <= 1 and self.sequence_parallel is True:
-            logger.warning("If tensor_parallel_degree <= 1, sequence_parallel will be force to False")
-            self.sequence_parallel = False
-
         if len(self.sharding) > 0 or self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1:
             self.use_hybrid_parallel = True
 
@@ -776,9 +751,6 @@ class TrainingArguments:
             if not (self.bf16 or self.fp16):
                 logger.warning("set amp_master_grad to false since amp is disabled.")
                 self.amp_master_grad = False
-            if self.sequence_parallel and self.fuse_sequence_parallel_allreduce:
-                logger.warning("If amp_master_grad is True, fuse_sequence_parallel_allreduce will be forced to False.")
-                self.fuse_sequence_parallel_allreduce = False
 
         if self.use_hybrid_parallel:
             world_size = paddle.distributed.get_world_size()
@@ -840,17 +812,10 @@ class TrainingArguments:
                     strategy.pipeline_configs = {
                         "accumulate_steps": self.gradient_accumulation_steps,
                         "micro_batch_size": self.per_device_train_batch_size,
-                        "enable_partial_send_recv": "disable_partial_send_recv" not in pipeline_parallel_config
-                        or not self.sequence_parallel,
+                        "enable_partial_send_recv": "disable_partial_send_recv" not in pipeline_parallel_config,
                         "p2p_cache_shape": False if "disable_p2p_cache_shape" in pipeline_parallel_config else True,
                         # "delay_scale_loss": True, Fix ME
                     }
-                    if self.sequence_parallel and strategy.pipeline_configs["enable_partial_send_recv"]:
-                        strategy.pipeline_configs["enable_partial_send_recv"] = False
-                        logger.warning(
-                            "if pipeline_parallel_degree > 1 and sequence_parallel is True, "
-                            "enable_partial_send_recv will be set False."
-                        )
                     logger.info(f"PP configs:{strategy.pipeline_configs}, use master_grad: {self.amp_master_grad}")
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,

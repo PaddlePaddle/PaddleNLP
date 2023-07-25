@@ -239,7 +239,7 @@ class ColumnSequenceParallelLinear(Layer):
         self.world_size = hcg.get_model_parallel_group().nranks if mp_group is None else mp_group.nranks
 
         pp_degree = hcg.get_pipe_parallel_world_size()
-        if pp_degree >= 1:
+        if pp_degree > 1:
             strategy = fleet.fleet._user_defined_strategy
             if strategy.pipeline_configs["enable_partial_send_recv"]:
                 raise ValueError(
@@ -353,7 +353,7 @@ class RowSequenceParallelLinear(Layer):
         self.rank = hcg.get_model_parallel_group().rank if mp_group is None else mp_group.rank
 
         pp_degree = hcg.get_pipe_parallel_world_size()
-        if pp_degree >= 1:
+        if pp_degree > 1:
             strategy = fleet.fleet._user_defined_strategy
             if strategy.pipeline_configs["enable_partial_send_recv"]:
                 raise ValueError(
