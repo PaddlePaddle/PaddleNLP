@@ -18,7 +18,7 @@ import time
 
 import numpy as np
 import paddle
-from paddle.io import DataLoader  # , Dataset
+from paddle.io import DataLoader
 
 from paddlenlp.data import Stack, Tuple
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
@@ -33,10 +33,13 @@ def construct_samples_and_shuffle_data(
     sizes: the length list of all docs.
     num_samples: total step*bs iterations of data.
     seq_length: the sequence length.
+
+
     sum(sizes) = tokens_per_epoch
     data_nums = num_samples *  micro_batch_size
     num_epochs = (data_nums + 1) // sum(sizes)
     len(doc_idx) = num_epochs * sum(sizes)
+
     """
     # Number of tokens in each epoch and number of required epochs.
     tokens_per_epoch = _num_tokens(documents, sizes)
@@ -53,8 +56,6 @@ def construct_samples_and_shuffle_data(
     sample_idx_filename = _filename + "_sample_idx.npy"
     shuffle_idx_filename = _filename + "_shuffle_idx.npy"
 
-    # Sava random state
-    savedState = np_rng.get_state()
     # Build the indexed mapping if not exist.
     if build_data_file:
         if (
@@ -89,9 +90,6 @@ def construct_samples_and_shuffle_data(
             from tool_helpers import helpers
 
             sample_idx = helpers.build_sample_idx(sizes, doc_idx, seq_length, num_epochs, tokens_per_epoch)
-            # sample_idx = _build_sample_idx(sizes, doc_idx, seq_length,
-            #                                num_epochs, tokens_per_epoch)
-
             np.save(sample_idx_filename, sample_idx, allow_pickle=True)
             print(
                 " > elasped time to build and save sample-idx mapping "
@@ -129,9 +127,6 @@ def construct_samples_and_shuffle_data(
                 except Exception:
                     print("%s file is still writing or damaged, please wait a moment." % shuffle_idx_filename)
                     time.sleep(3)
-
-    # Restore random state
-    np_rng.set_state(savedState)
 
     if paddle.distributed.get_world_size() > 1:
         if paddle.in_dynamic_mode():
@@ -267,8 +262,7 @@ def create_pretrained_dataset(
     max_seq_len=1024,
     places=None,
     data_holders=None,
-    current_step=0,
-    old_version_accumulate_compatible=False,  # FIXME @ZHUI delete it later.
+    pipeline_mode=False,
 ):
     device_world_size = paddle.distributed.get_world_size()
     device_world_rank = paddle.distributed.get_rank()
@@ -305,10 +299,11 @@ def create_pretrained_dataset(
         splits[-1],
     )
 
-    def build_dataset(index, name, num_samples, consumed_samples=0):
+    def build_dataset(index, name, num_samples):
         dataset = GPTDataset(
-            file_path=input_prefix,
+            file_prefix=input_prefix,
             build_data_file=local_rank == 0,
+            micro_batch_size=args.micro_batch_size,
             name="gpt_" + name,
             max_seq_len=max_seq_len,
             num_samples=num_samples,
@@ -318,51 +313,50 @@ def create_pretrained_dataset(
             eos_id=eos_id,
             seed=args.seed,
         )
-
         batch_sampler = DistributedBatchSampler(
             dataset,
-            batch_size=args.micro_batch_size if not old_version_accumulate_compatible else args.local_batch_size,
+            batch_size=args.micro_batch_size,
             num_replicas=data_world_size,
             rank=data_world_rank,
             shuffle=False,
             drop_last=True,
-            consumed_samples=consumed_samples,
         )
 
-        data_loader = DataLoader(
-            dataset=dataset,
-            places=places,
-            feed_list=data_holders,
-            batch_sampler=batch_sampler,
-            num_workers=1,
-            worker_init_fn=worker_init,
-            # collate_fn=Tuple(Stack(), Stack(), Stack(), Stack(), Stack()),
-            collate_fn=Tuple(Stack(), Stack(), Stack(), Stack()),
-            return_list=False,
-        )
+        if pipeline_mode:
+
+            def data_gen():
+                for data in dataset:
+                    yield tuple([np.expand_dims(np.array(x), axis=0) for x in data])
+
+            data_loader = paddle.fluid.reader.DataLoader.from_generator(
+                feed_list=data_holders, capacity=70, iterable=False
+            )
+            data_loader.set_batch_generator(data_gen, places)
+        else:
+            data_loader = DataLoader(
+                dataset=dataset,
+                places=places,
+                feed_list=data_holders,
+                batch_sampler=batch_sampler,
+                num_workers=0,
+                worker_init_fn=worker_init,
+                collate_fn=Tuple(Stack(), Stack(), Stack(), Stack(), Stack()),
+                return_list=False,
+            )
         return data_loader
 
     # Note, data should be broardcast to all devices.
     # for train, valid, test, the distinct data num is data_world_size
-    train_data_loader = build_dataset(
-        0,
-        "train",
-        args.local_batch_size * args.max_steps * data_world_size,
-        consumed_samples=args.global_batch_size * current_step,
-    )
-
-    valid_data_loader = build_dataset(
-        1,
-        "valid",
-        args.local_batch_size * (args.max_steps // args.eval_freq + 1) * args.eval_iters * data_world_size,
-        args.local_batch_size * ((current_step + 1) // args.eval_freq) * args.eval_iters * data_world_size,
-    )
-    test_data_loader = build_dataset(
-        2,
-        "test",
-        args.local_batch_size * args.test_iters * data_world_size,
-        0,
-    )
+    train_data_loader = build_dataset(0, "train", args.micro_batch_size * args.max_steps * data_world_size)
+    if pipeline_mode:
+        valid_data_loader, test_data_loader = None, None
+    else:
+        valid_data_loader = build_dataset(
+            1,
+            "valid",
+            args.micro_batch_size * (args.max_steps // args.eval_freq + 1) * args.eval_iters * data_world_size,
+        )
+        test_data_loader = build_dataset(2, "test", args.micro_batch_size * args.test_iters * data_world_size)
 
     return train_data_loader, valid_data_loader, test_data_loader
 
@@ -370,7 +364,8 @@ def create_pretrained_dataset(
 class GPTDataset(paddle.io.Dataset):
     def __init__(
         self,
-        file_path,
+        file_prefix,
+        micro_batch_size,
         num_samples,
         eos_id,
         sample_ids,
@@ -381,19 +376,28 @@ class GPTDataset(paddle.io.Dataset):
         max_seq_len=1024,
         seed=1234,
     ):
-        self.file_path = file_path
+        self.file_prefix = file_prefix
         self.max_seq_len = max_seq_len
         self.name = name
         self.eos_id = eos_id
         self.sample_ids = sample_ids
         self.sample_lens = sample_lens
+        self.micro_batch_size = micro_batch_size
+
         if documents is None:
             document_ids = np.arange(0, self.sample_lens.shape[0])
         else:
             document_ids = documents
 
         self.doc_idx, self.sample_idx, self.shuffle_idx = construct_samples_and_shuffle_data(
-            self.name, self.file_path, document_ids, self.sample_lens, num_samples, max_seq_len, seed, build_data_file
+            self.name,
+            self.file_prefix,
+            document_ids,
+            self.sample_lens,
+            num_samples,
+            max_seq_len,
+            seed,
+            build_data_file,
         )
 
         # The doc cumsum start pos
@@ -404,19 +408,15 @@ class GPTDataset(paddle.io.Dataset):
         labels = tokens[1:]
         tokens = tokens[:-1]
         seq_length = len(tokens)
-        # Attention mask for the attention calulate
-        # attention_mask = np.tri(seq_length, seq_length).reshape((1, seq_length,
-        #  seq_length))
 
         # The pad and eos tokens do not contribute the loss
         loss_mask = np.ones(seq_length, dtype="float32")
         loss_mask[tokens == self.eos_id] = 0.0
         position_ids = np.arange(0, seq_length, dtype="int64")
 
-        # attention_mask = (attention_mask - 1.0) * 1e9
-        # attention_mask = attention_mask.astype("float32")
-        # return [tokens, loss_mask, attention_mask, position_ids, labels]
-        return [tokens, loss_mask, position_ids, labels]
+        attention_mask = np.ones(seq_length, dtype="int64")
+        labels = np.array(labels, dtype="int64")
+        return [tokens, loss_mask, attention_mask, position_ids, labels]
 
     def _get_single_sample_from_idx(self, doc_index_f, doc_index_l, offset_f, offset_l):
         """

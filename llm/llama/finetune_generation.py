@@ -252,7 +252,9 @@ def main():
         train_ds = load_dataset(reader, data_path="./data/train.txt", lazy=False)
         training_args.do_eval = False
         data_args.always_pad_to_max_length = True
-        trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
+        trans_func = partial(
+            custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args, benchmark=True
+        )
     elif training_args.do_train or training_args.do_eval:
         if data_args.data_name is not None:
             if data_args.task_name is not None:
