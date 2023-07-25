@@ -853,7 +853,10 @@ class BloomModel(BloomPreTrainedModel):
         if len(attention_mask.shape) == 2:
             expanded_attn_mask = _expand_mask(attention_mask, tgt_length=src_length)
         else:
-            expanded_attn_mask = attention_mask
+            # [batch_size,1, tgt_length, src_length] -> [batch_size, tgt_length, src_length]
+            expanded_attn_mask = attention_mask.reshape(
+                (input_shape[0], attention_mask.shape[-2], attention_mask.shape[-1])
+            )
         combined_attention_mask = (
             expanded_attn_mask
             if combined_attention_mask is None
@@ -946,8 +949,12 @@ class BloomModel(BloomPreTrainedModel):
 
         if attention_mask is None:
             attention_mask = paddle.ones([batch_size, seq_length_with_past], dtype=paddle.get_default_dtype())
+        if len(attention_mask.shape) > 2:
+            _attention_mask = paddle.ones([batch_size, seq_length_with_past], dtype=paddle.get_default_dtype())
+            alibi = build_alibi_tensor(_attention_mask, self.config.n_head, dtype=hidden_states.dtype)
+        else:
+            alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
 
-        alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
         causal_mask = self._prepare_attn_mask(
             attention_mask,
             input_shape=(batch_size, seq_length),

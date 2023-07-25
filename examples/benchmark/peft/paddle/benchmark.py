@@ -142,6 +142,52 @@ def main():
         ).tolist()
         return model_inputs
 
+    def preprocess_function_chatglm(example, max_src_length=256, max_tgt_length=384):
+        inputs = example["instruction"]
+        targets = example["output"]
+        if "input" in example:
+            inputs += example["input"]
+        model_inputs = tokenizer(inputs, max_length=max_src_length, truncation=True, return_attention_mask=False)
+        labels = tokenizer(targets, max_length=max_tgt_length, truncation=True, return_attention_mask=False)
+        labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
+        model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
+        model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
+
+        context_length = model_inputs["input_ids"].index(tokenizer.bos_token_id)
+        seq_length = len(model_inputs["input_ids"])
+        position_ids = np.arange(seq_length, dtype=np.int64)
+        # mask_token = self.mask_token_id if self.mask_token_id in required_input else self.gmask_token_id
+        # if mask_token in required_input:
+        #     mask_position = required_input.index(mask_token)
+        #     position_ids[context_length:] = mask_position
+        block_position_ids = np.concatenate(
+            [
+                np.zeros(context_length, dtype=np.int64),
+                np.arange(1, seq_length - context_length + 1, dtype=np.int64),
+            ]
+        )
+        model_inputs["position_ids"] = np.stack([position_ids, block_position_ids], axis=0)
+        model_inputs["attention_mask"] = np.tril(
+            np.ones([len(model_inputs["input_ids"]), len(model_inputs["input_ids"])]), 0
+        ).tolist()
+        return model_inputs
+
+    def preprocess_function_bloom(example, max_src_length=256, max_tgt_length=384):
+        inputs = example["instruction"]
+        targets = example["output"]
+        if "input" in example:
+            inputs += example["input"]
+        model_inputs = tokenizer(inputs, max_length=max_src_length, truncation=True, return_attention_mask=False)
+        labels = tokenizer(targets, max_length=max_tgt_length, truncation=True, return_attention_mask=False)
+        labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
+        model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
+        model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
+
+        model_inputs["attention_mask"] = np.tril(
+            np.ones([len(model_inputs["input_ids"]), len(model_inputs["input_ids"])]), 0
+        ).tolist()
+        return model_inputs
+
     if model_args.english:
         dataset = load_dataset("tatsu-lab/alpaca")
     else:
@@ -149,12 +195,22 @@ def main():
 
     # select first 10k examples for benchmarking
     dataset = dataset["train"].select(range(model_args.train_data_size))
-    dataset = dataset.map(
-        lambda example: preprocess_function(example), remove_columns=["instruction", "input", "output"]
-    )
+    if "chatglm" in model_args.model_name_or_path:
+        dataset = dataset.map(
+            lambda example: preprocess_function_chatglm(example), remove_columns=["instruction", "input", "output"]
+        )
+    elif "bloom" in model_args.model_name_or_path:
+
+        dataset = dataset.map(
+            lambda example: preprocess_function_bloom(example), remove_columns=["instruction", "input", "output"]
+        )
+    else:
+        dataset = dataset.map(
+            lambda example: preprocess_function(example), remove_columns=["instruction", "input", "output"]
+        )
     total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
 
-    dataset = InTokensMapDataset(
+    intokens_dataset = InTokensMapDataset(
         dataset,
         tokenizer=tokenizer,
         max_length=model_args.intokens_length,
@@ -168,14 +224,12 @@ def main():
             on_trace_ready=profiler.export_chrome_tracing("./log"),
         )
 
-    data_collator = DataCollatorForSeq2Seq(
-        return_tensors="pd", padding="max_length", max_length=model_args.intokens_length, tokenizer=tokenizer
-    )
+    data_collator = DataCollatorForSeq2Seq(return_tensors="pd", tokenizer=tokenizer)
 
     trainer = CustomTrainer(
         model=model,
         tokenizer=tokenizer,
-        train_dataset=dataset,
+        train_dataset=intokens_dataset,
         callbacks=[ProfilerCallback(prof)] if model_args.profiler else [],
         args=training_args,
         data_collator=data_collator,
