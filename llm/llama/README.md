@@ -19,6 +19,7 @@ Llama2 模型的权重的使用则需要遵循[License](../../../paddlenlp/trans
 
 ## 权重列表
 
+
 | Model                         |
 |-------------------------------|
 | ziqingyang/chinese-llama-7b   |
@@ -26,6 +27,9 @@ Llama2 模型的权重的使用则需要遵循[License](../../../paddlenlp/trans
 | ziqingyang/chinese-alpaca-7b  |
 | ziqingyang/chinese-alpaca-13b |
 | idea-ccnl/ziya-llama-13b-v1   |
+| baichuan-inc/Baichuan-7B         |
+| baichuan-inc/Baichuan-13B-Base   |
+| baichuan-inc/Baichuan-13B-Chat   |
 | facebook/llama-7b             |
 | facebook/llama-13b            |
 | facebook/llama-30b            |

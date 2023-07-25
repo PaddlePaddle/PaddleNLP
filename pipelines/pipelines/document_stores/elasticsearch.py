@@ -44,6 +44,8 @@ from pipelines.document_stores.filter_utils import LogicalFilterClause
 from pipelines.schema import Document, Label
 
 logger = logging.getLogger(__name__)
+# disable elastic search debug log
+logging.getLogger("elasticsearch").setLevel(logging.INFO)
 
 
 class ElasticsearchDocumentStore(KeywordDocumentStore):
@@ -1157,6 +1159,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
             body["_source"] = {"excludes": self.excluded_meta_data}
 
         logger.debug(f"Retriever query: {body}")
+        logging.getLogger("elasticsearch").setLevel(logging.CRITICAL)
         result = self.client.search(index=index, body=body, headers=headers)["hits"]["hits"]
 
         documents = [self._convert_es_hit_to_document(hit, return_embedding=self.return_embedding) for hit in result]
