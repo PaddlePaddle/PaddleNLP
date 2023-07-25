@@ -891,7 +891,8 @@ class Trainer:
                     self.args.tensor_parallel_degree > 1 or self.args.pipeline_parallel_degree > 1
                 ):
                     forbidden_no_sync = True
-
+                if self.args.use_moe:
+                    forbidden_no_sync = True
                 availiable_no_sync = dp_enabled and not forbidden_no_sync
 
                 is_no_sync = (
@@ -941,28 +942,64 @@ class Trainer:
                     elif args.recompute and availiable_no_sync:
                         fused_allreduce_gradients(list(model.parameters()), None)
 
+                    elif args.use_moe:
+                        fused_allreduce_gradients(
+                            [p for p in model.parameters() if not getattr(p, "no_sync", False)], None
+                        )
+                        # moe_parameters_list = [p for p in model.parameters() if getattr(p, 'no_sync', False)]
+                        # non_moe_parameters_list = [p for p in model.parameters() if not getattr(p, 'no_sync', False)]
+
+                        # moe_parameters_list = "\n".join([f'{p.name}-pnorm:{p.astype("float32").norm()}-gnorm:{p.grad.astype("float32").norm()}' for p in moe_parameters_list[:1]])
+                        # non_moe_parameters_list = "\n".join([f'{p.name}-pnorm:{p.astype("float32").norm()}-gnorm:{p.grad.astype("float32").norm()}' for p in non_moe_parameters_list[-11:-10]])
+
+                        # logger.info(f'dp moe params: {moe_parameters_list}')
+                        # logger.info(f'dp non-moe params: {non_moe_parameters_list}')
+
                     pipeline_parallel_config = set(args.pipeline_parallel_config.split(" "))
                     enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
 
+                    assert not availiable_no_sync, availiable_no_sync
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
                         parameters_list = obtain_optimizer_parameters_list(self.optimizer._inner_opt)
 
-                        if not enable_dp_comm_overlap:
-                            if self.optimizer._sharding_enable:
-                                assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
-                                self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
+                        non_moe_parameters_list = [p for p in parameters_list if not getattr(p, "no_sync", False)]
+                        if self.optimizer._sharding_enable:
+                            assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
+                            # 广播状态精心跳过moe参数
+                            # https://github.com/PaddlePaddle/Paddle/blob/ae2d8ba157540b39a4d7ab897c030217a33e82cb/python/paddle/distributed/fleet/meta_optimizers/dygraph_optimizer/dygraph_sharding_optimizer.py#L359C14-L359C39
+                            self.optimizer._inner_opt._rank2params = {
+                                r: [pp for pp in p if not getattr(p, "no_sync", False)]
+                                for r, p in self.optimizer._inner_opt._rank2params.items()
+                            }
+                            self.optimizer._inner_opt.reduce_gradients(
+                                list(non_moe_parameters_list), self.optimizer._hcg
+                            )
 
-                            if self.optimizer._dp_enable:
-                                fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
+                        if self.optimizer._dp_enable:
+                            assert not enable_dp_comm_overlap
+                            fused_allreduce_gradients(list(non_moe_parameters_list), self.optimizer._hcg)
 
-                    self.timers and self.timers("all-reduce").stop()
-                    self.timers and self.timers("optimizer-step").start()
+                        moe_parameters_list = [
+                            p
+                            for p in obtain_optimizer_parameters_list(self.optimizer._inner_opt)
+                            if getattr(p, "no_sync", False)
+                        ]
+                        moe_parameters_list = "\n".join(
+                            [
+                                f'{p.name}-pnorm:{p.astype("float32").norm()}-gnorm:{p.grad.astype("float32").norm()}'
+                                for p in moe_parameters_list
+                            ]
+                        )
+                        logger.info(f"sharding moe params: {moe_parameters_list}")
 
                     # Case 3: hack dp with master_grad
                     if hack_dp_master_grad and not (args.recompute and availiable_no_sync):
-                        fused_allreduce_gradients(list(model.parameters()), None)
+                        fused_allreduce_gradients(list(model.parameters()), None)                        
 
+                    self.timers and self.timers("all-reduce").stop()
+                    self.timers and self.timers("optimizer-step").start()
+                    
                     # pipeline parallel mode,  handle gradient merge here
                     if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
                         for p in model._layers.parameters():
