@@ -2037,10 +2037,16 @@ class Trainer:
         if not optimizer:
             return None
 
+        param2rank = {k: v for (k, v) in optimizer._param2rank.items()}
+
+        model = self.model
+        structure_name_mapping = {k: v.name for (k, v) in model.state_dict().items()}
+
         sharding_metas = {}
         sharding_meta = {}
-        param2rank = {k: v for (k, v) in optimizer._param2rank.items()}
+
         sharding_meta["param2rank"] = param2rank
+        sharding_meta["structure_name_mapping"] = structure_name_mapping
         suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
         sharding_metas[suffix] = sharding_meta
         sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_model_parallel_group())
