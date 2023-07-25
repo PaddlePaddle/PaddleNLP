@@ -1061,10 +1061,8 @@ class GenerationMixin(object):
             next_token_logits = self.adjust_logits_during_generation(next_token_logits)
             next_tokens_scores = logits_processors(input_ids, next_token_logits)
             # greedy
-            probs = F.softmax(next_tokens_scores)
-            probs = paddle.log(probs)
-            next_tokens = paddle.argmax(probs, axis=-1).unsqueeze(-1)
-            next_scores = paddle.index_sample(probs.astype("float32"), next_tokens)
+            next_tokens = paddle.argmax(next_tokens_scores, axis=-1).unsqueeze(-1)
+            next_scores = paddle.index_sample(next_tokens_scores.astype("float32"), next_tokens)
 
             if eos_token_id is not None:
                 next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
