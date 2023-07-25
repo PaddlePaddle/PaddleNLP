@@ -236,6 +236,7 @@ class TrainingArguments:
             Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
             following config is support:
               enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation
+              enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -541,7 +542,8 @@ class TrainingArguments:
             "help": (
                 "Some additional config it highly affect the useage of sharding parallel, we provide some option to config it."
                 "following config is support: \n"
-                "enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation"
+                "enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation\n"
+                "enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed"
             )
         },
     )
@@ -852,21 +854,24 @@ class TrainingArguments:
                     sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
                     for x in sharding_parallel_config:
                         if len(x) > 0:
-                            if x not in [
-                                "enable_stage1_tensor_fusion",
-                            ]:
+                            if x not in ["enable_stage1_tensor_fusion", "enable_stage1_overlap"]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, "
-                                    f"accpet config is enable_stage1_tensor_fusion."
+                                    f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap."
                                 )
                     try:
                         strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
                             True if "enable_stage1_tensor_fusion" in sharding_parallel_config else False
                         )
+                        if "enable_stage1_overlap" in sharding_parallel_config:
+                            strategy.hybrid_configs["sharding_configs"].comm_overlap = True
+                            strategy.hybrid_configs[
+                                "sharding_configs"
+                            ].accumulate_steps = self.gradient_accumulation_steps
                     except KeyError:
                         warnings.warn(
-                            "The enable_stage1_tensor_fusion is not supported by current version of Paddle. "
-                            "Please try lateset develop Paddle."
+                            "The enable_stage1_tensor_fusion or enable_stage1_overlap is not supported "
+                            "by current version of Paddle. Please try latest develop Paddle."
                         )
                 fleet.init(is_collective=True, strategy=strategy)
 
