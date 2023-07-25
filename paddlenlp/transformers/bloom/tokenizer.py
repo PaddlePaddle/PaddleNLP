@@ -144,7 +144,8 @@ class BloomTokenizer(PretrainedTokenizer):
     max_model_input_sizes = {
         "bigscience/bloom-560m": 102400,
     }
-    padding_side = "right"
+    padding_side = "left"
+    model_input_names = ["input_ids", "attention_mask"]
 
     def __init__(
         self,
