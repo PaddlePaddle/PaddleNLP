@@ -25,7 +25,7 @@ from paddlenlp.peft.prefix import (
 )
 from paddlenlp.transformers import (
     ChatGLMv2Config,
-    ChatGLMv2ForConditionalGeneration,
+    ChatGLMv2ForCausalLM,
     LlamaConfig,
     LlamaForCausalLM,
 )
@@ -116,7 +116,7 @@ class TestPrefixModelMultiQuery(unittest.TestCase):
             dtype="float32",
         )
 
-        cls.model = ChatGLMv2ForConditionalGeneration(cls.config)
+        cls.model = ChatGLMv2ForCausalLM(cls.config)
         cls.prefix_config = PrefixConfig(
             num_prefix_tokens=2,
             num_attention_heads=cls.model.config.num_attention_heads,

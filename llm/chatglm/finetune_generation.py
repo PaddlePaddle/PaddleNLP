@@ -32,7 +32,7 @@ from paddlenlp.peft.prefix import (
     chatglm_v2_pad_attention_mask,
 )
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
-from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokenizer
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -101,7 +101,7 @@ def main():
             dtype = "float16"
 
     # Load the pretrained language model.
-    model = AutoModelForConditionalGeneration.from_pretrained(
+    model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         dtype=dtype,
         low_cpu_mem_usage=True,

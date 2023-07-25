@@ -38,6 +38,9 @@ import paddle.distributed as dist
 import paddle.nn as nn
 from packaging import version
 from paddle.distributed import fleet
+from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
+    DygraphShardingOptimizer,
+)
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
@@ -1115,11 +1118,14 @@ class Trainer:
             if hasattr(optimizer_cls, "_create_master_weight") and self.args.fp16_opt_level == "O2":
                 optimizer_kwargs["multi_precision"] = True
 
-            if ShardingOption.SHARD_OP in self.args.sharding:
-                from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
-                    DygraphShardingOptimizer,
-                )
+            def is_new_version_sharding_stage1_optimizer():
+                signature_keys = set(inspect.signature(DygraphShardingOptimizer).parameters.keys())
+                return "inner_optimizer_class" not in signature_keys
 
+            if ShardingOption.SHARD_OP in self.args.sharding and not is_new_version_sharding_stage1_optimizer():
+                # for backward compatibility.
+                # this call will raise, if sharding stage1 is supported in HybridParallelOptimizer,
+                # in which case, the logic follows will handle it
                 self.optimizer = DygraphShardingOptimizer(
                     hcg=fleet.get_hybrid_communicate_group(),
                     user_defined_strategy=None,
@@ -1241,6 +1247,9 @@ class Trainer:
                 learning_rate=self.args.learning_rate,
                 num_warmup_steps=warmup,
                 num_training_steps=num_training_steps,
+                num_cycles=self.args.num_cycles,
+                lr_end=self.args.lr_end,
+                power=self.args.power,
             )
 
         return self.lr_scheduler
@@ -1506,7 +1515,13 @@ class Trainer:
             self._past = outputs[self.args.past_index]
 
         # We don't use .loss here since the model may return tuples instead of ModelOutput.
-        loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
+        loss = outputs["loss"] if isinstance(outputs, dict) else outputs
+        if isinstance(outputs, dict):
+            loss = outputs["loss"]
+        elif isinstance(outputs, tuple):
+            loss = outputs[0]
+        else:
+            loss = outputs
 
         return (loss, outputs) if return_outputs else loss
 

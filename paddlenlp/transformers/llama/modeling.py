@@ -171,10 +171,7 @@ def scaled_dot_product_attention(
             attn_weights, paddle.full([1], float(finfo(query_states.dtype).min), dtype=attn_weights.dtype)
         )
 
-        if config.fp16_opt_level is not None:
-            with paddle.amp.auto_cast(False):
-                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
-        else:
+        with paddle.amp.auto_cast(False):
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
 
         attn_output = paddle.matmul(attn_weights, value_states)
@@ -239,11 +236,7 @@ class LlamaRMSNorm(nn.Layer):
         if self.config.use_fused_rms_norm:
             return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
 
-        if self.config.fp16_opt_level is not None:
-            with paddle.amp.auto_cast(False):
-                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
-                hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
-        else:
+        with paddle.amp.auto_cast(False):
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
             hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
 
@@ -650,6 +643,8 @@ class LlamaModel(LlamaPretrainedModel):
         super().__init__(config)
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
+        # Recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
 
         if config.tensor_parallel_degree > 1:
             self.embed_tokens = mpu.VocabParallelEmbedding(
@@ -783,7 +778,7 @@ class LlamaModel(LlamaPretrainedModel):
             past_key_value = past_key_values[idx] if past_key_values is not None else None
 
             has_gradient = not hidden_states.stop_gradient
-            if self.config.use_recompute and has_gradient:
+            if self.enable_recompute and has_gradient:
                 layer_outputs = self.recompute_training(
                     decoder_layer,
                     hidden_states,

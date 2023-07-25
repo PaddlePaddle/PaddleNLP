@@ -14,7 +14,7 @@
 
 import unittest
 
-from pipelines.nodes.llm import PromptTemplate
+from pipelines.nodes.llm import LLMPromptTemplate as PromptTemplate
 from pipelines.schema import Document
 
 
