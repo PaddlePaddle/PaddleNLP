@@ -26,6 +26,11 @@ import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
+
+try:
+    from paddle.incubate.nn.functional import fused_rotary_position_embedding
+except ImportError:
+    fused_rotary_position_embedding = None
 from paddle.utils import try_import
 
 from paddlenlp.transformers.conversion_utils import (
@@ -397,6 +402,15 @@ class LlamaAttention(nn.Layer):
             ), f"num_heads: {self.num_heads}, tensor_parallel_degree: {config.tensor_parallel_degree}"
             self.num_heads = self.num_heads // config.tensor_parallel_degree
 
+        self.rope_fusion_level = config.rope_fusion_level
+        if self.rope_fusion_level is not None:
+            if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
+                warnings.warn(
+                    "Enable fuse rope in the config, but fuse rope is not available. "
+                    "Will disable fuse rope. Try using latest gpu version of Paddle."
+                )
+                self.rope_fusion_level = None
+
         if config.tensor_parallel_degree > 1:
             self.q_proj = mpu.ColumnParallelLinear(
                 self.hidden_size,
@@ -446,7 +460,8 @@ class LlamaAttention(nn.Layer):
                 self.hidden_size,
                 bias_attr=False,
             )
-        if config.rope:
+
+        if config.rope and self.rope_fusion_level != "full":
             self.rotary_emb = LlamaRotaryEmbedding(self.head_dim, max_position_embeddings=self.max_position_embeddings)
 
         self.config = config
@@ -474,8 +489,19 @@ class LlamaAttention(nn.Layer):
             kv_seq_len += offset
 
         if self.config.rope:
-            cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-            query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, offset=offset)
+            if self.rope_fusion_level is not None:
+                assert past_key_value is None, "fuse rotary not support cache kv for now"
+
+            if self.rope_fusion_level == "full":
+                query_states, key_states, _ = fused_rotary_position_embedding(query_states, key_states, v=None)
+            elif self.rope_fusion_level == "core":
+                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+                query_states, key_states, _ = fused_rotary_position_embedding(
+                    query_states, key_states, v=None, sin=sin, cos=cos
+                )
+            else:
+                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+                query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, offset=offset)
             # [bsz, nh, t, hd]
 
         if past_key_value is not None:
