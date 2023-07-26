@@ -828,13 +828,13 @@ class LlamaModel(LlamaPretrainedModel):
         hidden_states: Tensor,
         attention_mask: Tensor,
         output_attentions: Tensor,
-        use_cache: bool,
         past_key_value: Tensor,
+        use_cache: bool,
         alibi=None,
     ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
-                return module(*inputs, output_attentions)
+                return module(*inputs)
 
             return custom_forward
 
@@ -842,9 +842,10 @@ class LlamaModel(LlamaPretrainedModel):
             create_custom_forward(layer_module),
             hidden_states,
             attention_mask,
-            use_cache,
+            output_attentions,
             past_key_value,
-            alibi=alibi,
+            use_cache,
+            alibi,
             use_reentrant=False,
         )
         return hidden_states
@@ -933,8 +934,8 @@ class LlamaModel(LlamaPretrainedModel):
                     hidden_states,
                     attention_mask,
                     output_attentions,
-                    use_cache,
                     past_key_value,
+                    use_cache,
                     alibi=alibi,
                 )
             else:
