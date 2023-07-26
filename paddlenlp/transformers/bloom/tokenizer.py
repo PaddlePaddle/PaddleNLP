@@ -387,7 +387,7 @@ class BloomTokenizer(PretrainedTokenizer):
         """
         # Load from model defaults
         attention_mask = None
-        if "attention_mask" in encoded_inputs:
+        if "attention_mask" in encoded_inputs and len(np.shape(attention_mask)) > 2:
             attention_mask = encoded_inputs["attention_mask"]
             encoded_inputs.pop("attention_mask")
 
@@ -395,7 +395,7 @@ class BloomTokenizer(PretrainedTokenizer):
         encoded_inputs = super()._pad(
             encoded_inputs, max_length, padding_strategy, pad_to_multiple_of, return_attention_mask
         )
-        if attention_mask is not None:
+        if attention_mask is not None and len(np.shape(attention_mask)) > 2:
             encoded_inputs["attention_mask"] = attention_mask
             needs_to_be_padded = padding_strategy != PaddingStrategy.DO_NOT_PAD and len(required_input) != max_length
             if needs_to_be_padded:
