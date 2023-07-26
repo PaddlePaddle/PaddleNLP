@@ -358,33 +358,60 @@ class LlamaMLP(nn.Layer):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
+        self.tensor_parallel_degree = config.tensor_parallel_degree
+        self.fuse_attention_ffn = config.fuse_attention_ffn
 
         if config.tensor_parallel_degree > 1:
-            self.gate_proj = mpu.ColumnParallelLinear(
-                self.hidden_size,
-                self.intermediate_size,
-                gather_output=False,
-                has_bias=False,
-            )
+            if config.fuse_attention_ffn:
+                self.gate_up_fused_proj = mpu.ColumnParallelLinear(
+                    self.hidden_size,
+                    self.intermediate_size * 2,
+                    gather_output=False,
+                    has_bias=False,
+                )
+            else:
+                self.gate_proj = mpu.ColumnParallelLinear(
+                    self.hidden_size,
+                    self.intermediate_size,
+                    gather_output=False,
+                    has_bias=False,
+                )
+                self.up_proj = mpu.ColumnParallelLinear(
+                    self.hidden_size,
+                    self.intermediate_size,
+                    gather_output=False,
+                    has_bias=False,
+                )
+
             self.down_proj = mpu.RowParallelLinear(
                 self.intermediate_size,
                 self.hidden_size,
                 input_is_parallel=True,
                 has_bias=False,
             )
-            self.up_proj = mpu.ColumnParallelLinear(
-                self.hidden_size,
-                self.intermediate_size,
-                gather_output=False,
-                has_bias=False,
-            )
         else:
-            self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+            if config.fuse_attention_ffn:
+                self.gate_up_fused_proj = nn.Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
+            else:
+                self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+                self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+
             self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
-            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
 
     def forward(self, x):
-        return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+        if self.fuse_attention_ffn:
+            # [s, b, 4hp]
+            intermediate_parallel = self.gate_up_fused_proj(x)
+            # Special Slicing to accomodate Tensor Parallel
+            # Even channels is ffc_fc, odd channels is gate
+            gate_out = intermediate_parallel[..., 0::2]
+            up_out = intermediate_parallel[..., 1::2]
+            intermediate_parallel = F.silu(gate_out) * up_out
+            # [s, b, h]
+            out = self.down_proj(intermediate_parallel)
+        else:
+            out = self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+        return out
 
 
 class LlamaAttention(nn.Layer):
@@ -396,6 +423,7 @@ class LlamaAttention(nn.Layer):
         self.num_heads = config.num_attention_heads
         self.head_dim = self.hidden_size // self.num_heads
         self.max_position_embeddings = config.max_position_embeddings
+        self.fuse_attention_qkv = config.fuse_attention_qkv
         if config.tensor_parallel_degree > 1:
             assert (
                 self.num_heads % config.tensor_parallel_degree == 0
@@ -412,40 +440,55 @@ class LlamaAttention(nn.Layer):
                 self.rope_fusion_level = None
 
         if config.tensor_parallel_degree > 1:
-            self.q_proj = mpu.ColumnParallelLinear(
-                self.hidden_size,
-                self.hidden_size,
-                has_bias=False,
-                gather_output=False,
-            )
-            self.k_proj = mpu.ColumnParallelLinear(
-                self.hidden_size,
-                self.hidden_size,
-                has_bias=False,
-                gather_output=False,
-            )
-            self.v_proj = mpu.ColumnParallelLinear(
-                self.hidden_size,
-                self.hidden_size,
-                has_bias=False,
-                gather_output=False,
-            )
+            if self.fuse_attention_qkv:
+                self.qkv_proj = mpu.ColumnParallelLinear(
+                    self.hidden_size,
+                    3 * self.hidden_size,
+                    has_bias=False,
+                    gather_output=False,
+                )
+            else:
+                self.q_proj = mpu.ColumnParallelLinear(
+                    self.hidden_size,
+                    self.hidden_size,
+                    has_bias=False,
+                    gather_output=False,
+                )
+                self.k_proj = mpu.ColumnParallelLinear(
+                    self.hidden_size,
+                    self.hidden_size,
+                    has_bias=False,
+                    gather_output=False,
+                )
+                self.v_proj = mpu.ColumnParallelLinear(
+                    self.hidden_size,
+                    self.hidden_size,
+                    has_bias=False,
+                    gather_output=False,
+                )
         else:
-            self.q_proj = nn.Linear(
-                self.hidden_size,
-                self.hidden_size,
-                bias_attr=False,
-            )
-            self.k_proj = nn.Linear(
-                self.hidden_size,
-                self.hidden_size,
-                bias_attr=False,
-            )
-            self.v_proj = nn.Linear(
-                self.hidden_size,
-                self.hidden_size,
-                bias_attr=False,
-            )
+            if self.fuse_attention_qkv:
+                self.qkv_proj = nn.Linear(
+                    self.hidden_size,
+                    3 * self.hidden_size,
+                    bias_attr=False,
+                )
+            else:
+                self.q_proj = nn.Linear(
+                    self.hidden_size,
+                    self.hidden_size,
+                    bias_attr=False,
+                )
+                self.k_proj = nn.Linear(
+                    self.hidden_size,
+                    self.hidden_size,
+                    bias_attr=False,
+                )
+                self.v_proj = nn.Linear(
+                    self.hidden_size,
+                    self.hidden_size,
+                    bias_attr=False,
+                )
 
         if config.tensor_parallel_degree > 1:
             self.o_proj = mpu.RowParallelLinear(
@@ -477,9 +520,14 @@ class LlamaAttention(nn.Layer):
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         bsz, q_len, _ = hidden_states.shape
-        query_states = self.q_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
-        key_states = self.k_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
-        value_states = self.v_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
+        if self.fuse_attention_qkv:
+            mix_layer = self.qkv_proj(hidden_states)
+            mix_layer = paddle.reshape_(mix_layer, [0, 0, self.num_heads, 3 * self.head_dim])
+            query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
+        else:
+            query_states = self.q_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
+            key_states = self.k_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
+            value_states = self.v_proj(hidden_states).reshape(shape=[bsz, q_len, self.num_heads, self.head_dim])
 
         kv_seq_len = key_states.shape[-3]
         offset = 0
@@ -645,19 +693,28 @@ class LlamaPretrainedModel(PretrainedModel):
 
         def get_tensor_parallel_split_mappings(num_layers):
             final_actions = {}
+
             base_actions = {
-                # Column Linear
-                "layers.0.self_attn.q_proj.weight": partial(fn, is_column=True),
-                "layers.0.self_attn.k_proj.weight": partial(fn, is_column=True),
-                "layers.0.self_attn.v_proj.weight": partial(fn, is_column=True),
-                "layers.0.mlp.gate_proj.weight": partial(fn, is_column=True),
-                "layers.0.mlp.up_proj.weight": partial(fn, is_column=True),
                 "lm_head.weight": partial(fn, is_column=True),
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
                 "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
             }
+
+            # Column Linear
+            if config.fuse_attention_qkv:
+                base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
+            else:
+                base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
+
+            if config.fuse_attention_ffn:
+                base_actions["layers.0.mlp.gate_up_fused_proj.weight"] = partial(fn, is_column=True)
+            else:
+                base_actions["layers.0.mlp.gate_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.mlp.up_proj.weight"] = partial(fn, is_column=True)
 
             for key, action in base_actions.items():
                 if "layers.0." in key:
