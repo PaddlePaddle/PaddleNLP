@@ -855,9 +855,9 @@ class Trainer:
                 if is_no_sync:
                     # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
                     with model.no_sync():
-                        tr_loss_step = self.training_step(model, inputs)
+                        tr_loss_step, outputs = self.training_step(model, inputs)
                 else:
-                    tr_loss_step = self.training_step(model, inputs)
+                    tr_loss_step, outputs = self.training_step(model, inputs)
 
                 tr_loss += tr_loss_step
 
@@ -975,7 +975,9 @@ class Trainer:
                     self.state.epoch = epoch + self.state.global_step / global_steps_in_epoch
 
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
-                    self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+                    self._maybe_log_save_evaluate(
+                        tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs, outputs=outputs
+                    )
                     step = 0
                 else:
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
@@ -1690,7 +1692,12 @@ class Trainer:
             self._past = outputs[self.args.past_index]
 
         # We don't use .loss here since the model may return tuples instead of ModelOutput.
-        loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
+        if isinstance(outputs, dict):
+            loss = outputs["loss"]
+        elif len(outputs) == 2:
+            loss, outputs = outputs
+        else:
+            loss = outputs[0]
 
         return (loss, outputs) if return_outputs else loss
 
@@ -1719,8 +1726,7 @@ class Trainer:
         inputs = self._prepare_inputs(inputs)
 
         with self.autocast_smart_context_manager():
-            loss = self.compute_loss(model, inputs)
-
+            loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
         if self.args.gradient_accumulation_steps > 1:
             loss = loss / self.args.gradient_accumulation_steps
 
@@ -1729,7 +1735,10 @@ class Trainer:
         else:
             loss.backward()
 
-        return loss.detach()
+        if isinstance(outputs, dict) and "loss" in outputs:
+            loss = outputs.pop("loss") / self.args.gradient_accumulation_steps
+
+        return loss.detach(), outputs
 
     def training_pipeline_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         """
