@@ -609,6 +609,7 @@ class GenerationMixin(object):
         diversity_rate=0.0,
         use_cache=True,
         use_fast=False,
+        pre_caches=None,
         use_fp16_decoding=False,
         **model_kwargs
     ):
@@ -934,6 +935,9 @@ class GenerationMixin(object):
                     "`num_return_sequences` has to be 1, but is {} "
                     "when doing greedy search.".format(num_return_sequences)
                 )
+            if pre_caches is not None:
+                model_kwargs["pre_caches"] = pre_caches
+
             return self.greedy_search(
                 input_ids, logits_processors, max_len, pad_token_id, eos_token_id, **model_kwargs
             )
@@ -954,6 +958,7 @@ class GenerationMixin(object):
                     top_k,
                     top_p,
                     temperature,
+                    pre_caches,
                     **model_kwargs,
                 )
             else:
@@ -966,6 +971,7 @@ class GenerationMixin(object):
                     top_k,
                     top_p,
                     temperature,
+                    pre_caches,
                     **model_kwargs,
                 )
 
@@ -1035,6 +1041,12 @@ class GenerationMixin(object):
 
     def greedy_search(self, input_ids, logits_processors, max_length, pad_token_id, eos_token_id, **model_kwargs):
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
+        pre_caches = model_kwargs.get("pre_caches", None)
+
+        immutable = {}
+        if pre_caches is not None and len(pre_caches) > 0:
+            immutable["pre_caches"] = pre_caches
+
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
@@ -1045,7 +1057,7 @@ class GenerationMixin(object):
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
-            outputs = self(**model_inputs)
+            outputs = self(**model_inputs, **immutable)
 
             if isinstance(outputs, tuple):
                 logits = outputs[0]
@@ -1098,6 +1110,7 @@ class GenerationMixin(object):
         top_k=None,
         top_p=None,
         temperature=None,
+        pre_caches=None,
         min_tokens_to_keep=1,
         **model_kwargs
     ):
@@ -1110,10 +1123,14 @@ class GenerationMixin(object):
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
+        immutable = {}
+        if pre_caches is not None and len(pre_caches) > 0:
+            immutable["pre_caches"] = pre_caches
+
         while cur_len < max_length:
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
-            outputs = self(**model_inputs)
+            outputs = self(**model_inputs, **immutable)
 
             if isinstance(outputs, tuple):
                 logits = outputs[0]
@@ -1249,6 +1266,7 @@ class GenerationMixin(object):
         top_k=None,
         top_p=None,
         temperature=None,
+        pre_caches=None,
         min_tokens_to_keep=1,
         **model_kwargs
     ):
@@ -1290,6 +1308,9 @@ class GenerationMixin(object):
         # use_cache is immutable, we split it off other mutable kwargs.
         assert "use_cache" in model_kwargs
         immutable = {"use_cache": model_kwargs["use_cache"]}
+        if pre_caches is not None:
+            immutable["pre_caches"] = pre_caches
+
         del model_kwargs["use_cache"]
 
         def _forward_(**args):
