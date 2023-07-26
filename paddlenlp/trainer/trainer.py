@@ -47,7 +47,6 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_
 )
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
-    sharding_reduce_gradients,
 )
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from tqdm.auto import tqdm
@@ -754,13 +753,13 @@ class Trainer:
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
                         parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
 
-                        if self.optimizer._sharding_enable:
-                            assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
-                            sharding_reduce_gradients(list(parameters_list), self.optimizer._hcg)
+                        if not enable_dp_comm_overlap:
+                            if self.optimizer._sharding_enable:
+                                assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
+                                self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
-                        if self.optimizer._dp_enable:
-                            assert not enable_dp_comm_overlap
-                            fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
+                            if self.optimizer._dp_enable:
+                                fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
 
                     # pipeline parallel mode,  handle gradient merge here
                     if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
@@ -1614,11 +1613,12 @@ class Trainer:
         model.micro_batch_size = self.args.per_device_train_batch_size
         model.accumulate_steps = self.args.gradient_accumulation_steps
 
-        if model._dp_comm_overlap:
-            for comm_buffer in model._dp_comm_buffers:
-                comm_buffer._acc_steps = self.args.gradient_accumulation_steps
+        inputs = model._prepare_training(
+            inputs, self.optimizer, self.lr_scheduler
+        )  # None, None => [optimizer, lr_scheduler]
+        model.optimizer = None  # we do not use `PipelineParallel` to handler optimizer step
+        model.lr_scheduler = None
 
-        inputs = model._prepare_training(inputs, self.optimizer, self.lr_scheduler)
         with self.autocast_smart_context_manager():
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
 
