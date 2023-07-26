@@ -44,6 +44,8 @@ sed -i "s/--device:cpu|gpu/--device:cpu|npu/g" $FILENAME
 sed -i "s/--device:gpu|cpu/--device:cpu|npu/g" $FILENAME
 sed -i "s/--benchmark:True/--benchmark:False/g" $FILENAME
 sed -i "s/--use_tensorrt:False|True/--use_tensorrt:False/g" $FILENAME
+# python has been updated to version 3.9 for npu backend
+sed -i "s/python3.7/python3.9/g" $FILENAME
 sed -i 's/\"gpu\"/\"npu\"/g' test_tipc/test_train_inference_python.sh
 
 # parser params

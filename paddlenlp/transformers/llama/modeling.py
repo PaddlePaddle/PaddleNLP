@@ -69,6 +69,35 @@ __all__ = [
 ]
 
 
+def _get_interleave(n):
+    def _get_interleave_power_of_2(n):
+        start = 2 ** (-(2 ** -(math.log2(n) - 3)))
+        ratio = start
+        return [start * ratio**i for i in range(n)]
+
+    if math.log2(n).is_integer():
+        return _get_interleave_power_of_2(n)
+    else:
+        closest_power_of_2 = 2 ** math.floor(math.log2(n))
+        return (
+            _get_interleave_power_of_2(closest_power_of_2)
+            + _get_interleave(2 * closest_power_of_2)[0::2][: n - closest_power_of_2]
+        )
+
+
+def build_alibi_tensor(
+    bool_attention_mask: Tensor, num_heads: int, dtype: paddle.dtype, tensor_parallel_degree=1
+) -> Tensor:
+    attention_mask = bool_attention_mask.astype("float32")
+    batch_size, seq_length = attention_mask.shape
+    slopes = paddle.to_tensor(_get_interleave(num_heads), dtype="float32")
+    alibi = slopes.unsqueeze(axis=[1, 2]) * paddle.arange(seq_length, dtype="float32").unsqueeze(axis=[0, 1]).expand(
+        [num_heads, -1, -1]
+    )
+    alibi = alibi.reshape(shape=(1, num_heads, 1, seq_length)).expand([batch_size, -1, -1, -1])
+    return paddle.cast(alibi, dtype)
+
+
 def get_triangle_upper_mask(x, mask=None):
     if mask is not None:
         return mask
@@ -134,11 +163,15 @@ def scaled_dot_product_attention(
     attention_mask,
     output_attentions,
     is_causal=True,
+    alibi=None,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention:
+        if alibi is not None:
+            raise ValueError("Flash Attention does not support ALiBi yet")
+
         # Flash Attention now ignore attention mask
         # Current Flash Attention doesn't support attn maskt
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
@@ -159,7 +192,12 @@ def scaled_dot_product_attention(
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
+        # matmul and devide by sqrt(head_dim)
         attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
+        # then add alibi bias
+        if alibi is not None:
+            alibi = alibi.reshape([bsz, num_heads, 1, -1])
+            attn_weights = attn_weights + alibi
 
         if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
             raise ValueError(
@@ -434,7 +472,9 @@ class LlamaAttention(nn.Layer):
                 self.hidden_size,
                 bias_attr=False,
             )
-        self.rotary_emb = LlamaRotaryEmbedding(self.head_dim, max_position_embeddings=self.max_position_embeddings)
+        if config.rope:
+            self.rotary_emb = LlamaRotaryEmbedding(self.head_dim, max_position_embeddings=self.max_position_embeddings)
+
         self.config = config
 
     def forward(
@@ -444,6 +484,7 @@ class LlamaAttention(nn.Layer):
         attention_mask: Optional[paddle.Tensor] = None,
         output_attentions: bool = False,
         use_cache: bool = False,
+        alibi: Optional[paddle.Tensor] = None,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
@@ -459,15 +500,16 @@ class LlamaAttention(nn.Layer):
         offset = 0
         kv_seq_len = key_states.shape[-3]
 
-        if past_key_value is not None:  # do not consider about sequence_parallel
+        if past_key_value is not None:
             offset = past_key_value[0].shape[-3]
             kv_seq_len += offset
-        cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)  # [1, kv_seq_len, 1, head_dim]
 
-        # [bs, kv_seq_len, num_head, head_dim] -> [kv_seq_len, bs, num_head, head_dim] (seq parallel)
-        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, offset=offset)
+        if self.config.rope:
+            cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+            query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, offset=offset)
+            # [bsz, nh, t, hd]
 
-        if past_key_value is not None:  # do not consider about sequence_paralle
+        if past_key_value is not None:
             # reuse k, v, self_attention
             key_states = paddle.concat([past_key_value[0], key_states], axis=1)
             value_states = paddle.concat([past_key_value[1], value_states], axis=1)
@@ -481,6 +523,7 @@ class LlamaAttention(nn.Layer):
             value_states=value_states,
             attention_mask=attention_mask,
             output_attentions=output_attentions,
+            alibi=alibi,
         )
 
         if self.sequence_parallel:
@@ -513,6 +556,7 @@ class LlamaDecoderLayer(nn.Layer):
         output_attentions: Optional[bool] = False,
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
+        alibi: Optional[paddle.Tensor] = None,
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         """
         Args:
@@ -539,6 +583,7 @@ class LlamaDecoderLayer(nn.Layer):
             attention_mask=attention_mask,
             output_attentions=output_attentions,
             use_cache=use_cache,
+            alibi=alibi,
         )
         hidden_states = residual + hidden_states
 
@@ -745,6 +790,7 @@ class LlamaModel(LlamaPretrainedModel):
         output_attentions: Tensor,
         use_cache: bool,
         past_key_value: Tensor,
+        alibi=None,
     ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
@@ -758,6 +804,7 @@ class LlamaModel(LlamaPretrainedModel):
             attention_mask,
             use_cache,
             past_key_value,
+            alibi=alibi,
             use_reentrant=False,
         )
         return hidden_states
@@ -805,7 +852,7 @@ class LlamaModel(LlamaPretrainedModel):
             cache_length = paddle.shape(past_key_values[0][0])[1]
             seq_length_with_past += cache_length
         if inputs_embeds is None:
-            inputs_embeds = self.embed_tokens(input_ids)  # 1. get inputs_embeds
+            inputs_embeds = self.embed_tokens(input_ids)
 
         if self.sequence_parallel:
             # [bs, seq_len, num_head * head_dim] -> [seq_len, bs, num_head * head_dim]
@@ -818,7 +865,23 @@ class LlamaModel(LlamaPretrainedModel):
             # [bs, seq_len]
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
 
-        attention_mask = self._prepare_decoder_attention_mask(  # 2. get attention_mask
+        if self.config.alibi:
+            alibi = build_alibi_tensor(attention_mask, self.config.num_attention_heads, dtype=inputs_embeds.dtype)
+            if self.config.tensor_parallel_degree > 1:
+                block_size = self.config.num_attention_heads // self.config.tensor_parallel_degree
+                alibi = alibi[
+                    :,
+                    self.config.tensor_parallel_rank
+                    * block_size : (self.config.tensor_parallel_rank + 1)
+                    * block_size,
+                ]
+                alibi = alibi.reshape([batch_size * block_size, 1, seq_length_with_past])
+            else:
+                alibi = alibi.reshape([batch_size * self.config.num_attention_heads, 1, seq_length_with_past])
+        else:
+            alibi = None
+
+        attention_mask = self._prepare_decoder_attention_mask(
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
         hidden_states = inputs_embeds
@@ -842,6 +905,7 @@ class LlamaModel(LlamaPretrainedModel):
                     output_attentions,
                     use_cache,
                     past_key_value,
+                    alibi=alibi,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -850,6 +914,7 @@ class LlamaModel(LlamaPretrainedModel):
                     output_attentions,
                     past_key_value,
                     use_cache,
+                    alibi=alibi,
                 )
             if type(layer_outputs) is tuple:
                 hidden_states = layer_outputs[0]

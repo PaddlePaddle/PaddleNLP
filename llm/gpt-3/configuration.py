@@ -287,6 +287,7 @@ class GPTConfig(PretrainedConfig):
         num_partitions: int = 1,
         use_recompute: bool = False,
         enable_fuse_transformer: bool = False,
+        lm_shift_labels: bool = True,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -310,3 +311,4 @@ class GPTConfig(PretrainedConfig):
         self.num_partitions = num_partitions
         self.use_recompute = use_recompute
         self.enable_fuse_transformer = enable_fuse_transformer
+        self.lm_shift_labels = lm_shift_labels
