@@ -119,9 +119,8 @@ def main():
         model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
         model_inputs["position_ids"] = list(range(len(model_inputs["input_ids"])))
-        model_inputs["attention_mask"] = np.tril(
-            np.ones([len(model_inputs["input_ids"]), len(model_inputs["input_ids"])]), 0
-        ).tolist()
+        seq_length = len(model_inputs["input_ids"])
+        model_inputs["attention_mask"] = np.tril(np.ones([seq_length, seq_length]), 0).tolist()
         return model_inputs
 
     def preprocess_function_chatglm(example, max_src_length=256, max_tgt_length=384):
@@ -138,10 +137,6 @@ def main():
         context_length = model_inputs["input_ids"].index(tokenizer.bos_token_id)
         seq_length = len(model_inputs["input_ids"])
         position_ids = np.arange(seq_length, dtype=np.int64)
-        # mask_token = self.mask_token_id if self.mask_token_id in required_input else self.gmask_token_id
-        # if mask_token in required_input:
-        #     mask_position = required_input.index(mask_token)
-        #     position_ids[context_length:] = mask_position
         block_position_ids = np.concatenate(
             [
                 np.zeros(context_length, dtype=np.int64),
@@ -149,9 +144,12 @@ def main():
             ]
         )
         model_inputs["position_ids"] = np.stack([position_ids, block_position_ids], axis=0)
-        model_inputs["attention_mask"] = np.tril(
-            np.ones([len(model_inputs["input_ids"]), len(model_inputs["input_ids"])]), 0
-        ).tolist()
+        # attention mask
+        attention_mask = np.ones((seq_length, seq_length))
+        attention_mask = np.tril(attention_mask)
+        attention_mask[:, :context_length] = 1
+        attention_mask = (attention_mask < 0.5).astype("int64")
+        model_inputs["attention_mask"] = attention_mask.tolist()
         return model_inputs
 
     def preprocess_function_bloom(example, max_src_length=256, max_tgt_length=384):
@@ -192,6 +190,7 @@ def main():
         )
     total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
 
+    # breakpoint()
     intokens_dataset = InTokensMapDataset(
         dataset,
         tokenizer=tokenizer,

@@ -48,7 +48,7 @@ class TestInTokensMapDataset(unittest.TestCase):
         ).tolist()
         return model_inputs
 
-    def test_InTokensMapDataset(
+    def test_map_dataset(
         self,
     ):
 
@@ -123,7 +123,7 @@ class TestInTokensIterableDataset(unittest.TestCase):
         ).tolist()
         return model_inputs
 
-    def test_InTokensIterableDataset(self):
+    def test_iterable_dataset(self):
         inData = InTokensIterableDataset(self.dataset, self.tokenizer, max_length=128)
 
         example = []
@@ -170,3 +170,10 @@ class TestInTokensIterableDataset(unittest.TestCase):
         self.assertEqual(example[0]["position_ids"], expected_output["position_ids"])
         self.assertEqual(example[0]["labels"], expected_output["labels"])
         self.assertEqual(example[0]["attention_mask"], expected_output["attention_mask"])
+
+    def test_missing_data(self):
+        orginal_input_ids = [item["input_ids"] for item in self.dataset]
+        orginal_input_ids = [sum(orginal_input_ids, [])]
+        inData = InTokensIterableDataset(self.dataset, self.tokenizer, max_length=128)
+        tgt_input_ids = [item["input_ids"] for item in inData]
+        self.assertEqual(orginal_input_ids, tgt_input_ids)

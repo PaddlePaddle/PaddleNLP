@@ -854,7 +854,7 @@ class BloomModel(BloomPreTrainedModel):
         # [batch_size, seq_length] -> [batch_size, tgt_length, src_length]
         if len(attention_mask.shape) == 2:
             expanded_attn_mask = _expand_mask(attention_mask, tgt_length=src_length)
-        else:
+        elif len(attention_mask.shape) == 4:
             # [batch_size,1, tgt_length, src_length] -> [batch_size, tgt_length, src_length]
             expanded_attn_mask = attention_mask.reshape(
                 (input_shape[0], attention_mask.shape[-2], attention_mask.shape[-1])
