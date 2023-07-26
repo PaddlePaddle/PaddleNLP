@@ -560,6 +560,7 @@ class LlamaAttention(nn.Layer):
 
         multiplier = self.config.num_attention_heads // self.config.num_key_value_heads
 
+        # TODO(wj-Mcat): use broadcast strategy when n_kv_heads = 1
         # repeat k/v heads if n_kv_heads < n_heads
         key_states = repeat_kv(key_states, multiplier)
         value_states = repeat_kv(value_states, multiplier)
@@ -1057,7 +1058,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         self.config = config
 
         self.llama = LlamaModel(config)
-        self.vocab_size = config.vocab_size
         self.lm_head = LlamaLMHead(config)
         self.criterion = LlamaPretrainingCriterion(config)
 
