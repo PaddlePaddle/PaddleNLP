@@ -163,11 +163,7 @@ def main():
         references = [x[x != -100].tolist() for x in eval_preds.label_ids]
 
         predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-        print("Predictions")
-        print(predictions[:2])
         references = tokenizer.batch_decode(references, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-        print("References")
-        print(references[:2])
 
         # for pred in predictions:
         rouge1_score = rouge1.score(predictions, references)
