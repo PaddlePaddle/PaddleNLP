@@ -1332,9 +1332,4 @@ llama
 gpt
 transformers
 }
-refactor_training_loop(){
-llama
-gpt
-transformers
-}
 $1

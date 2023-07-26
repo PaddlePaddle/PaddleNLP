@@ -133,7 +133,7 @@ def convert_example(
         )
     else:
         input_ids = source_tokenized["input_ids"] + target_tokenized["input_ids"]
-        labels = len(source_tokenized["input_ids"]) * [tokenizer.pad_token_id] + target_tokenized["input_ids"]
+        labels = len(source_tokenized["input_ids"]) * [-100] + target_tokenized["input_ids"]
 
         # shift labels
         input_ids, labels = input_ids[:-1], labels[1:]
@@ -308,7 +308,6 @@ def main():
         tokenizer=tokenizer,
         padding=True,
         max_length=data_args.src_length + data_args.tgt_length,
-        label_pad_token_id=tokenizer.pad_token_id,
         return_tensors="np",
     )
 

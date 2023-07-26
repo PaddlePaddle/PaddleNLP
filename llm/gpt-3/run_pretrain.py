@@ -1,5 +1,4 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
-#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -17,13 +16,15 @@ GPT/Llama pretraining scripts.
 import math
 import os
 import random
-import sys
 import time
 from dataclasses import dataclass, field
 from typing import Optional
 
 import numpy as np
 import paddle
+from configuration import GPTConfig
+from modeling import GPTForCausalLM
+from modeling_pp import GPTForCausalLMPipe
 
 from paddlenlp.trainer import (
     PdArgumentParser,
@@ -36,21 +37,18 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
-    LlamaConfig,
-    LlamaForCausalLM,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "llama": (
-        LlamaConfig,
-        LlamaForCausalLM,
+    "gpt": (
+        GPTConfig,
+        GPTForCausalLM,
     ),
 }
 
 from dataset import GPTDataset, get_train_valid_test_split_
-from modeling_pp import LlamaForCausalLMPipe
 
 
 def add_start_docstrings(*docstr):
@@ -108,11 +106,9 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to pre-train from.
     """
 
-    model_type: Optional[str] = field(
-        default="llama", metadata={"help": "Only support for llama pre-training for now."}
-    )
+    model_type: Optional[str] = field(default="gpt", metadata={"help": "Only support for gpt pre-training for now."})
     model_name_or_path: str = field(
-        default="__internal_testing__/tiny-random-llama",
+        default="gpt2-medium-en",
         metadata={
             "help": "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
         },
@@ -120,51 +116,19 @@ class ModelArguments:
     tokenizer_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
+    use_flash_attn: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
 
-    config_name: Optional[str] = field(
-        default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
-    )
-    use_flash_attention: bool = field(
+    enable_fuse_transformer: bool = field(
         default=False,
-        metadata={"help": "use_flash_attention"},
+        metadata={"help": "gpt, enable_fuse_transformer"},
     )
-    use_fused_rms_norm: bool = field(
-        default=False,
-        metadata={"help": "llama, use_fused_rms_norm"},
-    )
+
     fuse_attention_qkv: bool = field(
         default=False,
-        metadata={"help": "whether to fuse attention qkv"},
+        metadata={"help": "gpt, fuse_attention_qkv"},
     )
-    fuse_attention_ffn: bool = field(
-        default=False,
-        metadata={"help": "whether to fuse first up and gate proj in mlp block"},
-    )
-    recompute_granularity: str = field(
-        default="full",
-        metadata={"help": "full core_attn"},
-    )
-    virtual_pp_degree: int = field(
-        default=1,
-        metadata={"help": "virtual_pp_degree"},
-    )
-
-    continue_training: bool = field(
-        default=False,
-        metadata={
-            "help": "Pre-training from existing paddlenlp model weights. Default Fasle and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
-        },
-    )
-
-    rope_fusion_level: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "The level of fusion of rope embedding. Can be chosen from:\n"
-            "(1) 'full': fuse sin cos compute and rope embedding\n"
-            "(2) 'core': only fuse rope embedding, will compute the sin and cos\n"
-            "(3) None: don't fuse any part of the rope embedding"
-        },
-    )
+    hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
+    attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
 
 
 def create_pretrained_dataset(
@@ -243,9 +207,7 @@ def create_pretrained_dataset(
 
         return {
             "input_ids": out[0],
-            # "token_type_ids": out[1],
-            # "attention_mask": out[2],
-            # "loss_mask": out[3],
+            "attention_mask": out[2],
             "labels": out[4],
         }
 
@@ -359,11 +321,7 @@ class PretrainingTrainer(Trainer):
 
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
-    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
-    else:
-        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
 
@@ -389,11 +347,6 @@ def main():
     last_checkpoint = None
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        # if last_checkpoint is None and len(
-        #         os.listdir(training_args.output_dir)) > 1:
-        #     raise ValueError(
-        #         f"Output directory ({training_args.output_dir}) already exists and is not empty. "
-        #         "Use --overwrite_output_dir to overcome.")
         if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
             logger.info(
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
@@ -405,24 +358,14 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
 
     config = config_class.from_pretrained(model_args.model_name_or_path)
-
-    # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
-    if not model_args.continue_training:
-        config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
-
-    if not model_args.continue_training:
-        config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
-        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
-
-    config.lm_shift_labels = False
-    config.use_flash_attention = model_args.use_flash_attention
-    config.use_fused_rms_norm = model_args.use_fused_rms_norm
+    config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
+    config.hidden_dropout_prob = model_args.hidden_dropout_prob
+    config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
+    config.enable_fuse_transformer = model_args.enable_fuse_transformer
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
-    config.fuse_attention_ffn = model_args.fuse_attention_ffn
-    config.recompute_granularity = model_args.recompute_granularity
-    config.virtual_pp_degree = model_args.virtual_pp_degree
-    config.rope_fusion_level = model_args.rope_fusion_level
     config.use_recompute = training_args.recompute
+    config.use_flash_attn = model_args.use_flash_attn
+    config.lm_shift_labels = False
 
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
@@ -437,18 +380,15 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
-    if training_args.pipeline_parallel_degree > 1 and model_args.model_type == "llama":
-        model_class = LlamaForCausalLMPipe
+    if training_args.pipeline_parallel_degree > 1:
+        model_class = GPTForCausalLMPipe
 
-    if model_args.continue_training:
-        model = model_class.from_pretrained(
-            model_args.model_name_or_path,
-            config=config,
-            dtype=dtype,
-            load_state_as_np=True,
-        )
-    else:
-        model = model_class._from_config(config, dtype=dtype)
+    model = model_class.from_pretrained(
+        model_args.model_name_or_path,
+        config=config,
+        dtype=dtype,
+        load_state_as_np=True,
+    )
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
@@ -493,6 +433,7 @@ def main():
         checkpoint = training_args.resume_from_checkpoint
     elif last_checkpoint is not None:
         checkpoint = last_checkpoint
+    checkpoint = None
 
     # Training
     if training_args.do_train:

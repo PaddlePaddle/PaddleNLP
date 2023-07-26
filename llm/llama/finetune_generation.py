@@ -252,7 +252,9 @@ def main():
         train_ds = load_dataset(reader, data_path="./data/train.txt", lazy=False)
         training_args.do_eval = False
         data_args.always_pad_to_max_length = True
-        trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
+        trans_func = partial(
+            custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args, benchmark=True
+        )
     elif training_args.do_train or training_args.do_eval:
         if data_args.data_name is not None:
             if data_args.task_name is not None:
@@ -277,7 +279,7 @@ def main():
         # pipeline_parallel eval is the same as training.
         dev_ds = dev_ds.map(partial(trans_func, is_test=model_args.eval_with_do_generation))
 
-    model_max_length = 1024 if not training_args.benchmark else 512
+    model_max_length = data_args.src_length + data_args.tgt_length if not training_args.benchmark else 512
     collate_fn = DataCollatorForSeq2Seq(
         return_tensors="pd",
         tokenizer=tokenizer,

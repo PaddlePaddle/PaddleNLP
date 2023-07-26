@@ -16,7 +16,10 @@ import argparse
 import glob
 import time
 
-from pipelines.document_stores import ElasticsearchDocumentStore
+from pipelines.document_stores import (
+    BaiduElasticsearchDocumentStore,
+    ElasticsearchDocumentStore,
+)
 from pipelines.nodes import (
     BM25Retriever,
     CharacterTextSplitter,
@@ -39,7 +42,10 @@ BOT_CLASSES = {
 parser = argparse.ArgumentParser()
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to run dense_qa system, defaults to gpu.")
 parser.add_argument("--index_name", default='dureader_index', type=str, help="The ann index name of ANN.")
+parser.add_argument('--username', type=str, default="", help='Username of ANN search engine')
+parser.add_argument('--password', type=str, default="", help='Password of ANN search engine')
 parser.add_argument("--file_paths", default='./data/md_files', type=str, help="The PDF file path.")
+parser.add_argument("--search_engine", choices=['elastic', 'bes'], default="elastic", help="The type of ANN search engine.")
 parser.add_argument("--max_seq_len_query", default=64, type=int, help="The maximum total length of query after tokenization.")
 parser.add_argument("--max_seq_len_passage", default=256, type=int, help="The maximum total length of passage after tokenization.")
 parser.add_argument("--retriever_batch_size", default=16, type=int, help="The batch size of retriever to extract passage embedding for building ANN index.")
@@ -60,14 +66,29 @@ args = parser.parse_args()
 
 
 def chat_markdown_tutorial():
-    document_store = ElasticsearchDocumentStore(
-        host=args.host,
-        port=args.port,
-        username="",
-        password="",
-        embedding_dim=args.embedding_dim,
-        index=args.index_name,
-    )
+
+    if args.search_engine == "elastic":
+        document_store = ElasticsearchDocumentStore(
+            host=args.host,
+            port=args.port,
+            username=args.username,
+            password=args.password,
+            embedding_dim=args.embedding_dim,
+            index=args.index_name,
+        )
+
+    else:
+        document_store = BaiduElasticsearchDocumentStore(
+            host=args.host,
+            port=args.port,
+            username=args.username,
+            password=args.password,
+            embedding_dim=args.embedding_dim,
+            similarity="dot_prod",
+            vector_type="bpack_vector",
+            search_fields=["content", "meta"],
+            index=args.index_name,
+        )
     use_gpu = True if args.device == "gpu" else False
     retriever = DensePassageRetriever(
         document_store=document_store,
@@ -80,6 +101,7 @@ def chat_markdown_tutorial():
         batch_size=args.retriever_batch_size,
         use_gpu=use_gpu,
         embed_title=args.embed_title,
+        precision="fp16",
     )
     bm_retriever = BM25Retriever(document_store=document_store)
 

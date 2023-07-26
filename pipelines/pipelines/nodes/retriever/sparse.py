@@ -110,6 +110,7 @@ class BM25Retriever(BaseRetriever):
         index: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
         document_store: Optional[BaseDocumentStore] = None,
+        **kwargs
     ) -> List[Document]:
         """
         Scan through documents in DocumentStore and return a small number documents

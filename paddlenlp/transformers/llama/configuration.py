@@ -171,6 +171,11 @@ class LlamaConfig(PretrainedConfig):
             relevant if `config.is_decoder=True`.
         tie_word_embeddings(`bool`, *optional*, defaults to `False`):
             Whether to tie weight embeddings
+        rope_fusion_level(`str`, *optional*, defaults to ``):
+            The level of fusion of rope embedding. Can be chosen from:
+            (1) 'full': fuse sin cos compute and rope embedding
+            (2) 'core': only fuse rope embedding, will compute the sin and cos
+            (3) None: don't fuse any part of the rope embedding
         Example:
     ```python
     >>> from paddlenlp.transformer import LlamaModel, LlamaConfig
@@ -208,7 +213,9 @@ class LlamaConfig(PretrainedConfig):
         use_cache=True,
         use_recompute=False,
         recompute_granularity="full",
+        fuse_attention_qkv=False,
         use_flash_attention=False,
+        fuse_attention_ffn=False,
         use_fused_rms_norm=False,
         tensor_parallel_output=True,
         lm_shift_labels=True,
@@ -216,6 +223,8 @@ class LlamaConfig(PretrainedConfig):
         bos_token_id=1,
         eos_token_id=2,
         tie_word_embeddings=False,
+        alibi=False,
+        rope_fusion_level=None,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -230,7 +239,9 @@ class LlamaConfig(PretrainedConfig):
         self.use_cache = use_cache
         self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
+        self.fuse_attention_qkv = fuse_attention_qkv
         self.use_flash_attention = use_flash_attention
+        self.fuse_attention_ffn = fuse_attention_ffn
         self.use_fused_rms_norm = use_fused_rms_norm
         self.tensor_parallel_output = tensor_parallel_output
         self.lm_shift_labels = lm_shift_labels
@@ -238,6 +249,9 @@ class LlamaConfig(PretrainedConfig):
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
+        self.alibi = alibi
+
+        self.rope_fusion_level = rope_fusion_level
 
         super().__init__(
             pad_token_id=pad_token_id,
@@ -247,3 +261,7 @@ class LlamaConfig(PretrainedConfig):
             tensor_parallel_output=tensor_parallel_output,
             **kwargs,
         )
+
+    @property
+    def rope(self):
+        return not self.alibi
