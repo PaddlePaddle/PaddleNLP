@@ -71,7 +71,7 @@ def get_args():
     )
     group.add_argument("--split_sentences", action="store_true", help="Split documents into sentences.")
 
-    group.add_argument("--data_impl", type=str, default="mmap", choices=["lazy", "cached", "mmap"])
+    group.add_argument("--data_impl", type=str, default="mmap", choices=["lazy", "mmap"])
 
     group = parser.add_argument_group(title="chinese words")
     group.add_argument(
