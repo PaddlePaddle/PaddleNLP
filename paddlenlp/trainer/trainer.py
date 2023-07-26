@@ -1774,10 +1774,6 @@ class Trainer:
         model.micro_batch_size = self.args.per_device_train_batch_size
         model.accumulate_steps = self.args.gradient_accumulation_steps
 
-        # NOTE(shenliang03): For the PP mode, it is necessary to reset the accumulated
-        # steps by modifying the model._chunk_2_comm_buffers to realize the overlap communication of dp/vp.
-        # For PP+VPP, since the p2p communication becomes a global wait behavior,
-        # the above settings are not required, only model.accumulate_steps needs to be changed.
         if model._dp_comm_overlap or model._sharding_comm_overlap:
             for _, buffers in model._chunk_2_comm_buffers.items():
                 for buffer in buffers:
