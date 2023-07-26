@@ -53,8 +53,6 @@ from dataset import GPTDataset, get_train_valid_test_split_
 from fused_layers import mock_layers
 from modeling_pp import LlamaForCausalLMPipe
 
-mock_layers()
-
 
 def add_start_docstrings(*docstr):
     def docstring_decorator(fn):
@@ -75,6 +73,12 @@ class PreTrainingArguments(TrainingArguments):
         default=None,
         metadata={
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
+        },
+    )
+    enable_linear_fused_grad_add: bool = field(
+        default=False,
+        metadata={
+            "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
     )
 
@@ -366,6 +370,9 @@ def main():
         model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    if training_args.enable_linear_fused_grad_add:
+        mock_layers()
 
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path

@@ -81,7 +81,6 @@ def get_env(env_name, default_value=False):
 
 
 def mock_layers():
-    if get_env("USE_LINEAR_WITH_GRAD_ADD"):
-        paddle.nn.functional.linear = FusedLinearWithGradAdd.apply
-        if is_fused_matmul_bias_supported():
-            paddle.incubate.nn.functional.fused_linear = FusedLinearWithGradAdd.apply
+    paddle.nn.functional.linear = FusedLinearWithGradAdd.apply
+    if is_fused_matmul_bias_supported():
+        paddle.incubate.nn.functional.fused_linear = FusedLinearWithGradAdd.apply
