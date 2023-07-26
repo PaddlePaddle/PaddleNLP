@@ -317,11 +317,10 @@ class LlamaMLP(nn.Layer):
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
         self.tensor_parallel_degree = config.tensor_parallel_degree
-        self.fuse_mlp_linear = config.fuse_mlp_linear
+        self.fuse_attention_ffn = config.fuse_attention_ffn
 
         if config.tensor_parallel_degree > 1:
-            # 为了减少张量并行的通信量，将两个linear合并成一个
-            if config.fuse_mlp_linear:
+            if config.fuse_attention_ffn:
                 self.gate_up_fused_proj = mpu.ColumnParallelLinear(
                     self.hidden_size,
                     self.intermediate_size * 2,
@@ -349,12 +348,16 @@ class LlamaMLP(nn.Layer):
                 has_bias=False,
             )
         else:
-            self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+            if config.fuse_attention_ffn:
+                self.gate_up_fused_proj = nn.Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
+            else:
+                self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+                self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+
             self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
-            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
 
     def forward(self, x):
-        if self.tensor_parallel_degree > 1 and self.fuse_mlp_linear:
+        if self.fuse_attention_ffn:
             # [s, b, 4hp]
             intermediate_parallel = self.gate_up_fused_proj(x)
             # Special Slicing to accomodate Tensor Parallel
@@ -620,19 +623,28 @@ class LlamaPretrainedModel(PretrainedModel):
 
         def get_tensor_parallel_split_mappings(num_layers):
             final_actions = {}
+
             base_actions = {
-                # Column Linear
-                "layers.0.self_attn.q_proj.weight": partial(fn, is_column=True),
-                "layers.0.self_attn.k_proj.weight": partial(fn, is_column=True),
-                "layers.0.self_attn.v_proj.weight": partial(fn, is_column=True),
-                "layers.0.mlp.gate_proj.weight": partial(fn, is_column=True),
-                "layers.0.mlp.up_proj.weight": partial(fn, is_column=True),
                 "lm_head.weight": partial(fn, is_column=True),
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
                 "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
             }
+
+            # Column Linear
+            if config.fuse_attention_qkv:
+                base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
+            else:
+                base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
+
+            if config.fuse_attention_ffn:
+                base_actions["layers.0.mlp.gate_up_fused_proj.weight"] = partial(fn, is_column=True)
+            else:
+                base_actions["layers.0.mlp.gate_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.mlp.up_proj.weight"] = partial(fn, is_column=True)
 
             for key, action in base_actions.items():
                 if "layers.0." in key:
