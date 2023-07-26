@@ -65,8 +65,9 @@ class LlamaTokenizer(PretrainedTokenizer):
         self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
         super().__init__(bos_token=bos_token, eos_token=eos_token, unk_token=unk_token, **kwargs)
 
-        # NOTE: the original LLaMA has no pad_token but tokenizer requires one. Hence we are setting `pad_token` to `eos_token`
-        self.pad_token = self.eos_token
+        # NOTE: the original LLaMA has no pad_token but tokenizer requires one.
+        # Setting to <PAD> as https://github.com/facebookresearch/llama-recipes/blob/main/llama_finetuning.py
+        self.pad_token = "<PAD>"
         self.vocab_file = vocab_file
         self.add_bos_token = add_bos_token
         self.add_eos_token = add_eos_token
