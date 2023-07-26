@@ -152,6 +152,16 @@ class ModelArguments:
         },
     )
 
+    rope_fusion_level: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "The level of fusion of rope embedding. Can be chosen from:\n"
+            "(1) 'full': fuse sin cos compute and rope embedding\n"
+            "(2) 'core': only fuse rope embedding, will compute the sin and cos\n"
+            "(3) None: don't fuse any part of the rope embedding"
+        },
+    )
+
 
 def create_pretrained_dataset(
     data_args,
@@ -406,6 +416,7 @@ def main():
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
+    config.rope_fusion_level = model_args.rope_fusion_level
     config.use_recompute = training_args.recompute
 
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
