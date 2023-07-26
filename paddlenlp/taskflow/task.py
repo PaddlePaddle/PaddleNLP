@@ -98,7 +98,7 @@ class Task(metaclass=abc.ABCMeta):
         """
 
     @abstractmethod
-    def _run_model(self, inputs):
+    def _run_model(self, inputs, **kwargs):
         """
         Run the task model from the outputs of the `_tokenize` function.
         """
@@ -522,8 +522,8 @@ class Task(metaclass=abc.ABCMeta):
         """
         print("Examples:\n{}".format(self._usage))
 
-    def __call__(self, *args):
+    def __call__(self, *args, **kwargs):
         inputs = self._preprocess(*args)
-        outputs = self._run_model(inputs)
+        outputs = self._run_model(inputs, **kwargs)
         results = self._postprocess(outputs)
         return results

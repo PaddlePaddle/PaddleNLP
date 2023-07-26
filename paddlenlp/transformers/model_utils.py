@@ -809,6 +809,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
     # a list of `state_dict` keys to ignore when saving the model (useful for keys that aren't
     # trained, but which are either deterministic or tied variables)
     _keys_to_ignore_on_save = None
+    _tied_weights_keys = None
 
     def __init__(self, *args, **kwargs):
         super(PretrainedModel, self).__init__()
@@ -938,6 +939,30 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if "GenerationMixin" in str(self.prepare_inputs_for_generation):
             return False
         return True
+
+    def recompute_enable(self):
+        r"""
+        Enable Recompute.
+        All layers with the `enable_recompute` attribute will be set to `True`
+        """
+
+        def fn(layer):
+            if hasattr(layer, "enable_recompute") and (layer.enable_recompute is False or layer.enable_recompute == 0):
+                layer.enable_recompute = True
+
+        self.apply(fn)
+
+    def recompute_disable(self):
+        r"""
+        Disable Recompute.
+        All layers with the `enable_recompute` attribute will be set to `False`
+        """
+
+        def fn(layer):
+            if hasattr(layer, "enable_recompute") and (layer.enable_recompute is False or layer.enable_recompute == 0):
+                layer.enable_recompute = True
+
+        self.apply(fn)
 
     def get_memory_footprint(self, return_buffers=True):
         r"""
@@ -1285,54 +1310,80 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             pretrained_model_name_or_path = str(pretrained_model_name_or_path)
             is_local = os.path.isdir(pretrained_model_name_or_path)
 
+            def get_file_path(pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_NAME, variant):
+                return os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(SAFE_WEIGHTS_NAME, variant))
+
             # pretrained_model_name_or_path is dir
             if is_local:
                 if use_safetensors is not False and os.path.isfile(
-                    os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(SAFE_WEIGHTS_NAME, variant))
+                    get_file_path(pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_NAME, variant)
                 ):
                     # Load from a safetensors checkpoint
-                    archive_file = os.path.join(
-                        pretrained_model_name_or_path, subfolder, _add_variant(SAFE_WEIGHTS_NAME, variant)
+                    archive_file = get_file_path(pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_NAME, variant)
+                elif use_safetensors is not False and os.path.isfile(
+                    get_file_path(pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_NAME, weight_name_suffix())
+                ):
+                    # Load from a safetensors checkpoint
+                    archive_file = get_file_path(
+                        pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_NAME, weight_name_suffix()
                     )
                 elif use_safetensors is not False and os.path.isfile(
-                    os.path.join(
-                        pretrained_model_name_or_path, subfolder, _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant)
+                    get_file_path(pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_INDEX_NAME, variant)
+                ):
+                    # Load from a sharded safetensors checkpoint
+                    archive_file = get_file_path(
+                        pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_INDEX_NAME, variant
+                    )
+                    is_sharded = True
+                elif use_safetensors is not False and os.path.isfile(
+                    get_file_path(
+                        pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_INDEX_NAME, weight_name_suffix()
                     )
                 ):
                     # Load from a sharded safetensors checkpoint
-                    archive_file = os.path.join(
-                        pretrained_model_name_or_path, subfolder, _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant)
+                    archive_file = get_file_path(
+                        pretrained_model_name_or_path, subfolder, SAFE_WEIGHTS_INDEX_NAME, weight_name_suffix()
                     )
                     is_sharded = True
                 elif os.path.isfile(
-                    os.path.join(pretrained_model_name_or_path, subfolder, _add_variant(PADDLE_WEIGHTS_NAME, variant))
+                    get_file_path(pretrained_model_name_or_path, subfolder, PADDLE_WEIGHTS_NAME, variant)
                 ):
                     # Load from a PaddlePaddle checkpoint
-                    archive_file = os.path.join(
-                        pretrained_model_name_or_path, subfolder, _add_variant(PADDLE_WEIGHTS_NAME, variant)
+                    archive_file = get_file_path(
+                        pretrained_model_name_or_path, subfolder, PADDLE_WEIGHTS_NAME, variant
                     )
                 elif os.path.isfile(
-                    os.path.join(
-                        pretrained_model_name_or_path, subfolder, _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant)
-                    )
+                    get_file_path(pretrained_model_name_or_path, subfolder, PADDLE_WEIGHTS_INDEX_NAME, variant)
                 ):
                     # Load from a sharded PaddlePaddle checkpoint
-                    archive_file = os.path.join(
-                        pretrained_model_name_or_path, subfolder, _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant)
+                    archive_file = get_file_path(
+                        pretrained_model_name_or_path, subfolder, PADDLE_WEIGHTS_INDEX_NAME, variant
                     )
                     is_sharded = True
                 elif os.path.isfile(
-                    os.path.join(
+                    get_file_path(
+                        pretrained_model_name_or_path, subfolder, PADDLE_WEIGHTS_INDEX_NAME, weight_name_suffix()
+                    )
+                ):
+                    # Load from a sharded PaddlePaddle checkpoint for hybrid parallel model
+                    archive_file = get_file_path(
+                        pretrained_model_name_or_path, subfolder, PADDLE_WEIGHTS_INDEX_NAME, weight_name_suffix()
+                    )
+                    is_sharded = True
+                elif os.path.isfile(
+                    get_file_path(
                         pretrained_model_name_or_path,
                         subfolder,
-                        _add_variant(PADDLE_WEIGHTS_NAME, weight_name_suffix()),
+                        PADDLE_WEIGHTS_NAME,
+                        weight_name_suffix(),
                     )
                 ):
                     # Load from a PaddlePaddle checkpoint for hybrid parallel model
-                    archive_file = os.path.join(
+                    archive_file = get_file_path(
                         pretrained_model_name_or_path,
                         subfolder,
-                        _add_variant(PADDLE_WEIGHTS_NAME, weight_name_suffix()),
+                        PADDLE_WEIGHTS_NAME,
+                        weight_name_suffix(),
                     )
                 # At this stage we don't have a weight file so we will raise an error.
                 elif os.path.isfile(
@@ -1549,6 +1600,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             mismatched_keys = []
             if ignore_mismatched_sizes:
                 for checkpoint_key in loaded_keys:
+                    # If the checkpoint is sharded, we may not have the key here.
+                    if checkpoint_key not in state_dict:
+                        continue
                     model_key = checkpoint_key
                     if remove_prefix_from_model:
                         # The model key starts with `prefix` but `checkpoint_key` doesn't so we add it.
@@ -1600,7 +1654,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             for shard_file in resolved_archive_file:
                 pre_tensor_parallel_split = False
-                if shard_file.endswith(".safetensors") and config.tensor_parallel_degree > 1:
+                if (
+                    shard_file.endswith(".safetensors")
+                    and config.tensor_parallel_degree > 1
+                    and "tp" not in shard_file
+                ):
                     pre_tensor_parallel_split = True
                     assert loaded_keys is not None, "loaded_keys is not None."
                     tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
@@ -1619,12 +1677,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
 
                 if config.tensor_parallel_degree > 1 and ".tp" not in shard_file and not pre_tensor_parallel_split:
-                    logger.info("convert tp")
+                    logger.info("Converting state_dict to Tensor Parallel Format")
                     # ignore error for multi shard, since only parts of data
                     state_dict = cls.convert_tensor_parallel(
                         None, config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
                     )
-                    logger.info("conver tp over!")
+                    logger.info("Converted state_dict to Tensor Parallel Format")
 
                 if low_cpu_mem_usage:
                     new_error_msgs = _load_state_dict_into_meta_model(
@@ -1854,7 +1912,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 else:
                     state_dict = load_state_dict(resolved_archive_file)
 
-                logger.info("loaded weights file from disk, setting weights to model.")
+                logger.info("Loaded weights file from disk, setting weights to model.")
 
         # Check if `_keep_in_fp32_modules` is not None
         use_keep_in_fp32_modules = (cls._keep_in_fp32_modules is not None) and dtype == "float16"
@@ -1977,6 +2035,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 if config_to_save.tensor_parallel_rank != 0:
                     logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
                     return
+                if variant is not None and "tp" in variant:
+                    variant = "_".join([x for x in variant.split("_") if "tp" not in x])
             else:
                 variant = weight_name_suffix() if variant is None else variant
 
@@ -1992,6 +2052,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 # to do support generation_config
                 pass
                 # model_to_save.generation_config.save_pretrained(save_directory)
+
+        # Handle the case where some state_dict keys shouldn't be saved
+        if self._keys_to_ignore_on_save is not None:
+            for ignore_key in self._keys_to_ignore_on_save:
+                if ignore_key in state_dict.keys():
+                    del state_dict[ignore_key]
 
         # Shard the model if it is too big.
         weights_name = SAFE_WEIGHTS_NAME if safe_serialization else PADDLE_WEIGHTS_NAME

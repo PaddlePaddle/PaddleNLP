@@ -52,6 +52,7 @@ def parse_args():
         help="Pretrained tokenizer name or path if not the same as model_name.",
     )
     parser.add_argument("--model_max_length", type=int, default=77, help="Pretrained tokenizer model_max_length.")
+    parser.add_argument("--device", type=str, default=None, help="Device to use. Like gpu:0 or cpu")
 
     return parser.parse_args()
 
@@ -153,6 +154,8 @@ def build_pipelines(
 
 if __name__ == "__main__":
     args = parse_args()
+    if args.device is not None:
+        paddle.set_device(args.device)
     build_pipelines(
         model_file=args.model_file,
         output_path=args.output_path,

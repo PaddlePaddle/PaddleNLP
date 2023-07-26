@@ -42,6 +42,8 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("BigBirdTokenizer", "bigbird"),
         ("BlenderbotSmallTokenizer", "blenderbot_small"),
         ("BlenderbotTokenizer", "blenderbot"),
+        ("ChatGLMTokenizer", "chatglm"),
+        ("ChatGLMv2Tokenizer", "chatglm_v2"),
         ("ChineseBertTokenizer", "chinesebert"),
         ("ConvBertTokenizer", "convbert"),
         ("CTRLTokenizer", "ctrl"),
@@ -54,6 +56,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("ErnieGramTokenizer", "ernie_gram"),
         ("ErnieLayoutTokenizer", "ernie_layout"),
         ("ErnieMTokenizer", "ernie_m"),
+        ("ErnieCodeTokenizer", "ernie_code"),
         ("ErnieTokenizer", "ernie"),
         ("FNetTokenizer", "fnet"),
         ("FunnelTokenizer", "funnel"),
@@ -100,7 +103,6 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("GLMChineseTokenizer", "glm"),
         ("GLMGPT2Tokenizer", "glm"),
         ("BloomTokenizer", "bloom"),
-        ("ChatGLMTokenizer", "chatglm"),
         ("SpeechT5Tokenizer", "speecht5"),
     ]
 )
