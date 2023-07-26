@@ -403,13 +403,13 @@ class LlamaAttention(nn.Layer):
             self.num_heads = self.num_heads // config.tensor_parallel_degree
 
         self.rope_fusion_level = config.rope_fusion_level
-        if self.rope_fusion_level != "":
+        if self.rope_fusion_level is not None:
             if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
                     "Will disable fuse rope. Try using latest gpu version of Paddle."
                 )
-                self.rope_fusion_level = ""
+                self.rope_fusion_level = None
 
         if config.tensor_parallel_degree > 1:
             self.q_proj = mpu.ColumnParallelLinear(
@@ -489,7 +489,7 @@ class LlamaAttention(nn.Layer):
             kv_seq_len += offset
 
         if self.config.rope:
-            if self.rope_fusion_level != "":
+            if self.rope_fusion_level is not None:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
 
             if self.rope_fusion_level == "full":

@@ -175,7 +175,7 @@ class LlamaConfig(PretrainedConfig):
             The level of fusion of rope embedding. Can be chosen from:
             (1) 'full': fuse sin cos compute and rope embedding
             (2) 'core': only fuse rope embedding, will compute the sin and cos
-            (3) '': don't fuse any part of the rope embedding
+            (3) None: don't fuse any part of the rope embedding
         Example:
     ```python
     >>> from paddlenlp.transformer import LlamaModel, LlamaConfig
@@ -222,7 +222,7 @@ class LlamaConfig(PretrainedConfig):
         eos_token_id=2,
         tie_word_embeddings=False,
         alibi=False,
-        rope_fusion_level="",
+        rope_fusion_level=None,
         **kwargs,
     ):
         self.vocab_size = vocab_size

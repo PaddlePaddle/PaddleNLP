@@ -152,13 +152,13 @@ class ModelArguments:
         },
     )
 
-    rope_fusion_level: str = field(
-        default="",
+    rope_fusion_level: Optional[str] = field(
+        default=None,
         metadata={
             "help": "The level of fusion of rope embedding. Can be chosen from:\n"
             "(1) 'full': fuse sin cos compute and rope embedding\n"
             "(2) 'core': only fuse rope embedding, will compute the sin and cos\n"
-            "(3) '': don't fuse any part of the rope embedding"
+            "(3) None: don't fuse any part of the rope embedding"
         },
     )
 
