@@ -30,14 +30,14 @@ def parse_args():
     # Required parameters
     parser.add_argument(
         "--model_name_or_path",
-        default="THUDM/chatglm-6b",
+        default="THUDM/chatglm-6b-v1.1",
         type=str,
         # required=True,
         help="Path of the trained model to be exported.",
     )
     parser.add_argument(
         "--output_path",
-        default="inference/chatglm",
+        default="inference_1024/chatglm",
         type=str,
         # required=True,
         help="The output file prefix used to save the exported inference model.",
@@ -50,7 +50,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-
+    paddle.set_default_dtype("float16")
     tokenizer = ChatGLMTokenizer.from_pretrained(args.model_name_or_path)
     if args.lora_path is not None:
         lora_config = LoRAConfig.from_pretrained(args.lora_path)
@@ -62,10 +62,15 @@ def main():
         dtype = config.dtype if config.dtype is not None else config.paddle_dtype
 
     model = ChatGLMForConditionalGeneration.from_pretrained(
-        args.model_name_or_path, load_state_as_np=True, dtype=dtype
+        args.model_name_or_path, 
+        load_state_as_np=True, 
+        dtype=dtype,
+        tensor_parallel_degree=1,
+        tensor_parallel_rank=0,
     )
-    if args.lora_path is not None:
-        model = LoRAModel.from_pretrained(model, args.lora_path)
+
+    state_dict = paddle.load(args.model_name_or_path + "/model_state.pdparams")
+    model.chatglm.transformer.set_state_dict(state_dict)
 
     model.eval()
     input_spec = [
@@ -73,7 +78,7 @@ def main():
         paddle.static.InputSpec(shape=[None, None, None, None], dtype="int64"),  # attention_mask
         paddle.static.InputSpec(shape=[None, None, None], dtype="int64"),  # position_ids
         # max_length
-        128,
+        1024,
         # min_length
         0,
         # decode_strategy
@@ -95,9 +100,9 @@ def main():
         # early_stopping
         False,
         # bos_token_id
-        tokenizer.eos_token_id,
+        tokenizer.bos_token_id,
         # eos_token_id
-        tokenizer.end_token_id,
+        tokenizer.eos_token_id,
         # pad_token_id
         tokenizer.pad_token_id,
         # decoder_start_token_id
@@ -114,6 +119,9 @@ def main():
         0.0,
         # use_cache
         True,
+        False,
+        [paddle.static.InputSpec(shape=[2, None, 32, 64, 128], dtype='float16',name="pre_cache_{}".format(i)) for i in range(28)],
+        paddle.static.InputSpec(shape=[None], dtype="bool"),  # use_precaches
     ]
     model = paddle.jit.to_static(model.generate, input_spec=input_spec)
 

@@ -15,16 +15,10 @@
 import paddle
 from paddle.distributed import fleet
 import time
-from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.peft.prefix import (
-    chatglm_pad_attention_mask,
-    chatglm_postprocess_past_key_value,
-)
-from paddlenlp.transformers import (
-    ChatGLMConfig,
-    ChatGLMForConditionalGeneration,
-    ChatGLMTokenizer,
-)
+# from modeling import ChatGLMForConditionalGeneration
+from paddlenlp.transformers import (ChatGLMConfig,
+                                    ChatGLMTokenizer,
+                                    ChatGLMForConditionalGeneration)
 
 
 def parse_arguments():
@@ -32,17 +26,39 @@ def parse_arguments():
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model_name_or_path", default="THUDM/chatglm-6b-v1.1", help="The directory of model."
+        "--model_name_or_path",
+        default="THUDM/chatglm-6b-v1.1",
+        help="The directory of model.",
     )
     parser.add_argument(
-        "--merge_tensor_parallel_path", default=None, help="The directory of model to merge tensor parallel parts."
+        "--merge_tensor_parallel_path",
+        default=None,
+        help="The directory of model to merge tensor parallel parts.",
     )
-    parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
-    parser.add_argument("--src_length", type=int, default=128, help="The batch size of data.")
-    parser.add_argument("--tgt_length", type=int, default=128, help="The batch size of data.")
-    parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     parser.add_argument(
-        "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
+        "--batch_size", type=int, default=1, help="The batch size of data."
+    )
+    parser.add_argument(
+        "--src_length", type=int, default=2048, help="The batch size of data."
+    )
+    parser.add_argument(
+        "--tgt_length", type=int, default=2048, help="The batch size of data."
+    )
+    parser.add_argument(
+        "--lora_path",
+        default=None,
+        help="The directory of LoRA parameters. Default to None",
+    )
+    parser.add_argument(
+        "--prefix_path",
+        default=None,
+        help="The directory of Prefix Tuning parameters. Default to None",
+    )
+    parser.add_argument(
+        "--fp16",
+        action="store_true",
+        help="Whether to use fp16 16-bit (mixed) precision "
+        "training instead of 32-bit training.",
     )
     return parser.parse_args()
 
@@ -84,16 +100,13 @@ class Predictor(object):
                 hcg = fleet.get_hybrid_communicate_group()
                 tensor_parallel_rank = hcg.get_model_parallel_rank()
 
-            if self.args.lora_path is not None:
-                lora_config = LoRAConfig.from_pretrained(self.args.lora_path)
-                dtype = lora_config.dtype
-            elif self.args.prefix_path is not None:
-                prefix_config = PrefixConfig.from_pretrained(self.args.prefix_path)
-                dtype = prefix_config.dtype
-            else:
-                config = ChatGLMConfig.from_pretrained(args.model_name_or_path)
-                dtype = config.dtype if config.dtype is not None else config.paddle_dtype
+            config = ChatGLMConfig.from_pretrained(args.model_name_or_path)
+            dtype = "float16"
 
+            if args.fp16:
+                dtype = "float16"
+            paddle.set_default_dtype(dtype)
+            self.dtype = dtype
             self.model = ChatGLMForConditionalGeneration.from_pretrained(
                 args.model_name_or_path,
                 tensor_parallel_degree=tensor_parallel_degree,
@@ -101,14 +114,9 @@ class Predictor(object):
                 load_state_as_np=True,
                 dtype=dtype,
             )
-            if self.args.lora_path is not None:
-                self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
-                self.model.mark_only_lora_as_trainable()
-            if self.args.prefix_path is not None:
-                self.model = PrefixModelForCausalLM.from_pretrained(
-                    self.model, self.args.prefix_path, chatglm_postprocess_past_key_value, chatglm_pad_attention_mask
-                )
 
+            state_dict = paddle.load(args.model_name_or_path + "/model_state.pdparams")
+            self.model.chatglm.transformer.set_state_dict(state_dict)
         self.model.eval()
 
     def preprocess(self, input_text):
@@ -120,14 +128,32 @@ class Predictor(object):
             truncation=True,
             truncation_side="left",
         )
-        
+       
+        use_pre_caches = True
         inputs_tensor = {}
         for key in inputs:
             inputs_tensor[key] = paddle.to_tensor(inputs[key])
+        
+        print(inputs_tensor)
+        import numpy as np
+        
+        pre_caches = paddle.split(paddle.to_tensor(np.load("./prefix_tuning/pre_caches.npy")), 28, 0)
+        for i in range(28):
+            pre_caches[i] = pre_caches[i].transpose([1, 0, 2, 3, 4]).cast(self.dtype)
+        inputs_tensor["pre_caches"] = pre_caches
+        
+        if use_pre_caches:
+            input_ids_shape = inputs_tensor["input_ids"].shape
+            prefix_attention_mask = paddle.zeros(
+                [input_ids_shape[0], 1, input_ids_shape[-1], 64], dtype="int64"
+            )
+            inputs_tensor["use_pre_caches"] = True
+            inputs_tensor["attention_mask"] = paddle.concat((prefix_attention_mask, inputs_tensor["attention_mask"]), axis=3)
+        print(inputs_tensor["attention_mask"])
         return inputs_tensor
 
     def infer(self, inputs):
-        for in range(10):
+        for i in range(10):
             start = time.perf_counter()
             result = self.model.generate(
                 **inputs,
@@ -138,17 +164,20 @@ class Predictor(object):
                 eos_token_id=self.tokenizer.eos_token_id,
                 pad_token_id=self.tokenizer.pad_token_id,
                 use_cache=True,
+                temperature=1,
+                top_p=1,
             )
             hf_cost = (time.perf_counter() - start) * 1000
-            results = output_handle.copy_to_cpu()
+            print(result[0].shape)
             print("Speed Paddle:", hf_cost)
+
         result = result[0]
         return result
 
     def postprocess(self, infer_data):
         result = []
         for x in infer_data.tolist():
-            res = self.tokenizer.decode(x, skip_special_tokens=True)
+            res = self.tokenizer.decode(x, skip_special_tokens=False)
             res = res.strip("\n")
             result.append(res)
         out_dict = {"result": result}
@@ -157,7 +186,9 @@ class Predictor(object):
     def predict(self, texts):
         input_map = self.preprocess(texts)
         infer_result = self.infer(input_map)
+        # print(infer_result)
         output = self.postprocess(infer_result)
+        print(output)
         return output
 
 
@@ -165,9 +196,10 @@ if __name__ == "__main__":
     args = parse_arguments()
     predictor = Predictor(args)
     all_texts = [
-        "小明有5个苹果，小红有3个苹果，他们一共有多少个苹果？",
+        # "小明有5个苹果，小红有3个苹果，他们一共有多少个苹果？",
         # "小明有15本漫画书，他每天阅读3本。请问他可以连续阅读几天？",
-        # "[Round 0]\n问：你好\n答：你好👋!我是人工智能助手 ChatGLM-6B,很高兴见到你,欢迎问我任何问题。\n[Round 1]\n问：晚上睡不着应该怎么办\n答：",
+        "[Round 1]\n问:你需要根据以下任务中的描述进行角色扮演，你只能以任务角色的身份应答，而不是语言模型。\n\n任务：大模型应用助手\n\n请基于以下已知信息回答我的问题，不允许进行编造与作假，如仍无法回答，请说你不知道如何作答。\n\n\n我的问题：你是谁？\n答:我是大模型应用助手,一名由清华大学 KEG 实验室和智谱AI训练的大型语言模型。我被设计用于回答用户提出的问题,并提供有用的信息和建议。\n[Round 2]\n问:请介绍一下你自己\n答:我是一个大型语言模型,被训练用于回答用户提出的问题。我可以通过分析大量的文本数据来学习语言模式和知识,并为用户提供相关的信息和建议。我可以回答各种各样的问题,例如学术、技术、娱乐、健康等方面的问题。\n[Round 3]\n问:chatglm好还是baichuan好\n答:"
+        # "你好",
     ]
     batch_texts = batchfy_text(all_texts, args.batch_size)
     for bs, texts in enumerate(batch_texts):
