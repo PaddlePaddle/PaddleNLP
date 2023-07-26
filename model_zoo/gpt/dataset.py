@@ -98,7 +98,6 @@ def build_train_valid_test_datasets(
     """Build train, valid, and test datasets."""
     if data_prefix:
         print_rank_0("Single data path provided for train, valid & test")
-
         # Single dataset.
         if len(data_prefix) == 1:
             return _build_train_valid_test_datasets(
@@ -572,7 +571,6 @@ def _build_index_mappings(
             # from megatron.data import helpers
             from tool_helpers import helpers
 
-            # import pdb; pdb.set_trace()
             assert doc_idx.dtype == np.int32
             assert sizes.dtype == np.int32
             sample_idx = helpers.build_sample_idx(sizes, doc_idx, seq_length, num_epochs, tokens_per_epoch)
@@ -621,7 +619,6 @@ def _build_index_mappings(
     print_rank_0("    loaded indexed file in {:3.3f} seconds".format(time.time() - start_time))
     print_rank_0("    total number of samples: {}".format(sample_idx.shape[0]))
     print_rank_0("    total number of epochs: {}".format(num_epochs))
-
     return doc_idx, sample_idx, shuffle_idx, desc, desc_hash
 
 

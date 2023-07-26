@@ -226,9 +226,9 @@ def create_pretrained_dataset(
             "labels": labels,
         }
 
-    print_dataset(train_dataset[0])
-    print_dataset(valid_dataset[0])
-    print_dataset(test_dataset[0])
+    print_dataset(train_dataset[0], "train")
+    print_dataset(valid_dataset[0], "valid")
+    print_dataset(test_dataset[0], "test")
 
     return train_dataset, valid_dataset, test_dataset, _collate_data
 
