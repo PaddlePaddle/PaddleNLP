@@ -38,6 +38,7 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     LlamaConfig,
     LlamaForCausalLM,
+    register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
@@ -133,8 +134,12 @@ class ModelArguments:
         metadata={"help": "llama, use_fused_rms_norm"},
     )
     fuse_attention_qkv: bool = field(
-        default=True,
-        metadata={"help": "gpt, fuse_attention_qkv"},
+        default=False,
+        metadata={"help": "whether to fuse attention qkv"},
+    )
+    fuse_attention_ffn: bool = field(
+        default=False,
+        metadata={"help": "whether to fuse first up and gate proj in mlp block"},
     )
     recompute_granularity: str = field(
         default="full",
@@ -144,11 +149,28 @@ class ModelArguments:
         default=1,
         metadata={"help": "virtual_pp_degree"},
     )
-
     continue_training: bool = field(
         default=False,
         metadata={
-            "help": "Pre-training from existing paddlenlp model weights. Default Fasle and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
+            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
+        },
+    )
+    sequence_parallel: bool = field(
+        default=False,
+        metadata={"help": "whether to use sequence parallel"},
+    )
+    fuse_sequence_parallel_allreduce: bool = field(
+        default=False,
+        metadata={"help": "whether to use fuse sequence parallel allreduce"},
+    )
+
+    rope_fusion_level: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "The level of fusion of rope embedding. Can be chosen from:\n"
+            "(1) 'full': fuse sin cos compute and rope embedding\n"
+            "(2) 'core': only fuse rope embedding, will compute the sin and cos\n"
+            "(3) None: don't fuse any part of the rope embedding"
         },
     )
 
@@ -404,10 +426,14 @@ def main():
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
+    config.fuse_attention_ffn = model_args.fuse_attention_ffn
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
-    config.use_recompute = training_args.recompute
+    config.sequence_parallel = model_args.sequence_parallel
+    config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
+    config.rope_fusion_level = model_args.rope_fusion_level
 
+    config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
 
@@ -433,6 +459,11 @@ def main():
         )
     else:
         model = model_class._from_config(config, dtype=dtype)
+
+    if model_args.sequence_parallel:
+        register_sequence_parallel_allreduce_hooks(
+            model, training_args.gradient_accumulation_steps, model_args.fuse_sequence_parallel_allreduce
+        )
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
