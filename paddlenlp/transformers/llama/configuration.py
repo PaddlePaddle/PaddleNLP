@@ -218,6 +218,8 @@ class LlamaConfig(PretrainedConfig):
         fuse_attention_ffn=False,
         use_fused_rms_norm=False,
         tensor_parallel_output=True,
+        sequence_parallel=False,
+        fuse_sequence_parallel_allreduce=False,
         lm_shift_labels=True,
         pad_token_id=0,
         bos_token_id=1,
@@ -244,6 +246,8 @@ class LlamaConfig(PretrainedConfig):
         self.fuse_attention_ffn = fuse_attention_ffn
         self.use_fused_rms_norm = use_fused_rms_norm
         self.tensor_parallel_output = tensor_parallel_output
+        self.sequence_parallel = sequence_parallel
+        self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
         self.lm_shift_labels = lm_shift_labels
 
         self.pad_token_id = pad_token_id
