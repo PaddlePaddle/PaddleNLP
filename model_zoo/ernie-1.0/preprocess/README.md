@@ -48,7 +48,7 @@
 | 0️⃣初始状态 | -|原始数据： <br/> **每个doc之间用空行间隔开** <br/> - 中文，默认每句换行符，作为句子结束。<br/> - 英文，默认使用nltk判断句子结束  | ```飞桨是功能完备、开源开放的产业级深度学习平台。``` <br/> ```飞桨拥有核心训练和推理框架、基础模型库。``` <br/><br/> ```PaddleNLP是自然语言处理领域的优秀工具。```  |
 |1️⃣原始数据转换<br/>`trans_to_json.py`|预处理 <br>输入：0️⃣初始状态 <br>输出：jsonl|jsonl格式：每个doc对应一行json字符串| ```{"text": "飞桨是功能完备、开源开放的产业级深度学习平台。飞桨拥有..."}```<br/>```{"text": "PaddleNLP是自然语言..."}```
 |❇️(**可选**)数据中文分词<br/>`words_segmentation.py`|语料分词：中文WWM <br>输入：jsonl  <br> 输出：0️⃣初始状态| 将jsonl格式的数据，恢复成分词后的原始格式数据 <br> | ```飞桨 是 功能 完备、开源 开放的 产业级 深度学习 平台。``` <br/> ```飞桨 拥有 核心 训练和推理 框架、基础 模型库。``` <br/><br/> ```PaddleNLP 是 自然语言处理领域 的 优秀工具。```
-|2️⃣数据ID化<br/>`create_pretrain_data.py`|预处理| npy格式：数据id化后的token id <br/>npz格式：数据句子、文章位置索引 | -
+|2️⃣数据ID化<br/>`create_pretrain_data.py`|预处理| bin格式：数据id化后的token id <br/>idx格式：数据句子、文章位置索引 | -
 |3️⃣训练index文件生成|训练启动|npy格式：<br/> 根据训练步数max_steps生成<br/>train、valid、test的每个样本索引文件| -
 |4️⃣token动态mask（可选）| Dataset取数据 | 无 |-
 
@@ -145,14 +145,17 @@ data input/output:
   --output_prefix OUTPUT_PREFIX
                         Output prefix to store output file.
                         必须设置，输出文件的名称。
-                        假设名称为XXX，则会输出 XXX_ids.npy, XXX_idx.npz 两个文件。
-                        npy文件，数据id化后的token ids; npz文件，数据句子、文章位置索引。
+                        假设名称为XXX，则会输出 XXX.bin, XXX.idx 两个文件。
+                        bin文件，数据id化后的token ids; idx文件，数据句子、文章位置索引。
   --data_format {JSON}  Only support json format for now. One document per line.
                         不需要设置。目前默认处理jsonl数据格式
   --json_key JSON_KEY   For JSON format. Space separate listed of keys to extract from json
                         文本串json的key值。同前面trans_to_json.py的json_key，默认text为key
   --split_sentences     Split documents into sentences.
                         是否需要将文章划分成句子。一般而言，GPT不需要，BERT/ERNIE模型需要
+  --data_impl {mmap,lazy}
+                        Convert the json into mmap/lazy format.
+                        处理后的数据格式，可选“mmap”或“lazy”，其中“mmap”格式在读入数据时会建立内存映射，“lazy”格式在读入数据时直接从文件读取。
 
 chinese words:
   --chinese             Is corpus need words segmentation step for chinese words.
@@ -179,7 +182,7 @@ common config:
   --workers WORKERS     Number of worker processes to launch
                         处理文本id化的进程个数。
 ```
-通过下面脚本转化，我们可以得到处理好的预训练数据，token ids:`baike_sample_ids.npy`, 文章索引信息`baike_sample_idx.npz`.
+通过下面脚本转化，我们可以得到处理好的预训练数据，token ids:`baike_sample.bin`, 文章索引信息`baike_sample.idx`.
 ```
 python -u  create_pretraining_data.py \
     --model_name ernie-1.0-base-zh \
@@ -190,11 +193,33 @@ python -u  create_pretraining_data.py \
     --cn_whole_word_segment \
     --output_prefix baike_sample  \
     --workers 1 \
-    --log_interval 5
+    --log_interval 5 \
+    --data_impl "lazy"
 ```
 1. 如果您使用已经分好词的语料，可以设置 --cn_splited 为 True，同时指定--cn_split_dimer如空格。
 2. 使用自定义词表的话，请指定model_name为词表所在的文件夹地址。
 
+若需要预处理的文件过大，该脚本所耗费的时间可能会很长。此时可以考虑将jsonl文件拆分为多个小文件，并行使用create_pretraining_data.py进行处理，得到多个.bin & .idx文件。
+之后使用如下merge脚本合并多个小的.bin & .idx文件。
+```
+python merge.py \
+    --input /root/data/index \
+    --output-prefix /root/data/index/merged \
+    --data_impl lazy
+```
+使用说明：
+```
+arguments:
+  --input INPUT_PATH
+                        Path to the folder where the files to be merged.
+                        待合并的文件所在文件夹，文件夹内各个小文件需按merge的顺序排列，如1.bin / 1.idx，2.bin / 2.idx...
+  --output_prefix OUTPUT_PREFIX
+                        Output prefix to store output file.
+                        合并后输出文件的名称，假设名称为XXX，则会输出 XXX.bin, XXX.idx 两个文件。
+  --data_impl {mmap,lazy}
+                        Convert the json into mmap/lazy format.
+                        merge前后的数据格式，可选“mmap”或“lazy”。
+```
 
 ### ERNIE 预训练开始
 得到了处理好的训练数据，就可以开始ERNIE模型的预训练了。ERNIE预训练的代码在`model_zoo/ernie-1.0`。
@@ -202,12 +227,11 @@ python -u  create_pretraining_data.py \
 ```
 mkdir data
 mv ./preprocess/baike_sample* ./data
-sh run_static.sh
-# 建议修改 run_static.sh 中的配置，将max_steps设置小一些。
+sh run_pretrain_trainer.sh
 ```
 代码说明：
 
-- ernie预训练使用的 dataset 代码文件在 `./data_tools/ernie_dataset.py`
+- ernie预训练使用的 dataset 代码文件在`./data_tools/ernie_dataset.py`
 - 数据集index生成，动态mask相关代码实现在`./data_tools/dataset_utils.py`
 
 用户可以根据自己的需求，灵活修改mask方式。具体可以参考`dataset_utils.py`中`create_masked_lm_predictions`函数。
