@@ -69,7 +69,6 @@ class Predictor(object):
             self.tgt_length = kwargs["tgt_length"]
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-            self.tokenizer.pad_token = self.tokenizer.unk_token
             self.batch_size = args.batch_size
             self.args = args
             self.src_length = self.args.src_length

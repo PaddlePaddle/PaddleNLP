@@ -65,9 +65,6 @@ if __name__ == "__main__":
         "去年9月，拼多多海外版“Temu”正式在美国上线。数据显示，截至2023年2月23日，Temu App新增下载量4000多万，新增用户增速第一，AppStore购物榜霸榜69天、Google Play购物榜霸榜114天。",
     ]
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-    if "llama" in args.model_name_or_path:
-        tokenizer.pad_token = tokenizer.unk_token
-
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name_or_path,
         load_state_as_np=True,

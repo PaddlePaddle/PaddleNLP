@@ -69,10 +69,10 @@ def convert_example_common(example, tokenizer, data_args, is_test=True):
     if is_test:
         return dict(
             input_ids=tokenized_source["input_ids"],
-            labels=tokenized_target["input_ids"] + tokenizer.eos_token_id,
+            labels=tokenized_target["input_ids"] + [tokenizer.eos_token_id],
         )
     else:
-        input_ids = tokenized_source["input_ids"] + tokenized_target["input_ids"] + tokenizer.eos_token_id
+        input_ids = tokenized_source["input_ids"] + tokenized_target["input_ids"] + [tokenizer.eos_token_id]
         source_length = len(tokenized_source["input_ids"])
         labels = [-100] * source_length + input_ids[source_length:]
         # shift labels

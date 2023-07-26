@@ -95,9 +95,6 @@ def main():
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
-    if model.base_model_prefix == "llama":
-        tokenizer.pad_token = tokenizer.unk_token
-
     if data_args.dataset_name_or_path is None:
         raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
     elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) and os.path.exists(
@@ -166,7 +163,11 @@ def main():
         references = [x[x != -100].tolist() for x in eval_preds.label_ids]
 
         predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+        print("Predictions")
+        print(predictions[:2])
         references = tokenizer.batch_decode(references, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+        print("References")
+        print(references[:2])
 
         # for pred in predictions:
         rouge1_score = rouge1.score(predictions, references)
