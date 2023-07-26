@@ -59,7 +59,7 @@ class TestLlama(unittest.TestCase):
         config.lm_shift_labels = False
         config.use_flash_attention = False
         config.use_fused_rms_norm = False
-        config.fuse_attention_qkv = True
+        config.fuse_attention_qkv = False
         config.recompute_granularity = "full"
         config.virtual_pp_degree = 1
         config.use_recompute = False

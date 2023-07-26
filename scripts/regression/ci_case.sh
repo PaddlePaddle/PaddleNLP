@@ -1327,4 +1327,9 @@ python -m paddle.distributed.launch finetune_generation.py \
     --scale_loss 32768 \
     --overwrite_output_dir
 }
+refactor_training_loop(){
+llama
+gpt
+transformers
+}
 $1
