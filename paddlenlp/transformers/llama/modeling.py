@@ -451,19 +451,19 @@ class LlamaAttention(nn.Layer):
                 self.q_proj = mpu.ColumnParallelLinear(
                     self.hidden_size,
                     self.hidden_size,
-                    has_bias=False,
+                    has_bias=config.bias,
                     gather_output=False,
                 )
                 self.k_proj = mpu.ColumnParallelLinear(
                     self.hidden_size,
                     self.hidden_size,
-                    has_bias=False,
+                    has_bias=config.bias,
                     gather_output=False,
                 )
                 self.v_proj = mpu.ColumnParallelLinear(
                     self.hidden_size,
                     self.hidden_size,
-                    has_bias=False,
+                    has_bias=config.bias,
                     gather_output=False,
                 )
         else:
@@ -477,31 +477,31 @@ class LlamaAttention(nn.Layer):
                 self.q_proj = nn.Linear(
                     self.hidden_size,
                     self.hidden_size,
-                    bias_attr=False,
+                    bias_attr=config.bias,
                 )
                 self.k_proj = nn.Linear(
                     self.hidden_size,
                     self.hidden_size,
-                    bias_attr=False,
+                    bias_attr=config.bias,
                 )
                 self.v_proj = nn.Linear(
                     self.hidden_size,
                     self.hidden_size,
-                    bias_attr=False,
+                    bias_attr=config.bias,
                 )
 
         if config.tensor_parallel_degree > 1:
             self.o_proj = mpu.RowParallelLinear(
                 self.hidden_size,
                 self.hidden_size,
-                has_bias=False,
+                has_bias=config.bias,
                 input_is_parallel=True,
             )
         else:
             self.o_proj = nn.Linear(
                 self.hidden_size,
                 self.hidden_size,
-                bias_attr=False,
+                bias_attr=config.bias,
             )
 
         if config.rope and self.rope_fusion_level != "full":
@@ -656,9 +656,13 @@ class LlamaPretrainedModel(PretrainedModel):
         for layer_index in range(config.num_hidden_layers):
             layer_mappings = [
                 [f"layers.{layer_index}.self_attn.q_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.q_proj.bias", None],
                 [f"layers.{layer_index}.self_attn.k_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.k_proj.bias", None],
                 [f"layers.{layer_index}.self_attn.v_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.v_proj.bias", None],
                 [f"layers.{layer_index}.self_attn.o_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.self_attn.o_proj.bias", None],
                 [f"layers.{layer_index}.self_attn.rotary_emb.inv_freq"],
                 [f"layers.{layer_index}.mlp.gate_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.mlp.down_proj.weight", None, "transpose"],

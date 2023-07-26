@@ -225,6 +225,7 @@ class LlamaConfig(PretrainedConfig):
         tie_word_embeddings=False,
         alibi=False,
         rope_fusion_level=None,
+        bias=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -252,6 +253,8 @@ class LlamaConfig(PretrainedConfig):
         self.alibi = alibi
 
         self.rope_fusion_level = rope_fusion_level
+
+        self.bias = bias
 
         super().__init__(
             pad_token_id=pad_token_id,
