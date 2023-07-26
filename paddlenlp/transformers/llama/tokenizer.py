@@ -246,7 +246,8 @@ class LlamaTokenizer(PretrainedTokenizer):
         """
         # Load from model defaults
         attention_mask = None
-        if "attention_mask" in encoded_inputs:
+        # attention_mask shape [1,seq_len,seq_len]
+        if "attention_mask" in encoded_inputs and len(np.shape(attention_mask)) > 2:
             attention_mask = encoded_inputs["attention_mask"]
             encoded_inputs.pop("attention_mask")
 
@@ -255,16 +256,16 @@ class LlamaTokenizer(PretrainedTokenizer):
         encoded_inputs = super()._pad(
             encoded_inputs, max_length, padding_strategy, pad_to_multiple_of, return_attention_mask
         )
-        if attention_mask is not None:
+        if attention_mask is not None and len(np.shape(attention_mask)) > 2:
             encoded_inputs["attention_mask"] = attention_mask
-        needs_to_be_padded = padding_strategy != PaddingStrategy.DO_NOT_PAD and len(required_input) != max_length
-        if needs_to_be_padded:
-            difference = max_length - len(required_input)
-            if "attention_mask" in encoded_inputs:
-                encoded_inputs["attention_mask"] = np.pad(
-                    encoded_inputs["attention_mask"],
-                    pad_width=[(0, 0), (difference, 0), (difference, 0)],
-                    mode="constant",
-                    constant_values=0,
-                )
+            needs_to_be_padded = padding_strategy != PaddingStrategy.DO_NOT_PAD and len(required_input) != max_length
+            if needs_to_be_padded:
+                difference = max_length - len(required_input)
+                if "attention_mask" in encoded_inputs:
+                    encoded_inputs["attention_mask"] = np.pad(
+                        encoded_inputs["attention_mask"],
+                        pad_width=[(0, 0), (difference, 0), (difference, 0)],
+                        mode="constant",
+                        constant_values=0,
+                    )
         return encoded_inputs
