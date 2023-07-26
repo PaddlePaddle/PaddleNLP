@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import distutils.util
 import os
 
 import paddle
 
-
-def strtobool(s):
-    return True if distutils.util.strtobool(s) else False
+from paddlenlp.trainer.argparser import strtobool
 
 
 def get_env(env_name, default_value=False):
