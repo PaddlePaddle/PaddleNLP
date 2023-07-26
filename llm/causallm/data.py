@@ -46,7 +46,6 @@ def tokenize_example(tokenizer, example, data_args):
         target = example["tgt"]
     else:
         raise ValueError(f"Example format is wrong, please check: {example} or rewrite tokenize_example in data.py ")
-    target += tokenizer.eos_token
     tokenized_source = tokenizer(
         source,
         max_length=data_args.src_length,
@@ -56,7 +55,7 @@ def tokenize_example(tokenizer, example, data_args):
     )
     tokenized_target = tokenizer(
         target,
-        max_length=data_args.tgt_length,
+        max_length=data_args.tgt_length - 1,
         truncation=True,
         truncation_side="right",
         add_special_tokens=False,
@@ -70,10 +69,10 @@ def convert_example_common(example, tokenizer, data_args, is_test=True):
     if is_test:
         return dict(
             input_ids=tokenized_source["input_ids"],
-            labels=tokenized_target["input_ids"],
+            labels=tokenized_target["input_ids"] + tokenizer.eos_token_id,
         )
     else:
-        input_ids = tokenized_source["input_ids"] + tokenized_target["input_ids"]
+        input_ids = tokenized_source["input_ids"] + tokenized_target["input_ids"] + tokenizer.eos_token_id
         source_length = len(tokenized_source["input_ids"])
         labels = [-100] * source_length + input_ids[source_length:]
         # shift labels
@@ -92,10 +91,10 @@ def convert_example_chatglm(example, tokenizer, data_args, is_test=True):
             input_ids=tokenized_source["input_ids"],
             position_ids=tokenized_source["position_ids"],
             attention_mask=tokenized_source["attention_mask"],
-            labels=tokenized_target["input_ids"],
+            labels=tokenized_target["input_ids"] + tokenizer.eos_token_id,
         )
     else:
-        input_ids = tokenized_source["input_ids"] + tokenized_target["input_ids"]
+        input_ids = tokenized_source["input_ids"] + tokenized_target["input_ids"] + tokenizer.eos_token_id
         bos_position = len(tokenized_source["input_ids"]) - 1
 
         attention_mask = np.tri(len(input_ids), len(input_ids))

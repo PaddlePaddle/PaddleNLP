@@ -40,7 +40,12 @@ def merge(args):
     model.eval()
     if args.output_path is None:
         args.output_path = args.lora_path
-    model.model.save_pretrained(args.lora_path)
+
+    model_state_dict = model.model.state_dict()
+    for key in list(model_state_dict):
+        if "lora" in key:
+            del model_state_dict[key]
+    model.model.save_pretrained(args.output_path, state_dict=model_state_dict)
 
 
 if __name__ == "__main__":
