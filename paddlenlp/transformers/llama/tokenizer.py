@@ -67,7 +67,8 @@ class LlamaTokenizer(PretrainedTokenizer):
 
         # NOTE: the original LLaMA has no pad_token but tokenizer requires one.
         # Setting to <PAD> as https://github.com/facebookresearch/llama-recipes/blob/main/llama_finetuning.py
-        self.pad_token = "<PAD>"
+        if self.pad_token is None:
+            self.pad_token = "<PAD>"
         self.vocab_file = vocab_file
         self.add_bos_token = add_bos_token
         self.add_eos_token = add_eos_token
