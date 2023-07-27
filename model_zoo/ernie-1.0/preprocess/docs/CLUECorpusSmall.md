@@ -45,7 +45,8 @@ python -u  create_pretraining_data.py \
     --cn_seg_func jieba \
     --output_prefix clue_corpus_small_14g_20220104 \
     --workers 48 \
-    --log_interval 10000
+    --log_interval 10000 \
+    --data_impl "mmap"
 ```
 
 - model_name 可以更换为其他 ERNIE 系列模型，如: `ernie-3.0-base-zh`
@@ -53,7 +54,7 @@ python -u  create_pretraining_data.py \
 
 数据共有文档`15702702`条左右，由于分词比较耗时，大概一小时左右可以完成。在当前目录下产出训练所需数据。
 ```
-clue_corpus_small_14g_20220104_ids.npy
-clue_corpus_small_14g_20220104_idx.npz
+clue_corpus_small_14g_20220104.bin
+clue_corpus_small_14g_20220104.idx
 ```
 用户可以使用此数据进行预训练任务。

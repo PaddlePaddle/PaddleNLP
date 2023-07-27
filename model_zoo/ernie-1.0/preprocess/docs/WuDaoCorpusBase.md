@@ -60,7 +60,8 @@ python -u  create_pretraining_data.py \
     --cn_splited \
     --output_prefix wudao_corpus_200g_0623 \
     --workers 48 \
-    --log_interval 10000
+    --log_interval 10000 \
+    --data_impl "mmap"
 ```
 
 - 我们提前分词好了，所以加上了 `cn_splited`，否则不需要使用此选项。
@@ -69,7 +70,7 @@ python -u  create_pretraining_data.py \
 
 在当前目录下产出训练所需数据。
 ```
-wudao_corpus_200g_0623_ids.npy
-wudao_corpus_200g_0623_idx.npz
+wudao_corpus_200g_0623.bin
+wudao_corpus_200g_0623.idx
 ```
 用户可以使用此数据进行预训练任务。

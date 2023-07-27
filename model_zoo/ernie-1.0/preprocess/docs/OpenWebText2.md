@@ -29,22 +29,17 @@ python -u  create_pretraining_data.py \
     --append_eos \
     --output_prefix gpt_openwebtext  \
     --workers 40 \
-    --log_interval 10000
+    --log_interval 10000 \
+    --data_impl "mmap"
 ```
-处理时间约一个小时左右，就可以得到我们需要的`gpt_openwebtext_ids.npy`, `gpt_openwebtext_idx.npz`数据集文件。
-
-为了方便用户运行测试本模型，本项目提供了处理好的300M的训练样本：
-```shell
-wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
-wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
-```
+处理时间约一个小时左右，就可以得到我们需要的`gpt_openwebtext.bin`, `gpt_openwebtext.idx`数据集文件。
 
 将所有预处理得到的文件统一放入一个文件夹中，以备训练使用：
 
 ```
 mkdir data
-mv gpt_en_dataset_300m_ids.npy ./data
-mv gpt_en_dataset_300m_idx.npz ./data
+mv gpt_openwebtext.bin ./data
+mv gpt_openwebtext.idx ./data
 ```
 ## Llama训练数据制作
 
@@ -58,20 +53,15 @@ python -u  create_pretraining_data.py \
     --append_eos \
     --output_prefix llama_openwebtext  \
     --workers 40 \
-    --log_interval 10000
+    --log_interval 10000 \
+    --data_impl "mmap"
 ```
-处理时间约一个小时左右，就可以得到我们需要的`llama_openwebtext_ids.npy`, `llama_openwebtext_idx.npz`数据集文件。
-
-为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
-```shell
-wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
-wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
-```
+处理时间约一个小时左右，就可以得到我们需要的`llama_openwebtext.bin`, `llama_openwebtext.idx`数据集文件。
 
 将所有预处理得到的文件统一放入一个文件夹中，以备训练使用：
 
 ```
 mkdir data
-mv llama_openwebtext_100k_ids.npy ./data
-mv llama_openwebtext_100k_idx.npz ./data
+mv llama_openwebtext_100k.bin ./data
+mv llama_openwebtext_100k.idx ./data
 ```
