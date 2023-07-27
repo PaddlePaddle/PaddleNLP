@@ -110,7 +110,6 @@ class ErnieViLTextConfig(PretrainedConfig):
         use_task_id: bool = False,
         fuse: bool = False,
         use_cache: bool = False,
-        enable_recompute: bool = False,
         **kwargs
     ):
         kwargs["return_dict"] = kwargs.pop("return_dict", True)
@@ -132,7 +131,6 @@ class ErnieViLTextConfig(PretrainedConfig):
         self.layer_norm_eps = layer_norm_eps
         self.use_cache = use_cache
         self.use_task_id = use_task_id
-        self.enable_recompute = enable_recompute
 
     @classmethod
     def from_pretrained(

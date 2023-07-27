@@ -6,12 +6,13 @@
 |-|-|-|-|
 |CLIP Guided Stable Diffusion|使用CLIP引导Stable Diffusion实现文生图|[CLIP Guided Stable Diffusion](#clip-guided-stable-diffusion)||
 |Stable Diffusion Interpolation|在不同的prompts或seed的Stable Diffusion潜空间进行插值|[Stable Diffusion Interpolation](#stable-diffusion-interpolation)||
-|Stable Diffusion Mega|一个 Stable Diffusion 管道实现文生图、图生图、图像修复|[Stable Diffusion Mega](#stable-diffusion-mega)||
-|Long Prompt Weighting Stable Diffusion| 一个没有token数目限制的Stable Diffusion管道，支持在prompt中解析权重|[Long Prompt Weighting Stable Diffusion](#long-prompt-weighting-stable-diffusion)||
+|Stable Diffusion Mega|一个集成Stable Diffusion 文生图、图生图、图像修复的Pipeline|[Stable Diffusion Mega](#stable-diffusion-mega)||
+|Long Prompt Weighting Stable Diffusion| 一个没有token数目限制的Stable Diffusion Pipeline，支持在prompt中解析权重|[Long Prompt Weighting Stable Diffusion](#long-prompt-weighting-stable-diffusion)||
 |AUTOMATIC1111 WebUI Stable Diffusion| 与AUTOMATIC1111的WebUI基本一致的Pipeline |[AUTOMATIC1111 WebUI Stable Diffusion](#automatic1111-webui-stable-diffusion)||
 |Stable Diffusion with High Resolution Fixing| 使用高分辨率修复功能进行文图生成|[Stable Diffusion with High Resolution Fixing](#stable-diffusion-with-high-resolution-fixing)||
 |ControlNet Reference Only| 基于参考图片生成与图片相似的图片|[ControlNet Reference Only](#controlnet-reference-only)||
-
+|Stable Diffusion Mixture Tiling| 基于Mixture机制的多文本大图生成Stable Diffusion Pipeline|[Stable Diffusion Mixture Tiling](#stable-diffusion-mixture-tiling)||
+|CLIP Guided Images Mixing Stable Diffusion Pipeline| 一个用于图片融合的Stable Diffusion Pipeline|[CLIP Guided Images Mixing Using Stable Diffusion](#clip-guided-images-mixing-with-stable-diffusion)||
 
 ## Example usages
 
@@ -520,3 +521,108 @@ for control_name in ["none", "reference_only", "reference_adain", "reference_ada
 [reference_only]: https://github.com/PaddlePaddle/PaddleNLP/assets/50394665/4d67e752-cddc-40ab-9524-39e8d9b4a428
 [reference_adain]: https://github.com/PaddlePaddle/PaddleNLP/assets/50394665/266968c7-5065-4589-9bd8-47515d50c6de
 [reference_adain+attn]: https://github.com/PaddlePaddle/PaddleNLP/assets/50394665/73d53a4f-e601-4969-9cb8-e3fdf719ae0c
+
+
+### Stable Diffusion Mixture Tiling
+`StableDiffusionTilingPipeline`是一个基于Mixture机制的多文本大图生成Stable Diffusion Pipeline。使用方式如下所示：
+
+```python
+from ppdiffusers import LMSDiscreteScheduler, DiffusionPipeline
+
+# Creater scheduler and model (similar to StableDiffusionPipeline)
+scheduler = LMSDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000)
+pipeline = DiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4", scheduler=scheduler, custom_pipeline="mixture_tiling")
+
+# Mixture of Diffusers generation
+image = pipeline(
+    prompt=[[
+        "A charming house in the countryside, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+        "A dirt road in the countryside crossing pastures, by jakub rozalski, sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece",
+        "An old and rusty giant robot lying on a dirt road, by jakub rozalski, dark sunset lighting, elegant, highly detailed, smooth, sharp focus, artstation, stunning masterpiece"
+    ]],
+    tile_height=640,
+    tile_width=640,
+    tile_row_overlap=0,
+    tile_col_overlap=256,
+    guidance_scale=8,
+    seed=7178915308,
+    num_inference_steps=50,
+)["images"][0]
+image.save('mixture_tiling' + ".png")
+```
+生成的图片如下所示：
+<center><img src="https://user-images.githubusercontent.com/20476674/250050184-c3d26d20-dbdf-42f6-9723-5f35f628f68e.png" width=100%></center>
+
+### CLIP Guided Images Mixing With Stable Diffusion
+`CLIPGuidedImagesMixingStableDiffusion` 基于Stable Diffusion来针对输入的两个图片进行融合：
+```python
+import requests
+from io import BytesIO
+
+import PIL
+import paddle
+import open_clip
+from open_clip import SimpleTokenizer
+from ppdiffusers import DiffusionPipeline
+from paddlenlp.transformers import CLIPFeatureExtractor, CLIPModel
+
+
+def download_image(url):
+    response = requests.get(url)
+    return PIL.Image.open(BytesIO(response.content)).convert("RGB")
+
+# Loading additional models
+feature_extractor = CLIPFeatureExtractor.from_pretrained(
+    "laion/CLIP-ViT-B-32-laion2B-s34B-b79K"
+)
+clip_model = CLIPModel.from_pretrained(
+    "laion/CLIP-ViT-B-32-laion2B-s34B-b79K", paddle_dtype=paddle.float16
+)
+
+mixing_pipeline = DiffusionPipeline.from_pretrained(
+    "CompVis/stable-diffusion-v1-4",
+    custom_pipeline="clip_guided_images_mixing_stable_diffusion",
+    clip_model=clip_model,
+    feature_extractor=feature_extractor,
+    paddle_dtype=paddle.float16,
+)
+mixing_pipeline.enable_attention_slicing()
+
+# Pipline running
+generator = paddle.Generator().manual_seed(17)
+
+def download_image(url):
+    response = requests.get(url)
+    return PIL.Image.open(BytesIO(response.content)).convert("RGB")
+
+content_image = download_image("https://paddlenlp.bj.bcebos.com/models/community/westfish/develop/clip_guided_images_mixing_stable_diffusion_images/boromir.jpg")
+style_image = download_image("https://paddlenlp.bj.bcebos.com/models/community/westfish/develop/clip_guided_images_mixing_stable_diffusion_images/gigachad.jpg")
+
+pipe_images = mixing_pipeline(
+    num_inference_steps=50,
+    content_image=content_image,
+    style_image=style_image,
+    content_prompt="boromir",
+    style_prompt="gigachad",
+    noise_strength=0.65,
+    slerp_latent_style_strength=0.9,
+    slerp_prompt_style_strength=0.1,
+    slerp_clip_image_style_strength=0.1,
+    guidance_scale=9.0,
+    batch_size=1,
+    clip_guidance_scale=100,
+    generator=generator,
+).images
+
+pipe_images[0].save('clip_guided_images_mixing_stable_diffusion.png')
+```
+图片生成效果如下所示：
+<div align="center">
+<center><img src="https://user-images.githubusercontent.com/20476674/251700919-8abd694f-d93f-4ead-8379-f99405aff1c4.jpg" width=30%></center>
+<center>内容图像</center>
+<div align="center">
+<center><img src="https://user-images.githubusercontent.com/20476674/251700932-4ff5f914-bbd6-4c99-abc4-c7a7fc0fa826.jpg" width=30%></center>
+<center>风格图像</center>
+<div align="center">
+<center><img src="https://user-images.githubusercontent.com/20476674/251701022-c11ea706-f865-4b3f-ab99-9eb79c87439b.png" width=30%></center>
+<center>生成图像</center>

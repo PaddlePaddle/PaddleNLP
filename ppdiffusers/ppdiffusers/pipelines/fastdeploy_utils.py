@@ -518,7 +518,7 @@ class FastDeployDiffusionPipelineMixin:
 
     @property
     def text_encoder_hidden_states_dim(self):
-        if self.text_encoder is None:
+        if not hasattr(self, "text_encoder") or self.text_encoder is None:
             return 768
         return self.text_encoder.model.get_output_info(0).shape[2]
 
