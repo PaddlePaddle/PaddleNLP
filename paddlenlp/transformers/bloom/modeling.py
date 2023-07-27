@@ -183,7 +183,7 @@ def build_alibi_tensor(attention_mask: Tensor, num_heads: int, dtype) -> Tensor:
     # https://github.com/huggingface/transformers/blob/f681437203baa7671de3174b0fa583c349d9d5e1/src/transformers/models/t5/modeling_t5.py#L527
     arange_tensor = ((attention_mask.cumsum(axis=-1) - 1) * attention_mask)[:, None, :]
     alibi = slopes[..., None] * arange_tensor
-    return alibi
+    # return alibi
     return paddle.cast(alibi, dtype)
     # return paddle.cast(alibi.reshape([batch_size * num_heads, 1, seq_length]), dtype)
 
@@ -852,7 +852,13 @@ class BloomModel(BloomPreTrainedModel):
             combined_attention_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
 
         # [batch_size, seq_length] -> [batch_size, tgt_length, src_length]
-        expanded_attn_mask = _expand_mask(attention_mask, tgt_length=src_length)
+        if len(attention_mask.shape) == 2:
+            expanded_attn_mask = _expand_mask(attention_mask, tgt_length=src_length)
+        elif len(attention_mask.shape) == 4:
+            # [batch_size,1, tgt_length, src_length] -> [batch_size, tgt_length, src_length]
+            expanded_attn_mask = attention_mask.reshape(
+                (input_shape[0], attention_mask.shape[-2], attention_mask.shape[-1])
+            )
         combined_attention_mask = (
             expanded_attn_mask
             if combined_attention_mask is None
@@ -945,8 +951,12 @@ class BloomModel(BloomPreTrainedModel):
 
         if attention_mask is None:
             attention_mask = paddle.ones([batch_size, seq_length_with_past], dtype=paddle.get_default_dtype())
+        if len(attention_mask.shape) > 2:
+            _attention_mask = paddle.ones([batch_size, seq_length_with_past], dtype=paddle.get_default_dtype())
+            alibi = build_alibi_tensor(_attention_mask, self.config.n_head, dtype=hidden_states.dtype)
+        else:
+            alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
 
-        alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
         causal_mask = self._prepare_attn_mask(
             attention_mask,
             input_shape=(batch_size, seq_length),

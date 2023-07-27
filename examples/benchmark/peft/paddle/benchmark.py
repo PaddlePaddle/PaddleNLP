@@ -15,11 +15,13 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
+import numpy as np
 import paddle.profiler as profiler
 from datasets import load_dataset
 from utils import CustomTrainer, ProfilerCallback
 
 from paddlenlp.data import DataCollatorForSeq2Seq
+from paddlenlp.datasets import InTokensMapDataset
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
@@ -60,6 +62,7 @@ class ModelArguments:
     english: Optional[bool] = field(default=False, metadata={"help": "whether to english benchmark dataset"})
     profiler: Optional[bool] = field(default=False, metadata={"help": "whether to use profiler"})
     train_data_size: int = field(default=1000, metadata={"help": "Number of dataset for training"})
+    intokens_length: int = field(default=2048, metadata={"help": "Intokens length"})
 
 
 def main():
@@ -113,7 +116,54 @@ def main():
         labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
         model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
+        model_inputs["position_ids"] = list(range(len(model_inputs["input_ids"])))
+        seq_length = len(model_inputs["input_ids"])
+        model_inputs["attention_mask"] = np.tril(np.ones([seq_length, seq_length]), 0).tolist()
+        return model_inputs
 
+    def preprocess_function_chatglm(example, max_src_length=256, max_tgt_length=384):
+        inputs = example["instruction"]
+        targets = example["output"]
+        if "input" in example:
+            inputs += example["input"]
+        model_inputs = tokenizer(inputs, max_length=max_src_length, truncation=True, return_attention_mask=False)
+        labels = tokenizer(targets, max_length=max_tgt_length, truncation=True, return_attention_mask=False)
+        labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
+        model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
+        model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
+
+        context_length = model_inputs["input_ids"].index(tokenizer.bos_token_id)
+        seq_length = len(model_inputs["input_ids"])
+        position_ids = np.arange(seq_length, dtype=np.int64)
+        block_position_ids = np.concatenate(
+            [
+                np.zeros(context_length, dtype=np.int64),
+                np.arange(1, seq_length - context_length + 1, dtype=np.int64),
+            ]
+        )
+        model_inputs["position_ids"] = np.stack([position_ids, block_position_ids], axis=0)
+        # attention mask
+        attention_mask = np.ones((seq_length, seq_length))
+        attention_mask = np.tril(attention_mask)
+        attention_mask[:, :context_length] = 1
+        attention_mask = (attention_mask < 0.5).astype("int64")
+        model_inputs["attention_mask"] = attention_mask.tolist()
+        return model_inputs
+
+    def preprocess_function_bloom(example, max_src_length=256, max_tgt_length=384):
+        inputs = example["instruction"]
+        targets = example["output"]
+        if "input" in example:
+            inputs += example["input"]
+        model_inputs = tokenizer(inputs, max_length=max_src_length, truncation=True, return_attention_mask=False)
+        labels = tokenizer(targets, max_length=max_tgt_length, truncation=True, return_attention_mask=False)
+        labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
+        model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
+        model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
+
+        model_inputs["attention_mask"] = np.tril(
+            np.ones([len(model_inputs["input_ids"]), len(model_inputs["input_ids"])]), 0
+        ).tolist()
         return model_inputs
 
     if model_args.english:
@@ -123,10 +173,26 @@ def main():
 
     # select first 10k examples for benchmarking
     dataset = dataset["train"].select(range(model_args.train_data_size))
-    dataset = dataset.map(
-        lambda example: preprocess_function(example), remove_columns=["instruction", "input", "output"]
-    )
+    if "chatglm" in model_args.model_name_or_path:
+        dataset = dataset.map(
+            lambda example: preprocess_function_chatglm(example), remove_columns=["instruction", "input", "output"]
+        )
+    elif "bloom" in model_args.model_name_or_path:
+
+        dataset = dataset.map(
+            lambda example: preprocess_function_bloom(example), remove_columns=["instruction", "input", "output"]
+        )
+    else:
+        dataset = dataset.map(
+            lambda example: preprocess_function(example), remove_columns=["instruction", "input", "output"]
+        )
     total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
+
+    intokens_dataset = InTokensMapDataset(
+        dataset,
+        tokenizer=tokenizer,
+        max_length=model_args.intokens_length,
+    )
 
     if model_args.profiler:
         prof = profiler.Profiler(
@@ -141,7 +207,7 @@ def main():
     trainer = CustomTrainer(
         model=model,
         tokenizer=tokenizer,
-        train_dataset=dataset,
+        train_dataset=intokens_dataset,
         callbacks=[ProfilerCallback(prof)] if model_args.profiler else [],
         args=training_args,
         data_collator=data_collator,
