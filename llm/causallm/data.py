@@ -55,24 +55,31 @@ def tokenize_example(tokenizer, example, data_args):
     )
     tokenized_target = tokenizer(
         target,
-        max_length=data_args.tgt_length - 1,
+        max_length=data_args.tgt_length,
         truncation=True,
         truncation_side="right",
         add_special_tokens=False,
     )
-    return tokenized_source, tokenized_target
+
+    tokenized_target_input_ids = tokenized_target["input_ids"]
+    # Add eos_token_id at the end of sequence if the sentence is not truncated.
+    # Attention! In some cases(ex. ChatGLMv2), tokenized eos_token is not equal to eos_token_id.
+    if len(tokenized_target_input_ids) < data_args.tgt_length:
+        tokenized_target_input_ids += [tokenizer.eos_token_id]
+
+    return tokenized_source, tokenized_target_input_ids
 
 
 def convert_example_common(example, tokenizer, data_args, is_test=True):
-    tokenized_source, tokenized_target = tokenize_example(tokenizer, example, data_args)
+    tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
 
     if is_test:
         return dict(
             input_ids=tokenized_source["input_ids"],
-            labels=tokenized_target["input_ids"] + [tokenizer.eos_token_id],
+            labels=tokenized_target_input_ids,
         )
     else:
-        input_ids = tokenized_source["input_ids"] + tokenized_target["input_ids"] + [tokenizer.eos_token_id]
+        input_ids = tokenized_source["input_ids"] + tokenized_target_input_ids
         source_length = len(tokenized_source["input_ids"])
         labels = [-100] * source_length + input_ids[source_length:]
         # shift labels
@@ -85,16 +92,16 @@ def convert_example_common(example, tokenizer, data_args, is_test=True):
 
 def convert_example_chatglm(example, tokenizer, data_args, is_test=True):
 
-    tokenized_source, tokenized_target = tokenize_example(tokenizer, example, data_args)
+    tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
     if is_test:
         return dict(
             input_ids=tokenized_source["input_ids"],
             position_ids=tokenized_source["position_ids"],
             attention_mask=tokenized_source["attention_mask"],
-            labels=tokenized_target["input_ids"] + tokenizer.eos_token_id,
+            labels=tokenized_target_input_ids,
         )
     else:
-        input_ids = tokenized_source["input_ids"] + tokenized_target["input_ids"] + tokenizer.eos_token_id
+        input_ids = tokenized_source["input_ids"] + tokenized_target_input_ids
         bos_position = len(tokenized_source["input_ids"]) - 1
 
         attention_mask = np.tri(len(input_ids), len(input_ids))
