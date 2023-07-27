@@ -77,8 +77,6 @@ def main():
         dtype = "float32"
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    if "llama" in model_args.model_name_or_path:
-        tokenizer.pad_token = tokenizer.unk_token
     model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         load_state_as_np=True,
