@@ -39,7 +39,7 @@ from .configuration import CHATGLM_PRETRAINED_RESOURCE_FILES_MAP, ChatGLMConfig
 __all__ = [
     "ChatGLMModel",
     "ChatGLMPretrainedModel",
-    "ChatGLMForConditionalGeneration",
+    "ChatGLMForCausalLM",
 ]
 
 
@@ -97,9 +97,9 @@ class PrefixEncoder(nn.Layer):
 class RotaryEmbeddings(nn.Layer):
     def __init__(self, hidden_size, base=10000.0, position_encoding_2d=True):
         super().__init__()
-        self.dtype = paddle.get_default_dtype()
+        self.default_dtype = paddle.get_default_dtype()
         inv_freq = 1.0 / (base ** (paddle.arange(0, hidden_size, 2).astype("float32") / hidden_size))
-        inv_freq = inv_freq.astype(self.dtype)
+        inv_freq = inv_freq.astype(self.default_dtype)
         self.position_encoding_2d = position_encoding_2d
         self.register_buffer("inv_freq", inv_freq)
         self.max_seq_len_cached = -1
@@ -118,22 +118,28 @@ class RotaryEmbeddings(nn.Layer):
             self.max_seq_len_cached = seq_len
 
             # x.shape = [b, s, n, h/n/2]
-            t = paddle.arange(seq_len, dtype=self.inv_freq.dtype)
+            # TODO(duanyanhui): npu arange kernel don't support fp16, and
+            # it can't be fallbacked to cpu. It will be fixed in future.
+            if paddle.get_device().split(":")[0] == "npu":
+                t = paddle.arange(start=0, end=seq_len, dtype="float32")
+                t = t.cast(self.inv_freq.dtype)
+            else:
+                t = paddle.arange(start=0, end=seq_len, dtype=self.inv_freq.dtype)
             # [s, h/n/2]
             # TODO: Failed for fp16 when converting to static graph.
             freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
-            freqs = freqs.cast(self.dtype)
+            freqs = freqs.cast(self.default_dtype)
             # [s, h/n]
             emb = paddle.concat([freqs, freqs], axis=-1)
-            if self.dtype == paddle.bfloat16:
+            if self.default_dtype == paddle.bfloat16:
                 emb = emb.cast("float32")
             # [s, 1, h/n]
             cos_cached = emb.cos().unsqueeze(1)
             sin_cached = emb.sin().unsqueeze(1)
 
-            if self.dtype == paddle.bfloat16:
-                cos_cached = cos_cached.astype(self.dtype)
-                sin_cached = sin_cached.astype(self.dtype)
+            if self.default_dtype == paddle.bfloat16:
+                cos_cached = cos_cached.astype(self.default_dtype)
+                sin_cached = sin_cached.astype(self.default_dtype)
 
             self.cos_cached, self.sin_cached = cos_cached, sin_cached
 
@@ -170,7 +176,7 @@ class ChatGLMAttention(nn.Layer):
         self.hidden_size = config.hidden_size
         self.position_encoding_2d = config.position_encoding_2d
         self.scale_mask_softmax = False
-        self.dtype = paddle.get_default_dtype()
+        self.default_dtype = paddle.get_default_dtype()
 
         self.attention_scale = config.attention_scale
 
@@ -260,7 +266,7 @@ class ChatGLMAttention(nn.Layer):
         if self.attention_scale:
             # [s, b, n, h/n]
             q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
-            q_layer = q_layer.astype(self.dtype)
+            q_layer = q_layer.astype(self.default_dtype)
 
         # [b, n, s, s]
         output_shape = [q_layer.shape[1], q_layer.shape[2], q_layer.shape[0], k_layer.shape[0]]
@@ -288,8 +294,8 @@ class ChatGLMAttention(nn.Layer):
             attention_scores = attention_scores.astype("float32")
             attention_scores = attention_scores * attention_scale_coeff
             attention_probs = F.softmax(attention_scores, axis=-1)
-            attention_probs = attention_probs.astype(self.dtype)
-            v_layer = v_layer.astype(self.dtype)
+            attention_probs = attention_probs.astype(self.default_dtype)
+            v_layer = v_layer.astype(self.default_dtype)
 
         # [b, n, s, h/n]
         output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]
@@ -323,7 +329,7 @@ class ChatGLMBlock(nn.Layer):
         super(ChatGLMBlock, self).__init__()
         self.config = config
         self.layer_id = layer_id
-        self.dtype = paddle.get_default_dtype()
+        self.default_dtype = paddle.get_default_dtype()
         self.input_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
         self.attention = ChatGLMAttention(config)
         self.post_attention_layernorm = nn.LayerNorm(config.hidden_size, epsilon=config.layernorm_epsilon)
@@ -789,7 +795,8 @@ class ChatGLMStack(nn.Layer):
         self.config = config
         self.position_encoding_2d = config.position_encoding_2d
         self.hidden_size = config.hidden_size
-        self.enable_recompute = config.recompute
+        # Recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
         self.num_attention_heads = config.num_attention_heads
         self.rotary_embeddings = RotaryEmbeddings(
             self.hidden_size // (self.num_attention_heads * 2)
@@ -1122,16 +1129,37 @@ class ChatGLMModel(ChatGLMPretrainedModel):
         self.transformer.set_state_dict(state_dict)
 
 
-class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
+class ChatGLMHead(nn.Layer):
+    def __init__(self, config, embedding_weights=None):
+        super(ChatGLMHead, self).__init__()
+        self.decoder_weight = (
+            self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype())
+            if embedding_weights is None
+            else embedding_weights
+        )
+        self.config = config
+
+    def forward(self, hidden_states):
+        if self.config.tensor_parallel_degree > 1:
+            logits = parallel_matmul(hidden_states, self.decoder_weight, self.config.tensor_parallel_output)
+        else:
+            logits = F.linear(hidden_states, self.decoder_weight.T)
+        return logits
+
+
+class ChatGLMForCausalLM(ChatGLMPretrainedModel):
+    _keys_to_ignore_on_save = [r"lm_head.weight"]
+    _tied_weights_keys = ["lm_head.weight"]
+
     def __init__(self, config: ChatGLMConfig):
-        super(ChatGLMForConditionalGeneration, self).__init__(config)
+        super(ChatGLMForCausalLM, self).__init__(config)
 
         self.config = config
         self.max_sequence_length = config.max_sequence_length
         self.position_encoding_2d = config.position_encoding_2d
         self.chatglm = ChatGLMModel(config)
 
-        self.lm_head = self.chatglm.get_input_embeddings()
+        self.lm_head = ChatGLMHead(config, self.chatglm.transformer.word_embeddings.weight)
         # from paddlenlp.transformers import ChatGLMTokenizer
         # self.tokenizer = ChatGLMTokenizer.from_pretrained("THUDM/chatglm-6b")
 
@@ -1258,10 +1286,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
 
         hidden_states = transformer_outputs.last_hidden_state if return_dict else transformer_outputs[0]
 
-        if self.config.tensor_parallel_degree > 1:
-            lm_logits = parallel_matmul(hidden_states, self.lm_head.weight, self.config.tensor_parallel_output)
-        else:
-            lm_logits = F.linear(hidden_states, self.lm_head.weight.T)
+        lm_logits = self.lm_head(hidden_states)
         lm_logits = lm_logits.transpose([1, 0, 2])
         loss = None
         if labels is not None:
@@ -1273,10 +1298,14 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
                 print(self.tokenizer.decode(l[l != -100].tolist()))
             """
 
-            shift_logits = lm_logits[..., :-1, :]
-            shift_logits = shift_logits.reshape([-1, shift_logits.shape[-1]])
-            shift_logits = shift_logits.astype("float32")
-            shift_labels = labels[..., 1:].reshape([-1])
+            if self.config.lm_shift_labels:
+                shift_logits = lm_logits[..., :-1, :]
+                shift_logits = shift_logits.reshape([-1, shift_logits.shape[-1]])
+                shift_logits = shift_logits.astype("float32")
+                shift_labels = labels[..., 1:].reshape([-1])
+            else:
+                shift_logits = lm_logits
+                shift_labels = labels
 
             if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
                 self.parallel_loss_func = fleet.meta_parallel.ParallelCrossEntropy()

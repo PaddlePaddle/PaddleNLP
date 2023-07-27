@@ -125,6 +125,7 @@ class BloomConfig(PretrainedConfig):
         use_recompute=False,
         use_pure_fp16=False,
         use_fast=False,
+        lm_shift_labels=True,
         **kwargs,
     ):
 
@@ -150,3 +151,4 @@ class BloomConfig(PretrainedConfig):
         self.use_recompute = use_recompute
         self.use_pure_fp16 = use_pure_fp16
         self.use_fast = use_fast
+        self.lm_shift_labels = lm_shift_labels

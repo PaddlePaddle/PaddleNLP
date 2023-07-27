@@ -100,11 +100,11 @@ class ChatGLMConfig(PretrainedConfig):
         pre_seq_len=None,
         prefix_projection=False,
         output_predict=True,
-        recompute=False,
         attention_scale=True,
         activation="gelu",
         num_image_tokens=0,
         use_fast=False,
+        lm_shift_labels=True,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
@@ -126,8 +126,8 @@ class ChatGLMConfig(PretrainedConfig):
         self.pre_seq_len = pre_seq_len
         self.prefix_projection = prefix_projection
         self.output_predict = output_predict
-        self.recompute = recompute
         self.attention_scale = attention_scale
         self.activation = activation
         self.num_image_tokens = num_image_tokens
         self.use_fast = use_fast
+        self.lm_shift_labels = lm_shift_labels

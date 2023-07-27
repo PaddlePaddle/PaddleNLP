@@ -1014,6 +1014,11 @@ class ConversionMixin:
             else:
                 tensor = tensor.numpy() if is_dst else None
 
+            # keep state dict use paddle.tensor
+            if isinstance(tensor, np.ndarray):
+                with device_guard("cpu"):
+                    tensor = paddle.Tensor(tensor, zero_copy=True)
+
             state_dict_to_save[key] = tensor
 
         if len(name_action_mappings) > 0:
@@ -1052,7 +1057,7 @@ class ConversionMixin:
                     break
             if key not in state_keys_map:
                 if not ignore_error:
-                    logger.error(f"could not find name {key} in loaded state dict!")
+                    logger.error(f"tensor parallel conversion: could not find name {key} in loaded state dict!")
             else:
                 state_keys_real.remove(state_keys_map[key])
 

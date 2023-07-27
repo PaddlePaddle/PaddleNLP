@@ -68,10 +68,11 @@ from inception import InceptionV3
 
 parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
 parser.add_argument("--batch-size", type=int, default=50, help="Batch size to use")
+parser.add_argument("--resolution", type=int, default=None, help="The resolution to resize.")
 parser.add_argument(
     "--num-workers", type=int, help=("Number of processes to use for data loading. " "Defaults to `min(8, num_cpus)`")
 )
-parser.add_argument("--device", type=str, default=None, help="Device to use. Like gpu, gpu:0 or cpu")
+parser.add_argument("--device", type=str, default=None, help="Device to use. Like cuda, cuda:0 or cpu")
 parser.add_argument(
     "--dims",
     type=int,
@@ -79,15 +80,24 @@ parser.add_argument(
     choices=list(InceptionV3.BLOCK_INDEX_BY_DIM),
     help=("Dimensionality of Inception features to use. " "By default, uses pool3 features"),
 )
+parser.add_argument(
+    "--save-stats",
+    action="store_true",
+    help=(
+        "Generate an npz archive from a directory of samples. "
+        "The first path is used as input and the second as output."
+    ),
+)
 parser.add_argument("path", type=str, nargs=2, help=("Paths to the generated images or " "to .npz statistic files"))
 
 IMAGE_EXTENSIONS = {"bmp", "jpg", "jpeg", "pgm", "png", "ppm", "tif", "tiff", "webp"}
 
 
 class ImagePathDataset(paddle.io.Dataset):
-    def __init__(self, files, transforms=None):
+    def __init__(self, files, transforms=None, resolution=None):
         self.files = files
         self.transforms = transforms
+        self.resolution = resolution
 
     def __len__(self):
         return len(self.files)
@@ -95,12 +105,15 @@ class ImagePathDataset(paddle.io.Dataset):
     def __getitem__(self, i):
         path = self.files[i]
         img = Image.open(path).convert("RGB")
+        if self.resolution is not None:
+            if img.size != (self.resolution, self.resolution):
+                img = img.resize((self.resolution, self.resolution))
         if self.transforms is not None:
             img = self.transforms(img)
         return {"img": img}
 
 
-def get_activations(files, model, batch_size=50, dims=2048, num_workers=1):
+def get_activations(files, model, batch_size=50, dims=2048, num_workers=1, resolution=None):
     """Calculates the activations of the pool_3 layer for all images.
 
     Params:
@@ -125,9 +138,13 @@ def get_activations(files, model, batch_size=50, dims=2048, num_workers=1):
         print(("Warning: batch size is bigger than the data size. " "Setting batch size to data size"))
         batch_size = len(files)
 
-    dataset = ImagePathDataset(files, transforms=TF.ToTensor())
+    dataset = ImagePathDataset(files, transforms=TF.ToTensor(), resolution=resolution)
     dataloader = paddle.io.DataLoader(
-        dataset, batch_size=batch_size, shuffle=False, drop_last=False, num_workers=num_workers
+        dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        drop_last=False,
+        num_workers=num_workers,
     )
 
     pred_arr = np.empty((len(files), dims))
@@ -206,7 +223,7 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
     return diff.dot(diff) + np.trace(sigma1) + np.trace(sigma2) - 2 * tr_covmean
 
 
-def calculate_activation_statistics(files, model, batch_size=50, dims=2048, num_workers=1):
+def calculate_activation_statistics(files, model, batch_size=50, dims=2048, num_workers=1, resolution=None):
     """Calculation of the statistics used by the FID.
     Params:
     -- files       : List of image files paths
@@ -223,25 +240,28 @@ def calculate_activation_statistics(files, model, batch_size=50, dims=2048, num_
     -- sigma : The covariance matrix of the activations of the pool_3 layer of
                the inception model.
     """
-    act = get_activations(files, model, batch_size, dims, num_workers)
+    act = get_activations(files, model, batch_size, dims, num_workers, resolution=resolution)
     mu = np.mean(act, axis=0)
     sigma = np.cov(act, rowvar=False)
     return mu, sigma
 
 
-def compute_statistics_of_path(path, model, batch_size, dims, num_workers=1):
+def compute_statistics_of_path(path, model, batch_size, dims, num_workers=1, resolution=None):
     if path.endswith(".npz"):
         with np.load(path) as f:
             m, s = f["mu"][:], f["sigma"][:]
     else:
         path = pathlib.Path(path)
         files = sorted([file for ext in IMAGE_EXTENSIONS for file in path.glob("*.{}".format(ext))])
-        m, s = calculate_activation_statistics(files, model, batch_size, dims, num_workers)
+        FLAG_IMAGE_NUM = os.getenv("FLAG_IMAGE_NUM", None)
+        if FLAG_IMAGE_NUM is not None:
+            files = files[: int(FLAG_IMAGE_NUM)]
+        m, s = calculate_activation_statistics(files, model, batch_size, dims, num_workers, resolution=resolution)
 
     return m, s
 
 
-def calculate_fid_given_paths(paths, batch_size, dims, num_workers=1):
+def calculate_fid_given_paths(paths, batch_size, dims, num_workers=1, resolution=None):
     """Calculates the FID of two paths"""
     for p in paths:
         if not os.path.exists(p):
@@ -251,11 +271,32 @@ def calculate_fid_given_paths(paths, batch_size, dims, num_workers=1):
 
     model = InceptionV3([block_idx])
 
-    m1, s1 = compute_statistics_of_path(paths[0], model, batch_size, dims, num_workers)
-    m2, s2 = compute_statistics_of_path(paths[1], model, batch_size, dims, num_workers)
+    m1, s1 = compute_statistics_of_path(paths[0], model, batch_size, dims, num_workers, resolution=resolution)
+
+    m2, s2 = compute_statistics_of_path(paths[1], model, batch_size, dims, num_workers, resolution=resolution)
+
     fid_value = calculate_frechet_distance(m1, s1, m2, s2)
 
     return fid_value
+
+
+def save_fid_stats(paths, batch_size, dims, num_workers=1, resolution=None):
+    """Calculates the FID of two paths"""
+    if not os.path.exists(paths[0]):
+        raise RuntimeError("Invalid path: %s" % paths[0])
+
+    if os.path.exists(paths[1]):
+        raise RuntimeError("Existing output file: %s" % paths[1])
+
+    block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[dims]
+
+    model = InceptionV3([block_idx])
+
+    print(f"Saving statistics for {paths[0]}")
+
+    m1, s1 = compute_statistics_of_path(paths[0], model, batch_size, dims, num_workers, resolution=resolution)
+
+    np.savez_compressed(paths[1], mu=m1, sigma=s1)
 
 
 def main():
@@ -264,12 +305,25 @@ def main():
         paddle.set_device(args.device)
 
     if args.num_workers is None:
-        num_avail_cpus = len(os.sched_getaffinity(0))
-        num_workers = min(num_avail_cpus, 8)
+        try:
+            num_cpus = len(os.sched_getaffinity(0))
+        except AttributeError:
+            # os.sched_getaffinity is not available under Windows, use
+            # os.cpu_count instead (which may not return the *available* number
+            # of CPUs).
+            num_cpus = os.cpu_count()
+
+        num_workers = min(num_cpus, 8) if num_cpus is not None else 0
     else:
         num_workers = args.num_workers
 
-    fid_value = calculate_fid_given_paths(args.path, args.batch_size, args.dims, num_workers)
+    if args.save_stats:
+        save_fid_stats(args.path, args.batch_size, args.dims, num_workers, resolution=args.resolution)
+        return
+
+    fid_value = calculate_fid_given_paths(
+        args.path, args.batch_size, args.dims, num_workers, resolution=args.resolution
+    )
     print("FID: ", fid_value)
 
 

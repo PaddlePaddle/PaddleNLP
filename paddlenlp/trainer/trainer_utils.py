@@ -394,6 +394,9 @@ def get_scheduler(
     learning_rate: float,
     num_warmup_steps: Optional[int] = None,
     num_training_steps: Optional[int] = None,
+    num_cycles: Optional[float] = 0.5,
+    lr_end: Optional[float] = 1e-7,
+    power: Optional[float] = 1.0,
 ):
     """
     Unified API to get any scheduler from its name.
@@ -408,6 +411,15 @@ def get_scheduler(
         num_training_steps (`int``, *optional*):
             The number of training steps to do. This is not required by all schedulers (hence the argument being
             optional), the function will raise an error if it's unset and the scheduler type requires it.
+        num_cycles (``float``, *optional*):
+            The number of waves in the cosine scheduler (the defaults is to just decrease from the max value to 0
+            following a half-cosine). This is not required by all schedulers (hence the argument being optional)
+        lr_end (``float``, *optional*):
+            The end LR in the polynomial scheduler. This is not required by all schedulers (hence the argument
+            being optional).
+        power (``float``, *optional*):
+            The power factor in the polynomial scheduler. This is not required by all schedulers (hence the argument
+            being optional).
     """
     name = SchedulerType(name)
     schedule_func = TYPE_TO_SCHEDULER_FUNCTION[name]
@@ -424,6 +436,23 @@ def get_scheduler(
     # All other schedulers require `num_training_steps`
     if num_training_steps is None:
         raise ValueError(f"{name} requires `num_training_steps`, please provide that argument.")
+
+    if name == SchedulerType.COSINE:
+        return schedule_func(
+            learning_rate,
+            num_warmup_steps=num_warmup_steps,
+            num_training_steps=num_training_steps,
+            num_cycles=num_cycles,
+        )
+
+    if name == SchedulerType.POLYNOMIAL:
+        return schedule_func(
+            learning_rate,
+            num_warmup_steps=num_warmup_steps,
+            num_training_steps=num_training_steps,
+            lr_end=lr_end,
+            power=power,
+        )
 
     return schedule_func(learning_rate, num_warmup_steps=num_warmup_steps, num_training_steps=num_training_steps)
 

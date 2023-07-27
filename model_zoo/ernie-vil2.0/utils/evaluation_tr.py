@@ -42,12 +42,6 @@ def read_submission(submit_path, reference, k=5):
                 raise Exception("Cannot parse this line into json object: {}".format(line))
             if "image_id" not in pred_obj:
                 raise Exception("There exists one line not containing image_id: {}".format(line))
-            if not isinstance(pred_obj["image_id"], int):
-                raise Exception(
-                    "Found an invalid image_id {}, it should be an integer (not string), please check your schema".format(
-                        pred_obj["image_id"]
-                    )
-                )
             image_id = pred_obj["image_id"]
             if "text_ids" not in pred_obj:
                 raise Exception("There exists one line not containing the predicted text_ids: {}".format(line))
@@ -71,11 +65,6 @@ def read_submission(submit_path, reference, k=5):
                             image_id, text_id, rank + 1
                         )
                     )
-            # Check whether there are duplicate predicted products for a single text
-            if len(set(text_ids)) != k:
-                raise Exception(
-                    "Image_id {} has duplicate products in your prediction. Pleace check again!".format(image_id)
-                )
             submission_dict[image_id] = text_ids  # here we save the list of product ids
 
     # Check if any text is missing in the submission
@@ -168,7 +157,6 @@ if __name__ == "__main__":
 
     print("Read standard from %s" % standard_path)
     print("Read user submit file from %s" % submit_path)
-
     try:
         # Read ground-truth
         reference = read_reference(standard_path)
@@ -176,7 +164,6 @@ if __name__ == "__main__":
         # Read predictions
         k = 10
         predictions = read_submission(submit_path, reference, k)
-
         # Compute score for each text
         r1_stat, r5_stat, r10_stat = 0, 0, 0
         for qid in reference.keys():

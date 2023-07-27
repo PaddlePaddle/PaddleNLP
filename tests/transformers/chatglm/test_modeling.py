@@ -21,6 +21,7 @@ import paddle
 
 from paddlenlp.transformers import (
     ChatGLMConfig,
+    ChatGLMForCausalLM,
     ChatGLMForConditionalGeneration,
     ChatGLMModel,
     ChatGLMTokenizer,
@@ -186,7 +187,7 @@ class ChatGLMTester:
         return config, inputs_dict
 
     def create_and_check_lm_head_model(self, config, input_ids, labels, *args):
-        model = ChatGLMForConditionalGeneration(config)
+        model = ChatGLMForCausalLM(config)
         model.eval()
 
         result = model(
@@ -217,7 +218,7 @@ class ChatGLMTest(ModelTesterMixin, unittest.TestCase):
     return_dict = False
     use_labels = False
 
-    all_model_classes = (ChatGLMModel, ChatGLMForConditionalGeneration)
+    all_model_classes = (ChatGLMModel, ChatGLMForCausalLM)
 
     def get_test_inputs(self, tensor_type="pd"):
         tokenizer = ChatGLMTokenizer.from_pretrained("__internal_testing__/tiny-fused-chatglm")

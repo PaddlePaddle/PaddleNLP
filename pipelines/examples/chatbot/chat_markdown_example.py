@@ -26,6 +26,8 @@ from pipelines.nodes import (
     PromptTemplate,
     TruncatedConversationHistory,
 )
+from pipelines.nodes.file_converter.markdown import MarkdownRawTextConverter
+from pipelines.nodes.preprocessor.text_splitter import MarkdownHeaderTextSplitter
 from pipelines.pipelines import Pipeline
 
 # yapf: disable
@@ -44,6 +46,7 @@ parser.add_argument("--chunk_size", default=300, type=int, help="The length of d
 parser.add_argument('--host', type=str, default="localhost", help='host ip of ANN search engine')
 parser.add_argument('--embed_title', default=False, type=bool, help="The title to be  embedded into embedding")
 parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search'], default="ernie", help="the ernie model types")
+parser.add_argument('--title_split', default=False, type=bool, help='the markdown file is split by titles')
 parser.add_argument("--api_key", default=None, type=str, help="The API Key.")
 parser.add_argument("--secret_key", default=None, type=str, help="The secret key.")
 args = parser.parse_args()
@@ -72,9 +75,28 @@ def chat_markdown_tutorial():
     )
 
     # Indexing Markdowns
-    markdown_converter = MarkdownConverter()
-
-    text_splitter = CharacterTextSplitter(separator="\n", chunk_size=args.chunk_size, chunk_overlap=0, filters=["\n"])
+    if args.title_split is True:
+        markdown_converter = MarkdownRawTextConverter()
+        headers_to_split_on = [
+            ("#", "Header 1"),
+            ("##", "Header 2"),
+            ("###", "Header 3"),
+            ("####", "Header 4"),
+            ("#####", "Header 5"),
+            ("######", "Header 6"),
+        ]
+        text_splitter = MarkdownHeaderTextSplitter(
+            separator="\n",
+            chunk_size=args.chunk_size,
+            headers_to_split_on=headers_to_split_on,
+            return_each_line=False,
+            filters=["\n"],
+        )
+    else:
+        markdown_converter = MarkdownConverter()
+        text_splitter = CharacterTextSplitter(
+            separator="\n", chunk_size=args.chunk_size, chunk_overlap=0, filters=["\n"]
+        )
     indexing_pipeline = Pipeline()
     indexing_pipeline.add_node(component=markdown_converter, name="MarkdownConverter", inputs=["File"])
     indexing_pipeline.add_node(component=text_splitter, name="Splitter", inputs=["MarkdownConverter"])
@@ -96,7 +118,7 @@ def chat_markdown_tutorial():
     query_pipeline.add_node(component=ernie_bot, name="ErnieBot", inputs=["TruncateHistory"])
     query = "Jupyter 和 AI Studio Notebook 有什么区别？如何使用Jupyter？"
     start_time = time.time()
-    prediction = query_pipeline.run(query=query, params={"Retriever": {"top_k": 30}, "Ranker": {"top_k": 2}})
+    prediction = query_pipeline.run(query=query, params={"Retriever": {"top_k": 30}, "Ranker": {"top_k": 3}})
     end_time = time.time()
     print("Time cost for query markdown conversion:", end_time - start_time)
     print("user: {}".format(query))
