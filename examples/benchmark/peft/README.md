@@ -23,10 +23,10 @@
 | Model          | Setup           | Paddle Effective Tokens /s | Torch Effective Tokens /s  |  Speedup  |
 |----------------|-----------------|----------------------------|----------------------------|-----------|
 | Bloomz-7b1-mt  | bsz 8 MP4     |       2873.13           |         N/A                |   N/A     |
-| Bloomz-7b1-mt  | bsz 8 ZeRO 3  |       1541.62               |     1702.00                |   N/A     |
+| Bloomz-7b1-mt  | bsz 8 ZeRO 3  |       1625.14               |     1702.00                |   -5%     |
 | Bloomz-7b1-mt  | bsz 8 ZeRO 2  |      2172.40            |     1891.16                |   15%     |
 | Bloomz-7b1-mt  | bsz 16 MP4    |      2853.83            |         N/A                |   N/A     |
-| Bloomz-7b1-mt  | bsz 16 ZeRO 3 |      2320.81                |      2849.90               |   N/A     |
+| Bloomz-7b1-mt  | bsz 16 ZeRO 3 |      2382.49                |      2849.90               |        |
 | Bloomz-7b1-mt  | bsz 16 ZeRO 2 |    2604.56 (accumulations 2) |  2719.92              |   -4%     |
 
 
@@ -77,11 +77,11 @@
 
 | Model     | Setup           | Paddle Effective Tokens /s | Torch Effective Tokens /s  |  Speedup  |
 |-----------|-----------------|----------------------------|----------------------------|-----------|
-| chatglm-6b  | bsz 8 MP4     |  3109.83                   |         N/A                |   N/A     |
+| chatglm-6b  | bsz 8 MP4     |  3109.83                   |         N/A                |   -4%     |
 | chatglm-6b  | bsz 8 ZeRO 3  |    1766.74                     |         1840.99            |   N/A     |
 | chatglm-6b  | bsz 8 ZeRO 2  |    2457.88                 |         2124.17            |   16%     |
 | chatglm-6b  | bsz 16 MP4    |    3549.68                 |         N/A                |   N/A     |
-| chatglm-6b  | bsz 16 ZeRO 3 |    2733.72                 |         3184.26            |   N/A     |
+| chatglm-6b  | bsz 16 ZeRO 3 |    2733.72                 |         3184.26            |   -14%     |
 | chatglm-6b  | bsz 16 ZeRO 2 |    3462.83                 |         3151.07            |   10%     |
 
 ### TODOs
