@@ -30,7 +30,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
-from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -71,26 +71,29 @@ def main():
     else:
         dtype = "float32"
 
-    model = AutoModelForCausalLM.from_pretrained(
+    model_config = AutoConfig.from_pretrained(
         model_args.model_name_or_path,
-        dtype=dtype,
+        tensor_parallel_output=False,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
-        tensor_parallel_output=False,
+        dtype=dtype,
     )
-
     # Alreday shift label & logit in convert example
-    if hasattr(model.config, "lm_shift_labels"):
-        model.config.lm_shift_labels = False
-
-    # Only llama and gpt support flash_attention
-    if model_args.use_flash_attention:
-        if model.base_model_prefix not in ["llama", "gpt"]:
-            raise NotImplementedError(
-                "Only llama and gpt support flash_attention. Please set use_flash_attention to False"
+    # lm_shift_labels should be set before model initilization for some models(ex. llama)
+    if hasattr(model_config, "lm_shift_labels"):
+        model_config.lm_shift_labels = False
+    if hasattr(model_config, "use_flash_attention"):
+        model_config.use_flash_attention = model_args.use_flash_attention
+    if hasattr(model_config, "max_position_embeddings"):
+        if model_config.max_position_embeddings < data_args.src_length + data_args.tgt_length:
+            raise ValueError(
+                f"The src_length + tgt_length ({data_args.src_length + data_args.tgt_length}) must be smaller than max_position_embeddings({model_config.max_position_embeddings})."
             )
-        if hasattr(model.config, "use_flash_attention"):
-            model.config.use_flash_attention = model_args.use_flash_attention
+
+    model = AutoModelForCausalLM.from_pretrained(
+        model_args.model_name_or_path,
+        config=model_config,
+    )
 
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
