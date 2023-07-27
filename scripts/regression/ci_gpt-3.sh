@@ -495,8 +495,10 @@ function gpt_auto_dp2mp2() {
         -o Distributed.sharding.sharding_stage=1 \
         -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
         >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.0 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
-    check_result $FUNCNAME 11.0349 ${loss}
+    loss1=`cat $log_dir/workerlog.0 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
+    loss2=`cat $log_dir/workerlog.2 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
+    loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
+    check_result $FUNCNAME 11.0469 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -553,7 +555,7 @@ function gpt_auto_dp2pp2() {
         -o Distributed.sharding.sharding_stage=1 \
         -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
         >>${log_path}/$FUNCNAME 2>&1
-    loss1=`cat $log_dir/workerlog.2 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
+    loss1=`cat $log_dir/workerlog.1 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss2=`cat $log_dir/workerlog.3 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
     check_result $FUNCNAME 11.0469 ${loss}
@@ -584,7 +586,7 @@ function gpt_auto_dp2mp2pp2() {
         -o Distributed.sharding.sharding_stage=1 \
         -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
         >>${log_path}/$FUNCNAME 2>&1
-    loss1=`cat $log_dir/workerlog.4 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
+    loss1=`cat $log_dir/workerlog.2 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss2=`cat $log_dir/workerlog.6 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
     check_result $FUNCNAME 11.0469 ${loss}
@@ -644,8 +646,10 @@ function gpt_auto_dp2sharding2() {
         -o Distributed.sharding.sharding_stage=2 \
         -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
         >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.0 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
-    check_result $FUNCNAME 11.0349 ${loss}
+    loss1=`cat $log_dir/workerlog.0 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
+    loss2=`cat $log_dir/workerlog.1 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
+    loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
+    check_result $FUNCNAME 11.0469 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -673,8 +677,10 @@ function gpt_auto_dp2mp2sharding2() {
         -o Distributed.sharding.sharding_stage=2 \
         -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
         >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.0 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
-    check_result $FUNCNAME 11.0349 ${loss}
+    loss1=`cat $log_dir/workerlog.0 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
+    loss2=`cat $log_dir/workerlog.2 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
+    loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
+    check_result $FUNCNAME 11.0469 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -702,7 +708,7 @@ function gpt_auto_dp2pp2sharding2() {
         -o Distributed.sharding.sharding_stage=2 \
         -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
         >>${log_path}/$FUNCNAME 2>&1
-    loss1=`cat $log_dir/workerlog.2 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
+    loss1=`cat $log_dir/workerlog.1 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss2=`cat $log_dir/workerlog.3 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
     check_result $FUNCNAME 11.0469 ${loss}
@@ -733,7 +739,7 @@ function gpt_auto_dp2mp2pp2sharding2() {
         -o Distributed.sharding.sharding_stage=2 \
         -o Engine.save_load.ckpt_dir="./ckpt_dynamic/epoch_0_step_1/auto_infer/auto" \
         >>${log_path}/$FUNCNAME 2>&1
-    loss1=`cat $log_dir/workerlog.4 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
+    loss1=`cat $log_dir/workerlog.2 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss2=`cat $log_dir/workerlog.6 | grep '10/10' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
     check_result $FUNCNAME 11.0469 ${loss}
@@ -764,10 +770,10 @@ function gpt_auto_pass_o1_stage1() {
         -o Distributed.sharding.sharding_degree=2 \
         -o Distributed.sharding.sharding_stage=1 \
         >>${log_path}/$FUNCNAME 2>&1
-    loss1=`cat $log_dir/workerlog.4 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
+    loss1=`cat $log_dir/workerlog.2 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss2=`cat $log_dir/workerlog.6 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 10.9905 ${loss}
+    check_result $FUNCNAME 10.9906 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -795,10 +801,10 @@ function gpt_auto_pass_o1_stage2() {
         -o Distributed.sharding.sharding_degree=2 \
         -o Distributed.sharding.sharding_stage=2 \
         >>${log_path}/$FUNCNAME 2>&1
-    loss1=`cat $log_dir/workerlog.4 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
+    loss1=`cat $log_dir/workerlog.2 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss2=`cat $log_dir/workerlog.6 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 10.9905 ${loss}
+    check_result $FUNCNAME 10.9906 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -826,10 +832,10 @@ function gpt_auto_pass_o2_stage1() {
         -o Distributed.sharding.sharding_degree=2 \
         -o Distributed.sharding.sharding_stage=1 \
         >>${log_path}/$FUNCNAME 2>&1
-    loss1=`cat $log_dir/workerlog.4 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
+    loss1=`cat $log_dir/workerlog.2 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss2=`cat $log_dir/workerlog.6 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 10.99465 ${loss}
+    check_result $FUNCNAME 10.9947 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -857,10 +863,10 @@ function gpt_auto_pass_o2_stage2() {
         -o Distributed.sharding.sharding_degree=2 \
         -o Distributed.sharding.sharding_stage=2 \
         >>${log_path}/$FUNCNAME 2>&1
-    loss1=`cat $log_dir/workerlog.4 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
+    loss1=`cat $log_dir/workerlog.2 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss2=`cat $log_dir/workerlog.6 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 10.99465 ${loss}
+    check_result $FUNCNAME 10.9947 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -888,10 +894,10 @@ function gpt_auto_pass_o3_stage1() {
         -o Distributed.sharding.sharding_degree=2 \
         -o Distributed.sharding.sharding_stage=1 \
         >>${log_path}/$FUNCNAME 2>&1
-    loss1=`cat $log_dir/workerlog.4 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
+    loss1=`cat $log_dir/workerlog.2 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss2=`cat $log_dir/workerlog.6 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 10.99495 ${loss}
+    check_result $FUNCNAME 10.9949 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -919,10 +925,10 @@ function gpt_auto_pass_o3_stage2() {
         -o Distributed.sharding.sharding_degree=2 \
         -o Distributed.sharding.sharding_stage=2 \
         >>${log_path}/$FUNCNAME 2>&1
-    loss1=`cat $log_dir/workerlog.4 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
+    loss1=`cat $log_dir/workerlog.2 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss2=`cat $log_dir/workerlog.6 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 10.99495 ${loss}
+    check_result $FUNCNAME 10.9949 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
