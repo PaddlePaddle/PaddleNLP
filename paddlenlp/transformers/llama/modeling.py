@@ -1045,6 +1045,7 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         super(LlamaPretrainingCriterion, self).__init__()
         self.ignore_index = getattr(config, "ignore_index", -100)
         self.config = config
+        self.lm_shift_labels = config.lm_shift_labels
         self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
 
         if self.enable_parallel_cross_entropy:  # and False: # and lm_head is distributed
@@ -1059,6 +1060,11 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
                     f"enable_parallel_cross_entropy, the vocab_size should be splited: {prediction_scores.shape[-1]}, {self.config.vocab_size}"
                 )
                 self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
+
+        if self.lm_shift_labels:
+            # Shift so that tokens < n predict n
+            prediction_scores = prediction_scores[..., :-1, :]
+            masked_lm_labels = masked_lm_labels[..., 1:]
 
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
