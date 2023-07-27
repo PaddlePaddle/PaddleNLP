@@ -19,7 +19,10 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.distributed.fleet.layers.mpu import mp_ops
-from paddle.distributed.fleet.meta_parallel import ColumnParallelLinear
+from paddle.distributed.fleet.meta_parallel import (
+    ColumnParallelLinear,
+    RowParallelLinear,
+)
 
 
 class LoRALinear(nn.Linear):
@@ -87,6 +90,107 @@ class LoRALinear(nn.Linear):
         if not self.merged:
             result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
         return result
+
+    def extra_repr(self):
+        name = f", name={self.name}" if self.name else ""
+        return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}{name}"
+
+
+class RowParallelLoRALinear(RowParallelLinear):
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        r: int = 0,
+        lora_alpha: int = 1,
+        lora_dropout: float = 0.0,
+        merge_weights: bool = True,
+        **kwargs
+    ):
+        RowParallelLinear.__init__(self, in_features, out_features, **kwargs)
+        if not isinstance(r, int) or r <= 0:
+            raise ValueError("Lora rank r should be a positive integer")
+        self.r = r
+        self.lora_alpha = lora_alpha
+        # Optional dropout
+        if lora_dropout > 0.0:
+            self.lora_dropout = nn.Dropout(p=lora_dropout)
+        else:
+            self.lora_dropout = lambda x: x
+        # Mark the weight as unmerged
+        self.merged = False
+        self.merge_weights = merge_weights
+
+        # compatible
+        self.name = self._name
+
+        # Actual trainable parameters
+        self.lora_A = self.create_parameter(
+            shape=[self.input_size_per_partition, r],
+            dtype=self._dtype,
+            is_bias=False,
+            attr=paddle.ParamAttr(
+                initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
+            ),
+        )
+        self.lora_A.is_distributed = False
+        self.lora_B = self.create_parameter(
+            shape=[r, self.out_features],
+            dtype=self._dtype,
+            is_bias=False,
+            default_initializer=nn.initializer.Constant(value=0.0),
+        )
+        self.lora_A.is_distributed = True
+        self.lora_A.split_axis = 0
+        self.scaling = self.lora_alpha / self.r
+
+        # Freezing the pre-trained weight matrix
+        self.weight.stop_gradient = True
+
+    def train(self):
+        super().train()
+        if self.merge_weights and self.merged:
+            # Make sure that the weights are not merged
+            new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
+            self.weight.set_value(new_weight)
+            self.merged = False
+
+    def eval(self):
+        super().eval()
+        if self.merge_weights and not self.merged:
+            # Merge the weights and mark it
+            new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
+            self.weight.set_value(new_weight)
+            self.merged = True
+
+    def forward(self, x: paddle.Tensor):
+        # print(x.shape)
+        if not self.input_is_parallel:
+            input_mp = mp_ops._c_split(x, group=self.model_parallel_group)
+        else:
+            input_mp = x
+
+        # x @ W : [bz, in_f / ws] ===> [bz, out_f]
+        # print(input_mp.shape, self.weight.shape, self.lora_A.shape, self.lora_B.shape)
+        result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
+
+        if not self.merged:
+            # input_dup = mp_ops._c_identity(input_mp, group=self.model_parallel_group)
+            # x @ A: [bz, in_f/ ws] ===> [bz, r]
+            input_mp = self.lora_dropout(input_mp) @ self.lora_A
+            # is nessary?
+            # input_a_mp = mp_ops._c_identity(input_dup, group=self.model_parallel_group)
+            #  @ B: [bz, r] ===> [bz, out_f]
+            delta_mp = (input_mp @ self.lora_B) * self.scaling
+            result_mp += delta_mp
+
+        output = mp_ops._mp_allreduce(
+            result_mp,
+            group=self.model_parallel_group,
+            use_calc_stream=True,
+            use_model_parallel=True,
+        )
+        return output
 
     def extra_repr(self):
         name = f", name={self.name}" if self.name else ""

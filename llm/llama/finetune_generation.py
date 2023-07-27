@@ -158,6 +158,8 @@ def main():
                     ".*k_proj.*",
                     ".*gate_proj.*",
                     ".*up_proj.*",
+                    ".*o_proj.*",
+                    ".*down_proj.*",
                 ]
             else:
                 target_modules = [
@@ -184,6 +186,8 @@ def main():
 
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
+        # print(model._get_tensor_parallel_mappings(model.config, is_split=False))
+        # import pdb; pdb.set_trace()
 
     if model_args.qat:
         from paddle import nn
