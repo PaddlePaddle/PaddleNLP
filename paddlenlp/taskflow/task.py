@@ -246,7 +246,7 @@ class Task(metaclass=abc.ABCMeta):
             onnx_dir = os.path.join(self._task_path, "onnx", self.export_type)
 
         if not os.path.exists(onnx_dir):
-            os.mkdir(onnx_dir)
+            os.makedirs(onnx_dir, exist_ok=True)
         float_onnx_file = os.path.join(onnx_dir, "model.onnx")
         if not os.path.exists(float_onnx_file) or self._param_updated:
             onnx_model = paddle2onnx.command.c_paddle_to_onnx(
