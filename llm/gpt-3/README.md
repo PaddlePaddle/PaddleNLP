@@ -77,6 +77,7 @@ python -u  -m paddle.distributed.launch \
 
 <a name="1"></a>
 
+
 ## 微调
 
 ```shell
@@ -117,6 +118,46 @@ python -u  -m paddle.distributed.launch \
     --do_eval \
     --device "gpu"
 ```
+
+## lora微调
+
+```shell
+export PYTHONPATH="../../PaddleNLP/"
+export FLAGS_cudnn_deterministic=True
+log_dir="log"
+rm -rf $log_dir
+
+python finetune_generation.py \
+    --model_type "gpt" \
+    --model_name_or_path gpt2-medium-en \
+    --output_dir "output/$task_name" \
+    --per_device_train_batch_size 2 \
+    --per_device_eval_batch_size 1 \
+    --tensor_parallel_degree 1 \
+    --pipeline_parallel_degree 1 \
+    --fp16  \
+    --fp16_opt_level "O2"  \
+    --scale_loss 1024 \
+    --learning_rate 3e-4 \
+    --max_steps 10000 \
+    --save_steps 5000 \
+    --weight_decay 0.01 \
+    --warmup_ratio 0.01 \
+    --max_grad_norm 1.0 \
+    --logging_steps 1\
+    --dataloader_num_workers 1 \
+    --sharding "stage2" \
+    --eval_steps 1000 \
+    --report_to "visualdl" \
+    --disable_tqdm true \
+    --recompute 1 \
+    --gradient_accumulation_steps 2 \
+    --do_train \
+    --do_eval \
+    --device "gpu" \
+    --lora
+```
+
 
 <a name="2"></a>
 
