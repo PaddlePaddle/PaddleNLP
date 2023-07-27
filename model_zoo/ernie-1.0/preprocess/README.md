@@ -49,7 +49,7 @@
 |1️⃣原始数据转换<br/>`trans_to_json.py`|预处理 <br>输入：0️⃣初始状态 <br>输出：jsonl|jsonl格式：每个doc对应一行json字符串| ```{"text": "飞桨是功能完备、开源开放的产业级深度学习平台。飞桨拥有..."}```<br/>```{"text": "PaddleNLP是自然语言..."}```
 |❇️(**可选**)数据中文分词<br/>`words_segmentation.py`|语料分词：中文WWM <br>输入：jsonl  <br> 输出：0️⃣初始状态| 将jsonl格式的数据，恢复成分词后的原始格式数据 <br> | ```飞桨 是 功能 完备、开源 开放的 产业级 深度学习 平台。``` <br/> ```飞桨 拥有 核心 训练和推理 框架、基础 模型库。``` <br/><br/> ```PaddleNLP 是 自然语言处理领域 的 优秀工具。```
 |2️⃣数据ID化<br/>`create_pretrain_data.py`|预处理| bin格式：数据id化后的token id <br/>idx格式：数据句子、文章位置索引 | -
-|3️⃣训练index文件生成|训练启动|npy格式：<br/> 根据训练步数max_steps生成<br/>train、valid、test的每个样本索引文件| -
+|3️⃣训练index文件生成|训练启动|idx格式：<br/> 根据训练步数max_steps生成<br/>train、valid、test的每个样本索引文件| -
 |4️⃣token动态mask（可选）| Dataset取数据 | 无 |-
 
 
@@ -194,7 +194,7 @@ python -u  create_pretraining_data.py \
     --output_prefix baike_sample  \
     --workers 1 \
     --log_interval 5 \
-    --data_impl "lazy"
+    --data_impl "mmap"
 ```
 1. 如果您使用已经分好词的语料，可以设置 --cn_splited 为 True，同时指定--cn_split_dimer如空格。
 2. 使用自定义词表的话，请指定model_name为词表所在的文件夹地址。
@@ -205,7 +205,7 @@ python -u  create_pretraining_data.py \
 python merge.py \
     --input /root/data/index \
     --output-prefix /root/data/index/merged \
-    --data_impl lazy
+    --data_impl mmap
 ```
 使用说明：
 ```
