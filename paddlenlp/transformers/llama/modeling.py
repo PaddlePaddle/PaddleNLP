@@ -859,7 +859,10 @@ class LlamaModel(LlamaPretrainedModel):
 
         if attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
-            expanded_attn_mask = _expand_mask(attention_mask, dtype, tgt_length=input_shape[-1])
+            if len(attention_mask.shape) == 2:
+                expanded_attn_mask = _expand_mask(attention_mask, dtype, tgt_length=input_shape[-1])
+            else:
+                expanded_attn_mask = attention_mask
             combined_attention_mask = (
                 expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
             )
