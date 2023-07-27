@@ -23,7 +23,11 @@ CHATGLM_V2_PRETRAINED_RESOURCE_FILES_MAP = {
 
 class ChatGLMv2Config(PretrainedConfig):
     model_type = "chatglm_v2"
-    attribute_map = {"num_layers": "num_hidden_layers", "padded_vocab_size": "vocab_size"}
+    attribute_map = {
+        "num_layers": "num_hidden_layers",
+        "padded_vocab_size": "vocab_size",
+        "seq_length": "max_sequence_length",
+    }
 
     def __init__(
         self,
