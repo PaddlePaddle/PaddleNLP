@@ -544,7 +544,7 @@ class UniDiffuserPipeline(DiffusionPipeline):
                 noise_pred = self.get_noise_pred(
                     mode,
                     latents,
-                    t * N,
+                    t * N if isinstance(self.scheduler, DPMSolverUniDiffuserScheduler) else t,
                     image_vae_latents,
                     image_clip_latents,
                     prompt_embeds,
