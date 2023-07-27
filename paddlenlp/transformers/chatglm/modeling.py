@@ -617,11 +617,10 @@ class FusedChatGLMStack(nn.Layer):
         attention_mask: Tensor,
         inputs_embeds: Tensor = None,
         cache: Optional[Tensor] = None,
-        time_step: Tensor = None,
         use_cache: bool = False,
         **kwargs,
     ):
-
+        print("fused-model")
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
@@ -635,6 +634,7 @@ class FusedChatGLMStack(nn.Layer):
             inputs_embeds = self.word_embeddings(input_ids)
             inputs_embeds = inputs_embeds.transpose([1, 0, 2])
 
+        is_decoder = cache is not None
         if cache is None:
             if self.config.pre_seq_len is not None:
                 cache = self.get_prompt(batch_size=input_ids.shape[0], dtype=inputs_embeds.dtype)
@@ -668,7 +668,11 @@ class FusedChatGLMStack(nn.Layer):
             ]
 
         if attention_mask is None:
-            attention_mask = paddle.zeros([1, 1]).astype("int64")
+            attention_mask = paddle.zeros_like(input_ids, dtype=paddle.get_default_dtype())
+
+        if not attention_mask.is_floating_point():
+            # tokenizer return: [0, 0, 0, 0, 1]
+            attention_mask = attention_mask * -10000
 
         cos, sin = self.rotary_embeddings(seq_len=self.config.max_sequence_length + 1)
         coses = []
@@ -695,12 +699,11 @@ class FusedChatGLMStack(nn.Layer):
         sines = paddle.concat([position_sin, block_position_sin], axis=-1).unsqueeze(0)
         rotary_embeds = paddle.concat([coses, sines])
 
-        attention_mask = (1 - attention_mask) * -10000
-
         new_cache = [None]
         hidden_states = hidden_states.transpose([1, 0, 2])
         hidden_states = self.input_layernorm(hidden_states)
 
+        time_step = paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None
         hidden_states, new_cache = self.transformer_block(
             hidden_states,
             attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
@@ -709,6 +712,7 @@ class FusedChatGLMStack(nn.Layer):
             rotary_emb_dims=2 if self.config.position_encoding_2d else 1,
             time_step=time_step,
         )
+        print("hidden_states", hidden_states)
 
         output = hidden_states.transpose([1, 0, 2])
         return (output, new_cache)
@@ -1131,12 +1135,15 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
         # from paddlenlp.transformers import ChatGLMTokenizer
         # self.tokenizer = ChatGLMTokenizer.from_pretrained("THUDM/chatglm-6b")
 
-    def prepare_fast_entry(self, kwargs):
+    def prepare_fast_entry(self, kwargs=None):
         """create `FusedLlamaModel` model by `LlamaModel` and re-use the lm-head layer"""
+        if isinstance(self.chatglm.transformer, FusedChatGLMStack):
+            return
         self.chatglm.config.tensor_parallel_degree = max(self.chatglm.config.tensor_parallel_degree, 1)
         model = FusedChatGLMStack.from_pretrained_model(self.chatglm)
+        delattr(self.chatglm, "transformer")
+        setattr(self.chatglm, "transformer", model)
         self.chatglm.transformer.forward = model.forward
-        self.chatglm.transformer = model
 
     def prepare_inputs_for_generation(
         self, input_ids, position_ids=None, attention_mask=None, past_key_values=None, cache=None, **kwargs
@@ -1211,7 +1218,7 @@ class ChatGLMForConditionalGeneration(ChatGLMPretrainedModel):
         # update attention mask
         if "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]
-            if attention_mask is not None and attention_mask.dtype == paddle.int64:
+            if attention_mask is not None and not attention_mask.is_floating_point():
                 attention_mask = paddle.concat(
                     [attention_mask, paddle.ones([*attention_mask.shape[:3], 1], attention_mask.dtype)], axis=3
                 )

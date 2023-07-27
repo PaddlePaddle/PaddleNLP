@@ -14,6 +14,7 @@
 
 import os
 
+import numpy as np
 import paddle
 
 from paddlenlp.transformers import AutoTokenizer
@@ -33,7 +34,10 @@ def parse_arguments():
         help="Type of inference device, support 'cpu' or 'gpu'.",
     )
     parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
-    parser.add_argument("--src_length", type=int, default=50, help="The batch size of data.")
+    parser.add_argument("--src_length", type=int, default=1024, help="decoding length")
+    parser.add_argument("--top_k", type=int, default=0, help="top_p parameter for decoding")
+    parser.add_argument("--temperature", type=int, default=1024, help="temperature parameter for decoding")
+    parser.add_argument("--top_p", type=int, default=1024, help="top_p parameter for decoding")
     return parser.parse_args()
 
 
@@ -76,6 +80,10 @@ class Predictor(object):
             return_attention_mask=True,
             return_position_ids=True,
         )
+        inputs["max_length"] = np.array(args.src_length, dtype="int64")
+        inputs["top_p"] = np.array(args.top_p)
+        inputs["top_k"] = np.array(args.top_k, dtype="int64")
+        inputs["temperature"] = np.array(args.temperature)
         return inputs
 
     def infer(self, inputs):
@@ -113,7 +121,6 @@ if __name__ == "__main__":
         "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
         "answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
     ]
-
     batch_texts = batchfy_text(all_texts, args.batch_size)
     for bs, texts in enumerate(batch_texts):
         outputs = predictor.predict(texts)

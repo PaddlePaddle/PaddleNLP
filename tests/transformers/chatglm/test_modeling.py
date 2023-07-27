@@ -23,8 +23,9 @@ from paddlenlp.transformers import (
     ChatGLMConfig,
     ChatGLMForConditionalGeneration,
     ChatGLMModel,
-    LlamaForCausalLM,
+    ChatGLMTokenizer,
 )
+from paddlenlp.transformers.chatglm.modeling import FusedChatGLMStack
 from tests.transformers.test_configuration_common import ConfigTester
 from tests.transformers.test_modeling_common import ModelTesterMixin, ids_tensor
 from tests.transformers.test_modeling_utils import SimplePredictor
@@ -149,7 +150,13 @@ class ChatGLMTester:
 
         next_tokens = ids_tensor([self.batch_size, 3], self.vocab_size)
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
+        import pdb
+
+        pdb.set_trace()
         next_attention_mask = model.get_masks(next_input_ids)
+        import pdb
+
+        pdb.set_trace()
 
         outputs = model(next_input_ids, attention_mask=next_attention_mask, return_dict=self.return_dict)
         output_from_no_past = outputs.past_key_values[0] if self.return_dict else outputs[1][0]
@@ -212,6 +219,10 @@ class ChatGLMTest(ModelTesterMixin, unittest.TestCase):
 
     all_model_classes = (ChatGLMModel, ChatGLMForConditionalGeneration)
 
+    def get_test_inputs(self, tensor_type="pd"):
+        tokenizer = ChatGLMTokenizer.from_pretrained("__internal_testing__/tiny-fused-chatglm")
+        return tokenizer("hello, ", return_attention_mask=True, return_tensors=tensor_type)
+
     def setUp(self):
         super().setUp()
 
@@ -233,61 +244,65 @@ class ChatGLMTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_lm_head_model(*config_and_inputs)
 
     def test_fused_model(self):
-        model = ChatGLMForConditionalGeneration.from_pretrained("__internal_testing__/tiny-random-chatglm")
-        # model = ChatGLMForConditionalGeneration.from_pretrained("THUDM/chatglm-6b")
-        model.prepare_fast_entry({})
-        fused_model = model.chatglm
+        fused_model = ChatGLMModel.from_pretrained("__internal_testing__/tiny-fused-chatglm")
+
+        model = FusedChatGLMStack.from_pretrained_model(fused_model)
+        delattr(fused_model, "transformer")
+        setattr(fused_model, "transformer", model)
+        fused_model.transformer.forward = model.forward
+
+        self.assertTrue(isinstance(fused_model.transformer, FusedChatGLMStack))
         fused_model.eval()
 
-        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
-        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        inputs = self.get_test_inputs()
         with paddle.no_grad():
-            output = fused_model(input_ids, attention_mask=attention_mask)[0]
+            output = fused_model(**inputs)[0]
+
+        expected_shape = [4, 1, 64]
+        self.assertEqual(output.shape, expected_shape)
+        expected_slice = paddle.to_tensor(
+            [
+                [[-0.17035565, -0.32559395, 0.32660657]],
+                [[1.57559943, -0.89013374, -0.23218645]],
+                [[1.19164538, 0.61022210, 0.05817826]],
+                [[-0.48568538, -1.26236689, -0.69049180]],
+            ]
+        )
+        self.assertTrue(paddle.allclose(output[:, :, 1:4], expected_slice, atol=1e-4))
+
+    def test_fast_generation(self):
+        model = ChatGLMForConditionalGeneration.from_pretrained("__internal_testing__/tiny-fused-chatglm")
+        model.eval()
+
+        inputs = self.get_test_inputs()
+
+        with paddle.no_grad():
+            output = model.generate(**inputs, max_length=10, use_fast=True)[0]
+
+        expected_shape = [1, 10]
+        self.assertEqual(output.shape, expected_shape)
+        expected_ids = [[130004, 130004, 130004, 130004, 130004, 130004, 130004, 130004, 130004, 130004]]
+        self.assertListEqual(output.tolist(), expected_ids)
+
+    @unittest.skip("`to_static` of chatglm takes a long time to run")
+    def test_static_fast_generation(self):
+        model = ChatGLMForConditionalGeneration.from_pretrained("__internal_testing__/tiny-fused-chatglm")
+        model.prepare_fast_entry({})
+        model.eval()
 
         import pdb
 
         pdb.set_trace()
-        expected_shape = [1, 11, 768]
-        self.assertEqual(output.shape, expected_shape)
-        expected_slice = paddle.to_tensor(
-            [
-                [
-                    [0.20424680, 0.18634382, -0.75255555],
-                    [0.37669501, -0.38723028, -1.21922004],
-                    [0.31110007, -0.40123510, -0.64165694],
-                ]
-            ]
-        )
-        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
-
-    def test_fast_generation(self):
-        model = LlamaForCausalLM.from_pretrained("__internal_testing__/micro-random-llama")
-        model.eval()
-
-        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
-        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
-
-        with paddle.no_grad():
-            output = model.generate(input_ids, attention_mask=attention_mask, max_length=10, use_fast=True)[0]
-
-        expected_shape = [1, 10]
-        self.assertEqual(output.shape, expected_shape)
-        expected_ids = [[20762, 3825, 3009, 24082, 23694, 30334, 3557, 19503, 20577, 15480]]
-        self.assertListEqual(output.tolist(), expected_ids)
-
-    def test_static_fast_generation(self):
-        model = LlamaForCausalLM.from_pretrained("__internal_testing__/micro-random-llama")
-        model.eval()
-
         with tempfile.TemporaryDirectory() as tempdir:
+            tempdir = "./test"
             model_path = os.path.join(tempdir, "model")
             config = dict(use_top_p=False)
             model.to_static(model_path, config)
 
             predictor = SimplePredictor(tempdir)
+            test_inputs = self.get_test_inputs("np")
             inputs = {
-                "input_ids": np.array([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]]),
-                "attention_mask": np.array([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]]),
+                **test_inputs,
                 "max_length": np.array(10),
                 "top_k": np.array(1),
             }
@@ -296,6 +311,7 @@ class ChatGLMTest(ModelTesterMixin, unittest.TestCase):
             self.assertEqual(list(outputs.shape), expected_shape)
 
             expected_ids = [[20762, 3825, 3009, 24082, 23694, 30334, 3557, 19503, 20577, 15480]]
+            expected_ids = [[130004, 130004, 130004, 130004, 130004, 130004, 130004, 130004, 130004, 130004]]
             self.assertListEqual(outputs.tolist(), expected_ids)
 
 

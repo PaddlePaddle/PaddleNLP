@@ -24,7 +24,7 @@ def get_parser():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name_or_path", default="facebook/llama-7b", help="The directory of model.")
+    parser.add_argument("--model_name_or_path", default="ziqingyang/chinese-alpaca-7b", help="The directory of model.")
     parser.add_argument(
         "--merge_tensor_parallel_path", default=None, help="The directory of model to merge tensor parallel parts."
     )
@@ -158,6 +158,7 @@ class Predictor(object):
     def postprocess(self, infer_data):
         result = []
         for x in infer_data.tolist():
+            print("decoded ids:", x)
             res = self.tokenizer.decode(x, skip_special_tokens=True)
             result.append(res)
         out_dict = {"result": result}
@@ -173,10 +174,11 @@ class Predictor(object):
 if __name__ == "__main__":
     args = parse_arguments()
     predictor = Predictor(args)
-    all_texts = [
-        "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
-        "answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
-    ]
+    # all_texts = [
+    #     "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
+    #     "answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
+    # ]
+    all_texts = ["中国的首都在哪里？"]
     batch_texts = batchfy_text(all_texts, args.batch_size)
     for bs, texts in enumerate(batch_texts):
         outputs = predictor.predict(texts)

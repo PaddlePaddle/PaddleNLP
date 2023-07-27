@@ -646,6 +646,64 @@ class GPTPretrainedModel(PretrainedModel):
 
 
 class FusedGPTModel(GPTPretrainedModel):
+    r"""
+    The bare GPT Model transformer outputting raw hidden-states.
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        vocab_size (int):
+            Vocabulary size of `inputs_ids` in `GPTModel`. Also is the vocab size of token embedding matrix.
+            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `GPTModel`.
+        hidden_size (int, optional):
+            Dimensionality of the embedding layer and decoder layer. Defaults to `768`.
+        num_hidden_layers (int, optional):
+            Number of hidden layers in the Transformer decoder. Defaults to `12`.
+        num_attention_heads (int, optional):
+            Number of attention heads for each attention layer in the Transformer decoder.
+            Defaults to `12`.
+        intermediate_size (int, optional):
+            Dimensionality of the feed-forward (ff) layer in the decoder. Input tensors
+            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
+            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
+            Defaults to `3072`.
+        hidden_act (str, optional):
+            The non-linear activation function in the feed-forward layer.
+            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
+            are supported. Defaults to `"gelu"`.
+        hidden_dropout_prob (float, optional):
+            The dropout probability for all fully connected layers in the embeddings and decoder.
+            Defaults to `0.1`.
+        attention_probs_dropout_prob (float, optional):
+            The dropout probability used in MultiHeadAttention in all decoder layers to drop some attention target.
+            Defaults to `0.1`.
+        max_position_embeddings (int, optional):
+            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
+            sequence. Defaults to `512`.
+        type_vocab_size (int, optional):
+            The vocabulary size of the `token_type_ids`. Defaults to `16`.
+
+            .. note::
+                Please NOT using `type_vocab_size`, for it will be obsolete in the future..
+
+        initializer_range (float, optional):
+            The standard deviation of the normal initializer. Default to `0.02`.
+
+            .. note::
+                A normal_initializer initializes weight matrices as normal distributions.
+                See :meth:`GPTPretrainedModel._init_weights()` for how weights are initialized in `GPTModel`.
+
+        pad_token_id(int, optional):
+            The index of padding token in the token vocabulary.
+            Defaults to `0`.
+
+    """
+
     def __init__(self, config: GPTConfig):
         super(FusedGPTModel, self).__init__(config)
 
@@ -657,17 +715,6 @@ class FusedGPTModel(GPTPretrainedModel):
         self.hidden_size = config.hidden_size
         self.vocab_size = config.vocab_size
         self.n_head = config.num_attention_heads
-
-        self.embeddings = GPTEmbeddings(
-            config.vocab_size,
-            config.hidden_size,
-            config.hidden_dropout_prob,
-            config.max_position_embeddings,
-            config.type_vocab_size,
-            config.tensor_parallel_degree,
-            self.initializer_range,
-        )
-
         self.bias = paddle.tril(
             paddle.ones(
                 [1, 1, config.max_position_embeddings, config.max_position_embeddings],
@@ -675,14 +722,25 @@ class FusedGPTModel(GPTPretrainedModel):
             )
         )
 
-        # get ring_id
-        ring_id = -1
-        try:
-            hcg = fleet.get_hybrid_communicate_group()
-            model_parallel_group = hcg.get_model_parallel_group()
-            ring_id = model_parallel_group.id
-        except:
-            pass
+        self.embeddings = GPTEmbeddings(
+            config.vocab_size,
+            config.hidden_size,
+            config.hidden_dropout_prob,
+            config.max_position_embeddings,
+            config.type_vocab_size,
+            self.initializer_range,
+        )
+
+        decoder_layers = nn.LayerList()
+        for i in range(config.num_hidden_layers):
+            decoder_layers.append(TransformerDecoderLayer(config))
+
+        self.decoder = TransformerDecoder(
+            decoder_layers,
+            config.num_hidden_layers,
+            norm="LayerNorm",
+            hidden_size=config.hidden_size,
+        )
 
         ln_scale_attrs = [
             paddle.ParamAttr(name="fusemt.{}.ln_scale".format(i)) for i in range(config.num_hidden_layers)
@@ -726,7 +784,7 @@ class FusedGPTModel(GPTPretrainedModel):
             4 * self.hidden_size,
             activation="gelu",
             nranks=config.tensor_parallel_degree,
-            ring_id=ring_id,
+            ring_id=-1,
             num_layers=config.num_hidden_layers,
             ln_scale_attrs=ln_scale_attrs,
             ln_bias_attrs=ln_bias_attrs,
@@ -773,6 +831,60 @@ class FusedGPTModel(GPTPretrainedModel):
     ):
         r"""
         The GPTModel forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor, optional):
+                Indices of input sequence tokens in the vocabulary. They are
+                numerical representations of tokens that build the input sequence.
+                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to None.
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
+                max_position_embeddings - 1]``.
+                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
+            attention_mask (Tensor, optional):
+                Mask used in self attention to avoid performing attention to some unwanted positions,
+                usually the subsequent positions.
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
+                [batch_size, num_attention_heads, sequence_length, sequence_length].
+                Its data type should be int64.
+                The `masked` tokens have `0` values, and the `unmasked` tokens have `1` values.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+            inputs_embeds (Tensor, optional):
+                Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation
+                of shape `(batch_size, sequence_length, hidden_size)`. This is useful if you want more control over
+                how to convert `input_ids` indices into associated vectors than the model's internal embedding lookup matrix.
+                Default to None.
+            use_cache (bool, optional):
+                Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
+                can be used to speed up decoding.
+            cache (list, optional):
+                It is a list, and each element in the list is a tuple `(incremental_cache, static_cache)`.
+                See `TransformerDecoder.gen_cache <https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__ for more details.
+                It is only used for inference and should be None for training.
+                Default to `None`.
+            output_attentions (bool, optional):
+                Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
+                tensors for more detail. Defaults to `False`.
+            output_hidden_states (bool, optional):
+                Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
+                more detail. Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
+
+        Returns:
+            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
+
+            Especially, When `return_dict=output_hidden_states=output_attentions=False`,
+            returns tensor `outputs` which is the output at the last layer of the model.
+            Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
+
         Example:
             .. code-block::
 
@@ -839,7 +951,6 @@ class FusedGPTModel(GPTPretrainedModel):
         causal_mask = self.bias[:, :, cache_length:length, :length]
 
         attention_mask = (1.0 - causal_mask) * -1e4
-
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 
@@ -866,13 +977,17 @@ class FusedGPTModel(GPTPretrainedModel):
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         hidden_states = inputs_embeds
+
+        print("hidden_states", hidden_states)
         hidden_states, presents = self.transformer_block(
             hidden_states,
             attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
             caches=self.cache_kvs,
             time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
         )
-        hidden_states = self.norm(hidden_states)
+        print("hidden_states", hidden_states)
+        hidden_states = self.decoder.norm(hidden_states)
+        print("hidden_states norm output", hidden_states)
 
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
@@ -894,66 +1009,95 @@ class FusedGPTModel(GPTPretrainedModel):
     @paddle.no_grad()
     def set_state_dict(self, state_dict, use_structured_name=True):
         dtype = paddle.get_default_dtype()
+        new_state_dict = {}
+
+        for key in list(state_dict.keys()):
+            state_dict[key.replace("gpt.", "")] = state_dict.pop(key)
+
+        self.embeddings.word_embeddings.weight.set_value(state_dict.pop("embeddings.word_embeddings.weight"))
+        self.embeddings.position_embeddings.weight.set_value(state_dict.pop("embeddings.position_embeddings.weight"))
+        self.decoder.norm.weight.set_value(state_dict.pop("decoder.norm.weight"))
+
+        for i in range(self.config.num_hidden_layers):
+            q_proj_weight = state_dict.pop(f"decoder.layers.{i}.self_attn.q_proj.weight")
+            k_proj_weight = state_dict.pop(f"decoder.layers.{i}.self_attn.k_proj.weight")
+            v_proj_weight = state_dict.pop(f"decoder.layers.{i}.self_attn.v_proj.weight")
+
+            q_proj_weight = q_proj_weight.transpose([1, 0]).reshape(
+                [self.n_head, self.hidden_size // self.n_head, self.hidden_size]
+            )
+            k_proj_weight = k_proj_weight.transpose([1, 0]).reshape(
+                [self.n_head, self.hidden_size // self.n_head, self.hidden_size]
+            )
+            v_proj_weight = v_proj_weight.transpose([1, 0]).reshape(
+                [self.n_head, self.hidden_size // self.n_head, self.hidden_size]
+            )
+
+            concated_qkv_weight = (
+                paddle.concat([q_proj_weight, k_proj_weight, v_proj_weight], axis=1)
+                .reshape([3 * self.hidden_size, self.hidden_size])
+                .transpose([1, 0])
+            )
+            state_dict[f"decoder.layers.{i}.self_attn.qkv_proj.weight"] = concated_qkv_weight
+
+            q_proj_bias = state_dict.pop(f"decoder.layers.{i}.self_attn.q_proj.bias")
+            k_proj_bias = state_dict.pop(f"decoder.layers.{i}.self_attn.k_proj.bias")
+            v_proj_bias = state_dict.pop(f"decoder.layers.{i}.self_attn.v_proj.bias")
+
+            q_proj_bias = q_proj_bias.reshape([self.n_head, self.hidden_size // self.n_head])
+            k_proj_bias = k_proj_bias.reshape([self.n_head, self.hidden_size // self.n_head])
+            v_proj_bias = v_proj_bias.reshape([self.n_head, self.hidden_size // self.n_head])
+
+            concated_qkv_bias = paddle.concat([q_proj_bias, k_proj_bias, v_proj_bias], axis=-1).reshape([-1])
+            state_dict[f"decoder.layers.{i}.self_attn.qkv_proj.bias"] = concated_qkv_bias
 
         for k, v in state_dict.items():
-            print("process -> ", k)
-            if k.startswith("gpt."):
-                k = str(k.split("gpt.")[1])
-            if k.find("embeddings.word_embeddings.weight") >= 0:
-                self.embeddings.word_embeddings.weight.set_value(paddle.cast(v, dtype))
-            elif k.find("decoder.norm.weight") >= 0:
-                self.norm.weight.set_value(paddle.cast(v, dtype))
-            elif k.find("decoder.norm.bias") >= 0:
-                self.norm.bias.set_value(paddle.cast(v, dtype))
+            if not k.startswith("decoder.layers."):
+                new_state_dict[k] = v
+                continue
+
+            idx = int(k.split(".")[2])
+            if k.endswith("norm1.weight"):
+                new_state_dict["fusemt.{}.ln_scale".format(idx)] = v.astype("float32")
+            elif k.endswith("norm1.bias"):
+                new_state_dict["fusemt.{}.ln_bias".format(idx)] = v.astype("float32")
+            elif k.endswith("self_attn.qkv_proj.weight"):
+                new_state_dict["fusemt.{}.qkv_weight".format(idx)] = (
+                    v.reshape(
+                        [
+                            self.hidden_size,
+                            self.n_head,
+                            3,
+                            self.hidden_size // self.n_head,
+                        ]
+                    )
+                    .transpose([2, 1, 3, 0])
+                    .astype(dtype)
+                )
+            elif k.endswith("self_attn.qkv_proj.bias"):
+                new_state_dict["fusemt.{}.qkv_bias".format(idx)] = (
+                    v.reshape([self.n_head, 3, self.hidden_size // self.n_head]).transpose([1, 0, 2]).astype(dtype)
+                )
+            elif k.endswith("self_attn.out_proj.weight"):
+                new_state_dict["fusemt.{}.linear_weight".format(idx)] = v.astype(dtype)
+            elif k.endswith("self_attn.out_proj.bias"):
+                new_state_dict["fusemt.{}.linear_bias".format(idx)] = v.astype(dtype)
+            elif k.endswith("norm2.weight"):
+                new_state_dict["fusemt.{}.ffn_ln_scale".format(idx)] = v.astype("float32")
+            elif k.endswith("norm2.bias"):
+                new_state_dict["fusemt.{}.ffn_ln_bias".format(idx)] = v.astype("float32")
+            elif k.endswith("linear1.weight"):
+                new_state_dict["fusemt.{}.ffn1_weight".format(idx)] = v.astype(dtype)
+            elif k.endswith("linear1.bias"):
+                new_state_dict["fusemt.{}.ffn1_bias".format(idx)] = v.astype(dtype)
+            elif k.endswith("linear2.weight"):
+                new_state_dict["fusemt.{}.ffn2_weight".format(idx)] = v.astype(dtype)
+            elif k.endswith("linear2.bias"):
+                new_state_dict["fusemt.{}.ffn2_bias".format(idx)] = v.astype(dtype)
             else:
-                if not k.startswith("decoder.layers."):
-                    continue
-                idx = int(k.split(".")[2])
-                if k.endswith("norm1.weight"):
-                    self.transformer_block.ln_scales[idx].set_value(paddle.cast(v, "float32"))
-                elif k.endswith("norm1.bias"):
-                    self.transformer_block.ln_biases[idx].set_value(paddle.cast(v, "float32"))
-                elif k.endswith("self_attn.qkv_proj.weight"):
-                    self.transformer_block.qkv_weights[idx].set_value(
-                        paddle.cast(
-                            v.reshape(
-                                [
-                                    self.hidden_size,
-                                    self.n_head // self.config.tensor_parallel_degree,
-                                    3,
-                                    self.hidden_size // self.n_head,
-                                ]
-                            ).transpose([2, 1, 3, 0]),
-                            dtype,
-                        )
-                    )
-                elif k.endswith("self_attn.qkv_proj.bias"):
-                    self.transformer_block.qkv_biases[idx].set_value(
-                        paddle.cast(
-                            v.reshape(
-                                [self.n_head // self.config.tensor_parallel_degree, 3, self.hidden_size // self.n_head]
-                            ).transpose([1, 0, 2]),
-                            dtype,
-                        )
-                    )
-                elif k.endswith("self_attn.out_proj.weight"):
-                    self.transformer_block.linear_weights[idx].set_value(paddle.cast(v, dtype))
-                elif k.endswith("self_attn.out_proj.bias"):
-                    self.transformer_block.linear_biases[idx].set_value(paddle.cast(v, dtype))
-                elif k.endswith("norm2.weight"):
-                    self.transformer_block.ffn_ln_scales[idx].set_value(paddle.cast(v, "float32"))
-                elif k.endswith("norm2.bias"):
-                    self.transformer_block.ffn_ln_biases[idx].set_value(paddle.cast(v, "float32"))
-                elif k.endswith("linear1.weight"):
-                    self.transformer_block.ffn1_weights[idx].set_value(paddle.cast(v, dtype))
-                elif k.endswith("linear1.bias"):
-                    self.transformer_block.ffn1_biases[idx].set_value(paddle.cast(v, dtype))
-                elif k.endswith("linear2.weight"):
-                    self.transformer_block.ffn2_weights[idx].set_value(paddle.cast(v, dtype))
-                elif k.endswith("linear2.bias"):
-                    self.transformer_block.ffn2_biases[idx].set_value(paddle.cast(v, dtype))
-                else:
-                    raise ValueError("Unknow weight {}".format(k))
+                raise ValueError("Unknow weight {}".format(k))
+
+        super().set_state_dict(new_state_dict, False)
 
 
 @register_base_model
@@ -1548,8 +1692,11 @@ class GPTLMHeadModel(GPTPretrainedModel):
         """create `FusedGPTModel` model by `GPTModel` and re-use the lm-head layer"""
         self.config.tensor_parallel_degree = max(self.config.tensor_parallel_degree, 1)
         model = FusedGPTModel.from_pretrained_model(self)
+
+        delattr(self, "gpt")
+        setattr(self, "gpt", model)
         self.gpt.forward = model.forward
-        self.gpt = model
+        self.gpt.eval()
 
     def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs

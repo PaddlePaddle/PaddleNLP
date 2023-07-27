@@ -25,7 +25,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model_path",
-        default="checkpoints",
+        default="ziqingyang/chinese-alpaca-7b",
         type=str,
         required=False,
         help="Path of the trained model to be exported.",
@@ -54,8 +54,10 @@ def main():
     elif args.dtype is not None:
         dtype = args.dtype
     else:
-        config = LlamaConfig.from_pretrained(args.model_name_or_path)
+        config = LlamaConfig.from_pretrained(args.model_path)
         dtype = "float16" if config.dtype is None else config.dtype
+
+    paddle.set_default_dtype(dtype)
 
     model = AutoModelForCausalLM.from_pretrained(
         args.model_path,
@@ -65,6 +67,15 @@ def main():
         use_cache=True,
         dtype=dtype,
     )
+
+    # model.prepare_fast_entry({})
+    # config = {"use_top_p": True}
+
+    # model.to_static(args.output_path, config)
+
+    # tokenizer.save_pretrained(os.path.dirname(args.output_path))
+    # return
+
     model.config.fp16_opt_level = None  # For dygraph to static only
     if args.lora_path is not None:
         model = LoRAModel.from_pretrained(model, args.lora_path)

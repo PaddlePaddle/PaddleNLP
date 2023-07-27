@@ -25,6 +25,8 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.common_ops_import import convert_dtype
 
+from paddlenlp.utils.import_utils import import_module
+
 try:
     from paddle.utils import map_structure
 except ImportError:
@@ -32,19 +34,14 @@ except ImportError:
 
 from paddle.fluid.dygraph.base import in_declarative_mode
 
-try:
-    from paddle import top_p_sampling
-
-    is_top_p_sampling_avaliable = True
-except:
-    is_top_p_sampling_avaliable = False
-
 from paddlenlp.utils.log import logger
 
 from .model_outputs import ModelOutput
 from .utils import get_scale_by_dtype
 
 __all__ = ["GenerationMixin"]
+
+is_top_p_sampling_avaliable = import_module("paddle.top_p_sampling") is not None
 
 
 def get_unfinished_flag(
@@ -366,8 +363,8 @@ class GenerationMixin(object):
     ):
         processors = LogitsProcessorList()
 
-        if min_length is not None and eos_token_id is not None and min_length > -1:
-            processors.append(MinLengthLogitsProcessor(min_length, eos_token_id))
+        # if min_length is not None and eos_token_id is not None and min_length > -1:
+        #     processors.append(MinLengthLogitsProcessor(min_length, eos_token_id))
         if num_beam_groups > 1 and diversity_rate > 0.0:
             processors.append(
                 HammingDiversityLogitsProcessor(
@@ -582,7 +579,10 @@ class GenerationMixin(object):
                 "Since the default dtype is float16, float16 would be used " "though 'use_fp16_decoding=False'."
             )
             kwargs["use_fp16_decoding"] = True
+
+        logger.info("start to build faster model ...")
         self.prepare_fast_entry(kwargs)
+        logger.info("faster model is ready ...")
         self._has_build_fast = True
 
     @paddle.no_grad()
@@ -1108,6 +1108,8 @@ class GenerationMixin(object):
         min_tokens_to_keep=1,
         **model_kwargs
     ):
+        return_scores = model_kwargs.pop("return_scores", True)
+
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
 
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
@@ -1115,7 +1117,8 @@ class GenerationMixin(object):
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
-        scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
+        if return_scores:
+            scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
         while cur_len < max_length:
             # prepare model inputs & get model output
@@ -1130,15 +1133,19 @@ class GenerationMixin(object):
                 logits = outputs
 
             # [batch_size, vocab_size]
-            logits = logits[:, -1, :]
+            if logits.dim() == 3:
+                logits = logits[:, -1, :]
 
+            # logits = paddle.cast(logits, "float32")
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
             logits = logits_processors(input_ids, logits)
 
             # sample
-            origin_probs = F.softmax(logits)
-            origin_probs = paddle.log(origin_probs)
+            if return_scores:
+                origin_probs = F.softmax(logits)
+                origin_probs = paddle.log(origin_probs)
+
             if temperature is not None and temperature != 1.0:
                 logits = logits / temperature
             probs = F.softmax(logits)
@@ -1157,12 +1164,14 @@ class GenerationMixin(object):
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
 
-            next_scores = paddle.index_sample(origin_probs, next_tokens)
+            if return_scores:
+                next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
                 next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
 
-            scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
+            if return_scores:
+                scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
 
             cur_len += 1
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
@@ -1173,10 +1182,14 @@ class GenerationMixin(object):
             # Stop when there is a </s> in all sentences
             if not paddle.any(unfinished_flag):
                 break
+
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
-        return input_ids[:, origin_len:], scores
+        if return_scores:
+            return input_ids[:, origin_len:], scores
+
+        return input_ids[:, origin_len:], None
 
     def to_static(self, path: str, config: dict = None):
         """export generation model to static
@@ -1315,7 +1328,11 @@ class GenerationMixin(object):
                 logits = outputs
 
             # [batch_size, vocab_size]
+            # if len(logits.shape) == 3:
+            #     logits = logits[:, -1, :]
+
             logits = logits[:, -1, :]
+            logits = paddle.cast(logits, "float32")
 
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
@@ -1333,7 +1350,7 @@ class GenerationMixin(object):
                 logits = logits / temperature
                 if use_topp_sampling_op:
                     top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
-                    _, next_tokens = top_p_sampling(probs, top_ps_tensor)
+                    _, next_tokens = paddle.top_p_sampling(probs, top_ps_tensor)
                 else:
                     probs = TopPProcess(probs, top_p, min_tokens_to_keep)
                     next_tokens = paddle.multinomial(probs)

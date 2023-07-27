@@ -596,6 +596,7 @@ class LlamaPretrainedModel(PretrainedModel):
 
     def _init_weights(self, layer):
         """Initialization hook"""
+        return
         if isinstance(
             layer,
             (
@@ -920,8 +921,13 @@ class LlamaForCausalLM(LlamaPretrainedModel):
     def prepare_fast_entry(self, kwargs):
         """create `FusedLlamaModel` model by `LlamaModel` and re-use the lm-head layer"""
         model = FusedLlamaModel.from_pretrained_model(self)
+        self.llama = None
+        setattr(self, "llama", model)
         self.llama.forward = model.forward
-        self.llama = model
+        # self.llama = model
+        import gc
+
+        gc.collect()
 
     def prepare_inputs_for_generation(
         self, input_ids, use_cache=False, past_key_values=None, inputs_embeds=None, **kwargs
@@ -1006,6 +1012,8 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         )
 
+        # hidden_states = hidden_states[:, -1, :]
+
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
 
         loss = None
@@ -1026,11 +1034,13 @@ class LlamaForCausalLM(LlamaPretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict, use_structured_name=True):
+        print("start to build faster model")
         if not self.config.use_fast:
             return super().set_state_dict(state_dict)
 
         self.lm_head.weight.set_value(state_dict["lm_head.weight"])
         self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys() if "llama" in k})
+        print("start to build faster model")
 
 
 class FusedLlamaModel(LlamaPretrainedModel):
