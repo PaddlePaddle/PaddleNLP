@@ -4,7 +4,7 @@
 
 - 硬件: A100-80G with NVLink, 具体卡数见表
 - Torch环境: 见torch/requirements.txt
-- FP16配置: torch 使用 cuda amp fp16, paddle 使用 fp16 O2 opt level, intokens 设置为 1024
+- FP16配置: torch 使用 cuda amp fp16, paddle 使用 fp16 O2 opt level, intokens 设置为 1024, dataloader_num_workers 设置为 4
 
 ### Bloom
 
