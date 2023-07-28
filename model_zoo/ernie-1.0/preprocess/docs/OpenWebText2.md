@@ -17,7 +17,7 @@ wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/openwebtext2.jsonl.
 tar -xvf openwebtext2.json.zst.tar -C  /path/to/openwebtext
 ```
 
-## GPT训练数据制作
+## Llama训练数据制作
 
 然后使用[proprecess](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-1.0/proprecess) 工具下的`create_pretraining_data.py`脚本进行数据集制作：
 ```
@@ -40,28 +40,4 @@ python -u  create_pretraining_data.py \
 mkdir data
 mv llama_openwebtext.bin ./data
 mv llama_openwebtext.idx ./data
-```
-## Llama训练数据制作
-
-然后使用[proprecess](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-1.0/proprecess) 工具下的`create_pretraining_data.py`脚本进行数据集制作：
-```
-python -u  create_pretraining_data.py \
-    --model_name facebook/llama-7b  \
-    --tokenizer_name LlamaTokenizer \
-    --data_format JSON \
-    --input_path /path/to/openwebtext/ \
-    --append_eos \
-    --output_prefix llama_openwebtext  \
-    --workers 40 \
-    --log_interval 10000 \
-    --data_impl "mmap"
-```
-处理时间约一个小时左右，就可以得到我们需要的`llama_openwebtext.bin`, `llama_openwebtext.idx`数据集文件。
-
-将所有预处理得到的文件统一放入一个文件夹中，以备训练使用：
-
-```
-mkdir data
-mv llama_openwebtext_100k.bin ./data
-mv llama_openwebtext_100k.idx ./data
 ```

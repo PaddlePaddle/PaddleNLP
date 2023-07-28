@@ -30,7 +30,7 @@ python trans_to_json.py  --input_path ./clue_corpus_small_14g --output_path clue
 ```
 现在我们得到了jsonl格式的数据集。
 
-## ERNIE 中文预训练数据制作
+## 中文预训练数据制作
 
 下面是针对训练任务的数据集应用，此处以llama为例。
 
