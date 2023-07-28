@@ -142,7 +142,6 @@ class LoRAModel(nn.Layer):
 
     def _merge_trainable_tensor_parallel(self, trainable_state_dict):
         trainable_name_action_mappings = self._get_tensor_parallel_mappings(self.model.config, is_split=False)
-        print(trainable_name_action_mappings)
 
         name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
         state_keys_map = ConversionMixin._resolve_prefix_keys(
@@ -158,12 +157,9 @@ class LoRAModel(nn.Layer):
 
         for key in trainable_state_dict:
             tensor = trainable_state_dict[key]
-            print(key)
             if key in trainable_name_action_mappings:
                 ret = distributed_gather(tensor, group=mp_group, offload=True)
-                print(ret)
                 action = trainable_name_action_mappings[key]
-                print(action)
                 tensor = action(ret) if is_dst else None
                 trainable_state_dict[key] = tensor
             else:
@@ -173,7 +169,6 @@ class LoRAModel(nn.Layer):
 
     def _convert_tensor_parallel(self, lora_state_dict):
         lora_name_action_mappings = self._get_tensor_parallel_mappings(self.model.config, is_split=False)
-        print(lora_name_action_mappings)
 
         name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
         state_keys_map = ConversionMixin._resolve_prefix_keys(
@@ -271,7 +266,7 @@ class LoRAModel(nn.Layer):
                     merge_weights=lora_config.merge_weights,
                 )
                 # Lora column parallel will spilt lora A matrix
-                self.add_lora_split_mapping(module_name + "lora_A", is_column=False)
+                self.add_lora_split_mapping(module_name + ".lora_A", is_column=False)
         else:
             if isinstance(module, nn.Linear):
                 lora_module = LoRAMergedLinear(
