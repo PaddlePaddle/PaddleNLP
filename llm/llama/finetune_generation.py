@@ -151,24 +151,15 @@ def main():
     if model_args.lora:
         if model_args.lora_path is None:
             # Not yet support RowParallelLinear
-            if training_args.tensor_parallel_degree > 1:
-                target_modules = [
-                    ".*q_proj.*",
-                    ".*v_proj.*",
-                    ".*k_proj.*",
-                    ".*gate_proj.*",
-                    ".*up_proj.*",
-                ]
-            else:
-                target_modules = [
-                    ".*q_proj.*",
-                    ".*v_proj.*",
-                    ".*k_proj.*",
-                    ".*o_proj.*",
-                    ".*gate_proj.*",
-                    ".*down_proj.*",
-                    ".*up_proj.*",
-                ]
+            target_modules = [
+                ".*q_proj.*",
+                ".*v_proj.*",
+                ".*k_proj.*",
+                ".*gate_proj.*",
+                ".*up_proj.*",
+                ".*o_proj.*",
+                ".*down_proj.*",
+            ]
 
             lora_config = LoRAConfig(
                 target_modules=target_modules,
