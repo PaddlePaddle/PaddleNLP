@@ -386,7 +386,7 @@ class BloomTokenizer(PretrainedTokenizer):
                 (optional) Set to False to avoid returning attention mask (default: set to model specifics)
         """
         # Load from model defaults
-        if "attention_mask" in encoded_inputs:
+        if "attention_mask" in encoded_inputs and len(np.shape(encoded_inputs["attention_mask"])) > 2:
             attention_mask = encoded_inputs["attention_mask"]
             encoded_inputs.pop("attention_mask")
         else:

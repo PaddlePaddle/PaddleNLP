@@ -251,7 +251,7 @@ class LlamaTokenizer(PretrainedTokenizer):
         # Load from model defaults
 
         # attention_mask shape [1,seq_len,seq_len]
-        if "attention_mask" in encoded_inputs:
+        if "attention_mask" in encoded_inputs and len(np.shape(encoded_inputs["attention_mask"])) > 2:
             attention_mask = encoded_inputs["attention_mask"]
             encoded_inputs.pop("attention_mask")
         else:
