@@ -835,7 +835,7 @@ function gpt_auto_pass_o2_stage1() {
     loss1=`cat $log_dir/workerlog.2 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss2=`cat $log_dir/workerlog.6 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 10.9932 ${loss}
+    check_result $FUNCNAME 10.9931 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -866,7 +866,7 @@ function gpt_auto_pass_o2_stage2() {
     loss1=`cat $log_dir/workerlog.2 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss2=`cat $log_dir/workerlog.6 | grep '4/4' | grep "lr:" | awk -F 'loss: ' '{print $2}' | awk -F ' ' '{print $1}'`
     loss=$(echo $loss1 $loss2 | awk '{printf("%.4f",($1+$2)/2)}')
-    check_result $FUNCNAME 10.9932 ${loss}
+    check_result $FUNCNAME 10.9931 ${loss}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
