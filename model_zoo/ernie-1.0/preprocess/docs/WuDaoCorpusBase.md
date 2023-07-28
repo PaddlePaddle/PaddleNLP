@@ -50,14 +50,14 @@ python ./trans_to_json.py  \
 
 ```
 python -u  create_pretraining_data.py \
-    --model_name ernie-1.0-base-zh \
-    --tokenizer_name ErnieTokenizer \
+    --model_name idea-ccnl/ziya-llama-13b-v1 \
+    --tokenizer_name LlamaTokenizer \
+    --data_format "JSON" \
     --input_path wudao_corpus_200g_0623.jsonl \
-    --split_sentences \
     --chinese \
-    --cn_whole_word_segment \
     --cn_seg_func jieba \
     --cn_splited \
+    --append_eos \
     --output_prefix wudao_corpus_200g_0623 \
     --workers 48 \
     --log_interval 10000 \
@@ -65,7 +65,7 @@ python -u  create_pretraining_data.py \
 ```
 
 - 我们提前分词好了，所以加上了 `cn_splited`，否则不需要使用此选项。
-- model_name 可以更换为其他 ERNIE 系列模型，如: `ernie-3.0-base-zh`
+- model_name 可以更换为[其他模型](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/llama/README.md)。
 - workers 表示转化的线程数目
 
 在当前目录下产出训练所需数据。
