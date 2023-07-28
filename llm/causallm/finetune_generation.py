@@ -253,10 +253,19 @@ def main():
 
         apply_ptq(quant_args, trainer, ptq_dataloader)
 
-    # Evaluation
+    # Evaluation dev set
     if training_args.do_eval:
         eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("eval", eval_result)
+
+    # Evaluation test set
+    if training_args.do_predict:
+        test_ds = load_dataset(
+            read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "test.json"), lazy=False
+        )
+        test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
+        eval_result = trainer.predict(test_ds).metrics
+        trainer.log_metrics("test", eval_result)
 
 
 if __name__ == "__main__":
