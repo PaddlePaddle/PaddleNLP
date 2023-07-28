@@ -165,12 +165,10 @@ class RowParallelLoRALinear(RowParallelLinear):
 
     def forward(self, x: paddle.Tensor):
         if not self.input_is_parallel:
-            x_d = mp_ops._c_split(x, group=self.model_parallel_group)
+            input_mp = mp_ops._c_split(x, group=self.model_parallel_group)
         else:
-            x_d = x
+            input_mp = x
 
-        # x_d sync grad during backward
-        input_mp = mp_ops._c_identity(x_d, group=self.model_parallel_group)
         # x @ W : [bz, in_f / ws] ===> [bz, out_f]
         result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
 
@@ -273,7 +271,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
 
         if not self.merged:
-            input_a = self.lora_dropout(input_mp) @ self.lora_A
+            input_a = self.lora_dropout(input) @ self.lora_A
             input_a_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
             delta_mp = (input_a_mp @ self.lora_B) * self.scaling
             result_mp += delta_mp
