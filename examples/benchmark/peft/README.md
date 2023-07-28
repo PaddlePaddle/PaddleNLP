@@ -26,7 +26,7 @@
 | Bloomz-7b1-mt  | bsz 8 ZeRO 3  |       1625.14               |     1702.00                |   -5%     |
 | Bloomz-7b1-mt  | bsz 8 ZeRO 2  |      2172.40            |     1891.16                |   15%     |
 | Bloomz-7b1-mt  | bsz 16 MP4    |      2853.83            |         N/A                |   N/A     |
-| Bloomz-7b1-mt  | bsz 16 ZeRO 3 |      2382.49                |      2849.90               |        |
+| Bloomz-7b1-mt  | bsz 16 ZeRO 3 |      2382.49                |      2849.90               |  -16%      |
 | Bloomz-7b1-mt  | bsz 16 ZeRO 2 |    2604.56 (accumulations 2) |  2719.92              |   -4%     |
 
 
