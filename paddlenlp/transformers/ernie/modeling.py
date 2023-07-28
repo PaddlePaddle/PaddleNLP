@@ -1351,8 +1351,9 @@ class UTC(ErniePretrainedModel):
 
         option_logits = paddle.matmul(q.unsqueeze(1), k, transpose_y=True).squeeze(1)
         option_logits = option_logits / self.predict_size**0.5
-        for index, logit in enumerate(option_logits):
-            option_logits[index] -= (1 - (omask_positions[index] > 0).astype("float32")) * 1e12
+        with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
+            for index, logit in enumerate(option_logits):
+                option_logits[index] -= (1 - (omask_positions[index] > 0).astype("float32")) * 1e12
 
         loss = None
         if not return_dict:
