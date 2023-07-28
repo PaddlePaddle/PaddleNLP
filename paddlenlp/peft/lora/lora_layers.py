@@ -133,7 +133,6 @@ class RowParallelLoRALinear(RowParallelLinear):
                 initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
             ),
         )
-        self.lora_A.is_distributed = False
         self.lora_B = self.create_parameter(
             shape=[r, self.out_features],
             dtype=self._dtype,
@@ -142,6 +141,7 @@ class RowParallelLoRALinear(RowParallelLinear):
         )
         self.lora_A.is_distributed = True
         self.lora_A.split_axis = 0
+        self.lora_B.is_distributed = False
         self.scaling = self.lora_alpha / self.r
 
         # Freezing the pre-trained weight matrix
@@ -164,25 +164,15 @@ class RowParallelLoRALinear(RowParallelLinear):
             self.merged = True
 
     def forward(self, x: paddle.Tensor):
-        # print(x.shape)
         if not self.input_is_parallel:
-            input_mp = mp_ops._c_split(x, group=self.model_parallel_group)
+            x_d = mp_ops._c_split(x, group=self.model_parallel_group)
         else:
-            input_mp = x
+            x_d = x
 
+        # x_d sync grad during backward
+        input_mp = mp_ops._c_identity(x_d, group=self.model_parallel_group)
         # x @ W : [bz, in_f / ws] ===> [bz, out_f]
-        # print(input_mp.shape, self.weight.shape, self.lora_A.shape, self.lora_B.shape)
         result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
-
-        if not self.merged:
-            # input_dup = mp_ops._c_identity(input_mp, group=self.model_parallel_group)
-            # x @ A: [bz, in_f/ ws] ===> [bz, r]
-            input_mp = self.lora_dropout(input_mp) @ self.lora_A
-            # is nessary?
-            # input_a_mp = mp_ops._c_identity(input_dup, group=self.model_parallel_group)
-            #  @ B: [bz, r] ===> [bz, out_f]
-            delta_mp = (input_mp @ self.lora_B) * self.scaling
-            result_mp += delta_mp
 
         output = mp_ops._mp_allreduce(
             result_mp,
@@ -190,6 +180,21 @@ class RowParallelLoRALinear(RowParallelLinear):
             use_calc_stream=True,
             use_model_parallel=True,
         )
+
+        if not self.merged:
+            # x @ A: [bz, in_f/ ws] ===> [bz, r]
+            input_mp = self.lora_dropout(input_mp) @ self.lora_A
+            # all reduce to keep Lora B's gradient on different gpu consistent
+            input_dup = mp_ops._mp_allreduce(
+                input_mp,
+                group=self.model_parallel_group,
+                use_calc_stream=True,
+                use_model_parallel=True,
+            )
+            #  @ B: [bz, r] ===> [bz, out_f]
+            delta_mp = (input_dup @ self.lora_B) * self.scaling
+            output += delta_mp
+
         return output
 
     def extra_repr(self):
@@ -268,7 +273,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
 
         if not self.merged:
-            input_a = self.lora_dropout(input) @ self.lora_A
+            input_a = self.lora_dropout(input_mp) @ self.lora_A
             input_a_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
             delta_mp = (input_a_mp @ self.lora_B) * self.scaling
             result_mp += delta_mp

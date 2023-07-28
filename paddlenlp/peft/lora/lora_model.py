@@ -158,9 +158,12 @@ class LoRAModel(nn.Layer):
 
         for key in trainable_state_dict:
             tensor = trainable_state_dict[key]
+            print(key)
             if key in trainable_name_action_mappings:
                 ret = distributed_gather(tensor, group=mp_group, offload=True)
+                print(ret)
                 action = trainable_name_action_mappings[key]
+                print(action)
                 tensor = action(ret) if is_dst else None
                 trainable_state_dict[key] = tensor
             else:
@@ -253,7 +256,8 @@ class LoRAModel(nn.Layer):
                         )
                     ),
                 )
-                self.add_lora_split_mapping(module_name, is_column=True)
+                # Lora column parallel will spilt lora B matrix
+                self.add_lora_split_mapping(module_name + ".lora_B", is_column=True)
             elif isinstance(module, RowParallelLinear):
                 # recover the original output_features
                 lora_module = RowParallelLoRALinear(
@@ -266,7 +270,8 @@ class LoRAModel(nn.Layer):
                     lora_dropout=lora_config.lora_dropout,
                     merge_weights=lora_config.merge_weights,
                 )
-                self.add_lora_split_mapping(module_name, is_column=False)
+                # Lora column parallel will spilt lora A matrix
+                self.add_lora_split_mapping(module_name + "lora_A", is_column=False)
         else:
             if isinstance(module, nn.Linear):
                 lora_module = LoRAMergedLinear(
