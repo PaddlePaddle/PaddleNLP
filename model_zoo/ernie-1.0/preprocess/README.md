@@ -49,7 +49,7 @@
 |1️⃣原始数据转换<br/>`trans_to_json.py`|预处理 <br>输入：0️⃣初始状态 <br>输出：jsonl|jsonl格式：每个doc对应一行json字符串| ```{"text": "飞桨是功能完备、开源开放的产业级深度学习平台。飞桨拥有..."}```<br/>```{"text": "PaddleNLP是自然语言..."}```
 |❇️(**可选**)数据中文分词<br/>`words_segmentation.py`|语料分词：中文WWM <br>输入：jsonl  <br> 输出：0️⃣初始状态| 将jsonl格式的数据，恢复成分词后的原始格式数据 <br> | ```飞桨 是 功能 完备、开源 开放的 产业级 深度学习 平台。``` <br/> ```飞桨 拥有 核心 训练和推理 框架、基础 模型库。``` <br/><br/> ```PaddleNLP 是 自然语言处理领域 的 优秀工具。```
 |2️⃣数据ID化<br/>`create_pretrain_data.py`|预处理| bin格式：数据id化后的token id <br/>idx格式：数据句子、文章位置索引 | -
-|3️⃣训练index文件生成|训练启动|idx格式：<br/> 根据训练步数max_steps生成<br/>train、valid、test的每个样本索引文件| -
+|3️⃣训练index文件生成|训练启动|npy格式：<br/> 根据训练步数max_steps生成<br/>train、valid、test的每个样本索引文件| -
 |4️⃣token动态mask（可选）| Dataset取数据 | 无 |-
 
 
