@@ -1722,7 +1722,9 @@ class Trainer:
             paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
 
         # Maybe delete some older checkpoints.
-        if self.args.should_save and (True if not self.args.use_hybrid_parallel else self.args.local_rank == 0):
+        if self.args.should_save_model_state and (
+            True if not self.args.use_hybrid_parallel else self.args.local_rank == 0
+        ):
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
 
     def set_optimizer_grouped_parameters(self, optimizer_grouped_parameters=None):
