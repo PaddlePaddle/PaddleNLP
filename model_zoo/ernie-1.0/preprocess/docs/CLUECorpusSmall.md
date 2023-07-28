@@ -40,7 +40,6 @@ python -u  create_pretraining_data.py \
     --tokenizer_name LlamaTokenizer \
     --data_format "JSON" \
     --input_path clue_corpus_small_14g.jsonl \
-    --chinese \
     --append_eos \
     --output_prefix clue_corpus_small_14g_20220104 \
     --workers 48 \

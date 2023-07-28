@@ -54,7 +54,6 @@ python -u  create_pretraining_data.py \
     --tokenizer_name LlamaTokenizer \
     --data_format "JSON" \
     --input_path wudao_corpus_200g_0623.jsonl \
-    --chinese \
     --cn_seg_func jieba \
     --cn_splited \
     --append_eos \

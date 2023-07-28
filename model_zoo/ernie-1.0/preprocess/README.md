@@ -151,7 +151,7 @@ data input/output:
 
 chinese words:
   --chinese             Is corpus need words segmentation step for chinese words.
-                        中文情形必须设置。处理的文本类型是否是中文。
+                        若设置了split_sentences，并处理中文则需要设置。
   --cn_whole_word_segment
                         Is corpus need words segmentation step for chinese words WWM.
                         可选。是否需要WWM策略。一般而言，BERT/ERNIE模型需要，GPT不需要。
@@ -181,7 +181,6 @@ python -u  create_pretraining_data.py \
     --tokenizer_name "LlamaTokenizer" \
     --data_format "JSON" \
     --input_path "baike_sample.jsonl" \
-    --chinese \
     --append_eos \
     --output_prefix "baike_sample"  \
     --workers 1 \
