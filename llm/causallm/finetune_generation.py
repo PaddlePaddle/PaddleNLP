@@ -264,7 +264,7 @@ def main():
             read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "test.json"), lazy=False
         )
         test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
-        eval_result = trainer.evaluate(test_ds)
+        eval_result = trainer.predict(test_ds).metrics
         trainer.log_metrics("test", eval_result)
 
 
