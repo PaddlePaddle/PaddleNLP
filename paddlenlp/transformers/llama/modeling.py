@@ -212,6 +212,7 @@ def scaled_dot_product_attention(
 
         # FIXME ZHUI when we use pipeline parallel, the attention_mask can be None
         # we just make it triangle_upper_mask
+        # print(get_triangle_upper_mask(attn_weights))
         if attention_mask is None:
             attention_mask = get_triangle_upper_mask(attn_weights)
 
@@ -220,10 +221,14 @@ def scaled_dot_product_attention(
             raise ValueError(
                 f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
             )
-        attn_weights = attention_mask + attn_weights
+        # print(attention_mask.dtype)
+        # attn_weights = attention_mask + attn_weights
 
-        attn_weights = paddle.maximum(
-            attn_weights, paddle.full([1], float(finfo(query_states.dtype).min), dtype=attn_weights.dtype)
+        # attn_weights = paddle.maximum(
+        #     attn_weights, paddle.full([1], float(finfo(query_states.dtype).min), dtype=attn_weights.dtype)
+        # )
+        attn_weights = paddle.where(
+            attention_mask, attn_weights, paddle.full_like(attn_weights, paddle.finfo(attn_weights.dtype).min)
         )
 
         with paddle.amp.auto_cast(False):
@@ -852,7 +857,7 @@ class LlamaModel(LlamaPretrainedModel):
         # create causal mask
         # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
         combined_attention_mask = None
-        if input_shape[-1] > 1:
+        if input_shape[-1] > 1 and len(attention_mask.shape) == 2:
             combined_attention_mask = _make_causal_mask(
                 input_shape, past_key_values_length=past_key_values_length, dtype=dtype
             )
