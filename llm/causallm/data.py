@@ -40,12 +40,18 @@ def read_local_dataset(path):
             yield json.loads(line.strip())
 
 
+class DataFormatError(ValueError):
+    pass
+
+
 def tokenize_example(tokenizer, example, data_args):
     if "src" in example and "tgt" in example:
         source = example["src"]
         target = example["tgt"]
     else:
-        raise ValueError(f"Example format is wrong, please check: {example} or rewrite tokenize_example in data.py ")
+        raise DataFormatError(
+            f"Example format is wrong, please check: {example} or rewrite tokenize_example in data.py "
+        )
     tokenized_source = tokenizer(
         source,
         max_length=data_args.src_length,
