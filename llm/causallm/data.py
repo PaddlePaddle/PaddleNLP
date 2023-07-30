@@ -80,26 +80,20 @@ def convert_example_common(example, tokenizer, data_args, is_test=True):
     tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
 
     if is_test:
-        features = {
-            "input_ids": tokenized_source["input_ids"],
-            "labels": tokenized_target_input_ids,
-        }
+        return dict(
+            input_ids=tokenized_source["input_ids"],
+            labels=tokenized_target_input_ids,
+        )
     else:
         input_ids = tokenized_source["input_ids"] + tokenized_target_input_ids
         source_length = len(tokenized_source["input_ids"])
         labels = [-100] * source_length + input_ids[source_length:]
         # shift labels
         input_ids, labels = input_ids[:-1], labels[1:]
-        features = {
-            "input_ids": input_ids,
-            "labels": labels,
-        }
-    if data_args.use_intokens:
-        seq_length = len(input_ids)
-        features["position_ids"] = list(range(seq_length))
-        # features["attention_mask"] = np.tril(np.ones([seq_length, seq_length], dtype="bool")).tolist()
-        features["attention_mask"] = np.tril(np.ones([seq_length, seq_length], dtype="bool"))
-    return features
+        return dict(
+            input_ids=input_ids,
+            labels=labels,
+        )
 
 
 def convert_example_chatglm(example, tokenizer, data_args, is_test=True):

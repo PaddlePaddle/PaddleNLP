@@ -98,7 +98,6 @@ def main():
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
-    logger.info("Loading and pre-processing dataset")
     if data_args.dataset_name_or_path is None:
         raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
     elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) and os.path.exists(
@@ -118,18 +117,7 @@ def main():
         else:
             train_ds, dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["train", "dev"])
     trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
-    train_ds.new_data = train_ds.new_data[:1000]
     train_ds = train_ds.map(partial(trans_func, is_test=False))
-    if data_args.use_intokens:
-        from paddlenlp.datasets import InTokensMapDataset
-
-        logger.info("Creating InTokens Dataset")
-        train_ds = InTokensMapDataset(
-            train_ds,
-            tokenizer=tokenizer,
-            max_length=data_args.intokens_max_length,
-        )
-        logger.info("Completed InTokens Dataset creation")
     dev_ds = dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
 
     if model_args.prefix_tuning:
