@@ -21,12 +21,6 @@ class DataArgument:
     src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=1024, metadata={"help": "The max length of target text."})
     eval_with_do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
-    # intokens arguments
-    use_intokens: bool = field(default=False, metadata={"help": "Whether to use InTokens Datastream"})
-    intokens_max_length: int = field(
-        default=2048,
-        metadata={"help": "Max sequence length for InTokens Datastream. Only effective when `use_tokens=True`"},
-    )
 
 
 @dataclass
