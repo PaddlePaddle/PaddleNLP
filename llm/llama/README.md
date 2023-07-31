@@ -39,9 +39,9 @@ Llama2 模型的权重的使用则需要遵循[License](../../../paddlenlp/trans
 使用方法：
 
 ```python
-from paddlenlp.transformers import LlamaForCausalLM, LlamaTokenizer
-model: LlamaForCausalLM = LlamaForCausalLM.from_pretrained("meta-llama/Llama-2-7b-chat")
-tokenizer = LlamaTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat")
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-2-7b-chat")
+tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat")
 ```
 
 ## 预训练
