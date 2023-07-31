@@ -236,6 +236,7 @@ def main():
         model_args.model_name_or_path,
         padding_side="left",  # Allow batch inference
     )
+    tokenizer.pad_token = tokenizer.unk_token
 
     # Load the dataset.
     if training_args.benchmark:
