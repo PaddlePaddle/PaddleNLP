@@ -141,7 +141,7 @@ def main():
 
     if model_args.lora:
         if model_args.lora_path is None:
-            target_modules = get_lora_target_modules(model, is_tp=training_args.tensor_parallel_degree > 1)
+            target_modules = get_lora_target_modules(model)
             lora_config = LoRAConfig(
                 target_modules=target_modules,
                 r=model_args.lora_rank,
