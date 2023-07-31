@@ -683,6 +683,8 @@ def paddlenlp_load(path, map_location="cpu"):
         return paddle.load(path, return_numpy=True)
     else:
         with device_guard(map_location):
+            return paddle.load(path)
+            # TODO(zhonghui03): the following code has problems when hot start optimizer checkpoint.
             if map_location == "cpu":
                 from paddle.framework.io import (
                     _parse_every_object,
