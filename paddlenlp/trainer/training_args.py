@@ -313,6 +313,8 @@ class TrainingArguments:
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
         flatten_param_grads (`bool`, *optional*):
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
+        merge_tensor_parallel (`bool`, *optional*, defaults to `False`):
+            If `True`, merge tensor parallel model parameters to one piece.
     """
 
     output_dir: str = field(
@@ -638,6 +640,10 @@ class TrainingArguments:
     lazy_data_processing: Optional[bool] = field(
         default=True,
         metadata={"help": "Whether use lazy data processing."},
+    )
+    merge_tensor_parallel: bool = field(
+        default=False,
+        metadata={"help": ("Whether to merge tensor parallel model parameters to one piece. ")},
     )
 
     def __post_init__(self):

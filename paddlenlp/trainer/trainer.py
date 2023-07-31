@@ -414,16 +414,19 @@ class Trainer:
             else:
                 weight_name = PADDLE_WEIGHTS_NAME
 
-            if not os.path.isfile(
-                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
-            ):
-                raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
+            checkpoint_file = os.path.join(
+                resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
+            )
+            if not os.path.isfile(checkpoint_file):
+                checkpoint_file = os.path.join(resume_from_checkpoint, _add_variant(weight_name, None))
+                if not os.path.isfile(checkpoint_file):
+                    raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
 
             logger.info(f"Loading model from {resume_from_checkpoint} .")
 
             # We load the model state dict on the CPU to avoid an OOM error.
             state_dict = paddle.load(
-                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)),
+                checkpoint_file,
                 return_numpy=True,
             )
             # If the model is on the GPU, it still works!
@@ -469,16 +472,19 @@ class Trainer:
                 weight_name = PREFIX_WEIGHTS_NAME
             else:
                 weight_name = PADDLE_WEIGHTS_NAME
-            if not os.path.isfile(
-                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
-            ):
-                raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
+            checkpoint_file = os.path.join(
+                resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
+            )
+            if not os.path.isfile(checkpoint_file):
+                checkpoint_file = os.path.join(resume_from_checkpoint, _add_variant(weight_name, None))
+                if not os.path.isfile(checkpoint_file):
+                    raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
 
             logger.info(f"Loading model from {resume_from_checkpoint} .")
 
             # TODO: Need to load the model state dict on the CPU to avoid an OOM error.
             state_dict = paddle.load(
-                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)),
+                checkpoint_file,
                 return_numpy=True,
             )
             # If the model is on the GPU, it still works!
@@ -826,6 +832,8 @@ class Trainer:
             best_model_path = os.path.join(
                 self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
             )
+            if not os.path.isfile(best_model_path):
+                best_model_path = os.path.join(self.state.best_model_checkpoint, _add_variant(weight_name, None))
             if os.path.exists(best_model_path):
                 # We load the model state dict on the CPU to avoid an OOM error.
                 state_dict = paddle.load(best_model_path, return_numpy=True)
@@ -1657,7 +1665,7 @@ class Trainer:
             # TODO(ZHUI) fix it and set convert2cpu=True to save gpu memory
             model.get_all_parameters(convert2cpu=False)
 
-        self.save_model(output_dir)
+        self.save_model(output_dir, merge_tensor_parallel=self.args.merge_tensor_parallel)
 
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
