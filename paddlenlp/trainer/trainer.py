@@ -906,18 +906,17 @@ class Trainer:
                         non_moe_parameters_list = [p for p in parameters_list if not getattr(p, "no_sync", False)]
                         if self.optimizer._sharding_enable:
                             assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
-                            # 广播状态精心跳过moe参数
-                            # https://github.com/PaddlePaddle/Paddle/blob/ae2d8ba157540b39a4d7ab897c030217a33e82cb/python/paddle/distributed/fleet/meta_optimizers/dygraph_optimizer/dygraph_sharding_optimizer.py#L359C14-L359C39
-                            self.optimizer._inner_opt._rank2params = {
-                                r: [pp for pp in p if not getattr(p, "no_sync", False)]
-                                for r, p in self.optimizer._inner_opt._rank2params.items()
-                            }
-                            self.optimizer._inner_opt.reduce_gradients(
-                                list(non_moe_parameters_list), self.optimizer._hcg
-                            )
+                            assert not args.use_moe, "moe not support sharding"
+                            # self.optimizer._inner_opt._rank2params = {
+                            #     r: [pp for pp in p if not getattr(p, "no_sync", False)]
+                            #     for r, p in self.optimizer._inner_opt._rank2params.items()
+                            # }
+                            self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
                         if self.optimizer._dp_enable:
                             assert not enable_dp_comm_overlap
+                            # 广播状态精心跳过moe参数
+                            # https://github.com/PaddlePaddle/Paddle/blob/ae2d8ba157540b39a4d7ab897c030217a33e82cb/python/paddle/distributed/fleet/meta_optimizers/dygraph_optimizer/dygraph_sharding_optimizer.py#L359C14-L359C39
                             fused_allreduce_gradients(list(non_moe_parameters_list), self.optimizer._hcg)
 
                         moe_parameters_list = [
@@ -925,13 +924,28 @@ class Trainer:
                             for p in obtain_optimizer_parameters_list(self.optimizer._inner_opt)
                             if getattr(p, "no_sync", False)
                         ]
+
+                        def grad_norm(p):
+                            return (
+                                p.main_grad.astype("float32").norm()
+                                if hasattr(p, "main_grad")
+                                else p.grad.astype("float32").norm()
+                            )
+
                         moe_parameters_list = "\n".join(
                             [
-                                f'{p.name}-pnorm:{p.astype("float32").norm()}-gnorm:{p.grad.astype("float32").norm()}'
-                                for p in moe_parameters_list
+                                f'{p.name}-pnorm:{p.astype("float32").norm()}-gnorm:{grad_norm(p)}'
+                                for p in moe_parameters_list[:1]
                             ]
                         )
-                        logger.info(f"sharding moe params: {moe_parameters_list}")
+                        non_moe_parameters_list = "\n".join(
+                            [
+                                f'{p.name}-pnorm:{p.astype("float32").norm()}-gnorm:{grad_norm(p)}'
+                                for p in non_moe_parameters_list[10:11]
+                            ]
+                        )
+                        # logger.info(f"ppdp moe params: {moe_parameters_list}")
+                        # logger.info(f"ppdp moe params: {non_moe_parameters_list}")
 
                     # pipeline parallel mode,  handle gradient merge here
                     if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
@@ -1763,7 +1777,7 @@ class Trainer:
             self._pp_data_buffer = []
         self._pp_data_buffer.append(inputs)
         if len(self._pp_data_buffer) != self.args.gradient_accumulation_steps:
-            return paddle.zeros([])
+            return paddle.zeros([]), {}
 
         # for v in self._pp_data_buffer[0].values():
         #     assert isinstance(v, paddle.Tensor), f"Only support tensor as pipeline mode input, got type {type(v)}"
@@ -1796,8 +1810,18 @@ class Trainer:
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
 
         model.micro_batch_size, model.accumulate_steps = config_backup
-
-        return loss.detach()
+        if model.is_pipeline_last_stage():
+            buf = [
+                {k: v.item() if isinstance(v, paddle.Tensor) else v for k, v in model._layers._loss_fn.info.items()}
+            ]
+        else:
+            buf = [None]
+        hcg = fleet.get_hybrid_communicate_group()
+        dist.broadcast_object_list(buf, src=hcg._pp_comm_group.ranks[-1], group=hcg.get_pipe_parallel_group())
+        info = buf[0]
+        if isinstance(info, dict) and "loss" in info:
+            loss = paddle.to_tensor(info.pop("loss"))
+        return loss.detach(), info
 
     def save_model(
         self,
