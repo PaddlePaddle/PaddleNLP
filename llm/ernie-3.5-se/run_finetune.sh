@@ -25,7 +25,7 @@ python -m paddle.distributed.launch \
     --per_device_train_batch_size 4 \
     --gradient_accumulation_steps 2 \
     --per_device_eval_batch_size 8 \
-    --model_name_or_path ./output/ernie35_hybid/checkpoint-1000 \
+    --model_name_or_path <PATH_TO_CKPT> \
     --task_name squad \
     --num_train_epochs 2 \
     --learning_rate 3e-5 \

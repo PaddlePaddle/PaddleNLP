@@ -25,8 +25,7 @@ from utils import Ernie35Trainer, compute_metrics, compute_metrics_not_do_genera
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
-from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.peft.prefix import llama_postprocess_past_key_value
+from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
@@ -49,7 +48,8 @@ class DataArgument:
 @dataclass
 class ModelArgument:
     model_name_or_path: str = field(
-        default="baidu/ernie-3.5-se", metadata={"help": "Build-in pretrained model name or the path to local model."}
+        default="baidu/ernie-3.5-se-3b",
+        metadata={"help": "Build-in pretrained model name or the path to local model."},
     )
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
@@ -72,13 +72,6 @@ class ModelArgument:
     merge_weights: bool = field(
         default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
     )
-    # prefix
-    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
-    num_prefix_tokens: int = field(default=10, metadata={"help": "Number of prefix tokens"})
-    prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
-    # qat
-    qat: bool = field(default=False, metadata={"help": "Whether to use QAT technique"})
-    qat_type: str = field(default="A8W8", metadata={"help": "Quantization type. Supported values: A8W8, W4,A8W4"})
 
 
 def main():
@@ -157,6 +150,7 @@ def main():
                 ".*up_proj.*",
                 ".*o_proj.*",
                 ".*down_proj.*",
+                ".*qkv_gate_up_proj.*",
             ]
 
             lora_config = LoRAConfig(
@@ -172,62 +166,6 @@ def main():
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
 
         model.mark_only_lora_as_trainable()
-        model.print_trainable_parameters()
-
-    if model_args.qat:
-        from paddle import nn
-        from paddle.quantization import QAT, QuantConfig
-
-        # FakeQuanterChannelWiseAbsMaxObserver not yet merge in Paddle develop
-        from paddle.quantization.quanters import FakeQuanterChannelWiseAbsMaxObserver
-        from paddle.quantization.quanters.abs_max import (
-            FakeQuanterWithAbsMaxObserverLayer,
-        )
-        from paddleslim.quant.quanters import PACTQuanter
-
-        # from paddle.quantization.quanters import FakeQuanterWithAbsMaxObserver
-        from paddlenlp.peft.lora import LoRALinear
-        from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
-
-        q_config = QuantConfig(activation=None, weight=None)
-        q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
-
-        if model_args.qat_type == "A8W8":
-            activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
-            # activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
-            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype="float32")
-        elif model_args.qat_type == "W4":
-            activation = None
-            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
-        elif model_args.qat_type == "A8W4":
-            activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
-            # activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
-            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
-        else:
-            raise ValueError("qat_type should be one of ['A8W8', 'W4', 'A8W4']")
-
-        q_config.add_type_config(LoRALinear, weight=weight, activation=activation)
-        q_config.add_type_config(nn.Linear, weight=weight, activation=activation)
-
-        qat = QAT(q_config)
-        model = qat.quantize(model, inplace=True)
-
-    if model_args.prefix_tuning:
-        prefix_config = PrefixConfig(
-            num_prefix_tokens=model_args.num_prefix_tokens,
-            num_attention_heads=model.config.n_head,
-            num_hidden_layers=model.config.n_layer,
-            hidden_size=model.config.hidden_size,
-            prefix_projection=model_args.prefix_projection,
-            prefix_projection_hidden_size=model.config.hidden_size,
-            dtype=dtype,
-        )
-        model = PrefixModelForCausalLM(
-            model=model,
-            prefix_config=prefix_config,
-            postprocess_past_key_value=llama_postprocess_past_key_value,
-        )
-        model.mark_only_prefix_as_trainable()
         model.print_trainable_parameters()
 
     tokenizer = Ernie35Tokenizer.from_pretrained(

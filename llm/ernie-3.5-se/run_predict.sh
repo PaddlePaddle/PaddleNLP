@@ -15,5 +15,5 @@
 
 PYTHONPATH=../../:$PYTHONPATH
 python -m paddle.distributed.launch --gpus "0" predict_generation.py \
-    --model_name_or_path output/ernie35_hybid_new/checkpoint-1000 \
+    --model_name_or_path <PATH_TO_CKPT> \
     --tokenizer_name_or_path ernie-tokenizer 

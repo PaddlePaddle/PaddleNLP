@@ -2,13 +2,21 @@
 
 **目录**
 
-- [1. 模型结构&训练策略](#0)
-- [2. 预训练](#1)
-- [3. 微调](#2)
-- [4. 预测](#3)
+- [1. 模型介绍](#0)
+- [2. 模型结构&训练策略](#1)
+- [3. 预训练](#2)
+- [4. 微调](#3)
+- [5. 预测](#4)
 
 
 <a name="0"></a>
+
+## 模型介绍
+
+ERNIE-3.5-SE 是百度文心大模型 ERNIE-3.5 的特殊版本(**S**pecial **E**dition)。这次的代码开源主要包括模型组网、分布式预训练代码、微调以及预测服务。
+
+
+<a name="1"></a>
 
 ## 模型结构&训练策略
 
@@ -34,7 +42,7 @@
 * Sequence Length Warmup：通过动态调整前期训练的序列长度，提升模型的收敛效率。
 
 
-<a name="1"></a>
+<a name="2"></a>
 
 ## 预训练
 
@@ -54,7 +62,7 @@ mv ernie_openwebtext_100k_ids.npy ./data
 mv ernie_openwebtext_100k_idx.npz ./data
 ```
 
-使用下面脚本,即可启动ernie-3b的预训练,也可直接参考 run_trainer_stage2.sh.
+使用下面脚本,即可启动 ernie-3.5-se-3b 的预训练，也可直接参考 run_trainer_stage2.sh。
 ```shell
 task_name="ernie35_hybid"
 python -u -m paddle.distributed.launch \
@@ -62,7 +70,7 @@ python -u -m paddle.distributed.launch \
     --log_dir "output/$task_name""_log" \
     run_pretrain.py \
     --model_type "ernie" \
-    --model_name_or_path "baidu/ernie-3.5-se" \
+    --model_name_or_path "baidu/ernie-3.5-se-3b" \
     --tokenizer_name_or_path "ernie-tokenizer" \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
@@ -105,7 +113,7 @@ python -u -m paddle.distributed.launch \
 4. `use_fused_ln` 需要安装[此目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt-3/external_ops)下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置PYTHONPATH
 5. 当前脚本为sharding版本，需要4D并行训练（数据、sharding、张量、流水线并行）的用户，可另外调整相关参数。
 
-<a name="2"></a>
+<a name="3"></a>
 
 ## 微调
 
@@ -120,7 +128,7 @@ python -m paddle.distributed.launch \
     --per_device_train_batch_size 4 \
     --gradient_accumulation_steps 2 \
     --per_device_eval_batch_size 8 \
-    --model_name_or_path baidu/ernie-3.5-se \
+    --model_name_or_path <PATH_TO_CKPT> \
     --task_name squad \
     --num_train_epochs 2 \
     --learning_rate 3e-5 \
@@ -155,7 +163,7 @@ python -m paddle.distributed.launch \
     --per_device_train_batch_size 4 \
     --gradient_accumulation_steps 2 \
     --per_device_eval_batch_size 8 \
-    --model_name_or_path baidu/ernie-3.5-se \
+    --model_name_or_path <PATH_TO_CKPT> \
     --task_name squad \
     --num_train_epochs 2 \
     --learning_rate 3e-4 \
@@ -203,15 +211,15 @@ python -m paddle.distributed.launch \
 - `do_eval`: 是否评估模型。
 - `tensor_parallel_degree`: 模型并行数量。
 - `eval_with_do_generation`: 在评估的时候是否调用model.generate,默认为False。
-- `lora`: 是否使用LoRA技术。
-- `merge_weights`: 是否合并原始模型和Lora模型的权重。
-- `lora_rank`: lora 算法中rank（秩）的值，默认为8。
-- `lora_path`: lora参数和配置路径，对lora参数进行初始化。
+- `lora`: 是否使用 LoRA 技术。
+- `merge_weights`: 是否合并原始模型和 LoRA 模型的权重。
+- `lora_rank`: LoRA 算法中rank（秩）的值，默认为8。
+- `lora_path`: LoRA 参数和配置路径，对 LoRA 参数进行初始化。
 - `task_name`: 内置数据集任务名
 - `data_name`: 内置数据集名，定义数据集名必须同时定义数据集任务名
 - `dataset_path`: 自定义数据集路径。
 
-<a name="3"></a>
+<a name="4"></a>
 
 ## 预测
 
@@ -219,6 +227,6 @@ python -m paddle.distributed.launch \
 
 ```shell
 python -m paddle.distributed.launch --gpus "0" predict_generation.py \
-    --model_name_or_path output/ernie_hybid_new/checkpoint-2400 \
+    --model_name_or_path <PATH_TO_CKPT> \
     --tokenizer_name_or_path ernie-tokenizer
 ```

@@ -27,7 +27,7 @@ def get_parser():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name_or_path", default="baidu/ernie-3.5-se", help="The directory of model.")
+    parser.add_argument("--model_name_or_path", default="baidu/ernie-3.5-se-3b", help="The directory of model.")
     parser.add_argument("--tokenizer_name_or_path", default="ernie-tokenizer", help="The directory of tokenizer.")
     parser.add_argument(
         "--merge_tensor_parallel_path", default=None, help="The directory of model to merge tensor parallel parts."

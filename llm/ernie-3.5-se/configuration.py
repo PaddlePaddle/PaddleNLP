@@ -42,7 +42,7 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
         "use_recompute": False,
         "use_flash_attention": True,
     },
-    "baidu/ernie-3.5-se": {
+    "baidu/ernie-3.5-se-3b": {
         "fuse_linear": False,
         "fuse_ln": False,
         "hidden_size": 3072,
