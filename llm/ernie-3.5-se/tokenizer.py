@@ -24,6 +24,7 @@ from paddlenlp.utils.log import logger
 
 
 class Ernie35Tokenizer(PretrainedTokenizer):
+    model_input_names = ["input_ids", "attention_mask", "position_ids"]
     resource_files_names = {
         "vocab_file": "sentencepiece.bpe.model",
     }
@@ -43,6 +44,8 @@ class Ernie35Tokenizer(PretrainedTokenizer):
         self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
         super().__init__(bos_token=bos_token, eos_token=eos_token, unk_token=unk_token, **kwargs)
 
+        if self.pad_token is None:
+            self.pad_token = self.unk_token
         self.vocab_file = vocab_file
         self.add_bos_token = add_bos_token
         self.add_eos_token = add_eos_token

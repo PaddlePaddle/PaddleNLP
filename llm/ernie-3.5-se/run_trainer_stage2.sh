@@ -28,7 +28,7 @@ python -u  -m paddle.distributed.launch \
     --log_dir "output/$task_name""_log" \
     run_pretrain.py \
     --model_type "ernie" \
-    --model_name_or_path "baidu/ernie-3.5-se" \
+    --model_name_or_path "baidu/ernie-3.5-se-3b" \
     --tokenizer_name_or_path "ernie-tokenizer" \
     --input_dir "${data_dir}" \
     --output_dir "output/$task_name" \
