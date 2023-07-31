@@ -48,8 +48,10 @@ def main():
     training_args.print_config(quant_args, "Quant")
     training_args.print_config(gen_args, "Generation")
 
-    if quant_args.do_ptq and quant_args.do_qat:
-        raise ValueError("PTQ and QAT can not work at the same time.")
+    if sum([quant_args.do_ptq, quant_args.do_qat, training_args.do_train]) > 1:
+        raise ValueError(
+            "--do_train, --do_ptq and --do_qat cannot work at the same time. Please choose only one at a time"
+        )
 
     # Setup GPU & distributed training
     paddle.set_device(training_args.device)
@@ -239,7 +241,7 @@ def main():
         else:
             ptq_ds = train_ds
             logger.info(
-                f"Not found ptq.json in {data_args.dataset_name_or_path}. Set train dataset to PTQ dataset path."
+                f"Not found ptq.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
             )
         ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
         if quant_args.shift or quant_args.smooth:

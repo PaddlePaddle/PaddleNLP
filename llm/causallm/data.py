@@ -46,8 +46,8 @@ class DataFormatError(ValueError):
 
 def tokenize_example(tokenizer, example, data_args):
     if "src" in example and "tgt" in example:
-        source = example["src"]
-        target = example["tgt"]
+        source = example["src"][0] if isinstance(example["src"], list) else example["src"]
+        target = example["tgt"][0] if isinstance(example["tgt"], list) else example["tgt"]
     else:
         raise DataFormatError(
             f"Example format is wrong, please check: {example} or rewrite tokenize_example in data.py "
