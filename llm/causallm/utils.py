@@ -86,49 +86,31 @@ def get_prefix_tuning_params(model):
     )
 
 
-def get_lora_target_modules(model, is_tp=False):
+def get_lora_target_modules(model):
     # Not yet support RowParallelLinear
     if model.base_model_prefix == "chatglm":
-        if is_tp > 1:
-            target_modules = [".*query_key_value.*", ".*dense_h_to_4h.*"]
-        else:
-            target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
+        target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
     elif model.base_model_prefix == "chatglm_v2":
-        if is_tp > 1:
-            target_modules = [".*query.*", ".*key.*", ".*value.*", ".*dense_h_to_4h.*"]
-        else:
-            target_modules = [
-                ".*query.*",
-                ".*key.*",
-                ".*value.*",
-                ".*dense.*",
-                ".*dense_h_to_4h.*",
-                ".*dense_4h_to_h.*",
-            ]
+        target_modules = [
+            ".*query.*",
+            ".*key.*",
+            ".*value.*",
+            ".*dense.*",
+            ".*dense_h_to_4h.*",
+            ".*dense_4h_to_h.*",
+        ]
     elif model.base_model_prefix == "bloom":
-        if is_tp > 1:
-            target_modules = [".*query_key_value.*", ".*dense_h_to_4h.*"]
-        else:
-            target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
+        target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
     elif model.base_model_prefix == "llama":
-        if is_tp > 1:
-            target_modules = [
-                ".*q_proj.*",
-                ".*v_proj.*",
-                ".*k_proj.*",
-                ".*gate_proj.*",
-                ".*up_proj.*",
-            ]
-        else:
-            target_modules = [
-                ".*q_proj.*",
-                ".*v_proj.*",
-                ".*k_proj.*",
-                ".*o_proj.*",
-                ".*gate_proj.*",
-                ".*down_proj.*",
-                ".*up_proj.*",
-            ]
+        target_modules = [
+            ".*q_proj.*",
+            ".*v_proj.*",
+            ".*k_proj.*",
+            ".*o_proj.*",
+            ".*gate_proj.*",
+            ".*down_proj.*",
+            ".*up_proj.*",
+        ]
     else:
         raise ValueError(
             f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama."
