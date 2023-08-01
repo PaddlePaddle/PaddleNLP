@@ -785,3 +785,60 @@ def dtype_byte_size(dtype):
         raise ValueError(f"`dtype` is not a valid dtype: {dtype}.")
     bit_size = int(bit_search.groups()[0])
     return bit_size // 8
+
+
+def load_prefix_weights(
+    prefix_path: str, batch_size: int = 1, dtype: str = "bfloat16"
+) -> np.ndarray | list[paddle.Tensor]:
+    """load prefix weight by path
+
+    Args:
+        prefix_path (str): the path of prefix weight
+    """
+    past_key_values = paddle.to_tensor(np.load(f"{prefix_path}/pre_caches.npy")).unsqueeze(2)
+
+    # TODO(wj-Mcat): support load different prefix weights in one batch
+    if batch_size > 1:
+        past_key_values = paddle.concat([past_key_values] * batch_size, axis=2)
+
+    # static model require one tensor, otherwise list of tensor
+    return past_key_values.astype(dtype)
+
+
+def rebuild_attention_with_prefix(
+    attention_mask: paddle.Tensor | np.ndarray, prefix_lengths: list[int] | int, fill_value: int | float | None = None
+):
+    """rebuild attention mask tensor by prefix length
+
+    Args:
+        attention_mask (paddle.Tensor): the tensor of attention mask
+        prefix_lengths (list[int] | int | None, optional): prefix length of batched attention_mask. Defaults to None.
+    """
+    # 1. init prefix_length value
+    if isinstance(prefix_lengths, int):
+        prefix_lengths = [prefix_lengths] * len(attention_mask)
+
+    # 2. init prefix attention_mask value
+    seen_value, unseen_value = 1, 0
+    if fill_value is None:
+        if paddle.is_tensor(attention_mask):
+            if paddle.is_floating_point(attention_mask):
+                seen_value, unseen_value = 0, get_scale_by_dtype(attention_mask.dtype)
+        else:
+            if issubclass(attention_mask.dtype.type, np.floating) or attention_mask.dtype == np.uint16:
+                seen_value, unseen_value = 0, get_scale_by_dtype(attention_mask.dtype)
+
+    # 3. build prefix attention mask
+    max_prefix_length = max(prefix_lengths)
+    prefix_attention_mask_values = []
+
+    for batch_index in range(len(attention_mask)):
+        mask = [unseen_value] * (max_prefix_length - prefix_lengths[batch_index]) + [seen_value] * (
+            prefix_lengths[batch_index]
+        )
+        prefix_attention_mask_values.append(mask)
+
+    final_attention_mask = paddle.concat(
+        [paddle.to_tensor(prefix_attention_mask_values, dtype=attention_mask.dtype), attention_mask], axis=1
+    )
+    return final_attention_mask

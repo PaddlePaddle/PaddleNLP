@@ -34,7 +34,7 @@ def parse_args():
     )
     parser.add_argument(
         "--output_path",
-        default="./pretrained/bloom-560m-generation/bloom",
+        default="./inference/bloom",
         type=str,
         # required=True,
         help="The output file prefix used to save the exported inference model.",
@@ -64,6 +64,7 @@ def main():
     else:
         dtype = config.dtype if config.dtype is not None else "float16"
 
+    paddle.set_default_dtype(dtype)
     # Load the model and parameter
     model = BloomForCausalLM.from_pretrained(
         args.model_name_or_path, config=config, low_cpu_mem_usage=True, dtype=dtype
@@ -72,42 +73,18 @@ def main():
         model = LoRAModel.from_pretrained(model, args.lora_path)
 
     model.eval()
-    input_spec = [
-        paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-        None,
-        None,
-        # max_length
-        args.max_length,
-        # min_length
-        0,
-        # decode_strategy
-        "sampling",
-        # temperature
-        1.0,
-        # top_k
-        1,
-        # top_p
-        1.0,
-        1.0,
-        # repetition_penalty
-        1,
-        # num_beam_groups
-        1,
-        0.0,
-        # early_stopping
-        False,
-        # bos_token_id
-        tokenizer.bos_token_id,
-        # eos_token_id
-        tokenizer.eos_token_id,
-        # pad_token_id
-        tokenizer.pad_token_id,
-    ]
-    model = paddle.jit.to_static(model.generate, input_spec=input_spec)
 
-    # # Save converted static graph model
-    paddle.jit.save(model, args.output_path)
-    # # Also save tokenizer for inference usage
+    model.prepare_fast_entry({})
+    config = {
+        "use_top_p": True,
+        "pad_token_id": tokenizer.pad_token_id,
+        "eos_token_id": tokenizer.eos_token_id,
+        "bos_token_id": tokenizer.bos_token_id,
+        "use_pre_caches": True,
+        "num_layers": model.config.num_hidden_layers,
+    }
+    model.to_static(args.output_path, config)
+    model.config.save_pretrained("inference")
     tokenizer.save_pretrained(os.path.dirname(args.output_path))
 
 

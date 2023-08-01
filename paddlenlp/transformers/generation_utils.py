@@ -491,6 +491,7 @@ class GenerationMixin(object):
             role_ids = model_kwargs["role_ids"]
             model_kwargs["role_ids"] = paddle.concat([role_ids, role_ids[:, -1:]], axis=-1)
 
+        print("update_model_kwargs_for_generation-attention_mask", model_kwargs["attention_mask"])
         return model_kwargs
 
     @staticmethod
@@ -614,6 +615,8 @@ class GenerationMixin(object):
         use_cache=True,
         use_fast=False,
         use_fp16_decoding=False,
+        pre_caches=None,
+        use_pre_caches=False,
         **model_kwargs
     ):
         r"""
@@ -961,6 +964,8 @@ class GenerationMixin(object):
                     top_k,
                     top_p,
                     temperature,
+                    pre_caches=pre_caches,
+                    use_pre_caches=use_pre_caches,
                     **model_kwargs,
                 )
             else:
@@ -973,6 +978,8 @@ class GenerationMixin(object):
                     top_k,
                     top_p,
                     temperature,
+                    pre_caches=pre_caches,
+                    use_pre_caches=use_pre_caches,
                     **model_kwargs,
                 )
 
@@ -1106,6 +1113,8 @@ class GenerationMixin(object):
         top_p=None,
         temperature=None,
         min_tokens_to_keep=1,
+        pre_cache=None,
+        use_pre_caches=None,
         **model_kwargs
     ):
         return_scores = model_kwargs.pop("return_scores", True)
@@ -1256,6 +1265,19 @@ class GenerationMixin(object):
             False,
         ]
 
+        use_pre_caches = config.get("use_pre_caches", False)
+        if use_pre_caches:
+            num_layers = config.get("num_layers", None)
+            assert num_layers is not None, "num_layers should be set for pre-cached model when `use_pre_caches=True`"
+            dtype = config.get("dtype", paddle.get_default_dtype())
+            input_spec.append(
+                [paddle.static.InputSpec(shape=[2, None, None, None, None], dtype=dtype) for i in range(num_layers)]
+            )
+            input_spec.append(paddle.static.InputSpec(shape=[1], dtype="bool"))
+        else:
+            input_spec.append(None)
+            input_spec.append(None)
+
         model = paddle.jit.to_static(self.generate, input_spec=input_spec)
 
         paddle.jit.save(model, path)
@@ -1271,8 +1293,17 @@ class GenerationMixin(object):
         top_p=None,
         temperature=None,
         min_tokens_to_keep=1,
+        pre_caches=None,
+        use_pre_caches=False,
         **model_kwargs
     ):
+
+        if use_pre_caches:
+            assert (
+                use_pre_caches is not None
+            ), "pre_caches should be set for pre-cached model when `use_pre_cache`=True"
+        else:
+            pre_caches = None
 
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
@@ -1292,7 +1323,6 @@ class GenerationMixin(object):
             )
 
         use_topp_sampling_op = is_top_p_sampling_avaliable or model_kwargs.get("use_fuse_topp_sampling", False)
-        return_scores = model_kwargs.get("return_scores", True)
 
         batch_size, cur_len = paddle.shape(input_ids)
         # used for compute on gpu, avoid memcpy D2H
@@ -1303,15 +1333,16 @@ class GenerationMixin(object):
         origin_len_gpu = paddle.full([1], origin_len, dtype="int64")
 
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
-        if return_scores:
-            scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
-        else:
-            scores = None
 
         # use_cache is immutable, we split it off other mutable kwargs.
         assert "use_cache" in model_kwargs
         immutable = {"use_cache": model_kwargs["use_cache"]}
         del model_kwargs["use_cache"]
+
+        immutable["pre_caches"] = pre_caches
+        immutable["use_pre_caches"] = use_pre_caches
+
+        scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
         def _forward_(**args):
             model_inputs = self.prepare_inputs_for_generation(input_ids, **args, **immutable)
@@ -1327,10 +1358,6 @@ class GenerationMixin(object):
             else:
                 logits = outputs
 
-            # [batch_size, vocab_size]
-            # if len(logits.shape) == 3:
-            #     logits = logits[:, -1, :]
-
             logits = logits[:, -1, :]
             logits = paddle.cast(logits, "float32")
 
@@ -1340,10 +1367,8 @@ class GenerationMixin(object):
             logits = logits_processors(input_ids, logits)
             probs = F.softmax(logits)
 
-            # sample
-            if return_scores:
-                origin_probs = F.softmax(logits)
-                origin_probs = paddle.log(origin_probs)
+            origin_probs = F.softmax(logits)
+            origin_probs = paddle.log(origin_probs)
 
             # compute next_tokens
             if use_top_p:
@@ -1361,9 +1386,8 @@ class GenerationMixin(object):
                 else:
                     next_tokens = paddle.multinomial(probs)
 
-            if return_scores:
-                next_scores = paddle.index_sample(origin_probs, next_tokens)
-                scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
+            # next_scores = paddle.index_sample(origin_probs, next_tokens)
+            # scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
 
             if eos_token_id is not None:
                 next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
@@ -1371,7 +1395,7 @@ class GenerationMixin(object):
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
 
             if eos_token_id is not None:
-                unfinished_flag = get_unfinished_flag(input_ids, unfinished_flag, eos_token_id)
+                unfinished_flag = paddle.logical_and(unfinished_flag, next_tokens != eos_token_id)
 
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder

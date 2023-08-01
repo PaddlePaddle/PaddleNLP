@@ -34,7 +34,7 @@ from paddlenlp.transformers.model_outputs import (
     SequenceClassifierOutputWithPast,
     TokenClassifierOutput,
 )
-from paddlenlp.transformers.model_utils import PretrainedModel
+from paddlenlp.transformers.model_utils import PretrainedModel, dtype_guard
 from paddlenlp.utils.converter import StateDictNameMapping, init_name_mappings
 from paddlenlp.utils.log import logger
 
@@ -1197,6 +1197,9 @@ class BloomForCausalLM(BloomPreTrainedModel):
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
+        pre_caches=None,
+        use_pre_caches=False,
+        **kwargs
     ) -> Union[Tuple[Tensor], CausalLMOutputWithCrossAttentions]:
         r"""
         labels (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
@@ -1216,6 +1219,8 @@ class BloomForCausalLM(BloomPreTrainedModel):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            pre_caches=pre_caches,
+            use_pre_caches=use_pre_caches,
         )
         hidden_states = transformer_outputs[0]
         lm_logits = self.lm_head(hidden_states, self.config.tensor_parallel_output)
@@ -1330,7 +1335,8 @@ class BloomForSequenceClassification(BloomPreTrainedModel):
             if input_ids is not None:
                 # select the last word of batch sentence
                 sequence_lengths = paddle.where(input_ids != self.config.pad_token_id, 1, 0).sum(axis=-1) - 1
-                sequence_lengths += paddle.to_tensor([i * input_ids.shape[1] for i in range(batch_size)])
+                with dtype_guard("float32"):
+                    sequence_lengths += paddle.to_tensor([i * input_ids.shape[1] for i in range(batch_size)])
                 pooled_logits = paddle.index_select(
                     logits.reshape([batch_size * sequence_length, -1]), sequence_lengths, axis=0
                 )
@@ -2075,6 +2081,8 @@ class FusedBloomModel(BloomPreTrainedModel):
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
+        pre_caches=None,
+        use_pre_caches=False,
         **kwargs,
     ) -> Union[Tuple[Tensor], BaseModelOutputWithPastAndCrossAttentions]:
 
@@ -2158,6 +2166,19 @@ class FusedBloomModel(BloomPreTrainedModel):
                 paddle.get_default_dtype()
             )
 
+        if pre_caches is not None:
+            pre_caches_length = pre_caches[0].shape[-2]
+            if use_pre_caches:
+                pre_cache_attention_mask = paddle.ones(
+                    [batch_size, 1, pre_caches_length, seq_length_with_past], dtype=attention_mask.dtype
+                )
+            else:
+                pre_cache_attention_mask = paddle.zeros(
+                    [batch_size, 1, pre_caches_length, seq_length_with_past], dtype=attention_mask.dtype
+                )
+
+            causal_mask = paddle.concat([pre_cache_attention_mask, causal_mask], axis=1)
+
         if self.config.tensor_parallel_degree > 1:
             block_size = self.config.n_head // self.config.tensor_parallel_degree
             alibi = alibi[
@@ -2183,6 +2204,7 @@ class FusedBloomModel(BloomPreTrainedModel):
             hidden_states,
             attn_mask=paddle.cast(attn_mask, dtype=hidden_states.dtype),
             caches=self.cache_kvs,
+            pre_caches=pre_caches,
             time_step=paddle.increment(paddle.shape(attn_mask)[-1], -1) if is_decoder else None,
         )
 

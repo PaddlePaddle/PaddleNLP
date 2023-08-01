@@ -18,9 +18,10 @@ import json
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.peft.prefix import bloom_postprocess_past_key_value
+from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import AutoConfig, AutoTokenizer, BloomForCausalLM
+from paddlenlp.transformers.utils import load_prefix_weights
 
 
 def parse_arguments():
@@ -40,6 +41,7 @@ def parse_arguments():
     parser.add_argument("--data_file", default=None, help="data file directory")
     parser.add_argument("--predict_file", default="prediction.json", help="predict result file directory")
     parser.add_argument("--device", type=str, default="gpu", help="Device")
+    parser.add_argument("--use_fast", default="True", type=strtobool, help="whether use fast model to do generation")
     return parser.parse_args()
 
 
@@ -101,10 +103,24 @@ class Predictor(object):
             )
             if self.args.lora_path is not None:
                 self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
-            if self.args.prefix_path is not None:
-                self.model = PrefixModelForCausalLM.from_pretrained(
-                    self.model, self.args.prefix_path, bloom_postprocess_past_key_value
-                )
+
+            self.args.prefix_path = (
+                "/root/paddlejob/workspace/wujingjing/mount/models/bloom-prefix/bloomz_prefix_checkpoints"
+            )
+
+            pre_caches = load_prefix_weights(self.args.prefix_path, self.args.batch_size)
+            self.pre_caches = paddle.split(pre_caches, len(pre_caches))
+            self.pre_caches_length = 128
+
+            # if self.args.prefix_path is not None:
+            #     if self.args.use_fast:
+            #         pre_caches = load_prefix_weights(self.args.prefix_path, self.args.batch_size)
+            #         self.pre_caches = paddle.split(pre_caches, len(pre_caches))
+            #         self.pre_caches_length = 128
+            #     else:
+            #         self.model = PrefixModelForCausalLM.from_pretrained(
+            #             self.model, self.args.prefix_path, bloom_postprocess_past_key_value
+            #         )
 
         self.model.eval()
 
@@ -114,16 +130,30 @@ class Predictor(object):
             return_tensors="np",
             padding=True,
             max_length=self.src_length,
-            return_attention_mask=False,
+            return_attention_mask=True,
             return_token_type_ids=False,
         )
         inputs_tensor = {}
         for key, value in inputs.items():
             inputs_tensor[key] = paddle.to_tensor(value)
+
+        if self.args.prefix_path is not None and self.args.use_fast:
+            import pdb
+
+            pdb.set_trace()
+            inputs["attention_mask"] = paddle.concat(
+                [
+                    paddle.ones(shape=[self.batch_size, self.pre_caches_length], dtype=inputs["attention_mask"].dtype),
+                    inputs["attention_mask"],
+                ],
+                axis=1,
+            )
+
         return inputs_tensor
 
     def infer(self, inputs):
         if self.model.config.dtype == "float32" or self.model.config.dtype is None:
+            print("start to generate")
             with paddle.no_grad():
                 result = self.model.generate(
                     **inputs,
@@ -133,6 +163,8 @@ class Predictor(object):
                     pad_token_id=self.tokenizer.pad_token_id,
                     decode_strategy="sampling",
                     top_k=1,
+                    pre_caches=self.pre_caches,
+                    use_pre_caches=True,
                 )
         else:
             with paddle.no_grad():

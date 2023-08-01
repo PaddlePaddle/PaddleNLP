@@ -297,9 +297,12 @@ class LlamaRMSNorm(nn.Layer):
         if self.config.use_fused_rms_norm:
             return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
 
-        with paddle.amp.auto_cast(False):
-            variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
-            hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
+        # with paddle.amp.auto_cast(False):
+        #     variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
+        #     hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
+
+        variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
+        hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
 
         if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
             hidden_states = paddle.cast(hidden_states, self.weight.dtype)
@@ -1154,7 +1157,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
     def get_decoder(self):
         return self.llama
 
-    def prepare_fast_entry(self, kwargs):
+    def prepare_fast_entry(self, kwargs=None):
         """create `FusedLlamaModel` model by `LlamaModel` and re-use the lm-head layer"""
         model = FusedLlamaModel.from_pretrained_model(self)
         self.llama = None
@@ -1199,9 +1202,15 @@ class LlamaForCausalLM(LlamaPretrainedModel):
 
         if not is_encoder_decoder and "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]
-            model_kwargs["attention_mask"] = paddle.concat(
-                [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)], axis=-1
-            )
+            if attention_mask.dim() == 2:
+                model_kwargs["attention_mask"] = paddle.concat(
+                    [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)], axis=-1
+                )
+            elif attention_mask.dim() == 4:
+                attention_mask = attention_mask[:, :, -1:, :]
+                attention_mask = paddle.concat([attention_mask, attention_mask[:, :, -1:, -1:]], axis=-1)
+                model_kwargs["attention_mask"] = attention_mask
+
         # update role_ids
         if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
             role_ids = model_kwargs["role_ids"]
@@ -1221,6 +1230,8 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
+        pre_caches=None,
+        use_pre_caches=False,
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1229,7 +1240,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         outputs = self.llama(
-            input_ids,  # [bs, seq_len]
+            input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
             inputs_embeds=inputs_embeds,
@@ -1238,6 +1249,8 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            pre_caches=pre_caches,
+            use_pre_caches=use_pre_caches,
         )
 
         hidden_states = outputs[0]  # [bs, seq_len, dim]
@@ -1247,8 +1260,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         tensor_parallel_output = (
             self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         )
-
-        # hidden_states = hidden_states[:, -1, :]
 
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
 
@@ -1368,8 +1379,6 @@ class FusedLlamaModel(LlamaPretrainedModel):
         return fused_model
 
     def _prepare_decoder_attention_mask(self, attention_mask, input_shape, past_key_values_length, dtype):
-        # create causal mask
-        # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
         combined_attention_mask = None
         if input_shape[-1] > 1:
             combined_attention_mask = _make_causal_mask(
@@ -1378,14 +1387,41 @@ class FusedLlamaModel(LlamaPretrainedModel):
 
         if attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
-            expanded_attn_mask = _expand_mask(attention_mask, dtype, tgt_length=input_shape[-1])
+            if len(attention_mask.shape) == 2:
+                expanded_attn_mask = _expand_mask(attention_mask, dtype, tgt_length=input_shape[-1])
+            else:
+                expanded_attn_mask = attention_mask
             combined_attention_mask = (
                 expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
             )
-        combined_attention_mask = paddle.maximum(
-            combined_attention_mask.astype(dtype), paddle.to_tensor(float(finfo(dtype).min), dtype=dtype)
-        )
         return combined_attention_mask
+
+    # def _prepare_decoder_attention_mask(self, attention_mask, input_shape, past_key_values_length, dtype):
+    #     # create causal mask
+    #     # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+    #     combined_attention_mask = None
+    #     if input_shape[-1] > 1:
+    #         combined_attention_mask = _make_causal_mask(
+    #             input_shape, past_key_values_length=past_key_values_length, dtype=dtype
+    #         )
+
+    #     if attention_mask is not None:
+    #         # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+    #         expanded_attn_mask = _expand_mask(attention_mask, dtype, tgt_length=input_shape[-1])
+    #         combined_attention_mask = (
+    #             expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
+    #         )
+
+    #     # TODO(wj-Mcat): to disable float32 for maximum
+    #     with dtype_guard("float32"):
+    #         scale_value = get_scale_by_dtype(dtype)
+    #         scale_value = paddle.to_tensor(scale_value)
+
+    #     combined_attention_mask = paddle.maximum(
+    #         combined_attention_mask.astype(dtype), scale_value
+    #     )
+    #     combined_attention_mask = paddle.cast(combined_attention_mask, dtype=dtype)
+    #     return combined_attention_mask
 
     @paddle.jit.not_to_static
     def recompute_training(self, layer_module, hidden_states, attention_mask, output_attentions):
@@ -1414,8 +1450,11 @@ class FusedLlamaModel(LlamaPretrainedModel):
         output_attentions=False,
         output_hidden_states=None,
         return_dict=False,
+        pre_caches=None,
+        use_pre_caches=False,
         **kwargs,
     ):
+
         past_key_values = kwargs.get("cache", past_key_values)
         is_decoder = past_key_values is not None
 
@@ -1452,20 +1491,15 @@ class FusedLlamaModel(LlamaPretrainedModel):
         if attention_mask is None:
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
 
-        if is_decoder:
-            causal_mask = 1.0 - attention_mask[:, None, None, :]
-        else:
-            causal_mask = paddle.tensor.triu(
-                paddle.ones((paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1])), diagonal=1
-            )
-            causal_mask = paddle.logical_or(causal_mask, 1.0 - attention_mask[:, None, None, :]).astype(
-                paddle.get_default_dtype()
-            )
-        causal_mask *= float(finfo(inputs_embeds.dtype).min)
+        if attention_mask.dim() < 4:
+            attention_mask = self._prepare_decoder_attention_mask(
+                attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
+            )  # [bs, 1, seq_len, seq_len]
 
         hidden_states = inputs_embeds
 
         # Transformer cache kv
+
         if len(self.cache_kvs) == 0:
             max_seq_length = 1024
             self.cache_kvs = [
@@ -1493,16 +1527,20 @@ class FusedLlamaModel(LlamaPretrainedModel):
         head_dim = self.hidden_size // self.num_attention_heads
         offset = paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else 0
 
+        if use_pre_caches and pre_caches is not None:
+            offset = pre_caches[0].shape[-2] + offset
+
         rotary_embeddings = self.get_rotary_embedding(
             batch_size, self.max_position_embeddings, 10000, head_dim, seq_length, offset
         )
 
         hidden_states, presents = self.transformer_block(
             hidden_states,
-            attn_mask=paddle.cast(causal_mask, dtype=hidden_states.dtype),
+            attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
             caches=self.cache_kvs,
             rotary_embs=paddle.cast(rotary_embeddings, dtype=paddle.float32),
             rotary_emb_dims=1,
+            pre_caches=pre_caches,
             time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
         )
         hidden_states = self.norm(hidden_states)

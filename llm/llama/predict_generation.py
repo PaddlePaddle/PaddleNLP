@@ -19,6 +19,7 @@ from paddle.distributed import fleet
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.peft.prefix import llama_postprocess_past_key_value
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaConfig
+from paddlenlp.transformers.utils import get_scale_by_dtype
 
 
 def get_parser():
@@ -43,6 +44,7 @@ def get_parser():
         "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
     )
     parser.add_argument("--device", type=str, default="gpu", help="Device")
+    parser.add_argument("--dtype", type=str, default="gpu", help="Device")
     return parser
 
 
@@ -100,6 +102,8 @@ class Predictor(object):
                 config = LlamaConfig.from_pretrained(args.model_name_or_path)
                 dtype = "float16" if config.dtype is None else config.dtype
 
+            dtype = "float32"
+
             self.model = AutoModelForCausalLM.from_pretrained(
                 args.model_name_or_path,
                 tensor_parallel_degree=tensor_parallel_degree,
@@ -107,9 +111,11 @@ class Predictor(object):
                 load_state_as_np=True,
                 dtype=dtype,
             )
+            self.model.prepare_fast_entry(None)
             if self.args.lora_path is not None:
                 self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
             if self.args.prefix_path is not None:
+
                 self.model = PrefixModelForCausalLM.from_pretrained(
                     self.model, self.args.prefix_path, llama_postprocess_past_key_value
                 )
@@ -125,9 +131,62 @@ class Predictor(object):
             return_attention_mask=True,
             return_position_ids=True,
         )
+
+        input_ids_shape = inputs["input_ids"].shape
+
+        # create 4-d attention-mask
+        attention_mask = (
+            paddle.tril(paddle.ones([input_ids_shape[-1], input_ids_shape[-1]], dtype="float32"))
+            .unsqueeze_(0)
+            .unsqueeze_(0)
+        )
+        attention_mask = (attention_mask - 1) * get_scale_by_dtype(self.args.dtype)
+
+        inputs["attention_mask"] = attention_mask
+
+        pre_caches = [
+            paddle.randn(
+                [
+                    2,
+                    self.model.config.num_attention_heads,
+                    128,
+                    self.model.config.hidden_size // self.model.config.num_attention_heads,
+                ],
+                dtype="float32",
+            ).numpy()
+            for _ in range(self.model.config.num_hidden_layers)
+        ]
+
         inputs_tensor = {}
         for key, value in inputs.items():
             inputs_tensor[key] = paddle.to_tensor(value)
+
+        inputs_tensor["use_pre_caches"] = False
+
+        # append pre_cache attention_mask
+        pre_caches_length = pre_caches[0].shape[-2]
+        batch_size, seq_length_with_past = inputs["input_ids"].shape[0], inputs["input_ids"].shape[-1]
+        if False:
+            pre_cache_attention_mask = paddle.zeros(
+                [batch_size, 1, pre_caches_length, seq_length_with_past], dtype=attention_mask.dtype
+            )
+        else:
+            pre_cache_attention_mask = (
+                paddle.ones([1, 1, pre_caches_length, inputs["input_ids"].shape[-1]], dtype=attention_mask.dtype)
+                * -1
+                * get_scale_by_dtype(self.args.dtype)
+            )
+
+        print("pre_cache_attention_mask", pre_cache_attention_mask.shape)
+        print("pre_cache_attention_mask", pre_cache_attention_mask)
+        print("attention_mask", attention_mask.shape)
+        print("attention_mask", attention_mask)
+
+        attention_mask = paddle.concat([pre_cache_attention_mask, attention_mask], axis=2)
+
+        inputs_tensor["pre_caches"] = pre_caches
+        inputs_tensor["attention_mask"] = attention_mask
+        inputs_tensor["use_pre_caches"] = True
         return inputs_tensor
 
     def infer(self, inputs):
@@ -179,8 +238,9 @@ if __name__ == "__main__":
     predictor = Predictor(args)
     if args.data_file is None:
         all_texts = [
-            "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
-            "answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
+            # "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
+            # "answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
+            "中国的首都在哪里？"
         ]
     else:
         all_texts = []

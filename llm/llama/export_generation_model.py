@@ -67,71 +67,20 @@ def main():
         dtype=dtype,
     )
 
-    # model.prepare_fast_entry({})
-    # config = {"use_top_p": True}
-
-    # model.to_static(args.output_path, config)
-
-    # tokenizer.save_pretrained(os.path.dirname(args.output_path))
-    # return
-
-    model.config.fp16_opt_level = None  # For dygraph to static only
     if args.lora_path is not None:
         model = LoRAModel.from_pretrained(model, args.lora_path)
-    model.eval()
-    model = paddle.jit.to_static(
-        model.generate,
-        input_spec=[
-            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
-            None,  # position_ids
-            args.tgt_length,  # max length
-            # min_length
-            0,
-            # decode_strategy
-            "sampling",
-            # temperature
-            1.0,
-            # top_k
-            1,
-            # top_p
-            1.0,
-            # repetition_penalty
-            1,
-            # num_beams
-            1,
-            # num_beam_groups
-            1,
-            # length_penalty
-            0.0,
-            # early_stopping
-            False,
-            # bos_token_id
-            tokenizer.bos_token_id,
-            # eos_token_id
-            tokenizer.eos_token_id,
-            # pad_token_id
-            tokenizer.pad_token_id,
-            # decoder_start_token_id
-            None,
-            # forced_bos_token_id
-            None,
-            # forced_eos_token_id
-            None,
-            # no_repeat_ngram_size
-            None,
-            # num_return_sequences
-            1,
-            # diversity_rate
-            0.0,
-            # use_cache
-            True,
-        ],
-    )
 
-    # Save converted static graph model
-    paddle.jit.save(model, args.output_path)
-    # Also save tokenizer for inference usage
+    model.prepare_fast_entry({})
+    config = {
+        "use_top_p": True,
+        "pad_token_id": tokenizer.pad_token_id,
+        "eos_token_id": tokenizer.eos_token_id,
+        "bos_token_id": tokenizer.bos_token_id,
+        "use_pre_caches": True,
+        "num_layers": model.config.num_hidden_layers,
+    }
+    model.to_static(args.output_path, config)
+    model.config.save_pretrained("inference")
     tokenizer.save_pretrained(os.path.dirname(args.output_path))
 
 
