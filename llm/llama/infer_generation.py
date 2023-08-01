@@ -25,7 +25,7 @@ def parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_dir", required=True, help="The directory of model.")
+    parser.add_argument("--model_dir", default="inference", help="The directory of model.")
     parser.add_argument("--model_prefix", type=str, default="llama", help="The model and params file prefix.")
     parser.add_argument(
         "--device",
@@ -100,18 +100,17 @@ class Predictor(object):
 
         inputs["attention_mask"] = attention_mask
 
-        pre_caches = [
-            paddle.randn(
-                [2, self.config.num_attention_heads, 128, self.config.hidden_size // self.config.num_attention_heads],
-                dtype="float32",
-            ).numpy()
-            for _ in range(self.config.num_hidden_layers)
-        ]
-
+        for i in range(self.config.num_hidden_layers):
+            pre_cache = paddle.randn(
+                    [2, self.config.num_attention_heads, 128, self.config.hidden_size // self.config.num_attention_heads],
+                    dtype="float32",
+                ).numpy()
+            # inputs["pre_caches_" + i] = pre_cache
+                
         use_pre_caches = False
 
         # append pre_cache attention_mask
-        pre_caches_length = pre_caches[0].shape[-2]
+        pre_caches_length = pre_cache.shape[-2]
         if use_pre_caches:
             batch_size = inputs["input_ids"].shape[0]
             pre_cache_attention_mask = paddle.zeros(
@@ -131,9 +130,8 @@ class Predictor(object):
 
         # attention_mask = paddle.concat([pre_cache_attention_mask, attention_mask], axis=2)
 
-        inputs["pre_caches"] = pre_caches
         inputs["attention_mask"] = attention_mask.numpy()
-        inputs["use_pre_caches"] = np.array(use_pre_caches, dtype=np.bool)
+        # inputs["use_pre_caches"] = np.array(use_pre_caches, dtype=np.bool)
 
         return inputs
 
@@ -150,7 +148,8 @@ class Predictor(object):
         output_names = self.predictor.get_output_names()
         output_handle = self.predictor.get_output_handle(output_names[0])
         results = output_handle.copy_to_cpu()
-        return results
+        print(results)
+        return results[0]
 
     def postprocess(self, infer_data):
         result = []

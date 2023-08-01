@@ -1491,10 +1491,10 @@ class FusedLlamaModel(LlamaPretrainedModel):
         if attention_mask is None:
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
 
-        if attention_mask.dim() < 4:
-            attention_mask = self._prepare_decoder_attention_mask(
-                attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
-            )  # [bs, 1, seq_len, seq_len]
+        # if len(attention_mask.shape) < 4:
+        #     attention_mask = self._prepare_decoder_attention_mask(
+        #         attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
+        #     )  # [bs, 1, seq_len, seq_len]
 
         hidden_states = inputs_embeds
 

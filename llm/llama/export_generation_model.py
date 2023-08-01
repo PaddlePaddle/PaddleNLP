@@ -76,7 +76,7 @@ def main():
         "pad_token_id": tokenizer.pad_token_id,
         "eos_token_id": tokenizer.eos_token_id,
         "bos_token_id": tokenizer.bos_token_id,
-        "use_pre_caches": True,
+        "use_pre_caches": False,
         "num_layers": model.config.num_hidden_layers,
     }
     model.to_static(args.output_path, config)

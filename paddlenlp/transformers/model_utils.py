@@ -328,7 +328,8 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike], tensor_parallel_sp
             logger.warning("copy paddle tensor done.")
             return state_dict
 
-    state_dict = paddlenlp_load(checkpoint_file, map_location="cpu")
+    # state_dict = paddlenlp_load(checkpoint_file, map_location="cpu")
+    state_dict = paddle.load(checkpoint_file)
     return state_dict
 
 

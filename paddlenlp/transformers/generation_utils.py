@@ -1233,7 +1233,7 @@ class GenerationMixin(object):
 
         input_spec = [
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
+            paddle.static.InputSpec(shape=[None, None, None, None], dtype="int64"),  # attention_mask
             None,  # position_ids
             paddle.static.InputSpec(shape=[1], dtype="int64"),  # max_length
             0,  # min_length
