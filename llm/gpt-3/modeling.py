@@ -98,45 +98,38 @@ class MultiHeadAttention(nn.Layer):
 
     def __init__(
         self,
-        embed_dim,
-        num_heads,
-        dropout=0.0,
-        kdim=None,
-        vdim=None,
-        need_weights=False,
-        weight_attr=None,
-        output_layer_weight_attr=None,
-        bias_attr=None,
-        fuse_attention_qkv=False,
-        scale_qk_coeff=1.0,
-        num_partitions=1,
-        fused_linear=False,
-        use_recompute=False,
-        recompute_granularity="full",
-        do_recompute=True,
-        use_flash_attn=False,
+        config,
+        kdim=None, #
+        vdim=None, #
+        need_weights=False, # 
+        weight_attr=None, #
+        bias_attr=None, #
+        do_recompute=False,
     ):
         super(MultiHeadAttention, self).__init__()
-        self.embed_dim = embed_dim
-        self.kdim = kdim if kdim is not None else embed_dim
-        self.vdim = vdim if vdim is not None else embed_dim
-        self.num_heads = num_heads
-        self.dropout = dropout
+        
+        self.config = config
+        embed_dim = config.hidden_size
+        self.embed_dim = config.hidden_size
+        self.kdim = kdim if kdim is not None else config.hidden_size
+        self.vdim = vdim if vdim is not None else config.hidden_size
+        self.num_heads = config.num_attention_heads
+        self.dropout = config.hidden_dropout_prob
         self.need_weights = need_weights
-        self.fuse_attention_qkv = fuse_attention_qkv
-        self.scale_qk_coeff = scale_qk_coeff
-        self.use_recompute = use_recompute
-        self.recompute_granularity = recompute_granularity
+        self.fuse_attention_qkv = config.fuse_attention_qkv
+        self.scale_qk_coeff = getattr(config,"scale_qk_coeff", 1.0)
+        self.use_recompute = config.use_recompute
+        self.recompute_granularity = getattr(config,"recompute_granularity", "full")
         self.do_recompute = do_recompute
-        self.use_flash_attn = use_flash_attn if flash_attention else None
+        self.use_flash_attn = config.use_flash_attn if flash_attention else None
 
-        self.head_dim = embed_dim // num_heads
-        assert self.head_dim * num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
+        self.head_dim = embed_dim // self.num_heads
+        assert self.head_dim * self.num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
 
-        assert self.num_heads % num_partitions == 0
-        self.num_heads = self.num_heads // num_partitions
+        assert self.num_heads % config.tensor_parallel_degree == 0
+        self.num_heads = self.num_heads // config.tensor_parallel_degree
 
-        if num_partitions > 1:
+        if config.tensor_parallel_degree > 1:
             if self.fuse_attention_qkv:
                 assert self.kdim == embed_dim, "embed_dim should be equal to kdim"
                 assert self.vdim == embed_dim, "embed_dim should be equal to vidm"
@@ -147,7 +140,7 @@ class MultiHeadAttention(nn.Layer):
                     weight_attr=weight_attr,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=fused_linear,
+                    fuse_matmul_bias=config.fused_linear,
                 )
             else:
                 self.q_proj = fleet.meta_parallel.ColumnParallelLinear(
@@ -156,7 +149,7 @@ class MultiHeadAttention(nn.Layer):
                     weight_attr=weight_attr,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=fused_linear,
+                    fuse_matmul_bias=config.fused_linear,
                 )
 
                 self.k_proj = fleet.meta_parallel.ColumnParallelLinear(
@@ -165,7 +158,7 @@ class MultiHeadAttention(nn.Layer):
                     weight_attr=weight_attr,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=fused_linear,
+                    fuse_matmul_bias=config.fused_linear,
                 )
 
                 self.v_proj = fleet.meta_parallel.ColumnParallelLinear(
@@ -174,7 +167,7 @@ class MultiHeadAttention(nn.Layer):
                     weight_attr=weight_attr,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=fused_linear,
+                    fuse_matmul_bias=config.fused_linear,
                 )
 
             self.out_proj = fleet.meta_parallel.RowParallelLinear(
@@ -183,7 +176,7 @@ class MultiHeadAttention(nn.Layer):
                 weight_attr=weight_attr,
                 has_bias=True,
                 input_is_parallel=True,
-                fuse_matmul_bias=fused_linear,
+                fuse_matmul_bias=config.fused_linear,
             )
         else:
             if self.fuse_attention_qkv:
@@ -481,20 +474,11 @@ class TransformerDecoderLayer(nn.Layer):
         output_layer_weight_attrs = _convert_param_attr_to_list(output_layer_weight_attr, 3)
 
         self.self_attn = MultiHeadAttention(
-            d_model,
-            nhead,
-            dropout=attn_dropout,
+            config=config,
+            need_weights=False,
             weight_attr=weight_attrs[0],
-            output_layer_weight_attr=output_layer_weight_attrs[0],
             bias_attr=bias_attrs[0],
-            num_partitions=self.tensor_parallel_degree,
-            fused_linear=self.fused_linear,
-            fuse_attention_qkv=self.fuse_attention_qkv,
-            scale_qk_coeff=self.scale_qk_coeff,
-            use_recompute=self.use_recompute,
-            recompute_granularity=self.recompute_granularity,
             do_recompute=self.do_recompute,
-            use_flash_attn=self.use_flash_attn,
         )
 
         if config.tensor_parallel_degree > 1:
