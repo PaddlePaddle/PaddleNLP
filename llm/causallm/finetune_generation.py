@@ -231,7 +231,13 @@ def main():
             raise NotImplementedError(
                 "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
             )
-        from quant import apply_ptq, apply_shift, apply_smooth, get_ptq_model_config
+        from quant import (
+            apply_gptq,
+            apply_ptq,
+            apply_shift,
+            apply_smooth,
+            get_ptq_model_config,
+        )
 
         trainer.model.eval()
         # Prepare ptq dataloader
@@ -255,7 +261,10 @@ def main():
         if quant_args.smooth:
             apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config)
 
-        apply_ptq(quant_args, trainer, ptq_dataloader)
+        if quant_args.do_gptq:
+            apply_gptq(quant_args, trainer, ptq_dataloader)
+        else:
+            apply_ptq(quant_args, trainer, ptq_dataloader)
 
     # Evaluation dev set
     if training_args.do_eval:
