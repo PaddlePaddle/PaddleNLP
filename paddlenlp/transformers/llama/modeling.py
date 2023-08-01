@@ -109,7 +109,8 @@ def get_triangle_upper_mask(x, mask=None):
     shape = x.shape
     #  [bsz, 1, q_len, kv_seq_len]
     shape[1] = 1
-    mask = paddle.tril(paddle.ones(shape, dtype="bool"))
+    mask = paddle.full(shape, paddle.finfo(x.dtype).min, dtype=x.dtype)
+    mask = paddle.triu(mask, diagonal=1)
     mask.stop_gradient = True
     return mask
 
@@ -189,6 +190,7 @@ def scaled_dot_product_attention(
                 f" {attn_weights.shape}"
             )
 
+        # NOTE: we only call get_triangle_upper_mask under PP setup
         # FIXME ZHUI when we use pipeline parallel, the attention_mask can be None
         # we just make it triangle_upper_mask
         if attention_mask is None:
@@ -200,10 +202,14 @@ def scaled_dot_product_attention(
                 f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
             )
 
-        # If element is 1, keep the original attn_weights value. If element is 0, set to min value of the dtype
-        attn_weights = paddle.where(
-            attention_mask, attn_weights, paddle.full_like(attn_weights, paddle.finfo(attn_weights.dtype).min)
-        )
+        if attention_mask.dtype == paddle.bool:
+            # If element is 1, keep the original attn_weights value. If element is 0, set to min value of the dtype
+            attn_weights = paddle.where(
+                attention_mask, attn_weights, paddle.full_like(attn_weights, paddle.finfo(attn_weights.dtype).min)
+            )
+        else:
+            # NOTE: we only use this branch in under PP setup, in combination with get_triangle_upper_mask
+            attn_weights = attn_weights + attention_mask
 
         with paddle.amp.auto_cast(False):
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
