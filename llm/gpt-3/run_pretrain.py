@@ -125,7 +125,7 @@ class ModelArguments:
 
     fuse_attention_qkv: bool = field(
         default=False,
-        metadata={"help": "gpt, fuse_attention_qkv"},
+        metadata={"help": "gpt, whether to fuse attention qkv"},
     )
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})

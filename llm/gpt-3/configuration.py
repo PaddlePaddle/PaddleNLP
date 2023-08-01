@@ -286,6 +286,7 @@ class GPTConfig(PretrainedConfig):
         eol_token_id: int = 3,
         num_partitions: int = 1,
         use_recompute: bool = False,
+        fuse_attention_qkv=False,
         enable_fuse_transformer: bool = False,
         lm_shift_labels: bool = True,
         **kwargs
@@ -307,7 +308,7 @@ class GPTConfig(PretrainedConfig):
         self.eos_token_id = eos_token_id
         self.bos_token_id = bos_token_id
         self.eol_token_id = eol_token_id
-        self.fuse_attention_qkv = False
+        self.fuse_attention_qkv = fuse_attention_qkv
         self.num_partitions = num_partitions
         self.use_recompute = use_recompute
         self.enable_fuse_transformer = enable_fuse_transformer
