@@ -160,9 +160,11 @@ class LlamaModelTester:
         result_3d = model(input_ids, attention_mask=attn_mask_3d)[0]
         attn_mask_4d = attn_mask_3d.unsqueeze(1)
         result_4d = model(input_ids, attention_mask=attn_mask_4d)[0]
+        result_no_attention_mask = model(input_ids, attention_mask=None)[0]
         # Assert non-padding tokens have the same logits with different attention_mask shape
         self.parent.assertTrue((result_2d[attn_mask_2d] == result_3d[attn_mask_2d]).all())
         self.parent.assertTrue((result_2d[attn_mask_2d] == result_4d[attn_mask_2d]).all())
+        self.parent.assertTrue((result_2d[attn_mask_2d] == result_no_attention_mask[attn_mask_2d]).all())
 
     def create_and_check_model_past_large_inputs(
         self,

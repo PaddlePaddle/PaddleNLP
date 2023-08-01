@@ -109,7 +109,7 @@ def get_triangle_upper_mask(x, mask=None):
     shape = x.shape
     #  [bsz, 1, q_len, kv_seq_len]
     shape[1] = 1
-    mask = paddle.triu(paddle.ones(shape, dtype="bool"))
+    mask = paddle.tril(paddle.ones(shape, dtype="bool"))
     mask.stop_gradient = True
     return mask
 
