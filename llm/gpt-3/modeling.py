@@ -99,11 +99,7 @@ class MultiHeadAttention(nn.Layer):
     def __init__(
         self,
         config,
-        kdim=None, #
-        vdim=None, #
-        need_weights=False, # 
-        weight_attr=None, #
-        bias_attr=None, #
+        weight_attr=None,
         do_recompute=False,
     ):
         super(MultiHeadAttention, self).__init__()
@@ -111,18 +107,19 @@ class MultiHeadAttention(nn.Layer):
         self.config = config
         embed_dim = config.hidden_size
         self.embed_dim = config.hidden_size
-        self.kdim = kdim if kdim is not None else config.hidden_size
-        self.vdim = vdim if vdim is not None else config.hidden_size
+        self.kdim = config.hidden_size
+        self.vdim = config.hidden_size
         self.num_heads = config.num_attention_heads
         self.dropout = config.hidden_dropout_prob
-        self.need_weights = need_weights
+        self.need_weights = False
         self.fuse_attention_qkv = config.fuse_attention_qkv
         self.scale_qk_coeff = getattr(config,"scale_qk_coeff", 1.0)
         self.use_recompute = config.use_recompute
         self.recompute_granularity = getattr(config,"recompute_granularity", "full")
         self.do_recompute = do_recompute
         self.use_flash_attn = config.use_flash_attn if flash_attention else None
-
+        self.fused_linear = getattr(config, "fused_linear", False)
+        
         self.head_dim = embed_dim // self.num_heads
         assert self.head_dim * self.num_heads == self.embed_dim, "embed_dim must be divisible by num_heads"
 
@@ -140,7 +137,7 @@ class MultiHeadAttention(nn.Layer):
                     weight_attr=weight_attr,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=config.fused_linear,
+                    fuse_matmul_bias=self.fused_linear,
                 )
             else:
                 self.q_proj = fleet.meta_parallel.ColumnParallelLinear(
@@ -149,7 +146,7 @@ class MultiHeadAttention(nn.Layer):
                     weight_attr=weight_attr,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=config.fused_linear,
+                    fuse_matmul_bias=self.fused_linear,
                 )
 
                 self.k_proj = fleet.meta_parallel.ColumnParallelLinear(
@@ -158,7 +155,7 @@ class MultiHeadAttention(nn.Layer):
                     weight_attr=weight_attr,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=config.fused_linear,
+                    fuse_matmul_bias=self.fused_linear,
                 )
 
                 self.v_proj = fleet.meta_parallel.ColumnParallelLinear(
@@ -167,7 +164,7 @@ class MultiHeadAttention(nn.Layer):
                     weight_attr=weight_attr,
                     has_bias=True,
                     gather_output=False,
-                    fuse_matmul_bias=config.fused_linear,
+                    fuse_matmul_bias=self.fused_linear,
                 )
 
             self.out_proj = fleet.meta_parallel.RowParallelLinear(
@@ -176,7 +173,7 @@ class MultiHeadAttention(nn.Layer):
                 weight_attr=weight_attr,
                 has_bias=True,
                 input_is_parallel=True,
-                fuse_matmul_bias=config.fused_linear,
+                fuse_matmul_bias=self.fused_linear,
             )
         else:
             if self.fuse_attention_qkv:
@@ -475,9 +472,7 @@ class TransformerDecoderLayer(nn.Layer):
 
         self.self_attn = MultiHeadAttention(
             config=config,
-            need_weights=False,
             weight_attr=weight_attrs[0],
-            bias_attr=bias_attrs[0],
             do_recompute=self.do_recompute,
         )
 
@@ -607,7 +602,9 @@ class GPTEmbeddings(nn.Layer):
     def _init_weights(self, layer):
         """Initialization Weights"""
 
-        if isinstance(layer, (nn.Linear, nn.Embedding)):
+        if isinstance(layer, (nn.Linear, 
+                              nn.Embedding,
+                              fleet.meta_parallel.VocabParallelEmbedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
