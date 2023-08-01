@@ -235,7 +235,7 @@ def _make_causal_mask(input_ids_shape, past_key_values_length, dtype):
     return mask[None, None, :, :].expand([batch_size, 1, target_length, target_length + past_key_values_length])
 
 
-def _expand_mask(mask, dtype, tgt_length):
+def _expand_2d_mask(mask, dtype, tgt_length):
     """
     Expands attention_mask from `[batch_size, src_length]` to `[batch_size, 1, tgt_length, src_length]`.
     """
@@ -824,28 +824,27 @@ class LlamaModel(LlamaPretrainedModel):
 
     @staticmethod
     def _prepare_decoder_attention_mask(attention_mask, input_shape, past_key_values_length, dtype):
-        # create causal mask
-        # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
-        combined_attention_mask = None
-        if input_shape[-1] > 1:
-            combined_attention_mask = _make_causal_mask(
-                input_shape, past_key_values_length=past_key_values_length, dtype=dtype
-            )
-
         if attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
             if len(attention_mask.shape) == 2:
-                expanded_attn_mask = _expand_mask(attention_mask, dtype, tgt_length=input_shape[-1])
-                combined_attention_mask = (
-                    expanded_attn_mask
-                    if combined_attention_mask is None
-                    else expanded_attn_mask & combined_attention_mask
-                )
-            # if given a 4-d attention_mask
+                expanded_attn_mask = _expand_2d_mask(attention_mask, dtype, tgt_length=input_shape[-1])
+                # For decoding phase in generation, seq_length = 1, we don't need to add causal mask
+                if input_shape[-1] > 1:
+                    combined_attention_mask = _make_causal_mask(
+                        input_shape, past_key_values_length=past_key_values_length, dtype=dtype
+                    )
+                    expanded_attn_mask = expanded_attn_mask & combined_attention_mask
+            # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
+            elif len(attention_mask.shape) == 3:
+                expanded_attn_mask = attention_mask.unsqueeze(1).astype("bool")
+            # if attention_mask is already 4-D, do nothing
             else:
-                combined_attention_mask = attention_mask
-
-        return combined_attention_mask
+                expanded_attn_mask = attention_mask
+        else:
+            expanded_attn_mask = _make_causal_mask(
+                input_shape, past_key_values_length=past_key_values_length, dtype=dtype
+            )
+        return expanded_attn_mask
 
     @paddle.jit.not_to_static
     def recompute_training(
