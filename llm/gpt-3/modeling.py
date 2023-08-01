@@ -664,12 +664,6 @@ class GPTPretrainedModel(PretrainedModel):
             final_actions = {}
             base_actions = {
                 # Column Linear
-                "layers.0.self_attn.q_proj.weight": partial(fn, is_column=True),
-                "layers.0.self_attn.k_proj.weight": partial(fn, is_column=True),
-                "layers.0.self_attn.v_proj.weight": partial(fn, is_column=True),
-                "layers.0.self_attn.q_proj.bias": partial(fn, is_column=True),
-                "layers.0.self_attn.k_proj.bias": partial(fn, is_column=True),
-                "layers.0.self_attn.v_proj.bias": partial(fn, is_column=True),
                 "layers.0.linear1.weight": partial(fn, is_column=True),
                 "layers.0.linear1.bias": partial(fn, is_column=True),
                 # Row Linear
@@ -677,6 +671,17 @@ class GPTPretrainedModel(PretrainedModel):
                 "layers.0.self_attn.out_proj.weight": partial(fn, is_column=False),
                 "layers.0.linear2.weight": partial(fn, is_column=False),
             }
+
+            if config.fuse_attention_qkv:
+                base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.qkv_proj.bias"] = partial(fn, is_column=True)
+            else:
+                base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.q_proj.bias"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.k_proj.bias"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.v_proj.bias"] = partial(fn, is_column=True)
 
             for key, action in base_actions.items():
                 if "layers.0." in key:
