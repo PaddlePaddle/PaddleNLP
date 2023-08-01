@@ -98,7 +98,7 @@ def parallel_matmul(
             if bias is not None:
                 logits += bias
         else:
-            if fuse_linear:
+            if not fuse_linear:
                 logits = F.linear(input_parallel, y, bias)
             else:
                 logits = paddle.incubate.nn.functional.fused_linear(input_parallel, y, bias)  # hack for 逐位对齐
@@ -792,42 +792,56 @@ class Ernie35PretrainedModel(PretrainedModel):
             num_attention_heads=config.num_attention_heads,
         )
 
-        def get_tensor_parallel_split_mappings(num_layers):
+        def get_tensor_parallel_split_mappings(num_layers, parallel_attn_hatf):
             final_actions = {}
             base_actions = {
                 # Column Linear
-                "layers.0.self_attn.q_proj.weight": partial(fn, is_column=True),
-                "layers.0.self_attn.k_proj.weight": partial(fn, is_column=True),
-                "layers.0.self_attn.v_proj.weight": partial(fn, is_column=True),
-                "layers.0.mlp.gate_proj.weight": partial(fn, is_column=True),
-                "layers.0.mlp.up_proj.weight": partial(fn, is_column=True),
+                "layers.1.self_attn_mlp.qkv_gate_up_proj.weight": partial(fn, is_column=True),
                 "lm_head.weight": partial(fn, is_column=True),
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
-                "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
-                "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
+                "layers.1.self_attn_mlp.o_proj.weight": partial(fn, is_column=False),
             }
             if config.use_bias:
                 base_actions.update(
                     {
                         # Column Linear
-                        "layers.0.self_attn.q_proj.bias": partial(fn, is_column=True),
-                        "layers.0.self_attn.k_proj.bias": partial(fn, is_column=True),
-                        "layers.0.self_attn.v_proj.bias": partial(fn, is_column=True),
-                        "layers.0.mlp.gate_proj.bias": partial(fn, is_column=True),
-                        "layers.0.mlp.up_proj.bias": partial(fn, is_column=True),
-                        "lm_head.weight": partial(fn, is_column=True),
+                        "layers.1.self_attn_mlp.qkv_gate_up_proj.bias": partial(fn, is_column=True),
+                        "lm_head.bias": partial(fn, is_column=True),
                     }
                 )
-            for key, action in base_actions.items():
-                if "layers.0." in key:
-                    for i in range(num_layers):
-                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
-                final_actions[key] = action
+            if not parallel_attn_hatf:
+                for key, action in base_actions.items():
+                    if "layers.1." in key:
+                        for i in range(num_layers):
+                            final_actions[key.replace("layers.1.", f"layers.{i}.")] = action
+                    final_actions[key] = action
+            else:
+                for key, action in base_actions.items():
+                    if "layers.1." in key:
+                        for i in range(1, num_layers - 1):
+                            final_actions[key.replace("layers.1.", f"layers.{i}.")] = action
+                    final_actions[key] = action
+                # Layer 0
+                final_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
+                final_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
+                final_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
+                final_actions["layers.0.self_attn.o_proj.weight"] = partial(fn, is_column=False)
+                if config.use_bias:
+                    final_actions["layers.0.self_attn.q_proj.bias"] = partial(fn, is_column=True)
+                    final_actions["layers.0.self_attn.k_proj.bias"] = partial(fn, is_column=True)
+                    final_actions["layers.0.self_attn.v_proj.bias"] = partial(fn, is_column=True)
+                # Layer num_layers - 1
+                final_actions[f"layers.{num_layers - 1}.mlp.gate_proj.weight"] = partial(fn, is_column=True)
+                final_actions[f"layers.{num_layers - 1}.mlp.up_proj.weight"] = partial(fn, is_column=True)
+                final_actions[f"layers.{num_layers - 1}.mlp.down_proj.weight"] = partial(fn, is_column=False)
+                if config.use_bias:
+                    final_actions[f"layers.{num_layers - 1}.mlp.gate_proj.bias"] = partial(fn, is_column=True)
+                    final_actions[f"layers.{num_layers - 1}.mlp.up_proj.bias"] = partial(fn, is_column=True)
 
             return final_actions
 
-        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers, config.parallel_attn_hatf)
 
         return mappings
 
