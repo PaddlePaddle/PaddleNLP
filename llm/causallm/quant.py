@@ -30,12 +30,22 @@ from paddleslim.quant.layers import (
     QuantizedColumnParallelLinear,
     QuantizedRowParallelLinear,
 )
-from paddleslim.quant.observers import AbsMaxChannelWiseWeightObserver, AbsmaxObserver
+from paddleslim.quant.observers import (
+    AbsMaxChannelWiseWeightObserver,
+    AbsmaxObserver,
+    AVGObserver,
+)
 from paddleslim.quant.quanters import PACTQuanter
 
 from paddlenlp.peft import PrefixModelForCausalLM
 from paddlenlp.peft.lora import LoRALinear
 from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
+
+quant_method_dict = {
+    "abs_max_channelwise": AbsMaxChannelWiseWeightObserver,
+    "abs_max": AbsmaxObserver,
+    "avg": AVGObserver,
+}
 
 
 def create_qat_model(quant_args, model, dtype):
@@ -92,8 +102,8 @@ def apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config):
             search_alpha_max=0.8,
             search_scale_min=1.0,
             search_scale_max=5.0,
-            weight_quant_method="abs_max_channel_wise",
-            act_quant_method="abs_max",
+            weight_quant_method=quant_method_dict[quant_args.weight_quant_method],
+            act_quant_method=quant_method_dict[quant_args.act_quant_method],
         )
     else:
         search_func = None
@@ -117,8 +127,8 @@ def apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config):
 
 def apply_ptq(quant_args, trainer, ptq_dataloader):
     q_config = QuantConfig(activation=None, weight=None)
-    act_quanter = AbsmaxObserver()
-    weight_quanter = AbsMaxChannelWiseWeightObserver()
+    act_quanter = quant_method_dict[quant_args.act_quant_method]()
+    weight_quanter = quant_method_dict[quant_args.weight_quant_method]()
     q_config.add_qat_layer_mapping(ColumnParallelLinear, QuantizedColumnParallelLinear)
     q_config.add_qat_layer_mapping(RowParallelLinear, QuantizedRowParallelLinear)
     q_config.add_type_config(
@@ -146,7 +156,7 @@ def get_ptq_model_config(model):
     if base_model_prefix in ["chatglm"]:
         raise NotImplementedError(f"{model} does not support Shift or Smooth.")
     elif base_model_prefix == "chatglm_v2":
-        model_config = {"fused_qkv": False, "parallel_ffn": False}
+        model_config = {"fused_qkv": False, "skip_norm_list": ["rms_norm_56"], "parallel_ffn": False}
     elif base_model_prefix == "bloom":
         model_config = {"fused_qkv": True, "parallel_ffn": False}
     elif base_model_prefix == "llama":
