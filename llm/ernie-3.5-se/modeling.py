@@ -98,7 +98,7 @@ def parallel_matmul(
             if bias is not None:
                 logits += bias
         else:
-            if fuse_linear:
+            if not fuse_linear:
                 logits = F.linear(input_parallel, y, bias)
             else:
                 logits = paddle.incubate.nn.functional.fused_linear(input_parallel, y, bias)  # hack for 逐位对齐
