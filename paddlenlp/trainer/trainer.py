@@ -480,7 +480,7 @@ class Trainer:
             if self.args.bf16:
                 state_dict = self.recover_params_from_master_weights(state_dict)
         else:
-            if self.args.dataset_rank == 0:
+            if self.args.dataset_rank == 0 or self.args.use_moe:
                 state_dict = self.load_one_state_dict_from_checkpoint(
                     resume_from_checkpoint, self.args.old_weight_name_suffix
                 )
@@ -1961,7 +1961,7 @@ class Trainer:
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
         if self.args.should_save:
-            if not self.args.use_hybrid_parallel:
+            if not self.args.use_hybrid_parallel and not self.args.use_moe:
                 self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
             # FIXME: manybe only save one copy

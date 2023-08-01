@@ -978,9 +978,10 @@ class TrainingArguments:
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
-            if self.sharding_parallel_degree > 1 or self.use_moe:
+            if self.sharding_parallel_degree > 1:
                 name.append(f"shard{self.sharding_parallel_rank:0>2d}")
-
+            if self.use_moe:
+                name.append(f"moe{self.data_parallel_rank:0>2d}")
             return "_".join(name)
         else:
             if self.use_moe:
@@ -995,8 +996,12 @@ class TrainingArguments:
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
+            if self.use_moe:
+                name.append(f"moe{self.data_parallel_rank:0>2d}")
             return "_".join(name)
         else:
+            if self.use_moe:
+                return f"moe{self.data_parallel_rank:0>2d}"
             return None
 
     @property
@@ -1007,8 +1012,10 @@ class TrainingArguments:
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
-            if self.save_sharding_stage1_model or self.use_moe:
+            if self.save_sharding_stage1_model:
                 name.append(f"shard{self.sharding_parallel_rank:0>2d}")
+            if self.use_moe:
+                name.append(f"moe{self.data_parallel_rank:0>2d}")
             return "_".join(name)
         else:
             if self.use_moe:
@@ -1054,7 +1061,7 @@ class TrainingArguments:
             work for data parallel, tensor parallel
             not work for sharding
         """
-        if self.save_on_each_node:
+        if self.save_on_each_node and not (self.use_moe):
             return self.local_process_index == 0
         else:
             return self.process_index == 0
