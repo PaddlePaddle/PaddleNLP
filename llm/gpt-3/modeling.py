@@ -582,30 +582,42 @@ class GPTEmbeddings(nn.Layer):
     ):
         super(GPTEmbeddings, self).__init__()
 
+        self.config = config
+
         if config.tensor_parallel_degree > 1:
             self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
                 config.vocab_size,
                 config.hidden_size,
-                weight_attr=paddle.ParamAttr(
-                    initializer=nn.initializer.Normal(mean=0.0, std=config.initializer_range)
-                ),
             )
         else:
             self.word_embeddings = nn.Embedding(
                 config.vocab_size,
                 config.hidden_size,
-                weight_attr=paddle.ParamAttr(
-                    initializer=nn.initializer.Normal(mean=0.0, std=config.initializer_range)
-                ),
             )
 
         self.position_embeddings = nn.Embedding(
             config.max_position_embeddings,
             config.hidden_size,
-            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=config.initializer_range)),
         )
 
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
+
+        self.apply(self._init_weights)
+
+    def _init_weights(self, layer):
+        """Initialization Weights"""
+
+        if isinstance(layer, (nn.Linear, nn.Embedding)):
+            # In the dygraph mode, use the `set_value` to reset the parameter directly,
+            # and reset the `state_dict` to update parameter in static mode.
+            if isinstance(layer.weight, paddle.Tensor):
+                layer.weight.set_value(
+                    paddle.tensor.normal(
+                        mean=0.0,
+                        std=self.initializer_range if hasattr(self, "initializer_range") else self.config["initializer_range"],
+                        shape=layer.weight.shape,
+                    )
+                )
 
     def forward(self, input_ids, position_ids=None):
         if position_ids is None:
