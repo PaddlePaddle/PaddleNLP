@@ -954,6 +954,13 @@ class GenerationMixin(object):
                     input_ids, expand_size=num_return_sequences, **model_kwargs
                 )
 
+            if use_pre_caches:
+                assert (
+                    use_pre_caches is not None
+                ), "pre_caches should be set for pre-cached model when `use_pre_cache`=True"
+            else:
+                pre_caches = None
+
             if is_tracing:
                 return self.sample_d2s(
                     input_ids,
@@ -1113,7 +1120,7 @@ class GenerationMixin(object):
         top_p=None,
         temperature=None,
         min_tokens_to_keep=1,
-        pre_cache=None,
+        pre_caches=None,
         use_pre_caches=None,
         **model_kwargs
     ):
@@ -1129,10 +1136,14 @@ class GenerationMixin(object):
         if return_scores:
             scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
+        immutable = {}
+        immutable["pre_caches"] = pre_caches
+        immutable["use_pre_caches"] = use_pre_caches
+        
         while cur_len < max_length:
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
-            outputs = self(**model_inputs)
+            outputs = self(**model_inputs, **immutable)
 
             if isinstance(outputs, tuple):
                 logits = outputs[0]
@@ -1297,14 +1308,7 @@ class GenerationMixin(object):
         use_pre_caches=False,
         **model_kwargs
     ):
-
-        if use_pre_caches:
-            assert (
-                use_pre_caches is not None
-            ), "pre_caches should be set for pre-cached model when `use_pre_cache`=True"
-        else:
-            pre_caches = None
-
+        
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
         if paddle.is_tensor(top_k) and not paddle.is_tensor(top_p):

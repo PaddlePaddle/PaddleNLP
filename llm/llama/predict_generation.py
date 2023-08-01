@@ -44,7 +44,7 @@ def get_parser():
         "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
     )
     parser.add_argument("--device", type=str, default="gpu", help="Device")
-    parser.add_argument("--dtype", type=str, default="gpu", help="Device")
+    parser.add_argument("--dtype", type=str, default="float32", help="Device")
     return parser
 
 
@@ -182,11 +182,11 @@ class Predictor(object):
         print("attention_mask", attention_mask.shape)
         print("attention_mask", attention_mask)
 
-        attention_mask = paddle.concat([pre_cache_attention_mask, attention_mask], axis=2)
+        # attention_mask = paddle.concat([pre_cache_attention_mask, attention_mask], axis=2)
 
         inputs_tensor["pre_caches"] = pre_caches
         inputs_tensor["attention_mask"] = attention_mask
-        inputs_tensor["use_pre_caches"] = True
+        inputs_tensor["use_pre_caches"] = False
         return inputs_tensor
 
     def infer(self, inputs):

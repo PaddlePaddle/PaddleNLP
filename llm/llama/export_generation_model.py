@@ -36,7 +36,7 @@ def parse_args():
         type=str,
         help="The output file prefix used to save the exported inference model.",
     )
-    parser.add_argument("--dtype", default=None, help="The data type of exported model")
+    parser.add_argument("--dtype", default="float16", help="The data type of exported model")
     parser.add_argument("--tgt_length", type=int, default=100, help="The batch size of data.")
     parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     args = parser.parse_args()
