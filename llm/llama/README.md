@@ -64,16 +64,16 @@ mv llama_openwebtext_100k_idx.npz ./data
 
 使用下面脚本,即可在llama-7b的基础上,继续训练.
 ```shell
-task_name="llama_hybid"
+task_name_or_path="llama_hybid"
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
-    --log_dir "output/$task_name""_log" \
+    --log_dir "output/$task_name_or_path""_log" \
     run_pretrain.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
     --tokenizer_name_or_path "facebook/llama-7b" \
     --input_dir "./data" \
-    --output_dir "output/$task_name" \
+    --output_dir "output/$task_name_or_path" \
     --split 949,50,1 \
     --max_seq_length 2048 \
     --per_device_train_batch_size 1 \
@@ -122,7 +122,7 @@ python -u  -m paddle.distributed.fleet.launch \
     --gradient_accumulation_steps 2 \
     --per_device_eval_batch_size 8 \
     --model_name_or_path facebook/llama-7b \
-    --task_name squad \
+    --task_name_or_path squad \
     --num_train_epochs 2 \
     --learning_rate 3e-5 \
     --warmup_steps 30 \
@@ -154,7 +154,7 @@ python finetune_generation.py \
     --gradient_accumulation_steps 2 \
     --per_device_eval_batch_size 8 \
     --model_name_or_path facebook/llama-7b \
-    --task_name squad \
+    --task_name_or_path squad \
     --num_train_epochs 2 \
     --learning_rate 3e-4 \
     --warmup_steps 30 \
@@ -187,7 +187,7 @@ python finetune_generation.py \
     --gradient_accumulation_steps 2 \
     --per_device_eval_batch_size 8 \
     --model_name_or_path facebook/llama-7b \
-    --task_name squad \
+    --task_name_or_path squad \
     --num_train_epochs 2 \
     --learning_rate 3e-5 \
     --warmup_steps 30 \
@@ -242,9 +242,8 @@ python finetune_generation.py \
 - `qat_type`: qat量化类型，支持A8W8, W4, A8W4。默认为A8W8。
 - `prefix_tuning`: 是否使用Prefix技术。
 - `num_prefix_tokens`: prefix tuning算法中前缀token数量。
-- `task_name`: 内置数据集任务名
+- `task_name_or_path`: 内置数据集任务名或者自定义数据集路径
 - `data_name`: 内置数据集名，定义数据集名必须同时定义数据集任务名
-- `dataset_path`: 自定义数据集路径。
 
 ## 流水线并行
 ```shell
