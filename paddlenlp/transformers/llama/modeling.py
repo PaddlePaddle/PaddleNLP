@@ -202,7 +202,7 @@ def scaled_dot_product_attention(
                 f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
             )
 
-        if attention_mask.dtype == paddle.bool:
+        if attention_mask.dtype in [paddle.bool, paddle.int32, paddle.int64]:
             # If element is 1, keep the original attn_weights value. If element is 0, set to min value of the dtype
             attn_weights = paddle.where(
                 attention_mask, attn_weights, paddle.full_like(attn_weights, paddle.finfo(attn_weights.dtype).min)
@@ -840,16 +840,19 @@ class LlamaModel(LlamaPretrainedModel):
                         input_shape, past_key_values_length=past_key_values_length, dtype=dtype
                     )
                     expanded_attn_mask = expanded_attn_mask & combined_attention_mask
+                print("2D", expanded_attn_mask)
             # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
             elif len(attention_mask.shape) == 3:
                 expanded_attn_mask = attention_mask.unsqueeze(1).astype("bool")
             # if attention_mask is already 4-D, do nothing
             else:
                 expanded_attn_mask = attention_mask
+                print("4D", expanded_attn_mask)
         else:
             expanded_attn_mask = _make_causal_mask(
                 input_shape, past_key_values_length=past_key_values_length, dtype=dtype
             )
+
         return expanded_attn_mask
 
     @paddle.jit.not_to_static
