@@ -840,14 +840,12 @@ class LlamaModel(LlamaPretrainedModel):
                         input_shape, past_key_values_length=past_key_values_length, dtype=dtype
                     )
                     expanded_attn_mask = expanded_attn_mask & combined_attention_mask
-                print("2D", expanded_attn_mask)
             # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
             elif len(attention_mask.shape) == 3:
                 expanded_attn_mask = attention_mask.unsqueeze(1).astype("bool")
             # if attention_mask is already 4-D, do nothing
             else:
                 expanded_attn_mask = attention_mask
-                print("4D", expanded_attn_mask)
         else:
             expanded_attn_mask = _make_causal_mask(
                 input_shape, past_key_values_length=past_key_values_length, dtype=dtype
