@@ -13,9 +13,18 @@ PaddleNLP Peft提供了LoRA和 Prefix-tuning 训练API，针对训练过程的�
 
 # 预备知识
 ## LoRA tuning
-LoRA tuning(LOW-RANK ADAPTATION OF LARGE LANGUAGE MODELS)[论文](https://arxiv.org/pdf/2106.09685.pdf)
+![LoRA tuning 示意图](https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/63d56558-247a-4a8d-a6ca-121c820f7534)
+大模型网络中有很多的线性层，里面需要进行密集的矩阵乘法计算，而这些通常具有全秩(full rank)，较难优化计算。LoRA论文的研究中表明, 将输入表达随机投影到较小的子空间不仅任然可以有效地学习还可以节约大量的计算显存需求。具体做法：对于预训练的权重矩阵, 通过引入两个低 rank 矩阵 $AB$(图中橙色的两个矩阵) 来近似权重的更新过程 $W_0+\Delta W=W_0+B A$ , 其中 $B \in \mathbb{R}^{d \times r}, A \in \mathbb{R}^{r \times k}$, $r$ 远小于原权重矩阵的 rank 。训练期间, $W_0$ 参数冻结, 只对 $\mathrm{A}$ 和 $\mathrm{B}$ 两个矩阵进行梯度更新，前向传播公式如下:
+$$
+h=W_0 x+B A x
+$$
+由于训练参数的减少，训练过程会减少很多中间变量的存储，由此节约大量的训练显存消耗。
+更多算法细节参考LoRA tuning[论文](https://arxiv.org/abs/2106.09685)
+
 ## Prefix tuning
-Prefix tuning[论文](https://arxiv.org/pdf/2101.00190.pdf)
+![Prefix tuning 示意图](https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/8baf6943-4540-4c02-8540-35f977acc077)
+Prefix tuning是一个针对NLG类型下游任务的轻量级微调方案，受提示学习（Prompt learning）的影响，加入的一部分 prefix embedding 作为连续型提示进行训练。prefix embedding是由专门的 prefix encoder 网络生成的数个张量，会以 past_key_value的方式被插入到语言模型每一层的 hidden_state之前。和 LoRA tuning 类似，它也会冻结整个预训练模型的所有参数权重，只对prefix embedding进行梯度更新，因此训练参数量只有常规 SFT 的 0.1%。prefix tuning可以在全样本下获得与 SFT 比肩的训练效果，在小样本环境下甚至可以超越 SFT。更多算法细节参考
+Prefix tuning[论文](https://arxiv.org/abs/2101.00190)
 
 # LoRAConfig
 
