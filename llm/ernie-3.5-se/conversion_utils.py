@@ -73,7 +73,7 @@ def merge_qkv_gate_up_tensor_parallel_weight(weight_list, tensor_parallel_degree
     bhs = 3 * hidden_size // tensor_parallel_degree
     bis = intermediate_size // tensor_parallel_degree
 
-    qkv_l, g_l, u_l = [], [], [], [], []
+    qkv_l, g_l, u_l = [], [], []
     for weight in weight_list:
         qkv, g, u = np.split(weight, [bhs * 3, bhs * 3 + bis], axis=-1)
         qkv_l.append(qkv)
