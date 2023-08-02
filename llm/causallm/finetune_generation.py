@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import os
 import sys
 from functools import partial
@@ -171,6 +172,11 @@ def main():
 
         predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False)
         references = tokenizer.batch_decode(references, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+        if data_args.save_generation_output:
+            with open(os.path.join(training_args.output_dir, "generated_output.json"), "w", encoding="utf-8") as f:
+                for pred, ref in zip(predictions, references):
+                    out = {"output": pred, "tgt": ref}
+                    f.write(json.dumps(out, ensure_ascii=False) + "\n")
 
         # for pred in predictions:
         rouge1_score = rouge1.score(predictions, references)
