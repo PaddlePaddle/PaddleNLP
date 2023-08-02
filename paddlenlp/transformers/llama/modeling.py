@@ -202,15 +202,7 @@ def scaled_dot_product_attention(
                 f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
             )
 
-        if attention_mask.dtype in [paddle.bool, paddle.int32, paddle.int64]:
-            # If element is 1, keep the original attn_weights value. If element is 0, set to min value of the dtype
-            attn_weights = paddle.where(
-                attention_mask, attn_weights, paddle.full_like(attn_weights, paddle.finfo(attn_weights.dtype).min)
-            )
-        else:
-            # NOTE: we only use this branch in under PP setup, in combination with get_triangle_upper_mask
-            attn_weights = attn_weights + attention_mask
-
+        attn_weights = attn_weights + attention_mask
         with paddle.amp.auto_cast(False):
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
 
@@ -850,7 +842,12 @@ class LlamaModel(LlamaPretrainedModel):
             expanded_attn_mask = _make_causal_mask(
                 input_shape, past_key_values_length=past_key_values_length, dtype=dtype
             )
-
+        # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
+        expanded_attn_mask = paddle.where(
+            expanded_attn_mask,
+            0.0,  # if true, visible
+            paddle.finfo(dtype).min  # if false, invisible
+        )
         return expanded_attn_mask
 
     @paddle.jit.not_to_static
