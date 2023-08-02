@@ -32,6 +32,7 @@ mv gpt_en_dataset_300m_idx.npz ./data
 
 注意：
 1. 需要paddle develop版本训练，需要安装`pip install tool_helpers visualdl==2.5.3`等相关缺失whl包
+2. `use_flash_attn` 需要在A100机器开启，否则loss可能不正常（很快变成0.00x,非常小不正常）。建议使用cuda11.8环境。
 
 使用下面脚本,即可在gpt2-medium-en的基础上,继续训练.
 ```shell
@@ -42,7 +43,7 @@ log_dir="log"
 rm -rf $log_dir
 
 python -u  -m paddle.distributed.launch \
-    --gpus "0" \
+    --gpus "6,7" \
     --log_dir ${log_dir} \
     run_pretrain.py \
     --model_type "gpt" \
@@ -56,6 +57,8 @@ python -u  -m paddle.distributed.launch \
     --per_device_eval_batch_size 1 \
     --tensor_parallel_degree 1 \
     --pipeline_parallel_degree 1 \
+    --fuse_attention_qkv 1 \
+    --use_flash_attention 0 \
     --fp16  \
     --fp16_opt_level "O2"  \
     --scale_loss 1024 \
@@ -94,6 +97,8 @@ python -u  -m paddle.distributed.launch \
 - `src_length`: 上下文的最大输入长度，默认为128.
 - `tgt_length`: 生成文本的最大长度，默认为160.
 - `gradient_accumulation_steps`: 模型参数梯度累积的步数，可用于扩大 batch size。实际的 batch_size = per_device_train_batch_size * gradient_accumulation_steps。
+- `fuse_attention_qkv`：在MultiHeadAttention中使用qkv线性层融合
+- `use_flash_attention`：使用flash attention技术，注意此处需要在A100机器开启
 - `fp16`: 使用 float16 精度进行模型训练和推理。
 - `fp16_opt_level`: float16 精度训练模式，`O2`表示纯 float16 训练。
 - `recompute`: 使用重计算策略，开启后可节省训练显存。
@@ -116,7 +121,7 @@ log_dir="log"
 rm -rf $log_dir
 
 python -u  -m paddle.distributed.launch \
-    --gpus "0" \
+    --gpus "6,7" \
     --log_dir ${log_dir} \
     finetune_generation.py \
     --model_type "gpt" \
