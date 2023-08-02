@@ -21,7 +21,6 @@ import sys
 import time
 
 import numpy as np
-import paddle
 from tqdm import tqdm
 
 import paddlenlp.transformers as tfs
@@ -33,6 +32,13 @@ try:
     nltk_available = True
 except ImportError:
     nltk_available = False
+
+from datetime import datetime
+
+
+def print_datetime(string):
+    time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print("[" + string + "] datetime: {} ".format(time_str))
 
 
 def get_args():
@@ -286,6 +292,7 @@ class Converter(object):
 
 
 def main():
+    print_datetime("start")
     args = get_args()
     file_paths = []
     if os.path.isfile(args.input_path):
@@ -331,7 +338,6 @@ def main():
         encoded_docs = pool.imap(convert.encode, text, 256)
         print("Processing %s" % file_path)
         for i, (doc, bytes_processed) in enumerate(encoded_docs, start=1):
-
             step += 1
             total_bytes_processed += bytes_processed
             if len(doc) == 0:
@@ -341,7 +347,7 @@ def main():
                 sentence_len = len(sentence)
                 if sentence_len == 0:
                     continue
-                builder.add_item(paddle.to_tensor(sentence))
+                builder.add_item(sentence)
 
             builder.end_document()
 
@@ -359,6 +365,7 @@ def main():
     pool.close()
     print("Saving tokens to files...")
     builder.finalize(output_idx_files)
+    print_datetime("end")
 
 
 if __name__ == "__main__":

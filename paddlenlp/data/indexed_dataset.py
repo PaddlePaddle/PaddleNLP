@@ -254,12 +254,13 @@ class IndexedDatasetBuilder(object):
         self.doc_idx = [0]
 
     def add_item(self, tensor):
-
-        bytes = self.out_file.write(np.array(tensor.numpy(), dtype=self.dtype))
+        tensor = np.array(tensor, dtype=self.dtype)
+        bytes = self.out_file.write(tensor)
         self.data_offsets.append(self.data_offsets[-1] + bytes / self.element_size)
         for s in tensor.shape:
             self.sizes.append(s)
         self.dim_offsets.append(self.dim_offsets[-1] + len(tensor.shape))
+        del bytes
 
     def end_document(self):
         self.doc_idx.append(len(self.sizes))
@@ -537,9 +538,9 @@ class MMapIndexedDatasetBuilder(object):
         self._doc_idx = [0]
 
     def add_item(self, tensor):
-        np_array = np.array(tensor.numpy(), dtype=self._dtype)
-        self._data_file.write(np_array.tobytes(order="C"))
-        self._sizes.append(np_array.size)
+        tensor = np.array(tensor, dtype=self._dtype)
+        self._data_file.write(tensor.tobytes(order="C"))
+        self._sizes.append(tensor.size)
 
     def add_doc(self, tensor, sizes):
         np_array = np.array(tensor, dtype=self._dtype)
