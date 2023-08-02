@@ -116,19 +116,13 @@ class ModelArguments:
     tokenizer_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
-    use_flash_attn: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
-
-    enable_fuse_transformer: bool = field(
-        default=False,
-        metadata={"help": "gpt, enable_fuse_transformer"},
-    )
-
-    fuse_attention_qkv: bool = field(
-        default=False,
-        metadata={"help": "gpt, whether to fuse attention qkv"},
-    )
+    use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
+    fused_linear: bool = field(default=False, metadata={"help": "gpt, whether to fuse linear projection"},)
+    fuse_attention_qkv: bool = field(default=False, metadata={"help": "gpt, whether to fuse attention qkv"},)
+    enable_fuse_transformer: bool = field(default=False, metadata={"help": "gpt, enable_fuse_transformer"},)
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
+
 
 
 def create_pretrained_dataset(
@@ -364,7 +358,7 @@ def main():
     config.enable_fuse_transformer = model_args.enable_fuse_transformer
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.use_recompute = training_args.recompute
-    config.use_flash_attn = model_args.use_flash_attn
+    config.use_flash_attention = model_args.use_flash_attention
     config.lm_shift_labels = False
 
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
