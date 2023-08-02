@@ -819,7 +819,8 @@ class BloomModel(BloomPreTrainedModel):
         zero = paddle.zeros(expanded_attn_mask.shape, dtype=dtype)
         neg_inf = paddle.full(expanded_attn_mask.shape, paddle.finfo(dtype).min, dtype=dtype)
         expanded_attn_mask = paddle.where(expanded_attn_mask, zero, neg_inf)
-        return expanded_attn_mask.reshape([-1, expanded_attn_mask.shape[-2], expanded_attn_mask.shape[-1]])
+        batch_size, num_heads, sq_len, kv_len = expanded_attn_mask.shape
+        return expanded_attn_mask.reshape([batch_size * num_heads, sq_len, kv_len])
 
     def set_input_embeddings(self, new_embeddings: Tensor):
         self.word_embeddings = new_embeddings
