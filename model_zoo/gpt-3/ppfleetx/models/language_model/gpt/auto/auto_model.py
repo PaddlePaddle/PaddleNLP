@@ -950,6 +950,7 @@ class GPTForGenerationAuto(nn.Layer):
             return probs
 
         batch_size, cur_len = paddle.shape(input_ids)
+        cur_len = paddle.assign(cur_len)
         # used for compute on gpu, avoid memcpy D2H
         cur_len_gpu = paddle.full([1], cur_len, dtype="int64")
 
@@ -973,7 +974,7 @@ class GPTForGenerationAuto(nn.Layer):
             return self.gpt(**model_inputs, **immutable)
 
         def _post_process_(outputs, input_ids, cur_len, origin_len, scores, unfinished_flag, model_kwargs):
-            cur_len = paddle.assign(cur_len)
+
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
 
             x_dims_mapping = [auto_env.get_mesh().dp_dim] + [None] * (len(logits.shape) - 1)
