@@ -36,6 +36,7 @@ class Task(metaclass=abc.ABCMeta):
         model(string): The model name in the task.
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
+    
 
     def __init__(self, model, task, priority_path=None, **kwargs):
         self.model = model
@@ -63,6 +64,7 @@ class Task(metaclass=abc.ABCMeta):
         self.from_hf_hub = kwargs.pop("from_hf_hub", False)
         # Add mode flag for onnx output path redirection
         self.export_type = None
+
 
         if "task_path" in self.kwargs:
             self._task_path = self.kwargs["task_path"]
@@ -208,12 +210,13 @@ class Task(metaclass=abc.ABCMeta):
                 logger.info(
                     ">>> [InferBackend] It is a INT8 model which is not yet supported on gpu, use FP32 to inference here ..."
                 )
-            self._config.enable_use_gpu(100, self.kwargs["device_id"])
+            self._config.enable_use_gpu(1000, self.kwargs["device_id"])
             # TODO(linjieccc): enable after fixed
-            self._config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
+            self._config.delete_pass0("embedding_eltwise_layernorm_fuse_pass")
             self._config.delete_pass("fused_multi_transformer_encoder_pass")
         self._config.set_cpu_math_library_num_threads(self._num_threads)
         self._config.switch_use_feed_fetch_ops(False)
+        self._config.switch_ir_optim()
         self._config.disable_glog_info()
         self._config.enable_memory_optim()
 
