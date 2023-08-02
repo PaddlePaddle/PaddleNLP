@@ -1351,10 +1351,15 @@ class UTC(ErniePretrainedModel):
 
         option_logits = paddle.matmul(q.unsqueeze(1), k, transpose_y=True).squeeze(1)
         option_logits = option_logits / self.predict_size**0.5
-        with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
+
+        if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+            # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be removed after static graphs support inplace and stride.
+            with paddle.framework._no_check_dy2st_diff():
+                for index, logit in enumerate(option_logits):
+                    option_logits[index] -= (1 - (omask_positions[index] > 0).astype("float32")) * 1e12
+        else:
             for index, logit in enumerate(option_logits):
                 option_logits[index] -= (1 - (omask_positions[index] > 0).astype("float32")) * 1e12
-
         loss = None
         if not return_dict:
             output = (option_logits,)
