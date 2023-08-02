@@ -1353,7 +1353,9 @@ class UTC(ErniePretrainedModel):
         option_logits = option_logits / self.predict_size**0.5
 
         if hasattr(paddle.framework, "_no_check_dy2st_diff"):
-            # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be removed after static graphs support inplace and stride.
+            # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior
+            # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+            # removed after static graphs support inplace and stride.
             with paddle.framework._no_check_dy2st_diff():
                 for index, logit in enumerate(option_logits):
                     option_logits[index] -= (1 - (omask_positions[index] > 0).astype("float32")) * 1e12
