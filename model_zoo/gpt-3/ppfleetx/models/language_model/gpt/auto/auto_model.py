@@ -1045,8 +1045,15 @@ class GPTForGenerationAuto(nn.Layer):
         if not self.inference:
             cur_len += 1
         else:
-            # Note(ZhenyuLi): Avoid the synchronization caused by scale in dy2static
-            paddle.increment(cur_len)
+            # Note(ZhenyuLi): Avoid the synchronization caused by scale in 
+            if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+                # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior
+                # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+                # removed after static graphs support inplace and stride.
+                with paddle.framework._no_check_dy2st_diff():
+                    paddle.increment(cur_len)
+            else:
+                paddle.increment(cur_len)
         paddle.increment(cur_len_gpu)
 
         attn_mask = model_kwargs["attention_mask"]
@@ -1071,7 +1078,14 @@ class GPTForGenerationAuto(nn.Layer):
                 cur_len += 1
             else:
                 # Note(ZhenyuLi): Avoid the synchronization caused by scale in dy2static
-                paddle.increment(cur_len)
+                if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+                    # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior
+                    # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+                    # removed after static graphs support inplace and stride.
+                    with paddle.framework._no_check_dy2st_diff():
+                        paddle.increment(cur_len)
+                else:
+                    paddle.increment(cur_len)
             paddle.increment(cur_len_gpu)
 
             # early finish should be True in generation scenes,
