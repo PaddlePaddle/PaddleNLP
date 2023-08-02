@@ -63,6 +63,7 @@ class ModelArguments:
     profiler: Optional[bool] = field(default=False, metadata={"help": "whether to use profiler"})
     train_data_size: int = field(default=1000, metadata={"help": "Number of dataset for training"})
     intokens_length: int = field(default=2048, metadata={"help": "Intokens length"})
+    intokens: Optional[bool] = field(default=False, metadata={"help": "whether to use intokens"})
 
 
 def main():
@@ -80,6 +81,9 @@ def main():
         dtype = "float32"
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+
+    if "llama" in model_args.model_name_or_path:
+        tokenizer.pad_token = tokenizer.unk_token
     model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         load_state_as_np=True,
@@ -106,7 +110,7 @@ def main():
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
 
-    def preprocess_function(example, max_src_length=256, max_tgt_length=384):
+    def preprocess_function(example, max_src_length=256, max_tgt_length=384, intokens=False):
         inputs = example["instruction"]
         targets = example["output"]
         if "input" in example:
@@ -118,10 +122,11 @@ def main():
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
         model_inputs["position_ids"] = list(range(len(model_inputs["input_ids"])))
         seq_length = len(model_inputs["input_ids"])
-        model_inputs["attention_mask"] = np.tril(np.ones([seq_length, seq_length]), 0).tolist()
+        if intokens:
+            model_inputs["attention_mask"] = np.tril(np.ones([seq_length, seq_length]), 0).tolist()
         return model_inputs
 
-    def preprocess_function_chatglm(example, max_src_length=256, max_tgt_length=384):
+    def preprocess_function_chatglm(example, max_src_length=256, max_tgt_length=384, intokens=False):
         inputs = example["instruction"]
         targets = example["output"]
         if "input" in example:
@@ -143,14 +148,15 @@ def main():
         )
         model_inputs["position_ids"] = np.stack([position_ids, block_position_ids], axis=0)
         # attention mask
-        attention_mask = np.ones((seq_length, seq_length))
-        attention_mask = np.tril(attention_mask)
-        attention_mask[:, :context_length] = 1
-        attention_mask = (attention_mask < 0.5).astype("int64")
-        model_inputs["attention_mask"] = attention_mask.tolist()
+        if intokens:
+            attention_mask = np.ones((seq_length, seq_length))
+            attention_mask = np.tril(attention_mask)
+            attention_mask[:, :context_length] = 1
+            attention_mask = (attention_mask < 0.5).astype("int64")
+            model_inputs["attention_mask"] = attention_mask.tolist()
         return model_inputs
 
-    def preprocess_function_bloom(example, max_src_length=256, max_tgt_length=384):
+    def preprocess_function_bloom(example, max_src_length=256, max_tgt_length=384, intokens=False):
         inputs = example["instruction"]
         targets = example["output"]
         if "input" in example:
@@ -160,10 +166,10 @@ def main():
         labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
         model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
-
-        model_inputs["attention_mask"] = np.tril(
-            np.ones([len(model_inputs["input_ids"]), len(model_inputs["input_ids"])]), 0
-        ).tolist()
+        if intokens:
+            model_inputs["attention_mask"] = np.tril(
+                np.ones([len(model_inputs["input_ids"]), len(model_inputs["input_ids"])]), 0
+            ).tolist()
         return model_inputs
 
     if model_args.english:
@@ -175,24 +181,28 @@ def main():
     dataset = dataset["train"].select(range(model_args.train_data_size))
     if "chatglm" in model_args.model_name_or_path:
         dataset = dataset.map(
-            lambda example: preprocess_function_chatglm(example), remove_columns=["instruction", "input", "output"]
+            lambda example: preprocess_function_chatglm(example, intokens=model_args.intokens),
+            remove_columns=["instruction", "input", "output"],
         )
     elif "bloom" in model_args.model_name_or_path:
 
         dataset = dataset.map(
-            lambda example: preprocess_function_bloom(example), remove_columns=["instruction", "input", "output"]
+            lambda example: preprocess_function_bloom(example, intokens=model_args.intokens),
+            remove_columns=["instruction", "input", "output"],
         )
     else:
         dataset = dataset.map(
-            lambda example: preprocess_function(example), remove_columns=["instruction", "input", "output"]
+            lambda example: preprocess_function(example, intokens=model_args.intokens),
+            remove_columns=["instruction", "input", "output"],
         )
     total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
 
-    intokens_dataset = InTokensMapDataset(
-        dataset,
-        tokenizer=tokenizer,
-        max_length=model_args.intokens_length,
-    )
+    if model_args.intokens:
+        dataset = InTokensMapDataset(
+            dataset,
+            tokenizer=tokenizer,
+            max_length=model_args.intokens_length,
+        )
 
     if model_args.profiler:
         prof = profiler.Profiler(
@@ -207,7 +217,7 @@ def main():
     trainer = CustomTrainer(
         model=model,
         tokenizer=tokenizer,
-        train_dataset=intokens_dataset,
+        train_dataset=dataset,
         callbacks=[ProfilerCallback(prof)] if model_args.profiler else [],
         args=training_args,
         data_collator=data_collator,

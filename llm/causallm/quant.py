@@ -146,7 +146,7 @@ def get_ptq_model_config(model):
     if base_model_prefix in ["chatglm"]:
         raise NotImplementedError(f"{model} does not support Shift or Smooth.")
     elif base_model_prefix == "chatglm_v2":
-        model_config = {"fused_qkv": False, "parallel_ffn": True}
+        model_config = {"fused_qkv": False, "parallel_ffn": False}
     elif base_model_prefix == "bloom":
         model_config = {"fused_qkv": True, "parallel_ffn": False}
     elif base_model_prefix == "llama":

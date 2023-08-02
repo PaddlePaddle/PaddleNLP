@@ -13,20 +13,17 @@
 # limitations under the License.
 
 import os
+import sys
 from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-from configuration import GPTConfig
-from modeling import GPTForCausalLM
-from modeling_pp import GPTForCausalLMPipe
-from utils import (
-    DataCollatorForSupervisedDataset,
-    GPTTrainer,
-    compute_metrics,
-    convert_example,
-)
+from data import convert_example, custom_instruction_convert_example, reader
+from modeling import Ernie35ForCausalLM
+from tokenizer import Ernie35Tokenizer
+from utils import Ernie35Trainer, compute_metrics, compute_metrics_not_do_generation
 
+from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import (
@@ -35,48 +32,43 @@ from paddlenlp.trainer import (
     get_last_checkpoint,
     set_seed,
 )
-from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.log import logger
-
-MODEL_CLASSES = {
-    "gpt": (GPTConfig, GPTForCausalLM),
-}
 
 
 @dataclass
 class DataArgument:
-    task_name: str = field(default="squad", metadata={"help": "The name of task."})
-    src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
-    tgt_length: int = field(default=142, metadata={"help": "The max length of target text."})
-    generate_num: int = field(default=0, metadata={"help": "Save first k examples generation result in dev dataset"})
+
+    data_name: str = field(default=None, metadata={"help": "The name of data."})
+    task_name: str = field(default=None, metadata={"help": "The name of task."})
+    dataset_path: str = field(default=None, metadata={"help": "The file name of train dataset."})
+    src_length: int = field(default=512, metadata={"help": "The max length of source text."})
+    tgt_length: int = field(default=256, metadata={"help": "The max length of target text."})
 
 
 @dataclass
 class ModelArgument:
-    model_type: str = field(
-        default="gpt-cn", metadata={"help": "Build-in pretrained model from the different model type."}
-    )
     model_name_or_path: str = field(
-        default="gpt-cpm-large-cn", metadata={"help": "Build-in pretrained model name or the path to local model."}
+        default="baidu/ernie-3.5-se-3b",
+        metadata={"help": "Build-in pretrained model name or the path to local model."},
     )
-    use_flash_attn: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
-    enable_fuse_transformer: bool = field(
-        default=False,
-        metadata={"help": "gpt, enable_fuse_transformer"},
-    )
-
-    fuse_attention_qkv: bool = field(
-        default=False,
-        metadata={"help": "gpt, fuse_attention_qkv"},
-    )
-    eval_with_do_generation: bool = field(
-        default=True, metadata={"help": "Evaluate with generation, instead for calc loss."}
-    )
+    label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
+    use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
+    eval_with_do_generation: bool = field(
+        default=False, metadata={"help": "Evaluate with generation, instead for calc loss."}
+    )
+    benchmark: bool = field(
+        default=False,
+        metadata={"help": "Whether or not run benchmark."},
+    )
+    profiler_options: str = field(
+        default=None,
+        metadata={"help": "profiler_options."},
+    )
     # lora
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
     lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
-    lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
+    lora_rank: int = field(default=4, metadata={"help": "Lora attention dimension"})
     merge_weights: bool = field(
         default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
     )
@@ -84,13 +76,22 @@ class ModelArgument:
 
 def main():
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    # data_args.always_pad_to_max_length = False
-    data_args.always_pad_to_max_length = training_args.pipeline_parallel_degree > 1
-    setattr(training_args, "lr_decay_ratio", model_args.lr_decay_ratio)
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    else:
+        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    data_args.always_pad_to_max_length = False
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
+    training_args.benchmark = model_args.benchmark
+    training_args.tgt_length = data_args.tgt_length
+
+    training_args.profiler_options = model_args.profiler_options
+    setattr(training_args, "label_smoothing", model_args.label_smoothing)
+    setattr(training_args, "lr_decay_ratio", model_args.lr_decay_ratio)
+
     paddle.set_device(training_args.device)
 
     set_seed(args=training_args)
@@ -124,42 +125,33 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
-    config_class, model_class = MODEL_CLASSES[model_args.model_type]
-    if training_args.pipeline_parallel_degree > 1:
-        model_class = GPTForCausalLMPipe
-    # Load the tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    tokenizer.padding_side = "left"
+    model_class = Ernie35ForCausalLM
 
-    # Load and set the pretrained configuration
-    config = config_class.from_pretrained(model_args.model_name_or_path)
-    config.enable_fuse_transformer = model_args.enable_fuse_transformer
-    config.fuse_attention_qkv = model_args.fuse_attention_qkv
-    config.use_flash_attn = model_args.use_flash_attn
-    config.use_recompute = training_args.recompute
-    config.lm_shift_labels = True
-
-    config.tensor_parallel_degree = training_args.tensor_parallel_degree
-    config.tensor_parallel_rank = training_args.tensor_parallel_rank
-    config.ignore_index = tokenizer.pad_token_id
-
+    # Load the pretrained language model.
     model = model_class.from_pretrained(
         model_args.model_name_or_path,
-        config=config,
-        dtype=dtype,
-        load_state_as_np=True,
+        tensor_parallel_output=False,
+        tensor_parallel_degree=training_args.tensor_parallel_degree,
+        tensor_parallel_rank=training_args.tensor_parallel_rank,
+        use_flash_attention=model_args.use_flash_attention,
+        dtype=dtype,  # todo enable set dtype to avoid additional mem usage
+        use_progressive_seq_len=False,
+        parallel_attn_hatf=True,
     )
+
     if model_args.lora:
         if model_args.lora_path is None:
             # Not yet support RowParallelLinear
-            if model_args.fuse_attention_qkv:
-                target_modules = [".*qkv_proj.*"]
-            else:
-                target_modules = [".*q_proj.*", ".*k_proj.*", ".*v_proj.*"]
-            if training_args.tensor_parallel_degree > 1:
-                target_modules += [".*linear1.*"]
-            else:
-                target_modules += [".*linear1.*", ".*linear2.*", ".*out_proj.*"]
+            target_modules = [
+                ".*q_proj.*",
+                ".*v_proj.*",
+                ".*k_proj.*",
+                ".*gate_proj.*",
+                ".*up_proj.*",
+                ".*o_proj.*",
+                ".*down_proj.*",
+                ".*qkv_gate_up_proj.*",
+            ]
 
             lora_config = LoRAConfig(
                 target_modules=target_modules,
@@ -172,27 +164,55 @@ def main():
             model = LoRAModel(model, lora_config)
         else:
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
+
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
 
+    tokenizer = Ernie35Tokenizer.from_pretrained(
+        model_args.model_name_or_path,
+        padding_side="left",  # Allow batch inference
+    )
+    tokenizer.pad_token = tokenizer.unk_token
+
     # Load the dataset.
-    if training_args.do_train or training_args.do_eval:
-        train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train_v1", "dev_v1"])
+    if training_args.benchmark:
+        train_ds = load_dataset(reader, data_path="./data/train.txt", lazy=False)
+        training_args.do_eval = False
+        data_args.always_pad_to_max_length = True
         trans_func = partial(
-            convert_example,
-            tokenizer=tokenizer,
-            max_source_length=data_args.src_length,
-            max_target_length=data_args.tgt_length,
+            custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args, benchmark=True
         )
+    elif training_args.do_train or training_args.do_eval:
+        if data_args.data_name is not None:
+            if data_args.task_name is not None:
+                train_ds, dev_ds = load_dataset(data_args.data_name, data_args.task_name, splits=["train", "dev"])
+            else:
+                raise ValueError("`data_args.task_name` and `data_args.data_name` should be specified together")
+        elif data_args.task_name is not None:
+            if data_args.task_name == "squad":
+                train_ds, dev_ds = load_dataset("squad", splits=["train_v1", "dev_v1"])
+            else:
+                train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train", "dev"])
+        elif data_args.dataset_path is not None:
+            train_ds = load_dataset(reader, data_path=os.path.join(data_args.dataset_path, "train.json"), lazy=False)
+            dev_ds = load_dataset(reader, data_path=os.path.join(data_args.dataset_path, "dev.json"), lazy=False)
+        else:
+            raise ValueError("Please set the correct data arguments(data_name, task_name, dataset_pat)")
+        trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
 
     if training_args.do_train:
         train_ds = train_ds.map(partial(trans_func))
     if training_args.do_eval:
-        is_test = model_args.eval_with_do_generation
-        dev_ds = dev_ds.map(partial(trans_func, is_test=is_test))
+        # pipeline_parallel eval is the same as training.
+        dev_ds = dev_ds.map(partial(trans_func, is_test=model_args.eval_with_do_generation))
 
-    collate_fn = DataCollatorForSupervisedDataset(
-        tokenizer, max_length=1024 if data_args.always_pad_to_max_length else 0
+    model_max_length = data_args.src_length + data_args.tgt_length if not training_args.benchmark else 512
+    collate_fn = DataCollatorForSeq2Seq(
+        return_tensors="pd",
+        tokenizer=tokenizer,
+        max_length=model_max_length if data_args.always_pad_to_max_length else -1,
+        padding="max_length" if data_args.always_pad_to_max_length else True,
+        return_attention_mask=True,
     )
 
     def compute_metrics_trainer(eval_preds, tokenizer):
@@ -217,15 +237,15 @@ def main():
         tokenizer=tokenizer,
     )
 
-    trainer = GPTTrainer(
+    trainer = Ernie35Trainer(
         model=model,
         args=training_args,
         train_dataset=train_ds if training_args.do_train else None,
         eval_dataset=dev_ds if training_args.do_eval else None,
         tokenizer=tokenizer,
         compute_metrics=compute_metrics_func
-        if (model_args.eval_with_do_generation and training_args.do_eval)
-        else None,
+        if model_args.eval_with_do_generation
+        else compute_metrics_not_do_generation,
         do_generation=model_args.eval_with_do_generation,
         data_collator=collate_fn,
     )

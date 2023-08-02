@@ -84,6 +84,8 @@ class Predictor(object):
                 pad_attention_mask=prefix_tuning_params["pad_attention_mask"],
             )
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
+        if self.model.base_model_prefix == "llama":
+            self.tokenizer.pad_token = self.tokenizer.unk_token
         self.model.eval()
 
     def preprocess(self, source):

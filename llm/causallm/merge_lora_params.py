@@ -13,6 +13,8 @@
 # limitations under the License.
 import argparse
 
+import paddle
+
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.transformers import AutoModelForCausalLM
 
@@ -24,10 +26,13 @@ def parse_arguments():
         "--lora_path", default=None, required=True, help="The directory of LoRA parameters. Default to None"
     )
     parser.add_argument("--output_path", default=None, help="The directory of merged parameters. Default to None")
+    parser.add_argument("--device", type=str, default="gpu", help="Device")
     return parser.parse_args()
 
 
-def merge(args):
+def merge():
+    args = parse_arguments()
+    paddle.set_device(args.device)
     lora_config = LoRAConfig.from_pretrained(args.lora_path)
     dtype = lora_config.dtype
     lora_config.merge_weights = True
@@ -49,5 +54,4 @@ def merge(args):
 
 
 if __name__ == "__main__":
-    args = parse_arguments()
-    merge(args)
+    merge()

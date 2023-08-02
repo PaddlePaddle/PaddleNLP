@@ -12,20 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import os
+import sys
+
+sys.path.append("../../")
 
 import paddle
+from modeling import Ernie35Config, Ernie35ForCausalLM
 from paddle.distributed import fleet
-
-from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.peft.prefix import llama_postprocess_past_key_value
-from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaConfig
+from tokenizer import Ernie35Tokenizer
 
 
 def get_parser():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name_or_path", default="facebook/llama-7b", help="The directory of model.")
+    parser.add_argument("--model_name_or_path", default="baidu/ernie-3.5-se-3b", help="The directory of model.")
+    parser.add_argument("--tokenizer_name_or_path", default="ernie-tokenizer", help="The directory of tokenizer.")
     parser.add_argument(
         "--merge_tensor_parallel_path", default=None, help="The directory of model to merge tensor parallel parts."
     )
@@ -33,15 +36,11 @@ def get_parser():
     parser.add_argument("--src_length", type=int, default=50, help="the max length of source text")
     parser.add_argument("--tgt_length", type=int, default=100, help="the max length of decoding length")
 
-    parser.add_argument("--top_k", type=int, default=1, help="top_k parameter for generation")
-    parser.add_argument("--top_p", type=float, default=1.0, help="top_p parameter for generation")
+    parser.add_argument("--top_k", type=int, default=3, help="top_k parameter for generation")
+    parser.add_argument("--top_p", type=float, default=0.8, help="top_p parameter for generation")
     parser.add_argument("--temperature", type=float, default=0.95, help="top_p parameter for generation")
     parser.add_argument("--data_file", default=None, help="data file directory")
     parser.add_argument("--predict_file", default="prediction.json", help="predict result file directory")
-    parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
-    parser.add_argument(
-        "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
-    )
     parser.add_argument("--device", type=str, default="gpu", help="Device")
     return parser
 
@@ -68,7 +67,7 @@ class Predictor(object):
             self.src_length = kwargs["src_length"]
             self.tgt_length = kwargs["tgt_length"]
         else:
-            self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+            self.tokenizer = Ernie35Tokenizer.from_pretrained(args.tokenizer_name_or_path)
             self.tokenizer.pad_token = self.tokenizer.unk_token
             self.batch_size = args.batch_size
             self.args = args
@@ -91,29 +90,20 @@ class Predictor(object):
 
             self.rank = tensor_parallel_rank
 
-            if self.args.lora_path is not None:
-                lora_config = LoRAConfig.from_pretrained(self.args.lora_path)
-                dtype = lora_config.dtype
-            elif self.args.prefix_path is not None:
-                prefix_config = PrefixConfig.from_pretrained(self.args.prefix_path)
-                dtype = prefix_config.dtype
-            else:
-                config = LlamaConfig.from_pretrained(args.model_name_or_path)
-                dtype = "float16" if config.dtype is None else config.dtype
-
-            self.model = AutoModelForCausalLM.from_pretrained(
+            config = Ernie35Config.from_pretrained(args.model_name_or_path)
+            config.tensor_parallel_degree = tensor_parallel_degree
+            config.tensor_parallel_rank = (tensor_parallel_rank,)
+            dtype = "float16" if config.dtype is None else config.dtype
+            use_flash_attn = False if dtype == "float32" else True
+            self.model = Ernie35ForCausalLM.from_pretrained(
                 args.model_name_or_path,
                 tensor_parallel_degree=tensor_parallel_degree,
                 tensor_parallel_rank=tensor_parallel_rank,
                 load_state_as_np=True,
                 dtype=dtype,
+                use_flash_attention=use_flash_attn,
             )
-            if self.args.lora_path is not None:
-                self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
-            if self.args.prefix_path is not None:
-                self.model = PrefixModelForCausalLM.from_pretrained(
-                    self.model, self.args.prefix_path, llama_postprocess_past_key_value
-                )
+            print(self.model)
 
         self.model.eval()
 
@@ -129,9 +119,23 @@ class Predictor(object):
         inputs_tensor = {}
         for key, value in inputs.items():
             inputs_tensor[key] = paddle.to_tensor(value)
+
         return inputs_tensor
 
     def infer(self, inputs):
+        if self.src_length + self.tgt_length > 4096:
+            self.model.pos_decoding_interval = max(
+                self.model.config.max_position_embeddings // (self.tgt_length + self.src_length), 1
+            )
+        else:
+            self.model.pos_decoding_interval = 8
+        if self.model.pos_decoding_interval > 1 and "position_ids" in inputs:
+            inputs["position_ids"] = inputs["position_ids"] * self.model.pos_decoding_interval + (
+                self.model.pos_decoding_interval - 1
+            )
+
+        os.environ["pos_decoding_interval"] = str(self.model.pos_decoding_interval)
+
         if self.model.config.dtype == "float32" or self.model.config.dtype is None:
             with paddle.no_grad():
                 result = self.model.generate(
@@ -144,8 +148,9 @@ class Predictor(object):
                     repetition_penalty=1.0,
                 )
         else:
+            white = ["flash_attn"]
             with paddle.no_grad():
-                with paddle.amp.auto_cast(False, level="O2", dtype=self.model.config.dtype):
+                with paddle.amp.auto_cast(True, custom_white_list=white, level="O2", dtype=self.model.config.dtype):
                     result = self.model.generate(
                         **inputs,
                         max_length=self.tgt_length,
@@ -179,8 +184,9 @@ if __name__ == "__main__":
     predictor = Predictor(args)
     if args.data_file is None:
         all_texts = [
-            "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
-            "answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
+            "The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, ",
+            "Hello, it is a great day! nice to ",
+            "a b c d e f g ",
         ]
     else:
         all_texts = []
