@@ -27,7 +27,8 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py 
     --eval_with_do_generation False \
     --recompute \
     --save_total_limit 1 \
-    --tensor_parallel_degree 4
+    --tensor_parallel_degree 4 \
+    --eval_accumulation_steps 16
 ```
 # lora
 ```
@@ -58,7 +59,8 @@ python  finetune_generation.py \
     --eval_with_do_generation False \
     --recompute \
     --save_total_limit 1  \
-    --lora True
+    --lora True \
+    --eval_accumulation_steps 16
 ```
 # prefix_tuning
 ```
@@ -89,5 +91,6 @@ python  finetune_generation.py \
     --eval_with_do_generation False \
     --recompute \
     --save_total_limit 1  \
-    --prefix_tuning True
+    --prefix_tuning True \
+    --eval_accumulation_steps 16
 ```
