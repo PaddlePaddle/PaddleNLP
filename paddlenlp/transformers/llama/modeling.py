@@ -217,7 +217,7 @@ def masked_fill(x, mask, value):
     return paddle.where(mask, y, x)
 
 
-def _make_causal_mask(input_ids_shape, past_key_values_length, dtype):
+def _make_causal_mask(input_ids_shape, past_key_values_length):
     """
     Make causal mask used for self-attention.
     """
@@ -828,9 +828,7 @@ class LlamaModel(LlamaPretrainedModel):
                 expanded_attn_mask = _expand_2d_mask(attention_mask, dtype, tgt_length=input_shape[-1])
                 # For decoding phase in generation, seq_length = 1, we don't need to add causal mask
                 if input_shape[-1] > 1:
-                    combined_attention_mask = _make_causal_mask(
-                        input_shape, past_key_values_length=past_key_values_length, dtype=dtype
-                    )
+                    combined_attention_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
                     expanded_attn_mask = expanded_attn_mask & combined_attention_mask
             # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
             elif len(attention_mask.shape) == 3:
@@ -839,15 +837,13 @@ class LlamaModel(LlamaPretrainedModel):
             else:
                 expanded_attn_mask = attention_mask
         else:
-            expanded_attn_mask = _make_causal_mask(
-                input_shape, past_key_values_length=past_key_values_length, dtype=dtype
-            )
+            expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
         # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
         expanded_attn_mask = paddle.where(
             expanded_attn_mask,
             0.0,  # if true, visible
             paddle.finfo(dtype).min  # if false, invisible
-        )
+        ).astype(dtype)
         return expanded_attn_mask
 
     @paddle.jit.not_to_static
