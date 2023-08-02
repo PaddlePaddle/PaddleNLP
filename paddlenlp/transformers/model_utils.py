@@ -1483,10 +1483,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
 
             if is_local:
-                logger.info(f"loading weights file {archive_file}")
+                logger.info(f"Loading weights file {archive_file}")
                 resolved_archive_file = archive_file
             else:
-                logger.info(f"loading weights file {filename} from cache at {resolved_archive_file}")
+                logger.info(f"Loading weights file {filename} from cache at {resolved_archive_file}")
         else:
             resolved_archive_file = None
 
@@ -1896,7 +1896,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 if convert_from_torch:
                     # try to get the name-mapping info
                     logger.info(
-                        f"start to convert pytorch weight file<{resolved_archive_file}> to "
+                        f"Starting to convert pytorch weight file<{resolved_archive_file}> to "
                         f"paddle weight file<{os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)}> ..."
                     )
                     state_dict = cls.convert(resolved_archive_file, config, cache_dir)

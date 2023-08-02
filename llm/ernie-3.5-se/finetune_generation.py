@@ -18,21 +18,20 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-from data import convert_example, custom_instruction_convert_example, read_local_dataset
-from modeling_pp import LlamaForCausalLMPipe
-from utils import LlamaTrainer, compute_metrics, compute_metrics_not_do_generation
+from data import convert_example, custom_instruction_convert_example, reader
+from modeling import Ernie35ForCausalLM
+from tokenizer import Ernie35Tokenizer
+from utils import Ernie35Trainer, compute_metrics, compute_metrics_not_do_generation
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
-from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.peft.prefix import llama_postprocess_past_key_value
+from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
     get_last_checkpoint,
     set_seed,
 )
-from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -40,7 +39,8 @@ from paddlenlp.utils.log import logger
 class DataArgument:
 
     data_name: str = field(default=None, metadata={"help": "The name of data."})
-    task_name_or_path: str = field(default=None, metadata={"help": "The name of task."})
+    task_name: str = field(default=None, metadata={"help": "The name of task."})
+    dataset_path: str = field(default=None, metadata={"help": "The file name of train dataset."})
     src_length: int = field(default=512, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=256, metadata={"help": "The max length of target text."})
 
@@ -48,7 +48,8 @@ class DataArgument:
 @dataclass
 class ModelArgument:
     model_name_or_path: str = field(
-        default="facebook/llama-7b", metadata={"help": "Build-in pretrained model name or the path to local model."}
+        default="baidu/ernie-3.5-se-3b",
+        metadata={"help": "Build-in pretrained model name or the path to local model."},
     )
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
@@ -71,13 +72,6 @@ class ModelArgument:
     merge_weights: bool = field(
         default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
     )
-    # prefix
-    prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
-    num_prefix_tokens: int = field(default=10, metadata={"help": "Number of prefix tokens"})
-    prefix_projection: bool = field(default=False, metadata={"help": "Whether to project the prefix tokens"})
-    # qat
-    qat: bool = field(default=False, metadata={"help": "Whether to use QAT technique"})
-    qat_type: str = field(default="A8W8", metadata={"help": "Quantization type. Supported values: A8W8, W4,A8W4"})
 
 
 def main():
@@ -87,7 +81,7 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    data_args.always_pad_to_max_length = training_args.pipeline_parallel_degree > 1
+    data_args.always_pad_to_max_length = False
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -131,11 +125,7 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
-    model_class = AutoModelForCausalLM
-    if training_args.pipeline_parallel_degree > 1:
-        if model_args.eval_with_do_generation and training_args.do_eval:
-            raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
-        model_class = LlamaForCausalLMPipe
+    model_class = Ernie35ForCausalLM
 
     # Load the pretrained language model.
     model = model_class.from_pretrained(
@@ -145,8 +135,10 @@ def main():
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         use_flash_attention=model_args.use_flash_attention,
         dtype=dtype,  # todo enable set dtype to avoid additional mem usage
-        lm_shift_labels=False,
+        use_progressive_seq_len=False,
+        parallel_attn_hatf=True,
     )
+
     if model_args.lora:
         if model_args.lora_path is None:
             # Not yet support RowParallelLinear
@@ -158,6 +150,7 @@ def main():
                 ".*up_proj.*",
                 ".*o_proj.*",
                 ".*down_proj.*",
+                ".*qkv_gate_up_proj.*",
             ]
 
             lora_config = LoRAConfig(
@@ -175,63 +168,7 @@ def main():
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()
 
-    if model_args.qat:
-        from paddle import nn
-        from paddle.quantization import QAT, QuantConfig
-
-        # FakeQuanterChannelWiseAbsMaxObserver not yet merge in Paddle develop
-        from paddle.quantization.quanters import FakeQuanterChannelWiseAbsMaxObserver
-        from paddle.quantization.quanters.abs_max import (
-            FakeQuanterWithAbsMaxObserverLayer,
-        )
-        from paddleslim.quant.quanters import PACTQuanter
-
-        # from paddle.quantization.quanters import FakeQuanterWithAbsMaxObserver
-        from paddlenlp.peft.lora import LoRALinear
-        from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
-
-        q_config = QuantConfig(activation=None, weight=None)
-        q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
-
-        if model_args.qat_type == "A8W8":
-            activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
-            # activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
-            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype="float32")
-        elif model_args.qat_type == "W4":
-            activation = None
-            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
-        elif model_args.qat_type == "A8W4":
-            activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
-            # activation = FakeQuanterWithAbsMaxObserver(moving_rate=0.9, bit_length=8, dtype=dtype)
-            weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
-        else:
-            raise ValueError("qat_type should be one of ['A8W8', 'W4', 'A8W4']")
-
-        q_config.add_type_config(LoRALinear, weight=weight, activation=activation)
-        q_config.add_type_config(nn.Linear, weight=weight, activation=activation)
-
-        qat = QAT(q_config)
-        model = qat.quantize(model, inplace=True)
-
-    if model_args.prefix_tuning:
-        prefix_config = PrefixConfig(
-            num_prefix_tokens=model_args.num_prefix_tokens,
-            num_attention_heads=model.config.n_head,
-            num_hidden_layers=model.config.n_layer,
-            hidden_size=model.config.hidden_size,
-            prefix_projection=model_args.prefix_projection,
-            prefix_projection_hidden_size=model.config.hidden_size,
-            dtype=dtype,
-        )
-        model = PrefixModelForCausalLM(
-            model=model,
-            prefix_config=prefix_config,
-            postprocess_past_key_value=llama_postprocess_past_key_value,
-        )
-        model.mark_only_prefix_as_trainable()
-        model.print_trainable_parameters()
-
-    tokenizer = AutoTokenizer.from_pretrained(
+    tokenizer = Ernie35Tokenizer.from_pretrained(
         model_args.model_name_or_path,
         padding_side="left",  # Allow batch inference
     )
@@ -239,36 +176,28 @@ def main():
 
     # Load the dataset.
     if training_args.benchmark:
-        train_ds = load_dataset(read_local_dataset, path="./data/train.txt", lazy=False)
+        train_ds = load_dataset(reader, data_path="./data/train.txt", lazy=False)
         training_args.do_eval = False
         data_args.always_pad_to_max_length = True
         trans_func = partial(
             custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args, benchmark=True
         )
     elif training_args.do_train or training_args.do_eval:
-        if os.path.exists(os.path.join(data_args.task_name_or_path, "train.json")) and os.path.exists(
-            os.path.join(data_args.task_name_or_path, "dev.json")
-        ):
-            train_ds = load_dataset(
-                read_local_dataset, path=os.path.join(data_args.task_name_or_path, "train.json"), lazy=False
-            )
-            dev_ds = load_dataset(
-                read_local_dataset, path=os.path.join(data_args.task_name_or_path, "dev.json"), lazy=False
-            )
-        elif data_args.data_name is not None:
-            if data_args.task_name_or_path is not None:
-                train_ds, dev_ds = load_dataset(
-                    data_args.data_name, data_args.task_name_or_path, splits=["train", "dev"]
-                )
+        if data_args.data_name is not None:
+            if data_args.task_name is not None:
+                train_ds, dev_ds = load_dataset(data_args.data_name, data_args.task_name, splits=["train", "dev"])
             else:
-                raise ValueError(
-                    "`data_args.task_name_or_path` and `data_args.data_name` should be specified together"
-                )
-        else:
-            if data_args.task_name_or_path == "squad":
+                raise ValueError("`data_args.task_name` and `data_args.data_name` should be specified together")
+        elif data_args.task_name is not None:
+            if data_args.task_name == "squad":
                 train_ds, dev_ds = load_dataset("squad", splits=["train_v1", "dev_v1"])
             else:
-                train_ds, dev_ds = load_dataset(data_args.task_name_or_path, splits=["train", "dev"])
+                train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train", "dev"])
+        elif data_args.dataset_path is not None:
+            train_ds = load_dataset(reader, data_path=os.path.join(data_args.dataset_path, "train.json"), lazy=False)
+            dev_ds = load_dataset(reader, data_path=os.path.join(data_args.dataset_path, "dev.json"), lazy=False)
+        else:
+            raise ValueError("Please set the correct data arguments(data_name, task_name, dataset_pat)")
         trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
 
     if training_args.do_train:
@@ -283,7 +212,6 @@ def main():
         tokenizer=tokenizer,
         max_length=model_max_length if data_args.always_pad_to_max_length else -1,
         padding="max_length" if data_args.always_pad_to_max_length else True,
-        max_label_length=model_max_length if data_args.always_pad_to_max_length else None,
         return_attention_mask=True,
     )
 
@@ -309,7 +237,7 @@ def main():
         tokenizer=tokenizer,
     )
 
-    trainer = LlamaTrainer(
+    trainer = Ernie35Trainer(
         model=model,
         args=training_args,
         train_dataset=train_ds if training_args.do_train else None,
