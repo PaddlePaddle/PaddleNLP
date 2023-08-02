@@ -1527,12 +1527,14 @@ class FusedLlamaModel(LlamaPretrainedModel):
         head_dim = self.hidden_size // self.num_attention_heads
         offset = paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else 0
 
-        if use_pre_caches and pre_caches is not None:
-            offset = pre_caches[0].shape[-2] + offset
+        # if use_pre_caches and pre_caches is not None:
+        #     offset = pre_caches[0].shape[-2] + offset
+        #     print("offset",offset)
 
         rotary_embeddings = self.get_rotary_embedding(
             batch_size, self.max_position_embeddings, 10000, head_dim, seq_length, offset
         )
+        rotary_embeddings = paddle.transpose(rotary_embeddings.unsqueeze(1), [0, 1, 3, 2, 4])
 
         hidden_states, presents = self.transformer_block(
             hidden_states,

@@ -28,9 +28,9 @@ def parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name_or_path", default="bigscience/bloom-560m", help="The directory of model.")
+    parser.add_argument("--model_name_or_path", default="bigscience/bloomz-7b1-mt", help="The directory of model.")
     parser.add_argument("--save_onepiece_model_path", default=None, help="The directory of model.")
-    parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
+    parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
     parser.add_argument("--src_length", type=int, default=200, help="The batch size of data.")
     parser.add_argument("--tgt_length", type=int, default=200, help="The batch size of data.")
     parser.add_argument("--seed", type=int, default=20, help="the seed of parameter initialization")
@@ -210,7 +210,7 @@ def predict():
     if args.data_file is None:
         all_texts = [
             "答案：年基准利率4.35%，上下文：从实际看,贷款的基本条件是: 一是中国大陆居民,年龄在60岁以下; 二是有稳定的住址和工作或经营地点; 三是有稳定的收入来源; 四是无不良信用记录,贷款用途不能作为炒股,赌博等行为; 五是具有完全民事行为能力。在已知答案的前提下，问题：</s>",
-            "答案：U系列，上下文：U系列是最好的，采用国际顶尖技术（由格力自主研发）双级变频压缩机，提高压缩机运转效率，制冷制热能力更强劲；1赫兹变频技术，使空调相当于一个15 W电灯泡，更加节能省电；送风面积广，风力大；生态风，净化空气。非常不错，现在国美在做活动，可以了解一下。在已知答案的前提下，问题：</s>",
+            # "答案：U系列，上下文：U系列是最好的，采用国际顶尖技术（由格力自主研发）双级变频压缩机，提高压缩机运转效率，制冷制热能力更强劲；1赫兹变频技术，使空调相当于一个15 W电灯泡，更加节能省电；送风面积广，风力大；生态风，净化空气。非常不错，现在国美在做活动，可以了解一下。在已知答案的前提下，问题：</s>",
         ]
     else:
         all_texts = []

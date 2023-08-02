@@ -34,11 +34,11 @@ def parse_arguments():
         choices=["gpu", "cpu"],
         help="Type of inference device, support 'cpu' or 'gpu'.",
     )
-    parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
+    parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
     parser.add_argument("--src_length", type=int, default=1024, help="decoding length")
-    parser.add_argument("--top_k", type=int, default=0, help="top_p parameter for decoding")
-    parser.add_argument("--temperature", type=float, default=0.95, help="temperature parameter for decoding")
-    parser.add_argument("--top_p", type=int, default=0.7, help="top_p parameter for decoding")
+    parser.add_argument("--top_k", type=int, default=1, help="top_p parameter for decoding")
+    parser.add_argument("--temperature", type=float, default=1, help="temperature parameter for decoding")
+    parser.add_argument("--top_p", type=int, default=0, help="top_p parameter for decoding")
     return parser.parse_args()
 
 
@@ -53,7 +53,7 @@ def batchfy_text(texts, batch_size):
 
 class Predictor(object):
     def __init__(self, args):
-        self.tokenizer = AutoTokenizer.from_pretrained("facebook/llama-7b")
+        self.tokenizer = AutoTokenizer.from_pretrained("ziqingyang/chinese-alpaca-7b")
         self.config = AutoConfig.from_pretrained(args.model_dir)
 
         self.batch_size = args.batch_size
@@ -96,29 +96,32 @@ class Predictor(object):
             .unsqueeze_(0)
             .unsqueeze_(0)
         )
-        attention_mask = (attention_mask - 1) * get_scale_by_dtype("bfloat16")
+        attention_mask = (attention_mask - 1) * get_scale_by_dtype("float32")
 
         inputs["attention_mask"] = attention_mask
+        use_pre_caches = True
 
-        for i in range(self.config.num_hidden_layers):
-            pre_cache = paddle.randn(
-                    [2, self.config.num_attention_heads, 128, self.config.hidden_size // self.config.num_attention_heads],
-                    dtype="float32",
-                ).numpy()
-            # inputs["pre_caches_" + i] = pre_cache
+        if use_pre_caches:
+            pre_caches_numpy = np.load("./weights/chinese-alpacha/pre_caches.npy")
+            pre_caches = np.split(pre_caches_numpy, self.config.num_hidden_layers)
+            for i in range(self.config.num_hidden_layers):
+                inputs["pre_caches_{}".format(i)] = pre_caches[i].transpose(1, 0, 2, 3, 4).astype("float16")
+        else:
+            for i in range(self.config.num_hidden_layers):
+                inputs["pre_caches_{}".format(i)] = np.ones([1]).astype("float16")
                 
-        use_pre_caches = False
+        
 
         # append pre_cache attention_mask
-        pre_caches_length = pre_cache.shape[-2]
+        pre_caches_length = pre_caches[0].shape[-2]
         if use_pre_caches:
             batch_size = inputs["input_ids"].shape[0]
             pre_cache_attention_mask = paddle.zeros(
-                [batch_size, 1, pre_caches_length, inputs["input_ids"].shape[-1]], dtype=attention_mask.dtype
+                [batch_size, 1, inputs["input_ids"].shape[-1], pre_caches_length], dtype=attention_mask.dtype
             )
         else:
             pre_cache_attention_mask = (
-                paddle.ones([1, 1, pre_caches_length, inputs["input_ids"].shape[-1]], dtype=attention_mask.dtype)
+                paddle.ones([1, 1, inputs["input_ids"].shape[-1], pre_caches_length], dtype=attention_mask.dtype)
                 * -1
                 * get_scale_by_dtype("bfloat16")
             )
@@ -128,16 +131,19 @@ class Predictor(object):
         print("attention_mask", attention_mask.shape)
         print("attention_mask", attention_mask)
 
-        # attention_mask = paddle.concat([pre_cache_attention_mask, attention_mask], axis=2)
+        attention_mask = paddle.concat([pre_cache_attention_mask, attention_mask], axis=3)
 
         inputs["attention_mask"] = attention_mask.numpy()
-        # inputs["use_pre_caches"] = np.array(use_pre_caches, dtype=np.bool)
+        print("inputs ",inputs["attention_mask"].shape)
+        print("inputs ",inputs["input_ids"].shape)
+        print("inputs ",inputs["attention_mask"])
+        inputs["use_pre_caches"] = np.array(use_pre_caches, dtype=np.bool)
 
         return inputs
 
     def infer(self, inputs):
         input_handles = {}
-        print("inputs", inputs)
+        # print("inputs", inputs)
         for name in self.predictor.get_input_names():
             print("start to infer based on:", name)
             input_handles[name] = self.predictor.get_input_handle(name)
@@ -149,7 +155,7 @@ class Predictor(object):
         output_handle = self.predictor.get_output_handle(output_names[0])
         results = output_handle.copy_to_cpu()
         print(results)
-        return results[0]
+        return results
 
     def postprocess(self, infer_data):
         result = []
@@ -175,7 +181,7 @@ if __name__ == "__main__":
     #     "answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
     # ]
     all_texts = [
-        "中国的首都是哪里？"
+        "类型#裙*版型#显瘦*风格#文艺*风格#简约*图案#印花*图案#撞色*裙下摆#压褶*裙长#连衣裙*裙领型#"
         # "where is the capital of china?"
         # "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
     ]

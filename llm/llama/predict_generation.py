@@ -35,8 +35,8 @@ def get_parser():
     parser.add_argument("--tgt_length", type=int, default=100, help="the max length of decoding length")
 
     parser.add_argument("--top_k", type=int, default=1, help="top_k parameter for generation")
-    parser.add_argument("--top_p", type=float, default=1.0, help="top_p parameter for generation")
-    parser.add_argument("--temperature", type=float, default=0.95, help="top_p parameter for generation")
+    parser.add_argument("--top_p", type=float, default=0, help="top_p parameter for generation")
+    parser.add_argument("--temperature", type=float, default=1.0, help="top_p parameter for generation")
     parser.add_argument("--data_file", default=None, help="data file directory")
     parser.add_argument("--predict_file", default="prediction.json", help="predict result file directory")
     parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
@@ -110,6 +110,7 @@ class Predictor(object):
                 tensor_parallel_rank=tensor_parallel_rank,
                 load_state_as_np=True,
                 dtype=dtype,
+                use_safetensors=True,
             )
             self.model.prepare_fast_entry(None)
             if self.args.lora_path is not None:
@@ -144,31 +145,37 @@ class Predictor(object):
 
         inputs["attention_mask"] = attention_mask
 
-        pre_caches = [
-            paddle.randn(
-                [
-                    2,
-                    self.model.config.num_attention_heads,
-                    128,
-                    self.model.config.hidden_size // self.model.config.num_attention_heads,
-                ],
-                dtype="float32",
-            ).numpy()
-            for _ in range(self.model.config.num_hidden_layers)
-        ]
+        # pre_caches = [
+        #     paddle.randn(
+        #         [
+        #             2,
+        #             self.model.config.num_attention_heads,
+        #             128,
+        #             self.model.config.hidden_size // self.model.config.num_attention_heads,
+        #         ],
+        #         dtype="float32",
+        #     ).numpy()
+        #     for _ in range(self.model.config.num_hidden_layers)
+        # ]
+        import numpy as np
+        pre_caches = paddle.split(paddle.to_tensor(np.load("./weights/chinese-alpacha/pre_caches.npy")), self.model.config.num_hidden_layers, 0)
+        for i in range(self.model.config.num_hidden_layers):
+            pre_caches[i] = pre_caches[i].transpose([1, 0, 2, 3, 4]).cast(self.args.dtype)
 
         inputs_tensor = {}
         for key, value in inputs.items():
             inputs_tensor[key] = paddle.to_tensor(value)
+        
+        print("self.args.dtype",self.args.dtype)
+        inputs_tensor["use_pre_caches"] = True
 
-        inputs_tensor["use_pre_caches"] = False
 
         # append pre_cache attention_mask
         pre_caches_length = pre_caches[0].shape[-2]
         batch_size, seq_length_with_past = inputs["input_ids"].shape[0], inputs["input_ids"].shape[-1]
-        if False:
+        if True:
             pre_cache_attention_mask = paddle.zeros(
-                [batch_size, 1, pre_caches_length, seq_length_with_past], dtype=attention_mask.dtype
+                [batch_size, 1, seq_length_with_past, pre_caches_length], dtype=attention_mask.dtype
             )
         else:
             pre_cache_attention_mask = (
@@ -181,12 +188,14 @@ class Predictor(object):
         print("pre_cache_attention_mask", pre_cache_attention_mask)
         print("attention_mask", attention_mask.shape)
         print("attention_mask", attention_mask)
-
-        # attention_mask = paddle.concat([pre_cache_attention_mask, attention_mask], axis=2)
+        # import pdb;pdb.set_trace()
+        attention_mask = paddle.concat([pre_cache_attention_mask, attention_mask], axis=3)
 
         inputs_tensor["pre_caches"] = pre_caches
         inputs_tensor["attention_mask"] = attention_mask
-        inputs_tensor["use_pre_caches"] = False
+        print("attention_mask", attention_mask.shape)
+        print("attention_mask", attention_mask)
+
         return inputs_tensor
 
     def infer(self, inputs):
@@ -240,7 +249,7 @@ if __name__ == "__main__":
         all_texts = [
             # "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
             # "answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
-            "中国的首都在哪里？"
+            "类型#裙*版型#显瘦*风格#文艺*风格#简约*图案#印花*图案#撞色*裙下摆#压褶*裙长#连衣裙*裙领型#"
         ]
     else:
         all_texts = []
