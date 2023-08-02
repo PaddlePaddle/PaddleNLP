@@ -973,7 +973,7 @@ class GPTForGenerationAuto(nn.Layer):
             return self.gpt(**model_inputs, **immutable)
 
         def _post_process_(outputs, input_ids, cur_len, origin_len, scores, unfinished_flag, model_kwargs):
-
+            cur_len = paddle.assign(cur_len)
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
 
             x_dims_mapping = [auto_env.get_mesh().dp_dim] + [None] * (len(logits.shape) - 1)
@@ -1046,14 +1046,7 @@ class GPTForGenerationAuto(nn.Layer):
             cur_len += 1
         else:
             # Note(ZhenyuLi): Avoid the synchronization caused by scale in 
-            if hasattr(paddle.framework, "_no_check_dy2st_diff"):
-                # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior
-                # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
-                # removed after static graphs support inplace and stride.
-                with paddle.framework._no_check_dy2st_diff():
-                    paddle.increment(cur_len)
-            else:
-                paddle.increment(cur_len)
+            paddle.increment(cur_len)
         paddle.increment(cur_len_gpu)
 
         attn_mask = model_kwargs["attention_mask"]
@@ -1078,14 +1071,7 @@ class GPTForGenerationAuto(nn.Layer):
                 cur_len += 1
             else:
                 # Note(ZhenyuLi): Avoid the synchronization caused by scale in dy2static
-                if hasattr(paddle.framework, "_no_check_dy2st_diff"):
-                    # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior
-                    # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
-                    # removed after static graphs support inplace and stride.
-                    with paddle.framework._no_check_dy2st_diff():
-                        paddle.increment(cur_len)
-                else:
-                    paddle.increment(cur_len)
+                paddle.increment(cur_len)
             paddle.increment(cur_len_gpu)
 
             # early finish should be True in generation scenes,
