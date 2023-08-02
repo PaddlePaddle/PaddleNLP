@@ -48,8 +48,10 @@ def main():
     training_args.print_config(quant_args, "Quant")
     training_args.print_config(gen_args, "Generation")
 
-    if quant_args.do_ptq and quant_args.do_qat:
-        raise ValueError("PTQ and QAT can not work at the same time.")
+    if sum([quant_args.do_ptq, quant_args.do_qat, training_args.do_train]) > 1:
+        raise ValueError(
+            "--do_train, --do_ptq and --do_qat cannot work at the same time. Please choose only one at a time"
+        )
 
     # Setup GPU & distributed training
     paddle.set_device(training_args.device)
@@ -97,6 +99,8 @@ def main():
 
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    if model.base_model_prefix == "llama":
+        tokenizer.pad_token = tokenizer.unk_token
 
     if data_args.dataset_name_or_path is None:
         raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
@@ -141,7 +145,7 @@ def main():
 
     if model_args.lora:
         if model_args.lora_path is None:
-            target_modules = get_lora_target_modules(model, is_tp=training_args.tensor_parallel_degree > 1)
+            target_modules = get_lora_target_modules(model)
             lora_config = LoRAConfig(
                 target_modules=target_modules,
                 r=model_args.lora_rank,
@@ -239,7 +243,7 @@ def main():
         else:
             ptq_ds = train_ds
             logger.info(
-                f"Not found ptq.json in {data_args.dataset_name_or_path}. Set train dataset to PTQ dataset path."
+                f"Not found ptq.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
             )
         ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
         if quant_args.shift or quant_args.smooth:
