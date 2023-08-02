@@ -70,7 +70,7 @@ def merge_qkv_gate_up_tensor_parallel_weight(weight_list, tensor_parallel_degree
     Only support split Column dim.
 
     """
-    bhs = 3 * hidden_size // tensor_parallel_degree
+    bhs = hidden_size // tensor_parallel_degree
     bis = intermediate_size // tensor_parallel_degree
 
     qkv_l, g_l, u_l = [], [], []
