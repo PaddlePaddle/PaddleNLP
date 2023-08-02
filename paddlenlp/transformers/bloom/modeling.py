@@ -91,13 +91,6 @@ def split_tensor_along_last_dim(tensor: Tensor, num_partitions: int, contiguous_
     return paddle.split(tensor, 3, axis=-1)
 
 
-def masked_fill(x, mask, value):
-
-    y = paddle.full(x.shape, value, x.dtype)
-    mask = mask.reshape(x.shape)
-    return paddle.where(mask, x, y)
-
-
 def _make_causal_mask(input_ids_shape, past_key_values_length: int) -> Tensor:
     """
     Make causal mask used for self-attention.
@@ -421,10 +414,10 @@ class BloomAttention(nn.Layer):
         # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
         if input_dtype != paddle.float32:
             attention_scores = paddle.cast(attention_scores, paddle.float32)
-            attn_weights = masked_fill(attention_scores, attention_mask, paddle.finfo(attention_scores.dtype).min)
+            attn_weights = attention_scores + attention_mask
             attention_probs = paddle.cast(F.softmax(attn_weights, axis=-1, dtype=paddle.float32), dtype=input_dtype)
         else:
-            attn_weights = masked_fill(attention_scores, attention_mask, paddle.finfo(attention_scores.dtype).min)
+            attn_weights = attention_scores + attention_mask
             attention_probs = F.softmax(attn_weights, axis=-1)
 
         # [batch_size, num_heads, q_length, kv_length]
@@ -799,7 +792,7 @@ class BloomModel(BloomPreTrainedModel):
         return self.word_embeddings
 
     def _prepare_attn_mask(
-        self, attention_mask: Tensor, input_shape: Tuple[int, int], past_key_values_length: int
+        self, attention_mask: Tensor, input_shape: Tuple[int, int], past_key_values_length: int, num_heads: int, dtype
     ) -> Tensor:
         # create causal mask
         # [batch_size, seq_length] -> [batch_size, 1, tgt_length, src_length]
@@ -821,7 +814,12 @@ class BloomModel(BloomPreTrainedModel):
         if combined_attention_mask is not None:
             expanded_attn_mask = expanded_attn_mask & combined_attention_mask
 
-        return expanded_attn_mask
+        mask_shape = expanded_attn_mask.shape
+        expanded_attn_mask = expanded_attn_mask.expand([mask_shape[0], num_heads, mask_shape[2], mask_shape[3]])
+        zero = paddle.zeros(expanded_attn_mask.shape, dtype=dtype)
+        neg_inf = paddle.full(expanded_attn_mask.shape, paddle.finfo(dtype).min, dtype=dtype)
+        expanded_attn_mask = paddle.where(expanded_attn_mask, zero, neg_inf)
+        return expanded_attn_mask.reshape([-1, expanded_attn_mask.shape[-2], expanded_attn_mask.shape[-1]])
 
     def set_input_embeddings(self, new_embeddings: Tensor):
         self.word_embeddings = new_embeddings
@@ -916,21 +914,28 @@ class BloomModel(BloomPreTrainedModel):
         else:
             alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
 
-        causal_mask = self._prepare_attn_mask(
-            attention_mask,
-            input_shape=(batch_size, seq_length),
-            past_key_values_length=past_key_values_length,
-        )
         if self.config.tensor_parallel_degree > 1:
             block_size = self.config.n_head // self.config.tensor_parallel_degree
             alibi = alibi[
                 :, self.config.tensor_parallel_rank * block_size : (self.config.tensor_parallel_rank + 1) * block_size
             ]
             alibi = alibi.reshape([batch_size * block_size, 1, seq_length_with_past])
-            causal_mask = causal_mask.expand([batch_size, block_size, seq_length, seq_length_with_past])
+            causal_mask = self._prepare_attn_mask(
+                attention_mask,
+                input_shape=(batch_size, seq_length),
+                past_key_values_length=past_key_values_length,
+                num_heads=block_size,
+                dtype=hidden_states.dtype,
+            )
         else:
             alibi = alibi.reshape([batch_size * self.config.n_head, 1, seq_length_with_past])
-            causal_mask = causal_mask.expand([batch_size, self.config.n_head, seq_length, seq_length_with_past])
+            causal_mask = self._prepare_attn_mask(
+                attention_mask,
+                input_shape=(batch_size, seq_length),
+                past_key_values_length=past_key_values_length,
+                num_heads=self.config.n_head,
+                dtype=hidden_states.dtype,
+            )
 
         for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
             has_gradient = not hidden_states.stop_gradient
