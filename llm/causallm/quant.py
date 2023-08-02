@@ -32,7 +32,7 @@ from paddleslim.quant.layers import (
     QuantizedColumnParallelLinear,
     QuantizedRowParallelLinear,
 )
-from paddleslim.quant.observers import AbsMaxChannelWiseWeightObserver, AbsmaxObserver
+from paddleslim.quant.observers import AbsMaxChannelWiseWeightObserver, AVGObserver
 from paddleslim.quant.quanters import PACTQuanter
 
 from paddlenlp.peft import PrefixModelForCausalLM
@@ -95,7 +95,7 @@ def apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config):
             search_scale_min=1.0,
             search_scale_max=5.0,
             weight_quant_method="abs_max_channel_wise",
-            act_quant_method="abs_max",
+            act_quant_method="avg",
         )
     else:
         search_func = None
@@ -119,7 +119,7 @@ def apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config):
 
 def apply_ptq(quant_args, trainer, ptq_dataloader):
     q_config = QuantConfig(activation=None, weight=None)
-    act_quanter = AbsmaxObserver() if not quant_args.ptq_weight_only else None
+    act_quanter = AVGObserver() if not quant_args.ptq_weight_only else None
     weight_quanter = AbsMaxChannelWiseWeightObserver(quant_bits=quant_args.quant_bits)
     q_config.add_qat_layer_mapping(ColumnParallelLinear, QuantizedColumnParallelLinear)
     q_config.add_qat_layer_mapping(RowParallelLinear, QuantizedRowParallelLinear)
