@@ -285,6 +285,8 @@ class LlamaTask(ChatGLMTask):
                     .unsqueeze_(0)
                     .unsqueeze_(0)
                 )
+
+                attention_mask = paddle.tile(attention_mask, [input_ids_shape[0], 1, 1, 1])
                 attention_mask = (1 - attention_mask) * paddle.finfo(paddle.float16).min
 
                 tokenized_output["attention_mask"] = attention_mask.numpy()
