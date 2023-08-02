@@ -954,10 +954,11 @@ class OPTModel(OPTPretrainedModel):
 
 
 class OPTLMHead(Layer):
-    def __init__(self, hidden_size: int, vocab_size: int, embedding_weights=None):
+    def __init__(self, config: OPTConfig, embedding_weights=None):
         super(OPTLMHead, self).__init__()
+        self.config = config
         self.decoder_weight = (
-            self.create_parameter(shape=[vocab_size, hidden_size], dtype=paddle.get_default_dtype(), is_bias=True)
+            self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=config.dtype, is_bias=True)
             if embedding_weights is None
             else embedding_weights
         )
@@ -965,8 +966,7 @@ class OPTLMHead(Layer):
     def forward(self, hidden_states):
         if isinstance(hidden_states, BaseModelOutputWithPastAndCrossAttentions):
             hidden_states = hidden_states["last_hidden_state"]
-
-        logits = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True)
+        logits = paddle.tensor.matmul(hidden_states, self.decoder_weight.cast(hidden_states.dtype), transpose_y=True)
         return logits
 
 
@@ -984,8 +984,7 @@ class OPTForCausalLM(OPTPretrainedModel):
         super(OPTForCausalLM, self).__init__(config)
         self.opt = OPTModel(config)
         self.lm_head = OPTLMHead(
-            hidden_size=self.opt.config.hidden_size,
-            vocab_size=self.opt.config.vocab_size,
+            config,
             embedding_weights=self.opt.embeddings.word_embeddings.weight,
         )
 
