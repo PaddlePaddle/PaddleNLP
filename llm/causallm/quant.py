@@ -46,17 +46,17 @@ def create_qat_model(quant_args, model, dtype):
 
     q_config = QuantConfig(activation=None, weight=None)
     q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
-    if quant_args.qat_type == "A8W8":
+    if quant_args.quant_type == "A8W8":
         activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
         weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype="float32")
-    elif quant_args.qat_type == "W4":
+    elif quant_args.quant_type == "W4":
         activation = None
         weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
-    elif quant_args.qat_type == "A8W4":
+    elif quant_args.quant_type == "A8W4":
         activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
         weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
     else:
-        raise ValueError("qat_type should be one of ['A8W8', 'W4', 'A8W4']")
+        raise ValueError("quant_type should be one of ['A8W8', 'W4', 'A8W4']")
     q_config.add_type_config(LoRALinear, weight=weight, activation=activation)
     q_config.add_type_config(nn.Linear, weight=weight, activation=activation)
 
@@ -119,14 +119,25 @@ def apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config):
 
 def apply_ptq(quant_args, trainer, ptq_dataloader):
     q_config = QuantConfig(activation=None, weight=None)
-    act_quanter = AVGObserver() if not quant_args.ptq_weight_only else None
-    weight_quanter = AbsMaxChannelWiseWeightObserver(quant_bits=quant_args.quant_bits)
+
+    if quant_args.quant_type == "A8W8":
+        activation = AVGObserver(quant_bits=8)
+        weight = AbsMaxChannelWiseWeightObserver(quant_bits=8)
+    elif quant_args.quant_type == "W4":
+        activation = None
+        weight = AbsMaxChannelWiseWeightObserver(quant_bits=4)
+    elif quant_args.quant_type == "A8W4":
+        activation = AVGObserver(quant_bits=8)
+        weight = AbsMaxChannelWiseWeightObserver(quant_bits=4)
+    else:
+        raise ValueError("quant_type should be one of ['A8W8', 'W4', 'A8W4']")
+
     q_config.add_qat_layer_mapping(ColumnParallelLinear, QuantizedColumnParallelLinear)
     q_config.add_qat_layer_mapping(RowParallelLinear, QuantizedRowParallelLinear)
     q_config.add_type_config(
         [paddle.nn.Linear, ColumnParallelLinear, RowParallelLinear, QuantedLoRALinear],
-        activation=act_quanter,
-        weight=weight_quanter,
+        activation=activation,
+        weight=weight,
     )
 
     ptq = PTQ(q_config)
@@ -151,8 +162,8 @@ def apply_gptq(quant_args, trainer, ptq_dataloader):
             setattr(parent_layer, sub_name, cur_quant_layer)
             trainer.ptq_loop(
                 ptq_dataloader,
-                description="PTQ",
-                max_eval_iters=quant_args.ptq_step,
+                description="GPTQ",
+                max_eval_iters=quant_args.gptq_step,
             )
             cur_quant_layer.fasterquant(percdamp=0.1, groupsize=-1, actorder=True)
             del cur_quant_layer
@@ -168,7 +179,7 @@ def get_ptq_model_config(model):
     if base_model_prefix in ["chatglm"]:
         raise NotImplementedError(f"{model} does not support Shift or Smooth.")
     elif base_model_prefix == "chatglm_v2":
-        model_config = {"fused_qkv": False, "parallel_ffn": False}
+        model_config = {"fused_qkv": False, "parallel_ffn": False, "skip_norm_list": ["rms_norm_56"]}
     elif base_model_prefix == "bloom":
         model_config = {"fused_qkv": True, "parallel_ffn": False}
     elif base_model_prefix == "llama":
