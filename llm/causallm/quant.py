@@ -20,17 +20,19 @@ from paddle.distributed.fleet.meta_parallel import (
 from paddle.quantization import PTQ, QAT, QuantConfig
 from paddle.quantization.quanters.abs_max import FakeQuanterWithAbsMaxObserverLayer
 from paddleslim.quant.advanced import (
+    GPTQ,
     EMASampler,
     MultiStepSampler,
     PieceWiseSearch,
     Shift,
     Smooth,
 )
+from paddleslim.quant.advanced.utils import find_parent_layer_and_sub_name
 from paddleslim.quant.layers import (
     QuantizedColumnParallelLinear,
     QuantizedRowParallelLinear,
 )
-from paddleslim.quant.observers import AbsMaxChannelWiseWeightObserver, AbsmaxObserver
+from paddleslim.quant.observers import AbsMaxChannelWiseWeightObserver, AVGObserver
 from paddleslim.quant.quanters import PACTQuanter
 
 from paddlenlp.peft import PrefixModelForCausalLM
@@ -93,7 +95,7 @@ def apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config):
             search_scale_min=1.0,
             search_scale_max=5.0,
             weight_quant_method="abs_max_channel_wise",
-            act_quant_method="abs_max",
+            act_quant_method="avg",
         )
     else:
         search_func = None
@@ -117,8 +119,8 @@ def apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config):
 
 def apply_ptq(quant_args, trainer, ptq_dataloader):
     q_config = QuantConfig(activation=None, weight=None)
-    act_quanter = AbsmaxObserver()
-    weight_quanter = AbsMaxChannelWiseWeightObserver()
+    act_quanter = AVGObserver() if not quant_args.ptq_weight_only else None
+    weight_quanter = AbsMaxChannelWiseWeightObserver(quant_bits=quant_args.quant_bits)
     q_config.add_qat_layer_mapping(ColumnParallelLinear, QuantizedColumnParallelLinear)
     q_config.add_qat_layer_mapping(RowParallelLinear, QuantizedRowParallelLinear)
     q_config.add_type_config(
@@ -135,6 +137,26 @@ def apply_ptq(quant_args, trainer, ptq_dataloader):
         max_eval_iters=quant_args.ptq_step,
     )
     trainer.model = ptq.convert(trainer.model, inplace=True)
+
+
+def apply_gptq(quant_args, trainer, ptq_dataloader):
+    num_layer = 0
+    model = trainer.model
+    for cur_name, cur_layer in model.named_sublayers():
+        if type(cur_layer) in [paddle.nn.Linear, ColumnParallelLinear, RowParallelLinear]:
+            num_layer += 1
+            print("GPTQ layer", num_layer, cur_name)
+            parent_layer, sub_name = find_parent_layer_and_sub_name(model, cur_name)
+            cur_quant_layer = GPTQ(cur_layer)
+            setattr(parent_layer, sub_name, cur_quant_layer)
+            trainer.ptq_loop(
+                ptq_dataloader,
+                description="PTQ",
+                max_eval_iters=quant_args.ptq_step,
+            )
+            cur_quant_layer.fasterquant(percdamp=0.1, groupsize=-1, actorder=True)
+            del cur_quant_layer
+            setattr(parent_layer, sub_name, cur_layer)
 
 
 def get_ptq_model_config(model):

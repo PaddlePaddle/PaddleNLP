@@ -48,9 +48,9 @@ def main():
     training_args.print_config(quant_args, "Quant")
     training_args.print_config(gen_args, "Generation")
 
-    if sum([quant_args.do_ptq, quant_args.do_qat, training_args.do_train]) > 1:
+    if sum([quant_args.do_ptq, quant_args.do_qat, quant_args.do_gptq, training_args.do_train]) > 1:
         raise ValueError(
-            "--do_train, --do_ptq and --do_qat cannot work at the same time. Please choose only one at a time"
+            "--do_train, --do_ptq, --do_gptq and --do_qat cannot work at the same time. Please choose only one at a time"
         )
 
     # Setup GPU & distributed training
@@ -256,6 +256,15 @@ def main():
             apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config)
 
         apply_ptq(quant_args, trainer, ptq_dataloader)
+
+    if quant_args.do_gptq:
+        if isinstance(model, LoRAModel):
+            raise NotImplementedError(
+                "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
+            )
+        from quant import apply_gptq
+
+        apply_gptq(quant_args, trainer, ptq_dataloader)
 
     # Evaluation dev set
     if training_args.do_eval:

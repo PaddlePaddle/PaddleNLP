@@ -52,6 +52,8 @@ class QuantArgument:
     # PTQ related parameters
     do_ptq: bool = field(default=False, metadata={"help": "Whether to use PTQ"})
     ptq_step: int = field(default=8, metadata={"help": "Step for PTQ"})
+    ptq_weight_only: bool = field(default=False, metadata={"help": "Whether to use PTQ weight only"})
+    quant_bits: int = field(default=8, metadata={"help": "Quantization bit size"})
 
     fused_qkv: bool = field(default=False, metadata={"help": "Whether to use Fused Quantized QKV"})
     parallel_ffn: bool = field(default=False, metadata={"help": "Whether to use Parallel FFN"})
