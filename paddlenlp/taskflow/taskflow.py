@@ -33,7 +33,7 @@ from .pos_tagging import POSTaggingTask
 from .question_answering import QuestionAnsweringTask
 from .question_generation import QuestionGenerationTask
 from .sentiment_analysis import SentaTask, SkepTask, UIESentaTask
-from .text2text_generation import ChatGLMTask
+from .text2text_generation import ChatGLMTask, LlamaTask
 from .text_classification import TextClassificationTask
 from .text_correction import CSCTask
 from .text_feature_extraction import (
@@ -480,6 +480,18 @@ TASKS = {
             "THUDM/chatglm-6b-v1.1": {
                 "task_class": ChatGLMTask,
                 "task_flag": "text_generation-THUDM/chatglm-6b-v1.1",
+            },
+            "idea-ccnl/ziya-llama-13b-v1": {
+                "task_class": LlamaTask,
+                "task_flag": "text_generation-idea-ccnl/ziya-llama-13b-v1",
+            },
+            "baichuan-13b-chat": {
+                "task_class": LlamaTask,
+                "task_flag": "text_generation-baichuan-13b-chat",
+            },
+            "ziqingyang/chinese-alpaca-7b": {
+                "task_class": LlamaTask,
+                "task_flag": "text_generation-ziqingyang/chinese-alpaca-7b",
             },
         },
         "default": {"model": "THUDM/chatglm-6b-v1.1"},

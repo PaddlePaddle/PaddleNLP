@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
 import paddle
 
-import numpy as np
 from ..transformers import AutoModelForCausalLM, AutoTokenizer
 from ..utils.log import logger
 from .task import Task
@@ -138,7 +138,7 @@ class ChatGLMTask(Task):
                 one_batch = []
         if one_batch:
             yield one_batch
-    
+
     def _preprocess(self, inputs, padding=True, add_special_tokens=True, **kwargs):
         """
         Transform the raw text to the model inputs, two steps involved:
@@ -160,26 +160,6 @@ class ChatGLMTask(Task):
                     truncation=True,
                     truncation_side="left",
                 )
-                if self._prefix:
-                    pre_caches_numpy = kwargs.get("pre_caches_numpy", None)
-                    if pre_caches_numpy is None:
-                        logger.info("pre_caches_numpy is not provided.")
-                        use_pre_caches = False
-                        for i in range(28):
-                            tokenized_output["pre_cache_{}".format(i)] = np.ones([1]).astype("float16")
-                    else:
-                        use_pre_caches = True
-                        pre_caches = np.split(pre_caches_numpy, 28)
-                        for i in range(28):
-                            tokenized_output["pre_cache_{}".format(i)] = (pre_caches[i].transpose(1, 0, 2, 3, 4).astype("float16")
-                            )
-
-                    tokenized_output["use_pre_caches"] = np.array([use_pre_caches])
-                    input_ids_shape = tokenized_output["input_ids"].shape
-                    prefix_attention_mask = np.zeros([input_ids_shape[0], 1, input_ids_shape[-1], 64], dtype="int64")
-                    if use_pre_caches:
-                        tokenized_output["attention_mask"] = np.concatenate((prefix_attention_mask, tokenized_output["attention_mask"]), axis=3)
-
             else:
                 tokenized_output = self._tokenizer(
                     input_text,
@@ -274,3 +254,90 @@ class ChatGLMTask(Task):
         static_model = paddle.jit.to_static(self._model.generate, input_spec=self._input_spec)
         paddle.jit.save(static_model, self.inference_model_path)
         logger.info("The inference model save in the path:{}".format(self.inference_model_path))
+
+
+class LlamaTask(ChatGLMTask):
+    def _preprocess(self, inputs, padding=True, add_special_tokens=True, **kwargs):
+        """
+        Transform the raw text to the model inputs, two steps involved:
+           1) Transform the raw text to token ids.
+           2) Generate the other model inputs from the raw text and token ids.
+        """
+        inputs = self._check_input_text(inputs)
+        # Get the config from the kwargs
+        batch_size = self.kwargs["batch_size"] if "batch_size" in self.kwargs else 1
+        batches = self._batchify(inputs, batch_size)
+        examples = []
+        for input_text in batches:
+            if self._static_mode:
+                tokenized_output = self._tokenizer(
+                    input_text,
+                    return_tensors="np",
+                    padding=True,
+                    max_length=self._max_seq_length,
+                    truncation=True,
+                    truncation_side="left",
+                )
+
+                input_ids_shape = tokenized_output["input_ids"].shape
+                attention_mask = (
+                    paddle.tril(paddle.ones([input_ids_shape[-1], input_ids_shape[-1]], dtype="float32"))
+                    .unsqueeze_(0)
+                    .unsqueeze_(0)
+                )
+                attention_mask = (1 - attention_mask) * paddle.finfo(paddle.float16).min
+
+                tokenized_output["attention_mask"] = attention_mask.numpy()
+
+                tokenized_output["max_length"] = np.array(self._tgt_length, dtype="int64")
+                tokenized_output["top_p"] = np.array(self._top_p, dtype="float32")
+                tokenized_output["temperature"] = np.array(self._temperature, dtype="float32")
+
+                if self._prefix:
+                    pre_caches_numpy = kwargs.get("pre_caches_numpy", None)
+                    if pre_caches_numpy is None:
+                        logger.info("pre_caches_numpy is not provided.")
+                        use_pre_caches = False
+                        for i in range(28):
+                            tokenized_output["pre_cache_{}".format(i)] = np.ones([1]).astype("float16")
+                    else:
+                        use_pre_caches = True
+                        pre_caches = np.split(pre_caches_numpy, 28)
+                        for i in range(28):
+                            tokenized_output["pre_cache_{}".format(i)] = (
+                                pre_caches[i].transpose(1, 0, 2, 3, 4).astype("float16")
+                            )
+
+                    tokenized_output["use_pre_caches"] = np.array([use_pre_caches])
+                    input_ids_shape = tokenized_output["input_ids"].shape
+                    prefix_attention_mask = np.zeros([input_ids_shape[0], 1, input_ids_shape[-1], 64], dtype="int64")
+                    if use_pre_caches:
+                        tokenized_output["attention_mask"] = np.concatenate(
+                            (prefix_attention_mask, tokenized_output["attention_mask"]), axis=3
+                        )
+
+            else:
+                tokenized_output = self._tokenizer(
+                    input_text,
+                    return_tensors="pd",
+                    padding=True,
+                    max_length=self._max_seq_length,
+                    truncation=True,
+                    truncation_side="left",
+                )
+            examples.append(tokenized_output)
+        outputs = {}
+        outputs["text"] = inputs
+        outputs["data_loader"] = examples
+        return outputs
+
+    def _construct_tokenizer(self, model):
+        """
+        Construct the tokenizer for the predictor.
+        """
+        try:
+            tokenizer_instance = AutoTokenizer.from_pretrained(self._task_path)
+        except:
+            tokenizer_instance = AutoTokenizer.from_pretrained(model)
+
+        self._tokenizer = tokenizer_instance
