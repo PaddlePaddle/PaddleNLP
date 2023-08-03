@@ -18,7 +18,7 @@ import paddle.distributed.fleet as fleet
 import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import LayerDesc, PipelineLayer
 
-from paddlenlp.transformers import PretrainedModel, ScatterOp
+from paddlenlp.transformers import PretrainedModel
 from paddlenlp.transformers.llama.modeling import (
     LlamaConfig,
     LlamaDecoderLayer,
@@ -94,6 +94,8 @@ class LlamaEmbeddingPipe(nn.Layer):
         input_ids, attention_mask, position_ids = parse_args(args)
         input_embeds = self.embed_tokens(input_ids)
         if self.sequence_parallel:
+            from paddlenlp.transformers import ScatterOp
+
             input_embeds = paddle.transpose(input_embeds, perm=[1, 0, 2])
             input_embeds = ScatterOp.apply(input_embeds)
 

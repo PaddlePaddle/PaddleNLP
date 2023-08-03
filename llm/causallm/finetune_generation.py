@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import os
 import sys
 from functools import partial
@@ -48,8 +49,10 @@ def main():
     training_args.print_config(quant_args, "Quant")
     training_args.print_config(gen_args, "Generation")
 
-    if quant_args.do_ptq and quant_args.do_qat:
-        raise ValueError("PTQ and QAT can not work at the same time.")
+    if sum([quant_args.do_ptq, quant_args.do_qat, quant_args.do_gptq, training_args.do_train]) > 1:
+        raise ValueError(
+            "--do_train, --do_ptq, --do_gptq and --do_qat cannot work at the same time. Please choose only one at a time"
+        )
 
     # Setup GPU & distributed training
     paddle.set_device(training_args.device)
@@ -97,6 +100,8 @@ def main():
 
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    if model.base_model_prefix == "llama":
+        tokenizer.pad_token = tokenizer.unk_token
 
     if data_args.dataset_name_or_path is None:
         raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
@@ -141,7 +146,7 @@ def main():
 
     if model_args.lora:
         if model_args.lora_path is None:
-            target_modules = get_lora_target_modules(model, is_tp=training_args.tensor_parallel_degree > 1)
+            target_modules = get_lora_target_modules(model)
             lora_config = LoRAConfig(
                 target_modules=target_modules,
                 r=model_args.lora_rank,
@@ -167,6 +172,11 @@ def main():
 
         predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False)
         references = tokenizer.batch_decode(references, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+        if data_args.save_generation_output:
+            with open(os.path.join(training_args.output_dir, "generated_output.json"), "w", encoding="utf-8") as f:
+                for pred, ref in zip(predictions, references):
+                    out = {"output": pred, "tgt": ref}
+                    f.write(json.dumps(out, ensure_ascii=False) + "\n")
 
         # for pred in predictions:
         rouge1_score = rouge1.score(predictions, references)
@@ -239,7 +249,7 @@ def main():
         else:
             ptq_ds = train_ds
             logger.info(
-                f"Not found ptq.json in {data_args.dataset_name_or_path}. Set train dataset to PTQ dataset path."
+                f"Not found ptq.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
             )
         ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
         if quant_args.shift or quant_args.smooth:
@@ -253,10 +263,28 @@ def main():
 
         apply_ptq(quant_args, trainer, ptq_dataloader)
 
-    # Evaluation
+    if quant_args.do_gptq:
+        if isinstance(model, LoRAModel):
+            raise NotImplementedError(
+                "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
+            )
+        from quant import apply_gptq
+
+        apply_gptq(quant_args, trainer, ptq_dataloader)
+
+    # Evaluation dev set
     if training_args.do_eval:
         eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("eval", eval_result)
+
+    # Evaluation test set
+    if training_args.do_predict:
+        test_ds = load_dataset(
+            read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "test.json"), lazy=False
+        )
+        test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
+        eval_result = trainer.predict(test_ds).metrics
+        trainer.log_metrics("test", eval_result)
 
 
 if __name__ == "__main__":

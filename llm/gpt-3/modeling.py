@@ -343,8 +343,8 @@ class MultiHeadAttention(nn.Layer):
             attn_func = self._flash_attention
         else:
             attn_func = self.core_attn
-
-        if self.use_recompute and self.recompute_granularity == "core_attn" and self.do_recompute:
+        has_gradient = (not q.stop_gradient) or (not k.stop_gradient) or (not v.stop_gradient)
+        if self.use_recompute and self.recompute_granularity == "core_attn" and self.do_recompute and has_gradient:
             out = recompute(attn_func, q, k, v, attn_mask, use_reentrant=False)
         else:
             out = attn_func(q, k, v, attn_mask=attn_mask)
@@ -403,10 +403,12 @@ class TransformerDecoder(nn.Layer):
                     output, new_cache = mod(output, tgt_mask=tgt_mask, memory=memory, use_cache=use_cache, cache=cache)
                     new_caches.append(new_cache)
                 else:
+                    has_gradient = not output.stop_gradient
                     if (
                         self.use_recompute
                         and self.recompute_granularity == "full"
                         and i not in self.no_recompute_layers
+                        and has_gradient
                     ):
                         output = recompute(mod, output, tgt_mask, memory, use_cache, cache, use_reentrant=False)
                     else:
@@ -536,7 +538,8 @@ class TransformerDecoderLayer(nn.Layer):
             tgt = self.norm1(tgt)
 
         if use_cache is False:
-            if self.use_recompute and self.recompute_granularity == "full_attn" and self.do_recompute:
+            has_gradient = not tgt.stop_gradient
+            if self.use_recompute and self.recompute_granularity == "full_attn" and self.do_recompute and has_gradient:
                 tgt = recompute(self.self_attn, tgt, None, None, tgt_mask, use_cache, cache, use_reentrant=False)
             else:
                 tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
