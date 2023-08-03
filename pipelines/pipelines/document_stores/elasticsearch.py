@@ -32,7 +32,7 @@ try:
         Urllib3HttpConnection,
     )
     from elasticsearch.exceptions import RequestError
-    from elasticsearch.helpers import bulk, scan
+    from elasticsearch.helpers import bulk, parallel_bulk, scan
 except (ImportError, ModuleNotFoundError) as ie:
     from pipelines.utils.import_utils import _optional_component_not_installed
 
@@ -677,11 +677,18 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
 
             # Pass batch_size number of documents to bulk
             if len(documents_to_index) % batch_size == 0:
-                bulk(self.client, documents_to_index, request_timeout=300, refresh=self.refresh_type, headers=headers)
+                parallel_bulk(
+                    self.client, documents_to_index, request_timeout=300, refresh=self.refresh_type, headers=headers
+                )
                 documents_to_index = []
 
         if documents_to_index:
-            bulk(self.client, documents_to_index, request_timeout=300, refresh=self.refresh_type, headers=headers)
+            # bulk(self.client, documents_to_index, request_timeout=300, refresh=self.refresh_type, headers=headers)
+            for success, info in parallel_bulk(
+                self.client, documents_to_index, chunk_size=500, thread_count=32, queue_size=32
+            ):
+                if not success:
+                    logger.error("A document failed:", info)
 
     def write_labels(
         self,
@@ -1481,7 +1488,6 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         )
 
         logging.getLogger("elasticsearch").setLevel(logging.CRITICAL)
-
         with tqdm(total=document_count, position=0, unit=" Docs", desc="Updating embeddings") as progress_bar:
             for result_batch in get_batches_from_generator(result, batch_size):
                 document_batch = [

@@ -115,6 +115,8 @@ def chat_markdown_tutorial():
     indexing_pipeline.add_node(component=retriever, name="Retriever", inputs=["Splitter"])
     indexing_pipeline.add_node(component=document_store, name="DocumentStore", inputs=["Retriever"])
     files = glob.glob(args.file_paths + "/**/*.md", recursive=True)
+    if len(files) == 0:
+        raise Exception("file should not be empty")
     indexing_pipeline.run(file_paths=files)
 
     # Query Markdowns
