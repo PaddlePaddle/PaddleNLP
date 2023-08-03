@@ -376,4 +376,3 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" server.py \
     --flask_port 8011 \
     --src_length 100
 ```
-python predict_generation.py --model_name_or_path idea-ccnl/ziya-llama-13b-v1 --data_file /root/paddlejob/work/eb_data/hcg/dev.json
