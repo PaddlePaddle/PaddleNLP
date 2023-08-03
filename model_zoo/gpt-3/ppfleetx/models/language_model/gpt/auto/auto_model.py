@@ -950,7 +950,6 @@ class GPTForGenerationAuto(nn.Layer):
             return probs
 
         batch_size, cur_len = paddle.shape(input_ids)
-
         # used for compute on gpu, avoid memcpy D2H
         cur_len_gpu = paddle.full([1], cur_len, dtype="int64")
 
