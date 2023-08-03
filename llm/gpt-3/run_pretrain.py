@@ -116,6 +116,7 @@ class ModelArguments:
     tokenizer_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
+    need_weights: bool = field(default=False, metadata={"help": "Whether output attention weights"})
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
     fused_linear: bool = field(default=False, metadata={"help": "gpt, whether to fuse linear projection"},)
     fuse_attention_qkv: bool = field(default=False, metadata={"help": "gpt, whether to fuse attention qkv"},)
@@ -352,6 +353,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
 
     config = config_class.from_pretrained(model_args.model_name_or_path)
+    config.need_weights = model_args.need_weights
     config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
     config.hidden_dropout_prob = model_args.hidden_dropout_prob
     config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob

@@ -104,14 +104,15 @@ class MultiHeadAttention(nn.Layer):
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
 
-        config.use_flash_attention = config.use_flash_attention if flash_attention else None
+        self.use_flash_attention = config.use_flash_attention if flash_attention else None
 
         self.head_dim = config.hidden_size // config.num_attention_heads
         assert self.head_dim * config.num_attention_heads == config.hidden_size, "hidden_size must be divisible by num_attention_heads"
 
+        self.num_attention_heads = config.num_attention_heads  # default, without tensor parallel
         if config.tensor_parallel_degree > 1:
             assert config.num_attention_heads % config.tensor_parallel_degree == 0
-            config.num_attention_heads = config.num_attention_heads // config.tensor_parallel_degree
+            self.num_attention_heads = config.num_attention_heads // config.tensor_parallel_degree
 
             if config.fuse_attention_qkv:
                 self.qkv_proj = fleet.meta_parallel.ColumnParallelLinear(
@@ -233,24 +234,24 @@ class MultiHeadAttention(nn.Layer):
             return self.StaticCache(k, v)
         elif value is None:  # incremental_state
             k = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.config.num_attention_heads, 0, self.head_dim], dtype=key.dtype, value=0
+                input=key, shape=[-1, self.num_attention_heads, 0, self.head_dim], dtype=key.dtype, value=0
             )
             v = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.config.num_attention_heads, 0, self.head_dim], dtype=key.dtype, value=0
+                input=key, shape=[-1, self.num_attention_heads, 0, self.head_dim], dtype=key.dtype, value=0
             )
             return self.Cache(k, v)
         else:
             # incremental_state with initial value, mainly for usage like UniLM
             return self.Cache(key, value)
 
-    def _flash_attention(self, q, k, v, attn_mask=None):
+    def _flash_attention(self, q, k, v, attn_mask=None, output_attentions=False):
         out, weights = flash_attention(
-            q, k, v, self.config.hidden_dropout_prob, causal=True, return_softmax=self.config.need_weights, training=self.training
+            q, k, v, self.config.hidden_dropout_prob, causal=True, return_softmax=output_attentions, training=self.training
         )
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
-        return (out, weights) if self.config.need_weights else out
+        return (out, weights) if output_attentions else out
 
-    def core_attn(self, q, k, v, attn_mask=None):
+    def core_attn(self, q, k, v, attn_mask=None, output_attentions=False):
         perm = [0, 2, 1, 3]
         q = tensor.transpose(x=q, perm=perm)
         k = tensor.transpose(x=k, perm=perm)
@@ -287,9 +288,9 @@ class MultiHeadAttention(nn.Layer):
         out = tensor.transpose(out, perm=[0, 2, 1, 3])
         out = tensor.reshape(x=out, shape=[0, 0, -1])
 
-        return (out, weights) if self.config.need_weights else out
+        return (out, weights) if output_attentions else out
 
-    def forward(self, query, key, value, attn_mask=None, use_cache=False, cache=None):
+    def forward(self, query, key, value, attn_mask=None, use_cache=False, cache=None, output_attentions=False):
         r"""
         Applies multi-head attention to map queries and a set of key-value pairs
         to outputs.
@@ -302,24 +303,24 @@ class MultiHeadAttention(nn.Layer):
         else:
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
 
-        if self.config.use_flash_attention and attn_mask is None:
+        if self.use_flash_attention and attn_mask is None:
             attn_func = self._flash_attention
         else:
             attn_func = self.core_attn
         has_gradient = (not q.stop_gradient) or (not k.stop_gradient) or (not v.stop_gradient)
         if self.enable_recompute and self.config.recompute_granularity == "core_attn" and has_gradient:
-            out = recompute(attn_func, q, k, v, attn_mask, use_reentrant=False)
+            out = recompute(attn_func, q, k, v, attn_mask, output_attentions, use_reentrant=False)
         else:
-            out = attn_func(q, k, v, attn_mask=attn_mask)
+            out = attn_func(q, k, v, attn_mask=attn_mask, output_attentions=output_attentions)
 
-        if self.config.need_weights:
+        if output_attentions:
             out, weights = out
 
         # project to output
         out = self.out_proj(out)
 
         outs = [out]
-        if self.config.need_weights:
+        if output_attentions:
             outs.append(weights)
         if use_cache:
             outs.append(cache)
@@ -345,7 +346,7 @@ class TransformerDecoder(nn.Layer):
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
 
-    def forward(self, tgt, tgt_mask=None, memory=None, memory_mask=None, use_cache=False, cache=None):
+    def forward(self, tgt, tgt_mask=None, memory=None, memory_mask=None, use_cache=False, cache=None, output_attentions=False):
         r"""
         Applies a stack of N Transformer decoder layers on inputs. If `norm` is
         provided, also applies layer normalization on the output of last decoder
@@ -353,26 +354,37 @@ class TransformerDecoder(nn.Layer):
         """
         output = tgt
         new_caches = []
+        all_self_attentions = [] if output_attentions else None
 
         for i, mod in enumerate(self.layers):
             if cache is None:
                 if use_cache:
-                    output, new_cache = mod(output, tgt_mask=tgt_mask, memory=memory, use_cache=use_cache, cache=cache)
+                    output, new_cache = mod(output, tgt_mask=tgt_mask, memory=memory, use_cache=use_cache, cache=cache, output_attentions=output_attentions)
                     new_caches.append(new_cache)
                 else:
                     has_gradient = not output.stop_gradient
                     if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
-                        output = recompute(mod, output, tgt_mask, memory, use_cache, cache, use_reentrant=False)
+                        output = recompute(mod, output, tgt_mask, memory, use_cache, cache, output_attentions, use_reentrant=False)
                     else:
-                        output = mod(output, tgt_mask, memory, use_cache, cache)
+                        output = mod(output, tgt_mask, memory, use_cache, cache, output_attentions)
 
             else:
-                output, new_cache = mod(output, tgt_mask=tgt_mask, memory=memory, use_cache=use_cache, cache=cache[i])
+                output, new_cache = mod(output, tgt_mask=tgt_mask, memory=memory, use_cache=use_cache, cache=cache[i], output_attentions=output_attentions)
                 new_caches.append(new_cache)
+
+            if output_attentions:
+                output, weights = output
+                all_self_attentions.append(weights)
 
         if self.norm is not None:
             output = self.norm(output)
-        return output if use_cache is False else (output, new_caches)
+
+        outputs = [output]
+        if output_attentions:
+            outputs.append(all_self_attentions)
+        if use_cache:
+            outputs.append(new_caches)
+        return output if len(outputs) == 1 else tuple(outputs)
 
     def gen_cache(self, memory, do_zip=False):
         r"""
@@ -440,8 +452,7 @@ class TransformerDecoderLayer(nn.Layer):
 
         self.activation = getattr(F, config.hidden_activation)
 
-    def forward(self, tgt, tgt_mask=None, memory=None, use_cache=False, cache=None):
-        # todo 需要判断MHA返回内容，根据self.config.need_weights进行判断
+    def forward(self, tgt, tgt_mask=None, memory=None, use_cache=False, cache=None, output_attentions=False):
         residual = tgt
 
         if self.config.normalize_before:
@@ -450,11 +461,15 @@ class TransformerDecoderLayer(nn.Layer):
         if use_cache is False:
             has_gradient = not tgt.stop_gradient
             if self.enable_recompute and self.config.recompute_granularity == "full_attn" and has_gradient:
-                tgt = recompute(self.self_attn, tgt, None, None, tgt_mask, use_cache, cache, use_reentrant=False)
+                tgt = recompute(self.self_attn, tgt, None, None, tgt_mask, use_cache, cache, output_attentions, use_reentrant=False)
             else:
-                tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
+                tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache, output_attentions)
         else:
-            tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
+            tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache, output_attentions)
+
+        if output_attentions:
+            tgt, weights = tgt
+
         current_seed = "global_seed"
         if self.training:
             with get_rng_state_tracker().rng_state(current_seed):
@@ -490,6 +505,8 @@ class TransformerDecoderLayer(nn.Layer):
         if not self.config.normalize_before:
             tgt = self.norm2(tgt)
 
+        if output_attentions:
+            tgt = (tgt, weights)
         return tgt if use_cache is False else (tgt, incremental_cache)
 
     def gen_cache(self, memory):
@@ -657,7 +674,7 @@ class GPTModel(GPTPretrainedModel):
             decoder_layers,
         )
 
-    def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None):
+    def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None, output_attentions=False):
         if position_ids is None:
             past_length = 0
             if cache is not None:
@@ -690,6 +707,7 @@ class GPTModel(GPTPretrainedModel):
             else attention_mask,  # use softmax_mask_fuse_upper_triangle
             use_cache=use_cache,
             cache=cache,
+            output_attentions=output_attentions,
         )
         return encoder_outputs
 
@@ -747,6 +765,7 @@ class GPTForCausalLM(GPTPretrainedModel):
         use_cache=False,
         cache=None,
         labels=None,
+        output_attentions=None,
         return_dict=False,
     ):
         r"""
@@ -784,13 +803,14 @@ class GPTForCausalLM(GPTPretrainedModel):
             returns a tensor `logits` which is the output of the gpt model.
         """
         input_type = type(input_ids) if input_ids is not None else type(inputs_embeds)
+        output_attentions = output_attentions if output_attentions is not None else self.config.need_weights
         outputs = self.gpt(
             input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
             use_cache=use_cache,
             cache=cache,
-            # output_attentions=output_attentions,
+            output_attentions=output_attentions,
             # output_hidden_states=output_hidden_states,
             # return_dict=return_dict,
         )
