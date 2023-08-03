@@ -78,10 +78,24 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
                     input_ids.shape, self.prefix_config.num_prefix_tokens, attention_mask
                 )
             else:
-                prefix_attention_mask = paddle.ones(
-                    [batch_size, self.prefix_config.num_prefix_tokens], dtype=attention_mask.dtype
-                )
-                attention_mask = paddle.concat((prefix_attention_mask, attention_mask), axis=1)
+                if len(attention_mask.shape) == 2:
+                    prefix_attention_mask = paddle.ones(
+                        [batch_size, self.prefix_config.num_prefix_tokens], dtype=attention_mask.dtype
+                    )
+                elif len(attention_mask.shape) == 3:
+                    batch_size, src_seq_len, tgt_seq_len = attention_mask.shape
+                    prefix_attention_mask = paddle.ones(
+                        [batch_size, src_seq_len, self.prefix_config.num_prefix_tokens], dtype=attention_mask.dtype
+                    )
+                elif len(attention_mask.shape) == 4:
+                    batch_size, num_heads, src_seq_len, tgt_seq_len = attention_mask.shape
+                    prefix_attention_mask = paddle.ones(
+                        [batch_size, num_heads, src_seq_len, self.prefix_config.num_prefix_tokens],
+                        dtype=attention_mask.dtype,
+                    )
+                else:
+                    raise ValueError(f"Unexpected attention_mask shape: {attention_mask.shape}")
+                attention_mask = paddle.concat((prefix_attention_mask, attention_mask), axis=-1)
             kwargs["attention_mask"] = attention_mask
 
         if "past_key_values" in self.forward_keys:
