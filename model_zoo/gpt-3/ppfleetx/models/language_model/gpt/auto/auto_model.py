@@ -950,7 +950,7 @@ class GPTForGenerationAuto(nn.Layer):
             return probs
 
         batch_size, cur_len = paddle.shape(input_ids)
-        cur_len = paddle.assign(cur_len)
+
         # used for compute on gpu, avoid memcpy D2H
         cur_len_gpu = paddle.full([1], cur_len, dtype="int64")
 
@@ -1185,18 +1185,34 @@ class GPTForGenerationAuto(nn.Layer):
                 input_ids, model_kwargs = self.expand_inputs_for_generation(
                     input_ids, expand_size=num_return_sequences, **model_kwargs
                 )
-
-            ret = self.sample(
-                input_ids,
-                logits_processors,
-                max_len,
-                pad_token_id,
-                eos_token_id,
-                top_k,
-                top_p,
-                temperature,
-                **model_kwargs,
-            )
+            if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+                # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior
+                # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+                # removed after static graphs support inplace and stride.
+                with paddle.framework._no_check_dy2st_diff():
+                    ret = self.sample(
+                        input_ids,
+                        logits_processors,
+                        max_len,
+                        pad_token_id,
+                        eos_token_id,
+                        top_k,
+                        top_p,
+                        temperature,
+                        **model_kwargs,
+                    )
+            else:
+                ret = self.sample(
+                    input_ids,
+                    logits_processors,
+                    max_len,
+                    pad_token_id,
+                    eos_token_id,
+                    top_k,
+                    top_p,
+                    temperature,
+                    **model_kwargs,
+                )
         else:
             raise ValueError(f"Not support {decode_strategy} strategy yet!")
         return ret
