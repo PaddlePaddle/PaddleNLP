@@ -107,7 +107,7 @@ def _make_causal_mask(input_ids_shape, past_key_values_length: int) -> Tensor:
     return expanded_mask
 
 
-def _expand_mask(mask: Tensor, tgt_length: int) -> Tensor:
+def _expand_2d_mask(mask: Tensor, tgt_length: int) -> Tensor:
     """
     Expands attention_mask from `[batch_size, src_length]` to `[batch_size, 1, tgt_length, src_length]`.
     """
@@ -804,7 +804,7 @@ class BloomModel(BloomPreTrainedModel):
 
         # [batch_size, seq_length] -> [batch_size, 1, tgt_length, src_length]
         if len(attention_mask.shape) == 2:
-            expanded_attn_mask = _expand_mask(attention_mask, tgt_length=src_length)
+            expanded_attn_mask = _expand_2d_mask(attention_mask, tgt_length=src_length)
         elif len(attention_mask.shape) == 3:
             # [batch_size,tgt_length, src_length] -> [batch_size, 1, tgt_length, src_length]
             expanded_attn_mask = attention_mask.unsqueeze(1)
