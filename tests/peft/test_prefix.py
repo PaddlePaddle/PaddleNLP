@@ -94,8 +94,6 @@ class TestPrefixModel(unittest.TestCase):
         logits_3d = self.prefix_model(**inputs)[0]
         inputs["attention_mask"] = paddle.tril(paddle.ones([1, 1, 20, 20]))
         logits_4d = self.prefix_model(**inputs)[0]
-        # print(logits_2d)
-        # print(logits_3d)
         self.assertTrue(paddle.allclose(logits_2d, logits_3d))
         self.assertTrue(paddle.allclose(logits_3d, logits_4d))
 
