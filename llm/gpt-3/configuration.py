@@ -283,7 +283,7 @@ class GPTConfig(PretrainedConfig):
         recompute_granularity: str = "full",
         scale_qk_coeff: float = 1.0,
         tensor_parallel_degree: int = 1,
-        need_weights: bool = False,
+        output_attentions: bool = False,
         ignore_index: int = 0,
         use_flash_attention: bool = False,
         fused_linear: bool = False,
@@ -316,7 +316,7 @@ class GPTConfig(PretrainedConfig):
         self.recompute_granularity = recompute_granularity
         self.scale_qk_coeff = scale_qk_coeff
         self.tensor_parallel_degree = tensor_parallel_degree
-        self.need_weights = need_weights
+        self.output_attentions = output_attentions
         self.ignore_index = ignore_index
         self.use_flash_attention = use_flash_attention
         self.fused_linear = fused_linear

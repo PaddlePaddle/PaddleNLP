@@ -803,7 +803,7 @@ class GPTForCausalLM(GPTPretrainedModel):
             returns a tensor `logits` which is the output of the gpt model.
         """
         input_type = type(input_ids) if input_ids is not None else type(inputs_embeds)
-        output_attentions = output_attentions if output_attentions is not None else self.config.need_weights
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         outputs = self.gpt(
             input_ids,
             position_ids=position_ids,
