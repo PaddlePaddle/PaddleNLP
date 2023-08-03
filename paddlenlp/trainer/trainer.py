@@ -883,7 +883,8 @@ class Trainer:
                     elif args.recompute and availiable_no_sync:
                         fused_allreduce_gradients(list(model.parameters()), None)
 
-                    elif args.use_moe:
+                    elif args.use_moe and not args.use_hybrid_parallel:
+                        # dp grad reduce
                         fused_allreduce_gradients(
                             [p for p in model.parameters() if not getattr(p, "no_sync", False)], None
                         )
@@ -919,31 +920,31 @@ class Trainer:
                             # https://github.com/PaddlePaddle/Paddle/blob/ae2d8ba157540b39a4d7ab897c030217a33e82cb/python/paddle/distributed/fleet/meta_optimizers/dygraph_optimizer/dygraph_sharding_optimizer.py#L359C14-L359C39
                             fused_allreduce_gradients(list(non_moe_parameters_list), self.optimizer._hcg)
 
-                        moe_parameters_list = [
-                            p
-                            for p in obtain_optimizer_parameters_list(self.optimizer._inner_opt)
-                            if getattr(p, "no_sync", False)
-                        ]
+                        # moe_parameters_list = [
+                        #     p
+                        #     for p in obtain_optimizer_parameters_list(self.optimizer._inner_opt)
+                        #     if getattr(p, "no_sync", False)
+                        # ]
 
-                        def grad_norm(p):
-                            return (
-                                p.main_grad.astype("float32").norm()
-                                if hasattr(p, "main_grad")
-                                else p.grad.astype("float32").norm()
-                            )
+                        # def grad_norm(p):
+                        #     return (
+                        #         p.main_grad.astype("float32").norm()
+                        #         if hasattr(p, "main_grad")
+                        #         else p.grad.astype("float32").norm()
+                        #     )
 
-                        moe_parameters_list = "\n".join(
-                            [
-                                f'{p.name}-pnorm:{p.astype("float32").norm()}-gnorm:{grad_norm(p)}'
-                                for p in moe_parameters_list[:1]
-                            ]
-                        )
-                        non_moe_parameters_list = "\n".join(
-                            [
-                                f'{p.name}-pnorm:{p.astype("float32").norm()}-gnorm:{grad_norm(p)}'
-                                for p in non_moe_parameters_list[10:11]
-                            ]
-                        )
+                        # moe_parameters_list = "\n".join(
+                        #     [
+                        #         f'{p.name}-pnorm:{p.astype("float32").norm()}-gnorm:{grad_norm(p)}'
+                        #         for p in moe_parameters_list[:1]
+                        #     ]
+                        # )
+                        # non_moe_parameters_list = "\n".join(
+                        #     [
+                        #         f'{p.name}-pnorm:{p.astype("float32").norm()}-gnorm:{grad_norm(p)}'
+                        #         for p in non_moe_parameters_list[10:11]
+                        #     ]
+                        # )
                         # logger.info(f"ppdp moe params: {moe_parameters_list}")
                         # logger.info(f"ppdp moe params: {non_moe_parameters_list}")
 
@@ -963,6 +964,8 @@ class Trainer:
                     )
                     optimizer_was_run = True
                     if self.do_grad_scaling:
+                        if self.args.use_hybrid_parallel:
+                            assert not self.args.use_moe, "pipline moe not work under fp16"
                         scale_before = self.scaler._scale.numpy()
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
