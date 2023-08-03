@@ -37,8 +37,9 @@ class InTokens:
             # TODO: to adapt to chatglm position_2d
             position_ids = record.get("position_ids", list(range(len(record["input_ids"]))))
             batched_features["position_ids"].extend(position_ids)
-
-        batched_features["attention_mask"] = block_diag(*batched_features["attention_mask"])
+        block_attention_mask = block_diag(*batched_features["attention_mask"])
+        # convert to 3-D [batch_size(1), seq_length, seq_length]
+        batched_features["attention_mask"] = np.expand_dims(block_attention_mask, axis=0)
         return batched_features
 
 
@@ -94,7 +95,6 @@ class InTokensIterableDataset(InTokens, IterableDataset):
         batch_records, max_len = [], 0
         cur_len_so_far = 0
         for record in self.data:
-            # print(record)
             max_len = max(max_len, len(record["input_ids"]))
             to_append = (cur_len_so_far + len(record["input_ids"])) <= self.max_length
             if to_append:

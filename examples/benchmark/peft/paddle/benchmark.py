@@ -123,7 +123,7 @@ def main():
         model_inputs["position_ids"] = list(range(len(model_inputs["input_ids"])))
         seq_length = len(model_inputs["input_ids"])
         if intokens:
-            model_inputs["attention_mask"] = np.tril(np.ones([seq_length, seq_length]), 0).tolist()
+            model_inputs["attention_mask"] = np.tril(np.ones([seq_length, seq_length], dtype="bool"))
         return model_inputs
 
     def preprocess_function_chatglm(example, max_src_length=256, max_tgt_length=384, intokens=False):
@@ -153,7 +153,7 @@ def main():
             attention_mask = np.tril(attention_mask)
             attention_mask[:, :context_length] = 1
             attention_mask = (attention_mask < 0.5).astype("int64")
-            model_inputs["attention_mask"] = attention_mask.tolist()
+            model_inputs["attention_mask"] = attention_mask
         return model_inputs
 
     def preprocess_function_bloom(example, max_src_length=256, max_tgt_length=384, intokens=False):
