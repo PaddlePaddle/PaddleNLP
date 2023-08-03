@@ -1046,7 +1046,7 @@ class GPTForGenerationAuto(nn.Layer):
         if not self.inference:
             cur_len += 1
         else:
-            # Note(ZhenyuLi): Avoid the synchronization caused by scale in 
+            # Note(ZhenyuLi): Avoid the synchronization caused by scale in dy2static
             paddle.increment(cur_len)
         paddle.increment(cur_len_gpu)
 
