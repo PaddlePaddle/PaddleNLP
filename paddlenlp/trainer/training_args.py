@@ -215,7 +215,7 @@ class TrainingArguments:
             default -1 means sharding parameters between all workers.
         tensor_parallel_degree (`int`, *optional*, defaults to `-1`)
             Tensor parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.3 Tensor Model Parallelism).
-            This techique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts)
+            This technique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts)
             tensor_parallel_degree means split the transformer layer to how many parts.
             default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better proformance.
             Note, this need model support in source code, currently GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM is supported.
@@ -1088,7 +1088,7 @@ class TrainingArguments:
         if self.save_on_each_node:
             return self.local_process_index == 0
         else:
-            if self.tensor_parallel_degree > 1:
+            if self.use_hybrid_parallel:
                 # save on dataset rank 0
                 return self.sharding_parallel_rank == 0 and self.data_parallel_rank == 0
             else:

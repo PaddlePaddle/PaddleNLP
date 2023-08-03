@@ -38,6 +38,7 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     LlamaConfig,
     LlamaForCausalLM,
+    register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
@@ -50,6 +51,7 @@ MODEL_CLASSES = {
 }
 
 from dataset import GPTDataset, get_train_valid_test_split_
+from fused_layers import mock_layers
 from modeling_pp import LlamaForCausalLMPipe
 
 
@@ -72,6 +74,12 @@ class PreTrainingArguments(TrainingArguments):
         default=None,
         metadata={
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
+        },
+    )
+    enable_linear_fused_grad_add: bool = field(
+        default=False,
+        metadata={
+            "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
     )
 
@@ -148,12 +156,19 @@ class ModelArguments:
         default=1,
         metadata={"help": "virtual_pp_degree"},
     )
-
     continue_training: bool = field(
         default=False,
         metadata={
-            "help": "Pre-training from existing paddlenlp model weights. Default Fasle and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
+            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
         },
+    )
+    sequence_parallel: bool = field(
+        default=False,
+        metadata={"help": "whether to use sequence parallel"},
+    )
+    fuse_sequence_parallel_allreduce: bool = field(
+        default=False,
+        metadata={"help": "whether to use fuse sequence parallel allreduce"},
     )
 
     rope_fusion_level: Optional[str] = field(
@@ -364,6 +379,9 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
+    if training_args.enable_linear_fused_grad_add:
+        mock_layers()
+
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
 
@@ -421,9 +439,11 @@ def main():
     config.fuse_attention_ffn = model_args.fuse_attention_ffn
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
+    config.sequence_parallel = model_args.sequence_parallel
+    config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
     config.rope_fusion_level = model_args.rope_fusion_level
-    config.use_recompute = training_args.recompute
 
+    config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
 
@@ -449,6 +469,11 @@ def main():
         )
     else:
         model = model_class._from_config(config, dtype=dtype)
+
+    if model_args.sequence_parallel:
+        register_sequence_parallel_allreduce_hooks(
+            model, training_args.gradient_accumulation_steps, model_args.fuse_sequence_parallel_allreduce
+        )
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:

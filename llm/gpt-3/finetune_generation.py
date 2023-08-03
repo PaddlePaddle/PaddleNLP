@@ -28,6 +28,7 @@ from utils import (
 )
 
 from paddlenlp.datasets import load_dataset
+from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import (
     PdArgumentParser,
     TrainingArguments,
@@ -72,6 +73,13 @@ class ModelArgument:
         default=True, metadata={"help": "Evaluate with generation, instead for calc loss."}
     )
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})
+    # lora
+    lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
+    lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
+    lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
+    merge_weights: bool = field(
+        default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
+    )
 
 
 def main():
@@ -141,6 +149,31 @@ def main():
         dtype=dtype,
         load_state_as_np=True,
     )
+    if model_args.lora:
+        if model_args.lora_path is None:
+            # Not yet support RowParallelLinear
+            if model_args.fuse_attention_qkv:
+                target_modules = [".*qkv_proj.*"]
+            else:
+                target_modules = [".*q_proj.*", ".*k_proj.*", ".*v_proj.*"]
+            if training_args.tensor_parallel_degree > 1:
+                target_modules += [".*linear1.*"]
+            else:
+                target_modules += [".*linear1.*", ".*linear2.*", ".*out_proj.*"]
+
+            lora_config = LoRAConfig(
+                target_modules=target_modules,
+                r=model_args.lora_rank,
+                lora_alpha=2 * model_args.lora_rank,
+                merge_weights=model_args.merge_weights,
+                tensor_parallel_degree=training_args.tensor_parallel_degree,
+                dtype=dtype,
+            )
+            model = LoRAModel(model, lora_config)
+        else:
+            model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
+        model.mark_only_lora_as_trainable()
+        model.print_trainable_parameters()
 
     # Load the dataset.
     if training_args.do_train or training_args.do_eval:

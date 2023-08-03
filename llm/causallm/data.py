@@ -40,13 +40,18 @@ def read_local_dataset(path):
             yield json.loads(line.strip())
 
 
+class DataFormatError(ValueError):
+    pass
+
+
 def tokenize_example(tokenizer, example, data_args):
     if "src" in example and "tgt" in example:
-        source = example["src"]
-        target = example["tgt"]
+        source = example["src"][0] if isinstance(example["src"], list) else example["src"]
+        target = example["tgt"][0] if isinstance(example["tgt"], list) else example["tgt"]
     else:
-        raise ValueError(f"Example format is wrong, please check: {example} or rewrite tokenize_example in data.py ")
-    target += tokenizer.eos_token
+        raise DataFormatError(
+            f"Example format is wrong, please check: {example} or rewrite tokenize_example in data.py "
+        )
     tokenized_source = tokenizer(
         source,
         max_length=data_args.src_length,
@@ -61,41 +66,54 @@ def tokenize_example(tokenizer, example, data_args):
         truncation_side="right",
         add_special_tokens=False,
     )
-    return tokenized_source, tokenized_target
+
+    tokenized_target_input_ids = tokenized_target["input_ids"]
+    # Add eos_token_id at the end of sequence if the sentence is not truncated.
+    # Attention! In some cases(ex. ChatGLMv2), tokenized eos_token is not equal to eos_token_id.
+    if len(tokenized_target_input_ids) < data_args.tgt_length:
+        tokenized_target_input_ids += [tokenizer.eos_token_id]
+
+    return tokenized_source, tokenized_target_input_ids
 
 
-def convert_example_common(example, tokenizer, data_args, is_test=True):
-    tokenized_source, tokenized_target = tokenize_example(tokenizer, example, data_args)
+def convert_example_common(example, tokenizer, data_args, is_test=True, intokens=False):
+    tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
 
     if is_test:
         return dict(
             input_ids=tokenized_source["input_ids"],
-            labels=tokenized_target["input_ids"],
+            labels=tokenized_target_input_ids,
         )
     else:
-        input_ids = tokenized_source["input_ids"] + tokenized_target["input_ids"]
+        input_ids = tokenized_source["input_ids"] + tokenized_target_input_ids
         source_length = len(tokenized_source["input_ids"])
         labels = [-100] * source_length + input_ids[source_length:]
         # shift labels
         input_ids, labels = input_ids[:-1], labels[1:]
-        return dict(
-            input_ids=input_ids,
-            labels=labels,
-        )
+        features = {
+            "input_ids": input_ids,
+            "labels": labels,
+        }
+        seq_length = len(input_ids)
+        if intokens:
+            features["position_ids"] = list(range(seq_length))
+            features["attention_mask"] = np.tril(np.ones((seq_length, seq_length), dtype="bool"))
+
+        return features
 
 
 def convert_example_chatglm(example, tokenizer, data_args, is_test=True):
 
-    tokenized_source, tokenized_target = tokenize_example(tokenizer, example, data_args)
+    tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
     if is_test:
         return dict(
             input_ids=tokenized_source["input_ids"],
             position_ids=tokenized_source["position_ids"],
             attention_mask=tokenized_source["attention_mask"],
-            labels=tokenized_target["input_ids"],
+            labels=tokenized_target_input_ids,
         )
     else:
-        input_ids = tokenized_source["input_ids"] + tokenized_target["input_ids"]
+        input_ids = tokenized_source["input_ids"] + tokenized_target_input_ids
         bos_position = len(tokenized_source["input_ids"]) - 1
 
         attention_mask = np.tri(len(input_ids), len(input_ids))

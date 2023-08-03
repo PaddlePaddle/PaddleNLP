@@ -29,17 +29,16 @@ declare -A Normal_dic
 declare -A all_P0case_dic
 declare -A Build_list
 all_P0case_dic=(["waybill_ie"]=3 ["msra_ner"]=15 ["glue"]=2 ["bert"]=2 ["skep"]=10 ["bigbird"]=2 ["electra"]=2  ["gpt"]=2 ["ernie-1.0"]=2 ["xlnet"]=2 \
-["ofa"]=2 ["albert"]=2   ["SQuAD"]=20 ["tinybert"]=5 ["lexical_analysis"]=5 ["seq2seq"]=5 ["word_embedding"]=5 \
-["ernie-ctm"]=5 ["distilbert"]=5  ["stacl"]=5 ["transformer"]=5 ["pet"]=5 ["efl"]=5 ["p-tuning"]=5 ["simbert"]=5 ["ernie-doc"]=20 ["transformer-xl"]=5 \
-["pointer_summarizer"]=5 ["question_matching"]=5 ["ernie-csc"]=5 ["nptag"]=5 ["ernie-m"]=5 ["taskflow"]=5 ["clue"]=5 ["textcnn"]=5 \
-["fast_generation"]=10 ["ernie-3.0"]=5 ["ernie-layout"]=5 ["uie"]=5 ["ernie-health"]=5 ["llama"]=5 \
+["ofa"]=2 ["albert"]=2   ["SQuAD"]=20 ["lexical_analysis"]=5 ["seq2seq"]=5 ["word_embedding"]=5 \
+["ernie-ctm"]=5 ["distilbert"]=5  ["transformer"]=5 ["pet"]=5 ["efl"]=5 ["p-tuning"]=5 ["ernie-doc"]=20 ["transformer-xl"]=5 \
+["question_matching"]=5 ["ernie-csc"]=5 ["nptag"]=5 ["ernie-m"]=5 ["taskflow"]=5 ["clue"]=5 ["textcnn"]=5 ["transformers"]=20 \
+["fast_generation"]=10 ["ernie-3.0"]=5 ["ernie-layout"]=5 ["uie"]=5 ["ernie-health"]=5 ["llama"]=5  \
 ["ernie"]=2 ["ernie_m"]=5 ["ernie_layout"]=5 ["ernie_csc"]=5 ["ernie_ctm"]=5 ["ernie_doc"]=20 ["ernie_health"]=5 ["gpt-3"]=5)
 ####################################
 # Insatll paddlepaddle-gpu
 install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
     python -m pip install --user -r scripts/regression/requirements_ci.txt
-    python -m pip install -r requirements-dev.txt
     python -m pip uninstall paddlepaddle -y
     python -m pip install --user ${paddle};
     python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
@@ -207,7 +206,7 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
         echo "instal_nlp_pr"
         python -m pip install  dist/p****.whl
     fi
-    pip list
+    python -m pip list
     echo -e "\033[35m =======CI Check P0case========= \033[0m"
     echo -e "\033[35m ---- P0case_list length: ${#P0case_list[*]}, cases: ${P0case_list[*]} \033[0m"
     set +e

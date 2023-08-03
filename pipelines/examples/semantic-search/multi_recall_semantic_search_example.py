@@ -26,7 +26,7 @@ from pipelines.nodes import (
 )
 from pipelines.pipelines import Pipeline
 from pipelines.utils import (
-    convert_files_to_dicts,
+    convert_files_to_dicts_splitter,
     fetch_archive_from_http,
     print_documents,
 )
@@ -59,9 +59,8 @@ def get_retrievers(use_gpu):
 
     doc_dir = "data/dureader_dev"
     dureader_data = "https://paddlenlp.bj.bcebos.com/applications/dureader_dev.zip"
-
     fetch_archive_from_http(url=dureader_data, output_dir=doc_dir)
-    dicts = convert_files_to_dicts(dir_path=doc_dir, split_paragraphs=True, encoding="utf-8")
+    dicts = convert_files_to_dicts_splitter(dir_path=doc_dir, split_paragraphs=True, encoding="utf-8")
     if args.search_engine == "elastic":
         document_store_with_docs = ElasticsearchDocumentStore(
             host=args.host,
