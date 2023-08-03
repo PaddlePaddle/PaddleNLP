@@ -596,17 +596,19 @@ class ChatGLMPretrainedModel(PretrainedModel):
 
         causal_mask = paddle.tril(paddle.ones([batch_size, seq_length, seq_length], dtype="bool"))
 
-        if not attention_mask:
+        if attention_mask is None:
             attention_mask = paddle.ones([batch_size, seq_length, seq_length], dtype="bool")
-        elif attention_mask.shape == 2:
+        elif len(attention_mask.shape) == 2:
             # [batchsize, seq_length]
             attention_mask = attention_mask.unsqueeze(1).expand([batch_size, seq_length, seq_length]).astype("bool")
-        elif attention_mask.shape == 3:
+        elif len(attention_mask.shape) == 3:
             # [batchsize, seq_length, seq_length]
             attention_mask = attention_mask.astype("bool")
+        elif len(attention_mask.shape) == 4:
+            attention_mask = attention_mask.squeeze(1).astype("bool")
 
         for i, context_length in enumerate(context_lengths):
-            causal_mask[i, :, :context_length] = True
+            attention_mask[i, :, :context_length] = True
 
         attention_mask = attention_mask & causal_mask
 
