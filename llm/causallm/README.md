@@ -27,7 +27,8 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py 
     --eval_with_do_generation False \
     --recompute \
     --save_total_limit 1 \
-    --tensor_parallel_degree 4
+    --tensor_parallel_degree 4 \
+    --eval_accumulation_steps 16
 ```
 # lora
 ```
@@ -58,7 +59,8 @@ python  finetune_generation.py \
     --eval_with_do_generation False \
     --recompute \
     --save_total_limit 1  \
-    --lora True
+    --lora True \
+    --eval_accumulation_steps 16
 ```
 # prefix_tuning
 ```
@@ -89,5 +91,17 @@ python  finetune_generation.py \
     --eval_with_do_generation False \
     --recompute \
     --save_total_limit 1  \
-    --prefix_tuning True
+    --prefix_tuning True \
+    --eval_accumulation_steps 16
+```
+# server
+```
+python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" server.py \
+    --model_name_or_path facebook/llama-7b \
+    --port 8010 \
+    --flask_port 8011 \
+    --src_length 100 \
+    --dtype "float16" \ #非lora、pt，需要传入dtype
+    --lora_path ./checkpoint  \ # 如果加载lora权重
+    --gpt True # 如果是gpt模型选择True
 ```
