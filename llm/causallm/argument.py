@@ -25,6 +25,11 @@ class DataArgument:
         default=False,
         metadata={"help": "Whether to save generated text to file when eval_with_do_generation set to True."},
     )
+    intokens: bool = field(default=False, metadata={"help": "Whether to use InTokens data stream"})
+    intokens_max_length: int = field(
+        default=1024,
+        metadata={"help": "The max length for InTokens data stream. Only effective when intokens is True"},
+    )
 
 
 @dataclass
