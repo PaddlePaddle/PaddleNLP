@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -25,6 +26,9 @@ from paddlenlp.datasets import InTokensMapDataset
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+
+os.environ["http_proxy"] = "http://172.19.56.199:3128"
+os.environ["https_proxy"] = "http://172.19.56.199:3128"
 
 """
 单卡
@@ -88,7 +92,7 @@ def main():
         model_args.model_name_or_path,
         load_state_as_np=True,
         low_cpu_mem_usage=True,
-        # use_flash_attention=True,
+        use_flash_attention=True,
         dtype=dtype,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,

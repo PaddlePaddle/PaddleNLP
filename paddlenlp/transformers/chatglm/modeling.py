@@ -26,6 +26,13 @@ from paddle import Tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
+from ..llama.modeling import scaled_dot_product_attention
+
+try:
+    from paddle.nn.functional.flash_attention import flash_attention
+except:
+    flash_attention = None
+
 from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
@@ -249,72 +256,92 @@ class ChatGLMAttention(nn.Layer):
         # [s, b, n, h/n]
         q_layer, k_layer = self._core_attention(q_layer, k_layer, position_ids, rotary_embeds)
 
-        if cache is not None:
-            cache_k, cache_v = cache[0], cache[1]
-            # [s + c, b, n, h/n]
-            k_layer = paddle.concat([cache_k, k_layer], axis=0)
-            v_layer = paddle.concat([cache_v, v_layer], axis=0)
+        if self.config.use_flash_attention and flash_attention:
+            # Flash Attention now ignore attention mask
+            # Current Flash Attention doesn't support attn maskt
+            # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
+            # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
+            query_states, key_states, value_states = q_layer, k_layer, v_layer
+            attn_output, attn_weights = scaled_dot_product_attention(
+                config=self.config,
+                query_states=query_states,
+                key_states=key_states,
+                value_states=value_states,
+                attention_mask=attention_mask,
+                output_attentions=True,
+            )
+            # [ seq_len, batch_size, nhead, head_dim] = > [ seq_len, batch_size, hidden_size]
+            attn_output = self.dense(attn_output)
+            # print(attn_output.shape)
+            output, cache_kv, attention_probs = attn_output, None, attn_weights
 
-        seq_length, batch_size, num_heads, hidden_size = k_layer.shape
-
-        cache_kv = None
-        if use_cache:
-            cache_kv = (k_layer, v_layer)
-
-        attention_scale_coeff = float(layer_id) + 1.0
-        if self.attention_scale:
-            # [s, b, n, h/n]
-            q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
-            q_layer = q_layer.astype(self.default_dtype)
-
-        # [b, n, s, s]
-        output_shape = [q_layer.shape[1], q_layer.shape[2], q_layer.shape[0], k_layer.shape[0]]
-
-        # [s, b * n, h/n]
-        q_layer = q_layer.reshape([output_shape[2], output_shape[0] * output_shape[1], -1])
-        k_layer = k_layer.reshape([output_shape[3], output_shape[0] * output_shape[1], -1])
-
-        # [b * n , s, s] = matmul([b * n, s, h/n],  [b * n, h/n, s])
-        attention_scores = paddle.matmul(q_layer.transpose([1, 0, 2]), k_layer.transpose([1, 2, 0]))
-        # [b, n, s, s]
-        attention_scores = attention_scores.reshape(output_shape)
-
-        if self.scale_mask_softmax:
-            self.scale_mask_softmax.scale = attention_scale_coeff
-            attention_probs = self.scale_mask_softmax(attention_scores, attention_mask)
         else:
-            if not (attention_mask == 0).all():
-                # attention_mask = attention_mask.astype(attention_scores.dtype)
-                # attention_scores = paddle.multiply(attention_scores, 1.0 - attention_mask)
-                # attention_scores = attention_scores + (-10000.0) * attention_mask
-                attention_scores = paddle.where(
-                    attention_mask > 0, paddle.full_like(attention_scores, -10000.0), attention_scores
-                )
-            attention_scores = attention_scores.astype("float32")
-            attention_scores = attention_scores * attention_scale_coeff
-            attention_probs = F.softmax(attention_scores, axis=-1)
-            attention_probs = attention_probs.astype(self.default_dtype)
-            v_layer = v_layer.astype(self.default_dtype)
+            if cache is not None:
+                cache_k, cache_v = cache[0], cache[1]
+                # [s + c, b, n, h/n]
+                k_layer = paddle.concat([cache_k, k_layer], axis=0)
+                v_layer = paddle.concat([cache_v, v_layer], axis=0)
 
-        # [b, n, s, h/n]
-        output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]
-        # [s, b * n, h/n]
-        v_layer = v_layer.reshape([v_layer.shape[0], output_shape[0] * output_shape[1], -1])
-        # [b * n, s, s]
-        attention_probs = attention_probs.reshape([output_shape[0] * output_shape[1], output_shape[2], -1])
+            seq_length, batch_size, num_heads, hidden_size = k_layer.shape
 
-        # [b * n, s, h/n]
-        context_layer = paddle.bmm(attention_probs, v_layer.transpose([1, 0, 2]))
-        context_layer = context_layer.reshape(output_shape)
+            cache_kv = None
+            if use_cache:
+                cache_kv = (k_layer, v_layer)
 
-        # [s, b, n, h/n]
-        context_layer = context_layer.transpose([2, 0, 1, 3])
+            attention_scale_coeff = float(layer_id) + 1.0
+            if self.attention_scale:
+                # [s, b, n, h/n]
+                q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
+                q_layer = q_layer.astype(self.default_dtype)
 
-        # [s, b, h]
-        new_context_shape = context_layer.shape[:-2] + [self.num_attention_heads * self.attention_head_size]
-        context_layer = context_layer.reshape(new_context_shape)
+            # [b, n, s, s]
+            output_shape = [q_layer.shape[1], q_layer.shape[2], q_layer.shape[0], k_layer.shape[0]]
 
-        output = self.dense(context_layer)
+            # [s, b * n, h/n]
+            q_layer = q_layer.reshape([output_shape[2], output_shape[0] * output_shape[1], -1])
+            k_layer = k_layer.reshape([output_shape[3], output_shape[0] * output_shape[1], -1])
+
+            # [b * n , s, s] = matmul([b * n, s, h/n],  [b * n, h/n, s])
+            attention_scores = paddle.matmul(q_layer.transpose([1, 0, 2]), k_layer.transpose([1, 2, 0]))
+            # [b, n, s, s]
+            attention_scores = attention_scores.reshape(output_shape)
+
+            if self.scale_mask_softmax:
+                self.scale_mask_softmax.scale = attention_scale_coeff
+                attention_probs = self.scale_mask_softmax(attention_scores, attention_mask)
+            else:
+                if not (attention_mask == 0).all():
+                    # attention_mask = attention_mask.astype(attention_scores.dtype)
+                    # attention_scores = paddle.multiply(attention_scores, 1.0 - attention_mask)
+                    # attention_scores = attention_scores + (-10000.0) * attention_mask
+                    attention_scores = paddle.where(
+                        attention_mask > 0, paddle.full_like(attention_scores, -10000.0), attention_scores
+                    )
+                attention_scores = attention_scores.astype("float32")
+                attention_scores = attention_scores * attention_scale_coeff
+                attention_probs = F.softmax(attention_scores, axis=-1)
+                attention_probs = attention_probs.astype(self.default_dtype)
+                v_layer = v_layer.astype(self.default_dtype)
+
+            # [b, n, s, h/n]
+            output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]
+            # [s, b * n, h/n]
+            v_layer = v_layer.reshape([v_layer.shape[0], output_shape[0] * output_shape[1], -1])
+            # [b * n, s, s]
+            attention_probs = attention_probs.reshape([output_shape[0] * output_shape[1], output_shape[2], -1])
+
+            # [b * n, s, h/n]
+            context_layer = paddle.bmm(attention_probs, v_layer.transpose([1, 0, 2]))
+            context_layer = context_layer.reshape(output_shape)
+
+            # [s, b, n, h/n]
+            context_layer = context_layer.transpose([2, 0, 1, 3])
+
+            # [s, b, h]
+            new_context_shape = context_layer.shape[:-2] + [self.num_attention_heads * self.attention_head_size]
+            context_layer = context_layer.reshape(new_context_shape)
+
+            output = self.dense(context_layer)
 
         return output, cache_kv, attention_probs
 

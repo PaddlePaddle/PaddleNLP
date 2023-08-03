@@ -104,6 +104,7 @@ class ChatGLMConfig(PretrainedConfig):
         activation="gelu",
         num_image_tokens=0,
         lm_shift_labels=True,
+        use_flash_attention=False,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
@@ -129,3 +130,4 @@ class ChatGLMConfig(PretrainedConfig):
         self.activation = activation
         self.num_image_tokens = num_image_tokens
         self.lm_shift_labels = lm_shift_labels
+        self.use_flash_attention = use_flash_attention
