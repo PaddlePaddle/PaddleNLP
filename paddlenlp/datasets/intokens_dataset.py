@@ -18,16 +18,21 @@ from scipy.linalg import block_diag
 
 
 class InTokens:
-    required_keys = ["input_ids", "labels"]
+    required_input_keys = {"input_ids", "labels"}
+    required_output_keys = {"input_ids", "labels", "attention_mask"}
 
-    @staticmethod
-    def _pad_batch_records(batch_records):
+    @classmethod
+    def _pad_batch_records(cls, batch_records):
         # TODO: support pad_to_max_length for Pipeline parallel
-        batched_features = {"input_ids": [], "labels": [], "position_ids": [], "attention_mask": []}
-        for record in batch_records:
-            for key in batched_features:
-                assert key in record, f"feature `{key}` is required for InTokensDataset"
+        # check required_keys
+        input_keys = batch_records[0].keys()
+        for key in cls.required_input_keys:
+            if key not in input_keys:
+                raise ValueError(f"feature `{key}` is required for InTokensDataset")
 
+        output_keys = set(input_keys).union(cls.required_output_keys)
+        batched_features = {key: [] for key in output_keys}
+        for record in batch_records:
             batched_features["input_ids"].extend(record["input_ids"])
             batched_features["labels"].extend(record["labels"])
             seq_length = len(record["input_ids"])
@@ -35,8 +40,9 @@ class InTokens:
             attention_mask = record.get("attention_mask", np.tril(np.ones([seq_length, seq_length], dtype="bool")))
             batched_features["attention_mask"].append(attention_mask)
             # TODO: to adapt to chatglm position_2d
-            position_ids = record.get("position_ids", list(range(len(record["input_ids"]))))
-            batched_features["position_ids"].extend(position_ids)
+            # NOTE: position_ids is optional and not required by every model
+            if "position_ids" in record:
+                batched_features["position_ids"].extend(record["position_ids"])
         block_attention_mask = block_diag(*batched_features["attention_mask"])
         # convert to 3-D [batch_size(1), seq_length, seq_length]
         batched_features["attention_mask"] = np.expand_dims(block_attention_mask, axis=0)
