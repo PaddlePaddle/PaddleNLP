@@ -26,21 +26,29 @@ __all__ = [
 
 ERNIE_PRETRAINED_INIT_CONFIGURATION = {
     "ernie/tiny-random-ernie": {
+        "fuse_linear": False,
+        "fuse_ln": False,
         "hidden_size": 768,
+        "ignored_index": -100,
         "initializer_range": 0.02,
-        "intermediate_size": 11008,
-        "max_position_embeddings": 2048,
+        "intermediate_size": 2048,
+        "max_position_embeddings": 4096,
         "model_type": "ernie",
-        "num_attention_heads": 8,
-        "num_hidden_layers": 2,
-        "layer_norm_eps": 1e-06,
-        "vocab_size": 65536,
-        "bos_token_id": 1,
-        "eos_token_id": 2,
+        "num_attention_heads": 12,
+        "num_hidden_layers": 3,
         "pad_token_id": 0,
-        "use_cache": False,
-        "use_recompute": False,
+        "parallel_attn_hatf": True,
+        "enable_random_position_ids": True,
+        "use_progressive_seq_len": False,
+        "layer_norm_eps": 1e-06,
+        "tensor_parallel_output": True,
+        "tie_word_embeddings": False,
+        "use_bias": True,
         "use_flash_attention": True,
+        "use_recompute": False,
+        "use_recompute_attn": False,
+        "vocab_size": 32000,
+        "weight_share_add_bias": True,
     },
     "baidu/ernie-3.5-se-3b": {
         "fuse_linear": False,
@@ -55,7 +63,7 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
         "num_hidden_layers": 32,
         "pad_token_id": 0,
         "parallel_attn_hatf": True,
-        "enable_random_postion_ids": True,
+        "enable_random_position_ids": True,
         "use_progressive_seq_len": True,
         "layer_norm_eps": 1e-06,
         "tensor_parallel_output": True,
@@ -145,7 +153,7 @@ class Ernie35Config(PretrainedConfig):
         virtual_pp_degree=1,
         ignored_index=-100,
         parallel_attn_hatf=True,
-        enable_random_postion_ids=False,
+        enable_random_position_ids=False,
         use_progressive_seq_len=False,
         **kwargs,
     ):
@@ -178,7 +186,7 @@ class Ernie35Config(PretrainedConfig):
         self.fuse_linear = fuse_linear
         self.ignored_index = ignored_index
         self.parallel_attn_hatf = parallel_attn_hatf
-        self.enable_random_postion_ids = enable_random_postion_ids
+        self.enable_random_position_ids = enable_random_position_ids
         self.use_progressive_seq_len = use_progressive_seq_len
         super().__init__(
             pad_token_id=pad_token_id,
