@@ -32,7 +32,7 @@ mv gpt_en_dataset_300m_idx.npz ./data
 
 注意：
 1. 需要paddle develop版本训练，需要安装`pip install tool_helpers visualdl==2.5.3`等相关缺失whl包
-2. `use_flash_attn` 需要在A100机器开启，否则loss可能不正常（很快变成0.00x,非常小不正常）。建议使用cuda11.8环境。
+2. `use_flash_attention` 需要在A100机器开启，否则loss可能不正常（很快变成0.00x,非常小不正常）。建议使用cuda11.8环境。
 
 使用下面脚本,即可在gpt2-medium-en的基础上,继续训练.
 ```shell
@@ -43,7 +43,7 @@ log_dir="log"
 rm -rf $log_dir
 
 python -u  -m paddle.distributed.launch \
-    --gpus "6,7" \
+    --gpus "0" \
     --log_dir ${log_dir} \
     run_pretrain.py \
     --model_type "gpt" \
@@ -121,7 +121,7 @@ log_dir="log"
 rm -rf $log_dir
 
 python -u  -m paddle.distributed.launch \
-    --gpus "6,7" \
+    --gpus "0" \
     --log_dir ${log_dir} \
     finetune_generation.py \
     --model_type "gpt" \
