@@ -145,16 +145,12 @@ class TritonRunner:
         return None
 
 
-def run_main_doc(item, url="0.0.0.0:8082"):
-    model_name = "m3e"
-    model_version = "1"
+def run_main_doc(item, url="0.0.0.0:8082", model_name="m3e", model_version="1"):
     runner = TritonRunner(url, model_name, model_version)
     return runner.Run_docs(item)
 
 
-def run_main_query(query, url="0.0.0.0:8082"):
-    model_name = "m3e"
-    model_version = "1"
+def run_main_query(query, url="0.0.0.0:8082", model_name="m3e", model_version="1"):
     runner = TritonRunner(url, model_name, model_version)
     return runner.Run_query(query)
 
