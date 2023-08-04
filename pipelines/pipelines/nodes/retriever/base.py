@@ -139,7 +139,6 @@ class BaseRetriever(BaseComponent):
                 pooling_mode=pooling_mode,
             )
         elif root_node == "File":
-            # breakpoint()
             self.index_count += len(documents)  # type: ignore
             run_indexing = self.timing(self.run_indexing, "index_time")
             output, stream = run_indexing(documents=documents, pooling_mode=pooling_mode)
