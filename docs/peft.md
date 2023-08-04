@@ -71,34 +71,34 @@ Paddle会将 LoRAModel 的矩阵 AB 权重保存为lora_mode_state.pdparams文�
 Parameters:
 
     --r
-                        LoRA A/B 矩阵秩。
+                        默认为 8，LoRA A/B 矩阵秩。
 
     --target_modules
                         指定哪些 module 需要适配 LoRA 算法，格式为module 的名字
                         或正则表达式的 List，比如, ['q', 'v'] 或者 '.*decoder.*(SelfAttention|EncDecAttention).*(q|v)$'
 
     --trainable_modules
-                        指定哪些 module 参数需要进行梯度更新，格式为module 的名字
+                        指定除LoRA参数外的需要进行梯度更新参数的 modules，格式为module 的名字
                         或正则表达式的 List，比如, ['q', 'v'] 或者 '.*decoder.*(SelfAttention|EncDecAttention).*(q|v)$'
 
     --lora_alpha
-                        LoRA算法的 alpha 值，int 类型
+                        默认为 8，LoRA算法的 alpha 值，int 类型
 
     --lora_dropout
-                        dropout的比例设置，float 类型
+                        默认为 0.0，dropout的比例设置，float 类型
 
     --merge_weights
-                        是否进行base model 权重和 LoRA 权重的合参操作，bool 类型
+                        默认为 False，模型推理时，是否进行base model 权重和 LoRA 权重的合参操作，bool 类型
 
     --trainable_bias
-                        为 LoRAModel 指定bias 参数
+                        指定可训练的 bias, 可选项 ['lora', 'all']
 
     --enable_lora_list
                         指定是否需要使用`MergedLoRALinear`，如果不指定则默认使用
                         `LoRALinear`
 
     --tensor_parallel_degree
-                        多 GPU 并行的控制参数，默认设置为 1，代表不使用并行
+                        默认为-1，多 GPU 并行的控制参数，传入tensor_parallel_degree 必须与 base model保持一致
 
     --dtype
                         LoRA矩阵参数类型设置
@@ -117,32 +117,32 @@ Parameters:
     --lora_config
                         指定 LoRAConfig 用于配置 LoRAModel
 
-API:
+key function:
 
-    function `mark_only_lora_as_trainable`:
+    -mark_only_lora_as_trainable()
 
         其作用是将模型中与LoRA相关的的一些层标记为可训练，而其他层则标记为不可训练。
 
 
-    function `save_pretrained`:
+    -save_pretrained(save_directory, merge_tensor_parallel)
         --save_directory
                         保存目录的路径
         --merge_tensor_parallel
-                        是否合并张量并行训练的状态
+                        是否合并多卡参数
 
         如果merge_tensor_parallel为真且模型的配置中的张量并行度大于1，则获取可训练的state_dict，并使用_merge_trainable_tensor_parallel方法合并张量并行训练的state_dict。如果merge_tensor_parallel为真且模型的张量并行度大于1，只有主进程会进行保存操作。
 
 
-    function `from_pretrained`:
+    -from_pretrained(model, lora_path)
         --model
                         要加载LORA权重参数的model对象
         --lora_path
-                        保存LORA权重参数的路径
+                        保存LORA权重参数和 config 的路径
 
         该函数用于从预先训练的模型中加载LORA权重参数，并将其设置到给定的模型中，以便在后续的任务中使用该模型进行预测或训练。
 
 
-    function `print_trainable_parameters`:
+    -print_trainable_parameters()
 
         该函数会遍历整个权重参数列表，对于每个权重参数weight，统计所有进行梯度更新的参数，最后将信息打印出来。
 ```
@@ -193,7 +193,7 @@ Paddle会将 PrefixModel 中用到的 prefix_encoder(里面包含 Embedding laye
 Parameters:
 
     --prefix_dropout
-                        prefix projection dropout比例设置，float 类型
+                        默认为 0.0，prefix projection dropout比例设置，float 类型
 
     --num_prefix_tokens
                         prefix tokens个数设定，int 类型
@@ -211,14 +211,14 @@ Parameters:
                         base model 的 hidden size 设置，int 类型
 
     --prefix_projection
-                        是否对 prefix tokens 进行 projection 操作，bool 类型
+                        默认为 False，是否对 prefix tokens 进行 projection 操作，bool 类型
 
     --prefix_projection_hidden_size
                         如果 prefix_projection 设置为 True，则在这里设置
                         projection 操作的 hidden size，int 类型
 
     --tensor_parallel_degree
-                        多 GPU 并行的控制参数，默认设置为 1，代表不使用并行
+                        默认为-1，多 GPU 并行的控制参数
 
     --dtype
                         prefix embeddings 参数类型设置
@@ -241,25 +241,25 @@ Parameters:
     --pad_attention_mask
                         指定处理新增的 prefix embedding 的 pad_attention_mask函数
 
-API:
+key function
 
-    function `mark_only_prefix_as_trainable`:
+    -mark_only_prefix_as_trainable()
 
         其作用是只把模型中的 Prefix embedding 和 Prefix projection 层标记为可训练，而其他层参数冻结。
 
-    function `save_pretrained`:
+    -save_pretrained(save_directory, merge_tensor_parallel)
         --save_directory
                         保存目录的路径
         --merge_tensor_parallel
-                        是否合并张量并行训练的状态
+                        是否合并多卡参数
 
         如果merge_tensor_parallel为真且模型的配置中的张量并行度大于1，则获取可训练的state_dict，并使用_merge_trainable_tensor_parallel方法合并张量并行训练的state_dict。如果merge_tensor_parallel为真且模型的张量并行度大于1，只有主进程会进行保存操作。
 
-    function `from_pretrained`:
+    -from_pretrained(model, prefix_path, postprocess_past_key_value, pad_attention_mask)
         --model
                         要加载Prefix权重参数的model对象
         --prefix_path
-                        保存Prefix权重参数的
+                        保存Prefix权重参数和 config 文件的路径
         --postprocess_past_key_value
                         功能同 PrefixModelForCausalLM 构造参数
         --pad_attention_mask
@@ -267,7 +267,7 @@ API:
 
         该函数用于从预先训练的模型中加载Prefix权重参数，并将其设置到给定的模型中，以便在后续的任务中使用该模型进行预测或训练。
 
-    function `print_trainable_parameters`:
+    -print_trainable_parameters()
 
         该函数会遍历整个权重参数列表，对于每个权重参数weight，统计所有进行梯度更新的参数，最后将信息打印出来。
 ```
