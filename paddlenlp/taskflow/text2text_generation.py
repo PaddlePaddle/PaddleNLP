@@ -18,7 +18,7 @@ import paddle
 from ..transformers import AutoModelForCausalLM, AutoTokenizer
 from ..utils.log import logger
 from .task import Task
-from .utils import static_mode_guard
+from .utils import DTYPE_STRING_MAPPING, static_mode_guard
 
 
 class ChatGLMTask(Task):
@@ -37,7 +37,6 @@ class ChatGLMTask(Task):
         self._dtype = kwargs.get("dtype", "float16")
         self.kwargs["generation_task"] = task
         self._tgt_length = kwargs.get("tgt_length", 2048)
-        self._prefix = kwargs.get("prefix", False)
         # Token max length
         self._max_seq_length = kwargs.get("max_seq_length", 2048)
         self._top_k = kwargs.get("top_k", 1)
@@ -257,6 +256,22 @@ class ChatGLMTask(Task):
 
 
 class LlamaTask(ChatGLMTask):
+    def __init__(self, task, model, **kwargs):
+        super().__init__(task, model, **kwargs)
+
+        self._has_pre_cache_inputs = None
+        self.use_pre_caches = kwargs.get("use_pre_caches", False)
+        self.pre_caches = kwargs.get("pre_caches", None)
+
+    @property
+    def has_pre_cache_inputs(self):
+        if self._has_pre_cache_inputs is not None:
+            return self._has_pre_cache_inputs
+
+        output_names = self.predictor.get_input_names()
+        self._has_pre_cache_inputs = any(["pre_caches_" in name for name in output_names])
+        return self._has_pre_cache_inputs
+
     def _preprocess(self, inputs, padding=True, add_special_tokens=True, **kwargs):
         """
         Transform the raw text to the model inputs, two steps involved:
@@ -281,13 +296,13 @@ class LlamaTask(ChatGLMTask):
 
                 input_ids_shape = tokenized_output["input_ids"].shape
                 attention_mask = (
-                    paddle.tril(paddle.ones([input_ids_shape[-1], input_ids_shape[-1]], dtype="float32"))
+                    paddle.tril(paddle.ones([input_ids_shape[-1], input_ids_shape[-1]], dtype=self._dtype))
                     .unsqueeze_(0)
                     .unsqueeze_(0)
                 )
 
                 attention_mask = paddle.tile(attention_mask, [input_ids_shape[0], 1, 1, 1])
-                attention_mask = (1 - attention_mask) * paddle.finfo(paddle.float16).min
+                attention_mask = (1 - attention_mask) * paddle.finfo(DTYPE_STRING_MAPPING[self._dtype]).min
 
                 tokenized_output["attention_mask"] = attention_mask.numpy()
 
@@ -295,29 +310,25 @@ class LlamaTask(ChatGLMTask):
                 tokenized_output["top_p"] = np.array(self._top_p, dtype="float32")
                 tokenized_output["temperature"] = np.array(self._temperature, dtype="float32")
 
-                if self._prefix:
-                    pre_caches_numpy = kwargs.get("pre_caches_numpy", None)
-                    if pre_caches_numpy is None:
-                        logger.info("pre_caches_numpy is not provided.")
-                        use_pre_caches = False
-                        for i in range(28):
-                            tokenized_output["pre_cache_{}".format(i)] = np.ones([1]).astype("float16")
-                    else:
-                        use_pre_caches = True
-                        pre_caches = np.split(pre_caches_numpy, 28)
-                        for i in range(28):
-                            tokenized_output["pre_cache_{}".format(i)] = (
-                                pre_caches[i].transpose(1, 0, 2, 3, 4).astype("float16")
-                            )
+                if self.has_pre_cache_inputs:
+                    assert self.pre_caches is not None, "The pre_caches must be a valid list numpy tensor."
+                    for i in range(len(self.pre_caches)):
+                        tokenized_output["pre_caches_{}".format(i)] = self.pre_caches[i]
 
-                    tokenized_output["use_pre_caches"] = np.array([use_pre_caches])
-                    input_ids_shape = tokenized_output["input_ids"].shape
-                    prefix_attention_mask = np.zeros([input_ids_shape[0], 1, input_ids_shape[-1], 64], dtype="int64")
-                    if use_pre_caches:
-                        tokenized_output["attention_mask"] = np.concatenate(
-                            (prefix_attention_mask, tokenized_output["attention_mask"]), axis=3
-                        )
+                    pre_caches_length = self.pre_caches[0].shape[-2]
 
+                    batch_size = tokenized_output["input_ids"].shape[0]
+                    fill_value = 0.0 if self.use_pre_caches else paddle.finfo(DTYPE_STRING_MAPPING[self._dtype]).min
+                    pre_cache_attention_mask = paddle.full(
+                        shape=[batch_size, 1, tokenized_output["input_ids"].shape[-1], pre_caches_length],
+                        fill_value=fill_value,
+                        dtype=attention_mask.dtype,
+                    ).numpy()
+
+                    tokenized_output["attention_mask"] = np.concatenate(
+                        (pre_cache_attention_mask, tokenized_output["attention_mask"]), axis=3
+                    )
+                    tokenized_output["use_pre_caches"] = np.array(self.use_pre_caches, dtype=np.bool_)
             else:
                 tokenized_output = self._tokenizer(
                     input_text,

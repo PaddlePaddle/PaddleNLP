@@ -58,6 +58,13 @@ DOC_FORMAT = r"""
 DOWNLOAD_CHECK = False
 
 
+DTYPE_STRING_MAPPING = {
+    "float32": paddle.float32,
+    "float16": paddle.float16,
+    "bfloat16": paddle.bfloat16,
+}
+
+
 def download_file(save_dir, filename, url, md5=None):
     """
     Download the file from the url to specified directory.
@@ -2546,3 +2553,19 @@ def sort_res(prompt, ans_list, context, boxes, lang="en"):
                 ans_score = np.sum([ans_prob, ans_odist], axis=0).tolist()
                 sorted_ans_list = sorted(ans_list, key=lambda x: ans_score[ans_list.index(x)], reverse=True)
                 return sorted_ans_list
+
+
+def load_pre_cache_weight(pre_cache_path: str, dtype: str = "float16"):
+    """load pre_cache weight
+
+    Args:
+        pre_cache_path (str): _description_
+    """
+    weight = np.load(os.path.join(pre_cache_path, "pre_caches.npy"))
+
+    num_hidden_layers = weight.shape[0]
+    pre_caches = np.split(weight, num_hidden_layers)
+    for i in range(num_hidden_layers):
+        pre_caches[i] = pre_caches[i].transpose(1, 0, 2, 3, 4).astype(dtype)
+
+    return pre_caches

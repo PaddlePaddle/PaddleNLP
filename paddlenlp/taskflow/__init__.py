@@ -13,3 +13,4 @@
 # limitations under the License.
 
 from .taskflow import Taskflow
+from .utils import load_pre_cache_weight
