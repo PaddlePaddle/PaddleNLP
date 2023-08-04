@@ -24,7 +24,7 @@ from pipelines.nodes import (
 )
 from pipelines.nodes.file_converter import TextConverter
 from pipelines.nodes.preprocessor.text_splitter import CharacterTextSplitter
-from pipelines.nodes.retriever.m3e_retriever import m3eRetriever
+from pipelines.nodes.retriever.parallel_retriever import ParallelRetriever
 from pipelines.pipelines import Pipeline
 
 # yapf: disable
@@ -52,7 +52,7 @@ def ChatFile():
     text_splitter = CharacterTextSplitter(separator="\n", chunk_size=args.chunk_size, chunk_overlap=0, filters=["\n"])
     document_store = FAISSDocumentStore(embedding_dim=768, faiss_index_factory_str="Flat", duplicate_documents="skip", return_embedding=True)
     use_gpu = True if args.device == "gpu" else False
-    retriever = m3eRetriever(document_store=document_store, params_path=args.params_path, output_emb_size=None, max_seq_len_query=args.max_seq_len_query, max_seq_len_passage=args.max_seq_len_passage, use_gpu=use_gpu, batch_size=args.retriever_batch_size, embed_title=args.embed_title, url=args.url,)
+    retriever = ParallelRetriever(document_store=document_store, params_path=args.params_path, output_emb_size=None, max_seq_len_query=args.max_seq_len_query, max_seq_len_passage=args.max_seq_len_passage, use_gpu=use_gpu, batch_size=args.retriever_batch_size, embed_title=args.embed_title, url=args.url,)
     indexing_pipeline = Pipeline()
     indexing_pipeline.add_node(component=txt_converter, name="txt_converter", inputs=["File"])
     indexing_pipeline.add_node(component=text_splitter, name="Splitter", inputs=["txt_converter"])

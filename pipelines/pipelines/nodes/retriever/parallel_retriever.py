@@ -51,29 +51,24 @@ class SyncGRPCTritonRunner:
         verbose=False,
         resp_wait_s: Optional[float] = None
     ):
+        # the port of server
         self._server_url = server_url
+        # The model name needs to match the name in config.txt
         self._model_name = model_name
+        # Model version number
         self._model_version = model_version
         self._verbose = verbose
+        # the response waiting time
         self._response_wait_t = self.DEFAULT_MAX_RESP_WAIT_S if resp_wait_s is None else resp_wait_s
 
         self._client = InferenceServerClient(self._server_url, verbose=self._verbose)
         error = self._verify_triton_state(self._client)
         if error:
             raise RuntimeError(f"Could not communicate to Triton Server: {error}")
-
-        # logger.debug(
-        #     f"Triton server {self._server_url} and model {self._model_name}:{self._model_version} "
-        #     f"are up and ready!")
-        # model_config = self._client.get_model_config(self._model_name, self._model_version)
         model_metadata = self._client.get_model_metadata(self._model_name, self._model_version)
-        # logger.info(f"Model config {model_config}")
-        # logger.info(f"Model metadata {model_metadata}")
-        # self._inputs = {tm.name: tm for tm in model_metadata.inputs}
         self._inputs = {tm["name"]: tm for tm in model_metadata["inputs"]}
         self._input_names = list(self._inputs)
         self._outputs = {tm["name"]: tm for tm in model_metadata["outputs"]}
-        # self._outputs = {tm.name: tm for tm in model_metadata.outputs}
         self._output_names = list(self._outputs)
         self._outputs_req = [InferRequestedOutput(name) for name in self._outputs]
 
@@ -178,15 +173,15 @@ def embeddings_multi_doc(data, batch_size=32, p_m=10, url="0.0.0.0:8082"):
     data_list = [data[start:end] for start, end in data_index]
     from functools import partial
 
-    func = partial(run_main_doc, url="0.0.0.0:8082")
+    func = partial(run_main_doc, url=url)
     pool = Pool(processes=min(p_m, multiprocessing.cpu_count()))
     result = pool.map(func, data_list)
-    pool.close()  # 关闭进程池，不再接受新的进程
+    pool.close()  # close the process pool and no longer accept new processes
     pool.join()
     return result
 
 
-class m3eRetriever(BaseRetriever):
+class ParallelRetriever(BaseRetriever):
     def __init__(
         self,
         document_store: BaseDocumentStore,
@@ -203,7 +198,9 @@ class m3eRetriever(BaseRetriever):
         similarity_function: str = "dot_product",
         progress_bar: bool = True,
         mode: Literal["snippets", "raw_documents", "preprocessed_documents"] = "preprocessed_documents",
+        # the port of the HTTP service
         url="0.0.0.0:8082",
+        # number of processes
         p_m=10,
         **kwargs
     ):

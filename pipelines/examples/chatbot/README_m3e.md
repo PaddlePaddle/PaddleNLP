@@ -4,7 +4,7 @@
 
 在服务化部署前，需确认
 
-- 1. 服务化镜像的软硬件环境要求和镜像拉取命令请参考[FastDeploy服务化部署]
+- 1. 服务化镜像的软硬件环境要求和镜像拉取命令请参考[FastDeploy服务化部署](https://github.com/PaddlePaddle/FastDeploy/tree/develop/serving)
 ## GPU镜像
 GPU镜像支持Paddle/ONNX模型在GPU/CPU上进行服务化部署，支持的推理后端仅包括Paddle Inference（OpenVINO、TensorRT、Paddle Inference和ONNX Runtime目前尚不支持）
 ```
@@ -97,7 +97,7 @@ pip install tritonclient\[all\]
 ### 示例m3eRetriever
 注意执行客户端请求时关闭代理，并根据实际情况修改m3eRetriever中的url地址(启动服务所在的机器)
 ```
-python ./pipelines/examples/chatbot/m3e_retriever_example.py \
+python ./pipelines/examples/chatbot/ParallelRetriever_example.py \
 --file_paths ... \
 --api_key ... \
 --secret_key ... \
