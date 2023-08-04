@@ -162,7 +162,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         :param use_system_proxy: Whether to use system proxy.
         :param queue_size: size of the task queue between the main thread (producing chunks to send) and the processing threads. for more info at https://elasticsearch-py.readthedocs.io/en/v8.8.2/helpers.html?highlight=bulk#bulk-helpers
         :param chunk_size: number of docs in one chunk sent to es (default: 500)
-        :thread_count: size of the threadpool to use for the bulk requests
+        :param thread_count: size of the threadpool to use for the bulk requests
         """
         # save init parameters to enable export of component config as YAML
         self.set_config(
