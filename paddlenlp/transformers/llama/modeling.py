@@ -57,7 +57,7 @@ from ..sequence_parallel_utils import (
     ScatterOp,
     mark_as_sequence_parallel_parameter,
 )
-from .configuration import LlamaConfig
+from .configuration import LLAMA_PRETRAINED_INIT_CONFIGURATION, LlamaConfig
 
 LLAMA_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "__internal_testing__/tiny-random-llama",
@@ -330,11 +330,10 @@ def rotate_half(x):
 
 
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
-    if position_ids is not None:
-        cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
-        sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
-        cos = cos[position_ids].unsqueeze(2)  # [bs, 1, seq_len, dim]
-        sin = sin[position_ids].unsqueeze(2)  # [bs, 1, seq_len, dim]
+    cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
+    sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
+    cos = cos[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
+    sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
@@ -663,6 +662,7 @@ class LlamaDecoderLayer(nn.Layer):
 class LlamaPretrainedModel(PretrainedModel):
     config_class = LlamaConfig
     base_model_prefix = "llama"
+    pretrained_init_configuration = LLAMA_PRETRAINED_INIT_CONFIGURATION
 
     @classmethod
     def _get_name_mappings(cls, config: LlamaConfig) -> list[StateDictNameMapping]:
@@ -951,6 +951,9 @@ class LlamaModel(LlamaPretrainedModel):
         else:
             alibi = None
 
+        if position_ids is None:
+            position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
+
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
@@ -1121,10 +1124,12 @@ class LlamaForCausalLM(LlamaPretrainedModel):
     def prepare_inputs_for_generation(
         self, input_ids, use_cache=False, past_key_values=None, inputs_embeds=None, **kwargs
     ):
+        batch_size, seq_length = input_ids.shape
+        position_ids = kwargs.get("position_ids", paddle.arange(seq_length).expand((batch_size, seq_length)))
+        attention_mask = kwargs.get("attention_mask", None)
         if past_key_values:
             input_ids = input_ids[:, -1].unsqueeze(axis=-1)
-
-        attention_mask = kwargs.get("attention_mask", None)
+            position_ids = position_ids[:, -1].unsqueeze(-1)
 
         # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
         if inputs_embeds is not None and past_key_values is None:
@@ -1134,6 +1139,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
 
         model_inputs.update(
             {
+                "position_ids": position_ids,
                 "past_key_values": past_key_values,
                 "use_cache": use_cache,
                 "attention_mask": attention_mask,
@@ -1150,15 +1156,16 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         if isinstance(outputs, CausalLMOutputWithCrossAttentions) and "past_key_values" in outputs:
             model_kwargs["past_key_values"] = outputs.past_key_values
 
+        # update position_ids
+        if "position_ids" in model_kwargs and model_kwargs["position_ids"] is not None:
+            position_ids = model_kwargs["position_ids"]
+            model_kwargs["position_ids"] = paddle.concat([position_ids, position_ids[..., -1:] + 1], axis=-1)
+
         if not is_encoder_decoder and "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]
             model_kwargs["attention_mask"] = paddle.concat(
                 [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)], axis=-1
             )
-        # update role_ids
-        if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
-            role_ids = model_kwargs["role_ids"]
-            model_kwargs["role_ids"] = paddle.concat([role_ids, role_ids[:, -1:]], axis=-1)
 
         return model_kwargs
 
