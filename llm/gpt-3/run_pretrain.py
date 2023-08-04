@@ -86,6 +86,7 @@ class DataArguments:
     input_dir: str = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
     )
+    cache_prefix: str = field(default=None, metadata={"help": "The prefix of the cached dataset."})
     split: str = field(default="949,50,1", metadata={"help": "Train/valid/test data split."})
 
     max_seq_length: int = field(
@@ -183,7 +184,7 @@ def create_pretrained_dataset(
 
     def build_dataset(index, name):
         dataset = GPTDataset(
-            file_prefix=input_prefix,
+            file_prefix=os.path.join(data_args.cache_prefix, os.path.basename(input_prefix)),
             build_data_file=training_args.local_process_index == 0,
             micro_batch_size=training_args.per_device_train_batch_size
             if name == "train"
@@ -331,6 +332,11 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
+
+    if data_args.cache_prefix is None:
+        data_args.cache_prefix = data_args.input_dir
+    else:
+        os.makedirs(data_args.cache_prefix, exist_ok=True)
 
     set_seed(training_args)
     paddle.set_device(training_args.device)
