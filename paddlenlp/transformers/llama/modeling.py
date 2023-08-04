@@ -452,7 +452,7 @@ class LlamaAttention(nn.Layer):
         self.head_dim = self.hidden_size // config.num_attention_heads
 
         self.num_key_value_heads = config.num_key_value_heads
-        self.num_key_value_groups = self.num_heads // self.num_key_value_heads
+        self.num_key_value_groups = config.num_attention_heads // config.num_key_value_heads
 
         self.max_position_embeddings = config.max_position_embeddings
         self.sequence_parallel = config.sequence_parallel
@@ -630,8 +630,8 @@ class LlamaAttention(nn.Layer):
 
         # TODO(wj-Mcat): use broadcast strategy when n_kv_heads = 1
         # repeat k/v heads if n_kv_heads < n_heads
-        key_states = repeat_kv(key_states, self.config.num_attention_heads // self.config.num_key_value_heads)
-        value_states = repeat_kv(value_states, self.config.num_attention_heads // self.config.num_key_value_heads)
+        key_states = repeat_kv(key_states, self.num_key_value_groups)
+        value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         attn_output, attn_weights = scaled_dot_product_attention(
             config=self.config,
