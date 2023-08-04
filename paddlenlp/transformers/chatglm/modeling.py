@@ -590,12 +590,6 @@ class ChatGLMPretrainedModel(PretrainedModel):
 
     def get_masks(self, input_ids, attention_mask):
         batch_size, seq_length = input_ids.shape
-        context_lengths = []
-        for seq in input_ids:
-            context_lengths.append(paddle.where(seq == self.config.bos_token_id)[0][0])
-
-        causal_mask = paddle.tril(paddle.ones([batch_size, seq_length, seq_length], dtype="bool"))
-
         if attention_mask is None:
             attention_mask = paddle.ones([batch_size, seq_length, seq_length], dtype="bool")
         elif len(attention_mask.shape) == 2:
@@ -605,10 +599,23 @@ class ChatGLMPretrainedModel(PretrainedModel):
             # [batchsize, seq_length, seq_length]
             attention_mask = attention_mask.astype("bool")
         elif len(attention_mask.shape) == 4:
-            attention_mask = attention_mask.squeeze(1).astype("bool")
+            attention_mask = attention_mask.astype("bool")
+            # 4D attention mask come from Tokenizer, just pass
+            return attention_mask
+
+        context_lengths = []
+        pad_lengths = []
+        for seq in input_ids:
+            context_lengths.append(paddle.where(seq == self.config.bos_token_id)[0][0])
+            pad_lengths.append(paddle.where(seq != self.config.pad_token_id)[0][0])
+
+        causal_mask = paddle.tril(paddle.ones([batch_size, seq_length, seq_length], dtype="bool"))
 
         for i, context_length in enumerate(context_lengths):
             attention_mask[i, :, :context_length] = True
+
+        for i, pad_length in enumerate(pad_lengths):
+            attention_mask[i, :, :pad_length, :pad_length] = False
 
         attention_mask = attention_mask & causal_mask
 

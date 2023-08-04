@@ -44,14 +44,6 @@ def llama_postprocess_past_key_value(past_key_values):
     return tuple(zip(keys, values))
 
 
-def chatglm_pad_attention_mask(input_ids_shape, num_prefix_tokens, attention_mask):
-    prefix_attention_mask = paddle.ones(
-        [input_ids_shape[0], 1, input_ids_shape[-1], num_prefix_tokens], dtype=attention_mask.dtype
-    )
-    prefix_attention_mask = (prefix_attention_mask < 0.5).astype("int64")
-    return paddle.concat((prefix_attention_mask, attention_mask), axis=3)
-
-
 def chatglm_v2_pad_attention_mask(input_ids_shape, num_prefix_tokens, attention_mask):
     # chatglm_v2 uses a padding_mask of shape [batch_size, seq_length] as the attention_mask
     # 0 indicates the token is a pad token and 1 indicates the token is a real token
