@@ -51,14 +51,16 @@ class SyncGRPCTritonRunner:
         verbose=False,
         resp_wait_s: Optional[float] = None
     ):
-        # the port of server
+        """
+        :param server_url: The port of server
+        :param model_name: The model name needs to match the name in config.txt
+        :param model_version: Model version number
+        :param resp_wait_s: the response waiting time
+        """
         self._server_url = server_url
-        # The model name needs to match the name in config.txt
         self._model_name = model_name
-        # Model version number
         self._model_version = model_version
         self._verbose = verbose
-        # the response waiting time
         self._response_wait_t = self.DEFAULT_MAX_RESP_WAIT_S if resp_wait_s is None else resp_wait_s
 
         self._client = InferenceServerClient(self._server_url, verbose=self._verbose)
@@ -198,12 +200,14 @@ class ParallelRetriever(BaseRetriever):
         similarity_function: str = "dot_product",
         progress_bar: bool = True,
         mode: Literal["snippets", "raw_documents", "preprocessed_documents"] = "preprocessed_documents",
-        # the port of the HTTP service
         url="0.0.0.0:8082",
-        # number of processes
         p_m=10,
         **kwargs
     ):
+        """
+        :param url: the port of the HTTP service
+        :param p_m: the number of processes
+        """
         self.set_config(
             document_store=document_store,
             model_version=model_version,
