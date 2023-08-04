@@ -10,7 +10,7 @@ PaddleNLP PEFT API提供单卡/分布式LoRA和Prefix-Tuning，用户定义好�
 
 大模型网络中有很多的线性层，里面需要进行密集的矩阵乘法计算，而这些通常具有全秩(full rank)，较难优化计算。LoRA论文的研究中表明, 将输入表达随机投影到较小的子空间不仅任然可以有效地学习还可以节约大量的计算显存需求。具体做法：对于预训练的权重矩阵, 通过引入两个低 rank 矩阵 $AB$(图中橙色的两个矩阵) 来近似权重的更新过程 $W_0+\Delta W=W_0+B A$ , 其中 $B \in \mathbb{R}^{d \times r}, A \in \mathbb{R}^{r \times k}$, $r$ 远小于原权重矩阵的 rank 。训练期间, $W_0$ 参数冻结, 只对 $\mathrm{A}$ 和 $\mathrm{B}$ 两个矩阵进行梯度更新，前向传播公式如下:
 $$
-h=W_0 x+B A x
+h=W_{0}x+BAx
 $$
 由于训练参数的减少，训练过程会减少很多中间变量的存储，由此节约大量的训练显存消耗。
 更多算法细节参考LoRA[论文](https://arxiv.org/abs/2106.09685)
@@ -108,7 +108,7 @@ Parameters:
                         `ColumnParallelLoRAMergedLinear`使用
 ```
 ## class LoRAModel
-```text
+```python
 Parameters:
 
     --model
