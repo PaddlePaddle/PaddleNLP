@@ -307,7 +307,6 @@ class DensePassageRetriever(BaseRetriever):
             disable_tqdm = True
         else:
             disable_tqdm = not self.progress_bar
-
         with tqdm(
             total=len(datasets) // self.batch_size,
             unit=" Docs",
