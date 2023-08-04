@@ -38,17 +38,11 @@ from pipelines.utils.common_utils import initialize_device_settings
 logger = logging.getLogger(__name__)
 
 
-class SyncGRPCTritonRunner:
+class TritonRunner:
     DEFAULT_MAX_RESP_WAIT_S = 120
 
     def __init__(
-        self,
-        server_url: str,
-        model_name: str,
-        model_version: str,
-        *,
-        verbose=False,
-        resp_wait_s: Optional[float] = None
+        self, server_url: str, model_name: str, model_version: str, verbose=False, resp_wait_s: Optional[float] = None
     ):
         """
         :param server_url: The port of server
@@ -154,14 +148,14 @@ class SyncGRPCTritonRunner:
 def run_main_doc(item, url="0.0.0.0:8082"):
     model_name = "m3e"
     model_version = "1"
-    runner = SyncGRPCTritonRunner(url, model_name, model_version)
+    runner = TritonRunner(url, model_name, model_version)
     return runner.Run_docs(item)
 
 
 def run_main_query(query, url="0.0.0.0:8082"):
     model_name = "m3e"
     model_version = "1"
-    runner = SyncGRPCTritonRunner(url, model_name, model_version)
+    runner = TritonRunner(url, model_name, model_version)
     return runner.Run_query(query)
 
 
