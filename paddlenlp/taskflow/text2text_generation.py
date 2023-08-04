@@ -15,7 +15,12 @@
 import numpy as np
 import paddle
 
-from ..transformers import AutoModelForCausalLM, AutoTokenizer
+from ..transformers import (
+    AutoTokenizer,
+    ChatGLMForConditionalGeneration,
+    ChatGLMTokenizer,
+    LlamaConfig,
+)
 from ..utils.log import logger
 from .task import Task
 from .utils import DTYPE_STRING_MAPPING, static_mode_guard
@@ -37,6 +42,7 @@ class ChatGLMTask(Task):
         self._dtype = kwargs.get("dtype", "float16")
         self.kwargs["generation_task"] = task
         self._tgt_length = kwargs.get("tgt_length", 2048)
+        self._prefix = kwargs.get("prefix", False)
         # Token max length
         self._max_seq_length = kwargs.get("max_seq_length", 2048)
         self._top_k = kwargs.get("top_k", 1)
@@ -44,7 +50,6 @@ class ChatGLMTask(Task):
         self._temperature = kwargs.get("temperature", 1.0)
         self._decode_strategy = kwargs.get("decode_strategy", "sampling")
         self._num_return_sequences = kwargs.get("num_return_sequences", 1)
-
         self._construct_tokenizer(model)
         if self._static_mode:
             self._get_inference_model()
@@ -108,14 +113,18 @@ class ChatGLMTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        tokenizer_instance = AutoTokenizer.from_pretrained(model)
+        if self.is_static_model:
+            tokenizer_instance = ChatGLMTokenizer.from_pretrained(self._task_path)
+        else:
+            tokenizer_instance = ChatGLMTokenizer.from_pretrained(model)
+
         self._tokenizer = tokenizer_instance
 
     def _construct_model(self, model):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = AutoModelForCausalLM.from_pretrained(
+        model_instance = ChatGLMForConditionalGeneration.from_pretrained(
             self.model,
             load_state_as_np=True,
             dtype=self._dtype,
@@ -159,6 +168,32 @@ class ChatGLMTask(Task):
                     truncation=True,
                     truncation_side="left",
                 )
+
+                if self._prefix:
+                    pre_caches_numpy = kwargs.get("pre_caches_numpy", None)
+
+                    if pre_caches_numpy is None:
+                        logger.info("pre_caches_numpy is not provided.")
+                        use_pre_caches = False
+                        for i in range(28):
+                            tokenized_output["pre_cache_{}".format(i)] = np.ones([1]).astype("float16")
+
+                    else:
+                        use_pre_caches = True
+                        pre_caches = np.split(pre_caches_numpy, 28)
+                        for i in range(28):
+                            tokenized_output["pre_cache_{}".format(i)] = (
+                                pre_caches[i].transpose(1, 0, 2, 3, 4).astype("float16")
+                            )
+
+                    tokenized_output["use_pre_caches"] = np.array([use_pre_caches])
+                    input_ids_shape = tokenized_output["input_ids"].shape
+                    prefix_attention_mask = np.zeros([input_ids_shape[0], 1, input_ids_shape[-1], 64], dtype="int64")
+                    if use_pre_caches:
+                        tokenized_output["attention_mask"] = np.concatenate(
+                            (prefix_attention_mask, tokenized_output["attention_mask"]), axis=3
+                        )
+
             else:
                 tokenized_output = self._tokenizer(
                     input_text,
@@ -184,14 +219,14 @@ class ChatGLMTask(Task):
                 for batch in inputs["data_loader"]:
                     input_handles = {}
                     for name in self.predictor.get_input_names():
+                        # print("predictor input -> ", name)
+                        # print(batch[name])
                         input_handles[name] = self.predictor.get_input_handle(name)
                         input_handles[name].copy_from_cpu(batch[name])
-
                     self.predictor.run()
                     output_names = self.predictor.get_output_names()
                     output_handle = self.predictor.get_output_handle(output_names[0])
                     result = output_handle.copy_to_cpu().tolist()
-
                     results.extend(result)
         else:
             for batch_inputs in inputs["data_loader"]:
@@ -258,10 +293,10 @@ class ChatGLMTask(Task):
 class LlamaTask(ChatGLMTask):
     def __init__(self, task, model, **kwargs):
         super().__init__(task, model, **kwargs)
-
         self._has_pre_cache_inputs = None
-        self.use_pre_caches = kwargs.get("use_pre_caches", False)
-        self.pre_caches = kwargs.get("pre_caches", None)
+
+        # TODO(wj-Mcat): init with the model-name
+        self.config = LlamaConfig.from_pretrained(self._task_path)
 
     @property
     def has_pre_cache_inputs(self):
@@ -310,25 +345,33 @@ class LlamaTask(ChatGLMTask):
                 tokenized_output["top_p"] = np.array(self._top_p, dtype="float32")
                 tokenized_output["temperature"] = np.array(self._temperature, dtype="float32")
 
-                if self.has_pre_cache_inputs:
-                    assert self.pre_caches is not None, "The pre_caches must be a valid list numpy tensor."
-                    for i in range(len(self.pre_caches)):
-                        tokenized_output["pre_caches_{}".format(i)] = self.pre_caches[i]
+                if self._prefix:
+                    pre_caches_numpy = kwargs.get("pre_caches_numpy", None)
 
-                    pre_caches_length = self.pre_caches[0].shape[-2]
+                    pre_caches_length = 128
+                    if pre_caches_numpy is None:
+                        logger.info("pre_caches_numpy is not provided.")
+                        use_pre_caches = False
+                        for i in range(32):
+                            tokenized_output["pre_caches_{}".format(i)] = np.ones([1]).astype("float16")
+                    else:
+                        use_pre_caches = True
+                        pre_caches = np.split(pre_caches_numpy, pre_caches_numpy.shape[0])
 
-                    batch_size = tokenized_output["input_ids"].shape[0]
-                    fill_value = 0.0 if self.use_pre_caches else paddle.finfo(DTYPE_STRING_MAPPING[self._dtype]).min
-                    pre_cache_attention_mask = paddle.full(
-                        shape=[batch_size, 1, tokenized_output["input_ids"].shape[-1], pre_caches_length],
-                        fill_value=fill_value,
-                        dtype=attention_mask.dtype,
-                    ).numpy()
+                        for i in range(len(pre_caches)):
+                            tokenized_output["pre_caches_{}".format(i)] = (
+                                pre_caches[i].transpose(1, 0, 2, 3, 4).astype("float16")
+                            )
 
-                    tokenized_output["attention_mask"] = np.concatenate(
-                        (pre_cache_attention_mask, tokenized_output["attention_mask"]), axis=3
+                    tokenized_output["use_pre_caches"] = np.array([use_pre_caches])
+                    input_ids_shape = tokenized_output["input_ids"].shape
+                    prefix_attention_mask = np.zeros(
+                        [input_ids_shape[0], 1, input_ids_shape[-1], pre_caches_length], dtype=self._dtype
                     )
-                    tokenized_output["use_pre_caches"] = np.array(self.use_pre_caches, dtype=np.bool_)
+                    if use_pre_caches:
+                        tokenized_output["attention_mask"] = np.concatenate(
+                            (prefix_attention_mask, tokenized_output["attention_mask"]), axis=3
+                        )
             else:
                 tokenized_output = self._tokenizer(
                     input_text,
