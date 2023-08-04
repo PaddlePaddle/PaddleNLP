@@ -615,7 +615,7 @@ class ChatGLMPretrainedModel(PretrainedModel):
             attention_mask[i, :, :context_length] = True
 
         for i, pad_length in enumerate(pad_lengths):
-            attention_mask[i, :, :pad_length, :pad_length] = False
+            attention_mask[i, :pad_length, :pad_length] = False
 
         attention_mask = attention_mask & causal_mask
 
