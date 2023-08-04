@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import sys
 from dataclasses import dataclass, field
 from functools import partial
 
@@ -84,7 +85,10 @@ class ModelArgument:
 
 def main():
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    else:
+        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     # data_args.always_pad_to_max_length = False
     data_args.always_pad_to_max_length = training_args.pipeline_parallel_degree > 1
     setattr(training_args, "lr_decay_ratio", model_args.lr_decay_ratio)
@@ -189,9 +193,9 @@ def main():
     if training_args.do_train:
         train_ds = train_ds.map(partial(trans_func))
     if training_args.do_eval:
-        is_test = model_args.eval_with_do_generation
+        # is_test = model_args.eval_with_do_generation
         # dev_ds = dev_ds.map(partial(trans_func, is_test=is_test))
-        dev_ds = dev_ds.map(partial(trans_func))    
+        dev_ds = dev_ds.map(partial(trans_func))
 
     collate_fn = DataCollatorForSupervisedDataset(
         tokenizer, max_length=1024 if data_args.always_pad_to_max_length else 0
