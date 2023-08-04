@@ -57,5 +57,4 @@ python -u  -m paddle.distributed.launch \
     --do_train \
     --do_eval \
     --device "gpu" \
-    --data_impl "mmap" \
-    --skip_warmup false 
+    --data_impl "mmap"

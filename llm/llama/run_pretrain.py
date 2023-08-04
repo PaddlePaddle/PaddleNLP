@@ -102,7 +102,7 @@ class DataArguments:
     )
     data_impl: str = field(default="mmap", metadata={"help": "Data implementation."})
     skip_warmup: bool = field(
-        default=False,
+        default=True,
         metadata={"help": "Skip warmup or not."},
     )
 
