@@ -1,6 +1,6 @@
 # PaddleNLP 预训练数据流程
 
-本示例致力于打造基于PaddleNLP预训练模型的最佳实践。预训练全部流程的整体详细介绍文档，请参考[ERNIE 中文预训练介绍](../pretraining_introduction.md)。本文档主要介绍预训练数据流程。
+本示例致力于打造基于PaddleNLP预训练模型的最佳实践。
 
 
 我们将预训练数据过程划分为以下部分
@@ -13,19 +13,11 @@
 本目录下主要包含一下文件：
 ```
 ├── create_pretraining_data.py
-├── dataset_utils.py
-├── ernie_dataset.py
-├── helpers.cpp
-├── Makefile
-├── README.md
-└── trans_to_json.py
-
+├── merge.py
+├── trans_to_json.py
+├── words_segmentation.py
+└── README.md
 ```
-其中，`trans_to_json.py`是原始数据转化的脚本，将数据转化为json串格式。
-`create_pretraining_data.py`将jsonl文本，断句、分词后，tokenizer转化为token id。
-`dataset_utils.py`中包含了index生成、动态mask的实现。
-`ernie_dataset.py`通过调用`dataset_utils.py`的一些函数，产生ernie的输入dataset。
-
 
 ### 环境依赖
 
@@ -48,7 +40,7 @@
 | 0️⃣初始状态 | -|原始数据： <br/> **每个doc之间用空行间隔开** <br/> - 中文，默认每句换行符，作为句子结束。<br/> - 英文，默认使用nltk判断句子结束  | ```飞桨是功能完备、开源开放的产业级深度学习平台。``` <br/> ```飞桨拥有核心训练和推理框架、基础模型库。``` <br/><br/> ```PaddleNLP是自然语言处理领域的优秀工具。```  |
 |1️⃣原始数据转换<br/>`trans_to_json.py`|预处理 <br>输入：0️⃣初始状态 <br>输出：jsonl|jsonl格式：每个doc对应一行json字符串| ```{"text": "飞桨是功能完备、开源开放的产业级深度学习平台。飞桨拥有..."}```<br/>```{"text": "PaddleNLP是自然语言..."}```
 |❇️(**可选**)数据中文分词<br/>`words_segmentation.py`|语料分词：中文WWM <br>输入：jsonl  <br> 输出：0️⃣初始状态| 将jsonl格式的数据，恢复成分词后的原始格式数据 <br> | ```飞桨 是 功能 完备、开源 开放的 产业级 深度学习 平台。``` <br/> ```飞桨 拥有 核心 训练和推理 框架、基础 模型库。``` <br/><br/> ```PaddleNLP 是 自然语言处理领域 的 优秀工具。```
-|2️⃣数据ID化<br/>`create_pretrain_data.py`|预处理| npy格式：数据id化后的token id <br/>npz格式：数据句子、文章位置索引 | -
+|2️⃣数据ID化<br/>`create_pretrain_data.py`|预处理| bin格式：数据id化后的token id <br/>idx格式：数据句子、文章位置索引 | -
 |3️⃣训练index文件生成|训练启动|npy格式：<br/> 根据训练步数max_steps生成<br/>train、valid、test的每个样本索引文件| -
 |4️⃣token动态mask（可选）| Dataset取数据 | 无 |-
 
@@ -69,14 +61,14 @@
 
 | 名称 | 文本类型 | 纯文本大小 | 适配模型
 |-|-|-|-|
-| [CLUECorpusSmall](./docs/CLUECorpusSmall.md)| 中文 | 14GB | ERNIE
-| [OpenWebText2](./docs/OpenWebText2.md) | 英文 | 70GB | GPT
-| [WuDaoCorpus2.0 Base](./docs/WuDaoCorpusBase.md)| 中文 |  200GB | ERNIE
-| [CLUECorpus2020](./docs/CLUECorpus2020.md)| 中文 | 200GB | ERNIE
+| [CLUECorpusSmall](./docs/CLUECorpusSmall.md)| 中文 | 14GB | Llama
+| [OpenWebText2](./docs/OpenWebText2.md) | 英文 | 70GB | Llama
+| [WuDaoCorpus2.0 Base](./docs/WuDaoCorpusBase.md)| 中文 |  200GB | Llama
+| [CLUECorpus2020](./docs/CLUECorpus2020.md)| 中文 | 200GB | Llama
 
-## ERNIE预训练详细准备
+## 预训练详细准备
 
-下面以ERNIE预训练为例，简要介绍一下预训练的全流程。
+下面以ziya-llama-13b-v1预训练为例，简要介绍一下预训练的全流程。
 
 ### 原始数据
 首先下载样例数据：
@@ -134,10 +126,10 @@ optional arguments:
   -h, --help            show this help message and exit
   --model_name MODEL_NAME
                         What model to use.
-                        必须设置，如：ernie-1.0-base-zh, 可以参考已有的模型名称 https://paddlenlp.readthedocs.io/zh/latest/model_zoo/index.html#transformer
-  --tokenizer_name {ErnieTokenizer,BertTokenizer,GPTTokenizer,GPTChineseTokenizer}
+                        必须设置，如：idea-ccnl/ziya-llama-13b-v1, 可以参考已有的模型名称 https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/llama/README.md
+  --tokenizer_name {LlamaTokenizer}
                         What type of tokenizer to use.
-                        模型对应的tokenizer, 目前暂时只支持 ERNIE，BERT，GPT
+                        模型对应的tokenizer, Llama模型需使用LlamaTokenizer
 data input/output:
   --input_path INPUT_PATH
                         Path to input JSON files.
@@ -145,18 +137,21 @@ data input/output:
   --output_prefix OUTPUT_PREFIX
                         Output prefix to store output file.
                         必须设置，输出文件的名称。
-                        假设名称为XXX，则会输出 XXX_ids.npy, XXX_idx.npz 两个文件。
-                        npy文件，数据id化后的token ids; npz文件，数据句子、文章位置索引。
+                        假设名称为XXX，则会输出 XXX.bin, XXX.idx 两个文件。
+                        bin文件，数据id化后的token ids; idx文件，数据句子、文章位置索引。
   --data_format {JSON}  Only support json format for now. One document per line.
                         不需要设置。目前默认处理jsonl数据格式
   --json_key JSON_KEY   For JSON format. Space separate listed of keys to extract from json
                         文本串json的key值。同前面trans_to_json.py的json_key，默认text为key
   --split_sentences     Split documents into sentences.
                         是否需要将文章划分成句子。一般而言，GPT不需要，BERT/ERNIE模型需要
+  --data_impl {mmap,lazy}
+                        Convert the json into mmap/lazy format.
+                        处理后的数据格式，可选“mmap”或“lazy”，其中“mmap”格式在读入数据时会建立内存映射，“lazy”格式在读入数据时直接从文件读取。
 
 chinese words:
   --chinese             Is corpus need words segmentation step for chinese words.
-                        中文情形必须设置。处理的文本类型是否是中文。
+                        若设置了split_sentences，并处理中文则需要设置。
   --cn_whole_word_segment
                         Is corpus need words segmentation step for chinese words WWM.
                         可选。是否需要WWM策略。一般而言，BERT/ERNIE模型需要，GPT不需要。
@@ -179,46 +174,58 @@ common config:
   --workers WORKERS     Number of worker processes to launch
                         处理文本id化的进程个数。
 ```
-通过下面脚本转化，我们可以得到处理好的预训练数据，token ids:`baike_sample_ids.npy`, 文章索引信息`baike_sample_idx.npz`.
+通过下面脚本转化，我们可以得到处理好的预训练数据，token ids:`baike_sample.bin`, 文章索引信息`baike_sample.idx`.
 ```
 python -u  create_pretraining_data.py \
-    --model_name ernie-1.0-base-zh \
-    --tokenizer_name ErnieTokenizer \
-    --input_path baike_sample.jsonl \
-    --split_sentences\
-    --chinese \
-    --cn_whole_word_segment \
-    --output_prefix baike_sample  \
+    --model_name "idea-ccnl/ziya-llama-13b-v1" \
+    --tokenizer_name "LlamaTokenizer" \
+    --data_format "JSON" \
+    --input_path "baike_sample.jsonl" \
+    --append_eos \
+    --output_prefix "baike_sample"  \
     --workers 1 \
-    --log_interval 5
+    --log_interval 5 \
+    --data_impl "mmap"
 ```
 1. 如果您使用已经分好词的语料，可以设置 --cn_splited 为 True，同时指定--cn_split_dimer如空格。
 2. 使用自定义词表的话，请指定model_name为词表所在的文件夹地址。
 
+若需要预处理的文件过大，该脚本所耗费的时间可能会很长。此时可以考虑将jsonl文件拆分为多个小文件，并行使用create_pretraining_data.py进行处理，得到多个.bin & .idx文件。
+之后使用如下merge脚本合并多个小的.bin & .idx文件。
+```
+python merge.py \
+    --input /root/data \
+    --output-prefix /root/data/merged \
+    --data_impl mmap
+```
+使用说明：
+```
+arguments:
+  --input INPUT_PATH
+                        Path to the folder where the files to be merged.
+                        待合并的文件所在文件夹，文件夹内各个小文件需按merge的顺序排列，如1.bin / 1.idx，2.bin / 2.idx...
+  --output_prefix OUTPUT_PREFIX
+                        Output prefix to store output file.
+                        合并后输出文件的名称，假设名称为XXX，则会输出 XXX.bin, XXX.idx 两个文件。
+  --data_impl {mmap,lazy}
+                        Convert the json into mmap/lazy format.
+                        merge前后的数据格式，可选“mmap”或“lazy，各个待merge的文件需格式一致。”。
+```
 
-### ERNIE 预训练开始
-得到了处理好的训练数据，就可以开始ERNIE模型的预训练了。ERNIE预训练的代码在`model_zoo/ernie-1.0`。
-简单将预处理好的数据，拷贝到data目录，即可开始ERNIE模型预训练。
+### 预训练开始
+得到了处理好的训练数据，就可以开始Llama模型的预训练了。预训练的代码在`llm/llama`。
+简单将预处理好的数据，拷贝到data目录，即可开始预训练。
 ```
 mkdir data
 mv ./preprocess/baike_sample* ./data
-sh run_static.sh
-# 建议修改 run_static.sh 中的配置，将max_steps设置小一些。
+sh run_trainer.sh
 ```
 代码说明：
 
-- ernie预训练使用的 dataset 代码文件在 `./data_tools/ernie_dataset.py`
-- 数据集index生成，动态mask相关代码实现在`./data_tools/dataset_utils.py`
-
+- 动态mask相关代码实现在`./data_tools/dataset_utils.py`
 用户可以根据自己的需求，灵活修改mask方式。具体可以参考`dataset_utils.py`中`create_masked_lm_predictions`函数。
 可以自定义的选项有do_whole_word_mask, favor_longer_ngram, do_permutation, geometric_dist等，
 可以参考[Megatron](https://github.com/NVIDIA/Megatron-LM)使用这些lm_mask策略。
-
-### FAQ
-
-#### C++代码编译失败怎么办？
-- 请先检查pybind11包是否安装，g++、make工具是否正常。
-- 编译失败可能是本文件夹下的Makefile命令出现了一些问题。可以将Makefile中的python3、python3-config设置成完全的路径，如/usr/bin/python3.7。
 
 ## 参考内容
 
