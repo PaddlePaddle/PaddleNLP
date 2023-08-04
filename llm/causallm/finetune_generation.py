@@ -123,16 +123,15 @@ def main():
             train_ds, dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["train", "dev"])
     trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
     train_ds = train_ds.map(partial(trans_func, is_test=False, intokens=data_args.intokens))
+    eval_intokens = data_args.intokens
     if data_args.intokens and data_args.eval_with_do_generation:
         logger.warning(
             "`intokens` conflicts with `eval_with_do_generation`. Setting intokens to False for the eval_dataset."
         )
         eval_intokens = False
-    else:
-        eval_intokens = data_args.intokens
     dev_ds = dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, intokens=eval_intokens))
     if data_args.intokens:
-        if model.base_model_prefix != "llama":
+        if model.base_model_prefix not in ["llama", "bloom"]:
             raise NotImplementedError("InTokens data stream is only implemented for LLaMA so far.")
         from paddlenlp.datasets import InTokensMapDataset
 
@@ -142,7 +141,12 @@ def main():
             tokenizer=tokenizer,
             max_length=data_args.intokens_max_length,
         )
-
+        if eval_intokens:
+            dev_ds = InTokensMapDataset(
+                dev_ds,
+                tokenizer=tokenizer,
+                max_length=data_args.intokens_max_length,
+            )
     if model_args.prefix_tuning:
         prefix_tuning_params = get_prefix_tuning_params(model)
         prefix_config = PrefixConfig(
