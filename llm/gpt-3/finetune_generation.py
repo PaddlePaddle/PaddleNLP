@@ -91,6 +91,7 @@ def main():
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
+    training_args.tgt_length = data_args.tgt_length
     paddle.set_device(training_args.device)
 
     set_seed(args=training_args)
@@ -189,7 +190,8 @@ def main():
         train_ds = train_ds.map(partial(trans_func))
     if training_args.do_eval:
         is_test = model_args.eval_with_do_generation
-        dev_ds = dev_ds.map(partial(trans_func, is_test=is_test))
+        # dev_ds = dev_ds.map(partial(trans_func, is_test=is_test))
+        dev_ds = dev_ds.map(partial(trans_func))    
 
     collate_fn = DataCollatorForSupervisedDataset(
         tokenizer, max_length=1024 if data_args.always_pad_to_max_length else 0

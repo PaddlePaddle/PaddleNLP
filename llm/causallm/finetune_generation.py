@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import os
 import sys
 from functools import partial
@@ -48,9 +49,9 @@ def main():
     training_args.print_config(quant_args, "Quant")
     training_args.print_config(gen_args, "Generation")
 
-    if sum([quant_args.do_ptq, quant_args.do_qat, training_args.do_train]) > 1:
+    if sum([quant_args.do_ptq, quant_args.do_qat, quant_args.do_gptq, training_args.do_train]) > 1:
         raise ValueError(
-            "--do_train, --do_ptq and --do_qat cannot work at the same time. Please choose only one at a time"
+            "--do_train, --do_ptq, --do_gptq and --do_qat cannot work at the same time. Please choose only one at a time"
         )
 
     # Setup GPU & distributed training
@@ -121,8 +122,26 @@ def main():
         else:
             train_ds, dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["train", "dev"])
     trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
-    train_ds = train_ds.map(partial(trans_func, is_test=False))
-    dev_ds = dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
+    train_ds = train_ds.map(partial(trans_func, is_test=False, intokens=data_args.intokens))
+    if data_args.intokens and data_args.eval_with_do_generation:
+        logger.warning(
+            "`intokens` conflicts with `eval_with_do_generation`. Setting intokens to False for the eval_dataset."
+        )
+        eval_intokens = False
+    else:
+        eval_intokens = data_args.intokens
+    dev_ds = dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, intokens=eval_intokens))
+    if data_args.intokens:
+        if model.base_model_prefix != "llama":
+            raise NotImplementedError("InTokens data stream is only implemented for LLaMA so far.")
+        from paddlenlp.datasets import InTokensMapDataset
+
+        logger.info("Creating InTokens Data Stream. This may take a few minutes.")
+        train_ds = InTokensMapDataset(
+            train_ds,
+            tokenizer=tokenizer,
+            max_length=data_args.intokens_max_length,
+        )
 
     if model_args.prefix_tuning:
         prefix_tuning_params = get_prefix_tuning_params(model)
@@ -171,6 +190,11 @@ def main():
 
         predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False)
         references = tokenizer.batch_decode(references, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+        if data_args.save_generation_output:
+            with open(os.path.join(training_args.output_dir, "generated_output.json"), "w", encoding="utf-8") as f:
+                for pred, ref in zip(predictions, references):
+                    out = {"output": pred, "tgt": ref}
+                    f.write(json.dumps(out, ensure_ascii=False) + "\n")
 
         # for pred in predictions:
         rouge1_score = rouge1.score(predictions, references)
@@ -256,6 +280,15 @@ def main():
             apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config)
 
         apply_ptq(quant_args, trainer, ptq_dataloader)
+
+    if quant_args.do_gptq:
+        if isinstance(model, LoRAModel):
+            raise NotImplementedError(
+                "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
+            )
+        from quant import apply_gptq
+
+        apply_gptq(quant_args, trainer, ptq_dataloader)
 
     # Evaluation dev set
     if training_args.do_eval:
