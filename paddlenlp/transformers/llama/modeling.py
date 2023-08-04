@@ -330,10 +330,11 @@ def rotate_half(x):
 
 
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
-    cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
-    sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
-    cos = cos[position_ids].unsqueeze(2)  # [bs, 1, seq_len, dim]
-    sin = sin[position_ids].unsqueeze(2)  # [bs, 1, seq_len, dim]
+    if position_ids is not None:
+        cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
+        sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
+        cos = cos[position_ids].unsqueeze(2)  # [bs, 1, seq_len, dim]
+        sin = sin[position_ids].unsqueeze(2)  # [bs, 1, seq_len, dim]
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
@@ -852,6 +853,7 @@ class LlamaModel(LlamaPretrainedModel):
         self,
         layer_module: nn.Layer,
         hidden_states: Tensor,
+        position_ids: Optional[Tensor],
         attention_mask: Tensor,
         output_attentions: Tensor,
         past_key_value: Tensor,
@@ -867,6 +869,7 @@ class LlamaModel(LlamaPretrainedModel):
         hidden_states = recompute(
             create_custom_forward(layer_module),
             hidden_states,
+            position_ids,
             attention_mask,
             output_attentions,
             past_key_value,
