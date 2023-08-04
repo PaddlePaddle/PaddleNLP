@@ -64,6 +64,7 @@ class ModelArguments:
     train_data_size: int = field(default=1000, metadata={"help": "Number of dataset for training"})
     intokens_length: int = field(default=2048, metadata={"help": "Intokens length"})
     intokens: Optional[bool] = field(default=False, metadata={"help": "whether to use intokens"})
+    use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
 
 
 def main():
@@ -88,7 +89,7 @@ def main():
         model_args.model_name_or_path,
         load_state_as_np=True,
         low_cpu_mem_usage=True,
-        use_flash_attention=True,
+        use_flash_attention=model_args.use_flash_attention,
         dtype=dtype,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
@@ -174,26 +175,28 @@ def main():
 
     if model_args.english:
         dataset = load_dataset("tatsu-lab/alpaca")
+        columns = ["instruction", "input", "output", "text"]
     else:
         dataset = load_dataset("Chinese-Vicuna/guanaco_belle_merge_v1.0")
+        columns = ["instruction", "input", "output"]
 
     # select first 10k examples for benchmarking
     dataset = dataset["train"].select(range(model_args.train_data_size))
     if "chatglm" in model_args.model_name_or_path:
         dataset = dataset.map(
             lambda example: preprocess_function_chatglm(example, intokens=model_args.intokens),
-            remove_columns=["instruction", "input", "output"],
+            remove_columns=columns,
         )
     elif "bloom" in model_args.model_name_or_path:
 
         dataset = dataset.map(
             lambda example: preprocess_function_bloom(example, intokens=model_args.intokens),
-            remove_columns=["instruction", "input", "output"],
+            remove_columns=columns,
         )
     else:
         dataset = dataset.map(
             lambda example: preprocess_function(example, intokens=model_args.intokens),
-            remove_columns=["instruction", "input", "output"],
+            remove_columns=columns,
         )
     total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
 
