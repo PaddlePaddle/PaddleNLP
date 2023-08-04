@@ -391,15 +391,8 @@ class LlamaMLP(nn.Layer):
 
     def forward(self, x):
         if self.fuse_attention_ffn:
-            # [s, b, 4hp]
-            intermediate_parallel = self.gate_up_fused_proj(x)
-            # Special Slicing to accomodate Tensor Parallel
-            # Even channels is ffc_fc, odd channels is gate
-            gate_out = intermediate_parallel[..., 0::2]
-            up_out = intermediate_parallel[..., 1::2]
-            intermediate_parallel = F.silu(gate_out) * up_out
-            # [s, b, h]
-            out = self.down_proj(intermediate_parallel)
+            gate_out, up_out = paddle.chunk(self.gate_up_fused_proj(x), chunks=2, axis=-1)
+            out = self.down_proj(F.silu(gate_out) * up_out)
         else:
             out = self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
         return out
@@ -725,7 +718,9 @@ class LlamaPretrainedModel(PretrainedModel):
                 base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
 
             if config.fuse_attention_ffn:
-                base_actions["layers.0.mlp.gate_up_fused_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.mlp.gate_up_fused_proj.weight"] = partial(
+                    fn, is_column=True, is_naive_2fuse=True
+                )
             else:
                 base_actions["layers.0.mlp.gate_proj.weight"] = partial(fn, is_column=True)
                 base_actions["layers.0.mlp.up_proj.weight"] = partial(fn, is_column=True)

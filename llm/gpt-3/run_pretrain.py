@@ -16,6 +16,7 @@ GPT/Llama pretraining scripts.
 import math
 import os
 import random
+import sys
 import time
 from dataclasses import dataclass, field
 from typing import Optional
@@ -118,12 +119,20 @@ class ModelArguments:
     )
     output_attentions: bool = field(default=False, metadata={"help": "Whether output attention weights"})
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
-    fused_linear: bool = field(default=False, metadata={"help": "gpt, whether to fuse linear projection"},)
-    fuse_attention_qkv: bool = field(default=False, metadata={"help": "gpt, whether to fuse attention qkv"},)
-    enable_fuse_transformer: bool = field(default=False, metadata={"help": "gpt, enable_fuse_transformer"},)
+    fused_linear: bool = field(
+        default=False,
+        metadata={"help": "gpt, whether to fuse linear projection"},
+    )
+    fuse_attention_qkv: bool = field(
+        default=False,
+        metadata={"help": "gpt, whether to fuse attention qkv"},
+    )
+    enable_fuse_transformer: bool = field(
+        default=False,
+        metadata={"help": "gpt, enable_fuse_transformer"},
+    )
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
-
 
 
 def create_pretrained_dataset(
@@ -316,7 +325,10 @@ class PretrainingTrainer(Trainer):
 
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    else:
+        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
 
