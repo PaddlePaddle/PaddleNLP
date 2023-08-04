@@ -245,6 +245,28 @@ class LlamaModelTester:
         else:
             self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
+    def check_model_position_ids(self, config, input_ids, input_mask, *args):
+        model = LlamaForCausalLM(config)
+        model.eval()
+
+        result_no_position_id = model(
+            input_ids,
+            labels=input_ids if self.parent.use_labels else None,
+            return_dict=self.parent.return_dict,
+        )
+        batch_size, seq_len = input_ids.shape
+        position_ids = paddle.arange(seq_len).expand((batch_size, seq_len))
+        result_position_id = model(
+            input_ids,
+            position_ids,
+            labels=input_ids if self.parent.use_labels else None,
+            return_dict=self.parent.return_dict,
+        )
+        if self.parent.use_labels:
+            self.parent.assertTrue((result_position_id[1] == result_no_position_id[1]).all())
+        else:
+            self.parent.assertTrue((result_position_id[0] == result_no_position_id[0]).all())
+
 
 class LlamaModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = LlamaModel
@@ -266,6 +288,10 @@ class LlamaModelTest(ModelTesterMixin, unittest.TestCase):
     def test_model_attention_mask(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_model_attention_mask(*config_and_inputs)
+
+    def test_model_position_ids(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.check_model_position_ids(*config_and_inputs)
 
     def test_model_name_list(self):
         pass
