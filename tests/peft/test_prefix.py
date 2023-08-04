@@ -83,11 +83,24 @@ class TestPrefixModel(unittest.TestCase):
             self.assertEqual(loaded_results[0].shape, [1, 20, self.config.vocab_size])
             self.assertTrue(paddle.allclose(original_results[0], loaded_results[0]))
 
+    def test_prefix_model_attention_mask(self):
+        inputs = {
+            "input_ids": paddle.randint(100, 200, [1, 20]),
+            "attention_mask": paddle.ones([1, 20]),
+            "position_ids": paddle.arange(20).unsqueeze(0),
+        }
+        logits_2d = self.prefix_model(**inputs)[0]
+        inputs["attention_mask"] = paddle.tril(paddle.ones([1, 20, 20]))
+        logits_3d = self.prefix_model(**inputs)[0]
+        inputs["attention_mask"] = paddle.tril(paddle.ones([1, 1, 20, 20]))
+        logits_4d = self.prefix_model(**inputs)[0]
+        self.assertTrue(paddle.allclose(logits_2d, logits_3d))
+        self.assertTrue(paddle.allclose(logits_3d, logits_4d))
+
     def test_prefix_model_generate(self):
         inputs = {
             "input_ids": paddle.randint(100, 200, [1, 20]),
             "attention_mask": paddle.ones([1, 20]),
-            "token_type_ids": paddle.zeros([1, 20]),
             "position_ids": paddle.arange(20).unsqueeze(0),
         }
         result = self.prefix_model.generate(
