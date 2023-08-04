@@ -329,9 +329,11 @@ def rotate_half(x):
     return paddle.concat([-x2, x1], axis=-1)  # shape is the same as x
 
 
-def apply_rotary_pos_emb(q, k, cos, sin, offset: int = 0):
-    cos = cos[:, offset : q.shape[1] + offset, :, :]
-    sin = sin[:, offset : q.shape[1] + offset, :, :]
+def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
+    cos = cos.squeeze(axis=[0, 1])  # [seq_len, dim]
+    sin = sin.squeeze(axis=[0, 1])  # [seq_len, dim]
+    cos = cos[position_ids].unsqueeze(1)  # [bs, 1, seq_len, dim]
+    sin = sin[position_ids].unsqueeze(1)  # [bs, 1, seq_len, dim]
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
@@ -511,6 +513,7 @@ class LlamaAttention(nn.Layer):
     def forward(
         self,
         hidden_states,
+        position_ids: Optional[Tuple[paddle.Tensor]] = None,
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         attention_mask: Optional[paddle.Tensor] = None,
         output_attentions: bool = False,
@@ -534,12 +537,10 @@ class LlamaAttention(nn.Layer):
             key_states = key_states.transpose([1, 0, 2, 3])
             value_states = value_states.transpose([1, 0, 2, 3])
 
-        offset = 0
         kv_seq_len = key_states.shape[-3]
 
         if past_key_value is not None:
-            offset = past_key_value[0].shape[-3]
-            kv_seq_len += offset
+            kv_seq_len += past_key_value[0].shape[-3]
 
         if self.config.rope:
             if self.rope_fusion_level is not None:
@@ -554,7 +555,9 @@ class LlamaAttention(nn.Layer):
                 )
             else:
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-                query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, offset=offset)
+                print(query_states.shape)
+                query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+                print(query_states.shape)
             # [bsz, nh, t, hd]
 
         if past_key_value is not None:
@@ -601,6 +604,7 @@ class LlamaDecoderLayer(nn.Layer):
         self,
         hidden_states: paddle.Tensor,
         attention_mask: Optional[paddle.Tensor] = None,
+        position_ids: Optional[Tuple[paddle.Tensor]] = None,
         output_attentions: Optional[bool] = False,
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
@@ -628,6 +632,7 @@ class LlamaDecoderLayer(nn.Layer):
         hidden_states, self_attn_weights, present_key_value = self.self_attn(
             hidden_states=hidden_states,
             past_key_value=past_key_value,
+            position_ids=position_ids,
             attention_mask=attention_mask,
             output_attentions=output_attentions,
             use_cache=use_cache,
@@ -966,6 +971,7 @@ class LlamaModel(LlamaPretrainedModel):
                     decoder_layer,
                     hidden_states,
                     attention_mask,
+                    position_ids,
                     output_attentions,
                     past_key_value,
                     use_cache,
@@ -975,6 +981,7 @@ class LlamaModel(LlamaPretrainedModel):
                 layer_outputs = decoder_layer(
                     hidden_states,
                     attention_mask,
+                    position_ids,
                     output_attentions,
                     past_key_value,
                     use_cache,
