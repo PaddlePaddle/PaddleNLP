@@ -759,6 +759,9 @@ support_argument_list = [
     "THUDM/chatglm-6b",
     "THUDM/chatglm2-6b",
     "THUDM/chatglm-6b-v1.1",
+    "idea-ccnl/ziya-llama-13b-v1",
+    "baichuan-13b-chat",
+    "ziqingyang/chinese-alpaca-7b",
 ]
 
 

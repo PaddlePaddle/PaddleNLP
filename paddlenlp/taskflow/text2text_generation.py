@@ -17,7 +17,7 @@ import paddle
 
 from ..transformers import (
     AutoTokenizer,
-    ChatGLMForConditionalGeneration,
+    ChatGLMForCausalLM,
     ChatGLMTokenizer,
     LlamaConfig,
 )
@@ -124,7 +124,7 @@ class ChatGLMTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = ChatGLMForConditionalGeneration.from_pretrained(
+        model_instance = ChatGLMForCausalLM.from_pretrained(
             self.model,
             load_state_as_np=True,
             dtype=self._dtype,
@@ -348,30 +348,33 @@ class LlamaTask(ChatGLMTask):
                 if self._prefix:
                     pre_caches_numpy = kwargs.get("pre_caches_numpy", None)
 
-                    pre_caches_length = 128
-                    if pre_caches_numpy is None:
-                        logger.info("pre_caches_numpy is not provided.")
-                        use_pre_caches = False
-                        for i in range(32):
-                            tokenized_output["pre_caches_{}".format(i)] = np.ones([1]).astype("float16")
-                    else:
-                        use_pre_caches = True
-                        pre_caches = np.split(pre_caches_numpy, pre_caches_numpy.shape[0])
+                    if pre_caches_numpy is not None:
 
-                        for i in range(len(pre_caches)):
+                        # init pre_caches inputs for static model
+                        assert (
+                            pre_caches_numpy.shape[0] == self.config.num_hidden_layers
+                        ), "receive the wrong `pre_caches_numpy` for current llama model"
+                        pre_caches = np.split(pre_caches_numpy, self.config.num_hidden_layers)
+                        for i in range(self.config.num_hidden_layers):
                             tokenized_output["pre_caches_{}".format(i)] = (
-                                pre_caches[i].transpose(1, 0, 2, 3, 4).astype("float16")
+                                pre_caches[i].transpose(1, 0, 2, 3, 4).astype(self._dtype)
                             )
 
-                    tokenized_output["use_pre_caches"] = np.array([use_pre_caches])
-                    input_ids_shape = tokenized_output["input_ids"].shape
-                    prefix_attention_mask = np.zeros(
-                        [input_ids_shape[0], 1, input_ids_shape[-1], pre_caches_length], dtype=self._dtype
-                    )
-                    if use_pre_caches:
-                        tokenized_output["attention_mask"] = np.concatenate(
-                            (prefix_attention_mask, tokenized_output["attention_mask"]), axis=3
+                        # init attention_mask for pre_caches
+                        pre_caches_length = pre_caches[0].shape[-2]
+                        batch_size = tokenized_output["input_ids"].shape[0]
+                        pre_cache_attention_mask = paddle.zeros(
+                            [batch_size, 1, tokenized_output["input_ids"].shape[-1], pre_caches_length],
+                            dtype=attention_mask.dtype,
                         )
+                        attention_mask = paddle.concat([pre_cache_attention_mask, attention_mask], axis=3)
+                        tokenized_output["attention_mask"] = attention_mask.numpy()
+                    else:
+                        for i in range(self.config.num_hidden_layers):
+                            tokenized_output["pre_caches_{}".format(i)] = np.ones([1]).astype("float16")
+
+                    tokenized_output["use_pre_caches"] = np.array(pre_caches_numpy is not None)
+
             else:
                 tokenized_output = self._tokenizer(
                     input_text,
