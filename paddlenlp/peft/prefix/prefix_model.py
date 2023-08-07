@@ -56,11 +56,14 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         self.inference = False
         self.postprocess_past_key_value = postprocess_past_key_value
         self.pad_attention_mask = pad_attention_mask
-        if self.prefix_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
-            self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
-            logger.warning(
-                f"Reset tensor_parallel_degree of prefix_config to {self.model.config.tensor_parallel_degree}."
-            )
+        if self.model.base_model_prefix == "chatglm2":
+            self.prefix_config.tensor_parallel_degree = -1
+        else:
+            if self.prefix_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
+                self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
+                logger.warning(
+                    f"Reset tensor_parallel_degree of prefix_config to {self.model.config.tensor_parallel_degree}."
+                )
 
     def forward(
         self,
