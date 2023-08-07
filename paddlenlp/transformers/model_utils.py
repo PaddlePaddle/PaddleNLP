@@ -40,7 +40,6 @@ from huggingface_hub import (
 )
 from huggingface_hub.utils import EntryNotFoundError
 from paddle import Tensor
-from paddle.distributed import fleet  # noqa: E402
 from paddle.nn import Embedding, Layer
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
@@ -2059,8 +2058,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         os.makedirs(save_dir, exist_ok=True)
 
         merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
-        variant = kwargs.get("variant", None)
-        is_main_process = kwargs.get("is_main_process", True)
+        shard_format = kwargs.get("shard_format", "naive")  # support naive pipeline
+        # variant = kwargs.get("variant", None)
+        # is_main_process = kwargs.get("is_main_process", True)
         is_bf16 = kwargs.get("is_bf16", False)
         param_names_in_master_weights = list(kwargs.get("param_names_in_master_weights", []))
         sharding_group = kwargs.get("sharding_group", None)
@@ -2082,8 +2082,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # Only save the model itself if we are using distributed training
         model_to_save = unwrap_model(self)
 
-        WEIGHTS_NAME = model_to_save.resource_files_names["model_state"]
-
         # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
         # we currently don't use this setting automatically, but may start to use with v5
 
@@ -2091,36 +2089,39 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
         config_to_save = copy.deepcopy(model_to_save.config)
-        state_dict_to_save = model_to_save.state_dict()
+
+        if state_dict is None:
+            if config_to_save.tensor_parallel_degree > 1 and merge_tensor_parallel:
+                state_dict = model_to_save.state_dict()
+            else:
+                state_dict = self.state_dict()
+
         if save_sharding_stage1_model:
             sharding_rank = sharding_group.rank
-            state_dict_to_save = filter_sharded_params(state_dict_to_save, optimizer, sharding_rank)
-        if merge_tensor_parallel and config_to_save.tensor_parallel_degree > 1:
-            state_dict_to_save = model_to_save.merge_tensor_parallel(state_dict_to_save, config_to_save)
-            config_to_save.tensor_parallel_degree = 1
-            # set variant to None for merge_tensor_parallel, but there should no relationship with variant setting
-            variant = None
-            if config_to_save.tensor_parallel_rank != 0:
-                logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
-                return
-        else:
-            if config_to_save.tensor_parallel_degree > 1:
-                if variant is None:
-                    variant = f"tp{config_to_save.tensor_parallel_rank:0>2d}"
-                # WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, variant)
-
-        if is_bf16 and save_sharding_stage1_model:
-            state_dict_to_save = exlclude_paramters_in_state_dict(
-                state_dict_to_save, param_names_in_master_weights, sharding_group
-            )
-            logger.info(
-                "param_names_in_master_weights len:{}, bf16 state_dict_to_save len:{}, :{}".format(
-                    len(param_names_in_master_weights), len(state_dict_to_save), state_dict_to_save
-                )
-            )
+            state_dict = filter_sharded_params(state_dict, optimizer, sharding_rank)
+        # Save the model
+        if config_to_save.tensor_parallel_degree > 1:
+            if merge_tensor_parallel:
+                state_dict = model_to_save.merge_tensor_parallel(state_dict, config_to_save)
+                config_to_save.tensor_parallel_degree = 1
+                if config_to_save.tensor_parallel_rank != 0:
+                    logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
+                    return
+                if variant is not None and "tp" in variant:
+                    variant = "_".join([x for x in variant.split("_") if "tp" not in x])
+            else:
+                variant = weight_name_suffix() if variant is None else variant
 
         # Attach architecture to the config
         config_to_save.architectures = [model_to_save.__class__.__name__]
+
+        if is_bf16 and save_sharding_stage1_model:
+            state_dict = exlclude_paramters_in_state_dict(state_dict, param_names_in_master_weights, sharding_group)
+            logger.info(
+                "param_names_in_master_weights len:{}, bf16 state_dict len:{}, :{}".format(
+                    len(param_names_in_master_weights), len(state_dict), state_dict
+                )
+            )
         # Save the config
         if is_main_process:
             config_to_save.save_pretrained(save_directory)
@@ -2140,10 +2141,46 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         weights_name = _add_variant(weights_name, variant)
 
         # Save model
-        if paddle.in_dynamic_mode():
-            file_name = os.path.join(save_dir, _add_variant(WEIGHTS_NAME, variant))
-            paddle.save(state_dict_to_save, file_name)
-            del model_to_save
+        shards, index = shard_checkpoint(
+            state_dict, max_shard_size=max_shard_size, weights_name=weights_name, shard_format=shard_format
+        )
+
+        # Clean the folder from a previous save
+        for filename in os.listdir(save_directory):
+            full_filename = os.path.join(save_directory, filename)
+            # If we have a shard file that is not going to be replaced, we delete it, but only from the main process
+            # in distributed settings to avoid race conditions.
+            weights_no_suffix = weights_name.replace(".pdparams", "").replace(".safetensors", "")
+
+            # make sure that file to be deleted matches format of sharded file, e.g. paddle_model-00001-of-00005
+            filename_no_suffix = filename.replace(".pdparams", "").replace(".safetensors", "")
+            reg = re.compile("(.*?)-\d{5}-of-\d{5}")
+
+            if (
+                filename.startswith(weights_no_suffix)
+                and os.path.isfile(full_filename)
+                and filename not in shards.keys()
+                and is_main_process
+                and reg.fullmatch(filename_no_suffix) is not None
+            ):
+                os.remove(full_filename)
+
+        # Save the model
+        for shard_file, shard in shards.items():
+            if safe_serialization:
+                # At some point we will need to deal better with save_function (used for TPU and other distributed
+                # joyfulness), but for now this enough.
+                for k in list(shard.keys()):
+                    if isinstance(shard[k], paddle.Tensor):
+                        shard[k] = shard.pop(k).numpy()
+                safe_save_file(shard, os.path.join(save_directory, shard_file), metadata={"format": "np"})
+            else:
+                save_function(shard, os.path.join(save_directory, shard_file))
+
+        if index is None:
+            path_to_weights = os.path.join(save_directory, _add_variant(PADDLE_WEIGHTS_NAME, variant))
+            logger.info(f"Model weights saved in {path_to_weights}")
+
         else:
             save_index_file = SAFE_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_WEIGHTS_INDEX_NAME
             save_index_file = os.path.join(save_directory, _add_variant(save_index_file, variant))
