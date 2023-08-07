@@ -592,9 +592,6 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
             padding_mask = paddle.ones((batch_size, 1, seq_length, seq_length + past_length), dtype="bool")
         if len(padding_mask.shape) == 2:
             # from Tokenizer
-            print(padding_mask.shape)
-            print(padding_mask)
-            print(past_length, seq_length)
             padding_mask = (
                 padding_mask.unsqueeze(axis=[1, 2])
                 .expand([batch_size, 1, seq_length, seq_length + past_length])

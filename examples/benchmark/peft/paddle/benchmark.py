@@ -179,7 +179,12 @@ def main():
 
     # select first 10k examples for benchmarking
     dataset = dataset["train"].select(range(model_args.train_data_size))
-    if "chatglm" in model_args.model_name_or_path:
+    if "chatglm2" in model_args.model_name_or_path:
+        dataset = dataset.map(
+            lambda example: preprocess_function(example, intokens=model_args.intokens),
+            remove_columns=["instruction", "input", "output"],
+        )
+    elif "chatglm" in model_args.model_name_or_path:
         dataset = dataset.map(
             lambda example: preprocess_function_chatglm(example, intokens=model_args.intokens),
             remove_columns=["instruction", "input", "output"],
