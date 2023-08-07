@@ -391,7 +391,7 @@ def optimizer_name_suffix():
         return None
 
 
-def weight_name_suffix():
+def weight_name_suffix(config=None):
     hcg = use_hybrid_parallel()
     if hcg is not None:
         name = []
@@ -401,8 +401,9 @@ def weight_name_suffix():
             name.append(f"pp{hcg.get_stage_id():0>2d}")
         if hcg.get_sharding_parallel_world_size() > 1:
             name.append(f"shard{hcg.get_sharding_parallel_rank():0>2d}")
-        if True:
-            name.append(f"moe{hcg.get_sharding_parallel_rank():0>2d}")
+        if config and config.moe_num_experts > 0:
+            dp_group = hcg.get_data_parallel_group()
+            name.append(f"moe{dp_group.rank:0>2d}")
         return "_".join(name)
     else:
         return None
