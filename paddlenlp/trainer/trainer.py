@@ -395,6 +395,7 @@ class Trainer:
                         )
 
                         self.scaler = GroupShardedScaler(self.scaler)
+
                 else:
                     self.do_grad_scaling = False
                     self.use_cuda_amp = False
@@ -422,7 +423,6 @@ class Trainer:
 
         self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
         self.print_config()
-
         # very last
         self._memory_tracker.stop_and_update_metrics()
 
@@ -916,7 +916,6 @@ class Trainer:
                     tr_loss_step, outputs = self.training_step(model, inputs)
 
                 tr_loss += tr_loss_step
-
                 if (step + 1) % args.gradient_accumulation_steps == 0:
                     self.timers and self.timers("forward-backward").stop()
                     # Maunally collect gradients when group_sharded_parallel can't accept dp_group
@@ -926,8 +925,19 @@ class Trainer:
                     self.timers and self.timers("all-reduce").start()
 
                     if self.sharding and ShardingOption.SHARD_OP not in self.args.sharding:
-                        if self.args.data_parallel_degree > 1 and not is_dp_group_support_in_group_sharded_parallel():
-                            fused_allreduce_gradients(model.parameters(), fleet.get_hybrid_communicate_group())
+                        assert not model._reduce_overlap, type(model)
+                        assert not model._dp_group, type(model)
+                        assert not self.optimizer._reduce_overlap
+                        assert not self.optimizer._broadcast_overlap
+                        if self.args.data_parallel_degree > 1 and (
+                            not is_dp_group_support_in_group_sharded_parallel() or self.args.use_moe
+                        ):
+                            non_moe_parameters_list = [
+                                p for p in model.parameters() if not getattr(p, "no_sync", False)
+                            ]
+                            logger.info(f"moe broadcast, #grad={len(non_moe_parameters_list)}")
+
+                            fused_allreduce_gradients(non_moe_parameters_list, fleet.get_hybrid_communicate_group())
                             if ShardingOption.FULL_SHARD in self.args.sharding:
                                 # Why need sync on parm again ?
                                 # TODO: fix this.
@@ -940,9 +950,10 @@ class Trainer:
                     # Case 2: Use recompute and dp / sharding stage1,
                     # manualy collect gradient for dp.
                     elif args.recompute and availiable_no_sync:
+                        assert not self.args.use_moe, "never should come here"
                         fused_allreduce_gradients(list(model.parameters()), None)
 
-                    elif args.use_moe and not args.use_hybrid_parallel:
+                    elif args.use_moe and not args.use_hybrid_parallel:  # 纯dp + moe 才在这里手动执行 梯度聚合。
                         # dp grad reduce
                         fused_allreduce_gradients(
                             [p for p in model.parameters() if not getattr(p, "no_sync", False)], None
@@ -961,20 +972,25 @@ class Trainer:
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
 
                     assert not availiable_no_sync, availiable_no_sync
-                    if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
+                    logger.info(
+                        f"optimizer type:{type(self.optimizer)} sharding={self.optimizer._sharding_enable} dp={self.optimizer._dp_enable}"
+                    )
+                    if isinstance(self.optimizer, HybridParallelOptimizer):
+                        if self.do_grad_scaling:
+                            assert not enable_dp_comm_overlap, "`dp_comm_overlap` not work under fp16"
                         parameters_list = obtain_optimizer_parameters_list(self.optimizer._inner_opt)
 
                         non_moe_parameters_list = [p for p in parameters_list if not getattr(p, "no_sync", False)]
+
                         if self.optimizer._sharding_enable:
                             assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
-                            assert not args.use_moe, "moe not support sharding"
-                            # self.optimizer._inner_opt._rank2params = {
-                            #     r: [pp for pp in p if not getattr(p, "no_sync", False)]
-                            #     for r, p in self.optimizer._inner_opt._rank2params.items()
-                            # }
+                            # if self.args.use_moe:
+                            #     assert not self.optimizer._inner_opt.comm_overlap, f'moe will hang when using comm overlap'
                             self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
-                        if self.optimizer._dp_enable:
+                        if self.optimizer._dp_enable or (
+                            self.args.use_moe and self.optimizer._need_dp
+                        ):  # moe下面，DataParallel会被魔改, 不会走reducer，需要手动reduce-grad
                             assert not enable_dp_comm_overlap
                             # 广播状态精心跳过moe参数
                             # https://github.com/PaddlePaddle/Paddle/blob/ae2d8ba157540b39a4d7ab897c030217a33e82cb/python/paddle/distributed/fleet/meta_optimizers/dygraph_optimizer/dygraph_sharding_optimizer.py#L359C14-L359C39
@@ -1031,7 +1047,7 @@ class Trainer:
                     )
                     optimizer_was_run = True
                     if self.do_grad_scaling:
-                        if self.args.use_hybrid_parallel:
+                        if args.pipeline_parallel_degree > 1:
                             assert not self.args.use_moe, "pipline moe not work under fp16"
                         scale_before = self.scaler._scale.numpy()
                         self.scaler.step(self.optimizer)
@@ -1666,7 +1682,9 @@ class Trainer:
                 self.optimizer = fleet.distributed_optimizer(self.optimizer)
             else:
                 # sync params (broadcast) buffers in dp group
-                if not is_dp_group_support_in_group_sharded_parallel() and self.args.data_parallel_degree > 1:
+                if (
+                    not is_dp_group_support_in_group_sharded_parallel() or self.args.use_moe
+                ) and self.args.data_parallel_degree > 1:
                     try:
                         from paddle.fluid.dygraph.parallel import sync_params_buffers
                     except ImportError:
@@ -1690,7 +1708,7 @@ class Trainer:
                 # add dp_group and exclude_layer params
                 # https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/distributed/sharding/group_sharded_parallel_cn.html#group-sharded-parallel
                 extra_kwargs = {}
-                if is_dp_group_support_in_group_sharded_parallel():
+                if is_dp_group_support_in_group_sharded_parallel() and not self.args.use_moe:
                     extra_kwargs["dp_group"] = self.dp_group
                     extra_kwargs["exclude_layer"] = ["GroupNorm"]
 
@@ -1839,7 +1857,6 @@ class Trainer:
 
         model.train()
         inputs = self._prepare_inputs(inputs)
-
         with self.autocast_smart_context_manager():
             loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
         if self.args.gradient_accumulation_steps > 1:
