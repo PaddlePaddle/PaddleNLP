@@ -286,7 +286,7 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         PipelineLayer.__init__(
             self,
             layers=self.get_sequential_layers(),
-            loss_fn=GPTPretrainingCriterion(config, pad_token_id=config.pad_token_id),
+            loss_fn=GPTPretrainingCriterion(config),
             topology=get_hcg().topology(),
             seg_method=seg_method,
             recompute_interval=recompute_interval,
