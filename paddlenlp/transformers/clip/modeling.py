@@ -828,9 +828,9 @@ class CLIPTextTransformer(nn.Layer):
                     [
                         paddle.arange(last_hidden_state.shape[0], dtype="int32"),
                         (input_ids == self.eos_token_id).cast("int32").argmax(axis=-1, dtype="int32"),
-                    ]
-                ),
-                axis=-1,
+                    ],
+                    axis=-1,
+                )
             )
 
         if isinstance(encoder_outputs, type(embedding_output)):
