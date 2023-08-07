@@ -2047,7 +2047,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
         variant = kwargs.get("variant", None)
         is_main_process = kwargs.get("is_main_process", True)
-        use_async_save = kwargs.get("use_async_save", False)
 
         save_directory = save_dir
 
@@ -2116,10 +2115,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # Save model
         if paddle.in_dynamic_mode():
             file_name = os.path.join(save_dir, _add_variant(WEIGHTS_NAME, variant))
-            if use_async_save:
-                paddle.async_save(state_dict_to_save, file_name)
-            else:
-                paddle.save(state_dict_to_save, file_name)
+            paddle.save(state_dict_to_save, file_name)
             del model_to_save
         else:
             save_index_file = SAFE_WEIGHTS_INDEX_NAME if safe_serialization else PADDLE_WEIGHTS_INDEX_NAME

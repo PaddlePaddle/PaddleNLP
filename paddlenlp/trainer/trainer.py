@@ -1046,7 +1046,7 @@ class Trainer:
                 metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
 
         if self.control.should_save:
-            self._save_checkpoint(model, metrics=metrics, use_async_save=True)
+            self._save_checkpoint(model, metrics=metrics)
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
 
     def _get_learning_rate(self):
@@ -1749,8 +1749,7 @@ class Trainer:
     def save_model(
         self,
         output_dir: Optional[str] = None,
-        merge_tensor_parallel: Optional[bool] = False,
-        use_async_save: Optional[bool] = False,
+        merge_tensor_parallel: Optional[bool] = False
     ):
         """
         Will save the model, so you can reload it using `from_pretrained()`.
@@ -1763,13 +1762,11 @@ class Trainer:
 
         if self.args.should_save_model_state:
             self._save(
-                output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel, use_async_save=use_async_save
+                output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel
             )
 
-    def _save_checkpoint(self, model, metrics=None, use_async_save=False):
+    def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
-        if use_async_save:
-            paddle.clear_async_save_task_queue()
 
         # Save model checkpoint
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
@@ -1782,42 +1779,27 @@ class Trainer:
             # TODO(ZHUI) fix it and set convert2cpu=True to save gpu memory
             model.get_all_parameters(convert2cpu=False)
 
-        self.save_model(output_dir, use_async_save=use_async_save)
+        self.save_model(output_dir)
 
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
         if self.args.use_hybrid_parallel:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
-                if use_async_save:
-                    paddle.async_save(
-                        self.optimizer.state_dict(),
-                        os.path.join(output_dir, optimizer_name),
-                    )
-                else:
-                    paddle.save(
-                        self.optimizer.state_dict(),
-                        os.path.join(output_dir, optimizer_name),
-                    )
+                paddle.save(
+                    self.optimizer.state_dict(),
+                    os.path.join(output_dir, optimizer_name),
+                )
 
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
-                if use_async_save:
-                    paddle.async_save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
-                else:
-                    paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+                paddle.save(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
             # FIXME: manybe only save one copy
-            if use_async_save:
-                paddle.async_save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
-            else:
-                paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
+            paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
 
             if self.do_grad_scaling:
-                if use_async_save:
-                    paddle.async_save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
-                else:
-                    paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
+                paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
 
         # Determine the new best metric / best model checkpoint
         if metrics is not None and self.args.metric_for_best_model is not None:
@@ -1858,15 +1840,9 @@ class Trainer:
         if self.args.world_size > 1:
             # use global process_index to save
             process_index = self.args.process_index
-            if use_async_save:
-                paddle.async_save(rng_states, os.path.join(output_dir, f"rng_state_{process_index}.pth"))
-            else:
-                paddle.save(rng_states, os.path.join(output_dir, f"rng_state_{process_index}.pth"))
+            paddle.save(rng_states, os.path.join(output_dir, f"rng_state_{process_index}.pth"))
         else:
-            if use_async_save:
-                paddle.async_save(rng_states, os.path.join(output_dir, "rng_state.pth"))
-            else:
-                paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
+            paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
 
         # Maybe delete some older checkpoints.
         if self.args.should_save_model_state and (
@@ -2127,7 +2103,6 @@ class Trainer:
                 save_sharding_stage1_model=self.args.save_sharding_stage1_model,
                 optimizer=self.optimizer,
                 sharding_degree=self.args.sharding_parallel_degree,
-                use_async_save=self.args.use_async_save,
             )
 
         self._save_distributed_model_meta(output_dir)
