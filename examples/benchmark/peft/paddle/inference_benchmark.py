@@ -70,6 +70,8 @@ if __name__ == "__main__":
         load_state_as_np=True,
         low_cpu_mem_usage=True,
     )
+    if model.base_model_prefix == "llama":
+        tokenizer.pad_token = tokenizer.unk_token
     model.eval()
 
     if args.do_forward:

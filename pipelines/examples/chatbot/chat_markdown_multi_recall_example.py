@@ -53,7 +53,7 @@ parser.add_argument("--query_embedding_model", default="rocketqa-zh-nano-query-e
 parser.add_argument("--passage_embedding_model", default="rocketqa-zh-nano-query-encoder", type=str, help="The passage_embedding_model path")
 parser.add_argument("--params_path", default="checkpoints/model_40/model_state.pdparams", type=str, help="The checkpoint path")
 parser.add_argument("--embedding_dim", default=312, type=int, help="The embedding_dim of index")
-parser.add_argument("--chunk_size", default=300, type=int, help="The length of data for indexing by retriever")
+parser.add_argument("--data_chunk_size", default=300, type=int, help="The length of data for indexing by retriever")
 parser.add_argument('--host', type=str, default="localhost", help='host ip of ANN search engine')
 parser.add_argument('--embed_title', default=False, type=bool, help="The title to be  embedded into embedding")
 parser.add_argument('--chatbot', choices=['ernie_bot', 'chatglm'], default="chatglm", help="The chatbot models ")
@@ -61,6 +61,9 @@ parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'n
 parser.add_argument("--api_key", default=None, type=str, help="The API Key.")
 parser.add_argument("--secret_key", default=None, type=str, help="The secret key.")
 parser.add_argument("--port", type=str, default="9200", help="port of ANN search engine")
+parser.add_argument("--es_chunk_size", default=500, type=int, help="Number of docs in one chunk sent to es")
+parser.add_argument("--es_thread_count", default=32, type=int, help="Size of the threadpool to use for the bulk requests")
+parser.add_argument("--es_queue_size", default=32, type=int, help="Size of the task queue between the main thread (producing chunks to send) and the processing threads.")
 args = parser.parse_args()
 # yapf: enable
 
@@ -75,6 +78,9 @@ def chat_markdown_tutorial():
             password=args.password,
             embedding_dim=args.embedding_dim,
             index=args.index_name,
+            chunk_size=args.es_chunk_size,
+            thread_count=args.es_thread_count,
+            queue_size=args.es_queue_size,
         )
 
     else:
@@ -88,6 +94,9 @@ def chat_markdown_tutorial():
             vector_type="bpack_vector",
             search_fields=["content", "meta"],
             index=args.index_name,
+            chunk_size=args.es_chunk_size,
+            thread_count=args.es_thread_count,
+            queue_size=args.es_queue_size,
         )
     use_gpu = True if args.device == "gpu" else False
     retriever = DensePassageRetriever(
@@ -108,13 +117,17 @@ def chat_markdown_tutorial():
     # Indexing Markdowns
     markdown_converter = MarkdownConverter()
 
-    text_splitter = CharacterTextSplitter(separator="\n", chunk_size=args.chunk_size, chunk_overlap=0, filters=["\n"])
+    text_splitter = CharacterTextSplitter(
+        separator="\n", chunk_size=args.data_chunk_size, chunk_overlap=0, filters=["\n"]
+    )
     indexing_pipeline = Pipeline()
     indexing_pipeline.add_node(component=markdown_converter, name="MarkdownConverter", inputs=["File"])
     indexing_pipeline.add_node(component=text_splitter, name="Splitter", inputs=["MarkdownConverter"])
     indexing_pipeline.add_node(component=retriever, name="Retriever", inputs=["Splitter"])
     indexing_pipeline.add_node(component=document_store, name="DocumentStore", inputs=["Retriever"])
     files = glob.glob(args.file_paths + "/**/*.md", recursive=True)
+    if len(files) == 0:
+        raise Exception("file should not be empty")
     indexing_pipeline.run(file_paths=files)
 
     # Query Markdowns

@@ -21,6 +21,15 @@ class DataArgument:
     src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=1024, metadata={"help": "The max length of target text."})
     eval_with_do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
+    save_generation_output: bool = field(
+        default=False,
+        metadata={"help": "Whether to save generated text to file when eval_with_do_generation set to True."},
+    )
+    intokens: bool = field(default=False, metadata={"help": "Whether to use InTokens data stream"})
+    intokens_max_length: int = field(
+        default=1024,
+        metadata={"help": "The max length for InTokens data stream. Only effective when intokens is True"},
+    )
 
 
 @dataclass
@@ -45,18 +54,19 @@ class ModelArgument:
 
 @dataclass
 class QuantArgument:
+    quant_type: str = field(default="A8W8", metadata={"help": "Quantization type. Supported values: A8W8, W4,A8W4"})
+
     # QAT related parameters
     do_qat: bool = field(default=False, metadata={"help": "Whether to use QAT technique"})
-    qat_type: str = field(default="A8W8", metadata={"help": "Quantization type. Supported values: A8W8, W4,A8W4"})
+
+    # GPTQ related parameters
+    do_gptq: bool = field(default=False, metadata={"help": "Whether to use GPTQ"})
+    gptq_step: int = field(default=8, metadata={"help": "Step for GPTQ"})
 
     # PTQ related parameters
     do_ptq: bool = field(default=False, metadata={"help": "Whether to use PTQ"})
     ptq_step: int = field(default=8, metadata={"help": "Step for PTQ"})
 
-    fused_qkv: bool = field(default=False, metadata={"help": "Whether to use Fused Quantized QKV"})
-    parallel_ffn: bool = field(default=False, metadata={"help": "Whether to use Parallel FFN"})
-
-    # shift & smooth
     shift: bool = field(default=False, metadata={"help": "Whether to use Shift"})
     shift_all_linears: bool = field(default=False, metadata={"help": "Whether to shift all linears"})
     shift_sampler: str = field(

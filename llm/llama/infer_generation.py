@@ -18,8 +18,7 @@ import numpy as np
 import paddle
 
 from paddlenlp.trainer.argparser import strtobool
-from paddlenlp.transformers import AutoConfig, AutoTokenizer
-from paddlenlp.transformers.utils import get_scale_by_dtype
+from paddlenlp.transformers import AutoTokenizer
 
 
 def parse_arguments():
@@ -60,9 +59,8 @@ def batchfy_text(texts, batch_size):
 
 class Predictor(object):
     def __init__(self, args):
-        self.tokenizer = AutoTokenizer.from_pretrained("ziqingyang/chinese-alpaca-7b")
-        self.config = AutoConfig.from_pretrained(args.model_dir)
-
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
+        self.tokenizer.pad_token = self.tokenizer.unk_token
         self.batch_size = args.batch_size
         self.src_length = args.src_length
 
@@ -130,10 +128,11 @@ class Predictor(object):
             pre_caches_length = 128
             batch_size = inputs["input_ids"].shape[0]
             pre_cache_attention_mask = paddle.full(
-                [batch_size, 1, inputs["input_ids"].shape[-1], pre_caches_length], paddle.finfo(paddle.float16).min, dtype=attention_mask.dtype
+                [batch_size, 1, inputs["input_ids"].shape[-1], pre_caches_length],
+                paddle.finfo(paddle.float16).min,
+                dtype=attention_mask.dtype,
             )
             attention_mask = paddle.concat([pre_cache_attention_mask, attention_mask], axis=3)
-
 
         inputs["attention_mask"] = attention_mask.numpy()
         inputs["use_pre_caches"] = np.array(True, dtype=np.bool_)
@@ -150,7 +149,7 @@ class Predictor(object):
 
             input_handles[name] = self.predictor.get_input_handle(name)
             input_handles[name].copy_from_cpu(inputs[name])
-        
+
         print("start to run")
         self.predictor.run()
         output_names = self.predictor.get_output_names()

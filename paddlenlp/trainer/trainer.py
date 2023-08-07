@@ -657,6 +657,7 @@ class Trainer:
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
+                os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
                 # Skip past any already trained steps if resuming training
                 # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
@@ -1462,10 +1463,6 @@ class Trainer:
                 # the lookup_table is in black_list, but in O2, we need it return fp16
                 custom_white_list.extend(["lookup_table", "lookup_table_v2"])
 
-            if self.args.bf16 and self.args.fp16_opt_level == "O2":
-                # c_embedding not support bf16 yet
-                custom_black_list.append("c_embedding")
-
             if self.args.amp_custom_white_list is not None:
                 custom_white_list.extend(self.args.amp_custom_white_list)
             if self.args.amp_custom_black_list is not None:
@@ -1722,7 +1719,9 @@ class Trainer:
             paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
 
         # Maybe delete some older checkpoints.
-        if self.args.should_save and (True if not self.args.use_hybrid_parallel else self.args.local_rank == 0):
+        if self.args.should_save_model_state and (
+            True if not self.args.use_hybrid_parallel else self.args.local_rank == 0
+        ):
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
 
     def set_optimizer_grouped_parameters(self, optimizer_grouped_parameters=None):

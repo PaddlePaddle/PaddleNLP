@@ -11,9 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from pipelines.utils.preprocessing import convert_files_to_dicts, tika_convert_files_to_dicts
-from pipelines.utils.import_utils import fetch_archive_from_http
+# flake8: noqa
+from pipelines.utils.preprocessing import (  # isort: skip
+    convert_files_to_dicts,
+    convert_files_to_dicts_splitter,
+    tika_convert_files_to_dicts,
+)
 from pipelines.utils.cleaning import clean_wiki_text
 from pipelines.utils.doc_store import (
     launch_es,
@@ -24,9 +27,10 @@ from pipelines.utils.doc_store import (
     stop_service,
 )
 from pipelines.utils.export_utils import (
+    convert_labels_to_squad,
+    export_answers_to_csv,
     print_answers,
     print_documents,
     print_questions,
-    export_answers_to_csv,
-    convert_labels_to_squad,
 )
+from pipelines.utils.import_utils import fetch_archive_from_http

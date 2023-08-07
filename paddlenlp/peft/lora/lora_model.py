@@ -21,7 +21,10 @@ from typing import Dict, List, Union
 
 import paddle
 import paddle.nn as nn
-from paddle.distributed.fleet.meta_parallel import ColumnParallelLinear
+from paddle.distributed.fleet.meta_parallel import (
+    ColumnParallelLinear,
+    RowParallelLinear,
+)
 
 from ...transformers.conversion_utils import ConversionMixin
 from ...transformers.model_utils import PretrainedModel, _add_variant, dtype_guard
@@ -34,6 +37,7 @@ from .lora_layers import (
     ColumnParallelLoRAMergedLinear,
     LoRALinear,
     LoRAMergedLinear,
+    RowParallelLoRALinear,
 )
 
 
@@ -48,6 +52,7 @@ class LoRAModel(nn.Layer):
     def __init__(self, model, lora_config: LoRAConfig) -> None:
         super().__init__()
         self.lora_config = lora_config
+        self.lora_split_mapping = {}
         if self.lora_config.dtype is None:
             self.lora_config.dtype = paddle.get_default_dtype()
         with dtype_guard(self.lora_config.dtype):
@@ -58,6 +63,31 @@ class LoRAModel(nn.Layer):
                 f"Reset tensor_parallel_degree of lora_config to {self.model.config.tensor_parallel_degree}."
             )
         self.forward = self.model.forward
+
+    def add_lora_split_mapping(self, module_name, is_column=False):
+        self.lora_split_mapping[module_name] = is_column
+
+    def _get_tensor_parallel_mappings(self, config, is_split=True):
+
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+
+        fn = split_or_merge_func(
+            is_split=is_split,
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_rank=config.tensor_parallel_rank,
+            num_attention_heads=config.num_attention_heads,
+        )
+
+        def get_tensor_parallel_split_mappings():
+            final_actions = {}
+            for key, is_col in self.lora_split_mapping.items():
+                final_actions[key] = partial(fn, is_column=is_col)
+
+            return final_actions
+
+        mappings = get_tensor_parallel_split_mappings()
+
+        return mappings
 
     @classmethod
     def from_pretrained(cls, model, lora_path, **kwargs):
@@ -111,18 +141,8 @@ class LoRAModel(nn.Layer):
         logger.info("Load lora weight successfully")
 
     def _merge_trainable_tensor_parallel(self, trainable_state_dict):
-        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+        trainable_name_action_mappings = self._get_tensor_parallel_mappings(self.model.config, is_split=False)
 
-        fn = split_or_merge_func(
-            is_split=False,
-            tensor_parallel_degree=self.model.config.tensor_parallel_degree,
-            tensor_parallel_rank=self.model.config.tensor_parallel_rank,
-            num_attention_heads=self.model.config.num_attention_heads,
-        )
-        trainable_name_action_mappings = {}
-        for k in trainable_state_dict:
-            if "lora_B" in k:
-                trainable_name_action_mappings[k] = partial(fn, is_column=True)
         name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
         state_keys_map = ConversionMixin._resolve_prefix_keys(
             name_action_mappings.keys(), self.model.state_dict().keys()
@@ -148,19 +168,8 @@ class LoRAModel(nn.Layer):
         return trainable_state_dict
 
     def _convert_tensor_parallel(self, lora_state_dict):
-        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+        lora_name_action_mappings = self._get_tensor_parallel_mappings(self.model.config, is_split=False)
 
-        fn = split_or_merge_func(
-            is_split=True,
-            tensor_parallel_degree=self.model.config.tensor_parallel_degree,
-            tensor_parallel_rank=self.model.config.tensor_parallel_rank,
-            num_attention_heads=self.model.config.num_attention_heads,
-        )
-
-        lora_name_action_mappings = {}
-        for k in lora_state_dict.keys():
-            if "lora_B" in k:
-                lora_name_action_mappings[k] = partial(fn, is_column=True)
         name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
         state_keys_map = ConversionMixin._resolve_prefix_keys(
             name_action_mappings.keys(), self.model.state_dict().keys()
@@ -242,6 +251,22 @@ class LoRAModel(nn.Layer):
                         )
                     ),
                 )
+                # Lora column parallel will spilt lora B matrix
+                self.add_lora_split_mapping(module_name + ".lora_B", is_column=True)
+            elif isinstance(module, RowParallelLinear):
+                # recover the original output_features
+                lora_module = RowParallelLoRALinear(
+                    in_features=module.weight.shape[0] * module.world_size,
+                    out_features=module.weight.shape[1],
+                    has_bias=module.bias is not None,
+                    input_is_parallel=module.input_is_parallel,
+                    r=lora_config.r,
+                    lora_alpha=lora_config.lora_alpha,
+                    lora_dropout=lora_config.lora_dropout,
+                    merge_weights=lora_config.merge_weights,
+                )
+                # Lora column parallel will spilt lora A matrix
+                self.add_lora_split_mapping(module_name + ".lora_A", is_column=False)
         else:
             if isinstance(module, nn.Linear):
                 lora_module = LoRAMergedLinear(
@@ -321,6 +346,7 @@ class LoRAModel(nn.Layer):
             if (
                 isinstance(layer, LoRALinear)
                 or isinstance(layer, ColumnParallelLoRALinear)
+                or isinstance(layer, RowParallelLoRALinear)
                 or isinstance(layer, LoRAMergedLinear)
                 or isinstance(layer, ColumnParallelLoRAMergedLinear)
             ):

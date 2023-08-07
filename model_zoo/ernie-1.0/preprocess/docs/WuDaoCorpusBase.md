@@ -44,32 +44,32 @@ python ./trans_to_json.py  \
 {"text": "武田信玄 是 天生 的 武将 , 一生 开拓 了 八十五万 石至 九十余万 石之多 的 领地 。\n武田信玄  他 21 岁 时 流放 自己 的 父亲 武田信虎  至骏河 , 避免 父亲 传位 给 弟弟 , 从而 登上 了 第 19 代家督 之位 。\n他 将 信 浓国 ( 现 长野县 ) 纳入 控制 范围 后 , 又 与 当时 的 豪强 今井氏 、 北条 氏 结成 三国 军事同盟 , 与 上 杉谦信 在 川 中岛 前后 展开 了 五次 大战 。\n武田信玄  勇于 进攻 。\n他 连续 攻打 邻国 , 扩大 自己 势力范围 , 可称 遇神 杀神 , 遇佛 杀佛 。\n他 不仅 流放 了 自己 的 父亲 , 连 自己 的 嫡子 武田义信 因 与 他 在 战略 方向 上 相左 , 也 被 他 幽禁 于 佛寺 , 随即 被迫 自杀 。\n武田信玄  虽然 是 战国 武将 中 的 最强者 , 但 他 的 弱点 是 年龄 。\n信玄比 织田信长 年长 13 岁 , 比上 杉谦信 年长 9 岁 。\n当信 玄年 届 五十 之 时 , 信长 和 谦信 犹 在 壮年 。\n上杉谦信 而且 , 武田信玄  虽 驰骋 天下 , 却 未率 军 进过 京都 , 而 织田信长 在 永禄 十一年 ( 1568 年 ) 就 以 拥立 第 15 代 将军 足利义 昭 为名 率兵 上洛 了 。\n所谓 \" 制 京都 者 得 天下 \" , 所以 , 想要 一统天下 , 武田信玄  的 时间 很 紧迫 。\n元龟 三年 ( 1572 年 ) , 武田信玄  与 室 町 幕府 第 15 代 将军 足利义 昭 、 本愿 寺 显如 , 以及 浅井 氏 、 朝仓氏 等 反 织田信长 实力 组成 联盟 , 编织 \" 反信长 包围圈 \" 。\n同年 10 月 3 日 , 武田信玄  率领 大军 , 开始 了 第一次 上洛之行 。\n是 年 , 信玄 52 岁 , 这 也许 是 他 统一天下 的 最后 一次 机会 。\n武田信玄 所 率领 的 是 当时 战国 最强 的 3 万甲州 精兵 。\n打着 \" 风林火山 \" 的 旗帜 , 武田军 第一站 就 到达 了 织田信长 的 同盟 德川家康  所在 的 三河 远江 。\n织田信长 德川家康  的 军队 在 甲州 精兵 之前 显得 不堪一击 , 到 了 10 月 13 日 , 只来 成 、 天 方城 、 一 宫城 、 饭田 城 、 各和城 、 向 笠 城 等 城池 纷纷 被 攻陷 。\n德川家康  见势不妙 , 决定 在 浜松 城中 闭门不出 。\n但是 武田信玄  毫不 松懈 , 又 将 家康 在 远江 地区 的 重要 据点 二俣城 攻破 。\n德川家康  集合 所有 军队 共 1 万 1 千人 , 出城 与 信玄 决一死战 , 但 大败 而 还 , 险些 失 了 性命 。\n这次 战争 被 称为 \" 三方 原战 \" , 德川家康  曾经 承认 这次 战争 是 他 生平 最大 的 失败 。\n"}
 ```
 
-## ERNIE 中文预训练数据制作
+## 中文预训练数据制作
 
-下面是针对训练任务的数据集应用，此处以ernie为例。
+下面是针对训练任务的数据集应用，此处以ziya-llama-13b-v1为例。
 
 ```
 python -u  create_pretraining_data.py \
-    --model_name ernie-1.0-base-zh \
-    --tokenizer_name ErnieTokenizer \
+    --model_name idea-ccnl/ziya-llama-13b-v1 \
+    --tokenizer_name LlamaTokenizer \
+    --data_format "JSON" \
     --input_path wudao_corpus_200g_0623.jsonl \
-    --split_sentences \
-    --chinese \
-    --cn_whole_word_segment \
     --cn_seg_func jieba \
     --cn_splited \
+    --append_eos \
     --output_prefix wudao_corpus_200g_0623 \
     --workers 48 \
-    --log_interval 10000
+    --log_interval 10000 \
+    --data_impl "mmap"
 ```
 
 - 我们提前分词好了，所以加上了 `cn_splited`，否则不需要使用此选项。
-- model_name 可以更换为其他 ERNIE 系列模型，如: `ernie-3.0-base-zh`
+- model_name 可以更换为[其他模型](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/llama/README.md)。
 - workers 表示转化的线程数目
 
 在当前目录下产出训练所需数据。
 ```
-wudao_corpus_200g_0623_ids.npy
-wudao_corpus_200g_0623_idx.npz
+wudao_corpus_200g_0623.bin
+wudao_corpus_200g_0623.idx
 ```
 用户可以使用此数据进行预训练任务。

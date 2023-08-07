@@ -415,6 +415,7 @@ elif [ ${MODE} = "benchmark_train" ];then
 
     export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
     python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
+    python -m pip install einops -i https://pypi.tuna.tsinghua.edu.cn/simple
     python -m pip install setuptools_scm 
     python -m pip install Cython 
     python -m pip install -r ../requirements.txt  #-i https://pypi.tuna.tsinghua.edu.cn/simple
@@ -423,6 +424,13 @@ elif [ ${MODE} = "benchmark_train" ];then
     python -m pip install -e ../
     # python -m pip install paddlenlp    # PDC 镜像中安装失败
     python -m pip list
-    python -m pip install -e ../ppdiffusers
-
+    export http_proxy=${HTTP_PRO}
+    export https_proxy=${HTTPS_PRO}
+    # install develop paddlemix/ppdiffusers
+    git clone https://github.com/PaddlePaddle/PaddleMIX.git
+    unset http_proxy
+    unset https_proxy
+    cd PaddleMIX
+    python -m pip install -e ./ppdiffusers
+    cd -
 fi

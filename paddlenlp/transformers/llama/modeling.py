@@ -111,8 +111,7 @@ def get_triangle_upper_mask(x, mask=None):
     shape = x.shape
     #  [bsz, 1, q_len, kv_seq_len]
     shape[1] = 1
-    mask = paddle.full(shape, -np.inf, dtype=x.dtype)
-    mask.stop_gradient = True
+    mask = paddle.full(shape, paddle.finfo(x.dtype).min, dtype=x.dtype)
     mask = paddle.triu(mask, diagonal=1)
     mask.stop_gradient = True
     return mask
@@ -141,24 +140,6 @@ def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
     else:
         logits = paddle.matmul(x, y, transpose_y=False)
         return logits
-
-
-def finfo(dtype: paddle.dtype = None):
-    if dtype is None:
-        dtype = paddle.get_default_dtype()
-
-    if dtype == paddle.bfloat16:
-        # Numpy do not support `np.finfo(np.uint16)`, so try to construct a finfo object to fetch min value
-        class BFloatFInfo:
-            min = -3.3895313892515355e38
-
-        return BFloatFInfo
-    if dtype == paddle.float32:
-        return np.finfo(np.float32)
-    if dtype == paddle.float16:
-        return np.finfo(np.float16)
-    if dtype == paddle.float64:
-        return np.finfo(np.float64)
 
 
 def scaled_dot_product_attention(
@@ -211,6 +192,7 @@ def scaled_dot_product_attention(
                 f" {attn_weights.shape}"
             )
 
+        # NOTE: we only call get_triangle_upper_mask under PP setup
         # FIXME ZHUI when we use pipeline parallel, the attention_mask can be None
         # we just make it triangle_upper_mask
         if attention_mask is None:
@@ -221,12 +203,8 @@ def scaled_dot_product_attention(
             raise ValueError(
                 f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
             )
-        attn_weights = attention_mask + attn_weights
 
-        attn_weights = paddle.maximum(
-            attn_weights, paddle.full([1], float(finfo(query_states.dtype).min), dtype=attn_weights.dtype)
-        )
-
+        attn_weights = attn_weights + attention_mask
         with paddle.amp.auto_cast(False):
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
 
@@ -241,36 +219,32 @@ def masked_fill(x, mask, value):
     return paddle.where(mask, y, x)
 
 
-def _make_causal_mask(input_ids_shape, past_key_values_length, dtype):
+def _make_causal_mask(input_ids_shape, past_key_values_length):
     """
-    Make causal mask used for self-attention.
+    Make causal mask used for self-attention
     """
     batch_size, target_length = input_ids_shape  # target_length: seq_len
 
-    mask = paddle.full((target_length, target_length), float(finfo(dtype).min))
-
-    mask_cond = paddle.arange(mask.shape[-1])
-    mask = masked_fill(mask, mask_cond < (mask_cond + 1).reshape([mask.shape[-1], 1]), 0)  # [tgt_len, tgt_len]
+    mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
 
     if past_key_values_length > 0:
         # [tgt_len, tgt_len + past_len]
-        mask = paddle.concat([paddle.zeros([target_length, past_key_values_length]), mask], axis=-1)
+        mask = paddle.concat([paddle.ones([target_length, past_key_values_length], dtype="bool"), mask], axis=-1)
 
     # [bs, 1, tgt_len, tgt_len + past_len]
     return mask[None, None, :, :].expand([batch_size, 1, target_length, target_length + past_key_values_length])
 
 
-def _expand_mask(mask, dtype, tgt_length):
+def _expand_2d_mask(mask, dtype, tgt_length):
     """
     Expands attention_mask from `[batch_size, src_length]` to `[batch_size, 1, tgt_length, src_length]`.
     """
     batch_size, src_length = mask.shape[0], mask.shape[-1]
     tgt_length = tgt_length if tgt_length is not None else src_length
 
-    expanded_mask = mask[:, None, None, :].expand([batch_size, 1, tgt_length, src_length])
+    expanded_mask = mask[:, None, None, :].astype("bool").expand([batch_size, 1, tgt_length, src_length])
 
-    inverted_mask = 1.0 - expanded_mask
-    return masked_fill(inverted_mask, inverted_mask.cast("bool"), float(finfo(dtype).min))
+    return expanded_mask
 
 
 def rms_norm_fused(x_in, w, eps):
@@ -439,15 +413,8 @@ class LlamaMLP(nn.Layer):
 
     def forward(self, x):
         if self.fuse_attention_ffn:
-            # [s, b, 4hp]
-            intermediate_parallel = self.gate_up_fused_proj(x)
-            # Special Slicing to accomodate Tensor Parallel
-            # Even channels is ffc_fc, odd channels is gate
-            gate_out = intermediate_parallel[..., 0::2]
-            up_out = intermediate_parallel[..., 1::2]
-            intermediate_parallel = F.silu(gate_out) * up_out
-            # [s, b, h]
-            out = self.down_proj(intermediate_parallel)
+            gate_out, up_out = paddle.chunk(self.gate_up_fused_proj(x), chunks=2, axis=-1)
+            out = self.down_proj(F.silu(gate_out) * up_out)
         else:
             out = self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
         return out
@@ -773,7 +740,9 @@ class LlamaPretrainedModel(PretrainedModel):
                 base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
 
             if config.fuse_attention_ffn:
-                base_actions["layers.0.mlp.gate_up_fused_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.mlp.gate_up_fused_proj.weight"] = partial(
+                    fn, is_column=True, is_naive_2fuse=True
+                )
             else:
                 base_actions["layers.0.mlp.gate_proj.weight"] = partial(fn, is_column=True)
                 base_actions["layers.0.mlp.up_proj.weight"] = partial(fn, is_column=True)
@@ -871,24 +840,27 @@ class LlamaModel(LlamaPretrainedModel):
 
     @staticmethod
     def _prepare_decoder_attention_mask(attention_mask, input_shape, past_key_values_length, dtype):
-        # create causal mask
-        # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
-        combined_attention_mask = None
-        if input_shape[-1] > 1:
-            combined_attention_mask = _make_causal_mask(
-                input_shape, past_key_values_length=past_key_values_length, dtype=dtype
-            )
-
         if attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
             if len(attention_mask.shape) == 2:
-                expanded_attn_mask = _expand_mask(attention_mask, dtype, tgt_length=input_shape[-1])
+                expanded_attn_mask = _expand_2d_mask(attention_mask, dtype, tgt_length=input_shape[-1])
+                # For decoding phase in generation, seq_length = 1, we don't need to add causal mask
+                if input_shape[-1] > 1:
+                    combined_attention_mask = _make_causal_mask(
+                        input_shape, past_key_values_length=past_key_values_length
+                    )
+                    expanded_attn_mask = expanded_attn_mask & combined_attention_mask
+            # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
+            elif len(attention_mask.shape) == 3:
+                expanded_attn_mask = attention_mask.unsqueeze(1).astype("bool")
+            # if attention_mask is already 4-D, do nothing
             else:
                 expanded_attn_mask = attention_mask
-            combined_attention_mask = (
-                expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
-            )
-        return combined_attention_mask
+        else:
+            expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
+        # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
+        expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
+        return expanded_attn_mask
 
     @paddle.jit.not_to_static
     def recompute_training(
@@ -1378,50 +1350,29 @@ class FusedLlamaModel(LlamaPretrainedModel):
         fused_model.set_state_dict(model.state_dict())
         return fused_model
 
-    def _prepare_decoder_attention_mask(self, attention_mask, input_shape, past_key_values_length, dtype):
-        combined_attention_mask = None
-        if input_shape[-1] > 1:
-            combined_attention_mask = _make_causal_mask(
-                input_shape, past_key_values_length=past_key_values_length, dtype=dtype
-            )
-
+    @staticmethod
+    def _prepare_decoder_attention_mask(attention_mask, input_shape, past_key_values_length, dtype):
         if attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
             if len(attention_mask.shape) == 2:
-                expanded_attn_mask = _expand_mask(attention_mask, dtype, tgt_length=input_shape[-1])
+                expanded_attn_mask = _expand_2d_mask(attention_mask, dtype, tgt_length=input_shape[-1])
+                # For decoding phase in generation, seq_length = 1, we don't need to add causal mask
+                if input_shape[-1] > 1:
+                    combined_attention_mask = _make_causal_mask(
+                        input_shape, past_key_values_length=past_key_values_length
+                    )
+                    expanded_attn_mask = expanded_attn_mask & combined_attention_mask
+            # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
+            elif len(attention_mask.shape) == 3:
+                expanded_attn_mask = attention_mask.unsqueeze(1).astype("bool")
+            # if attention_mask is already 4-D, do nothing
             else:
                 expanded_attn_mask = attention_mask
-            combined_attention_mask = (
-                expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
-            )
-        return combined_attention_mask
-
-    # def _prepare_decoder_attention_mask(self, attention_mask, input_shape, past_key_values_length, dtype):
-    #     # create causal mask
-    #     # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
-    #     combined_attention_mask = None
-    #     if input_shape[-1] > 1:
-    #         combined_attention_mask = _make_causal_mask(
-    #             input_shape, past_key_values_length=past_key_values_length, dtype=dtype
-    #         )
-
-    #     if attention_mask is not None:
-    #         # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
-    #         expanded_attn_mask = _expand_mask(attention_mask, dtype, tgt_length=input_shape[-1])
-    #         combined_attention_mask = (
-    #             expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
-    #         )
-
-    #     # TODO(wj-Mcat): to disable float32 for maximum
-    #     with dtype_guard("float32"):
-    #         scale_value = get_scale_by_dtype(dtype)
-    #         scale_value = paddle.to_tensor(scale_value)
-
-    #     combined_attention_mask = paddle.maximum(
-    #         combined_attention_mask.astype(dtype), scale_value
-    #     )
-    #     combined_attention_mask = paddle.cast(combined_attention_mask, dtype=dtype)
-    #     return combined_attention_mask
+        else:
+            expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
+        # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
+        expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
+        return expanded_attn_mask
 
     @paddle.jit.not_to_static
     def recompute_training(self, layer_module, hidden_states, attention_mask, output_attentions):

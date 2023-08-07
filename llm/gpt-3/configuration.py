@@ -40,7 +40,6 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
         "bos_token_id": 0,
         "eol_token_id": 3,
         "num_partitions": 1,
-        "use_recompute": False,
     },
     "gpt-cpm-small-cn-distill": {  # 109M
         "vocab_size": 30000,
@@ -59,7 +58,6 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
         "bos_token_id": 0,
         "eol_token_id": 3,
         "num_partitions": 1,
-        "use_recompute": False,
     },
     "gpt3-89B-en": {  # 89B
         "vocab_size": 51200,
@@ -106,7 +104,6 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
         "eos_token_id": 50256,
         "eol_token_id": 198,
         "num_partitions": 1,
-        "use_recompute": False,
     },
     "gpt3-1.3B-en": {  # 1.3B
         "vocab_size": 50304,
@@ -123,7 +120,6 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
         "eos_token_id": 50256,
         "eol_token_id": 198,
         "num_partitions": 1,
-        "use_recompute": False,
     },
     "gpt2-medium-en": {  # 345M
         "vocab_size": 50304,
@@ -140,7 +136,6 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
         "eos_token_id": 50256,
         "eol_token_id": 198,
         "num_partitions": 1,
-        "use_recompute": False,
     },
     "gpt2-en": {  # 117M
         "vocab_size": 50304,
@@ -157,7 +152,6 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
         "eos_token_id": 50256,
         "eol_token_id": 198,
         "num_partitions": 1,
-        "use_recompute": False,
     },
     "gpt2-small-en": {  # config for CE
         "vocab_size": 50304,
@@ -174,7 +168,6 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
         "eos_token_id": 50256,
         "eol_token_id": 198,
         "num_partitions": 1,
-        "use_recompute": False,
     },
 }
 
@@ -210,7 +203,7 @@ class GPTConfig(PretrainedConfig):
             Number of attention heads for each attention layer in the Transformer encoder.
         intermediate_size (`int`, *optional*, defaults to 3072):
             Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
-        hidden_act (`str` or `Callable`, *optional*, defaults to `"gelu"`):
+        hidden_activation (`str` or `Callable`, *optional*, defaults to `"gelu"`):
             The non-linear activation function (function or string) in the encoder and pooler. If string, `"gelu"`,
             `"relu"`, `"silu"` and `"gelu_new"` are supported.
         hidden_dropout_prob (`float`, *optional*, defaults to 0.1):
@@ -274,7 +267,7 @@ class GPTConfig(PretrainedConfig):
         num_hidden_layers: int = 12,
         num_attention_heads: int = 12,
         intermediate_size: int = 3072,
-        hidden_act: str = "gelu",
+        hidden_activation: str = "gelu",
         hidden_dropout_prob: float = 0.1,
         attention_probs_dropout_prob: float = 0.1,
         max_position_embeddings: int = 512,
@@ -285,9 +278,19 @@ class GPTConfig(PretrainedConfig):
         bos_token_id: int = 0,
         eol_token_id: int = 3,
         num_partitions: int = 1,
-        use_recompute: bool = False,
-        enable_fuse_transformer: bool = False,
         lm_shift_labels: bool = True,
+        normalize_before: bool = True,
+        recompute_granularity: str = "full",
+        scale_qk_coeff: float = 1.0,
+        tensor_parallel_degree: int = 1,
+        output_attentions: bool = False,
+        ignore_index: int = 0,
+        use_flash_attention: bool = False,
+        fused_linear: bool = False,
+        fuse_attention_qkv=False,
+        enable_fuse_transformer: bool = False,
+        use_fused_dropout_add: bool = False,
+        fused_softmax_with_triangular: bool = False,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -297,7 +300,7 @@ class GPTConfig(PretrainedConfig):
         self.num_hidden_layers = num_hidden_layers
         self.num_attention_heads = num_attention_heads
         self.intermediate_size = intermediate_size
-        self.hidden_act = hidden_act
+        self.hidden_activation = hidden_activation
         self.hidden_dropout_prob = hidden_dropout_prob
         self.attention_probs_dropout_prob = attention_probs_dropout_prob
         self.max_position_embeddings = max_position_embeddings
@@ -307,8 +310,17 @@ class GPTConfig(PretrainedConfig):
         self.eos_token_id = eos_token_id
         self.bos_token_id = bos_token_id
         self.eol_token_id = eol_token_id
-        self.fuse_attention_qkv = False
         self.num_partitions = num_partitions
-        self.use_recompute = use_recompute
-        self.enable_fuse_transformer = enable_fuse_transformer
         self.lm_shift_labels = lm_shift_labels
+        self.normalize_before = normalize_before
+        self.recompute_granularity = recompute_granularity
+        self.scale_qk_coeff = scale_qk_coeff
+        self.tensor_parallel_degree = tensor_parallel_degree
+        self.output_attentions = output_attentions
+        self.ignore_index = ignore_index
+        self.use_flash_attention = use_flash_attention
+        self.fused_linear = fused_linear
+        self.fuse_attention_qkv = fuse_attention_qkv
+        self.enable_fuse_transformer = enable_fuse_transformer
+        self.use_fused_dropout_add = use_fused_dropout_add
+        self.fused_softmax_with_triangular = fused_softmax_with_triangular

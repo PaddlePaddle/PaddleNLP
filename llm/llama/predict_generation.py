@@ -18,11 +18,9 @@ import numpy as np
 import paddle
 from paddle.distributed import fleet
 
+from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig
 from paddlenlp.trainer.argparser import strtobool
-from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.peft.prefix import llama_postprocess_past_key_value
-from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaConfig, AutoConfig
-from paddlenlp.transformers.utils import get_scale_by_dtype
+from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 
 def get_parser():
@@ -80,6 +78,7 @@ class Predictor(object):
             self.tgt_length = kwargs["tgt_length"]
         else:
             self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+            self.tokenizer.pad_token = self.tokenizer.unk_token
             self.batch_size = args.batch_size
             self.args = args
             self.src_length = self.args.src_length
@@ -160,7 +159,9 @@ class Predictor(object):
             pre_caches_numpy = np.load(os.path.join(self.args.prefix_path, "pre_caches.npy"))
             pre_caches = np.split(pre_caches_numpy, self.config.num_hidden_layers)
             for i in range(self.config.num_hidden_layers):
-                pre_caches[i] = paddle.to_tensor(pre_caches[i].transpose(1, 0, 2, 3, 4).astype("float16"), dtype="float16")
+                pre_caches[i] = paddle.to_tensor(
+                    pre_caches[i].transpose(1, 0, 2, 3, 4).astype("float16"), dtype="float16"
+                )
         else:
             pre_caches = []
             for i in range(self.config.num_hidden_layers):
@@ -179,7 +180,8 @@ class Predictor(object):
             batch_size = inputs["input_ids"].shape[0]
             pre_cache_attention_mask = paddle.full(
                 [batch_size, 1, inputs["input_ids"].shape[-1], pre_caches_length],
-                paddle.finfo(attention_mask.dtype).min, dtype=attention_mask.dtype
+                paddle.finfo(attention_mask.dtype).min,
+                dtype=attention_mask.dtype,
             )
             attention_mask = paddle.concat([pre_cache_attention_mask, attention_mask], axis=3)
 

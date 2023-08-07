@@ -59,7 +59,6 @@ class LlamaTokenizer(PretrainedTokenizer):
         unk_token="<unk>",
         bos_token="<s>",
         eos_token="</s>",
-        pad_token="<unk>",
         add_bos_token=True,
         add_eos_token=False,
         sp_model_kwargs=None,
@@ -67,12 +66,8 @@ class LlamaTokenizer(PretrainedTokenizer):
         **kwargs
     ):
         self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
-        super().__init__(bos_token=bos_token, eos_token=eos_token, unk_token=unk_token, pad_token=pad_token, **kwargs)
+        super().__init__(bos_token=bos_token, eos_token=eos_token, unk_token=unk_token, **kwargs)
 
-        # NOTE: the original LLaMA has no pad_token but tokenizer requires one.
-        # Setting to `self.unk_token`, which makes the `pad_token_id = 0`
-        if self.pad_token is None:
-            self.pad_token = self.unk_token
         self.vocab_file = vocab_file
         self.add_bos_token = add_bos_token
         self.add_eos_token = add_eos_token
@@ -250,14 +245,15 @@ class LlamaTokenizer(PretrainedTokenizer):
                 (optional) Set to False to avoid returning attention mask (default: set to model specifics)
         """
         # Load from model defaults
-        attention_mask = None
+
         # attention_mask shape [1,seq_len,seq_len]
-        if "attention_mask" in encoded_inputs and len(np.shape(attention_mask)) > 2:
+        if "attention_mask" in encoded_inputs and len(np.shape(encoded_inputs["attention_mask"])) > 2:
             attention_mask = encoded_inputs["attention_mask"]
             encoded_inputs.pop("attention_mask")
+        else:
+            attention_mask = None
 
         required_input = encoded_inputs[self.model_input_names[0]]
-
         encoded_inputs = super()._pad(
             encoded_inputs, max_length, padding_strategy, pad_to_multiple_of, return_attention_mask
         )

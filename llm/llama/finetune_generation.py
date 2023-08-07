@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-from data import convert_example, custom_instruction_convert_example, reader
+from data import convert_example, custom_instruction_convert_example, read_local_dataset
 from modeling_pp import LlamaForCausalLMPipe
 from utils import LlamaTrainer, compute_metrics, compute_metrics_not_do_generation
 
@@ -40,8 +40,7 @@ from paddlenlp.utils.log import logger
 class DataArgument:
 
     data_name: str = field(default=None, metadata={"help": "The name of data."})
-    task_name: str = field(default=None, metadata={"help": "The name of task."})
-    dataset_path: str = field(default=None, metadata={"help": "The file name of train dataset."})
+    task_name_or_path: str = field(default=None, metadata={"help": "The name of task."})
     src_length: int = field(default=512, metadata={"help": "The max length of source text."})
     tgt_length: int = field(default=256, metadata={"help": "The max length of target text."})
 
@@ -151,24 +150,15 @@ def main():
     if model_args.lora:
         if model_args.lora_path is None:
             # Not yet support RowParallelLinear
-            if training_args.tensor_parallel_degree > 1:
-                target_modules = [
-                    ".*q_proj.*",
-                    ".*v_proj.*",
-                    ".*k_proj.*",
-                    ".*gate_proj.*",
-                    ".*up_proj.*",
-                ]
-            else:
-                target_modules = [
-                    ".*q_proj.*",
-                    ".*v_proj.*",
-                    ".*k_proj.*",
-                    ".*o_proj.*",
-                    ".*gate_proj.*",
-                    ".*down_proj.*",
-                    ".*up_proj.*",
-                ]
+            target_modules = [
+                ".*q_proj.*",
+                ".*v_proj.*",
+                ".*k_proj.*",
+                ".*gate_proj.*",
+                ".*up_proj.*",
+                ".*o_proj.*",
+                ".*down_proj.*",
+            ]
 
             lora_config = LoRAConfig(
                 target_modules=target_modules,
@@ -245,31 +235,40 @@ def main():
         model_args.model_name_or_path,
         padding_side="left",  # Allow batch inference
     )
+    tokenizer.pad_token = tokenizer.unk_token
 
     # Load the dataset.
     if training_args.benchmark:
-        train_ds = load_dataset(reader, data_path="./data/train.txt", lazy=False)
+        train_ds = load_dataset(read_local_dataset, path="./data/train.txt", lazy=False)
         training_args.do_eval = False
         data_args.always_pad_to_max_length = True
         trans_func = partial(
             custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args, benchmark=True
         )
     elif training_args.do_train or training_args.do_eval:
-        if data_args.data_name is not None:
-            if data_args.task_name is not None:
-                train_ds, dev_ds = load_dataset(data_args.data_name, data_args.task_name, splits=["train", "dev"])
+        if os.path.exists(os.path.join(data_args.task_name_or_path, "train.json")) and os.path.exists(
+            os.path.join(data_args.task_name_or_path, "dev.json")
+        ):
+            train_ds = load_dataset(
+                read_local_dataset, path=os.path.join(data_args.task_name_or_path, "train.json"), lazy=False
+            )
+            dev_ds = load_dataset(
+                read_local_dataset, path=os.path.join(data_args.task_name_or_path, "dev.json"), lazy=False
+            )
+        elif data_args.data_name is not None:
+            if data_args.task_name_or_path is not None:
+                train_ds, dev_ds = load_dataset(
+                    data_args.data_name, data_args.task_name_or_path, splits=["train", "dev"]
+                )
             else:
-                raise ValueError("`data_args.task_name` and `data_args.data_name` should be specified together")
-        elif data_args.task_name is not None:
-            if data_args.task_name == "squad":
+                raise ValueError(
+                    "`data_args.task_name_or_path` and `data_args.data_name` should be specified together"
+                )
+        else:
+            if data_args.task_name_or_path == "squad":
                 train_ds, dev_ds = load_dataset("squad", splits=["train_v1", "dev_v1"])
             else:
-                train_ds, dev_ds = load_dataset(data_args.task_name, splits=["train", "dev"])
-        elif data_args.dataset_path is not None:
-            train_ds = load_dataset(reader, data_path=os.path.join(data_args.dataset_path, "train.json"), lazy=False)
-            dev_ds = load_dataset(reader, data_path=os.path.join(data_args.dataset_path, "dev.json"), lazy=False)
-        else:
-            raise ValueError("Please set the correct data arguments(data_name, task_name, dataset_pat)")
+                train_ds, dev_ds = load_dataset(data_args.task_name_or_path, splits=["train", "dev"])
         trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
 
     if training_args.do_train:
