@@ -540,11 +540,11 @@ class Trainer:
         load state_dict of one shard from_checkpoint, Only load model state dict.
         """
         if isinstance(self.model, LoRAModel):
-            weight_name = LORA_WEIGHT_FILE_NAME
+            weight_name = LORA_WEIGHTS_NAME
         elif isinstance(self.model, PrefixModelForCausalLM):
-            weight_name = PREFIX_WEIGHT_FILE_NAME
+            weight_name = PREFIX_WEIGHTS_NAME
         else:
-            weight_name = PADDLE_WEIGHT_FILE_NAME
+            weight_name = PADDLE_WEIGHTS_NAME
         file_path = os.path.join(resume_from_checkpoint, _add_variant(weight_name, weight_name_suffix))
         if not os.path.isfile(file_path):
             raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}, no {file_path}")
