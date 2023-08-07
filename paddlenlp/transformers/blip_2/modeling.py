@@ -1568,7 +1568,7 @@ class Blip2ForConditionalGeneration(Blip2PretrainedModel):
         # step 3: use the language model, conditioned on the query outputs and the prompt
         language_model_inputs = self.language_projection(query_output)
         language_model_attention_mask = paddle.ones(language_model_inputs.shape[:-1], dtype="int64")
-        inputs_embeds = self.language_model.get_input_embeddings()(input_ids).cast(dtype=self.config.dtype)
+        inputs_embeds = self.language_model.get_input_embeddings()(input_ids).cast(dtype=language_model_inputs.dtype)
         inputs_embeds = paddle.concat([language_model_inputs, inputs_embeds], axis=1)
 
         if attention_mask is None:
