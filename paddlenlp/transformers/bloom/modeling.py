@@ -1114,11 +1114,13 @@ class BloomForCausalLM(BloomPreTrainedModel):
                 attention_mask = model_kwargs["attention_mask"]
                 if len(attention_mask.shape) == 2:
                     model_kwargs["attention_mask"] = paddle.concat(
-                        [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype="int64")], axis=-1
+                        [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)],
+                        axis=-1,
                     )
                 elif len(attention_mask.shape) == 4:
                     model_kwargs["attention_mask"] = paddle.concat(
-                        [attention_mask, paddle.ones([*attention_mask.shape[:3], 1], dtype="int64")], axis=-1
+                        [attention_mask, paddle.ones([*attention_mask.shape[:3], 1], dtype=attention_mask.dtype)],
+                        axis=-1,
                     )[:, :, -1:, :]
         # update role_ids
         if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
