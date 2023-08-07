@@ -568,7 +568,9 @@ class Trainer:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
         return resume_from_checkpoint
 
-    def _load_check_point(self, resume_from_checkpoint, delay_optimizer_creation, max_steps):
+    def _load_checkpoint(self, resume_from_checkpoint, delay_optimizer_creation, max_steps):
+        # In the non-sharded mode, only dp0 or sharding0 save checkpoint of all parameters.
+        # Thus dp0 or sharding0 load checkpoint in load_state_dict_from_checkpoint and the _wrap_model implicitly broadcast checkpoint to the other ranks.
         # Check if saved optimizer or scheduler states exist
         self._load_optimizer_and_scheduler(resume_from_checkpoint)
         self.load_state_dict_from_checkpoint(resume_from_checkpoint)
@@ -580,7 +582,10 @@ class Trainer:
             self.create_optimizer_and_scheduler(num_training_steps=max_steps)
         return model
 
-    def _load_sharded_check_point(self, resume_from_checkpoint, delay_optimizer_creation, max_steps):
+    def _load_sharded_checkpoint(self, resume_from_checkpoint, delay_optimizer_creation, max_steps):
+        # In the sharded mode, each sharding rank save checkpoint of sharded parameters.
+        # Because the _wrap_model implicitly broadcast checkpoint of sharding rank0 to other ranks, we need to load sharded parameters after _wrap_model
+        # thus each sharding rank load its own sharded parameters.
         model = self._wrap_model(self.model_wrapped)
         # for the rest of this function `model` is the outside model, whether it was wrapped or not
         if model is not self.model:
@@ -666,9 +671,9 @@ class Trainer:
         self.state = TrainerState()
 
         if self.args.load_sharding_stage1_model:
-            model = self._load_sharded_check_point(resume_from_checkpoint, delay_optimizer_creation, max_steps)
+            model = self._load_sharded_checkpoint(resume_from_checkpoint, delay_optimizer_creation, max_steps)
         else:
-            model = self._load_check_point(resume_from_checkpoint, delay_optimizer_creation, max_steps)
+            model = self._load_checkpoint(resume_from_checkpoint, delay_optimizer_creation, max_steps)
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples:,}")
@@ -2136,7 +2141,7 @@ class Trainer:
         path = os.path.join(checkpoint, optimizer_name)
         logger.info(f"load optimizer state from {path}")
         if os.path.isfile(path):
-            return paddlenlp_load(path, return_numpy=True)
+            return paddlenlp_load(path, map_location="cpu")
         logger.info(f"{path} not exists")
         return None
 
