@@ -18,9 +18,11 @@
 
 import collections
 import contextlib
+import copy
 import inspect
 import json
 import math
+import multiprocessing
 import os
 import random
 import re
@@ -139,6 +141,44 @@ try:
 except:
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
 
+async_save_queue = []
+
+
+def _save_func(obj, path, saved_signal_path, protocol):
+    paddle.save(obj, path, protocol)
+    # dump savd_siganl
+    with open(saved_signal_path, mode="w+") as f:
+        f.write("1")
+
+
+def clear_async_save_task_queue():
+    """
+    wait until all async save task to be done.
+    """
+    while len(async_save_queue) > 0:
+        task = async_save_queue.pop()
+        if task and task.is_alive():
+            task.join()
+
+
+def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol=4, sync_other_task=False):
+    cpu_optimizer_state_dict = {}
+    for k, v in optimizer_state_dict.items():
+        if k == "master_weights":
+            cpu_optimizer_state_dict[k] = {}
+            for kk, vv in v.items():
+                cpu_optimizer_state_dict[k][kk] = vv.numpy()
+        elif k == "LR_Scheduler":
+            cpu_optimizer_state_dict[k] = copy.deepcopy(v)
+        else:
+            cpu_optimizer_state_dict[k] = v.numpy()
+        paddle.device.cuda.synchronize()
+    if sync_other_task:
+        clear_async_save_task_queue()
+    p = multiprocessing.Process(target=_save_func, args=(cpu_optimizer_state_dict, path, saved_signal_path, protocol))
+    p.start()
+    async_save_queue.append(p)
+
 
 def paddlenlp_load(path, return_numpy=False):
     if return_numpy:
@@ -235,10 +275,8 @@ class Trainer:
             args = TrainingArguments(output_dir=output_dir)
 
         self.args = args
-        if self.args.use_async_save:
-            self.save_func = paddle.async_save
-        else:
-            self.save_func = paddle.save
+        # TODO(@tiangexiao): use async save in framework instead when use_async_save==True
+        self.save_func = paddle.save
         self.is_in_train = False
         # self.do_grad_scaling = args.fp16
 
@@ -1812,7 +1850,8 @@ class Trainer:
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
         if self.args.use_async_save:
-            paddle.clear_async_save_task_queue()
+            # paddle.clear_async_save_task_queue()
+            clear_async_save_task_queue()
 
         # Save model checkpoint
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
@@ -1828,11 +1867,6 @@ class Trainer:
         self.save_model(output_dir)
 
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
-
-        if self.args.use_hybrid_parallel:
-            if self.dp_group.rank <= 0:
-                os.makedirs(output_dir, exist_ok=True)
-                self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, optimizer_name))
 
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
@@ -1886,6 +1920,22 @@ class Trainer:
             self.save_func(rng_states, os.path.join(output_dir, f"rng_state_{process_index}.pth"))
         else:
             self.save_func(rng_states, os.path.join(output_dir, "rng_state.pth"))
+
+        saved_signal_path = os.path.join(output_dir, f"saved_signal_{dist.get_rank()}")
+        if self.args.use_hybrid_parallel:
+            if self.dp_group.rank <= 0:
+                os.makedirs(output_dir, exist_ok=True)
+                if self.args.use_async_save:
+                    async_save_optimizer(
+                        self.optimizer.state_dict(),
+                        os.path.join(output_dir, optimizer_name),
+                        saved_signal_path=saved_signal_path,
+                        sync_other_task=True,
+                    )
+                else:
+                    self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, optimizer_name))
+                    with open(saved_signal_path, mode="w+") as f:
+                        f.write("1")
 
         # Maybe delete some older checkpoints.
         if self.args.should_save and (True if not self.args.use_hybrid_parallel else self.args.local_rank == 0):
