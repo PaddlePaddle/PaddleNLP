@@ -39,8 +39,8 @@ from huggingface_hub import (
 )
 from huggingface_hub.utils import EntryNotFoundError
 from paddle import Tensor
-from paddle.nn import Embedding, Layer
 from paddle.distributed import fleet
+from paddle.nn import Embedding, Layer
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddle.utils.download import is_url as is_remote_url
@@ -84,6 +84,7 @@ __all__ = [
     "register_base_model",
 ]
 
+
 def unwrap_optimizer(optimizer, optimizer_instances=()):
     if optimizer is None:
         return None
@@ -93,9 +94,11 @@ def unwrap_optimizer(optimizer, optimizer_instances=()):
         return optimizer
     return None
 
+
 def filter_sharded_params(state_dict, optimizer, sharding_rank):
-    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer \
-        import DygraphShardingOptimizer
+    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
+        DygraphShardingOptimizer,
+    )
 
     logger.info(f"filter sharded_params not placed in sharding_rank {sharding_rank} .")
 
@@ -111,11 +114,20 @@ def filter_sharded_params(state_dict, optimizer, sharding_rank):
         filtered_state_dict[k] = v
     return filtered_state_dict
 
-def exlclude_paramters_in_state_dict(model_state_dict, param_names_in_master_weights, sharding_group, save_sharding_stage1_model=True):
+
+def exlclude_paramters_in_state_dict(
+    model_state_dict, param_names_in_master_weights, sharding_group, save_sharding_stage1_model=True
+):
     assert sharding_group is not None
-    assert isinstance(model_state_dict, dict) and isinstance(param_names_in_master_weights, (list, set)), "param_names_in_master_weights type:{}".format(type(param_names_in_master_weights))
-    state_param_names = [v.name for k,v in model_state_dict.items()]
-    logger.debug("param_names_in_master_weights:{}, state_param_names:{}".format(param_names_in_master_weights, state_param_names))
+    assert isinstance(model_state_dict, dict) and isinstance(
+        param_names_in_master_weights, (list, set)
+    ), "param_names_in_master_weights type:{}".format(type(param_names_in_master_weights))
+    state_param_names = [v.name for k, v in model_state_dict.items()]
+    logger.debug(
+        "param_names_in_master_weights:{}, state_param_names:{}".format(
+            param_names_in_master_weights, state_param_names
+        )
+    )
     if not save_sharding_stage1_model:
         # allgather parameter names in sharding group
         tmp = []
@@ -128,6 +140,7 @@ def exlclude_paramters_in_state_dict(model_state_dict, param_names_in_master_wei
             non_parameters_state_dict.pop(k)
 
     return non_parameters_state_dict
+
 
 if is_safetensors_available():
 
@@ -2089,8 +2102,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 # WEIGHTS_NAME = _add_variant(WEIGHTS_NAME, variant)
 
         if is_bf16 and save_sharding_stage1_model:
-            state_dict_to_save = exlclude_paramters_in_state_dict(state_dict_to_save, param_names_in_master_weights, sharding_group)
-            logger.info("param_names_in_master_weights len:{}, bf16 state_dict_to_save len:{}, :{}".format(len(param_names_in_master_weights), len(state_dict_to_save), state_dict_to_save))
+            state_dict_to_save = exlclude_paramters_in_state_dict(
+                state_dict_to_save, param_names_in_master_weights, sharding_group
+            )
+            logger.info(
+                "param_names_in_master_weights len:{}, bf16 state_dict_to_save len:{}, :{}".format(
+                    len(param_names_in_master_weights), len(state_dict_to_save), state_dict_to_save
+                )
+            )
 
         # Attach architecture to the config
         config_to_save.architectures = [model_to_save.__class__.__name__]

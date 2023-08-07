@@ -1746,11 +1746,7 @@ class Trainer:
 
         return loss.detach()
 
-    def save_model(
-        self,
-        output_dir: Optional[str] = None,
-        merge_tensor_parallel: Optional[bool] = False
-    ):
+    def save_model(self, output_dir: Optional[str] = None, merge_tensor_parallel: Optional[bool] = False):
         """
         Will save the model, so you can reload it using `from_pretrained()`.
 
@@ -1761,9 +1757,7 @@ class Trainer:
             output_dir = self.args.output_dir
 
         if self.args.should_save_model_state:
-            self._save(
-                output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel
-            )
+            self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
