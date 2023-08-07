@@ -813,7 +813,7 @@ class CLIPTextTransformer(nn.Layer):
             # ------------------------------------------------------------
             # text_embeds.shape = [batch_size, sequence_length, transformer.width]
             # take features from the eot embedding (eot_token is the highest number in each sequence)
-            # casting to torch.int for onnx compatibility: argmax doesn't support int64 inputs with opset 14
+            # casting to paddle.int32 for onnx compatibility: argmax doesn't support int64 inputs with opset 14
             pooled_output = last_hidden_state.gather_nd(
                 paddle.stack(
                     [paddle.arange(last_hidden_state.shape[0], dtype="int32"), input_ids.argmax(-1, dtype="int32")],
