@@ -378,27 +378,27 @@ class BloomAttention(nn.Layer):
 
         batch_size, q_length, _, _ = query_layer.shape
 
-        query_layer = query_layer.transpose([0, 2, 1, 3]).reshape(
-            [batch_size * self.num_heads, q_length, self.head_dim]
-        )
-        key_layer = key_layer.transpose([0, 2, 3, 1]).reshape([batch_size * self.num_heads, self.head_dim, q_length])
-        value_layer = value_layer.transpose([0, 2, 1, 3]).reshape(
-            [batch_size * self.num_heads, q_length, self.head_dim]
-        )
+        query_layer = query_layer.transpose([0, 2, 1, 3])
+        key_layer = key_layer.transpose([0, 2, 3, 1])
+        value_layer = value_layer.transpose([0, 2, 1, 3])
         if layer_past is not None:
             past_key, past_value = layer_past
             # concatenate along seq_length dimension:
-            #  - key: [batch_size * self.num_heads, head_dim, kv_length]
-            #  - value: [batch_size * self.num_heads, kv_length, head_dim]
-            key_layer = paddle.concat((past_key, key_layer), axis=2)
-            value_layer = paddle.concat((past_value, value_layer), axis=1)
-
-        _, _, kv_length = key_layer.shape
+            #  - key: [batch_size, self.num_heads, head_dim, kv_length]
+            #  - value: [batch_size, self.num_heads, kv_length, head_dim]
+            key_layer = paddle.concat((past_key, key_layer), axis=3)
+            value_layer = paddle.concat((past_value, value_layer), axis=2)
 
         if use_cache is True:
             present = (key_layer, value_layer)
         else:
             present = None
+
+        _, _, _, kv_length = key_layer.shape
+
+        query_layer = query_layer.reshape([batch_size * self.num_heads, q_length, self.head_dim])
+        key_layer = key_layer.reshape([batch_size * self.num_heads, self.head_dim, kv_length])
+        value_layer = value_layer.reshape([batch_size * self.num_heads, kv_length, self.head_dim])
 
         # [batch_size * num_heads, q_length, kv_length]
         # we use `Tensor.baddbmm` instead of `paddle.baddbmm` as the latter isn't supported by TorchScript v1.11
@@ -901,7 +901,7 @@ class BloomModel(BloomPreTrainedModel):
         seq_length_with_past = seq_length
         past_key_values_length = 0
         if past_key_values[0] is not None:
-            past_key_values_length = past_key_values[0][0].shape[2]
+            past_key_values_length = past_key_values[0][0].shape[3]
             seq_length_with_past = seq_length_with_past + past_key_values_length
 
         if attention_mask is None:
@@ -1112,9 +1112,16 @@ class BloomForCausalLM(BloomPreTrainedModel):
             # update attention mask
             if "attention_mask" in model_kwargs:
                 attention_mask = model_kwargs["attention_mask"]
-                model_kwargs["attention_mask"] = paddle.concat(
-                    [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype="int64")], axis=-1
-                )
+                if len(attention_mask.shape) == 2:
+                    model_kwargs["attention_mask"] = paddle.concat(
+                        [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)],
+                        axis=-1,
+                    )
+                elif len(attention_mask.shape) == 4:
+                    model_kwargs["attention_mask"] = paddle.concat(
+                        [attention_mask, paddle.ones([*attention_mask.shape[:3], 1], dtype=attention_mask.dtype)],
+                        axis=-1,
+                    )[:, :, -1:, :]
         # update role_ids
         if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
             role_ids = model_kwargs["role_ids"]
