@@ -20,6 +20,7 @@ import json
 import os
 import re
 import tempfile
+import warnings
 from collections import OrderedDict
 from contextlib import contextmanager
 
@@ -39,7 +40,7 @@ from huggingface_hub import (
 )
 from huggingface_hub.utils import EntryNotFoundError
 from paddle import Tensor
-from paddle.distributed import fleet
+from paddle.distributed import fleet  # noqa: E402
 from paddle.nn import Embedding, Layer
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
@@ -2060,6 +2061,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
         variant = kwargs.get("variant", None)
         is_main_process = kwargs.get("is_main_process", True)
+        is_bf16 = kwargs.get("is_bf16", False)
+        param_names_in_master_weights = list(kwargs.get("param_names_in_master_weights", []))
+        sharding_group = kwargs.get("sharding_group", None)
+        optimizer = kwargs.get("optimizer", None)
+        save_sharding_stage1_model = kwargs.get("save_sharding_stage1_model", False)
 
         save_directory = save_dir
 
@@ -2075,6 +2081,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # Only save the model itself if we are using distributed training
         model_to_save = unwrap_model(self)
+
+        WEIGHTS_NAME = model_to_save.resource_files_names["model_state"]
 
         # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
         # we currently don't use this setting automatically, but may start to use with v5

@@ -56,6 +56,7 @@ from ..transformers.model_utils import (
     _add_variant,
     exlclude_paramters_in_state_dict,
     filter_sharded_params,
+    paddlenlp_load,
     unwrap_model,
     unwrap_optimizer,
 )
