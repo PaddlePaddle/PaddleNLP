@@ -144,12 +144,9 @@ class Predictor(object):
         input_ids_shape = inputs["input_ids"].shape
 
         # create 4-d attention-mask
-        attention_mask = (
-            paddle.tril(paddle.ones([input_ids_shape[-1], input_ids_shape[-1]], dtype=self.args.dtype))
-            .unsqueeze_(0)
-            .unsqueeze_(0)
+        attention_mask = paddle.tril(paddle.ones([input_ids_shape[-1], input_ids_shape[-1]], dtype="bool")).unsqueeze(
+            [0, 1]
         )
-        attention_mask = (1 - attention_mask) * paddle.finfo(attention_mask.dtype).min
 
         inputs["attention_mask"] = attention_mask
         use_pre_caches = self.args.use_pre_caches
@@ -171,17 +168,15 @@ class Predictor(object):
         if use_pre_caches:
             pre_caches_length = pre_caches[0].shape[-2]
             batch_size = inputs["input_ids"].shape[0]
-            pre_cache_attention_mask = paddle.zeros(
-                [batch_size, 1, inputs["input_ids"].shape[-1], pre_caches_length], dtype=attention_mask.dtype
+            pre_cache_attention_mask = paddle.ones(
+                [batch_size, 1, inputs["input_ids"].shape[-1], pre_caches_length], dtype="bool"
             )
             attention_mask = paddle.concat([pre_cache_attention_mask, attention_mask], axis=3)
         else:
             pre_caches_length = 128
             batch_size = inputs["input_ids"].shape[0]
-            pre_cache_attention_mask = paddle.full(
-                [batch_size, 1, inputs["input_ids"].shape[-1], pre_caches_length],
-                paddle.finfo(attention_mask.dtype).min,
-                dtype=attention_mask.dtype,
+            pre_cache_attention_mask = paddle.zeros(
+                [batch_size, 1, inputs["input_ids"].shape[-1], pre_caches_length], dtype="bool"
             )
             attention_mask = paddle.concat([pre_cache_attention_mask, attention_mask], axis=3)
 
