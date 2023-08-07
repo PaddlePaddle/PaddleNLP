@@ -20,6 +20,7 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle.common_ops_import import LayerHelper
+from paddle.framework import core
 
 import paddlenlp
 from paddlenlp.ops.ext_utils import LOADED_EXT, load
@@ -28,24 +29,12 @@ from paddlenlp.transformers.t5.modeling import T5DenseGatedGeluDense, T5DenseRel
 from paddlenlp.transformers.utils import fn_args_to_dict
 from paddlenlp.utils.log import logger
 
-if (getattr(paddle.fluid.framework, "_in_eager_mode_", False)) or (
-    hasattr(paddle.fluid.framework, "global_var")
-    and getattr(paddle.fluid.framework.global_var, "_in_eager_mode_", False)
-):
-    from paddle.framework import core
-
 
 def run_custom(op_name, inputs_names, inputs_var, attrs_names, attrs_val, outputs_names, outputs_dtype=None):
     ret = []
 
-    if (
-        getattr(paddle.fluid.framework, "_in_eager_mode_", False)
-        and getattr(paddle.fluid.framework, "_dygraph_tracer_", None) is not None
-    ) or (
-        hasattr(paddle.fluid.framework, "global_var")
-        and getattr(paddle.fluid.framework.global_var, "_in_eager_mode_", False)
-        and getattr(paddle.fluid.framework.global_var, "_dygraph_tracer_", None) is not None
-    ):
+    if paddle.in_dynamic_mode():
+        # TODO(guosheng): wrong _run_custom_op usage in latest paddle, fix it
         ctx = core.CustomOpKernelContext()
 
         for ins in inputs_var:
@@ -1915,19 +1904,7 @@ def transfer_param(p, is_bias=False, dtype="float16", restore_data=False):
     if str(p.dtype)[-len(dtype) :] == dtype and ("gpu" in str(p.place).lower() or "cuda" in str(p.place).lower()):
         return p
     if restore_data:
-        if (
-            getattr(paddle.fluid.framework, "_in_eager_mode_", False)
-            and getattr(paddle.fluid.framework, "_dygraph_tracer_", None) is not None
-        ) or (
-            hasattr(paddle.fluid.framework, "global_var")
-            and getattr(paddle.fluid.framework.global_var, "_in_eager_mode_", False)
-            and getattr(paddle.fluid.framework.global_var, "_dygraph_tracer_", None) is not None
-        ):
-            param_data = p.numpy()
-            new_p = paddle.create_parameter(shape=param_shape, dtype=dtype, is_bias=is_bias)
-            new_p.set_value(param_data.astype(dtype))
-            return new_p
-        elif paddle.in_dynamic_mode():
+        if paddle.in_dynamic_mode():
             param_data = p.numpy()
             # Creating parameters with Assign initializer is too slow. Maybe we
             # can cast to fp16 directly and get a tensor, while we do it more

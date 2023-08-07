@@ -118,10 +118,7 @@ try:
 except:
     mix_precision_utils = None
 
-try:
-    from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
-except:
-    from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
+from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
 
 
 def is_dp_group_support_in_group_sharded_parallel():
@@ -1371,11 +1368,7 @@ class Trainer:
             else:
                 # sync params (broadcast) buffers in dp group
                 if not is_dp_group_support_in_group_sharded_parallel() and self.args.data_parallel_degree > 1:
-                    try:
-                        from paddle.fluid.dygraph.parallel import sync_params_buffers
-                    except ImportError:
-                        # fix for new api in paddlepaddle v2.5
-                        from paddle.distributed.parallel import sync_params_buffers
+                    from paddle.distributed.parallel import sync_params_buffers
 
                     hcg = fleet.get_hybrid_communicate_group()
                     dp_group = hcg.get_data_parallel_group()

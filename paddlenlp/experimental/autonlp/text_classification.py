@@ -688,10 +688,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         batch_size: int = 4,
         batch_nums: int = 1,
     ):
-        try:
-            from paddle.fluid.contrib.slim.quantization import PostTrainingQuantization
-        except ImportError:
-            from paddle.static.quantization import PostTrainingQuantization
+        from paddle.static.quantization import PostTrainingQuantization
 
         model_result = self._get_model_result(trial_id=trial_id)
         model_config = model_result.metrics["config"]["candidates"]
@@ -737,7 +734,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 yield batch_data
 
         paddle.enable_static()
-        place = paddle.fluid.framework._current_expected_place()
+        place = paddle.framework._current_expected_place()
         exe = paddle.static.Executor(place)
 
         post_training_quantization = PostTrainingQuantization(
