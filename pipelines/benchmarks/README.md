@@ -47,7 +47,7 @@ RocketQA系列的模型在GPU上能够达到ms级别的速度，一个query大�
 注意在测试速度的时候会有一些浮动，有很多因素会影响测试速度，比如 `elastic search`本身的性能，检索的文本数目，但总体的结论不会变。
 
 ## 模型评测
-- 数据集选择，使用 [T2Ranking](https://github.com/THUIR/T2Ranking/tree/main) 数据集，由于 T2Ranking 的数据集太大，openai 评测起来的时间成本有些高，所以我们只选择了 T2Ranking 中的前 10000 篇文章
+- 数据集选择，使用 [T2Ranking](https://github.com/THUIR/T2Ranking/tree/main) 数据集，由于 T2Ranking 的数据集太大，评测起来的时间成本有些高，所以我们只选择了 T2Ranking 中的前 10000 篇文章
 *注意*:由于T2Ranking数据集collection.tsv无法用datasets.load_dataset下载，手动下载并修改T2Ranking_test.py中load_t2ranking_for_reranking的collection.tsv加载路径
 ```bash
 collection_dataset=pandas.read_csv('T2Ranking/data/collection.tsv',sep='\t')
