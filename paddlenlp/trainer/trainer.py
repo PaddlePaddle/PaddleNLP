@@ -415,7 +415,10 @@ class Trainer:
             if self.args.bf16:
                 state_dict = self.recover_params_from_master_weights(state_dict)
         else:
-            state_dict = self.load_one_state_dict_from_checkpoint(resume_from_checkpoint, self.args.weight_name_suffix)
+            if self.args.dataset_rank == 0:
+                state_dict = self.load_one_state_dict_from_checkpoint(resume_from_checkpoint, self.args.old_weight_name_suffix)
+            else:
+                logger.info(f"not loading ckpt :{self.args.dataset_rank}")
 
         # If the model is on the GPU, it still works!
         self._set_state_dict_in_model(state_dict)
@@ -620,6 +623,11 @@ class Trainer:
 
         self.state = TrainerState()
 
+        # Check if saved optimizer or scheduler states exist
+        self._load_optimizer_and_scheduler(resume_from_checkpoint)
+
+        self.load_state_dict_from_checkpoint(resume_from_checkpoint)
+
         model = self._wrap_model(self.model_wrapped)
 
         # for the rest of this function `model` is the outside model, whether it was wrapped or not
@@ -628,11 +636,6 @@ class Trainer:
 
         if delay_optimizer_creation:
             self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-
-        # Check if saved optimizer or scheduler states exist
-        self._load_optimizer_and_scheduler(resume_from_checkpoint)
-
-        self.load_state_dict_from_checkpoint(resume_from_checkpoint)
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples:,}")
@@ -1905,9 +1908,75 @@ class Trainer:
             logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
             shutil.rmtree(checkpoint)
 
-    def _save(
-        self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False, use_async_save=False
-    ):
+    def _save_distributed_strategy(self, dir):
+        pp_degree = 1
+        mp_degree = 1
+        sharding_degree = 1
+        vpp_degree = 1
+        nranks = dist.get_world_size()
+        if self.args.use_hybrid_parallel and nranks > 1:
+            if dist.get_rank():
+                return
+            hcg = fleet.get_hybrid_communicate_group()
+            mp_degree = hcg.get_model_parallel_world_size()
+            pp_degree = hcg.get_pipe_parallel_world_size()
+            sharding_degree = hcg.get_sharding_parallel_world_size()
+            """
+            if pp_degree > 1:
+                assert isinstance(model, fleet.meta_parallel.PipelineParallel), "must be pipeline model"
+                vpp_degree = model._layers.get_num_virtual_stages()
+            """
+        model_meta = {}
+        model_meta["parallel_config"]={"pp_degree":pp_degree,
+                                       "mp_degree":mp_degree,
+                                       "sharding_degree":sharding_degree,
+                                       "vpp_degree":vpp_degree}
+        path=os.path.join(dir, MODEL_META_NAME)
+        with open(path, 'w') as f:
+            json.dump(model_meta, f, indent=4)
+
+    def _load_distributed_strategy(self, dir):
+        meta_path = os.path.join(dir, MODEL_META_NAME)
+        assert os.path.exists(meta_path), f"{meta_path} not exist"
+        with open(meta_path, 'r') as handle:
+            model_dist_meta = json.load(handle)
+        assert "parallel_config" in model_dist_meta
+        parallel_config = model_dist_meta["parallel_config"]
+        assert "pp_degree" in parallel_config
+        assert "mp_degree" in parallel_config
+        assert "sharding_degree" in parallel_config
+        return parallel_config
+
+    def _save_sharding_meta(self, dir):
+        nranks = dist.get_world_size()
+        if not self.args.use_hybrid_parallel or nranks <= 1:
+            return
+
+        hcg = fleet.get_hybrid_communicate_group()
+        mp_degree = hcg.get_model_parallel_world_size()
+        pp_degree = hcg.get_pipe_parallel_world_size()
+        sharding_degree = hcg.get_sharding_parallel_world_size()
+        sharding_rank = self.args.sharding_parallel_rank
+        optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
+        sharding_meta = {}
+        if optimizer and sharding_rank == 0:
+            param2rank = { k: v for (k, v) in optimizer._param2rank.items()}
+            sharding_meta["param2rank"] = param2rank
+            suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
+            path = os.path.join(dir, _add_variant(SHARDING_META_NAME, suffix))
+            with open(path, 'w') as f:
+                json.dump(sharding_meta, f, indent=4)
+
+    def _load_sharding_meta(self, dir):
+        suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
+        meta_path = os.path.join(dir, _add_variant(SHARDING_META_NAME, suffix))
+        assert os.path.exists(meta_path), f"{meta_path} not exist"
+        with open(meta_path, 'r') as f:
+            sharding_meta = json.load(f)
+        assert "param2rank" in sharding_meta
+        return sharding_meta
+
+    def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
         # If we are executing this function, we are the process zero, so we don't check for that.
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
@@ -1923,6 +1992,11 @@ class Trainer:
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
 
+        sharding_group = None
+        sharding_rank = 0
+        if paddle.distributed.get_world_size() > 1 and self.args.use_hybrid_parallel:
+            sharding_group = self.sharding_group
+            sharding_rank = sharding_group.rank
         if (
             not isinstance(self.model, PretrainedModel)
             and not isinstance(self.model, LoRAModel)
@@ -1936,7 +2010,7 @@ class Trainer:
                     is_main_process=self.args.should_save,
                     is_bf16=is_bf16,
                     param_names_in_master_weights=param_names_in_master_weights,
-                    sharding_group=self.sharding_group,
+                    sharding_group=sharding_group,
                     save_sharding_stage1_model=self.args.save_sharding_stage1_model,
                     optimizer=self.optimizer,
                 )
@@ -1947,11 +2021,10 @@ class Trainer:
                 if state_dict is None:
                     state_dict = self.model.state_dict()
                 if self.args.save_sharding_stage1_model:
-                    sharding_rank = self.sharding_group.rank
                     state_dict = filter_sharded_params(state_dict, self.optimizer, sharding_rank)
                     if is_bf16:
                         logger.info("before exclude state_dict_to_save len:{}".format(len(state_dict)))
-                        state_dict = exlclude_paramters_in_state_dict(state_dict, param_names_in_master_weights, self.sharding_group)
+                        state_dict = exlclude_paramters_in_state_dict(state_dict, param_names_in_master_weights, sharding_group)
                         logger.info("after exclude state_dict len:{}".format(len(state_dict)))
                 paddle.save(
                     state_dict,
@@ -1963,7 +2036,13 @@ class Trainer:
                 merge_tensor_parallel=merge_tensor_parallel,
                 variant=self.args.weight_name_suffix,
                 is_main_process=self.args.should_save,
-                use_async_save=use_async_save,
+                is_bf16=is_bf16,
+                param_names_in_master_weights=param_names_in_master_weights,
+                sharding_group=sharding_group,
+                save_sharding_stage1_model=self.args.save_sharding_stage1_model,
+                optimizer=self.optimizer,
+                sharding_degree=self.args.sharding_parallel_degree,
+                use_async_save=self.args.use_async_save,
             )
 
         self._save_distributed_strategy(output_dir)
