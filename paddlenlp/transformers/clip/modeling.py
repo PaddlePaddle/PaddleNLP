@@ -827,7 +827,7 @@ class CLIPTextTransformer(nn.Layer):
                 paddle.stack(
                     [
                         paddle.arange(last_hidden_state.shape[0], dtype="int32"),
-                        (input_ids.cast("int32") == self.eos_token_id).cast("int32").argmax(axis=-1),
+                        (input_ids == self.eos_token_id).cast("int32").argmax(axis=-1, dtype="int32"),
                     ]
                 ),
                 axis=-1,
