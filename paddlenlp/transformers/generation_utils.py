@@ -954,13 +954,6 @@ class GenerationMixin(object):
                     input_ids, expand_size=num_return_sequences, **model_kwargs
                 )
 
-            if use_pre_caches:
-                assert (
-                    use_pre_caches is not None
-                ), "pre_caches should be set for pre-cached model when `use_pre_cache`=True"
-            else:
-                pre_caches = None
-
             if is_tracing:
                 return self.sample_d2s(
                     input_ids,
@@ -1211,6 +1204,10 @@ class GenerationMixin(object):
 
         return input_ids[:, origin_len:], None
 
+    def _get_attention_mask_input_spec(self, dtype: str):
+        input_spec = paddle.static.InputSpec(shape=[None, None, None, None], dtype="int64")
+        return input_spec
+
     def to_static(self, path: str, config: dict = None):
         """export generation model to static
 
@@ -1233,7 +1230,7 @@ class GenerationMixin(object):
 
         input_spec = [
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None, None, None], dtype="int64"),  # attention_mask
+            self._get_attention_mask_input_spec("int64"),  # attention_mask
             None,  # position_ids
             paddle.static.InputSpec(shape=[1], dtype="int64"),  # max_length
             0,  # min_length
@@ -1284,7 +1281,7 @@ class GenerationMixin(object):
             input_spec.append(
                 [paddle.static.InputSpec(shape=[2, None, None, None, None], dtype=dtype) for i in range(num_layers)]
             )
-            input_spec.append(paddle.static.InputSpec(shape=[1], dtype="bool"))
+            input_spec.append(True)
         else:
             input_spec.append(None)
             input_spec.append(None)

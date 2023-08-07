@@ -17,7 +17,7 @@ import argparse
 import os
 
 import paddle
-
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.transformers import AutoTokenizer, BloomConfig, BloomForCausalLM
 
@@ -47,6 +47,12 @@ def parse_args():
     )
     parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     parser.add_argument("--dtype", default=None, help="The data type of exported model")
+    parser.add_argument(
+        "--export_pre_caches",
+        default="False",
+        type=strtobool,
+        help="whether use pre_caches",
+    )
     args = parser.parse_args()
     return args
 
@@ -80,12 +86,12 @@ def main():
         "pad_token_id": tokenizer.pad_token_id,
         "eos_token_id": tokenizer.eos_token_id,
         "bos_token_id": tokenizer.bos_token_id,
-        "use_pre_caches": True,
-        "num_layers": model.config.num_hidden_layers,
+        "use_pre_caches": args.export_pre_caches,
+        "num_layers": model.config.n_layer,
     }
-    model.to_static(args.output_path, config)
-    model.config.save_pretrained("inference")
-    tokenizer.save_pretrained(os.path.dirname(args.output_path))
+    model.to_static(os.path.join(args.output_path, "model"), config)
+    model.config.save_pretrained(args.output_path)
+    tokenizer.save_pretrained(args.output_path)
 
 
 if __name__ == "__main__":

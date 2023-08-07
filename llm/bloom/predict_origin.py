@@ -18,21 +18,20 @@ import json
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig
-from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.peft.prefix import bloom_postprocess_past_key_value
 from paddlenlp.transformers import AutoConfig, AutoTokenizer, BloomForCausalLM
-from paddlenlp.transformers.utils import load_prefix_weights
 
 
 def parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name_or_path", default="bigscience/bloomz-7b1-mt", help="The directory of model.")
+    parser.add_argument("--model_name_or_path", default="bigscience/bloom-560m", help="The directory of model.")
     parser.add_argument("--save_onepiece_model_path", default=None, help="The directory of model.")
-    parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
+    parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
     parser.add_argument("--src_length", type=int, default=200, help="The batch size of data.")
-    parser.add_argument("--tgt_length", type=int, default=1024, help="The batch size of data.")
+    parser.add_argument("--tgt_length", type=int, default=200, help="The batch size of data.")
     parser.add_argument("--seed", type=int, default=20, help="the seed of parameter initialization")
     parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     parser.add_argument(
@@ -41,8 +40,6 @@ def parse_arguments():
     parser.add_argument("--data_file", default=None, help="data file directory")
     parser.add_argument("--predict_file", default="prediction.json", help="predict result file directory")
     parser.add_argument("--device", type=str, default="gpu", help="Device")
-    parser.add_argument("--use_fast", default="True", type=strtobool, help="whether use fast model to do generation")
-    parser.add_argument("--use_pre_caches", default="True", type=strtobool, help="whether use fast model to do generation")
     return parser.parse_args()
 
 
@@ -94,6 +91,8 @@ class Predictor(object):
                 config = AutoConfig.from_pretrained(args.model_name_or_path)
                 dtype = config.dtype if config.dtype is not None else "float16"
 
+            print("dtype", dtype) 
+            dtype = "float16"
             self.model = BloomForCausalLM.from_pretrained(
                 args.model_name_or_path,
                 load_state_as_np=True,
@@ -104,6 +103,10 @@ class Predictor(object):
             )
             if self.args.lora_path is not None:
                 self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
+            if self.args.prefix_path is not None:
+                self.model = PrefixModelForCausalLM.from_pretrained(
+                    self.model, self.args.prefix_path, bloom_postprocess_past_key_value
+                )
 
         self.model.eval()
 
@@ -113,32 +116,16 @@ class Predictor(object):
             return_tensors="np",
             padding=True,
             max_length=self.src_length,
-            return_attention_mask=True,
+            return_attention_mask=False,
             return_token_type_ids=False,
         )
+        inputs_tensor = {}
         for key, value in inputs.items():
-            inputs[key] = paddle.to_tensor(value)
-
-        attention_mask = inputs["attention_mask"]
-
-        import numpy as np
-        pre_caches = paddle.split(
-            paddle.to_tensor(
-                np.load("/root/paddlejob/workspace/wujingjing/models/bloom-prefix/bloomz_prefix_checkpoints/pre_caches.npy")), 
-                self.model.config.n_layer, 0
-        )
-        for i in range(self.model.config.n_layer):
-            pre_caches[i] = pre_caches[i].transpose([1, 0, 2, 3, 4]).cast(self.dtype)
-
-        inputs["pre_caches"] = pre_caches
-        inputs["use_pre_caches"] = self.args.use_pre_caches
-        inputs["attention_mask"] = attention_mask
-
-        return inputs
+            inputs_tensor[key] = paddle.to_tensor(value)
+        return inputs_tensor
 
     def infer(self, inputs):
         if self.model.config.dtype == "float32" or self.model.config.dtype is None:
-            print("start to generate")
             with paddle.no_grad():
                 result = self.model.generate(
                     **inputs,
@@ -194,7 +181,6 @@ def predict():
         all_texts = [
             # "答案：年基准利率4.35%，上下文：从实际看,贷款的基本条件是: 一是中国大陆居民,年龄在60岁以下; 二是有稳定的住址和工作或经营地点; 三是有稳定的收入来源; 四是无不良信用记录,贷款用途不能作为炒股,赌博等行为; 五是具有完全民事行为能力。在已知答案的前提下，问题：</s>",
             # "答案：U系列，上下文：U系列是最好的，采用国际顶尖技术（由格力自主研发）双级变频压缩机，提高压缩机运转效率，制冷制热能力更强劲；1赫兹变频技术，使空调相当于一个15 W电灯泡，更加节能省电；送风面积广，风力大；生态风，净化空气。非常不错，现在国美在做活动，可以了解一下。在已知答案的前提下，问题：</s>",
-            # "where is the captial of china?"
             "类型#裙*版型#显瘦*风格#文艺*风格#简约*图案#印花*图案#撞色*裙下摆#压褶*裙长#连衣裙*裙领型#"
         ]
     else:

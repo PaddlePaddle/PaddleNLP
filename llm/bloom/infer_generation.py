@@ -17,6 +17,7 @@ import os
 import numpy as np
 import paddle
 
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import AutoTokenizer
 
 
@@ -38,6 +39,12 @@ def parse_arguments():
     parser.add_argument("--top_k", type=int, default=0, help="top_p parameter for decoding")
     parser.add_argument("--temperature", type=float, default=0.95, help="temperature parameter for decoding")
     parser.add_argument("--top_p", type=int, default=0.7, help="top_p parameter for decoding")
+    parser.add_argument(
+        "--use_pre_caches",
+        default="False",
+        type=strtobool,
+        help="whether use pre_caches",
+    )
     return parser.parse_args()
 
 
@@ -68,6 +75,7 @@ class Predictor(object):
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             config.disable_gpu()
         config.disable_glog_info()
+        self.args = args
         self.predictor = paddle.inference.create_predictor(config)
 
     def preprocess(self, input_text):
@@ -83,6 +91,21 @@ class Predictor(object):
         inputs["top_p"] = np.array(args.top_p, dtype="float32")
         inputs["top_k"] = np.array(args.top_k, dtype="int64")
         inputs["temperature"] = np.array(args.temperature, dtype="float32")
+
+
+        pre_caches_numpy = np.load(os.path.join(self.args.model_dir, "pre_caches.npy"))
+        pre_caches_length = pre_caches_numpy.shape[0]
+        if self.args.use_pre_cache:
+            pre_caches = np.split(pre_caches_numpy, pre_caches_length)
+            for i in range(pre_caches_length):
+                inputs["pre_caches_{}".format(i)] = pre_caches[i].transpose(1, 0, 2, 3, 4).astype("float16")
+        else:
+            # TODO(wj-Mcat): 
+            pre_caches_numpy = np.load(os.path.join(self.args.model_dir, "pre_caches.npy"))
+            for i in range(pre_caches_length):
+                inputs["pre_caches_{}".format(i)] = np.ones([1]).astype("float16")
+
+        inputs["use_pre_caches"] = np.array(self.args.use_pre_caches, dtype=np.bool_)
         return inputs
 
     def infer(self, inputs):
@@ -119,14 +142,9 @@ if __name__ == "__main__":
     args = parse_arguments()
     paddle.seed(100)
     predictor = Predictor(args)
-    # all_texts = [
-    #     "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
-    #     "answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
-    # ]
     all_texts = [
-        "中国的首都是哪里？"
-        # "where is the capital of china?"
-        # "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
+        "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
+        "answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
     ]
     batch_texts = batchfy_text(all_texts, args.batch_size)
     for bs, texts in enumerate(batch_texts):

@@ -59,6 +59,7 @@ class LlamaTokenizer(PretrainedTokenizer):
         unk_token="<unk>",
         bos_token="<s>",
         eos_token="</s>",
+        pad_token="<unk>",
         add_bos_token=True,
         add_eos_token=False,
         sp_model_kwargs=None,
@@ -66,7 +67,7 @@ class LlamaTokenizer(PretrainedTokenizer):
         **kwargs
     ):
         self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
-        super().__init__(bos_token=bos_token, eos_token=eos_token, unk_token=unk_token, **kwargs)
+        super().__init__(bos_token=bos_token, eos_token=eos_token, unk_token=unk_token, pad_token=pad_token, **kwargs)
 
         # NOTE: the original LLaMA has no pad_token but tokenizer requires one.
         # Setting to `self.unk_token`, which makes the `pad_token_id = 0`

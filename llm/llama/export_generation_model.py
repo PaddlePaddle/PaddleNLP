@@ -16,7 +16,7 @@ import argparse
 import os
 
 import paddle
-
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaConfig
 
@@ -32,13 +32,21 @@ def parse_args():
     )
     parser.add_argument(
         "--output_path",
-        default="inference/llama",
+        default="inference",
         type=str,
         help="The output file prefix used to save the exported inference model.",
     )
     parser.add_argument("--dtype", default="float16", help="The data type of exported model")
     parser.add_argument("--tgt_length", type=int, default=100, help="The batch size of data.")
     parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
+
+    parser.add_argument(
+        "--export_pre_caches",
+        default="False",
+        type=strtobool,
+        help="whether use pre_caches",
+    )
+
     args = parser.parse_args()
     return args
 
@@ -79,9 +87,9 @@ def main():
         "use_pre_caches": True,
         "num_layers": model.config.num_hidden_layers,
     }
-    model.to_static(args.output_path, config)
-    model.config.save_pretrained("inference")
-    tokenizer.save_pretrained(os.path.dirname(args.output_path))
+    model.to_static(os.path.join(args.output_path, "model"), config)
+    model.config.save_pretrained(args.output_path)
+    tokenizer.save_pretrained(args.output_path)
 
 
 if __name__ == "__main__":

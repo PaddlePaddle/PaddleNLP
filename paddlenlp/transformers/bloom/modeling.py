@@ -958,7 +958,7 @@ class BloomModel(BloomPreTrainedModel):
             alibi = build_alibi_tensor(_attention_mask, self.config.n_head, dtype=hidden_states.dtype)
         else:
             alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
-
+        
         causal_mask = self._prepare_attn_mask(
             attention_mask,
             input_shape=(batch_size, seq_length),
@@ -1183,6 +1183,10 @@ class BloomForCausalLM(BloomPreTrainedModel):
         attention_mask = paddle.ones_like(input_ids, dtype="int64")
         attention_mask = (input_ids != pad_token_id).astype("int64")
         return attention_mask
+    
+    def _get_attention_mask_input_spec(self, dtype: str):
+        input_spec = paddle.static.InputSpec(shape=[None, None], dtype="int64")
+        return input_spec
 
     def forward(
         self,
@@ -2147,37 +2151,49 @@ class FusedBloomModel(BloomPreTrainedModel):
         if past_key_values[0] is not None:
             seq_length_with_past = attention_mask.shape[-1]
 
-        if attention_mask is None:
-            attention_mask = paddle.ones([batch_size, seq_length_with_past], dtype=paddle.get_default_dtype())
+        pre_caches_length = 0
+        if use_pre_caches:
+            pre_caches_length = pre_caches[0].shape[-2]
 
         if position_ids is not None:
             arange_tensor = ((attention_mask.cumsum(axis=-1) - 1) * attention_mask)[:, None, :]
             alibi = position_ids[..., None] * arange_tensor
         else:
-            alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
-        if is_decoder:
-            causal_mask = 1.0 - attention_mask[:, None, None, :]
-        else:
-            causal_mask = paddle.tensor.triu(
-                paddle.ones((paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1])),
-                diagonal=1,
-            )
-            causal_mask = paddle.logical_or(causal_mask, 1.0 - attention_mask[:, None, None, :]).astype(
-                paddle.get_default_dtype()
-            )
-
-        if pre_caches is not None:
-            pre_caches_length = pre_caches[0].shape[-2]
             if use_pre_caches:
-                pre_cache_attention_mask = paddle.ones(
-                    [batch_size, 1, pre_caches_length, seq_length_with_past], dtype=attention_mask.dtype
+                alibi_attention_mask = paddle.concat([
+                    paddle.full(attention_mask.shape[:-1] + [pre_caches_length], 1, dtype=attention_mask.dtype),
+                    attention_mask
+                ], axis=-1)
+                alibi = build_alibi_tensor(
+                    alibi_attention_mask,
+                    self.config.n_head,
+                    dtype=hidden_states.dtype
                 )
             else:
-                pre_cache_attention_mask = paddle.zeros(
-                    [batch_size, 1, pre_caches_length, seq_length_with_past], dtype=attention_mask.dtype
-                )
+                alibi = build_alibi_tensor(attention_mask, self.config.n_head, dtype=hidden_states.dtype)
 
-            causal_mask = paddle.concat([pre_cache_attention_mask, causal_mask], axis=1)
+        if is_decoder:
+            causal_mask = 1.0 - attention_mask[:, None, None, :]
+            if use_pre_caches:
+                pre_caches_attention_mask = paddle.zeros(causal_mask.shape[:-1] + [pre_caches_length], dtype=causal_mask.dtype)
+                causal_mask = paddle.concat([pre_caches_attention_mask, causal_mask], axis=-1)
+        else:
+            input_ids_shape = paddle.shape(input_ids)
+            if use_pre_caches:
+                causal_mask = paddle.tensor.triu(
+                    paddle.ones((input_ids_shape[-1], input_ids_shape[-1]), dtype=paddle.get_default_dtype()),
+                    diagonal=1,
+                ).unsqueeze(0).unsqueeze(0).expand([input_ids_shape[0], self.config.n_head, -1, -1])
+                pre_caches_attention_mask = paddle.zeros([input_ids_shape[0], self.config.n_head, input_ids_shape[-1], pre_caches_length], dtype=paddle.get_default_dtype())
+                causal_mask = paddle.concat([pre_caches_attention_mask, causal_mask], axis=-1)
+            else:
+                causal_mask = paddle.tensor.triu(
+                    paddle.ones((input_ids_shape[-1], input_ids_shape[-1])),
+                    diagonal=1,
+                )
+                causal_mask = paddle.logical_or(causal_mask, 1.0 - attention_mask[:, None, None, :]).astype(
+                    paddle.get_default_dtype()
+                )
 
         if self.config.tensor_parallel_degree > 1:
             block_size = self.config.n_head // self.config.tensor_parallel_degree
@@ -2185,28 +2201,35 @@ class FusedBloomModel(BloomPreTrainedModel):
                 :,
                 self.config.tensor_parallel_rank * block_size : (self.config.tensor_parallel_rank + 1) * block_size,
             ]
-            alibi = alibi.reshape([batch_size, block_size, 1, seq_length_with_past])
+            alibi = alibi.reshape([batch_size, block_size, 1, seq_length_with_past + pre_caches_length])
         else:
-            alibi = alibi.reshape([batch_size, self.config.n_head, 1, seq_length_with_past])
+            alibi = alibi.reshape([batch_size, self.config.n_head, 1, seq_length_with_past + pre_caches_length])
 
         alibi = alibi.expand(
             [
                 batch_size,
                 self.config.n_head // self.config.tensor_parallel_degree,
                 seq_length,
-                seq_length_with_past,
+                seq_length_with_past + pre_caches_length,
             ]
         )
 
-        attn_mask = alibi + causal_mask * -60000.0
-        # attn_mask = alibi + causal_mask * -3.38e38
-        hidden_states, presents = self.transformer_block(
-            hidden_states,
-            attn_mask=paddle.cast(attn_mask, dtype=hidden_states.dtype),
-            caches=self.cache_kvs,
-            pre_caches=pre_caches,
-            time_step=paddle.increment(paddle.shape(attn_mask)[-1], -1) if is_decoder else None,
-        )
+        attn_mask = alibi + causal_mask * paddle.finfo(alibi.dtype).min
+        if use_pre_caches:
+            hidden_states, presents = self.transformer_block(
+                hidden_states,
+                attn_mask=paddle.cast(attn_mask, dtype=hidden_states.dtype),
+                caches=self.cache_kvs,
+                pre_caches=pre_caches,
+                time_step=paddle.increment(paddle.shape(attn_mask)[-1], -1) if is_decoder else None,
+            )
+        else:
+            hidden_states, presents = self.transformer_block(
+                hidden_states,
+                attn_mask=paddle.cast(attn_mask, dtype=hidden_states.dtype),
+                caches=self.cache_kvs,
+                time_step=paddle.increment(paddle.shape(attn_mask)[-1], -1) if is_decoder else None,
+            )
 
         # Add last hidden state
         hidden_states = self.ln_f(hidden_states)

@@ -12,13 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import os
 
+import numpy as np
 import paddle
 from paddle.distributed import fleet
 
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.peft.prefix import llama_postprocess_past_key_value
-from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaConfig
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaConfig, AutoConfig
 from paddlenlp.transformers.utils import get_scale_by_dtype
 
 
@@ -34,7 +37,7 @@ def get_parser():
     parser.add_argument("--src_length", type=int, default=50, help="the max length of source text")
     parser.add_argument("--tgt_length", type=int, default=100, help="the max length of decoding length")
 
-    parser.add_argument("--top_k", type=int, default=1, help="top_k parameter for generation")
+    parser.add_argument("--top_k", type=int, default=0, help="top_k parameter for generation")
     parser.add_argument("--top_p", type=float, default=0, help="top_p parameter for generation")
     parser.add_argument("--temperature", type=float, default=1.0, help="top_p parameter for generation")
     parser.add_argument("--data_file", default=None, help="data file directory")
@@ -45,6 +48,12 @@ def get_parser():
     )
     parser.add_argument("--device", type=str, default="gpu", help="Device")
     parser.add_argument("--dtype", type=str, default="float32", help="Device")
+    parser.add_argument(
+        "--use_pre_caches",
+        default="False",
+        type=strtobool,
+        help="whether use pre_caches",
+    )
     return parser
 
 
@@ -99,27 +108,27 @@ class Predictor(object):
                 prefix_config = PrefixConfig.from_pretrained(self.args.prefix_path)
                 dtype = prefix_config.dtype
             else:
-                config = LlamaConfig.from_pretrained(args.model_name_or_path)
+                config = AutoConfig.from_pretrained(args.model_name_or_path)
                 dtype = "float16" if config.dtype is None else config.dtype
 
-            dtype = "float32"
-
+            dtype = self.args.dtype
+            paddle.set_default_dtype(dtype)
             self.model = AutoModelForCausalLM.from_pretrained(
                 args.model_name_or_path,
                 tensor_parallel_degree=tensor_parallel_degree,
                 tensor_parallel_rank=tensor_parallel_rank,
                 load_state_as_np=True,
                 dtype=dtype,
-                use_safetensors=True,
             )
             self.model.prepare_fast_entry(None)
+            self.config = self.model.config
             if self.args.lora_path is not None:
                 self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
-            if self.args.prefix_path is not None:
+            # if self.args.prefix_path is not None:
 
-                self.model = PrefixModelForCausalLM.from_pretrained(
-                    self.model, self.args.prefix_path, llama_postprocess_past_key_value
-                )
+            #     self.model = PrefixModelForCausalLM.from_pretrained(
+            #         self.model, self.args.prefix_path, llama_postprocess_past_key_value
+            #     )
 
         self.model.eval()
 
@@ -137,65 +146,50 @@ class Predictor(object):
 
         # create 4-d attention-mask
         attention_mask = (
-            paddle.tril(paddle.ones([input_ids_shape[-1], input_ids_shape[-1]], dtype="float32"))
+            paddle.tril(paddle.ones([input_ids_shape[-1], input_ids_shape[-1]], dtype=self.args.dtype))
             .unsqueeze_(0)
             .unsqueeze_(0)
         )
-        attention_mask = (attention_mask - 1) * get_scale_by_dtype(self.args.dtype)
+        attention_mask = (1 - attention_mask) * paddle.finfo(attention_mask.dtype).min
 
         inputs["attention_mask"] = attention_mask
+        use_pre_caches = self.args.use_pre_caches
 
-        # pre_caches = [
-        #     paddle.randn(
-        #         [
-        #             2,
-        #             self.model.config.num_attention_heads,
-        #             128,
-        #             self.model.config.hidden_size // self.model.config.num_attention_heads,
-        #         ],
-        #         dtype="float32",
-        #     ).numpy()
-        #     for _ in range(self.model.config.num_hidden_layers)
-        # ]
-        import numpy as np
-        pre_caches = paddle.split(paddle.to_tensor(np.load("./weights/chinese-alpacha/pre_caches.npy")), self.model.config.num_hidden_layers, 0)
-        for i in range(self.model.config.num_hidden_layers):
-            pre_caches[i] = pre_caches[i].transpose([1, 0, 2, 3, 4]).cast(self.args.dtype)
+        # init pre_caches
+        if use_pre_caches:
+            pre_caches_numpy = np.load(os.path.join(self.args.prefix_path, "pre_caches.npy"))
+            pre_caches = np.split(pre_caches_numpy, self.config.num_hidden_layers)
+            for i in range(self.config.num_hidden_layers):
+                pre_caches[i] = paddle.to_tensor(pre_caches[i].transpose(1, 0, 2, 3, 4).astype("float16"), dtype="float16")
+        else:
+            pre_caches = []
+            for i in range(self.config.num_hidden_layers):
+                pre_caches.append(paddle.zeros([2, 1, 32, 128, 128]).astype(self.args.dtype))
 
+        # init pre_caches attention_mask
+        if use_pre_caches:
+            pre_caches_length = pre_caches[0].shape[-2]
+            batch_size = inputs["input_ids"].shape[0]
+            pre_cache_attention_mask = paddle.zeros(
+                [batch_size, 1, inputs["input_ids"].shape[-1], pre_caches_length], dtype=attention_mask.dtype
+            )
+            attention_mask = paddle.concat([pre_cache_attention_mask, attention_mask], axis=3)
+        else:
+            pre_caches_length = 128
+            batch_size = inputs["input_ids"].shape[0]
+            pre_cache_attention_mask = paddle.full(
+                [batch_size, 1, inputs["input_ids"].shape[-1], pre_caches_length],
+                paddle.finfo(attention_mask.dtype).min, dtype=attention_mask.dtype
+            )
+            attention_mask = paddle.concat([pre_cache_attention_mask, attention_mask], axis=3)
+
+        inputs["attention_mask"] = attention_mask
         inputs_tensor = {}
         for key, value in inputs.items():
             inputs_tensor[key] = paddle.to_tensor(value)
-        
-        print("self.args.dtype",self.args.dtype)
-        inputs_tensor["use_pre_caches"] = True
-
-
-        # append pre_cache attention_mask
-        pre_caches_length = pre_caches[0].shape[-2]
-        batch_size, seq_length_with_past = inputs["input_ids"].shape[0], inputs["input_ids"].shape[-1]
-        if True:
-            pre_cache_attention_mask = paddle.zeros(
-                [batch_size, 1, seq_length_with_past, pre_caches_length], dtype=attention_mask.dtype
-            )
-        else:
-            pre_cache_attention_mask = (
-                paddle.ones([1, 1, pre_caches_length, inputs["input_ids"].shape[-1]], dtype=attention_mask.dtype)
-                * -1
-                * get_scale_by_dtype(self.args.dtype)
-            )
-
-        print("pre_cache_attention_mask", pre_cache_attention_mask.shape)
-        print("pre_cache_attention_mask", pre_cache_attention_mask)
-        print("attention_mask", attention_mask.shape)
-        print("attention_mask", attention_mask)
-        # import pdb;pdb.set_trace()
-        attention_mask = paddle.concat([pre_cache_attention_mask, attention_mask], axis=3)
 
         inputs_tensor["pre_caches"] = pre_caches
-        inputs_tensor["attention_mask"] = attention_mask
-        print("attention_mask", attention_mask.shape)
-        print("attention_mask", attention_mask)
-
+        inputs_tensor["use_pre_caches"] = True
         return inputs_tensor
 
     def infer(self, inputs):
@@ -247,9 +241,8 @@ if __name__ == "__main__":
     predictor = Predictor(args)
     if args.data_file is None:
         all_texts = [
-            # "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
-            # "answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
-            "类型#裙*版型#显瘦*风格#文艺*风格#简约*图案#印花*图案#撞色*裙下摆#压褶*裙长#连衣裙*裙领型#"
+            "answer: linebacker context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
+            "answer: five context: The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, which sacked him seven times and forced him into three turnovers, including a fumble which they recovered for a touchdown. Denver linebacker Von Miller was named Super Bowl MVP, recording five solo tackles, 2½ sacks, and two forced fumbles. </s>",
         ]
     else:
         all_texts = []

@@ -1501,7 +1501,7 @@ class FusedLlamaModel(LlamaPretrainedModel):
         # Transformer cache kv
 
         if len(self.cache_kvs) == 0:
-            max_seq_length = 1024
+            max_seq_length = self.config.max_position_embeddings
             self.cache_kvs = [
                 paddle.fluid.layers.fill_constant_batch_size_like(
                     input_ids,
@@ -1527,24 +1527,31 @@ class FusedLlamaModel(LlamaPretrainedModel):
         head_dim = self.hidden_size // self.num_attention_heads
         offset = paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else 0
 
-        # if use_pre_caches and pre_caches is not None:
-        #     offset = pre_caches[0].shape[-2] + offset
-        #     print("offset",offset)
-
         rotary_embeddings = self.get_rotary_embedding(
             batch_size, self.max_position_embeddings, 10000, head_dim, seq_length, offset
         )
-        rotary_embeddings = paddle.transpose(rotary_embeddings.unsqueeze(1), [0, 1, 3, 2, 4])
 
-        hidden_states, presents = self.transformer_block(
-            hidden_states,
-            attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
-            caches=self.cache_kvs,
-            rotary_embs=paddle.cast(rotary_embeddings, dtype=paddle.float32),
-            rotary_emb_dims=1,
-            pre_caches=pre_caches,
-            time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
-        )
+        if use_pre_caches:
+            hidden_states, presents = self.transformer_block(
+                hidden_states,
+                attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
+                caches=self.cache_kvs,
+                rotary_embs=paddle.cast(rotary_embeddings, dtype=paddle.float32),
+                rotary_emb_dims=1,
+                pre_caches=pre_caches,
+                time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
+            )
+        else:
+            hidden_states, presents = self.transformer_block(
+                hidden_states,
+                attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
+                caches=self.cache_kvs,
+                rotary_embs=paddle.cast(rotary_embeddings, dtype=paddle.float32),
+                rotary_emb_dims=1,
+                pre_caches=None,
+                time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
+            )
+
         hidden_states = self.norm(hidden_states)
 
         if output_hidden_states:
