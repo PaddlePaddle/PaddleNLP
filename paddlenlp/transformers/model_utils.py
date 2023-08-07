@@ -327,6 +327,7 @@ def _find_weight_file_path(
     cache_dir: str,
     model_class: Type[PretrainedModel],
     resource_uri: Optional[str] = None,
+    config: Optional[PretrainedConfig] = None,
 ) -> str | None:
     """find the target weight file under the cache dir, because there are some conflicts about weight file names.
 
@@ -351,7 +352,7 @@ def _find_weight_file_path(
     # 3. find the target weight file name for splited tensor parallel
     # fix for load hybrid parallel
     hybrid_parallel_weight_file_path = os.path.join(
-        cache_dir, _add_variant(resource_weight_file_name, weight_name_suffix())
+        cache_dir, _add_variant(resource_weight_file_name, weight_name_suffix(config))
     )
     if os.path.isfile(hybrid_parallel_weight_file_path):
         return hybrid_parallel_weight_file_path
@@ -1000,7 +1001,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             # find the weight file with the above two branch: `bert-base-uncased.pdparams`, `model_state.pdparams`
             weight_file_path = _find_weight_file_path(
-                cache_dir=cache_dir, model_class=cls, resource_uri=pretrained_model_name_or_path
+                cache_dir=cache_dir, model_class=cls, resource_uri=pretrained_model_name_or_path, config=config,
             )
 
             return weight_file_path
@@ -1010,7 +1011,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # in-order to compatible with old style:
             # file name in pretrained_resouce_file_maps is https://path/to/bert-base-uncased.pdparams, but the registered model-state file name in `resouce_file_maps` is `model_state.pdparams`
 
-            return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls)
+            return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls, config=config)
 
         # 4. download from community or hf-hub
         else:
@@ -1233,6 +1234,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         import paddlenlp.ops.fast_transformer.transformer.decoding as ft_decoding
 
         state_to_load = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_dict)
+
         if paddle.in_dynamic_mode():
             model_to_load.set_state_dict(state_to_load)
 
