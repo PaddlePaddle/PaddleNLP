@@ -95,10 +95,10 @@ class GPTDecoderLayerPipe(TransformerDecoderLayer):
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
         # hidden_states = super().forward(hidden_states, tgt_mask=attention_mask)
-        # if self.use_recompute and self.recompute_granularity == "full":
-        #     hidden_states = recompute(super().forward, hidden_states, attention_mask)
-        # else:
-        hidden_states = super().forward(hidden_states, tgt_mask=attention_mask)
+        if self.enable_recompute and self.config.recompute_granularity == "full":
+            hidden_states = recompute(super().forward, hidden_states, attention_mask)
+        else:
+            hidden_states = super().forward(hidden_states, tgt_mask=attention_mask)
 
         return return_args(hidden_states, attention_mask, position_ids)
 
