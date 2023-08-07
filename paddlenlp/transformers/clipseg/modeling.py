@@ -239,7 +239,8 @@ class CLIPSegTextEmbeddings(nn.Layer):
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
         self.register_buffer(
             "position_ids",
-            paddle.arange(config.max_position_embeddings, dtype="int64").expand((1, -1), persistable=False),
+            paddle.arange(config.max_position_embeddings, dtype="int64").expand((1, -1)),
+            persistable=False,
         )
 
     def forward(
