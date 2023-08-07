@@ -199,7 +199,7 @@ class GPTChineseTokenizer(PretrainedTokenizer):
             return [self._convert_token_to_id(token) for token in tokens]
     '''
 
-    def convert_ids_to_tokens(self, ids):
+    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
         """
         Converts a single index or a sequence of indices to a token or a
         sequence of tokens.

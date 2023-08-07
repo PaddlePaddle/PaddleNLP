@@ -336,6 +336,8 @@ class ErnieLayoutEncoder(nn.Layer):
     def __init__(self, config):
         super(ErnieLayoutEncoder, self).__init__()
         self.config = config
+        # Recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
         self.layer = nn.LayerList([ErnieLayoutLayer(config) for _ in range(config["num_hidden_layers"])])
 
         self.has_relative_attention_bias = config["has_relative_attention_bias"]
@@ -426,7 +428,7 @@ class ErnieLayoutEncoder(nn.Layer):
             hidden_save["input_attention_mask"] = attention_mask
             hidden_save["input_layer_head_mask"] = layer_head_mask
 
-            if self.config.enable_recompute and self.training:
+            if self.enable_recompute and self.training:
 
                 def create_custom_forward(module):
                     def custom_forward(*inputs):

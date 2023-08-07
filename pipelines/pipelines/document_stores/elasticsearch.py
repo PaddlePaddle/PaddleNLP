@@ -32,7 +32,7 @@ try:
         Urllib3HttpConnection,
     )
     from elasticsearch.exceptions import RequestError
-    from elasticsearch.helpers import bulk, scan
+    from elasticsearch.helpers import parallel_bulk, scan
 except (ImportError, ModuleNotFoundError) as ie:
     from pipelines.utils.import_utils import _optional_component_not_installed
 
@@ -44,6 +44,8 @@ from pipelines.document_stores.filter_utils import LogicalFilterClause
 from pipelines.schema import Document, Label
 
 logger = logging.getLogger(__name__)
+# disable elastic search debug log
+logging.getLogger("elasticsearch").setLevel(logging.INFO)
 
 
 class ElasticsearchDocumentStore(KeywordDocumentStore):
@@ -83,6 +85,9 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         synonyms: Optional[List] = None,
         synonym_type: str = "synonym",
         use_system_proxy: bool = False,
+        chunk_size: int = 500,
+        thread_count: int = 32,
+        queue_size: int = 32,
     ):
         """
         A DocumentStore using Elasticsearch to store and query the documents for our search.
@@ -155,7 +160,9 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                              Synonym or Synonym_graph to handle synonyms, including multi-word synonyms correctly during the analysis process.
                              More info at https://www.elastic.co/guide/en/elasticsearch/reference/current/analysis-synonym-graph-tokenfilter.html
         :param use_system_proxy: Whether to use system proxy.
-
+        :param queue_size: size of the task queue between the main thread (producing chunks to send) and the processing threads. for more info at https://elasticsearch-py.readthedocs.io/en/v8.8.2/helpers.html?highlight=bulk#bulk-helpers
+        :param chunk_size: number of docs in one chunk sent to es (default: 500)
+        :param thread_count: size of the threadpool to use for the bulk requests
         """
         # save init parameters to enable export of component config as YAML
         self.set_config(
@@ -254,6 +261,9 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
 
         self.duplicate_documents = duplicate_documents
         self.refresh_type = refresh_type
+        self.chunk_size = chunk_size
+        self.thread_count = thread_count
+        self.queue_size = queue_size
 
     def similarity_check(self, similarity):
         if similarity in ["cosine", "dot_product", "l2"]:
@@ -675,11 +685,27 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
 
             # Pass batch_size number of documents to bulk
             if len(documents_to_index) % batch_size == 0:
-                bulk(self.client, documents_to_index, request_timeout=300, refresh=self.refresh_type, headers=headers)
+                for success, info in parallel_bulk(
+                    self.client,
+                    documents_to_index,
+                    chunk_size=self.chunk_size,
+                    thread_count=self.thread_count,
+                    queue_size=self.queue_size,
+                ):
+                    if not success:
+                        logger.error("A document failed:", info)
                 documents_to_index = []
 
         if documents_to_index:
-            bulk(self.client, documents_to_index, request_timeout=300, refresh=self.refresh_type, headers=headers)
+            for success, info in parallel_bulk(
+                self.client,
+                documents_to_index,
+                chunk_size=self.chunk_size,
+                thread_count=self.thread_count,
+                queue_size=self.queue_size,
+            ):
+                if not success:
+                    logger.error("A document failed:", info)
 
     def write_labels(
         self,
@@ -733,11 +759,27 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
 
             # Pass batch_size number of labels to bulk
             if len(labels_to_index) % batch_size == 0:
-                bulk(self.client, labels_to_index, request_timeout=300, refresh=self.refresh_type, headers=headers)
+                for success, info in parallel_bulk(
+                    self.client,
+                    labels_to_index,
+                    chunk_size=self.chunk_size,
+                    thread_count=self.thread_count,
+                    queue_size=self.queue_size,
+                ):
+                    if not success:
+                        logger.error("A document failed:", info)
                 labels_to_index = []
 
         if labels_to_index:
-            bulk(self.client, labels_to_index, request_timeout=300, refresh=self.refresh_type, headers=headers)
+            for success, info in parallel_bulk(
+                self.client,
+                labels_to_index,
+                chunk_size=self.chunk_size,
+                thread_count=self.thread_count,
+                queue_size=self.queue_size,
+            ):
+                if not success:
+                    logger.error("A document failed:", info)
 
     def update_document_meta(
         self, id: str, meta: Dict[str, str], headers: Optional[Dict[str, str]] = None, index: str = None
@@ -1157,6 +1199,7 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
             body["_source"] = {"excludes": self.excluded_meta_data}
 
         logger.debug(f"Retriever query: {body}")
+        logging.getLogger("elasticsearch").setLevel(logging.CRITICAL)
         result = self.client.search(index=index, body=body, headers=headers)["hits"]["hits"]
 
         documents = [self._convert_es_hit_to_document(hit, return_embedding=self.return_embedding) for hit in result]
@@ -1478,7 +1521,6 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
         )
 
         logging.getLogger("elasticsearch").setLevel(logging.CRITICAL)
-
         with tqdm(total=document_count, position=0, unit=" Docs", desc="Updating embeddings") as progress_bar:
             for result_batch in get_batches_from_generator(result, batch_size):
                 document_batch = [
@@ -1502,8 +1544,15 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                         "doc": {self.embedding_field: emb.tolist()},
                     }
                     doc_updates.append(update)
-
-                bulk(self.client, doc_updates, request_timeout=300, refresh=self.refresh_type, headers=headers)
+                for success, info in parallel_bulk(
+                    self.client,
+                    doc_updates,
+                    chunk_size=self.chunk_size,
+                    thread_count=self.thread_count,
+                    queue_size=self.queue_size,
+                ):
+                    if not success:
+                        logger.error("A document failed:", info)
                 progress_bar.update(batch_size)
 
     def delete_all_documents(
@@ -2138,8 +2187,15 @@ class OpenSearchDocumentStore(ElasticsearchDocumentStore):
                             "doc": {new_embedding_field: doc.embedding.tolist()},
                         }
                         doc_updates.append(update)
-
-                bulk(self.client, doc_updates, request_timeout=300, refresh=self.refresh_type, headers=headers)
+                for success, info in parallel_bulk(
+                    self.client,
+                    doc_updates,
+                    chunk_size=self.chunk_size,
+                    thread_count=self.thread_count,
+                    queue_size=self.queue_size,
+                ):
+                    if not success:
+                        logger.error("A document failed:", info)
                 progress_bar.update(batch_size)
 
 

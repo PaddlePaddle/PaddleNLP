@@ -14,6 +14,7 @@
 
 import json
 import os
+import sys
 from dataclasses import dataclass, field
 from functools import partial
 
@@ -133,7 +134,7 @@ def convert_example(
         )
     else:
         input_ids = source_tokenized["input_ids"] + target_tokenized["input_ids"]
-        labels = len(source_tokenized["input_ids"]) * [tokenizer.pad_token_id] + target_tokenized["input_ids"]
+        labels = len(source_tokenized["input_ids"]) * [-100] + target_tokenized["input_ids"]
 
         # shift labels
         input_ids, labels = input_ids[:-1], labels[1:]
@@ -146,7 +147,10 @@ def convert_example(
 def main():
     # Parse the model and data  arguements
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    else:
+        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -193,7 +197,6 @@ def main():
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         lm_shift_labels=False,
-        use_recompute=training_args.recompute,
     )
 
     if model_args.lora:
@@ -309,7 +312,6 @@ def main():
         tokenizer=tokenizer,
         padding=True,
         max_length=data_args.src_length + data_args.tgt_length,
-        label_pad_token_id=tokenizer.pad_token_id,
         return_tensors="np",
     )
 

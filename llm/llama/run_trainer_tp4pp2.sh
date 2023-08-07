@@ -20,7 +20,7 @@ rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
 
-PYTHONPATH=../../../:$PYTHONPATH  \
+PYTHONPATH=../../:$PYTHONPATH  \
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "output/$task_name""_log" \
@@ -43,6 +43,7 @@ python -u  -m paddle.distributed.launch \
     --tensor_parallel_degree 4 \
     --pipeline_parallel_degree 2 \
     --virtual_pp_degree 1 \
+    --sequence_parallel 0 \
     --learning_rate 0.00001 \
     --min_learning_rate 0.000001 \
     --max_steps 10000 \
@@ -61,3 +62,4 @@ python -u  -m paddle.distributed.launch \
     --do_train \
     --do_eval \
     --device "gpu"
+    # --pipeline_parallel_config "disable_partial_send_recv"  # if set sequence_parallel True, please note off this line.

@@ -38,6 +38,9 @@ import paddle.distributed as dist
 import paddle.nn as nn
 from packaging import version
 from paddle.distributed import fleet
+from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
+    DygraphShardingOptimizer,
+)
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
@@ -654,6 +657,7 @@ class Trainer:
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
+                os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
                 # Skip past any already trained steps if resuming training
                 # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
@@ -1115,11 +1119,14 @@ class Trainer:
             if hasattr(optimizer_cls, "_create_master_weight") and self.args.fp16_opt_level == "O2":
                 optimizer_kwargs["multi_precision"] = True
 
-            if ShardingOption.SHARD_OP in self.args.sharding:
-                from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
-                    DygraphShardingOptimizer,
-                )
+            def is_new_version_sharding_stage1_optimizer():
+                signature_keys = set(inspect.signature(DygraphShardingOptimizer).parameters.keys())
+                return "inner_optimizer_class" not in signature_keys
 
+            if ShardingOption.SHARD_OP in self.args.sharding and not is_new_version_sharding_stage1_optimizer():
+                # for backward compatibility.
+                # this call will raise, if sharding stage1 is supported in HybridParallelOptimizer,
+                # in which case, the logic follows will handle it
                 self.optimizer = DygraphShardingOptimizer(
                     hcg=fleet.get_hybrid_communicate_group(),
                     user_defined_strategy=None,
@@ -1456,10 +1463,6 @@ class Trainer:
                 # the lookup_table is in black_list, but in O2, we need it return fp16
                 custom_white_list.extend(["lookup_table", "lookup_table_v2"])
 
-            if self.args.bf16 and self.args.fp16_opt_level == "O2":
-                # c_embedding not support bf16 yet
-                custom_black_list.append("c_embedding")
-
             if self.args.amp_custom_white_list is not None:
                 custom_white_list.extend(self.args.amp_custom_white_list)
             if self.args.amp_custom_black_list is not None:
@@ -1509,7 +1512,13 @@ class Trainer:
             self._past = outputs[self.args.past_index]
 
         # We don't use .loss here since the model may return tuples instead of ModelOutput.
-        loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
+        loss = outputs["loss"] if isinstance(outputs, dict) else outputs
+        if isinstance(outputs, dict):
+            loss = outputs["loss"]
+        elif isinstance(outputs, tuple):
+            loss = outputs[0]
+        else:
+            loss = outputs
 
         return (loss, outputs) if return_outputs else loss
 
@@ -1710,7 +1719,9 @@ class Trainer:
             paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
 
         # Maybe delete some older checkpoints.
-        if self.args.should_save and (True if not self.args.use_hybrid_parallel else self.args.local_rank == 0):
+        if self.args.should_save_model_state and (
+            True if not self.args.use_hybrid_parallel else self.args.local_rank == 0
+        ):
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
 
     def set_optimizer_grouped_parameters(self, optimizer_grouped_parameters=None):
