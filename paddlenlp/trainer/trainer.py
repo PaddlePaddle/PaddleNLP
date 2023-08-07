@@ -1620,6 +1620,7 @@ class Trainer:
         inputs = _prepare_training(model, inputs)
 
         with self.autocast_smart_context_manager():
+            inputs = model._prepare_training(inputs, self.optimizer, self.lr_scheduler)
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
 
         model.micro_batch_size, model.accumulate_steps = config_backup
