@@ -587,7 +587,7 @@ class TransformerModel(nn.Layer):
     The Transformer model.
 
     This model is a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/https://www.paddlepaddle.org.cn/documentation/docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
