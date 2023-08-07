@@ -2090,18 +2090,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         config_to_save = copy.deepcopy(model_to_save.config)
 
-        if state_dict is None:
-            if config_to_save.tensor_parallel_degree > 1 and merge_tensor_parallel:
-                state_dict = model_to_save.state_dict()
-            else:
-                state_dict = self.state_dict()
-
-        if save_sharding_stage1_model:
-            sharding_rank = sharding_group.rank
-            state_dict = filter_sharded_params(state_dict, optimizer, sharding_rank)
         # Save the model
-        if config_to_save.tensor_parallel_degree > 1:
+        if state_dict is None and config_to_save.tensor_parallel_degree > 1:
             if merge_tensor_parallel:
+                state_dict = model_to_save.state_dict()
+                if save_sharding_stage1_model:
+                    state_dict = filter_sharded_params(state_dict, optimizer, sharding_group.rank)
                 state_dict = model_to_save.merge_tensor_parallel(state_dict, config_to_save)
                 config_to_save.tensor_parallel_degree = 1
                 if config_to_save.tensor_parallel_rank != 0:
@@ -2111,6 +2105,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     variant = "_".join([x for x in variant.split("_") if "tp" not in x])
             else:
                 variant = weight_name_suffix() if variant is None else variant
+
+        if state_dict is None:
+            state_dict = self.state_dict()
+            if save_sharding_stage1_model:
+                state_dict = filter_sharded_params(state_dict, optimizer, sharding_group.rank)
 
         # Attach architecture to the config
         config_to_save.architectures = [model_to_save.__class__.__name__]
