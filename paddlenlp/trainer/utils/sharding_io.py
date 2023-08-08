@@ -39,12 +39,15 @@ SHARDING_META_NAME = "shard_meta.json"
 
 
 class ShardingIO:
-    def __init__(self, args, hcg, model, optimizer=None):
+    def __init__(self, args, model, optimizer=None, hcg=None):
         self.args = args
-        self.hcg = hcg
-        self.sharding_group = self.hcg.get_sharding_parallel_group()
-        self.optimizer = optimizer
         self.model = model
+        self.optimizer = optimizer
+        self.hcg = hcg
+        self.sharding_group = None
+        if self.hcg is None and paddle.distributed.get_world_size() > 1 and self.args.use_hybrid_parallel:
+            self.hcg = fleet.get_hybrid_communicate_group()
+            self.sharding_group = self.hcg.get_sharding_parallel_group()
 
     def set_optimizer(self, optimizer):
         self.optimizer = optimizer

@@ -267,7 +267,7 @@ class Trainer:
         self.control = TrainerControl()
         self._signature_columns = None
         self.optimizer_grouped_parameters = None
-        self.sharding_io = ShardingIO(self.args, self.hcg, self.model, self.optimizer)
+        self.sharding_io = ShardingIO(self.args, self.model, self.optimizer)
 
         if self.sharding is not None and self.optimizer is not None:
             raise RuntimeError(
