@@ -38,7 +38,7 @@ from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
     GroupShardedScaler,
 )
-from paddle.fluid.framework import core
+from paddle.framework import core
 from paddle.incubate.distributed.models import moe
 from utils import get_timers, set_timers
 from visualdl import LogWriter

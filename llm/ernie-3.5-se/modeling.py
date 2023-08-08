@@ -281,7 +281,7 @@ class RotaryEmbedding(nn.Layer):
         if position_ids is not None:
             return self.cos_cached, self.sin_cached
         start = 0
-        if self.config.enable_random_postion_ids:
+        if self.config.enable_random_position_ids:
             if self.training:
                 np_rng = np.random.RandomState(
                     int(os.getenv("TRAINER_GLOBAL_STEP", "0")) + (paddle.distributed.get_rank() * 100000)
@@ -783,6 +783,13 @@ class Ernie35PretrainedModel(PretrainedModel):
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):
 
+        from conversion_utils import (
+            o_proj_merge_fn,
+            o_proj_split_fn,
+            qkv_gate_up_proj_merge_fn,
+            qkv_gate_up_proj_split_fn,
+        )
+
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
         fn = split_or_merge_func(
@@ -791,43 +798,71 @@ class Ernie35PretrainedModel(PretrainedModel):
             tensor_parallel_rank=config.tensor_parallel_rank,
             num_attention_heads=config.num_attention_heads,
         )
+        qkv_gate_up_proj_fn = qkv_gate_up_proj_split_fn if is_split else qkv_gate_up_proj_merge_fn
+        fuse_qkvgu_fn = qkv_gate_up_proj_fn(  # is_column: True
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_rank=config.tensor_parallel_rank,
+            hidden_size=config.hidden_size,
+            intermediate_size=config.intermediate_size,
+            num_heads=config.num_attention_heads,
+        )
+        o_proj_fn = o_proj_split_fn if is_split else o_proj_merge_fn
+        fuse_o_proj_fn = o_proj_fn(  # is_column: False
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_rank=config.tensor_parallel_rank,
+            hidden_size=config.hidden_size,
+            intermediate_size=config.intermediate_size,
+        )
 
-        def get_tensor_parallel_split_mappings(num_layers):
+        def get_tensor_parallel_split_mappings(num_layers, parallel_attn_hatf):
             final_actions = {}
             base_actions = {
                 # Column Linear
-                "layers.0.self_attn.q_proj.weight": partial(fn, is_column=True),
-                "layers.0.self_attn.k_proj.weight": partial(fn, is_column=True),
-                "layers.0.self_attn.v_proj.weight": partial(fn, is_column=True),
-                "layers.0.mlp.gate_proj.weight": partial(fn, is_column=True),
-                "layers.0.mlp.up_proj.weight": partial(fn, is_column=True),
+                "layers.0.self_attn_mlp.qkv_gate_up_proj.weight": fuse_qkvgu_fn,
                 "lm_head.weight": partial(fn, is_column=True),
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
-                "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
-                "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
+                "layers.0.self_attn_mlp.o_proj.weight": fuse_o_proj_fn,
             }
             if config.use_bias:
                 base_actions.update(
                     {
                         # Column Linear
-                        "layers.0.self_attn.q_proj.bias": partial(fn, is_column=True),
-                        "layers.0.self_attn.k_proj.bias": partial(fn, is_column=True),
-                        "layers.0.self_attn.v_proj.bias": partial(fn, is_column=True),
-                        "layers.0.mlp.gate_proj.bias": partial(fn, is_column=True),
-                        "layers.0.mlp.up_proj.bias": partial(fn, is_column=True),
-                        "lm_head.weight": partial(fn, is_column=True),
+                        "layers.0.self_attn_mlp.qkv_gate_up_proj.bias": fuse_qkvgu_fn,
+                        "lm_head.bias": partial(fn, is_column=True),
                     }
                 )
+
+            start = 0 if not parallel_attn_hatf else 1
+            end = num_layers if not parallel_attn_hatf else num_layers - 1
             for key, action in base_actions.items():
                 if "layers.0." in key:
-                    for i in range(num_layers):
+                    for i in range(start, end):
                         final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
-                final_actions[key] = action
+                if "layers.0." not in key:
+                    final_actions[key] = action
+
+            if parallel_attn_hatf:
+                # Layer 0
+                final_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
+                final_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
+                final_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
+                final_actions["layers.0.self_attn.o_proj.weight"] = partial(fn, is_column=False)
+                if config.use_bias:
+                    final_actions["layers.0.self_attn.q_proj.bias"] = partial(fn, is_column=True)
+                    final_actions["layers.0.self_attn.k_proj.bias"] = partial(fn, is_column=True)
+                    final_actions["layers.0.self_attn.v_proj.bias"] = partial(fn, is_column=True)
+                # Layer num_layers - 1
+                final_actions[f"layers.{num_layers - 1}.mlp.gate_proj.weight"] = partial(fn, is_column=True)
+                final_actions[f"layers.{num_layers - 1}.mlp.up_proj.weight"] = partial(fn, is_column=True)
+                final_actions[f"layers.{num_layers - 1}.mlp.down_proj.weight"] = partial(fn, is_column=False)
+                if config.use_bias:
+                    final_actions[f"layers.{num_layers - 1}.mlp.gate_proj.bias"] = partial(fn, is_column=True)
+                    final_actions[f"layers.{num_layers - 1}.mlp.up_proj.bias"] = partial(fn, is_column=True)
 
             return final_actions
 
-        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers, config.parallel_attn_hatf)
 
         return mappings
 

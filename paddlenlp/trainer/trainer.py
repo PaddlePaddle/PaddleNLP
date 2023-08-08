@@ -118,10 +118,7 @@ try:
 except:
     mix_precision_utils = None
 
-try:
-    from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
-except:
-    from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
+from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
 
 
 def is_dp_group_support_in_group_sharded_parallel():
@@ -1371,11 +1368,7 @@ class Trainer:
             else:
                 # sync params (broadcast) buffers in dp group
                 if not is_dp_group_support_in_group_sharded_parallel() and self.args.data_parallel_degree > 1:
-                    try:
-                        from paddle.fluid.dygraph.parallel import sync_params_buffers
-                    except ImportError:
-                        # fix for new api in paddlepaddle v2.5
-                        from paddle.distributed.parallel import sync_params_buffers
+                    from paddle.distributed.parallel import sync_params_buffers
 
                     hcg = fleet.get_hybrid_communicate_group()
                     dp_group = hcg.get_data_parallel_group()
@@ -1462,10 +1455,6 @@ class Trainer:
                 # https://github.com/PaddlePaddle/Paddle/blob/eb97f4f0adca40b16a309b927e480178beb8ae96/python/paddle/amp/amp_lists.py#L85-L86
                 # the lookup_table is in black_list, but in O2, we need it return fp16
                 custom_white_list.extend(["lookup_table", "lookup_table_v2"])
-
-            if self.args.bf16 and self.args.fp16_opt_level == "O2":
-                # c_embedding not support bf16 yet
-                custom_black_list.append("c_embedding")
 
             if self.args.amp_custom_white_list is not None:
                 custom_white_list.extend(self.args.amp_custom_white_list)
@@ -1594,24 +1583,6 @@ class Trainer:
         inputs = model._prepare_pipeline_inputs_func(self._pp_data_buffer)
         self._pp_data_buffer = []
 
-        # hack _prepare_training, remove additional optimizer or scheduler check
-        # https://github.com/PaddlePaddle/Paddle/blob/4695122492eee3cc9e9c585e33429c0f98dbdbb0/python/paddle/distributed/fleet/meta_parallel/pipeline_parallel.py#L241
-
-        def _prepare_training(self, data):
-            from paddle import framework
-
-            # reset the virtual pp rank for each run
-            self.set_virtual_pipeline_rank(0)
-            assert framework._dygraph_tracer()._has_grad, "Please enable the generation of gradients."
-            if self.is_pipeline_first_stage(ignore_virtual=True) or self.is_pipeline_last_stage(ignore_virtual=True):
-                assert data is not None, "For the first and the last stage, the data must be set."
-            else:
-                data = None
-
-            self._layers.train()
-
-            return data
-
         model.train()
 
         # hack pipeline-layers
@@ -1621,7 +1592,7 @@ class Trainer:
         model.micro_batch_size = self.args.per_device_train_batch_size
         model.accumulate_steps = self.args.gradient_accumulation_steps
 
-        inputs = _prepare_training(model, inputs)
+        inputs = model._prepare_training(inputs, self.optimizer, self.lr_scheduler)
 
         with self.autocast_smart_context_manager():
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)

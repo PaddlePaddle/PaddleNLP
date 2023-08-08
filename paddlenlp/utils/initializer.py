@@ -23,9 +23,8 @@ import warnings
 import numpy as np
 import paddle
 import paddle.nn as nn
-from paddle.fluid import core
-from paddle.fluid.core import VarDesc
-from paddle.fluid.framework import convert_np_dtype_to_dtype_
+from paddle.common_ops_import import convert_np_dtype_to_dtype_
+from paddle.framework import core
 
 __all__ = [
     "uniform_",
@@ -313,7 +312,7 @@ def _transform(t, device, dtype, blocking):
     if dtype is None:
         dtype = t.dtype
 
-    if type(dtype) is not VarDesc.VarType:
+    if type(dtype) is not core.VarDesc.VarType:
         dtype = convert_np_dtype_to_dtype_(dtype)
 
     # 1. gpu place need to determine whether the memory is sufficient for allocation:

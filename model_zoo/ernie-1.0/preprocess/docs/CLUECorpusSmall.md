@@ -30,30 +30,29 @@ python trans_to_json.py  --input_path ./clue_corpus_small_14g --output_path clue
 ```
 现在我们得到了jsonl格式的数据集。
 
-## ERNIE 中文预训练数据制作
+## 中文预训练数据制作
 
-下面是针对训练任务的数据集应用，此处以ernie为例。
+下面是针对训练任务的数据集应用，此处以llama为例。
 
 ```
 python -u  create_pretraining_data.py \
-    --model_name ernie-1.0-base-zh \
-    --tokenizer_name ErnieTokenizer \
+    --model_name idea-ccnl/ziya-llama-13b-v1 \
+    --tokenizer_name LlamaTokenizer \
+    --data_format "JSON" \
     --input_path clue_corpus_small_14g.jsonl \
-    --split_sentences \
-    --chinese \
-    --cn_whole_word_segment \
-    --cn_seg_func jieba \
+    --append_eos \
     --output_prefix clue_corpus_small_14g_20220104 \
     --workers 48 \
-    --log_interval 10000
+    --log_interval 10000 \
+    --data_impl "mmap"
 ```
 
-- model_name 可以更换为其他 ERNIE 系列模型，如: `ernie-3.0-base-zh`
+- model_name 可以更换为[其他模型](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/llama/README.md)。
 - workers 表示转化的线程数目
 
 数据共有文档`15702702`条左右，由于分词比较耗时，大概一小时左右可以完成。在当前目录下产出训练所需数据。
 ```
-clue_corpus_small_14g_20220104_ids.npy
-clue_corpus_small_14g_20220104_idx.npz
+clue_corpus_small_14g_20220104.bin
+clue_corpus_small_14g_20220104.idx
 ```
 用户可以使用此数据进行预训练任务。

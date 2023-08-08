@@ -695,7 +695,7 @@ def paddlenlp_load(path, map_location="cpu"):
                 def _ndarray_to_tensor(obj, return_numpy=False):
                     if return_numpy:
                         return obj
-                    if paddle.fluid.framework.in_dygraph_mode():
+                    if paddle.in_dynamic_mode():
                         return paddle.Tensor(obj, zero_copy=True)
                     else:
                         return _to_LodTensor(obj)

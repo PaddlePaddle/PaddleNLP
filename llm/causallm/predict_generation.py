@@ -12,16 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import sys
 
 import paddle
 from paddle.distributed import fleet
 from utils import get_prefix_tuning_params
 
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaTokenizer
 
 
-def parse_arguments():
+def get_parser():
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -33,10 +34,19 @@ def parse_arguments():
     parser.add_argument(
         "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
     )
+    parser.add_argument("--top_k", type=int, default=1, help="top_k parameter for generation")
+    parser.add_argument("--top_p", type=float, default=1.0, help="top_p parameter for generation")
+    parser.add_argument("--temperature", type=float, default=0.95, help="top_p parameter for generation")
     parser.add_argument("--data_file", default=None, help="data file directory")
     parser.add_argument("--output_file", default="output.json", help="predict result file directory")
     parser.add_argument("--device", type=str, default="gpu", help="Device")
     parser.add_argument("--dtype", type=str, default=None, help="Model dtype")
+    parser.add_argument("--gpt", type=bool, default=False, help="GPTForCausalLM")
+    return parser
+
+
+def parse_arguments():
+    parser = get_parser()
     return parser.parse_args()
 
 
@@ -50,8 +60,24 @@ def batchfy_text(texts, batch_size):
 
 
 class Predictor(object):
-    def __init__(self, args, tensor_parallel_degree, tensor_parallel_rank):
+    def __init__(self, args):
         self.args = args
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
+        if isinstance(self.tokenizer, LlamaTokenizer):
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+        tensor_parallel_degree = paddle.distributed.get_world_size()
+        self.tensor_parallel_rank = 0
+        if tensor_parallel_degree > 1:
+            strategy = fleet.DistributedStrategy()
+            strategy.hybrid_configs = {
+                "dp_degree": 1,
+                "mp_degree": tensor_parallel_degree,
+                "pp_degree": 1,
+                "sharding_degree": 1,
+            }
+            fleet.init(is_collective=True, strategy=strategy)
+            hcg = fleet.get_hybrid_communicate_group()
+            self.tensor_parallel_rank = hcg.get_model_parallel_rank()
 
         if self.args.lora_path is not None:
             lora_config = LoRAConfig.from_pretrained(self.args.lora_path)
@@ -64,13 +90,24 @@ class Predictor(object):
             dtype = self.args.dtype
         else:
             raise ValueError("Please specific the model dtype.")
+        if self.args.gpt:
+            sys.path.append("../gpt-3")
+            from modeling import GPTForCausalLM
 
-        self.model = AutoModelForCausalLM.from_pretrained(
-            args.model_name_or_path,
-            dtype=dtype,
-            tensor_parallel_degree=tensor_parallel_degree,
-            tensor_parallel_rank=tensor_parallel_rank,
-        )
+            self.model = GPTForCausalLM.from_pretrained(
+                args.model_name_or_path,
+                dtype=dtype,
+                tensor_parallel_degree=tensor_parallel_degree,
+                tensor_parallel_rank=self.tensor_parallel_rank,
+            )
+        else:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                args.model_name_or_path,
+                dtype=dtype,
+                tensor_parallel_degree=tensor_parallel_degree,
+                tensor_parallel_rank=self.tensor_parallel_rank,
+            )
+
         if self.args.lora_path is not None:
             self.model = LoRAModel.from_pretrained(
                 model=self.model, lora_path=self.args.lora_path, lora_config=lora_config
@@ -83,9 +120,6 @@ class Predictor(object):
                 postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
                 pad_attention_mask=prefix_tuning_params["pad_attention_mask"],
             )
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
-        if self.model.base_model_prefix == "llama":
-            self.tokenizer.pad_token = self.tokenizer.unk_token
         self.model.eval()
 
     def preprocess(self, source):
@@ -109,7 +143,9 @@ class Predictor(object):
                 eos_token_id=self.tokenizer.eos_token_id,
                 pad_token_id=self.tokenizer.pad_token_id,
                 decode_strategy="sampling",
-                top_k=1,
+                temperature=self.args.temperature,
+                top_k=self.args.top_k,
+                top_p=self.args.top_p,
             )
         result = result[0]
         return result
@@ -128,24 +164,9 @@ class Predictor(object):
 
 
 def predict():
-    args = parse_arguments()
+    args = parse_arguments().parse_args()
     paddle.set_device(args.device)
-
-    tensor_parallel_degree = paddle.distributed.get_world_size()
-    tensor_parallel_rank = 0
-    if tensor_parallel_degree > 1:
-        strategy = fleet.DistributedStrategy()
-        strategy.hybrid_configs = {
-            "dp_degree": 1,
-            "mp_degree": tensor_parallel_degree,
-            "pp_degree": 1,
-            "sharding_degree": 1,
-        }
-        fleet.init(is_collective=True, strategy=strategy)
-        hcg = fleet.get_hybrid_communicate_group()
-        tensor_parallel_rank = hcg.get_model_parallel_rank()
-
-    predictor = Predictor(args, tensor_parallel_degree, tensor_parallel_rank)
+    predictor = Predictor(args)
 
     source_texts = []
     target_texts = []

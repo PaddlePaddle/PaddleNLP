@@ -11,13 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import distutils.util
-import os
-
 import paddle
 from paddle import _C_ops
-from paddle.fluid import core
+from paddle.framework import core
 
 
 def is_fused_matmul_bias_supported():
@@ -45,16 +41,19 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
         x, weight, bias = ctx.saved_tensor()
         x_grad = paddle.matmul(y_grad, weight, transpose_y=True)
 
+        # _C_ops.fused_linear_param_grad_add(x, y_grad, dw, db, multi precision, has bias)
         if bias is None:
             if hasattr(weight, "main_grad"):
-                weight.main_grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, weight.main_grad, None, True)
+                weight.main_grad, _ = _C_ops.fused_linear_param_grad_add(
+                    x, y_grad, weight.main_grad, None, True, False
+                )
                 return x_grad, None
             else:
                 if weight.grad is not None:
-                    weight.grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, weight.grad, None, False)
+                    weight.grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, weight.grad, None, False, False)
                     return x_grad, None
                 else:
-                    weight_grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False)
+                    weight_grad, _ = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False, False)
                     return x_grad, weight_grad
 
         if hasattr(weight, "main_grad") and hasattr(bias, "main_grad"):
@@ -70,14 +69,6 @@ class FusedLinearWithGradAdd(paddle.autograd.PyLayer):
             else:
                 weight_grad, bias_grad = _C_ops.fused_linear_param_grad_add(x, y_grad, None, None, False)
                 return x_grad, weight_grad, bias_grad
-
-
-def strtobool(s):
-    return True if distutils.util.strtobool(s) else False
-
-
-def get_env(env_name, default_value=False):
-    return strtobool(os.getenv(env_name, str(default_value)))
 
 
 def mock_layers():
