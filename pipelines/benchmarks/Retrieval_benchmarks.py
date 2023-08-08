@@ -11,9 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
-
-sys.path = ["/qingzhong/qingzhong/PaddleNLP", "/qingzhong/qingzhong/langchain"] + sys.path
 import math
 import time
 from collections import defaultdict
@@ -141,12 +138,7 @@ class T2RRetrieval(AbsTaskRetrieval):
 def load_t2ranking_for_retraviel(num_max_passages: float):
     # import pandas
     # collection_dataset=pandas.read_csv('T2Ranking/data/collection.tsv',sep='\t')
-    import pandas
-
-    collection_dataset = pandas.read_csv(
-        "/qingzhong/qingzhong/qingzhong/trans_m3e/test_data_m3e/T2Ranking/data/collection.tsv", sep="\t"
-    )
-    # collection_dataset = load_dataset('THUIR/T2Ranking', 'collection')['train']  # type: ignore
+    collection_dataset = load_dataset("THUIR/T2Ranking", "collection")["train"]  # type: ignore
     dev_queries_dataset = load_dataset("THUIR/T2Ranking", "queries.dev")["train"]  # type: ignore
     dev_rels_dataset = load_dataset("THUIR/T2Ranking", "qrels.dev")["train"]  # type: ignore
     corpus = {}
@@ -180,5 +172,5 @@ def load_t2ranking_for_retraviel(num_max_passages: float):
 
 
 tasks = T2RRetrieval(num_max_passages=10000)
-# tasks.evaluate(model_query='moka-ai/m3e-base',model_corpus='moka-ai/m3e-base',split="dev")
-tasks.evaluate(model_query="rocketqa-zh-base-query-encoder", model_corpus="rocketqa-zh-base-para-encoder", split="dev")
+tasks.evaluate(model_query="moka-ai/m3e-base", model_corpus="moka-ai/m3e-base", split="dev")
+# tasks.evaluate(model_query="rocketqa-zh-base-query-encoder", model_corpus="rocketqa-zh-base-para-encoder", split="dev")
