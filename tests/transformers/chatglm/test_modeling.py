@@ -19,6 +19,7 @@ import paddle
 
 from paddlenlp.transformers import ChatGLMConfig, ChatGLMForCausalLM, ChatGLMModel
 from tests.transformers.test_configuration_common import ConfigTester
+from tests.transformers.test_generation_utils import GenerationTesterMixin
 from tests.transformers.test_modeling_common import (
     ModelTesterMixin,
     ids_tensor,
@@ -214,16 +215,19 @@ class ChatGLMTester:
         result_no_attention_mask = model(input_ids, attention_mask=None)[0]
         # Assert non-padding tokens have the same logits with different attention_mask shape
         self.parent.assertTrue((result_2d[attn_mask_2d] == result_3d[attn_mask_2d]).all())
+        # import pdb; pdb.set_trace()
         self.parent.assertTrue((result_2d[attn_mask_2d] == result_4d[attn_mask_2d]).all())
         self.parent.assertTrue((result_2d[attn_mask_2d] == result_no_attention_mask[attn_mask_2d]).all())
 
 
-class ChatGLMTest(ModelTesterMixin, unittest.TestCase):
+class ChatGLMTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     base_model_class = ChatGLMModel
     return_dict = False
     use_labels = False
 
     all_model_classes = (ChatGLMModel, ChatGLMForCausalLM)
+    all_generative_model_classes = {ChatGLMForCausalLM: (ChatGLMModel, "chatglm")}
+    # all_generative_model_classes = {}
 
     def setUp(self):
         super().setUp()
@@ -236,6 +240,15 @@ class ChatGLMTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_model(*config_and_inputs)
 
     def test_model_name_list(self):
+        pass
+
+    def test_beam_search_generate(self):
+        pass
+
+    def test_group_beam_search_generate(self):
+        pass
+
+    def test_generate_without_input_ids(self):
         pass
 
     def test_resize_tokens_embeddings(self):

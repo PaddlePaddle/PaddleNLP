@@ -600,7 +600,7 @@ class ChatGLMPretrainedModel(PretrainedModel):
             attention_mask = attention_mask.astype("bool")
         elif len(attention_mask.shape) == 4:
             attention_mask = attention_mask.astype("bool")
-            # 4D attention mask come from Tokenizer, just pass
+            # 4D attention mask come from Tokenizer or generate(), just pass
             return attention_mask
 
         context_lengths = []
@@ -611,13 +611,13 @@ class ChatGLMPretrainedModel(PretrainedModel):
 
         causal_mask = paddle.tril(paddle.ones([batch_size, seq_length, seq_length], dtype="bool"))
 
+        attention_mask = attention_mask & causal_mask
+
         for i, context_length in enumerate(context_lengths):
             attention_mask[i, :, :context_length] = True
 
         for i, pad_length in enumerate(pad_lengths):
             attention_mask[i, :pad_length, :pad_length] = False
-
-        attention_mask = attention_mask & causal_mask
 
         # [batch_size, 1, seq_length, seq_length]
         return attention_mask.unsqueeze(1)
@@ -629,7 +629,12 @@ class ChatGLMPretrainedModel(PretrainedModel):
 
         context_lengths = []
         for seq in input_ids:
-            context_lengths.append(paddle.where(seq == self.config.bos_token_id)[0][0])
+            bos_pos = paddle.where(seq == self.config.bos_token_id)[0]
+            if bos_pos.shape[0] > 0:
+                context_lengths.append(bos_pos[0])
+            else:
+                context_lengths.append(0)
+
         if self.config.position_encoding_2d:
             position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
             for i, context_length in enumerate(context_lengths):
@@ -807,7 +812,11 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
             mask_token = gMASK if gMASK in seq else MASK
             use_gmask = mask_token == gMASK
             use_gmasks.append(use_gmask)
-            mask_positions.append(paddle.where(seq == mask_token)[0][0])
+            mask_pos = paddle.where(seq == mask_token)[0]
+            if mask_pos.shape[0] > 0:
+                mask_positions.append(mask_pos[0])
+            else:
+                mask_positions.append(0)
 
         if cache is not None or past_key_values is not None:
             last_token = input_ids[:, -1].unsqueeze(-1)
@@ -820,9 +829,16 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
                 if self.position_encoding_2d:
                     context_lengths = []
                     for seq in input_ids:
-                        context_lengths.append(paddle.where(seq == self.config.bos_token_id)[0][0])
+                        bos_pos = paddle.where(seq == self.config.bos_token_id)[0]
+                        if bos_pos.shape[0] > 0:
+                            context_lengths.append(bos_pos[0])
+                        else:
+                            context_lengths.append(0)
+
                     context_lengths = paddle.to_tensor(context_lengths, dtype="int64")
                     block_position_ids = seq_length - context_lengths
+                    print(paddle.to_tensor(mask_positions, dtype="int64"))
+                    print(block_position_ids)
                     position_ids = paddle.concat(
                         [paddle.to_tensor(mask_positions, dtype="int64"), block_position_ids], axis=1
                     ).unsqueeze(-1)
@@ -871,12 +887,12 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
         # update attention mask
         if "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]
-            if attention_mask is not None and attention_mask.dtype == paddle.int64:
+            if attention_mask is not None:
                 attention_mask = paddle.concat(
-                    [attention_mask, paddle.ones([*attention_mask.shape[:3], 1], attention_mask.dtype)], axis=3
+                    [attention_mask, paddle.zeros([*attention_mask.shape[:3], 1], attention_mask.dtype)], axis=3
                 )
                 new_attention_mask = attention_mask[:, :, -1:].clone()
-                new_attention_mask[..., -1] = 0
+                new_attention_mask[..., -1] = 1
                 model_kwargs["attention_mask"] = paddle.concat([attention_mask, new_attention_mask], axis=2)
 
         # update position ids
