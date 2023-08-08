@@ -88,7 +88,7 @@ class ChatGLMTester:
         self.return_dict = return_dict
 
     def prepare_config_and_inputs(self):
-        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
+        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size, dtype="int64")
         input_ids[input_ids == self.gmask_token_id] = self.mask_token_id
         input_ids[input_ids == self.bos_token_id] = self.mask_token_id
 
@@ -230,10 +230,6 @@ class ChatGLMTester:
         result_no_attention_mask = model(input_ids, attention_mask=None)[0].transpose([1, 0, 2])
         # Assert non-padding tokens have the same logits with different attention_mask shape
         self.parent.assertTrue((result_2d[attn_mask_2d] == result_3d[attn_mask_2d]).all())
-        if (result_2d[attn_mask_2d] == result_4d[attn_mask_2d]).all() is False:
-            import pdb
-
-            pdb.set_trace()
         self.parent.assertTrue((result_2d[attn_mask_2d] == result_4d[attn_mask_2d]).all())
         self.parent.assertTrue((result_2d[attn_mask_2d] == result_no_attention_mask[attn_mask_2d]).all())
 
