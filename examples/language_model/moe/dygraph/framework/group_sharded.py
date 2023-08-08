@@ -37,14 +37,13 @@ from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_optimizer_sta
 from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_stage2 import (
     GroupShardedStage2,
 )
-from paddle.fluid import core
-from paddle.fluid.dygraph import base as imperative_base
+from paddle.framework import core
 from paddle.incubate.distributed.models.moe.grad_clip import ClipGradForMOEByGlobalNorm
 from paddle.optimizer import Optimizer
 
 
 class ClipGradForShardedMOEByGlobalNorm(ClipGradForMOEByGlobalNorm):
-    @imperative_base.no_grad
+    @paddle.no_grad
     def _dygraph_clip(self, params_grads):
         normal_params_grads = []
         moe_params_grads = []

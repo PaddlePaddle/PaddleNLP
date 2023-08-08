@@ -13,7 +13,7 @@
 # limitations under the License.
 import paddle
 from paddle import _C_ops
-from paddle.fluid import core
+from paddle.framework import core
 
 
 def is_fused_matmul_bias_supported():
