@@ -446,6 +446,8 @@ class LlamaAttention(nn.Layer):
 
     def __init__(self, config: LlamaConfig):
         super().__init__()
+
+        self.config = config
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
 
@@ -473,7 +475,7 @@ class LlamaAttention(nn.Layer):
             if self.num_key_value_heads % config.tensor_parallel_degree == 0:
                 self.num_key_value_heads = self.num_key_value_heads // config.tensor_parallel_degree
             else:
-                logger.warnings(
+                logger.warning(
                     f"Get num_key_value_heads: {self.num_key_value_heads}, can't split to tensor_parallel_degree: {config.tensor_parallel_degree}"
                 )
                 self.kv_indices = paddle.to_tensor(
@@ -513,18 +515,31 @@ class LlamaAttention(nn.Layer):
                     has_bias=False,
                     gather_output=False,
                 )
-                self.k_proj = ColumnParallelLinear(
-                    self.hidden_size,
-                    self.num_key_value_heads * self.head_dim,
-                    has_bias=False,
-                    gather_output=False,
-                )
-                self.v_proj = ColumnParallelLinear(
-                    self.hidden_size,
-                    self.num_key_value_heads * self.head_dim,
-                    has_bias=False,
-                    gather_output=False,
-                )
+                if self.kv_indices is None:
+                    self.k_proj = ColumnParallelLinear(
+                        self.hidden_size,
+                        self.config.num_key_value_heads * self.head_dim,
+                        has_bias=False,
+                        gather_output=False,
+                    )
+                    self.v_proj = ColumnParallelLinear(
+                        self.hidden_size,
+                        self.config.num_key_value_heads * self.head_dim,
+                        has_bias=False,
+                        gather_output=False,
+                    )
+                else:
+                    self.k_proj = nn.Linear(
+                        self.hidden_size,
+                        self.config.num_key_value_heads * self.head_dim,
+                        bias_attr=False,
+                    )
+                    self.v_proj = nn.Linear(
+                        self.hidden_size,
+                        self.config.num_key_value_heads * self.head_dim,
+                        bias_attr=False,
+                    )
+
         else:
             if self.fuse_attention_qkv:
                 self.qkv_proj = nn.Linear(
@@ -540,12 +555,12 @@ class LlamaAttention(nn.Layer):
                 )
                 self.k_proj = nn.Linear(
                     self.hidden_size,
-                    self.num_key_value_heads * self.head_dim,
+                    self.config.num_key_value_heads * self.head_dim,
                     bias_attr=False,
                 )
                 self.v_proj = nn.Linear(
                     self.hidden_size,
-                    self.num_key_value_heads * self.head_dim,
+                    self.config.num_key_value_heads * self.head_dim,
                     bias_attr=False,
                 )
 
