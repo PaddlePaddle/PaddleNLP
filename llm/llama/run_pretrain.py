@@ -430,6 +430,7 @@ def main():
 
     config = config_class.from_pretrained(model_args.model_name_or_path)
 
+    config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
     if not model_args.continue_training:
         config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)

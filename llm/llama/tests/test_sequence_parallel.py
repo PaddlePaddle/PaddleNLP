@@ -55,7 +55,11 @@ class TestLlama(unittest.TestCase):
         # model_name_or_path = "facebook/llama-7b"
         model_name_or_path = "__internal_testing__/tiny-random-llama"
 
+        seq_len = 2048
+        batch_size = 2
+
         config = LlamaConfig.from_pretrained(model_name_or_path)
+        config.seq_length = seq_len
         config.lm_shift_labels = False
         config.use_flash_attention = False
         config.use_fused_rms_norm = False
@@ -80,12 +84,13 @@ class TestLlama(unittest.TestCase):
 
         model.eval()
 
-        seq_len = 2048
-        input_ids = paddle.arange(100, 100 + seq_len, dtype="int64").reshape([1, -1])
-        labels = paddle.arange(101, 101 + seq_len, dtype="int64").reshape([1, -1])
+        input_ids = paddle.arange(100, 100 + batch_size * seq_len, dtype="int64").reshape([batch_size, seq_len])
+        labels = paddle.arange(101, 101 + batch_size * seq_len, dtype="int64").reshape([batch_size, seq_len])
+
         attention_mask = None
         if pp_degree > 1:
             pp_model = PipelineParallel(layers=model, hcg=hcg, strategy=strategy)
+            pp_model.accumulate_steps = batch_size  # for micro_batch_size * acc_steps == batch_size
             ret = pp_model.eval_batch(data=[input_ids, labels], compute_loss=True)
         else:
             # pp_model = PipelineParallel(layers=model, hcg=hcg, strategy=strategy)
@@ -98,11 +103,7 @@ class TestLlama(unittest.TestCase):
         print(f"ret mp{tp_degree} pp{pp_degree}", ret.item())
         ret_mp_pp = ret.item()
 
-        single_model = LlamaForCausalLM.from_pretrained(
-            model_name_or_path,
-            lm_shift_labels=False,
-            tensor_parallel_output=False,
-        )
+        single_model = LlamaForCausalLM.from_pretrained(model_name_or_path, config=config)
         single_model.eval()
         ret = single_model(input_ids=input_ids, labels=labels, attention_mask=attention_mask)
         print("ret single", ret[0].item())
