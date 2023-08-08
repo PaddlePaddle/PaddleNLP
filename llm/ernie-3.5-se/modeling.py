@@ -142,7 +142,7 @@ def scaled_dot_product_attention(
     query_states, key_states, value_states, attention_mask, output_attentions, config, is_causal=True
 ):
 
-    bsz, q_len, num_heads, head_dim = query_states.shape
+    bsz, q_len, num_heads, head_dim = paddle.shape(query_states)
     _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention is not None:
@@ -332,6 +332,8 @@ class RotaryEmbedding(nn.Layer):
         # q_embed = (q * cos) + (rotate_half(q) * sin)
         # k_embed = (k * cos) + (rotate_half(k) * sin)
 
+        cos = paddle.cast(cos, q.dtype)
+        sin = paddle.cast(sin, q.dtype)
         q_embed = paddle.add(paddle.multiply(q, cos), paddle.multiply(cls.rotate_half(q), sin))
         k_embed = paddle.add(paddle.multiply(k, cos), paddle.multiply(cls.rotate_half(k), sin))
         return q_embed, k_embed
