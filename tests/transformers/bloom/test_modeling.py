@@ -417,8 +417,7 @@ class BloomModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase)
     use_test_model_name_list = False
 
     all_model_classes = (BloomModel, BloomForCausalLM, BloomForSequenceClassification, BloomForTokenClassification)
-    # all_generative_model_classes = {BloomForCausalLM: (BloomModel, "bloom")}
-    all_generative_model_classes = {}
+    all_generative_model_classes = {BloomForCausalLM: (BloomModel, "bloom")}
 
     all_parallelizable_model_classes = BloomForCausalLM
     test_missing_keys = False
