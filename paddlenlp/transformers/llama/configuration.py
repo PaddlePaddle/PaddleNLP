@@ -176,6 +176,14 @@ class LlamaConfig(PretrainedConfig):
             (1) 'full': fuse sin cos compute and rope embedding
             (2) 'core': only fuse rope embedding, will compute the sin and cos
             (3) None: don't fuse any part of the rope embedding
+        num_key_value_heads (`int`, *optional*):
+            This is the number of key_value heads that should be used to implement Grouped Query Attention. If
+            `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
+            `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+            converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
+            by meanpooling all the original heads within that group. For more details checkout [this
+            paper](https://arxiv.org/pdf/2305.13245.pdf). If it is not specified, will default to
+            `num_attention_heads`.
         Example:
     ```python
     >>> from paddlenlp.transformer import LlamaModel, LlamaConfig
@@ -208,6 +216,7 @@ class LlamaConfig(PretrainedConfig):
         max_position_embeddings=2048,
         num_hidden_layers=32,
         num_attention_heads=32,
+        num_key_value_heads=None,
         initializer_range=0.02,
         rms_norm_eps=1e-6,
         use_cache=True,
@@ -235,6 +244,11 @@ class LlamaConfig(PretrainedConfig):
         self.max_position_embeddings = max_position_embeddings
         self.num_hidden_layers = num_hidden_layers
         self.num_attention_heads = num_attention_heads
+
+        if num_key_value_heads is None:
+            num_key_value_heads = num_attention_heads
+        self.num_key_value_heads = num_key_value_heads
+
         self.initializer_range = initializer_range
         self.rms_norm_eps = rms_norm_eps
 
