@@ -78,6 +78,7 @@ class ModelArgument:
     # qat
     qat: bool = field(default=False, metadata={"help": "Whether to use QAT technique"})
     qat_type: str = field(default="A8W8", metadata={"help": "Quantization type. Supported values: A8W8, W4,A8W4"})
+    to_static: bool = field(default=False, metadata={"help": "Enable training under @to_static."})
 
 
 def main():
@@ -308,6 +309,13 @@ def main():
         compute_metrics_trainer,
         tokenizer=tokenizer,
     )
+    if model_args.to_static:
+        input_ids = paddle.static.InputSpec(name="input_ids", shape=[-1, model_max_length], dtype="int64")
+        attention_mask = paddle.static.InputSpec(name="attention_mask", shape=[-1, model_max_length], dtype="int64")
+        specs = [input_ids, attention_mask]
+        paddle.jit.ignore_module([os])
+        model = paddle.jit.to_static(model, input_spec=specs)
+        logger.info("Successfully to apply @to_static with specs: {}".format(specs))
 
     trainer = LlamaTrainer(
         model=model,
