@@ -188,7 +188,7 @@ class CLIPSegVisionEmbeddings(nn.Layer):
         self.num_patches = (self.image_size // self.patch_size) ** 2
         self.num_positions = self.num_patches + 1
         self.position_embedding = nn.Embedding(self.num_positions, self.embed_dim)
-        self.register_buffer("position_ids", paddle.arange(self.num_positions).expand((1, -1)))
+        self.register_buffer("position_ids", paddle.arange(self.num_positions).expand((1, -1)), persistable=False)
 
     def interpolate_position_embeddings(self, new_size):
         if len(new_size) != 2:
@@ -238,7 +238,9 @@ class CLIPSegTextEmbeddings(nn.Layer):
 
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
         self.register_buffer(
-            "position_ids", paddle.arange(config.max_position_embeddings, dtype="int64").expand((1, -1))
+            "position_ids",
+            paddle.arange(config.max_position_embeddings, dtype="int64").expand((1, -1)),
+            persistable=False,
         )
 
     def forward(
@@ -601,6 +603,9 @@ class CLIPSegTextTransformer(nn.Layer):
         self.encoder = CLIPSegEncoder(config)
         self.final_layer_norm = nn.LayerNorm(embed_dim, epsilon=config.layer_norm_eps)
 
+        # For `pooled_output` computation
+        self.eos_token_id = config.eos_token_id
+
     # Copied from paddlenlp.transformers.clip.modeling.CLIPTextTransformer.forward with clip->clipseg, CLIP->CLIPSeg
     def forward(
         self,
@@ -649,13 +654,31 @@ class CLIPSegTextTransformer(nn.Layer):
         last_hidden_state = encoder_outputs[0]
         last_hidden_state = self.final_layer_norm(last_hidden_state)
 
-        # text_embeds.shape = [batch_size, sequence_length, transformer.width]
-        # take features from the eot embedding (eot_token is the highest number in each sequence)
-        # casting to torch.int for onnx compatibility: argmax doesn't support int64 inputs with opset 14
-        pooled_output = last_hidden_state[
-            paddle.arange(last_hidden_state.shape[0]),
-            input_ids.argmax(axis=-1),
-        ]
+        if self.eos_token_id == 2:
+            # The `eos_token_id` was incorrect before PR #24773: Let's keep what have been done here.
+            # A CLIPSeg model with such `eos_token_id` in the config can't work correctly with extra new tokens added
+            # ------------------------------------------------------------
+            # text_embeds.shape = [batch_size, sequence_length, transformer.width]
+            # take features from the eot embedding (eot_token is the highest number in each sequence)
+            # casting to paddle.int32 for onnx compatibility: argmax doesn't support int64 inputs with opset 14
+            pooled_output = last_hidden_state.gather_nd(
+                paddle.stack(
+                    [paddle.arange(last_hidden_state.shape[0], dtype="int32"), input_ids.argmax(-1, dtype="int32")],
+                    axis=-1,
+                )
+            )
+        else:
+            # The config gets updated `eos_token_id` from PR #24773 (so the use of exta new tokens is possible)
+            # We need to get the first position of `eos_token_id` value (`pad_token_ids` might equal to `eos_token_id`)
+            pooled_output = last_hidden_state.gather_nd(
+                paddle.stack(
+                    [
+                        paddle.arange(last_hidden_state.shape[0], dtype="int32"),
+                        (input_ids == self.eos_token_id).cast("int32").argmax(axis=-1, dtype="int32"),
+                    ],
+                    axis=-1,
+                )
+            )
 
         if not return_dict:
             return (last_hidden_state, pooled_output) + encoder_outputs[1:]
