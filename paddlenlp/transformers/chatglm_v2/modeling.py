@@ -198,18 +198,8 @@ class CoreAttention(nn.Layer):
             attention_scores = attention_scores.astype("float32")
         if self.coeff is not None:
             attention_scores = attention_scores * self.coeff
-        if attention_mask is None and attention_scores.shape[2] == attention_scores.shape[3]:
-            attention_mask = paddle.tril(
-                paddle.ones((output_size[0], 1, output_size[2], output_size[3]), dtype="bool")
-            )
-            attention_mask = ~attention_mask
 
-        if attention_mask is not None:
-            attention_scores = paddle.where(
-                attention_mask > 0,
-                paddle.full_like(attention_scores, paddle.finfo(attention_scores.dtype).min),
-                attention_scores,
-            )
+        attention_scores = attention_scores + attention_mask
 
         attention_probs = F.softmax(attention_scores.astype("float32"), axis=-1)
         attention_probs = attention_probs.astype(self.default_dtype)
@@ -536,6 +526,11 @@ class GLMTransformer(nn.Layer):
         presents = () if use_cache else None
         all_self_attentions = None
         all_hidden_states = () if output_hidden_states else None
+
+        zero = paddle.zeros(attention_mask.shape, dtype=hidden_states.dtype)
+        neg_inf = paddle.full_like(attention_mask, paddle.finfo(hidden_states.dtype).min, dtype=hidden_states.dtype)
+        attention_mask = paddle.where(attention_mask, zero, neg_inf)
+
         for index in range(self.num_hidden_layers):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
@@ -581,20 +576,36 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
 
     def get_masks(self, input_ids, past_key_values, padding_mask=None):
         batch_size, seq_length = input_ids.shape
-        full_attention_mask = paddle.tril(paddle.ones([batch_size, seq_length, seq_length]))
+
+        # casual mask
+        casual_mask = paddle.tril(paddle.ones([batch_size, 1, seq_length, seq_length])).astype("bool")
         past_length = 0
         if past_key_values:
             past_length = past_key_values[0][0].shape[0]
         if past_length:
-            full_attention_mask = paddle.concat(
-                [paddle.ones([batch_size, seq_length, past_length]), full_attention_mask], axis=-1
+            casual_mask = paddle.concat(
+                [paddle.ones([batch_size, 1, seq_length, past_length], dtype="bool"), casual_mask], axis=-1
             )
-        if padding_mask is not None:
-            full_attention_mask = full_attention_mask * padding_mask.unsqueeze(1)
-        if not past_length and padding_mask is not None:
-            full_attention_mask -= padding_mask.unsqueeze(-1) - 1
-        full_attention_mask = (full_attention_mask < 0.5).astype("bool")
-        return full_attention_mask.unsqueeze(1)
+
+        # seq_mask
+        if padding_mask is None:
+            padding_mask = paddle.ones((batch_size, 1, seq_length, seq_length + past_length), dtype="bool")
+        if len(padding_mask.shape) == 2:
+            # from Tokenizer
+            padding_mask = (
+                padding_mask.unsqueeze(axis=[1, 2])
+                .expand([batch_size, 1, seq_length, seq_length + past_length])
+                .astype("bool")
+            )
+        elif len(padding_mask.shape) == 3:
+            # [batch_size,tgt_length, src_length] -> [batch_size, 1, tgt_length, src_length]
+            padding_mask = padding_mask.unsqueeze(1).astype("bool")
+        elif len(padding_mask.shape) == 4:
+            padding_mask = padding_mask.astype("bool")
+
+        casual_mask = casual_mask & padding_mask
+
+        return casual_mask
 
     def get_position_ids(self, input_ids):
         batch_size, seq_length = input_ids.shape
@@ -716,11 +727,7 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.embedding(input_ids)
 
-        if full_attention_mask is None:
-            if (attention_mask is not None and not attention_mask.astype("bool").all()) or (
-                past_key_values and seq_length != 1
-            ):
-                full_attention_mask = self.get_masks(input_ids, past_key_values, padding_mask=attention_mask)
+        full_attention_mask = self.get_masks(input_ids, past_key_values, padding_mask=attention_mask)
 
         # Rotary positional embeddings
         rotary_pos_emb = self.rotary_pos_emb(self.max_sequence_length)
