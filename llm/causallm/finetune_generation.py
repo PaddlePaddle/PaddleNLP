@@ -63,9 +63,7 @@ def main():
 
     # Load model
     if training_args.fp16_opt_level == "O2":
-        if quant_args.do_ptq:
-            dtype = "float32"
-        elif training_args.fp16:
+        if training_args.fp16:
             dtype = "float16"
         elif training_args.bf16:
             dtype = "bfloat16"
@@ -122,6 +120,9 @@ def main():
         else:
             train_ds, dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["train", "dev"])
     trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
+    if data_args.intokens:
+        if model.base_model_prefix not in ["llama", "bloom"]:
+            raise NotImplementedError("InTokens data stream is only implemented for LLaMA、 Bloom so far.")
     train_ds = train_ds.map(partial(trans_func, is_test=False, intokens=data_args.intokens))
     eval_intokens = data_args.intokens
     if data_args.intokens and data_args.eval_with_do_generation:
@@ -131,8 +132,6 @@ def main():
         eval_intokens = False
     dev_ds = dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, intokens=eval_intokens))
     if data_args.intokens:
-        if model.base_model_prefix not in ["llama", "bloom"]:
-            raise NotImplementedError("InTokens data stream is only implemented for LLaMA so far.")
         from paddlenlp.datasets import InTokensMapDataset
 
         logger.info("Creating InTokens Data Stream. This may take a few minutes.")
@@ -147,6 +146,7 @@ def main():
                 tokenizer=tokenizer,
                 max_length=data_args.intokens_max_length,
             )
+
     if model_args.prefix_tuning:
         prefix_tuning_params = get_prefix_tuning_params(model)
         prefix_config = PrefixConfig(
