@@ -28,7 +28,7 @@ from itertools import accumulate
 
 import numpy as np
 import paddle
-
+from paddlenlp.data.indexed_dataset import make_dataset as make_indexed_dataset
 
 def get_local_rank():
     return int(os.getenv("PADDLE_RANK_IN_NODE", 0))
@@ -228,8 +228,8 @@ class MMapIndexedDataset(paddle.io.Dataset):
         self._doc_idx = doc_idx_
 
 
-def make_indexed_dataset(data_prefix, data_impl=None, skip_warmup=False):
-    return MMapIndexedDataset(data_prefix)
+# def make_indexed_dataset(data_prefix, data_impl=None, skip_warmup=False):
+#     return MMapIndexedDataset(data_prefix)
 
 
 def get_a_and_b_segments(sample, np_rng):
@@ -682,7 +682,7 @@ def _build_train_valid_test_datasets(
         raise ValueError("Invalid dataset_type: ", dataset_type)
 
     # Indexed dataset.
-    indexed_dataset = get_indexed_dataset_(data_prefix, None, skip_warmup)
+    indexed_dataset = get_indexed_dataset_(data_prefix, args.data_impl, skip_warmup)
 
     # Get start and end indices of train/valid/train into doc-idx
     # Note that doc-idx is desinged to be num-docs + 1 so we can
