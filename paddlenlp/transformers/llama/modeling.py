@@ -479,7 +479,7 @@ class LlamaAttention(nn.Layer):
                     f"Get num_key_value_heads: {self.num_key_value_heads}, can't split to tensor_parallel_degree: {config.tensor_parallel_degree}"
                 )
                 self.kv_indices = paddle.to_tensor(
-                    assign_kv_heads(self.num_key_value_groups, config.tensor_parallel_degree)[
+                    assign_kv_heads(self.num_key_value_heads, config.tensor_parallel_degree)[
                         config.tensor_parallel_rank
                     ]
                 )
