@@ -896,6 +896,9 @@ class GenerationMixin(object):
 
         if is_tracing and not paddle.is_tensor(max_length):
             if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+                # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
+                # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+                # removed after static graphs support inplace and stride.
                 with paddle.framework._no_check_dy2st_diff():
                     min_len = input_ids.shape[-1]
                     max_len = input_ids.shape[-1]
@@ -1362,6 +1365,9 @@ class GenerationMixin(object):
         )
 
         if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+            # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
+            # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+            # removed after static graphs support inplace and stride.
             with paddle.framework._no_check_dy2st_diff():
                 paddle.increment(cur_len)
                 paddle.increment(cur_len_gpu)
@@ -1376,6 +1382,9 @@ class GenerationMixin(object):
         max_length = paddle.full([1], max_length, dtype="int64")
 
         if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+            # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
+            # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+            # removed after static graphs support inplace and stride.
             with paddle.framework._no_check_dy2st_diff():
                 while cur_len < max_length and paddle.any(unfinished_flag):
                     input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
