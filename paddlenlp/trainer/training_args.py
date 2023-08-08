@@ -717,10 +717,9 @@ class TrainingArguments:
             # if not (self.bf16 or self.fp16) or self.fp16_opt_level != "O2":
             #     logger.warning("set amp_master_grad to false since amp is disabled.")
             #     self.amp_master_grad = False
-            if self.pipeline_parallel_degree <= 1 and len(self.sharding) > 1:
+            if self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1 and len(self.sharding) > 1:
                 logger.warning("set amp_master_grad to false, not support pure sharding yet.")
                 self.amp_master_grad = False
-                
 
         if self.use_hybrid_parallel:
             world_size = paddle.distributed.get_world_size()
@@ -1064,11 +1063,15 @@ class TrainingArguments:
 
     @property
     def save_sharding_stage1_model(self):
-        return ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.save_sharded_model
+        return (
+            ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.save_sharded_model
+        )
 
     @property
     def load_sharding_stage1_model(self):
-        return ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.load_sharded_model
+        return (
+            ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.load_sharded_model
+        )
 
     @contextlib.contextmanager
     def main_process_first(self, local=True, desc="work"):
