@@ -633,7 +633,7 @@ class ChatGLMPretrainedModel(PretrainedModel):
             if bos_pos.shape[0] > 0:
                 context_lengths.append(bos_pos[0])
             else:
-                context_lengths.append(0)
+                context_lengths.append(paddle.to_tensor([0]))
 
         if self.config.position_encoding_2d:
             position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
@@ -816,7 +816,7 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
             if mask_pos.shape[0] > 0:
                 mask_positions.append(mask_pos[0])
             else:
-                mask_positions.append(0)
+                mask_positions.append(paddle.to_tensor([0]))
 
         if cache is not None or past_key_values is not None:
             last_token = input_ids[:, -1].unsqueeze(-1)
@@ -833,12 +833,16 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
                         if bos_pos.shape[0] > 0:
                             context_lengths.append(bos_pos[0])
                         else:
-                            context_lengths.append(0)
+                            context_lengths.append(paddle.to_tensor([0]))
 
                     context_lengths = paddle.to_tensor(context_lengths, dtype="int64")
                     block_position_ids = seq_length - context_lengths
                     print(paddle.to_tensor(mask_positions, dtype="int64"))
                     print(block_position_ids)
+                    if len(paddle.to_tensor(mask_positions, dtype="int64")) == 0:
+                        import pdb
+
+                        pdb.set_trace()
                     position_ids = paddle.concat(
                         [paddle.to_tensor(mask_positions, dtype="int64"), block_position_ids], axis=1
                     ).unsqueeze(-1)
@@ -853,7 +857,6 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
                 "position_ids": position_ids,
                 "use_cache": True,
                 "attention_mask": attention_mask,
-                **kwargs,
             }
         else:
             if attention_mask is not None and attention_mask.dtype != paddle.int64:
@@ -871,7 +874,6 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
                 "position_ids": position_ids,
                 "use_cache": True,
                 "attention_mask": attention_mask,
-                **kwargs,
             }
 
     def update_model_kwargs_for_generation(

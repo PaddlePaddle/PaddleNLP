@@ -205,17 +205,35 @@ class ChatGLMTester:
         model = ChatGLMModel(config)
         model.eval()
         attn_mask_2d = random_attention_mask([self.batch_size, self.seq_length])
-        result_2d = model(input_ids, attention_mask=attn_mask_2d)[0]
+        result_2d = model(input_ids, attention_mask=attn_mask_2d)[0].transpose([1, 0, 2])
         batch, seq_length = input_ids.shape
         causal_mask = paddle.tril(paddle.ones((batch, seq_length, seq_length), dtype=attn_mask_2d.dtype))
         attn_mask_3d = causal_mask & attn_mask_2d.unsqueeze(-1)
-        result_3d = model(input_ids, attention_mask=attn_mask_3d)[0]
+        result_3d = model(input_ids, attention_mask=attn_mask_3d)[0].transpose([1, 0, 2])
+
+        # use 4d mask for chatglm must prepocess prefix mask and padding mask
         attn_mask_4d = attn_mask_3d.unsqueeze(1)
-        result_4d = model(input_ids, attention_mask=attn_mask_4d)[0]
-        result_no_attention_mask = model(input_ids, attention_mask=None)[0]
+        context_lengths, pad_lengths = [], []
+        for seq in input_ids:
+            context_lengths.append(paddle.where(seq == self.bos_token_id)[0][0])
+            pad_lengths.append(paddle.where(seq != self.pad_token_id)[0][0])
+
+        for i, context_length in enumerate(context_lengths):
+            attn_mask_4d[i, :, :, :context_length] = 1
+        print(attn_mask_4d)
+
+        for i, pad_length in enumerate(pad_lengths):
+            attn_mask_4d[i, :pad_length, :pad_length] = 0
+        print(attn_mask_4d)
+
+        result_4d = model(input_ids, attention_mask=attn_mask_4d)[0].transpose([1, 0, 2])
+        result_no_attention_mask = model(input_ids, attention_mask=None)[0].transpose([1, 0, 2])
         # Assert non-padding tokens have the same logits with different attention_mask shape
         self.parent.assertTrue((result_2d[attn_mask_2d] == result_3d[attn_mask_2d]).all())
-        # import pdb; pdb.set_trace()
+        if (result_2d[attn_mask_2d] == result_4d[attn_mask_2d]).all() is False:
+            import pdb
+
+            pdb.set_trace()
         self.parent.assertTrue((result_2d[attn_mask_2d] == result_4d[attn_mask_2d]).all())
         self.parent.assertTrue((result_2d[attn_mask_2d] == result_no_attention_mask[attn_mask_2d]).all())
 
@@ -246,9 +264,6 @@ class ChatGLMTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
         pass
 
     def test_group_beam_search_generate(self):
-        pass
-
-    def test_generate_without_input_ids(self):
         pass
 
     def test_resize_tokens_embeddings(self):
