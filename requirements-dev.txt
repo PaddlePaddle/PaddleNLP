@@ -1,4 +1,4 @@
-paddlepaddle==2.5.0rc1
+paddlepaddle==2.5.1
 paddleocr<2.7
 pre-commit
 pytest
