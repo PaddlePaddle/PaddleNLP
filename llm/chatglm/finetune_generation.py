@@ -30,7 +30,6 @@ from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCa
 from paddlenlp.peft.prefix import (
     chatglm_pad_attention_mask,
     chatglm_postprocess_past_key_value,
-    chatglm_v2_pad_attention_mask,
 )
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
@@ -114,7 +113,7 @@ def main():
     )
     if "chatglm2" in model_args.model_name_or_path:
         multi_query_group_num = model.config.multi_query_group_num
-        attention_mask_pad_fn = chatglm_v2_pad_attention_mask
+        attention_mask_pad_fn = None
     else:
         multi_query_group_num = None
         attention_mask_pad_fn = chatglm_pad_attention_mask
