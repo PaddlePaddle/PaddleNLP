@@ -95,7 +95,7 @@ class GPTDecoderLayerPipe(TransformerDecoderLayer):
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
         # hidden_states = super().forward(hidden_states, tgt_mask=attention_mask)
-        if self.use_recompute and self.recompute_granularity == "full":
+        if self.enable_recompute and self.config.recompute_granularity == "full":
             hidden_states = recompute(super().forward, hidden_states, attention_mask)
         else:
             hidden_states = super().forward(hidden_states, tgt_mask=attention_mask)
@@ -249,10 +249,9 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self.add_sequential_layer(
             SharedLayerDesc("gpt", GPTEmbeddingPipe, shared_weight_attr="embedding_weight", config=config), "gpt"
         )
-        self.no_recompute_layers = getattr(config, "no_recompute_layers", [])
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
-                LayerDesc(GPTDecoderLayerPipe, config=config, do_recompute=i not in self.no_recompute_layers),
+                LayerDesc(GPTDecoderLayerPipe, config=config),
                 f"gpt.decoder.layers.{i}",
             )
 
