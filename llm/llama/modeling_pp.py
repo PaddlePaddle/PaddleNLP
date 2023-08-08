@@ -72,6 +72,7 @@ class LlamaEmbeddingPipe(nn.Layer):
 
     def __init__(self, config):
         super(LlamaEmbeddingPipe, self).__init__()
+        self.sequence_parallel = config.sequence_parallel
         if config.tensor_parallel_degree > 1:
             self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
                 config.vocab_size,
@@ -91,8 +92,13 @@ class LlamaEmbeddingPipe(nn.Layer):
             _type_: _description_
         """
         input_ids, attention_mask, position_ids = parse_args(args)
-
         input_embeds = self.embed_tokens(input_ids)
+        if self.sequence_parallel:
+            from paddlenlp.transformers import ScatterOp
+
+            input_embeds = paddle.transpose(input_embeds, perm=[1, 0, 2])
+            input_embeds = ScatterOp.apply(input_embeds)
+
         batch_size, seq_length = input_ids.shape
         if attention_mask is not None:
             attention_mask = LlamaModel._prepare_decoder_attention_mask(

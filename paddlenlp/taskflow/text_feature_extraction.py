@@ -258,7 +258,7 @@ class TextFeatureExtractionTask(Task):
         outputs = {"batches": batches, "inputs": inputs}
         return outputs
 
-    def _run_model(self, inputs):
+    def _run_model(self, inputs, **kwargs):
         """
         Run the task model from the outputs of the `_preprocess` function.
         """

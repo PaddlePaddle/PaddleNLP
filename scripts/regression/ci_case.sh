@@ -515,49 +515,6 @@ time (python -u deploy/python/predict.py \
     --max_seq_length 384 >${log_path}/squad_predict) >>${log_path}/squad_predict 2>&1
 print_info $? squad_predict
 }
-# 14 tinybert
-tinybert() {
-export CUDA_VISIBLE_DEVICES=${cudaid1}
-cd ${nlp_dir}/model_zoo/tinybert/
-cp -r /ssd1/paddlenlp/download/tinybert/pretrained_models/ ./
-#中间层蒸馏
-time (python task_distill.py \
-    --model_type tinybert \
-    --student_model_name_or_path tinybert-6l-768d-v2 \
-    --task_name SST-2 \
-    --intermediate_distill \
-    --max_seq_length 64 \
-    --batch_size 32   \
-    --T 1 \
-    --teacher_model_type bert \
-    --teacher_path ./pretrained_models/SST-2/best_model_610/ \
-    --learning_rate 5e-5 \
-    --num_train_epochs 1 \
-    --max_steps 1 \
-    --logging_steps 1 \
-    --save_steps 1 \
-    --output_dir ./mid/SST-2/ \
-    --device gpu >${log_path}/tinybert_midslim) >>${log_path}/tinybert_midslim 2>&1
-print_info $? tinybert_midslim
-#预测层蒸馏
-time (python task_distill.py \
-    --model_type tinybert \
-    --student_model_name_or_path ./mid/SST-2/intermediate_distill_model_final.pdparams \
-    --task_name SST-2 \
-    --max_seq_length 64 \
-    --batch_size 32   \
-    --T 1 \
-    --teacher_model_type bert \
-    --teacher_path ./pretrained_models/SST-2/best_model_610/  \
-    --learning_rate 3e-5 \
-    --num_train_epochs 1 \
-    --logging_steps 1 \
-    --max_steps 1 \
-    --save_steps 1 \
-    --output_dir ./ped/SST-2/ \
-    --device gpu >${log_path}/tinybert_predslim) >>${log_path}/tinybert_predslim 2>&1
-print_info $? tinybert_predslim
-}
 # 15 lexical_analysis
 lexical_analysis(){
 export CUDA_VISIBLE_DEVICES=${cudaid2}
@@ -720,24 +677,6 @@ time (
     --embedding_name w2v.google_news.target.word-word.dim300.en >${log_path}/distilbert_teacher_train) >>${log_path}/distilbert_teacher_train 2>&1
 print_info $? distilbert_teacher_train
 }
-# 21 stacl
-stacl() {
-cd ${nlp_dir}/examples/simultaneous_translation/stacl/
-cp -r /ssd1/paddlenlp/download/stacl/* ./
-export CUDA_VISIBLE_DEVICES=${cudaid2}
-time (sed -i "s/save_step: 10000/save_step: 1/g" config/transformer.yaml
-sed -i "s/p print_step: 100/print_step: 1/g" config/transformer.yaml
-sed -i "s/epoch: 30/epoch: 1/g" config/transformer.yaml
-sed -i "s/max_iter: None/max_iter: 3/g" config/transformer.yaml
-sed -i "s/batch_size: 4096/batch_size: 500/g" config/transformer.yaml
-python -m paddle.distributed.launch train.py --config ./config/transformer.yaml  >${log_path}/stacl_wk-1) >>${log_path}/stacl_wk-1 2>&1
-print_info $? stacl_wk-1
-
-time (sed -i "s/batch_size: 500/batch_size: 100/g" config/transformer.yaml
-sed -i 's#init_from_params: "trained_models/step_final/"#init_from_params: "./trained_models/step_1/"#g' config/transformer.yaml
-python predict.py --config ./config/transformer.yaml >${log_path}/stacl_predict) >>${log_path}/stacl_predict 2>&1
-print_info $? stacl_predict
-}
 fast_transformer(){
 # FT
 cd ${nlp_dir}/
@@ -855,14 +794,6 @@ p-tuning(){
 path="examples/few_shot/p-tuning"
 python scripts/regression/ci_normal_case.py ${path}
 }
-#24 simbert
-simbert(){
-cd ${nlp_dir}/examples/text_matching/simbert/
-cp -r /ssd1/paddlenlp/download/simbert/dev.tsv ./
-time (
-python predict.py --input_file ./dev.tsv >${log_path}/simbert) >>${log_path}/simbert 2>&1
-print_info $? simbert
-}
 #25 ernie-doc
 ernie-doc(){
 cd ${nlp_dir}/model_zoo/ernie-doc/
@@ -897,16 +828,6 @@ time (sed -i 's/batch_size: 8/batch_size: 1/g' configs/enwik8.yaml
 sed -i 's#init_from_params: "./trained_models/step_final/"#init_from_params: "./trained_models/step_3/"#g' configs/enwik8.yaml
 python eval.py --config ./configs/enwik8.yaml >${log_path}/transformer-xl_eval_enwik8) >>${log_path}/transformer-xl_eval_enwik8 2>&1
 print_info $? transformer-xl_eval_enwik8
-}
-#27 pointer_summarizer
-pointer_summarizer() {
-cd ${nlp_dir}/examples/text_summarization/pointer_summarizer/
-cp -r /ssd1/paddlenlp/download/pointer_summarizer/* ./
-export CUDA_VISIBLE_DEVICES=${cudaid1}
-time (sed -i 's/max_iterations = 100000/max_iterations = 5/g' config.py
-sed -i 's/if iter % 5000 == 0 or iter == 1000:/if iter % 5 == 0 :/g' train.py
-python train.py >${log_path}/pointer_summarizer_train) >>${log_path}/pointer_summarizer_train 2>&1
-print_info $? pointer_summarizer_train
 }
 #28 question_matching
 question_matching() {
@@ -1285,7 +1206,7 @@ llama(){
         --per_device_train_batch_size 2 \
         --gradient_accumulation_steps 2 \
         --per_device_eval_batch_size 4 \
-        --model_name_or_path facebook/tiny-random-llama  \
+        --model_name_or_path "__internal_testing__/micro-random-llama"  \
         --task_name squad \
         --warmup_steps 30 \
         --logging_steps 1 \
@@ -1326,5 +1247,10 @@ python -m paddle.distributed.launch finetune_generation.py \
     --save_total_limit 1 \
     --scale_loss 32768 \
     --overwrite_output_dir
+}
+refactor_training_loop(){
+llama
+gpt
+transformers
 }
 $1

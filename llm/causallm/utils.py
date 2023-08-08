@@ -23,7 +23,6 @@ from paddlenlp.peft.prefix import (
     bloom_postprocess_past_key_value,
     chatglm_pad_attention_mask,
     chatglm_postprocess_past_key_value,
-    chatglm_v2_pad_attention_mask,
     llama_postprocess_past_key_value,
 )
 from paddlenlp.trainer import Trainer
@@ -32,8 +31,6 @@ from paddlenlp.utils.log import logger
 
 
 def compute_metrics(eval_preds):
-    np.save("pred.npy", np.array(eval_preds.predictions))
-    np.save("label.npy", np.array(eval_preds.label_ids))
 
     flattened_preds = np.array(eval_preds.predictions).flatten()
     flattened_labels = np.array(eval_preds.label_ids).flatten()
@@ -57,7 +54,7 @@ def get_prefix_tuning_params(model):
         num_attention_heads = model.config.num_attention_heads
         num_hidden_layers = model.config.num_layers
         hidden_size = model.config.hidden_size
-        pad_attention_mask = chatglm_v2_pad_attention_mask
+        pad_attention_mask = None
         postprocess_past_key_value = chatglm_postprocess_past_key_value
         multi_query_group_num = model.config.multi_query_group_num
     elif model.base_model_prefix == "bloom":
@@ -88,49 +85,31 @@ def get_prefix_tuning_params(model):
     )
 
 
-def get_lora_target_modules(model, is_tp=False):
+def get_lora_target_modules(model):
     # Not yet support RowParallelLinear
     if model.base_model_prefix == "chatglm":
-        if is_tp > 1:
-            target_modules = [".*query_key_value.*", ".*dense_h_to_4h.*"]
-        else:
-            target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
+        target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
     elif model.base_model_prefix == "chatglm_v2":
-        if is_tp > 1:
-            target_modules = [".*query.*", ".*key.*", ".*value.*", ".*dense_h_to_4h.*"]
-        else:
-            target_modules = [
-                ".*query.*",
-                ".*key.*",
-                ".*value.*",
-                ".*dense.*",
-                ".*dense_h_to_4h.*",
-                ".*dense_4h_to_h.*",
-            ]
+        target_modules = [
+            ".*query.*",
+            ".*key.*",
+            ".*value.*",
+            ".*dense.*",
+            ".*dense_h_to_4h.*",
+            ".*dense_4h_to_h.*",
+        ]
     elif model.base_model_prefix == "bloom":
-        if is_tp > 1:
-            target_modules = [".*query_key_value.*", ".*dense_h_to_4h.*"]
-        else:
-            target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
+        target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
     elif model.base_model_prefix == "llama":
-        if is_tp > 1:
-            target_modules = [
-                ".*q_proj.*",
-                ".*v_proj.*",
-                ".*k_proj.*",
-                ".*gate_proj.*",
-                ".*up_proj.*",
-            ]
-        else:
-            target_modules = [
-                ".*q_proj.*",
-                ".*v_proj.*",
-                ".*k_proj.*",
-                ".*o_proj.*",
-                ".*gate_proj.*",
-                ".*down_proj.*",
-                ".*up_proj.*",
-            ]
+        target_modules = [
+            ".*q_proj.*",
+            ".*v_proj.*",
+            ".*k_proj.*",
+            ".*o_proj.*",
+            ".*gate_proj.*",
+            ".*down_proj.*",
+            ".*up_proj.*",
+        ]
     else:
         raise ValueError(
             f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama."

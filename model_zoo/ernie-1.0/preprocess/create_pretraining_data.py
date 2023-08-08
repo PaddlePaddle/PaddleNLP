@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import argparse
 import io
 import json
@@ -25,6 +24,7 @@ import numpy as np
 from tqdm import tqdm
 
 import paddlenlp.transformers as tfs
+from paddlenlp.data import indexed_dataset
 
 try:
     import nltk
@@ -32,6 +32,13 @@ try:
     nltk_available = True
 except ImportError:
     nltk_available = False
+
+from datetime import datetime
+
+
+def print_datetime(string):
+    time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print("[" + string + "] datetime: {} ".format(time_str))
 
 
 def get_args():
@@ -69,6 +76,8 @@ def get_args():
         help="For JSON format. Space separate listed of keys to extract from json",
     )
     group.add_argument("--split_sentences", action="store_true", help="Split documents into sentences.")
+
+    group.add_argument("--data_impl", type=str, default="mmap", choices=["lazy", "mmap"])
 
     group = parser.add_argument_group(title="chinese words")
     group.add_argument(
@@ -283,8 +292,8 @@ class Converter(object):
 
 
 def main():
+    print_datetime("start")
     args = get_args()
-
     file_paths = []
     if os.path.isfile(args.input_path):
         file_paths.append(args.input_path)
@@ -292,6 +301,7 @@ def main():
         for root, _, fs in os.walk(args.input_path):
             for f in fs:
                 file_paths.append(os.path.join(root, f))
+
     convert = Converter(args)
 
     # Try tokenizer is availiable
@@ -303,18 +313,9 @@ def main():
 
     pool = multiprocessing.Pool(args.workers, initializer=convert.initializer)
 
-    # We use BytesIO to store the ids.
-    token_ids_stream = io.BytesIO()
-    sentlens_stream = io.BytesIO()
-    # # Cumsum on tokens num
-    # sent_cumsum_stream = io.BytesIO()
-    # sent_cumsum_stream.write((0).to_bytes(8, byteorder='little', signed=True))
-    # Cunsum on document on every sentence num, type=np.int64
-    doc_cumsum_stream = io.BytesIO()
-    doc_cumsum_stream.write((0).to_bytes(8, byteorder="little", signed=True))
-
-    sent_count = 0
-    # token_count = 0
+    output_ids_files = args.output_prefix + ".bin"
+    output_idx_files = args.output_prefix + ".idx"
+    builder = indexed_dataset.make_builder(output_ids_files, args.data_impl, save_dtype)
 
     file_paths.sort()
 
@@ -346,15 +347,9 @@ def main():
                 sentence_len = len(sentence)
                 if sentence_len == 0:
                     continue
-                sentlens_stream.write(sentence_len.to_bytes(4, byteorder="little", signed=True))
-                # token_count += sentence_len
-                # sent_cumsum_stream.write(
-                #     token_count.to_bytes(
-                #         8, byteorder='little', signed=True))
-                sent_count += 1
-                token_ids_stream.write(np.array(sentence, dtype=save_dtype).tobytes(order="C"))
+                builder.add_item(sentence)
 
-            doc_cumsum_stream.write(sent_count.to_bytes(8, byteorder="little", signed=True))
+            builder.end_document()
 
             if step % args.log_interval == 0:
                 current = time.time()
@@ -369,19 +364,8 @@ def main():
 
     pool.close()
     print("Saving tokens to files...")
-    all_doc_ids = np.frombuffer(token_ids_stream.getbuffer(), dtype=save_dtype)
-    lens = np.frombuffer(sentlens_stream.getbuffer(), dtype=np.int32)
-    # sents = np.frombuffer(sent_cumsum_stream.getbuffer(), dtype=np.int64)
-    docs = np.frombuffer(doc_cumsum_stream.getbuffer(), dtype=np.int64)
-    np.save(args.output_prefix + "_ids.npy", all_doc_ids)
-    # np.savez(args.output_prefix + "_idx.npz", lens=lens, sents=sents, docs=docs)
-    np.savez(args.output_prefix + "_idx.npz", lens=lens, docs=docs)
-
-    print("Total sentences num: %d" % len(lens))
-    print("Total documents num: %d" % (len(docs) - 1))
-    print("Total tokens num: %d" % len(all_doc_ids))
-    print("Average tokens per sentence: %.2f" % (len(all_doc_ids) / len(lens)))
-    print("Average tokens per document: %.2f" % (len(all_doc_ids) / (len(docs) - 1)))
+    builder.finalize(output_idx_files)
+    print_datetime("end")
 
 
 if __name__ == "__main__":

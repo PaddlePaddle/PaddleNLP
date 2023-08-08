@@ -215,7 +215,7 @@ class TrainingArguments:
             default -1 means sharding parameters between all workers.
         tensor_parallel_degree (`int`, *optional*, defaults to `-1`)
             Tensor parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.3 Tensor Model Parallelism).
-            This techique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts)
+            This technique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts)
             tensor_parallel_degree means split the transformer layer to how many parts.
             default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better proformance.
             Note, this need model support in source code, currently GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM is supported.
@@ -232,6 +232,7 @@ class TrainingArguments:
               disable_partial_send_recv, optmize send speed for tensor parallel.
               enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
               enable_dp_comm_overlap, fuse data parallel gradient communication.
+              enable_sharding_comm_overlap, fuse sharding stage 1 parallel gradient communication.
         sharding_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
             following config is support:
@@ -533,6 +534,7 @@ class TrainingArguments:
                 "disable_partial_send_recv, optmize send speed for tensor parallel.\n"
                 "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
                 "enable_dp_comm_overlap, fuse data parallel gradient communication. \n"
+                "enable_sharding_comm_overlap, fuse sharding stage 1 parallel gradient communication. \n"
             )
         },
     )
@@ -806,6 +808,7 @@ class TrainingArguments:
                                 "disable_partial_send_recv",
                                 "enable_delay_scale_loss",
                                 "enable_dp_comm_overlap",
+                                "enable_sharding_comm_overlap",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -822,6 +825,7 @@ class TrainingArguments:
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
                         "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config,
+                        "sharding_comm_overlap": "enable_sharding_comm_overlap" in pipeline_parallel_config,
                     }
 
                     if self.do_eval:
@@ -836,11 +840,17 @@ class TrainingArguments:
                 if tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
 
+                if tensor_parallel_degree == 1 and sharding_parallel_degree == 1:
+                    order = ["pp", "dp", "sharding", "mp"]
+                else:
+                    order = ["dp", "pp", "sharding", "mp"]
+
                 hybrid_configs = {
                     "dp_degree": self.data_parallel_degree,
                     "mp_degree": tensor_parallel_degree,
                     "pp_degree": pipeline_parallel_degree,
                     "sharding_degree": sharding_parallel_degree,
+                    "order": order,
                 }
 
                 if pipeline_parallel_degree > 1:
@@ -1088,7 +1098,7 @@ class TrainingArguments:
         if self.save_on_each_node:
             return self.local_process_index == 0
         else:
-            if self.tensor_parallel_degree > 1:
+            if self.use_hybrid_parallel:
                 # save on dataset rank 0
                 return self.sharding_parallel_rank == 0 and self.data_parallel_rank == 0
             else:

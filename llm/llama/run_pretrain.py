@@ -38,6 +38,7 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     LlamaConfig,
     LlamaForCausalLM,
+    register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
@@ -50,6 +51,7 @@ MODEL_CLASSES = {
 }
 
 from dataset import GPTDataset, get_train_valid_test_split_
+from fused_layers import mock_layers
 from modeling_pp import LlamaForCausalLMPipe
 
 
@@ -74,6 +76,12 @@ class PreTrainingArguments(TrainingArguments):
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
         },
     )
+    enable_linear_fused_grad_add: bool = field(
+        default=False,
+        metadata={
+            "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
+        },
+    )
 
 
 @dataclass
@@ -87,6 +95,7 @@ class DataArguments:
     input_dir: str = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
     )
+    cache_prefix: str = field(default=None, metadata={"help": "The prefix of the cached dataset."})
     split: str = field(default="949,50,1", metadata={"help": "Train/valid/test data split."})
 
     max_seq_length: int = field(
@@ -133,8 +142,12 @@ class ModelArguments:
         metadata={"help": "llama, use_fused_rms_norm"},
     )
     fuse_attention_qkv: bool = field(
-        default=True,
-        metadata={"help": "gpt, fuse_attention_qkv"},
+        default=False,
+        metadata={"help": "whether to fuse attention qkv"},
+    )
+    fuse_attention_ffn: bool = field(
+        default=False,
+        metadata={"help": "whether to fuse first up and gate proj in mlp block"},
     )
     recompute_granularity: str = field(
         default="full",
@@ -144,11 +157,28 @@ class ModelArguments:
         default=1,
         metadata={"help": "virtual_pp_degree"},
     )
-
     continue_training: bool = field(
         default=False,
         metadata={
-            "help": "Pre-training from existing paddlenlp model weights. Default Fasle and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
+            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
+        },
+    )
+    sequence_parallel: bool = field(
+        default=False,
+        metadata={"help": "whether to use sequence parallel"},
+    )
+    fuse_sequence_parallel_allreduce: bool = field(
+        default=False,
+        metadata={"help": "whether to use fuse sequence parallel allreduce"},
+    )
+
+    rope_fusion_level: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "The level of fusion of rope embedding. Can be chosen from:\n"
+            "(1) 'full': fuse sin cos compute and rope embedding\n"
+            "(2) 'core': only fuse rope embedding, will compute the sin and cos\n"
+            "(3) None: don't fuse any part of the rope embedding"
         },
     )
 
@@ -201,7 +231,7 @@ def create_pretrained_dataset(
 
     def build_dataset(index, name):
         dataset = GPTDataset(
-            file_prefix=input_prefix,
+            file_prefix=os.path.join(data_args.cache_prefix, os.path.basename(input_prefix)),
             build_data_file=training_args.local_process_index == 0,
             micro_batch_size=training_args.per_device_train_batch_size
             if name == "train"
@@ -350,8 +380,16 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
+    if training_args.enable_linear_fused_grad_add:
+        mock_layers()
+
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
+
+    if data_args.cache_prefix is None:
+        data_args.cache_prefix = data_args.input_dir
+    else:
+        os.makedirs(data_args.cache_prefix, exist_ok=True)
 
     set_seed(training_args)
     paddle.set_device(training_args.device)
@@ -404,10 +442,14 @@ def main():
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
+    config.fuse_attention_ffn = model_args.fuse_attention_ffn
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
-    config.use_recompute = training_args.recompute
+    config.sequence_parallel = model_args.sequence_parallel
+    config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
+    config.rope_fusion_level = model_args.rope_fusion_level
 
+    config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
 
@@ -433,6 +475,11 @@ def main():
         )
     else:
         model = model_class._from_config(config, dtype=dtype)
+
+    if model_args.sequence_parallel:
+        register_sequence_parallel_allreduce_hooks(
+            model, training_args.gradient_accumulation_steps, model_args.fuse_sequence_parallel_allreduce
+        )
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:

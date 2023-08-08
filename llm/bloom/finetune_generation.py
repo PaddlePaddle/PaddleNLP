@@ -14,6 +14,7 @@
 
 import json
 import os
+import sys
 from dataclasses import dataclass, field
 from functools import partial
 
@@ -146,7 +147,10 @@ def convert_example(
 def main():
     # Parse the model and data  arguements
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    else:
+        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
