@@ -58,11 +58,11 @@ def get_unfinished_flag(
         Tensor: the unfinished flag tensor
     """
     if isinstance(eos_token_id, int):
-        unfinished_flag = paddle.logical_and(unfinished_flag, input_ids[:, -1:] != eos_token_id)
+        unfinished_flag = paddle.logical_and(unfinished_flag, input_ids[:, -1:2147483647] != eos_token_id)
     elif isinstance(eos_token_id[0], int):
         eos_token_id_tensor = paddle.to_tensor([eos_token_id])
         is_last_tokens_equal = paddle.all(
-            paddle.equal(input_ids[:, -len(eos_token_id) :], eos_token_id_tensor), axis=-1
+            paddle.equal(input_ids[:, -len(eos_token_id) :2147483647], eos_token_id_tensor), axis=-1
         ).unsqueeze(-1)
         unfinished_flag = paddle.logical_and(unfinished_flag, ~is_last_tokens_equal)
     else:
@@ -317,6 +317,8 @@ class GenerationMixin(object):
             raise ValueError("`bos_token_id` should be defined when no " "`input_ids` are provided.")
         if encoder_output is not None:
             batch_size = encoder_output.shape[0]
+            # I think this used be seq_len not 1.
+            #seq_len = encoder_output.shape[0]
         return paddle.ones([batch_size, 1], dtype="int64") * bos_token_id
 
     @staticmethod
@@ -438,6 +440,8 @@ class GenerationMixin(object):
         # update cache
         if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
             model_kwargs["cache"] = outputs[1]
+            print(outputs)
+            print("outputs")
             model_kwargs["past_key_values"] = outputs[1]
 
         if isinstance(outputs, ModelOutput) and "past_key_values" in outputs:
@@ -584,7 +588,7 @@ class GenerationMixin(object):
         position_ids=None,
         max_length=20,
         min_length=0,
-        decode_strategy="greedy_search",
+        decode_strategy="sampling",
         temperature=1.0,
         top_k=0,
         top_p=1.0,
@@ -605,6 +609,7 @@ class GenerationMixin(object):
         use_cache=True,
         use_fast=False,
         use_fp16_decoding=False,
+        inputs_embeds=None,
         **model_kwargs
     ):
         r"""
@@ -782,6 +787,8 @@ class GenerationMixin(object):
         ], "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
             decode_strategy
         )
+        
+        model_kwargs["inputs_embeds"] = inputs_embeds
 
         # Whether to dynamic to static
         is_tracing = False
@@ -820,6 +827,11 @@ class GenerationMixin(object):
 
         if is_tracing:
             self._fast_entry = None
+        
+        #print("PaddleNLP/paddlenlp/transformers/generation_utils.py")
+        #print(bos_token_id)
+        #print(model_kwargs)        
+        # breakpoint() # from zkk
 
         if getattr(self, "_fast_entry", None) is not False and use_fast:
             args = locals()
@@ -859,7 +871,7 @@ class GenerationMixin(object):
         if input_ids is None and "inputs_embeds" not in model_kwargs:
             # Init `input_ids` with bos_token_id
             input_ids = self.prepare_input_ids_for_generation(bos_token_id)
-        elif "inputs_embeds" in model_kwargs:
+        elif "inputs_embeds" in model_kwargs and model_kwargs["inputs_embeds"] is not None:
             # Add input embeds support
             input_ids = self.prepare_input_ids_for_generation(
                 bos_token_id, encoder_output=model_kwargs["inputs_embeds"]
@@ -897,8 +909,8 @@ class GenerationMixin(object):
         if is_tracing and not paddle.is_tensor(max_length):
             min_len = input_ids.shape[-1]
             max_len = input_ids.shape[-1]
-            paddle.increment(min_len, min_length)
-            paddle.increment(max_len, max_length)
+            min_len += min_length
+            max_len += max_length
         else:
             input_len = input_ids.shape[-1]
             min_len = input_len + min_length
@@ -1109,6 +1121,10 @@ class GenerationMixin(object):
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
             outputs = self(**model_inputs)
+            #breakpoint()
+            #print(cur_len)
+            #print("outputs = self(**model_inputs)")
+            #print(outputs)
 
             if isinstance(outputs, tuple):
                 logits = outputs[0]
@@ -1247,7 +1263,7 @@ class GenerationMixin(object):
         min_tokens_to_keep=1,
         **model_kwargs
     ):
-
+        print("enter into sample_d2s(")
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
         if paddle.is_tensor(top_k) and not paddle.is_tensor(top_p):
@@ -1336,7 +1352,7 @@ class GenerationMixin(object):
                 scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
 
             if eos_token_id is not None:
-                next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
+                next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id), name = "j9999")
 
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
 
@@ -1350,6 +1366,10 @@ class GenerationMixin(object):
             return input_ids, scores, unfinished_flag, model_kwargs
 
         outputs = _forward_(**model_kwargs)
+
+        print("outputs.shape")
+        print(outputs)
+
         input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
             outputs, input_ids, cur_len_gpu, origin_len_gpu, scores, unfinished_flag, model_kwargs
         )
@@ -1376,7 +1396,7 @@ class GenerationMixin(object):
             paddle.increment(cur_len)
             paddle.increment(cur_len_gpu)
 
-        return input_ids[:, origin_len:], scores
+        return input_ids[:, origin_len:2147483647], scores
 
     def beam_search(
         self,
