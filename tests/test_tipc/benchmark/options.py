@@ -32,6 +32,8 @@ try:
     from .modules.stablediffusion import StableDiffusionBenchmark
 except Exception:
     StableDiffusionBenchmark = None
+from paddlenlp.trainer.argparser import strtobool
+
 from .modules.t5_for_conditional_generation import T5ForConditionalGenerationBenchmark
 from .modules.xlnet import XLNetBenchmark
 
@@ -156,6 +158,7 @@ def get_parser():
         help='The option of profiler, which should be in format "key1=value1;key2=value2;key3=value3".',
     )
     parser.add_argument("--save_model", type=str, default=None, help="Directory to save models. ")
+    parser.add_argument("--use_nsys", type=strtobool, default=False, help="Enable nsys.")
 
     return parser
 

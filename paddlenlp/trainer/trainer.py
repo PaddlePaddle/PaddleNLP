@@ -573,6 +573,21 @@ class Trainer:
                 # so, the trainable numel is a little bigger than real.
                 logger.info(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
 
+        model = paddle.jit.to_static(
+            model,
+            input_spec=[
+                paddle.static.InputSpec(name="input_ids", shape=[-1, -1], dtype="int64"),  # input_ids
+                None,  # position_ids
+                None,  # attention_mask
+                None,  # inputs_embeds
+                paddle.static.InputSpec(name="labels", shape=[-1, -1], dtype="int64"),  # labels
+                False,  # use_cache
+                None,  # past_key_values
+                None,  # output_attentions
+                None,  # output_hidden_states
+                None,  # return_dict
+            ],
+        )
         start_time = time.time()
         self._globalstep_last_start_time = time.time()
         self.state.epoch = 0
