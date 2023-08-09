@@ -158,7 +158,7 @@ class IndexedDataset(paddle.io.Dataset):
             self.dim_offsets = read_longs(f, self._len + 1)
             self.data_offsets = read_longs(f, self._len + 1)
             self.sizes = read_shorts(f, self.s)
-            self.doc_idx = read_longs(f, self.doc_count)
+            self._doc_idx = read_longs(f, self.doc_count)
 
     def read_data(self, path):
         self.data_file = open(data_file_path(path), "rb", buffering=0)
@@ -231,6 +231,16 @@ class IndexedDataset(paddle.io.Dataset):
     def supports_prefetch(self):
         return False  # avoid prefetching to save memory
 
+    @property
+    def doc_idx(self):
+        return self._doc_idx
+
+    def get_doc_idx(self):
+        return self._doc_idx
+
+    def set_doc_idx(self, doc_idx_):
+        self._doc_idx = doc_idx_
+
 
 class IndexedDatasetBuilder(object):
     element_sizes = {
@@ -254,12 +264,13 @@ class IndexedDatasetBuilder(object):
         self.doc_idx = [0]
 
     def add_item(self, tensor):
-
-        bytes = self.out_file.write(np.array(tensor.numpy(), dtype=self.dtype))
+        tensor = np.array(tensor, dtype=self.dtype)
+        bytes = self.out_file.write(tensor)
         self.data_offsets.append(self.data_offsets[-1] + bytes / self.element_size)
         for s in tensor.shape:
             self.sizes.append(s)
         self.dim_offsets.append(self.dim_offsets[-1] + len(tensor.shape))
+        del bytes
 
     def end_document(self):
         self.doc_idx.append(len(self.sizes))
@@ -537,9 +548,9 @@ class MMapIndexedDatasetBuilder(object):
         self._doc_idx = [0]
 
     def add_item(self, tensor):
-        np_array = np.array(tensor.numpy(), dtype=self._dtype)
-        self._data_file.write(np_array.tobytes(order="C"))
-        self._sizes.append(np_array.size)
+        tensor = np.array(tensor, dtype=self._dtype)
+        self._data_file.write(tensor.tobytes(order="C"))
+        self._sizes.append(tensor.size)
 
     def add_doc(self, tensor, sizes):
         np_array = np.array(tensor, dtype=self._dtype)

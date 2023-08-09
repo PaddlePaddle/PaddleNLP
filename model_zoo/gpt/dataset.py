@@ -161,7 +161,7 @@ def get_train_valid_test_split_(splits_string, size):
     return splits_index
 
 
-def get_datasets_weights_and_num_samples(data_prefix, train_valid_test_num_samples):
+def get_datasets_weights_and_num_samples(data_prefix, train_val_test_num_samples):
 
     # The data prefix should be in the format of:
     #   weight-1, data-prefix-1, weight-2, data-prefix-2, ..
@@ -185,7 +185,7 @@ def get_datasets_weights_and_num_samples(data_prefix, train_valid_test_num_sampl
     datasets_train_valid_test_num_samples = []
     for weight in weights:
         datasets_train_valid_test_num_samples.append(
-            [int(math.ceil(val * weight * 1.005)) for val in train_valid_test_num_samples]
+            [int(math.ceil(val * weight * 1.005)) for val in train_val_test_num_samples]
         )
 
     return prefixes, weights, datasets_train_valid_test_num_samples
@@ -200,7 +200,7 @@ def build_train_valid_test_datasets(
     data_prefix,
     data_impl,
     splits_string,
-    train_valid_test_num_samples,
+    train_val_test_num_samples,
     seq_length,
     seed,
     skip_warmup,
@@ -219,7 +219,7 @@ def build_train_valid_test_datasets(
             data_prefix[0],
             data_impl,
             splits_string,
-            train_valid_test_num_samples,
+            train_val_test_num_samples,
             seq_length,
             seed,
             skip_warmup,
@@ -228,7 +228,7 @@ def build_train_valid_test_datasets(
 
     # Blending dataset.
     # Parse the values.
-    output = get_datasets_weights_and_num_samples(data_prefix, train_valid_test_num_samples)
+    output = get_datasets_weights_and_num_samples(data_prefix, train_val_test_num_samples)
     prefixes, weights, datasets_train_valid_test_num_samples = output
     train_num_samples, valid_num_samples, test_num_samples = map(sum, zip(*datasets_train_valid_test_num_samples))
 
@@ -278,7 +278,7 @@ def _build_train_valid_test_datasets(
     data_prefix,
     data_impl,
     splits_string,
-    train_valid_test_num_samples,
+    train_val_test_num_samples,
     seq_length,
     seed,
     skip_warmup,
@@ -318,7 +318,7 @@ def _build_train_valid_test_datasets(
                 documents,
                 indexed_dataset,
                 splits_string,
-                train_valid_test_num_samples[index],
+                train_val_test_num_samples[index],
                 seq_length,
                 seed,
                 return_doc_ids,
