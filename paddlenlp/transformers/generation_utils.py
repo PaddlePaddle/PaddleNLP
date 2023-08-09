@@ -1061,8 +1061,6 @@ class GenerationMixin(object):
         pre_caches=None,
         **model_kwargs
     ):
-        return_scores = model_kwargs.pop("return_scores", True)
-
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
 
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
@@ -1070,8 +1068,7 @@ class GenerationMixin(object):
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
-        if return_scores:
-            scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
+        scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
         immutable = {}
         immutable["pre_caches"] = pre_caches
@@ -1098,9 +1095,8 @@ class GenerationMixin(object):
             logits = logits_processors(input_ids, logits)
 
             # sample
-            if return_scores:
-                origin_probs = F.softmax(logits)
-                origin_probs = paddle.log(origin_probs)
+            origin_probs = F.softmax(logits)
+            origin_probs = paddle.log(origin_probs)
 
             if temperature is not None and temperature != 1.0:
                 logits = logits / temperature
@@ -1120,13 +1116,11 @@ class GenerationMixin(object):
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
 
-            if return_scores:
-                next_scores = paddle.index_sample(origin_probs, next_tokens)
+            next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
                 next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
 
-            if return_scores:
                 scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
 
             cur_len += 1
@@ -1142,14 +1136,21 @@ class GenerationMixin(object):
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
-        if return_scores:
-            return input_ids[:, origin_len:], scores
+        return input_ids[:, origin_len:], scores
 
-        return input_ids[:, origin_len:], None
+    def _get_model_input_spec(self, dtype: str):
+        """get model input spec which contains `input_ids`, `attention_mask` and `position_ids`.
 
-    def _get_attention_mask_input_spec(self, dtype: str):
-        input_spec = paddle.static.InputSpec(shape=[None, None, None, None], dtype="int64")
-        return input_spec
+        Args:
+            dtype (str): the dtype of current model
+
+        Returns:
+            list[InputSpec] : input_ids, attention_mask, position_ids
+        """
+        input_ids = paddle.static.InputSpec(shape=[None, None], dtype="int64")
+        attention_mask = paddle.static.InputSpec(shape=[None, None], dtype="int64")
+        position_ids = None
+        return [input_ids, attention_mask, position_ids]
 
     def to_static(self, path: str, config: dict = None):
         """export generation model to static
@@ -1161,20 +1162,19 @@ class GenerationMixin(object):
                 eos_token_id (int): token id of end-of-sentence
                 pad_token_id (int): token id of pad token
                 use_top_p (bool): whether use top_p decoding strategy
+                export_pre_caches (bool): whether export pre_caches inputs in static graph
         """
         config = config or {}
 
         use_top_p = config.get("use_top_p", True)
 
         top_k_spec = paddle.static.InputSpec(shape=[1], dtype="int64") if not use_top_p else 0
-
         top_p_spec = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
         temperature = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
 
-        input_spec = [
-            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            self._get_attention_mask_input_spec("int64"),  # attention_mask
-            None,  # position_ids
+        model_input_spec = self._get_model_input_spec()
+        assert len(model_input_spec) == 3, "the length of model input spec must be 3"
+        input_spec = model_input_spec + [
             paddle.static.InputSpec(shape=[1], dtype="int64"),  # max_length
             0,  # min_length
             "sampling",  # decode_strategy

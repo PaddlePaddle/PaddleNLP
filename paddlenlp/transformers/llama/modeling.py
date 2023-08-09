@@ -1317,11 +1317,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
 
 
 class FusedLlamaModel(LlamaPretrainedModel):
-    """
-    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`LlamaDecoderLayer`]
-    Args:
-        config: LlamaConfig
-    """
+    """Fused Llama Model based on `FusedMultiTransformer` which is a huge OP of transformer."""
 
     def __init__(self, config: LlamaConfig):
         super().__init__(config)
