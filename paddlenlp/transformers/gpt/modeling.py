@@ -195,7 +195,7 @@ class MultiHeadAttention(nn.Layer):
         mix_layer = self.qkv_proj(query)
         # bs, seqlen, nhead, headdim
         mix_layer = paddle.reshape_(
-            mix_layer, [0, 0, self.num_heads, 3 * self.head_dim]
+            mix_layer, [0, 0, self.num_attention_heads, 3 * self.head_dim]
         )  # todo 需要判断参数类型及实际含义，后续修改此处及concat
         # bs, nhead, seqlen, headdim
         if not self.config.use_flash_attention:
@@ -223,7 +223,7 @@ class MultiHeadAttention(nn.Layer):
 
         """
         q = self.q_proj(query)
-        q = tensor.reshape(x=q, shape=[0, 0, self.num_heads, self.head_dim])
+        q = tensor.reshape(x=q, shape=[0, 0, self.num_attention_heads, self.head_dim])
         if not self.config.use_flash_attention:
             # falsh attn need: [ bz, seqlen, nhead, head_dim]
             q = tensor.transpose(x=q, perm=[0, 2, 1, 3])  # todo：需要判断参数类型及实际含义，后续修改此处及concat
@@ -257,9 +257,9 @@ class MultiHeadAttention(nn.Layer):
         """
         k = self.k_proj(key)
         v = self.v_proj(value)
-        k = tensor.reshape(x=k, shape=[0, 0, self.num_heads, self.head_dim])
+        k = tensor.reshape(x=k, shape=[0, 0, self.num_attention_heads, self.head_dim])
         k = tensor.transpose(x=k, perm=[0, 2, 1, 3])
-        v = tensor.reshape(x=v, shape=[0, 0, self.num_heads, self.head_dim])
+        v = tensor.reshape(x=v, shape=[0, 0, self.num_attention_heads, self.head_dim])
         v = tensor.transpose(x=v, perm=[0, 2, 1, 3])
         return k, v
 
@@ -273,8 +273,12 @@ class MultiHeadAttention(nn.Layer):
             k, v = self.compute_kv(key, value)
             return self.StaticCache(k, v)
         elif value is None:  # incremental_state
-            k = paddle.full(shape=[key.shape[0], self.num_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0)
-            v = paddle.full(shape=[key.shape[0], self.num_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0)
+            k = paddle.full(
+                shape=[key.shape[0], self.num_attention_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0
+            )
+            v = paddle.full(
+                shape=[key.shape[0], self.num_attention_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0
+            )
             return self.Cache(k, v)
         else:
             # incremental_state with initial value, mainly for usage like UniLM
