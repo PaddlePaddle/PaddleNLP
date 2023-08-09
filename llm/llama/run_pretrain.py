@@ -50,7 +50,7 @@ MODEL_CLASSES = {
     ),
 }
 
-from dataset import build_train_valid_test_datasets, print_rank_0
+from dataset import GPTDataset, get_train_valid_test_split_
 from fused_layers import mock_layers
 from modeling_pp import LlamaForCausalLMPipe
 
@@ -109,15 +109,6 @@ class DataArguments:
         default=False,
         metadata={"help": "Use share folder for data dir and output dir on multi machine."},
     )
-
-    data_impl: str = field(
-        default="mmap", choices=["lazy", "mmap"], metadata={"help": "The format of the preprocessed data."}
-    )
-    skip_warmup: bool = field(
-        default=True,
-        metadata={"help": "Whether to skip the warmup process of mmap files."},
-    )
-    data_cache: str = field(default=None, metadata={"help": "The path of the cached dataset."})
 
 
 @dataclass
@@ -199,7 +190,7 @@ def create_pretrained_dataset(
     tokenizer,
 ):
 
-    train_val_test_num_samples = [
+    train_valid_test_num_samples = [
         training_args.per_device_train_batch_size
         * training_args.dataset_world_size
         * training_args.max_steps
@@ -211,56 +202,74 @@ def create_pretrained_dataset(
         training_args.per_device_eval_batch_size * training_args.dataset_world_size * training_args.test_iters,
     ]
 
-    print_rank_0(" > datasets target sizes (minimum size):")
-    print_rank_0("    train:      {}".format(train_val_test_num_samples[0]))
-    print_rank_0("    validation: {}".format(train_val_test_num_samples[1]))
-    print_rank_0("    test:       {}".format(train_val_test_num_samples[2]))
+    input_prefix = data_file[0]
 
-    # Build the datasets.
-    train_dataset, valid_dataset, test_dataset = build_train_valid_test_datasets(
-        data_prefix=data_file,
-        data_impl=data_args.data_impl,
-        splits_string=data_args.split,
-        train_val_test_num_samples=train_val_test_num_samples,
-        seq_length=data_args.max_seq_length,
-        seed=training_args.seed,
-        skip_warmup=data_args.skip_warmup,
-        data_cache_path=data_args.data_cache,
+    for suffix in ["_ids.npy", "_idx.npz"]:
+        if not os.path.isfile(input_prefix + suffix):
+            raise ValueError("File Not found, %s" % (input_prefix + suffix))
+
+    sample_ids = np.load(input_prefix + "_ids.npy", mmap_mode="r", allow_pickle=True)
+    # All documment ids, extend as 1-D array.
+
+    process_data = np.load(input_prefix + "_idx.npz")
+    # The len(sample_lens) num of docs
+    # The sum(sample_lens) should equal len(sample_ids)
+    sample_lens = process_data["lens"]
+
+    splits = get_train_valid_test_split_(data_args.split, len(sample_lens))
+    assert len(sample_lens) >= splits[-1], "The document nums should larger than max of splits, but %s < %s" % (
+        len(sample_lens),
+        splits[-1],
     )
 
     def print_dataset(data, mode="train"):
         logger.info(f"Sample data for {mode} mode")
-        # input_ids, loss_mask, attention_mask, position_ids, labels = data
-        input_ids = data["text"]
-
-        logger.info(tokenizer._decode(input_ids))  # todo
-
+        input_ids, loss_mask, attention_mask, position_ids, labels = data
+        logger.info(tokenizer._decode(input_ids))
         # logger.info(tokenizer._decode(labels))
         # logger.info(tokenizer.convert_ids_to_tokens(input_ids))
 
+    def build_dataset(index, name):
+        dataset = GPTDataset(
+            file_prefix=os.path.join(data_args.cache_prefix, os.path.basename(input_prefix)),
+            build_data_file=training_args.local_process_index == 0,
+            micro_batch_size=training_args.per_device_train_batch_size
+            if name == "train"
+            else training_args.per_device_eval_batch_size,
+            name="gpt_" + name,
+            max_seq_len=data_args.max_seq_length,
+            num_samples=train_valid_test_num_samples[index],
+            documents=np.arange(splits[index], splits[index + 1]),
+            sample_ids=sample_ids,
+            sample_lens=sample_lens,
+            eos_id=tokenizer.eos_token_id,
+            seed=training_args.seed,
+        )
+        print_dataset(dataset[0], name)
+        return dataset
+
     from paddlenlp.data import Stack
 
-    eod_token = tokenizer.eos_token_id
-
     def _collate_data(data, stack_fn=Stack()):
-        tokens_ = stack_fn(x["text"] for x in data)
-        # Unpack.
-        # tokens_ = paddle.to_tensor(tokens_, dtype="int64")
-        labels = tokens_[:, 1:]
-        tokens = tokens_[:, :-1]
-
-        # Loss mask.
-        loss_mask = paddle.ones(tokens.shape, dtype=paddle.float32)
-        loss_mask[data == eod_token] = 0.0
+        num_fields = len(data[0])
+        out = [None] * num_fields
+        # 0:input_ids, 1:loss_mask, 2:attention_mask, 3:position_ids, 4:labels
+        for i in (0, 1, 2, 3, 4):
+            out[i] = stack_fn([x[i] for x in data])
 
         return {
-            "input_ids": tokens,
-            "labels": labels,
+            "input_ids": out[0],
+            # "token_type_ids": out[1],
+            # "attention_mask": out[2],
+            # "loss_mask": out[3],
+            "labels": out[4],
         }
 
-    print_dataset(train_dataset[0], "train")
-    print_dataset(valid_dataset[0], "valid")
-    print_dataset(test_dataset[0], "test")
+    # Note, data should be broardcast to all devices.
+    # for train, valid, test, the distinct data num is data_world_size
+    train_dataset = build_dataset(0, "train")
+    valid_dataset = build_dataset(1, "valid")
+    test_dataset = build_dataset(2, "test")
 
     return train_dataset, valid_dataset, test_dataset, _collate_data
 
@@ -273,10 +282,9 @@ def get_train_data_file(args):
         files = [
             os.path.join(args.input_dir, f)
             for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and ("_idx.npz" in str(f) or ".idx" in str(f)))
+            if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz" in str(f))
         ]
         files = [x.replace("_idx.npz", "") for x in files]
-        files = [x.replace(".idx", "") for x in files]  # add
 
         if len(files) > 1:
             ret = []
