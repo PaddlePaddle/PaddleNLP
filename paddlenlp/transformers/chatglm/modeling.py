@@ -588,40 +588,6 @@ class ChatGLMPretrainedModel(PretrainedModel):
         """Initialization hook"""
         return None
 
-    def get_masks(self, input_ids, attention_mask):
-        batch_size, seq_length = input_ids.shape
-        if attention_mask is None:
-            attention_mask = paddle.ones([batch_size, seq_length, seq_length], dtype="bool")
-        elif len(attention_mask.shape) == 2:
-            # [batchsize, seq_length]
-            attention_mask = attention_mask.unsqueeze(1).expand([batch_size, seq_length, seq_length]).astype("bool")
-        elif len(attention_mask.shape) == 3:
-            # [batchsize, seq_length, seq_length]
-            attention_mask = attention_mask.astype("bool")
-        elif len(attention_mask.shape) == 4:
-            attention_mask = attention_mask.astype("bool")
-            # 4D attention mask come from Tokenizer or generate(), just pass
-            return attention_mask
-
-        context_lengths = []
-        pad_lengths = []
-        for seq in input_ids:
-            context_lengths.append(paddle.where(seq == self.config.bos_token_id)[0][0])
-            pad_lengths.append(paddle.where(seq != self.config.pad_token_id)[0][0])
-
-        causal_mask = paddle.tril(paddle.ones([batch_size, seq_length, seq_length], dtype="bool"))
-
-        attention_mask = attention_mask & causal_mask
-
-        for i, context_length in enumerate(context_lengths):
-            attention_mask[i, :, :context_length] = True
-
-        for i, pad_length in enumerate(pad_lengths):
-            attention_mask[i, :pad_length, :pad_length] = False
-
-        # [batch_size, 1, seq_length, seq_length]
-        return attention_mask.unsqueeze(1)
-
     def get_position_ids(self, input_ids, mask_positions, use_gmasks=None):
         batch_size, seq_length = input_ids.shape
         if use_gmasks is None:
@@ -629,11 +595,7 @@ class ChatGLMPretrainedModel(PretrainedModel):
 
         context_lengths = []
         for seq in input_ids:
-            bos_pos = paddle.where(seq == self.config.bos_token_id)[0]
-            if bos_pos.shape[0] > 0:
-                context_lengths.append(bos_pos[0])
-            else:
-                context_lengths.append(paddle.to_tensor([0]))
+            context_lengths.append(paddle.where(seq == self.config.bos_token_id)[0][0])
 
         if self.config.position_encoding_2d:
             position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
@@ -737,7 +699,10 @@ class ChatGLMModel(ChatGLMPretrainedModel):
             assert position_ids is not None, "`position_ids` must be explicitly specified when input_ids is None."
             assert attention_mask is not None, "`attention_mask` must be explicitly specified when input_ids is None."
 
-        attention_mask = self.get_masks(input_ids, attention_mask)
+        if attention_mask is None or len(attention_mask.shape) != 4:
+            raise ValueError(f"attention mask should'nt be None or has size other than 4Dim. Found {attention_mask}")
+
+        attention_mask = attention_mask.astype("bool")
 
         if position_ids is None:
             MASK, gMASK = self.config.mask_token_id, self.config.gmask_token_id
@@ -812,16 +777,12 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
             mask_token = gMASK if gMASK in seq else MASK
             use_gmask = mask_token == gMASK
             use_gmasks.append(use_gmask)
-            mask_pos = paddle.where(seq == mask_token)[0]
-            if mask_pos.shape[0] > 0:
-                mask_positions.append(mask_pos[0])
-            else:
-                mask_positions.append(paddle.to_tensor([0]))
+            mask_positions.append(paddle.where(seq == mask_token)[0][0])
 
         if cache is not None or past_key_values is not None:
             last_token = input_ids[:, -1].unsqueeze(-1)
 
-            attention_mask = self.get_masks(input_ids, attention_mask)[:, :, -1:]
+            attention_mask = attention_mask[:, :, -1:]
 
             if position_ids is not None:
                 position_ids = position_ids[..., -1:]
@@ -829,11 +790,7 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
                 if self.position_encoding_2d:
                     context_lengths = []
                     for seq in input_ids:
-                        bos_pos = paddle.where(seq == self.config.bos_token_id)[0]
-                        if bos_pos.shape[0] > 0:
-                            context_lengths.append(bos_pos[0])
-                        else:
-                            context_lengths.append(paddle.to_tensor([0]))
+                        context_lengths.append(paddle.where(seq == self.config.bos_token_id)[0][0])
 
                     context_lengths = paddle.to_tensor(context_lengths, dtype="int64")
                     block_position_ids = seq_length - context_lengths
@@ -853,12 +810,6 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
                 "attention_mask": attention_mask,
             }
         else:
-            if attention_mask is not None and attention_mask.dtype != paddle.int64:
-                logger.warning(f"The dtype of attention mask ({attention_mask.dtype}) is not int64")
-                attention_mask = None
-
-            attention_mask = self.get_masks(input_ids, attention_mask)
-
             if position_ids is None:
                 position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, use_gmasks=use_gmasks)
 
