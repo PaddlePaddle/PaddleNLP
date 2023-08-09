@@ -40,7 +40,7 @@ models
     │   └── model.py
     └── config.pbtxt
 ```
-
+*注意*:如果使用TensorRT引擎，用 pipelines/examples/chatbot/config.pbtxt 替换 models/m3e_model/config.pbtxt
 ## 拉取并运行镜像
 ```bash
 # GPU镜像
