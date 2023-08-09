@@ -24,7 +24,9 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.common_ops_import import convert_dtype
-from paddle.fluid.dygraph.base import in_declarative_mode
+
+# TODO(guosheng): update this workaround import for in_declarative_mode
+from paddle.nn.layer.layers import in_declarative_mode
 from paddle.utils import map_structure
 
 try:
