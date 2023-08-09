@@ -21,7 +21,7 @@ from paddlenlp.peft.prefix import (
     chatglm_pad_attention_mask,
     chatglm_postprocess_past_key_value,
 )
-from paddlenlp.transformers import ChatGLMConfig, ChatGLMForCausalLM, ChatGLMTokenizer
+from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 
 def parse_arguments():
@@ -62,7 +62,7 @@ class Predictor(object):
             self.src_length = kwargs["src_length"]
             self.tgt_length = kwargs["tgt_length"]
         else:
-            self.tokenizer = ChatGLMTokenizer.from_pretrained(args.model_name_or_path)
+            self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
             self.batch_size = args.batch_size
             self.args = args
             self.src_length = self.args.src_length
@@ -89,10 +89,10 @@ class Predictor(object):
                 prefix_config = PrefixConfig.from_pretrained(self.args.prefix_path)
                 dtype = prefix_config.dtype
             else:
-                config = ChatGLMConfig.from_pretrained(args.model_name_or_path)
+                config = AutoConfig.from_pretrained(args.model_name_or_path)
                 dtype = config.dtype if config.dtype is not None else config.paddle_dtype
 
-            self.model = ChatGLMForCausalLM.from_pretrained(
+            self.model = AutoModelForCausalLM.from_pretrained(
                 args.model_name_or_path,
                 tensor_parallel_degree=tensor_parallel_degree,
                 tensor_parallel_rank=tensor_parallel_rank,
@@ -103,8 +103,12 @@ class Predictor(object):
                 self.model = LoRAModel.from_pretrained(self.model, self.args.lora_path)
                 self.model.mark_only_lora_as_trainable()
             if self.args.prefix_path is not None:
+                if "chatglm2" in args.model_name_or_path:
+                    pad_attention_mask = None
+                else:
+                    pad_attention_mask = chatglm_pad_attention_mask
                 self.model = PrefixModelForCausalLM.from_pretrained(
-                    self.model, self.args.prefix_path, chatglm_postprocess_past_key_value, chatglm_pad_attention_mask
+                    self.model, self.args.prefix_path, chatglm_postprocess_past_key_value, pad_attention_mask
                 )
 
         self.model.eval()

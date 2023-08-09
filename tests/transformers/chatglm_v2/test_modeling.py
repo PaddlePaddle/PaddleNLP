@@ -19,7 +19,11 @@ from parameterized import parameterized_class
 
 from paddlenlp.transformers import ChatGLMv2Config, ChatGLMv2ForCausalLM, ChatGLMv2Model
 from tests.transformers.test_generation_utils import GenerationTesterMixin
-from tests.transformers.test_modeling_common import ModelTesterMixin, ids_tensor
+from tests.transformers.test_modeling_common import (
+    ModelTesterMixin,
+    ids_tensor,
+    random_attention_mask,
+)
 
 
 class ChatGLMv2Tester:
@@ -149,6 +153,23 @@ class ChatGLMv2Tester:
         else:
             self.parent.assertTrue(past_key_values is None)
 
+    def create_and_check_model_attention_mask(self, config: ChatGLMv2Config, input_ids, labels):
+        model = ChatGLMv2ForCausalLM(config)
+        model.eval()
+        attn_mask_2d = random_attention_mask([self.batch_size, self.seq_length])
+        result_2d = model(input_ids, attention_mask=attn_mask_2d)[0]
+        batch, seq_length = input_ids.shape
+        causal_mask = paddle.tril(paddle.ones((batch, seq_length, seq_length), dtype=attn_mask_2d.dtype))
+        attn_mask_3d = causal_mask & attn_mask_2d.unsqueeze(-1)
+        result_3d = model(input_ids, attention_mask=attn_mask_3d)[0]
+        attn_mask_4d = attn_mask_3d.unsqueeze(1)
+        result_4d = model(input_ids, attention_mask=attn_mask_4d)[0]
+        result_no_attention_mask = model(input_ids, attention_mask=None)[0]
+        # Assert non-padding tokens have the same logits with different attention_mask shape
+        self.parent.assertTrue((result_2d[attn_mask_2d] == result_3d[attn_mask_2d]).all())
+        self.parent.assertTrue((result_2d[attn_mask_2d] == result_4d[attn_mask_2d]).all())
+        self.parent.assertTrue((result_2d[attn_mask_2d] == result_no_attention_mask[attn_mask_2d]).all())
+
 
 @parameterized_class(
     ("return_dict", "use_labels"),
@@ -193,6 +214,10 @@ class ChatGLMv2Test(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     def test_ChatGLMv2_lm_head_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_lm_head_model(*config_and_inputs)
+
+    def test_model_attention_mask(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_model_attention_mask(*config_and_inputs)
 
 
 if __name__ == "__main__":

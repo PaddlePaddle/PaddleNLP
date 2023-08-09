@@ -33,8 +33,8 @@ PROMPT_DICT = {
 }
 
 
-def reader(data_path):
-    with open(data_path, "r", encoding="utf-8") as f:
+def read_local_dataset(path):
+    with open(path, "r", encoding="utf-8") as f:
         for line in f:
             json_line = json.loads(line)
             yield json_line

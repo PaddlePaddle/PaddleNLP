@@ -126,7 +126,6 @@ def main():
                 model_args.model_name_or_path,
                 torch_dtype="auto",
             )
-
     if model_args.lora:
         if "llama" in model_args.model_name_or_path:
             target_modules = ["q_proj", "k_proj", "v_proj"]

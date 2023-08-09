@@ -683,6 +683,8 @@ def paddlenlp_load(path, map_location="cpu"):
         return paddle.load(path, return_numpy=True)
     else:
         with device_guard(map_location):
+            return paddle.load(path)
+            # TODO(zhonghui03): the following code has problems when hot start optimizer checkpoint.
             if map_location == "cpu":
                 from paddle.framework.io import (
                     _parse_every_object,
@@ -693,7 +695,7 @@ def paddlenlp_load(path, map_location="cpu"):
                 def _ndarray_to_tensor(obj, return_numpy=False):
                     if return_numpy:
                         return obj
-                    if paddle.fluid.framework.in_dygraph_mode():
+                    if paddle.in_dynamic_mode():
                         return paddle.Tensor(obj, zero_copy=True)
                     else:
                         return _to_LodTensor(obj)

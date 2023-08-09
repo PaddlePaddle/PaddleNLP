@@ -469,6 +469,10 @@ TASKS = {
                 "task_class": ChatGLMTask,
                 "task_flag": "text_generation-THUDM/chatglm-6b",
             },
+            "THUDM/chatglm2-6b": {
+                "task_class": ChatGLMTask,
+                "task_flag": "text_generation-THUDM/chatglm2-6b",
+            },
             "__internal_testing__/tiny-random-chatglm": {
                 "task_class": ChatGLMTask,
                 "task_flag": "text_generation-tiny-random-chatglm",
@@ -741,6 +745,7 @@ support_argument_list = [
     "__internal_testing__/tiny-random-uie-m",
     "__internal_testing__/tiny-random-uie-x",
     "THUDM/chatglm-6b",
+    "THUDM/chatglm2-6b",
     "THUDM/chatglm-6b-v1.1",
 ]
 
