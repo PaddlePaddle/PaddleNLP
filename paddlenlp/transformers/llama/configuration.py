@@ -206,7 +206,6 @@ class LlamaConfig(PretrainedConfig):
         "n_inner": "intermediate_size",
         "activation_function": "hidden_act",
     }
-    pretrained_init_configuration = LLAMA_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
         self,
