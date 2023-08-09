@@ -28,7 +28,7 @@ from itertools import accumulate
 
 import numpy as np
 import paddle
-from paddlenlp.data.indexed_dataset import make_dataset as make_indexed_dataset
+from paddlenlp.data.indexed_dataset import get_indexed_dataset_
 
 def get_local_rank():
     return int(os.getenv("PADDLE_RANK_IN_NODE", 0))
@@ -226,10 +226,6 @@ class MMapIndexedDataset(paddle.io.Dataset):
 
     def set_doc_idx(self, doc_idx_):
         self._doc_idx = doc_idx_
-
-
-# def make_indexed_dataset(data_prefix, data_impl=None, skip_warmup=False):
-#     return MMapIndexedDataset(data_prefix)
 
 
 def get_a_and_b_segments(sample, np_rng):
@@ -782,22 +778,6 @@ def _build_train_valid_test_datasets(
     test_dataset = build_dataset(2, "test")
 
     return (train_dataset, valid_dataset, test_dataset)
-
-
-def get_indexed_dataset_(data_prefix, data_impl, skip_warmup):
-
-    print_rank_0(" > building dataset index ...")
-
-    start_time = time.time()
-    indexed_dataset = make_indexed_dataset(data_prefix, data_impl, skip_warmup)
-    assert indexed_dataset.sizes.shape[0] == indexed_dataset.doc_idx[-1]
-    print_rank_0(" > finished creating indexed dataset in {:4f} " "seconds".format(time.time() - start_time))
-
-    print_rank_0(" > indexed dataset stats:")
-    print_rank_0("    number of documents: {}".format(indexed_dataset.doc_idx.shape[0] - 1))
-    print_rank_0("    number of sentences: {}".format(indexed_dataset.sizes.shape[0]))
-
-    return indexed_dataset
 
 
 def get_train_valid_test_split_(splits_string, size):
