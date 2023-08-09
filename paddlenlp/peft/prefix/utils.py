@@ -20,13 +20,9 @@ def bloom_postprocess_past_key_value(past_key_values):
     past_key_values = paddle.transpose(past_key_values, perm=[2, 0, 3, 1, 4]).split(2)
     # (layer_num, bs, head_num/tensor_parallel_degree, prefixlen, head_dim)
     num_hidden_layers, batch_size, num_attention_heads, num_prefix_tokens, head_hidden_size = past_key_values[0].shape
-    # (layer_num, bs, prefixlen, head_num/tensor_parallel_degree, head_dim)
-    keys, values = past_key_values[0].transpose([0, 1, 3, 2, 4]), past_key_values[1].transpose([0, 1, 3, 2, 4])
-    # (layer_num, bs*head_num/tensor_parallel_degree, head_dim, prefixlen)
-    keys = keys.reshape([num_hidden_layers, batch_size * num_attention_heads, head_hidden_size, num_prefix_tokens])
-    # (layer_num, bs*head_num/tensor_parallel_degree, prefixlen, head_dim)
-    values = values.reshape([num_hidden_layers, batch_size * num_attention_heads, num_prefix_tokens, head_hidden_size])
-
+    # keys: [layer_num, bs, head_num/tensor_parallel_degree, head_dim, prefixlen]
+    # value: [layer_num, bs, head_num/tensor_parallel_degree, prefixlen, head_dim]
+    keys, values = past_key_values[0].transpose([0, 1, 2, 4, 3]), past_key_values[1]
     return tuple(zip(keys, values))
 
 
