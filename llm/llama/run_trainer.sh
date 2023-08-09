@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+export PYTHONPATH=/root/paddlejob/workspace/gongenlei/dingkb/read/PaddleNLP:$PYTHONPATH
 
 set -x
 unset CUDA_VISIBLE_DEVICES
@@ -20,15 +21,15 @@ rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
 
-PYTHONPATH=../../:$PYTHONPATH  \
-python -u  -m paddle.distributed.launch \
-    --gpus "0,1,2,3,4,5,6,7" \
+PYTHONPATH=../../../:$PYTHONPATH  \
+python3.9 -u  -m paddle.distributed.launch \
+    --gpus "0,1,2,3" \
     --log_dir "output/$task_name""_log" \
     run_pretrain.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
     --tokenizer_name_or_path "facebook/llama-7b" \
-    --input_dir "./data" \
+    --input_dir "/root/paddlejob/workspace/gongenlei/dingkb/openwebtext2/llama/mmap" \
     --output_dir "output/$task_name" \
     --split 949,50,1 \
     --max_seq_length 2048 \
@@ -56,4 +57,6 @@ python -u  -m paddle.distributed.launch \
     --recompute 1 \
     --do_train \
     --do_eval \
-    --device "gpu"
+    --device "gpu" \
+    --tensor_parallel_degree 4 \
+    --data_impl "mmap"
