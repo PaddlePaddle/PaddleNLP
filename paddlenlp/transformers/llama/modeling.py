@@ -179,6 +179,7 @@ def scaled_dot_product_attention(
     output_attentions,
     is_causal=True,
     alibi=None,
+    sequence_parallel=False,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
@@ -198,8 +199,10 @@ def scaled_dot_product_attention(
             causal=is_causal and query_states.shape[1] != 1,
             return_softmax=output_attentions,
         )
-
-        attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+        if sequence_parallel:
+            attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
+        else:
+            attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
         return attn_output, attn_weights
     else:
         query_states = paddle.transpose(query_states, [0, 2, 1, 3])
@@ -238,7 +241,10 @@ def scaled_dot_product_attention(
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
-        attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+        if sequence_parallel:
+            attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
+        else:
+            attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
         return attn_output, attn_weights
 
 
@@ -459,6 +465,7 @@ class LlamaAttention(nn.Layer):
         self.num_key_value_groups = config.num_attention_heads // config.num_key_value_heads
 
         self.max_position_embeddings = config.max_position_embeddings
+        self.seq_length = config.seq_length
         self.sequence_parallel = config.sequence_parallel
 
         self.fuse_attention_qkv = config.fuse_attention_qkv
@@ -599,18 +606,25 @@ class LlamaAttention(nn.Layer):
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
 
         if self.fuse_attention_qkv:
+            if self.sequence_parallel:
+                target_shape = [-1, self.seq_length, self.num_heads, 3 * self.head_dim]
+            else:
+                target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
+
             mix_layer = self.qkv_proj(hidden_states)
-            mix_layer = paddle.reshape_(mix_layer, [0, 0, self.num_heads, 3 * self.head_dim])
+            mix_layer = paddle.reshape_(mix_layer, target_shape)
             query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
         else:
-            query_states = self.q_proj(hidden_states).reshape(shape=[0, 0, self.num_heads, self.head_dim])
-            key_states = self.k_proj(hidden_states).reshape(shape=[0, 0, self.num_key_value_heads, self.head_dim])
-            value_states = self.v_proj(hidden_states).reshape(shape=[0, 0, self.num_key_value_heads, self.head_dim])
+            if self.sequence_parallel:
+                target_query_shape = [-1, self.seq_length, self.num_heads, self.head_dim]
+                target_key_value_shape = [-1, self.seq_length, self.num_key_value_heads, self.head_dim]
+            else:
+                target_query_shape = [0, 0, self.num_heads, self.head_dim]
+                target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
 
-        if self.sequence_parallel:
-            query_states = query_states.transpose([1, 0, 2, 3])
-            key_states = key_states.transpose([1, 0, 2, 3])
-            value_states = value_states.transpose([1, 0, 2, 3])
+            query_states = self.q_proj(hidden_states).reshape(shape=target_query_shape)
+            key_states = self.k_proj(hidden_states).reshape(shape=target_key_value_shape)
+            value_states = self.v_proj(hidden_states).reshape(shape=target_key_value_shape)
 
         kv_seq_len = key_states.shape[-3]
 
@@ -657,10 +671,8 @@ class LlamaAttention(nn.Layer):
             attention_mask=attention_mask,
             output_attentions=output_attentions,
             alibi=alibi,
+            sequence_parallel=self.sequence_parallel,
         )
-
-        if self.sequence_parallel:
-            attn_output = paddle.transpose(attn_output, [1, 0, 2])
 
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
@@ -706,7 +718,7 @@ class LlamaDecoderLayer(nn.Layer):
             cache (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
         """
 
-        # [bs, seq_len, embed_dim] -> [seq_len / n, bs, embed_dim] (sequence_parallel)
+        # [bs * seq_len, embed_dim] -> [seq_len * bs / n, embed_dim] (sequence_parallel)
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
 
@@ -1012,9 +1024,10 @@ class LlamaModel(LlamaPretrainedModel):
             inputs_embeds = self.embed_tokens(input_ids)
 
         if self.sequence_parallel:
-            # [bs, seq_len, num_head * head_dim] -> [seq_len, bs, num_head * head_dim]
-            inputs_embeds = paddle.transpose(inputs_embeds, perm=[1, 0, 2])
-            # [seq_len / n, bs, num_head * head_dim] (n is mp parallelism)
+            # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
+            bs, seq_len, hidden_size = inputs_embeds.shape
+            inputs_embeds = paddle.reshape_(inputs_embeds, [bs * seq_len, hidden_size])
+            # [seq_len * bs / n, num_head * head_dim] (n is mp parallelism)
             inputs_embeds = ScatterOp.apply(inputs_embeds)
 
         # embed positions
@@ -1170,7 +1183,7 @@ class LlamaLMHead(nn.Layer):
     def forward(self, hidden_states, tensor_parallel_output=None):
         if self.config.sequence_parallel:
             hidden_states = GatherOp.apply(hidden_states)
-            hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
+            hidden_states = paddle.reshape_(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
 
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
