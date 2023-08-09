@@ -56,5 +56,4 @@ python -u  -m paddle.distributed.launch \
     --recompute 1 \
     --do_train \
     --do_eval \
-    --device "gpu" \
-    --data_impl "mmap"
+    --device "gpu"
