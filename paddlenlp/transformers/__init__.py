@@ -29,6 +29,16 @@ from .processing_utils import ProcessorMixin
 from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from .image_processing_utils import ImageProcessingMixin
 from .attention_utils import create_bigbird_rand_mask_idx_list
+from .sequence_parallel_utils import (
+    GatherOp,
+    ScatterOp,
+    AllGatherOp,
+    ReduceScatterOp,
+    ColumnSequenceParallelLinear,
+    RowSequenceParallelLinear,
+    mark_as_sequence_parallel_parameter,
+    register_sequence_parallel_allreduce_hooks,
+)
 from .export import export_model
 
 # isort: split

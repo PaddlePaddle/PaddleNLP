@@ -171,6 +171,19 @@ class LlamaConfig(PretrainedConfig):
             relevant if `config.is_decoder=True`.
         tie_word_embeddings(`bool`, *optional*, defaults to `False`):
             Whether to tie weight embeddings
+        rope_fusion_level(`str`, *optional*, defaults to ``):
+            The level of fusion of rope embedding. Can be chosen from:
+            (1) 'full': fuse sin cos compute and rope embedding
+            (2) 'core': only fuse rope embedding, will compute the sin and cos
+            (3) None: don't fuse any part of the rope embedding
+        num_key_value_heads (`int`, *optional*):
+            This is the number of key_value heads that should be used to implement Grouped Query Attention. If
+            `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
+            `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+            converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
+            by meanpooling all the original heads within that group. For more details checkout [this
+            paper](https://arxiv.org/pdf/2305.13245.pdf). If it is not specified, will default to
+            `num_attention_heads`.
         Example:
     ```python
     >>> from paddlenlp.transformer import LlamaModel, LlamaConfig
@@ -203,19 +216,26 @@ class LlamaConfig(PretrainedConfig):
         max_position_embeddings=2048,
         num_hidden_layers=32,
         num_attention_heads=32,
+        num_key_value_heads=None,
         initializer_range=0.02,
         rms_norm_eps=1e-6,
         use_cache=True,
         use_recompute=False,
         recompute_granularity="full",
+        fuse_attention_qkv=False,
         use_flash_attention=False,
+        fuse_attention_ffn=False,
         use_fused_rms_norm=False,
         tensor_parallel_output=True,
+        sequence_parallel=False,
+        fuse_sequence_parallel_allreduce=False,
         lm_shift_labels=True,
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
         tie_word_embeddings=False,
+        alibi=False,
+        rope_fusion_level=None,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -224,20 +244,32 @@ class LlamaConfig(PretrainedConfig):
         self.max_position_embeddings = max_position_embeddings
         self.num_hidden_layers = num_hidden_layers
         self.num_attention_heads = num_attention_heads
+
+        if num_key_value_heads is None:
+            num_key_value_heads = num_attention_heads
+        self.num_key_value_heads = num_key_value_heads
+
         self.initializer_range = initializer_range
         self.rms_norm_eps = rms_norm_eps
 
         self.use_cache = use_cache
         self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
+        self.fuse_attention_qkv = fuse_attention_qkv
         self.use_flash_attention = use_flash_attention
+        self.fuse_attention_ffn = fuse_attention_ffn
         self.use_fused_rms_norm = use_fused_rms_norm
         self.tensor_parallel_output = tensor_parallel_output
+        self.sequence_parallel = sequence_parallel
+        self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
         self.lm_shift_labels = lm_shift_labels
 
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
+        self.alibi = alibi
+
+        self.rope_fusion_level = rope_fusion_level
 
         super().__init__(
             pad_token_id=pad_token_id,
@@ -247,3 +279,7 @@ class LlamaConfig(PretrainedConfig):
             tensor_parallel_output=tensor_parallel_output,
             **kwargs,
         )
+
+    @property
+    def rope(self):
+        return not self.alibi

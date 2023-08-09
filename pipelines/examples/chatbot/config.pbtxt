@@ -1,0 +1,67 @@
+backend: "fastdeploy"
+max_batch_size: 64
+input [
+    {
+      name: "input_ids"
+      data_type: TYPE_INT64
+      dims: [ -1 ]
+    },
+    {
+      name: "token_type_ids"
+      data_type: TYPE_INT64
+      dims: [ -1 ]
+    }
+]
+output [
+    {
+      name: "layer_norm_49.tmp_2"
+      data_type: TYPE_FP32
+      dims: [ -1,768 ]
+    }
+]
+
+instance_group [
+  {
+      # 创建1个实例
+      count: 1
+      # 使用CPU推理(KIND_CPU、KIND_GPU)
+      kind: KIND_GPU
+      gpus: [ 0]
+  }
+]
+
+
+
+
+
+optimization {
+  execution_accelerators {
+  gpu_execution_accelerator : [ {
+    # use TRT engine
+    name: "tensorrt",
+    # use fp16 on TRT engine
+    parameters { key: "precision" value: "trt_fp16" }
+  },
+  {
+    # Configure the minimum shape of dynamic shape
+    name: "min_shape"
+    # All input name and minimum shape
+    parameters { key: "input_ids" value: "1 512" }
+    parameters { key: "token_type_ids" value: "1 512" }
+  },
+  {
+    # Configure the optimal shape of dynamic shape
+    name: "opt_shape"
+    # All input name and optimal shape
+    parameters { key: "input_ids" value: "10 512" }
+    parameters { key: "token_type_ids" value: "10 512" }
+  },
+  {
+    # Configure the maximum shape of dynamic shape
+    name: "max_shape"
+    # All input name and maximum shape
+    parameters { key: "input_ids" value: "16 512" }
+    parameters { key: "token_type_ids" value: "16 512" }
+  }
+  ]
+}}
