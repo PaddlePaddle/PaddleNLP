@@ -119,7 +119,6 @@ def convert_example_chatglm(example, tokenizer, data_args, is_test=True, intoken
         attention_mask = np.tri(len(input_ids), len(input_ids))
         attention_mask[:, :bos_position] = 1
         attention_mask = attention_mask[None, :, :]
-        attention_mask = (attention_mask < 0.5).astype("int64")
 
         labels = [-100] * bos_position + input_ids[bos_position:]
 

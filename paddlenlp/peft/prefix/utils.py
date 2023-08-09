@@ -42,11 +42,3 @@ def llama_postprocess_past_key_value(past_key_values):
     keys, values = paddle.transpose(past_key_values, perm=[2, 0, 1, 3, 4]).split(2)
 
     return tuple(zip(keys, values))
-
-
-def chatglm_pad_attention_mask(input_ids_shape, num_prefix_tokens, attention_mask):
-    prefix_attention_mask = paddle.ones(
-        [input_ids_shape[0], 1, input_ids_shape[-1], num_prefix_tokens], dtype=attention_mask.dtype
-    )
-    prefix_attention_mask = (prefix_attention_mask < 0.5).astype("int64")
-    return paddle.concat((prefix_attention_mask, attention_mask), axis=3)
