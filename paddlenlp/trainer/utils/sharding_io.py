@@ -66,7 +66,7 @@ class ShardingIO:
         state_dict = OrderedDict()
 
         for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
-            tmp = load_one_state_dict_func(resume_from_checkpoint, self.args.sharded_weight_name_suffix(i))
+            tmp = load_one_state_dict_func(resume_from_checkpoint, self.args.sharded_name_suffix(i))
             for (k, v) in tmp.items():
                 state_dict[k] = v
             del tmp
@@ -114,7 +114,7 @@ class ShardingIO:
         lr_scheduler = {}
 
         for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
-            tmp = load_optimizer_state_func(checkpoint, self.args.sharded_weight_name_suffix(i))
+            tmp = load_optimizer_state_func(checkpoint, self.args.sharded_name_suffix(i))
 
             if not tmp:
                 continue
@@ -131,7 +131,7 @@ class ShardingIO:
 
             del tmp
 
-            # gather all opt names
+        # gather all opt names
         # list of list
         opt_names_list = self._all_gather_simple_object(list(state_dict.keys()))
         opt_names = []
@@ -174,7 +174,7 @@ class ShardingIO:
         state_dict["master_weights"] = master_weights
 
         # lr scheduler
-        print(lr_scheduler)
+        logger.debug(f"lr_scheduler:{lr_scheduler}")
         lr_schedulers = self._all_gather_simple_object(lr_scheduler)
         lr_scheduler = {}
         for e in lr_schedulers:

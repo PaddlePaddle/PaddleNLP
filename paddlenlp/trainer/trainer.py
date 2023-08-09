@@ -110,8 +110,6 @@ TRAINER_STATE_NAME = "trainer_state.json"
 OPTIMIZER_NAME = "optimizer.pdopt"
 SCHEDULER_NAME = "scheduler.pdparams"
 SCALER_NAME = "scaler.pdparams"
-MODEL_META_NAME = "model_meta.json"
-SHARDING_META_NAME = "shard_meta.json"
 
 if is_datasets_available():
     import datasets
@@ -1843,7 +1841,7 @@ class Trainer:
             "optimizer": self.optimizer,
         }
         weight_name_suffix = (
-            self.args.sharded_weight_name_suffix()
+            self.args.sharded_name_suffix()
             if self.args.should_save_sharding_stage1_model
             else self.args.weight_name_suffix
         )

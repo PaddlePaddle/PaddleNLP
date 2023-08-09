@@ -1039,7 +1039,7 @@ class TrainingArguments:
         else:
             return None
 
-    def sharded_weight_name_suffix(self, shard_id=None):
+    def sharded_name_suffix(self, shard_id=None):
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
