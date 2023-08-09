@@ -119,7 +119,7 @@ class DataArguments:
     )
     data_impl: str = field(
         default="mmap",
-        metadata="mmap/lazy format converted from json"
+        metadata={"help": "mmap/lazy format converted from json"},
     )
 
 
