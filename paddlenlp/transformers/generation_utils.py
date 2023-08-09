@@ -305,6 +305,7 @@ class GenerationMixin(object):
     """
     # enable `to_static` method for CausalLM Model
     enable_to_static_method = False
+    support_pre_caches = False
 
     @staticmethod
     def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
@@ -1073,7 +1074,8 @@ class GenerationMixin(object):
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
         immutable = {}
-        immutable["pre_caches"] = pre_caches
+        if self.support_pre_caches:
+            immutable["pre_caches"] = pre_caches
 
         while cur_len < max_length:
             # prepare model inputs & get model output
@@ -1283,7 +1285,8 @@ class GenerationMixin(object):
         immutable = {"use_cache": model_kwargs["use_cache"]}
         del model_kwargs["use_cache"]
 
-        immutable["pre_caches"] = pre_caches
+        if self.support_pre_caches:
+            immutable["pre_caches"] = pre_caches
 
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
