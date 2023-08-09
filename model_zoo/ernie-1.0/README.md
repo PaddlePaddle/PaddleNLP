@@ -116,7 +116,7 @@ ERNIE 中文预训练更详细的介绍文档请可以参见[ERNIE 中文预训�
 <summary><b>CLUECorpusSmall 数据准备</b></summary>
 
 #### 数据准备
-数据下载部分请参考[preprocess](./preprocess)目录，根据文档中`CLUECorpusSmall 数据集处理教程`，下载数据。下载好后:
+数据下载部分请参考[data_tools](./data_tools)目录，根据文档中`CLUECorpusSmall 数据集处理教程`，下载数据。下载好后:
 
 解压文件
 ```shell
@@ -127,11 +127,11 @@ unzip wiki2019zh_corpus.zip    -d  clue_corpus_small_14g/wiki2019zh_corpus
 ```
 将txt文件转换为jsonl格式
 ```
-python preprocess/trans_to_json.py  --input_path ./clue_corpus_small_14g --output_path clue_corpus_small_14g.jsonl
+python data_tools/trans_to_json.py  --input_path ./clue_corpus_small_14g --output_path clue_corpus_small_14g.jsonl
 ```
 现在我们得到了jsonl格式的数据集，下面是针对训练任务的数据集应用，此处以ernie为例。
 ```
-python -u  preprocess/create_pretraining_data.py \
+python -u  data_tools/create_pretraining_data.py \
     --model_name ernie-1.0-base-zh \
     --tokenizer_name ErnieTokenizer \
     --input_path clue_corpus_small_14g.jsonl \
@@ -145,8 +145,8 @@ python -u  preprocess/create_pretraining_data.py \
 ```
 数据共有文档`15702702`条左右，由于分词比较耗时，大概一小时左右可以完成。在当前目录下产出训练所需数据。
 ```
-clue_corpus_small_14g_20220104.bin
-clue_corpus_small_14g_20220104.idx
+clue_corpus_small_14g_20220104_ids.npy
+clue_corpus_small_14g_20220104_idx.npz
 ```
 
 </details>
@@ -158,7 +158,7 @@ clue_corpus_small_14g_20220104.idx
 
 ####  开始训练
 
-将制作好的数据`clue_corpus_small_14g_20220104.bin,clue_corpus_small_14g_20220104.idx`移动到input_dir中，即可开始训练。
+将制作好的数据`clue_corpus_small_14g_20220104_ids.npy,clue_corpus_small_14g_20220104_idx.npz`移动到input_dir中，即可开始训练。
 这里以8卡GPU训练为例任务脚本为例：
 ```
 python -u  -m paddle.distributed.launch \
