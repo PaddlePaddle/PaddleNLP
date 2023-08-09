@@ -65,15 +65,8 @@ class ShardingIO:
 
         state_dict = OrderedDict()
 
-        def get_name_suffix(i):
-            name = []
-            name.append(f"tp{self.args.tensor_parallel_rank:0>2d}")
-            name.append(f"pp{self.args.pipeline_parallel_rank:0>2d}")
-            name.append(f"shard{i:0>2d}")
-            return "_".join(name)
-
         for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
-            tmp = load_one_state_dict_func(resume_from_checkpoint, get_name_suffix(i))
+            tmp = load_one_state_dict_func(resume_from_checkpoint, self.args.sharded_weight_name_suffix(i))
             for (k, v) in tmp.items():
                 state_dict[k] = v
             del tmp
@@ -120,15 +113,8 @@ class ShardingIO:
         master_weights = OrderedDict()
         lr_scheduler = {}
 
-        def get_name_suffix(i):
-            name = []
-            name.append(f"tp{self.args.tensor_parallel_rank:0>2d}")
-            name.append(f"pp{self.args.pipeline_parallel_rank:0>2d}")
-            name.append(f"shard{i:0>2d}")
-            return "_".join(name)
-
         for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
-            tmp = load_optimizer_state_func(checkpoint, get_name_suffix(i))
+            tmp = load_optimizer_state_func(checkpoint, self.args.sharded_weight_name_suffix(i))
 
             if not tmp:
                 continue
@@ -203,7 +189,7 @@ class ShardingIO:
         if not self.args.use_hybrid_parallel:
             return
 
-        if not self.args.save_sharding_stage1_model:
+        if not self.args.should_save_sharding_stage1_model:
             return
 
         nranks = dist.get_world_size()
@@ -259,10 +245,10 @@ class ShardingIO:
         master_weigths = opt_state_dict["master_weights"]
         param_names_in_master_weights = list(master_weigths.keys())
         tmp = []
-        logger.info("param_names_in_master_weights:{}".format(param_names_in_master_weights))
+        logger.debug("param_names_in_master_weights:{}".format(param_names_in_master_weights))
         paddle.distributed.all_gather_object(tmp, param_names_in_master_weights, group=self.sharding_group)
         sharding_group_param_names = [v for item in tmp for v in item]
-        logger.info("sharding_group_param_names:{}".format(sharding_group_param_names))
+        logger.debug("sharding_group_param_names:{}".format(sharding_group_param_names))
         model_state_dict = self.model.state_dict()
         logger.info("before recover, model_state_dict number: {}".format(len(model_state_dict)))
         for key, param in model_state_dict.items():

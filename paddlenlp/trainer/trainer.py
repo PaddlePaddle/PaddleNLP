@@ -267,7 +267,9 @@ class Trainer:
         self.control = TrainerControl()
         self._signature_columns = None
         self.optimizer_grouped_parameters = None
-        self.sharding_io = ShardingIO(self.args, self.model, self.optimizer)
+        self.sharding_io = None
+        if self.args.should_save_sharding_stage1_model or self.args.should_load_sharding_stage1_model:
+            self.sharding_io = ShardingIO(self.args, self.model, self.optimizer)
 
         if self.sharding is not None and self.optimizer is not None:
             raise RuntimeError(
@@ -409,14 +411,14 @@ class Trainer:
             return
 
         state_dict = None
-        if self.args.load_sharding_stage1_model:
+        if self.args.should_load_sharding_stage1_model:
             state_dict = self.sharding_io.load_state_dict_from_checkpoint_with_reshard(
                 resume_from_checkpoint, self.load_one_state_dict_from_checkpoint
             )
         else:
             if self.args.dataset_rank == 0:
                 state_dict = self.load_one_state_dict_from_checkpoint(
-                    resume_from_checkpoint, self.args.old_weight_name_suffix
+                    resume_from_checkpoint, self.args.weight_name_suffix
                 )
             else:
                 logger.info(f"not loading ckpt :{self.args.dataset_rank}")
@@ -465,7 +467,8 @@ class Trainer:
         self._load_optimizer_and_scheduler(resume_from_checkpoint)
         self.load_state_dict_from_checkpoint(resume_from_checkpoint)
         model = self._wrap_model(self.model_wrapped)
-        self.sharding_io.set_optimizer(self.optimizer)
+        if self.sharding_io is not None:
+            self.sharding_io.set_optimizer(self.optimizer)
         # for the rest of this function `model` is the outside model, whether it was wrapped or not
         if model is not self.model:
             self.model_wrapped = model
@@ -478,7 +481,8 @@ class Trainer:
         # Because the _wrap_model implicitly broadcast checkpoint of sharding rank0 to other ranks, we need to load sharded parameters after _wrap_model
         # thus each sharding rank load its own sharded parameters.
         model = self._wrap_model(self.model_wrapped)
-        self.sharding_io.set_optimizer(self.optimizer)
+        if self.sharding_io is not None:
+            self.sharding_io.set_optimizer(self.optimizer)
         # for the rest of this function `model` is the outside model, whether it was wrapped or not
         if model is not self.model:
             self.model_wrapped = model
@@ -562,7 +566,7 @@ class Trainer:
 
         self.state = TrainerState()
 
-        if self.args.load_sharding_stage1_model:
+        if self.args.should_load_sharding_stage1_model:
             model = self._wrap_model_and_load_sharded_checkpoint(
                 resume_from_checkpoint, delay_optimizer_creation, max_steps
             )
@@ -1831,6 +1835,18 @@ class Trainer:
         if paddle.distributed.get_world_size() > 1 and self.args.use_hybrid_parallel:
             sharding_group = self.sharding_group
             sharding_rank = sharding_group.rank
+        sharded_kwargs = {
+            "is_bf16": is_bf16,
+            "param_names_in_master_weights": param_names_in_master_weights,
+            "sharding_group": sharding_group,
+            "should_save_sharding_stage1_model": self.args.should_save_sharding_stage1_model,
+            "optimizer": self.optimizer,
+        }
+        weight_name_suffix = (
+            self.args.sharded_weight_name_suffix()
+            if self.args.should_save_sharding_stage1_model
+            else self.args.weight_name_suffix
+        )
         if (
             not isinstance(self.model, PretrainedModel)
             and not isinstance(self.model, LoRAModel)
@@ -1840,13 +1856,9 @@ class Trainer:
                 unwrap_model(self.model).save_pretrained(
                     output_dir,
                     merge_tensor_parallel=merge_tensor_parallel,
-                    variant=self.args.weight_name_suffix,
+                    variant=weight_name_suffix,
                     is_main_process=self.args.should_save,
-                    is_bf16=is_bf16,
-                    param_names_in_master_weights=param_names_in_master_weights,
-                    sharding_group=sharding_group,
-                    save_sharding_stage1_model=self.args.save_sharding_stage1_model,
-                    optimizer=self.optimizer,
+                    **sharded_kwargs,
                 )
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
@@ -1854,7 +1866,7 @@ class Trainer:
                     logger.warning("Trainer.model is not a `PretrainedModel`, not suppor for merge_tensor_parallel.")
                 if state_dict is None:
                     state_dict = self.model.state_dict()
-                if self.args.save_sharding_stage1_model:
+                if self.args.should_save_sharding_stage1_model:
                     state_dict = filter_sharded_params(state_dict, self.optimizer, sharding_rank)
                     if is_bf16:
                         logger.info("before exclude state_dict_to_save len:{}".format(len(state_dict)))
@@ -1864,23 +1876,19 @@ class Trainer:
                         logger.info("after exclude state_dict len:{}".format(len(state_dict)))
                 paddle.save(
                     state_dict,
-                    os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix)),
+                    os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, weight_name_suffix)),
                 )
         else:
             self.model.save_pretrained(
                 output_dir,
                 merge_tensor_parallel=merge_tensor_parallel,
-                variant=self.args.weight_name_suffix,
+                variant=weight_name_suffix,
                 is_main_process=self.args.should_save,
-                is_bf16=is_bf16,
-                param_names_in_master_weights=param_names_in_master_weights,
-                sharding_group=sharding_group,
-                save_sharding_stage1_model=self.args.save_sharding_stage1_model,
-                optimizer=self.optimizer,
-                sharding_degree=self.args.sharding_parallel_degree,
+                **sharded_kwargs,
             )
+        if self.args.should_save_sharding_stage1_model:
+            self.sharding_io.save_distributed_model_meta(output_dir)
 
-        self.sharding_io.save_distributed_model_meta(output_dir)
         if self.args.should_save:
             if self.tokenizer is not None:
                 self.tokenizer.save_pretrained(output_dir)
@@ -1898,7 +1906,7 @@ class Trainer:
         return None
 
     def _load_optimizer_state(self, checkpoint):
-        if self.args.load_sharding_stage1_model:
+        if self.args.should_load_sharding_stage1_model:
             return self.sharding_io.load_optimizer_state_with_reshard(
                 checkpoint, self._load_optimizer_state_of_one_shard
             )

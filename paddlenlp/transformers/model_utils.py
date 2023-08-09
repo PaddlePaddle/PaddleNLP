@@ -116,7 +116,7 @@ def filter_sharded_params(state_dict, optimizer, sharding_rank):
 
 
 def exlclude_paramters_in_state_dict(
-    model_state_dict, param_names_in_master_weights, sharding_group, save_sharding_stage1_model=True
+    model_state_dict, param_names_in_master_weights, sharding_group, should_save_sharding_stage1_model=True
 ):
     assert sharding_group is not None
     assert isinstance(model_state_dict, dict) and isinstance(
@@ -128,7 +128,7 @@ def exlclude_paramters_in_state_dict(
             param_names_in_master_weights, state_param_names
         )
     )
-    if not save_sharding_stage1_model:
+    if not should_save_sharding_stage1_model:
         # allgather parameter names in sharding group
         tmp = []
         paddle.distributed.all_gather_object(tmp, param_names_in_master_weights, group=sharding_group)
@@ -2065,7 +2065,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         param_names_in_master_weights = list(kwargs.get("param_names_in_master_weights", []))
         sharding_group = kwargs.get("sharding_group", None)
         optimizer = kwargs.get("optimizer", None)
-        save_sharding_stage1_model = kwargs.get("save_sharding_stage1_model", False)
+        should_save_sharding_stage1_model = kwargs.get("should_save_sharding_stage1_model", False)
 
         save_directory = save_dir
 
@@ -2094,7 +2094,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if state_dict is None and config_to_save.tensor_parallel_degree > 1:
             if merge_tensor_parallel:
                 state_dict = model_to_save.state_dict()
-                if save_sharding_stage1_model:
+                if should_save_sharding_stage1_model:
                     state_dict = filter_sharded_params(state_dict, optimizer, sharding_group.rank)
                 state_dict = model_to_save.merge_tensor_parallel(state_dict, config_to_save)
                 config_to_save.tensor_parallel_degree = 1
@@ -2108,13 +2108,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         if state_dict is None:
             state_dict = self.state_dict()
-            if save_sharding_stage1_model:
+            if should_save_sharding_stage1_model:
                 state_dict = filter_sharded_params(state_dict, optimizer, sharding_group.rank)
 
         # Attach architecture to the config
         config_to_save.architectures = [model_to_save.__class__.__name__]
 
-        if is_bf16 and save_sharding_stage1_model:
+        if is_bf16 and should_save_sharding_stage1_model:
             state_dict = exlclude_paramters_in_state_dict(state_dict, param_names_in_master_weights, sharding_group)
             logger.info(
                 "param_names_in_master_weights len:{}, bf16 state_dict len:{}, :{}".format(

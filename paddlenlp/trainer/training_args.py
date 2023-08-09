@@ -1028,7 +1028,7 @@ class TrainingArguments:
             return None
 
     @property
-    def old_weight_name_suffix(self):
+    def weight_name_suffix(self):
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
@@ -1039,16 +1039,18 @@ class TrainingArguments:
         else:
             return None
 
-    @property
-    def weight_name_suffix(self):
+    def sharded_weight_name_suffix(self, shard_id=None):
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
                 name.append(f"tp{self.tensor_parallel_rank:0>2d}")
             if self.pipeline_parallel_degree > 1:
                 name.append(f"pp{self.pipeline_parallel_rank:0>2d}")
-            if self.save_sharding_stage1_model:
-                name.append(f"shard{self.sharding_parallel_rank:0>2d}")
+            if self.sharding_parallel_degree > 1:
+                if shard_id is None:
+                    shard_id = self.sharding_parallel_rank
+                assert isinstance(shard_id, int)
+                name.append(f"shard{shard_id:0>2d}")
             return "_".join(name)
         else:
             return None
@@ -1111,7 +1113,7 @@ class TrainingArguments:
         if self.save_on_each_node:
             return self.local_process_index == 0
         else:
-            if self.save_sharding_stage1_model:
+            if self.should_save_sharding_stage1_model:
                 return True
             elif self.use_hybrid_parallel:
                 # save on dataset rank 0
@@ -1127,13 +1129,13 @@ class TrainingArguments:
         return True
 
     @property
-    def save_sharding_stage1_model(self):
+    def should_save_sharding_stage1_model(self):
         return (
             ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.save_sharded_model
         )
 
     @property
-    def load_sharding_stage1_model(self):
+    def should_load_sharding_stage1_model(self):
         return (
             ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.load_sharded_model
         )
