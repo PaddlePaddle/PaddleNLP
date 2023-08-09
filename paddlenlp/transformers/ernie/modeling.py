@@ -19,7 +19,9 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
-from paddle.fluid.dygraph.base import in_declarative_mode
+
+# TODO(guosheng): update this workaround import for in_declarative_mode
+from paddle.nn.layer.layers import in_declarative_mode
 
 from ...layers import Linear as TransposedLinear
 from ...utils.env import CONFIG_NAME
