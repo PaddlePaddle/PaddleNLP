@@ -266,10 +266,7 @@ def do_train(args):
     # TODO(Baibaifan): combine ShardingStage1/2/3 and fleet.distributed_model in feature
     if args.sharding_stage in [2, 3]:
         if args.dp_degree > 1:
-            try:
-                from paddle.fluid.dygraph.parallel import sync_params_buffers
-            except ImportError:
-                from paddle.distributed.parallel import sync_params_buffers
+            from paddle.distributed.parallel import sync_params_buffers
 
             sync_params_buffers(model, comm_group=dp_group, src_rank=dp_group.ranks[0])
 

@@ -27,7 +27,6 @@ from typing import Optional, Tuple, Type
 
 import numpy as np
 import paddle
-import paddle.fluid as fluid
 from paddle.distributed.utils.launch_utils import (
     TrainerProc,
     find_free_ports,
@@ -881,7 +880,7 @@ class DistributedTest(unittest.TestCase):
         eager_mode=True,
         allocator_strategy="auto_growth",
     ):
-        if not fluid.core.is_compiled_with_cuda() or fluid.core.get_cuda_device_count() == 0:
+        if not paddle.framework.core.is_compiled_with_cuda() or paddle.framework.core.get_cuda_device_count() == 0:
             return
 
         cluster = None

@@ -699,7 +699,7 @@ def _load_state_dict_into_meta_model(
     `bert.pooler.dense.weight`
 
     """
-    from paddle.fluid.framework import convert_np_dtype_to_dtype_
+    from paddle.common_ops_import import convert_np_dtype_to_dtype_
 
     dtype = convert_np_dtype_to_dtype_(dtype)
     error_msgs = []
