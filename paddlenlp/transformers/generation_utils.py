@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import inspect
-from abc import ABC
+from abc import ABC, abstractmethod
 from collections import OrderedDict
 from typing import Union
 
@@ -34,8 +34,6 @@ from .model_outputs import ModelOutput
 from .utils import get_scale_by_dtype
 
 __all__ = ["GenerationMixin"]
-
-is_top_p_sampling_avaliable = import_module("paddle.top_p_sampling") is not None
 
 
 def get_unfinished_flag(
@@ -357,6 +355,7 @@ class GenerationMixin(object):
     ):
         processors = LogitsProcessorList()
 
+        # TODO(wj-Mcat): MinLengthLogitsProcessor can not work, fix it later.
         # if min_length is not None and eos_token_id is not None and min_length > -1:
         #     processors.append(MinLengthLogitsProcessor(min_length, eos_token_id))
         if num_beam_groups > 1 and diversity_rate > 0.0:
@@ -553,29 +552,22 @@ class GenerationMixin(object):
 
         return logits
 
-    def prepare_fast_entry(self, kwargs):
-        return False
+    @abstractmethod
+    def _build_fast(self):
+        """abstract method for preparing fast
 
-    def _convert_to_fast(self, kwargs):
-        # try general convert
-        pass
+        Raises:
+            ValueError: raise error in no fused-mt model
+        """
+        raise ValueError(f"model<{self.__class__.__name__}> can not be converted to fast model")
 
-    def _build_fast(self, kwargs):
+    def build_fast(self):
         if getattr(self, "_has_build_fast", False):
+            logger.info("faster model is ready ...")
             return
 
-        self._fast_entry = False
-        if kwargs.get("num_beam_groups", 1) != 1:
-            # not support for group_beam_search yet in the fast version
-            raise AttributeError("'num_beam_groups != 1' is not supported yet in the fast version")
-        if paddle.get_default_dtype() == "float16" and kwargs.get("use_fp16_decoding", False) is False:
-            logger.info(
-                "Since the default dtype is float16, float16 would be used " "though 'use_fp16_decoding=False'."
-            )
-            kwargs["use_fp16_decoding"] = True
-
         logger.info("start to build faster model ...")
-        self.prepare_fast_entry(kwargs)
+        self._build_fast()
         logger.info("faster model is ready ...")
         self._has_build_fast = True
 
@@ -800,12 +792,6 @@ class GenerationMixin(object):
         if getattr(self, "deprecated_warnings", None) is None:
             self.deprecated_warnings = {}
 
-        if "use_faster" in model_kwargs:
-            use_fast = model_kwargs.pop("use_faster")
-            if not self.deprecated_warnings.get("use_faster", False):
-                logger.warning("`use_faster` will be deprecated in near future. Please use `use_fast` instead. ")
-                self.deprecated_warnings["use_faster"] = True
-
         bos_token_id = bos_token_id if bos_token_id is not None else self.config.bos_token_id
         eos_token_id = eos_token_id if eos_token_id is not None else self.config.eos_token_id
         pad_token_id = pad_token_id if pad_token_id is not None else self.config.pad_token_id
@@ -826,41 +812,10 @@ class GenerationMixin(object):
             self._fast_entry = None
 
         if use_fast:
-            if getattr(self, "_fast_entry", None) is not False:
-                args = locals()
-                args.pop("self")
-                args.pop("__class__", None)
-                model_kwargs = args.pop("model_kwargs")
-                args.update(model_kwargs)
-                try:
-                    if getattr(self, "_fast_entry", None) is None:
-                        self._build_fast(args)
-                    if self._fast_entry:
-                        output = self._fast_entry(**args)
-                        if isinstance(output, tuple):
-                            output_ids, dummy_srore = output
-                        else:
-                            output_ids = output
-                            # make result and fast result oneconsistent
-                            dummy_srore = None
-                        if decode_strategy == "beam_search":
-                            output_ids = output_ids.transpose([1, 2, 0])
-                            output_ids = output_ids[:, :num_return_sequences, :].reshape([-1, output_ids.shape[-1]])
-                            if dummy_srore is not None:
-                                dummy_srore = dummy_srore[:, :num_return_sequences].flatten()
-                        else:
-                            output_ids = output_ids.transpose([1, 0])
-                        return output_ids, dummy_srore
-
-                except Exception as e:
-                    args["model_kwargs"] = model_kwargs
-                    # TODO
-                    # Prevent self._convert_to_fast to throw Exception
-                    self._convert_to_fast(args)
-                    logger.warning(e)
-                    logger.warning(
-                        "FastGeneration is not available, " "and the original version would be used instead."
-                    )
+            try:
+                self.build_fast()
+            except Exception:
+                raise ValueError(f"can not build fast model for <{type(self)}>, so you should set `use_fast=False`")
 
         # params check
         if input_ids is None and "inputs_embeds" not in model_kwargs:
@@ -1310,6 +1265,8 @@ class GenerationMixin(object):
                 "you should not specify InputSpec for top_k and top_p parameters, one of InputSpec is expected"
             )
 
+        is_top_p_sampling_avaliable = import_module("paddle.top_p_sampling") is not None
+        # TODO(wj-Mcat): move `use_fuse_topp_sampling` to generation_config later
         use_topp_sampling_op = is_top_p_sampling_avaliable or model_kwargs.get("use_fuse_topp_sampling", False)
 
         batch_size, cur_len = paddle.shape(input_ids)

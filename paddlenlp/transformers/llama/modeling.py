@@ -1201,7 +1201,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
     def get_decoder(self):
         return self.llama
 
-    def prepare_fast_entry(self, kwargs=None):
+    def _build_fast(self):
         """create `FusedLlamaModel` model by `LlamaModel` and re-use the lm-head layer"""
         model = FusedLlamaModel.from_pretrained_model(self)
         self.llama = None
@@ -1399,11 +1399,22 @@ class FusedLlamaModel(LlamaPretrainedModel):
         self.embed_tokens = value
 
     @classmethod
-    def from_pretrained_model(cls: Type[PretrainedModel], model: LlamaModel):
+    def from_pretrained_model(cls: Type[PretrainedModel], model: LlamaModel) -> FusedLlamaModel:
+        """init FusedLlamaModel from pretrained Llama Model dynamic
+
+        Args:
+            cls (Type[PretrainedModel]): the class type of FusedLLamaModel
+            model (LlamaModel): the instance of LlamaModel
+
+        Returns:
+            FusedLlamaModel: the instance of FusedLlamaModel
+        """
+        # 1. init empty FusedLlamaModel model
         with paddle.LazyGuard():
             fused_model: FusedLlamaModel = cls(model.config)
         config: LlamaConfig = model.config
 
+        # 2 convert weights from llama model to fused llama model
         head_size = config.hidden_size // config.num_attention_heads
         fused_model.embed_tokens.weight.set_value(model.llama.embed_tokens.weight)
         del model.llama.embed_tokens.weight
@@ -1453,6 +1464,7 @@ class FusedLlamaModel(LlamaPretrainedModel):
             del model.llama.layers[idx].post_attention_layernorm
             paddle.device.cuda.empty_cache()
 
+        # free the model.llama model to allocate the cuda cache
         del model.llama
         return fused_model
 
