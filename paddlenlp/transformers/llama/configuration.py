@@ -214,7 +214,7 @@ class LlamaConfig(PretrainedConfig):
         hidden_size=4096,
         intermediate_size=11008,
         max_position_embeddings=2048,
-        seq_length=1024,
+        seq_length=2048,
         num_hidden_layers=32,
         num_attention_heads=32,
         num_key_value_heads=None,
