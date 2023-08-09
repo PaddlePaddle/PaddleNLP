@@ -28,6 +28,7 @@ from itertools import accumulate
 
 import numpy as np
 import paddle
+
 from paddlenlp.data.indexed_dataset import get_indexed_dataset_
 
 
