@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import collections
 import math
-from functools import partial
 
 import numpy as np
 import paddle
@@ -25,13 +24,10 @@ import paddle.incubate as incubate
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
-
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
-from paddle.fluid import layers
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
-from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
 from ...layers import Linear as TransposedLinear
 from ...utils.converter import StateDictNameMapping
@@ -70,6 +66,7 @@ __all__ = [
     "GPTForCausalLM",
 ]
 
+
 def get_triangle_upper_mask(x, mask=None):
     if mask is not None:
         return mask
@@ -82,6 +79,7 @@ def get_triangle_upper_mask(x, mask=None):
     mask = paddle.triu(mask, diagonal=1)
     mask.stop_gradient = True
     return mask
+
 
 def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, tensor_parallel_output=True):
     is_fleet_init = True
@@ -96,7 +94,7 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, tensor_parallel_output=T
     if is_fleet_init and tensor_parallel_degree > 1 and y.is_distributed:
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
         input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
-        logits = paddle.matmul(input_parallel, y, transpose_y=False) #todo llama此处为False， gpt-3此处为True
+        logits = paddle.matmul(input_parallel, y, transpose_y=False)  # todo llama此处为False， gpt-3此处为True
 
         if tensor_parallel_output:
             return logits
@@ -104,7 +102,7 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, tensor_parallel_output=T
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
 
     else:
-        logits = paddle.matmul(x, y, transpose_y=False) #todo llama此处为False， gpt-3此处为True
+        logits = paddle.matmul(x, y, transpose_y=False)  # todo llama此处为False， gpt-3此处为True
         return logits
 
 
@@ -119,7 +117,10 @@ class MultiHeadAttention(nn.Layer):
     Cache = collections.namedtuple("Cache", ["k", "v"])
     StaticCache = collections.namedtuple("StaticCache", ["k", "v"])
 
-    def __init__(self, config,):
+    def __init__(
+        self,
+        config,
+    ):
         super(MultiHeadAttention, self).__init__()
 
         self.config = config
@@ -131,7 +132,9 @@ class MultiHeadAttention(nn.Layer):
         self.dropout = config.attention_probs_dropout_prob
 
         self.head_dim = config.hidden_size // config.num_attention_heads
-        assert self.head_dim * config.num_attention_heads == config.hidden_size, "hidden_size must be divisible by num_attention_heads"
+        assert (
+            self.head_dim * config.num_attention_heads == config.hidden_size
+        ), "hidden_size must be divisible by num_attention_heads"
 
         self.num_attention_heads = config.num_attention_heads  # default, without tensor parallel
         if config.tensor_parallel_degree > 1:
@@ -191,7 +194,9 @@ class MultiHeadAttention(nn.Layer):
     def _fuse_prepare_qkv(self, query, use_cache=False, cache=None):
         mix_layer = self.qkv_proj(query)
         # bs, seqlen, nhead, headdim
-        mix_layer = paddle.reshape_(mix_layer, [0, 0, self.num_heads, 3 * self.head_dim]) # todo 需要判断参数类型及实际含义，后续修改此处及concat
+        mix_layer = paddle.reshape_(
+            mix_layer, [0, 0, self.num_heads, 3 * self.head_dim]
+        )  # todo 需要判断参数类型及实际含义，后续修改此处及concat
         # bs, nhead, seqlen, headdim
         if not self.config.use_flash_attention:
             # falsh attn need: [ bz, seqlen, nhead, head_dim]
@@ -221,7 +226,7 @@ class MultiHeadAttention(nn.Layer):
         q = tensor.reshape(x=q, shape=[0, 0, self.num_heads, self.head_dim])
         if not self.config.use_flash_attention:
             # falsh attn need: [ bz, seqlen, nhead, head_dim]
-            q = tensor.transpose(x=q, perm=[0, 2, 1, 3]) # todo：需要判断参数类型及实际含义，后续修改此处及concat
+            q = tensor.transpose(x=q, perm=[0, 2, 1, 3])  # todo：需要判断参数类型及实际含义，后续修改此处及concat
 
         if isinstance(cache, self.StaticCache):
             # for encoder-decoder attention in inference and has cached
@@ -268,12 +273,8 @@ class MultiHeadAttention(nn.Layer):
             k, v = self.compute_kv(key, value)
             return self.StaticCache(k, v)
         elif value is None:  # incremental_state
-            k = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_attention_heads, 0, self.head_dim], dtype=key.dtype, value=0
-            )
-            v = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_attention_heads, 0, self.head_dim], dtype=key.dtype, value=0
-            )
+            k = paddle.full(shape=[key.shape[0], self.num_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0)
+            v = paddle.full(shape=[key.shape[0], self.num_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0)
             return self.Cache(k, v)
         else:
             # incremental_state with initial value, mainly for usage like UniLM
@@ -281,7 +282,13 @@ class MultiHeadAttention(nn.Layer):
 
     def _flash_attention(self, q, k, v, attn_mask=None, output_attentions=False):
         out, weights = flash_attention(
-            q, k, v, self.config.hidden_dropout_prob, causal=True, return_softmax=output_attentions, training=self.training
+            q,
+            k,
+            v,
+            self.config.hidden_dropout_prob,
+            causal=True,
+            return_softmax=output_attentions,
+            training=self.training,
         )
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
         return (out, weights) if output_attentions else out
@@ -313,9 +320,13 @@ class MultiHeadAttention(nn.Layer):
         if self.config.hidden_dropout_prob:
             if self.training:
                 with get_rng_state_tracker().rng_state("local_seed"):
-                    weights = F.dropout(weights, self.config.hidden_dropout_prob, training=self.training, mode="upscale_in_train")
+                    weights = F.dropout(
+                        weights, self.config.hidden_dropout_prob, training=self.training, mode="upscale_in_train"
+                    )
             else:
-                weights = F.dropout(weights, self.config.hidden_dropout_prob, training=self.training, mode="upscale_in_train")
+                weights = F.dropout(
+                    weights, self.config.hidden_dropout_prob, training=self.training, mode="upscale_in_train"
+                )
 
         out = paddle.matmul(weights, v)
 
@@ -396,7 +407,7 @@ class TransformerDecoder(nn.Layer):
 
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
-        
+
         self.checkpoints = []
 
     @paddle.jit.not_to_static
@@ -573,7 +584,7 @@ class TransformerDecoderLayer(nn.Layer):
 
         self.norm1 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
         self.norm2 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
-        
+
         if config.use_fused_dropout_add:
             self.fused_dropout_add1 = FusedDropoutAdd(config.attention_probs_dropout_prob, mode="upscale_in_train")
             self.fused_dropout_add2 = FusedDropoutAdd(config.hidden_dropout_prob, mode="upscale_in_train")
@@ -596,7 +607,9 @@ class TransformerDecoderLayer(nn.Layer):
         if use_cache is False:
             has_gradient = not tgt.stop_gradient
             if self.enable_recompute and has_gradient and self.config.recompute_granularity == "full_attn":
-                tgt = recompute(self.self_attn, tgt, None, None, tgt_mask, use_cache, cache, output_attentions, use_reentrant=False)
+                tgt = recompute(
+                    self.self_attn, tgt, None, None, tgt_mask, use_cache, cache, output_attentions, use_reentrant=False
+                )
             else:
                 tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache, output_attentions)
         else:
@@ -619,7 +632,6 @@ class TransformerDecoderLayer(nn.Layer):
             else:
                 tgt = residual + self.dropout1(tgt)
 
-
         if not self.config.normalize_before:
             tgt = self.norm1(tgt)
 
@@ -632,12 +644,16 @@ class TransformerDecoderLayer(nn.Layer):
                 if not self.config.use_fused_dropout_add:
                     tgt = residual + self.dropout2(self.linear2(self.activation(self.linear1(tgt), approximate=True)))
                 else:
-                    tgt = self.fused_dropout_add2(self.linear2(self.activation(self.linear1(tgt), approximate=True)), residual)
+                    tgt = self.fused_dropout_add2(
+                        self.linear2(self.activation(self.linear1(tgt), approximate=True)), residual
+                    )
         else:
             if not self.config.use_fused_dropout_add:
                 tgt = residual + self.dropout2(self.linear2(self.activation(self.linear1(tgt), approximate=True)))
             else:
-                tgt = self.fused_dropout_add2(self.linear2(self.activation(self.linear1(tgt), approximate=True)), residual)
+                tgt = self.fused_dropout_add2(
+                    self.linear2(self.activation(self.linear1(tgt), approximate=True)), residual
+                )
 
         if not self.config.normalize_before:
             tgt = self.norm2(tgt)
@@ -645,9 +661,7 @@ class TransformerDecoderLayer(nn.Layer):
         if not (output_attentions or use_cache):
             return tgt
 
-        temp_list = [tgt, 
-                     attention_weights if output_attentions else None, 
-                     incremental_cache if use_cache else None]
+        temp_list = [tgt, attention_weights if output_attentions else None, incremental_cache if use_cache else None]
 
         return tuple(v for v in temp_list if v is not None)
 
@@ -661,7 +675,10 @@ class GPTEmbeddings(nn.Layer):
     Include embeddings from word and position embeddings.
     """
 
-    def __init__(self, config,):
+    def __init__(
+        self,
+        config,
+    ):
         super(GPTEmbeddings, self).__init__()
 
         self.config = config
@@ -896,7 +913,7 @@ class GPTModel(GPTPretrainedModel):
         super(GPTModel, self).__init__(config)
 
         self.config = config
-        
+
         self.bias = paddle.tril(
             paddle.ones([1, 1, config.max_position_embeddings, config.max_position_embeddings], dtype="int64")
         )
