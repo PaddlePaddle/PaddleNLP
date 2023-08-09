@@ -17,10 +17,7 @@ import paddle
 from paddle.distributed import fleet
 
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.peft.prefix import (
-    chatglm_pad_attention_mask,
-    chatglm_postprocess_past_key_value,
-)
+from paddlenlp.peft.prefix import chatglm_postprocess_past_key_value
 from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 
@@ -106,7 +103,7 @@ class Predictor(object):
                 if "chatglm2" in args.model_name_or_path:
                     pad_attention_mask = None
                 else:
-                    pad_attention_mask = chatglm_pad_attention_mask
+                    pad_attention_mask = None
                 self.model = PrefixModelForCausalLM.from_pretrained(
                     self.model, self.args.prefix_path, chatglm_postprocess_past_key_value, pad_attention_mask
                 )
