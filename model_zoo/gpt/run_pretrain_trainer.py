@@ -387,7 +387,6 @@ def main():
 
     config.lm_shift_labels = False
     config.use_flash_attention = model_args.use_flash_attention
-    config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
