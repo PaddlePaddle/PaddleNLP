@@ -67,7 +67,7 @@ class BlendableDataset(paddle.io.Dataset):
             index_path = os.path.join(data_cache_path, desc_hash + "_index.npy")
             sample_index_path = os.path.join(data_cache_path, desc_hash + "_sample_index.npy")
             cache_hit = os.path.isfile(index_path) and os.path.isfile(sample_index_path)
-            cache_success = True
+            # cache_success = True
             # if paddle.distributed.get_rank() == 0 and not cache_hit:
             if local_rank == 0 and not cache_hit:
                 print(
@@ -87,21 +87,25 @@ class BlendableDataset(paddle.io.Dataset):
                     print("or a file in it. This is set with the --data-cache-path argument. Please")
                     print("ensure you have write access to this directory or specify one that you do have")
                     print("write access to.")
-                    cache_success = False
+                    # cache_success = False
 
-            hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
+            # hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
 
-            counts = paddle.to_tensor([cache_success], dtype="int64")
-            paddle.distributed.all_reduce(counts, group=hcg.get_data_parallel_group())
-            paddle.distributed.all_reduce(counts, group=hcg.get_pipeline_model_parallel_group())
-            if counts[0].item() != (
-                paddle.distributed.get_world_size()
-                // paddle.distributed.get_world_size(group=hcg.get_tensor_model_parallel_group())
-            ):
-                print_rank_0("Data index creation unsuccessful, exiting.")
-                exit()
+            # counts = paddle.to_tensor([cache_success], dtype="int64")
+            # paddle.distributed.all_reduce(counts, group=hcg.get_data_parallel_group())
+            # paddle.distributed.all_reduce(counts, group=hcg.get_pipeline_model_parallel_group())
+            # if counts[0].item() != (
+            #     paddle.distributed.get_world_size()
+            #     // paddle.distributed.get_world_size(group=hcg.get_tensor_model_parallel_group())
+            # ):
+            #     print_rank_0("Data index creation unsuccessful, exiting.")
+            #     exit()
 
-            paddle.distributed.barrier()
+            if paddle.distributed.get_world_size() > 1:
+                if paddle.in_dynamic_mode():
+                    paddle.distributed.barrier()
+
+            # paddle.distributed.barrier()
             # Load on all ranks.
             print_rank_0(f"> loading blendable dataset index: {index_path}")
             self.dataset_index = np.load(index_path, allow_pickle=True, mmap_mode="r")

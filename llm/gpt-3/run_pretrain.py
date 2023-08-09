@@ -86,7 +86,6 @@ class DataArguments:
     input_dir: str = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
     )
-    cache_prefix: str = field(default=None, metadata={"help": "The prefix of the cached dataset."})
     split: str = field(default="949,50,1", metadata={"help": "Train/valid/test data split."})
 
     max_seq_length: int = field(
@@ -101,9 +100,7 @@ class DataArguments:
         metadata={"help": "Use share folder for data dir and output dir on multi machine."},
     )
 
-    data_impl: str = field(
-        default="mmap", choices=["lazy", "mmap"], metadata={"help": "The format of the preprocessed data."}
-    )
+    data_impl: str = field(default="mmap", metadata={"help": "The format of the preprocessed data."})
     skip_warmup: bool = field(
         default=True,
         metadata={"help": "Whether to skip the warmup process of mmap files."},
@@ -178,6 +175,7 @@ def create_pretrained_dataset(
         seq_length=data_args.max_seq_length,
         seed=training_args.seed,
         skip_warmup=data_args.skip_warmup,
+        data_cache_path=data_args.data_cache,
     )
 
     def print_dataset(data, mode="train"):
@@ -324,10 +322,8 @@ def main():
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
 
-    if data_args.cache_prefix is None:
-        data_args.cache_prefix = data_args.input_dir
-    else:
-        os.makedirs(data_args.cache_prefix, exist_ok=True)
+    if data_args.data_cache is not None:
+        os.makedirs(data_args.data_cache, exist_ok=True)
 
     set_seed(training_args)
     paddle.set_device(training_args.device)
