@@ -20,7 +20,7 @@ import lr
 import numpy as np
 import paddle
 from args import parse_args
-from dataset import create_pretrained_dataset
+from origin_dataset import create_pretrained_dataset
 from visualdl import LogWriter
 
 from paddlenlp.ops import Topology
