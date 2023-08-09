@@ -251,7 +251,12 @@ class FusedLayerNorm(nn.Layer):
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(1.0),
         )
-        self.bias = paddle.create_parameter(shape=[self.hidden_size], dtype=paddle.get_default_dtype(), is_bias=True)
+        self.bias = paddle.create_parameter(
+            shape=[self.hidden_size],
+            dtype=paddle.get_default_dtype(),
+            is_bias=True,
+            default_initializer=nn.initializer.Constant(0.0),
+        )
         self.variance_epsilon = config.layer_norm_eps
 
     def forward(self, hidden_states):
