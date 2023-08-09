@@ -27,19 +27,15 @@ from paddle.common_ops_import import convert_dtype
 from paddle.fluid.dygraph.base import in_declarative_mode
 from paddle.utils import map_structure
 
-try:
-    from paddle import top_p_sampling
-
-    is_top_p_sampling_avaliable = True
-except:
-    is_top_p_sampling_avaliable = False
-
+from paddlenlp.utils.import_utils import import_module
 from paddlenlp.utils.log import logger
 
 from .model_outputs import ModelOutput
 from .utils import get_scale_by_dtype
 
 __all__ = ["GenerationMixin"]
+
+is_top_p_sampling_avaliable = import_module("paddle.top_p_sampling") is not None
 
 
 def get_unfinished_flag(
@@ -361,8 +357,8 @@ class GenerationMixin(object):
     ):
         processors = LogitsProcessorList()
 
-        if min_length is not None and eos_token_id is not None and min_length > -1:
-            processors.append(MinLengthLogitsProcessor(min_length, eos_token_id))
+        # if min_length is not None and eos_token_id is not None and min_length > -1:
+        #     processors.append(MinLengthLogitsProcessor(min_length, eos_token_id))
         if num_beam_groups > 1 and diversity_rate > 0.0:
             processors.append(
                 HammingDiversityLogitsProcessor(
@@ -565,16 +561,23 @@ class GenerationMixin(object):
         pass
 
     def _build_fast(self, kwargs):
+        if getattr(self, "_has_build_fast", False):
+            return
+
         self._fast_entry = False
-        if kwargs["num_beam_groups"] != 1:
+        if kwargs.get("num_beam_groups", 1) != 1:
             # not support for group_beam_search yet in the fast version
             raise AttributeError("'num_beam_groups != 1' is not supported yet in the fast version")
-        if paddle.get_default_dtype() == "float16" and kwargs["use_fp16_decoding"] is False:
+        if paddle.get_default_dtype() == "float16" and kwargs.get("use_fp16_decoding", False) is False:
             logger.info(
                 "Since the default dtype is float16, float16 would be used " "though 'use_fp16_decoding=False'."
             )
             kwargs["use_fp16_decoding"] = True
+
+        logger.info("start to build faster model ...")
         self.prepare_fast_entry(kwargs)
+        logger.info("faster model is ready ...")
+        self._has_build_fast = True
 
     @paddle.no_grad()
     def generate(
@@ -605,6 +608,7 @@ class GenerationMixin(object):
         use_cache=True,
         use_fast=False,
         use_fp16_decoding=False,
+        pre_caches=None,
         **model_kwargs
     ):
         r"""
@@ -821,39 +825,42 @@ class GenerationMixin(object):
         if is_tracing:
             self._fast_entry = None
 
-        if getattr(self, "_fast_entry", None) is not False and use_fast:
-            args = locals()
-            args.pop("self")
-            args.pop("__class__", None)
-            model_kwargs = args.pop("model_kwargs")
-            args.update(model_kwargs)
-            try:
-                if getattr(self, "_fast_entry", None) is None:
-                    self._build_fast(args)
-                if self._fast_entry:
-                    output = self._fast_entry(**args)
-                    if isinstance(output, tuple):
-                        output_ids, dummy_srore = output
-                    else:
-                        output_ids = output
-                        # make result and fast result oneconsistent
-                        dummy_srore = None
-                    if decode_strategy == "beam_search":
-                        output_ids = output_ids.transpose([1, 2, 0])
-                        output_ids = output_ids[:, :num_return_sequences, :].reshape([-1, output_ids.shape[-1]])
-                        if dummy_srore is not None:
-                            dummy_srore = dummy_srore[:, :num_return_sequences].flatten()
-                    else:
-                        output_ids = output_ids.transpose([1, 0])
-                    return output_ids, dummy_srore
+        if use_fast:
+            if getattr(self, "_fast_entry", None) is not False:
+                args = locals()
+                args.pop("self")
+                args.pop("__class__", None)
+                model_kwargs = args.pop("model_kwargs")
+                args.update(model_kwargs)
+                try:
+                    if getattr(self, "_fast_entry", None) is None:
+                        self._build_fast(args)
+                    if self._fast_entry:
+                        output = self._fast_entry(**args)
+                        if isinstance(output, tuple):
+                            output_ids, dummy_srore = output
+                        else:
+                            output_ids = output
+                            # make result and fast result oneconsistent
+                            dummy_srore = None
+                        if decode_strategy == "beam_search":
+                            output_ids = output_ids.transpose([1, 2, 0])
+                            output_ids = output_ids[:, :num_return_sequences, :].reshape([-1, output_ids.shape[-1]])
+                            if dummy_srore is not None:
+                                dummy_srore = dummy_srore[:, :num_return_sequences].flatten()
+                        else:
+                            output_ids = output_ids.transpose([1, 0])
+                        return output_ids, dummy_srore
 
-            except Exception as e:
-                args["model_kwargs"] = model_kwargs
-                # TODO
-                # Prevent self._convert_to_fast to throw Exception
-                self._convert_to_fast(args)
-                logger.warning(e)
-                logger.warning("FastGeneration is not available, " "and the original version would be used instead.")
+                except Exception as e:
+                    args["model_kwargs"] = model_kwargs
+                    # TODO
+                    # Prevent self._convert_to_fast to throw Exception
+                    self._convert_to_fast(args)
+                    logger.warning(e)
+                    logger.warning(
+                        "FastGeneration is not available, " "and the original version would be used instead."
+                    )
 
         # params check
         if input_ids is None and "inputs_embeds" not in model_kwargs:
@@ -949,6 +956,7 @@ class GenerationMixin(object):
                     top_k,
                     top_p,
                     temperature,
+                    pre_caches=pre_caches,
                     **model_kwargs,
                 )
             else:
@@ -961,6 +969,7 @@ class GenerationMixin(object):
                     top_k,
                     top_p,
                     temperature,
+                    pre_caches=pre_caches,
                     **model_kwargs,
                 )
 
@@ -1094,8 +1103,11 @@ class GenerationMixin(object):
         top_p=None,
         temperature=None,
         min_tokens_to_keep=1,
+        pre_caches=None,
         **model_kwargs
     ):
+        return_scores = model_kwargs.pop("return_scores", True)
+
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
 
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
@@ -1103,12 +1115,16 @@ class GenerationMixin(object):
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
-        scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
+        if return_scores:
+            scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
+
+        immutable = {}
+        immutable["pre_caches"] = pre_caches
 
         while cur_len < max_length:
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
-            outputs = self(**model_inputs)
+            outputs = self(**model_inputs, **immutable)
 
             if isinstance(outputs, tuple):
                 logits = outputs[0]
@@ -1118,15 +1134,19 @@ class GenerationMixin(object):
                 logits = outputs
 
             # [batch_size, vocab_size]
-            logits = logits[:, -1, :]
+            if logits.dim() == 3:
+                logits = logits[:, -1, :]
 
+            # logits = paddle.cast(logits, "float32")
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
             logits = logits_processors(input_ids, logits)
 
             # sample
-            origin_probs = F.softmax(logits)
-            origin_probs = paddle.log(origin_probs)
+            if return_scores:
+                origin_probs = F.softmax(logits)
+                origin_probs = paddle.log(origin_probs)
+
             if temperature is not None and temperature != 1.0:
                 logits = logits / temperature
             probs = F.softmax(logits)
@@ -1145,12 +1165,14 @@ class GenerationMixin(object):
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
 
-            next_scores = paddle.index_sample(origin_probs, next_tokens)
+            if return_scores:
+                next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
                 next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
 
-            scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
+            if return_scores:
+                scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
 
             cur_len += 1
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
@@ -1161,12 +1183,20 @@ class GenerationMixin(object):
             # Stop when there is a </s> in all sentences
             if not paddle.any(unfinished_flag):
                 break
+
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
-        return input_ids[:, origin_len:], scores
+        if return_scores:
+            return input_ids[:, origin_len:], scores
 
-    def to_static(self, path: str, config: dict):
+        return input_ids[:, origin_len:], None
+
+    def _get_attention_mask_input_spec(self, dtype: str):
+        input_spec = paddle.static.InputSpec(shape=[None, None, None, None], dtype="int64")
+        return input_spec
+
+    def to_static(self, path: str, config: dict = None):
         """export generation model to static
 
         Args:
@@ -1177,6 +1207,7 @@ class GenerationMixin(object):
                 pad_token_id (int): token id of pad token
                 use_top_p (bool): whether use top_p decoding strategy
         """
+        config = config or {}
 
         use_top_p = config.get("use_top_p", True)
 
@@ -1187,7 +1218,7 @@ class GenerationMixin(object):
 
         input_spec = [
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
+            self._get_attention_mask_input_spec("int64"),  # attention_mask
             None,  # position_ids
             paddle.static.InputSpec(shape=[1], dtype="int64"),  # max_length
             0,  # min_length
@@ -1230,6 +1261,19 @@ class GenerationMixin(object):
             False,
         ]
 
+        export_pre_caches = config.get("export_pre_caches", False)
+        if export_pre_caches:
+            num_layers = config.get("num_layers", None)
+            assert num_layers is not None, "num_layers should be set for pre-cached model when `use_pre_caches=True`"
+            dtype = config.get("dtype", paddle.get_default_dtype())
+            input_spec.append(
+                [paddle.static.InputSpec(shape=[2, None, None, None, None], dtype=dtype) for i in range(num_layers)]
+            )
+            input_spec.append(True)
+        else:
+            input_spec.append(None)
+            input_spec.append(None)
+
         model = paddle.jit.to_static(self.generate, input_spec=input_spec)
 
         paddle.jit.save(model, path)
@@ -1245,6 +1289,7 @@ class GenerationMixin(object):
         top_p=None,
         temperature=None,
         min_tokens_to_keep=1,
+        pre_caches=None,
         **model_kwargs
     ):
 
@@ -1266,7 +1311,6 @@ class GenerationMixin(object):
             )
 
         use_topp_sampling_op = is_top_p_sampling_avaliable or model_kwargs.get("use_fuse_topp_sampling", False)
-        return_scores = model_kwargs.get("return_scores", True)
 
         batch_size, cur_len = paddle.shape(input_ids)
         # used for compute on gpu, avoid memcpy D2H
@@ -1277,15 +1321,15 @@ class GenerationMixin(object):
         origin_len_gpu = paddle.full([1], origin_len, dtype="int64")
 
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
-        if return_scores:
-            scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
-        else:
-            scores = None
 
         # use_cache is immutable, we split it off other mutable kwargs.
         assert "use_cache" in model_kwargs
         immutable = {"use_cache": model_kwargs["use_cache"]}
         del model_kwargs["use_cache"]
+
+        immutable["pre_caches"] = pre_caches
+
+        scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
         def _forward_(**args):
             model_inputs = self.prepare_inputs_for_generation(input_ids, **args, **immutable)
@@ -1301,8 +1345,8 @@ class GenerationMixin(object):
             else:
                 logits = outputs
 
-            # [batch_size, vocab_size]
             logits = logits[:, -1, :]
+            logits = paddle.cast(logits, "float32")
 
             # pre-process distribution
             logits = self.adjust_logits_during_generation(logits)
@@ -1310,17 +1354,15 @@ class GenerationMixin(object):
             logits = logits_processors(input_ids, logits)
             probs = F.softmax(logits)
 
-            # sample
-            if return_scores:
-                origin_probs = F.softmax(logits)
-                origin_probs = paddle.log(origin_probs)
+            origin_probs = F.softmax(logits)
+            origin_probs = paddle.log(origin_probs)
 
             # compute next_tokens
             if use_top_p:
                 logits = logits / temperature
                 if use_topp_sampling_op:
                     top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0], 1], fill_value=top_p, dtype=probs.dtype)
-                    _, next_tokens = top_p_sampling(probs, top_ps_tensor)
+                    _, next_tokens = paddle.top_p_sampling(probs, top_ps_tensor)
                 else:
                     probs = TopPProcess(probs, top_p, min_tokens_to_keep)
                     next_tokens = paddle.multinomial(probs)
@@ -1331,9 +1373,8 @@ class GenerationMixin(object):
                 else:
                     next_tokens = paddle.multinomial(probs)
 
-            if return_scores:
-                next_scores = paddle.index_sample(origin_probs, next_tokens)
-                scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
+            next_scores = paddle.index_sample(origin_probs, next_tokens)
+            scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
 
             if eos_token_id is not None:
                 next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
@@ -1341,7 +1382,7 @@ class GenerationMixin(object):
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
 
             if eos_token_id is not None:
-                unfinished_flag = get_unfinished_flag(input_ids, unfinished_flag, eos_token_id)
+                unfinished_flag = paddle.logical_and(unfinished_flag, next_tokens != eos_token_id)
 
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
