@@ -231,25 +231,15 @@ def create_pretrained_dataset(
         # input_ids, loss_mask, attention_mask, position_ids, labels = data
         input_ids = data["text"]
 
-        logger.info(tokenizer._decode(input_ids))  # todo
-
-        # logger.info(tokenizer._decode(labels))
-        # logger.info(tokenizer.convert_ids_to_tokens(input_ids))
+        logger.info(tokenizer._decode(input_ids))
 
     from paddlenlp.data import Stack
 
-    eod_token = tokenizer.eos_token_id
-
     def _collate_data(data, stack_fn=Stack()):
         tokens_ = stack_fn(x["text"] for x in data)
-        # Unpack.
-        # tokens_ = paddle.to_tensor(tokens_, dtype="int64")
+
         labels = tokens_[:, 1:]
         tokens = tokens_[:, :-1]
-
-        # Loss mask.
-        loss_mask = paddle.ones(tokens.shape, dtype=paddle.float32)
-        loss_mask[data == eod_token] = 0.0
 
         return {
             "input_ids": tokens,
