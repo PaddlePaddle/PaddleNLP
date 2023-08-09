@@ -48,7 +48,6 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
-from paddle.distributed.fleet.utils.timer_helper import get_timers as paddle_get_timers
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from tqdm.auto import tqdm
 
@@ -934,12 +933,18 @@ class Trainer:
         """print timer and clear states"""
         paddle_timer_info = ""
         try:
+            from paddle.distributed.fleet.utils.timer_helper import (
+                get_timers as paddle_get_timers,
+            )
+
             paddle_pipeline_timers = paddle_get_timers()
             for name, timer in paddle_pipeline_timers.timers.items():
                 elapsed_time = timer.elapsed(reset=False) * 1000.0
                 paddle_timer_info += f" | {name}: {elapsed_time:.2f}"
             paddle_pipeline_timers.log(paddle_pipeline_timers.timers.keys(), reset=True)
-        except AssertionError:
+        except ImportError:  # paddle version too old, timer not support
+            logger.warning(f"paddle version:{paddle._git_commit__} does not support pipeline timer")
+        except AssertionError:  # paddle timer not enabled
             pass
 
         if self.timers is not None:
@@ -1931,7 +1936,13 @@ class Trainer:
         """
 
         try:
+            from paddle.distributed.fleet.utils.timer_helper import (
+                get_timers as paddle_get_timers,
+            )
+
             paddle_pipeline_timers = paddle_get_timers()
+        except ImportError:  # paddle version too old, timer not support
+            logger.warning(f"paddle version:{paddle._git_commit__} does not support pipeline timer")
         except AssertionError:
             paddle_pipeline_timers = None
         kwargs.update(timer=self.timers, paddle_pipeline_timers=paddle_pipeline_timers)
