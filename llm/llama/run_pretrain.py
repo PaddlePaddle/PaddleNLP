@@ -50,9 +50,10 @@ MODEL_CLASSES = {
     ),
 }
 
-from dataset import build_train_valid_test_datasets, print_rank_0
 from fused_layers import mock_layers
 from modeling_pp import LlamaForCausalLMPipe
+
+from paddlenlp.data.causal_dataset import build_train_valid_test_datasets, print_rank_0
 
 
 def add_start_docstrings(*docstr):

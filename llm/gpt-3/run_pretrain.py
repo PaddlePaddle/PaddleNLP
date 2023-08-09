@@ -49,7 +49,7 @@ MODEL_CLASSES = {
     ),
 }
 
-from dataset import build_train_valid_test_datasets, print_rank_0
+from paddlenlp.data.causal_dataset import build_train_valid_test_datasets, print_rank_0
 
 
 def add_start_docstrings(*docstr):

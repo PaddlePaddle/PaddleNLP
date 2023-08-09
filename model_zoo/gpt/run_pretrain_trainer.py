@@ -50,7 +50,7 @@ MODEL_CLASSES = {
 }
 
 
-from dataset import build_train_valid_test_datasets, print_rank_0
+from paddlenlp.data.causal_dataset import build_train_valid_test_datasets, print_rank_0
 
 
 def add_start_docstrings(*docstr):
@@ -101,12 +101,12 @@ class DataArguments:
         metadata={"help": "Use share folder for data dir and output dir on multi machine."},
     )
 
-    data_impl: str = field(default="mmap", metadata={"help": "Data implementation."})
-
+    data_impl: str = field(default="mmap", metadata={"help": "The format of the preprocessed data."})
     skip_warmup: bool = field(
-        default=False,
-        metadata={"help": " Skip warmup or not."},
+        default=True,
+        metadata={"help": "Whether to skip the warmup process of mmap files."},
     )
+    data_cache: str = field(default=None, metadata={"help": "The path of the cached dataset."})
 
 
 @dataclass
@@ -184,10 +184,11 @@ def create_pretrained_dataset(
         data_prefix=data_file,
         data_impl=data_args.data_impl,
         splits_string=data_args.split,
-        train_valid_test_num_samples=train_val_test_num_samples,
+        train_val_test_num_samples=train_val_test_num_samples,
         seq_length=data_args.max_seq_length,
         seed=training_args.seed,
         skip_warmup=data_args.skip_warmup,
+        data_cache_path=data_args.data_cache,
     )
 
     def print_dataset(data, mode="train"):
@@ -207,7 +208,7 @@ def create_pretrained_dataset(
     def _collate_data(data, stack_fn=Stack()):
         tokens_ = stack_fn(x["text"] for x in data)
         # Unpack.
-        tokens_ = paddle.to_tensor(tokens_, dtype="int64")
+        # tokens_ = paddle.to_tensor(tokens_, dtype="int64")
         labels = tokens_[:, 1:]
         tokens = tokens_[:, :-1]
 
@@ -217,8 +218,6 @@ def create_pretrained_dataset(
 
         return {
             "input_ids": tokens,
-            # "token_type_ids": out[1],
-            # "attention_mask": out[2],
             "loss_mask": loss_mask,
             "labels": labels,
         }
@@ -241,7 +240,7 @@ def get_train_data_file(args):
             if (os.path.isfile(os.path.join(args.input_dir, f)) and ("_idx.npz" in str(f) or ".idx" in str(f)))
         ]
         files = [x.replace("_idx.npz", "") for x in files]
-        files = [x.replace(".idx", "") for x in files]
+        files = [x.replace(".idx", "") for x in files]  # add
 
         if len(files) > 1:
             ret = []
@@ -335,6 +334,9 @@ def main():
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
+
+    if data_args.data_cache is not None:
+        os.makedirs(data_args.data_cache, exist_ok=True)
 
     set_seed(training_args)
     paddle.set_device(training_args.device)
