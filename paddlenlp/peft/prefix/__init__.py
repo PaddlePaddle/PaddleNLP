@@ -17,6 +17,5 @@ from .prefix_model import PrefixModelForCausalLM
 from .utils import (
     bloom_postprocess_past_key_value,
     chatglm_postprocess_past_key_value,
-    chatglm_v2_pad_attention_mask,
     llama_postprocess_past_key_value,
 )

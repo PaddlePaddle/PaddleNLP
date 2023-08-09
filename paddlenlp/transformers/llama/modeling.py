@@ -49,6 +49,7 @@ from paddlenlp.transformers.model_outputs import (
     CausalLMOutputWithCrossAttentions,
 )
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
+from paddlenlp.utils.log import logger
 
 from ..sequence_parallel_utils import (
     ColumnSequenceParallelLinear,
@@ -113,6 +114,35 @@ def get_triangle_upper_mask(x, mask=None):
     mask = paddle.triu(mask, diagonal=1)
     mask.stop_gradient = True
     return mask
+
+
+def assign_kv_heads(num_kv_heads: int, num_gpus: int):
+    # Initialize the assignment list
+    """
+    Assign kv heads to different GPUs in the Tensor Parallel Setup
+
+    Examples:
+        assign_kv_heads(num_kv_heads=1, num_gpus=2): [[0], [0]]
+        assign_kv_heads(num_kv_heads=2, num_gpus=2): [[0], [1]]
+        assign_kv_heads(num_kv_heads=4, num_gpus=2): [[0,1], [2,3]]
+        assign_kv_heads(num_kv_heads=1, num_gpus=4): [[0],[0],[0],[0]]
+        assign_kv_heads(num_kv_heads=2, num_gpus=4): [[0],[0],[1],[1]]
+        assign_kv_heads(num_kv_heads=4, num_gpus=4): [[0],[1],[2],[3]]
+    """
+    assignment_list = [[] for _ in range(num_gpus)]
+    # Case 1: more heads than cards
+    if num_kv_heads > num_gpus:
+        num_heads_per_card = num_kv_heads // num_gpus
+        for i in range(num_gpus):
+            for j in range(num_heads_per_card):
+                assignment_list[i].append(i * num_heads_per_card + j)
+    # Case 2: more cards than heads. each card get only 1 head.
+    else:
+        num_card_per_heads = num_gpus // num_kv_heads
+        for i in range(num_kv_heads):
+            for j in range(num_card_per_heads):
+                assignment_list[i * num_card_per_heads + j].append(i)
+    return assignment_list
 
 
 def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
@@ -278,6 +308,19 @@ class LlamaRMSNorm(nn.Layer):
         return hidden_states * self.weight
 
 
+def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
+    """
+    This is the equivalent of paddle.repeat_interleave(hidden_states, n_rep, axis=1). The hidden states go from (batch,
+    num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)
+    """
+    batch, slen, num_key_value_heads, head_dim = hidden_states.shape
+    if n_rep == 1:
+        return hidden_states
+
+    hidden_states = hidden_states.unsqueeze(-2).tile([1, 1, 1, n_rep, 1])
+    return hidden_states.reshape([batch, slen, num_key_value_heads * n_rep, head_dim])
+
+
 class LlamaRotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
@@ -401,19 +444,45 @@ class LlamaMLP(nn.Layer):
 class LlamaAttention(nn.Layer):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    def __init__(self, config):
+    def __init__(self, config: LlamaConfig):
         super().__init__()
+
+        self.config = config
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
-        self.head_dim = self.hidden_size // self.num_heads
+
+        self.head_dim = self.hidden_size // config.num_attention_heads
+
+        self.num_key_value_heads = config.num_key_value_heads
+        self.num_key_value_groups = config.num_attention_heads // config.num_key_value_heads
+
         self.max_position_embeddings = config.max_position_embeddings
         self.sequence_parallel = config.sequence_parallel
+
         self.fuse_attention_qkv = config.fuse_attention_qkv
+        if self.fuse_attention_qkv and config.num_attention_heads != config.num_key_value_heads:
+            raise ValueError(
+                f"fuse_attention_qkv can't be True when num_attention_heads {config.num_attention_heads}!= num_key_value_heads {config.num_key_value_heads}"
+            )
+
+        self.kv_indices = None
         if config.tensor_parallel_degree > 1:
             assert (
                 self.num_heads % config.tensor_parallel_degree == 0
             ), f"num_heads: {self.num_heads}, tensor_parallel_degree: {config.tensor_parallel_degree}"
             self.num_heads = self.num_heads // config.tensor_parallel_degree
+
+            if self.num_key_value_heads % config.tensor_parallel_degree == 0:
+                self.num_key_value_heads = self.num_key_value_heads // config.tensor_parallel_degree
+            else:
+                logger.warning(
+                    f"Get num_key_value_heads: {self.num_key_value_heads}, can't split to tensor_parallel_degree: {config.tensor_parallel_degree}, so we don't spilt key value weight."
+                )
+                self.kv_indices = paddle.to_tensor(
+                    assign_kv_heads(self.num_key_value_heads, config.tensor_parallel_degree)[
+                        config.tensor_parallel_rank
+                    ]
+                )
 
         self.rope_fusion_level = config.rope_fusion_level
         if self.rope_fusion_level is not None:
@@ -446,18 +515,31 @@ class LlamaAttention(nn.Layer):
                     has_bias=False,
                     gather_output=False,
                 )
-                self.k_proj = ColumnParallelLinear(
-                    self.hidden_size,
-                    self.hidden_size,
-                    has_bias=False,
-                    gather_output=False,
-                )
-                self.v_proj = ColumnParallelLinear(
-                    self.hidden_size,
-                    self.hidden_size,
-                    has_bias=False,
-                    gather_output=False,
-                )
+                if self.kv_indices is None:
+                    self.k_proj = ColumnParallelLinear(
+                        self.hidden_size,
+                        self.config.num_key_value_heads * self.head_dim,
+                        has_bias=False,
+                        gather_output=False,
+                    )
+                    self.v_proj = ColumnParallelLinear(
+                        self.hidden_size,
+                        self.config.num_key_value_heads * self.head_dim,
+                        has_bias=False,
+                        gather_output=False,
+                    )
+                else:
+                    self.k_proj = nn.Linear(
+                        self.hidden_size,
+                        self.config.num_key_value_heads * self.head_dim,
+                        bias_attr=False,
+                    )
+                    self.v_proj = nn.Linear(
+                        self.hidden_size,
+                        self.config.num_key_value_heads * self.head_dim,
+                        bias_attr=False,
+                    )
+
         else:
             if self.fuse_attention_qkv:
                 self.qkv_proj = nn.Linear(
@@ -473,12 +555,12 @@ class LlamaAttention(nn.Layer):
                 )
                 self.k_proj = nn.Linear(
                     self.hidden_size,
-                    self.hidden_size,
+                    self.config.num_key_value_heads * self.head_dim,
                     bias_attr=False,
                 )
                 self.v_proj = nn.Linear(
                     self.hidden_size,
-                    self.hidden_size,
+                    self.config.num_key_value_heads * self.head_dim,
                     bias_attr=False,
                 )
 
@@ -519,8 +601,8 @@ class LlamaAttention(nn.Layer):
             query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
         else:
             query_states = self.q_proj(hidden_states).reshape(shape=[0, 0, self.num_heads, self.head_dim])
-            key_states = self.k_proj(hidden_states).reshape(shape=[0, 0, self.num_heads, self.head_dim])
-            value_states = self.v_proj(hidden_states).reshape(shape=[0, 0, self.num_heads, self.head_dim])
+            key_states = self.k_proj(hidden_states).reshape(shape=[0, 0, self.num_key_value_heads, self.head_dim])
+            value_states = self.v_proj(hidden_states).reshape(shape=[0, 0, self.num_key_value_heads, self.head_dim])
 
         if self.sequence_parallel:
             query_states = query_states.transpose([1, 0, 2, 3])
@@ -548,14 +630,23 @@ class LlamaAttention(nn.Layer):
             else:
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, offset=offset)
-            # [bsz, nh, t, hd]
 
+        # [bsz, nh, t, hd]
         if past_key_value is not None:
             # reuse k, v, self_attention
             key_states = paddle.concat([past_key_value[0], key_states], axis=1)
             value_states = paddle.concat([past_key_value[1], value_states], axis=1)
 
         past_key_value = (key_states, value_states) if use_cache else None
+
+        if self.kv_indices is not None:
+            key_states = paddle.index_select(key_states, self.kv_indices, axis=2)
+            value_states = paddle.index_select(value_states, self.kv_indices, axis=2)
+
+        # TODO(wj-Mcat): use broadcast strategy when n_kv_heads = 1
+        # repeat k/v heads if n_kv_heads < n_heads
+        key_states = repeat_kv(key_states, self.num_key_value_groups)
+        value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         attn_output, attn_weights = scaled_dot_product_attention(
             config=self.config,
@@ -687,7 +778,7 @@ class LlamaPretrainedModel(PretrainedModel):
         return mappings
 
     @classmethod
-    def _get_tensor_parallel_mappings(cls, config, is_split=True):
+    def _get_tensor_parallel_mappings(cls, config: LlamaConfig, is_split=True):
 
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
@@ -714,8 +805,10 @@ class LlamaPretrainedModel(PretrainedModel):
                 base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
             else:
                 base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
-                base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
-                base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
+                # if we have enough num_key_value_heads to split, then split it.
+                if config.num_key_value_heads % config.tensor_parallel_degree == 0:
+                    base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
+                    base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
 
             if config.fuse_attention_ffn:
                 base_actions["layers.0.mlp.gate_up_fused_proj.weight"] = partial(
@@ -791,7 +884,6 @@ class LlamaModel(LlamaPretrainedModel):
         self.sequence_parallel = config.sequence_parallel
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
-
         if config.tensor_parallel_degree > 1:
             self.embed_tokens = mpu.VocabParallelEmbedding(
                 self.vocab_size,

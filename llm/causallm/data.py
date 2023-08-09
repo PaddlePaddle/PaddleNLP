@@ -102,7 +102,7 @@ def convert_example_common(example, tokenizer, data_args, is_test=True, intokens
         return features
 
 
-def convert_example_chatglm(example, tokenizer, data_args, is_test=True):
+def convert_example_chatglm(example, tokenizer, data_args, is_test=True, intokens=False):
 
     tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
     if is_test:

@@ -630,10 +630,7 @@ def _post_training_quantization_grid_search(self, model_dir):
     output_dir_list = []
 
     def _post_training_quantization(algo, batch_size, batch_nums):
-        try:
-            from paddle.fluid.contrib.slim.quantization import PostTrainingQuantization
-        except ImportError:
-            from paddle.static.quantization import PostTrainingQuantization
+        from paddle.static.quantization import PostTrainingQuantization
 
         def _batch_generator_func():
             param_name_list = []
@@ -842,16 +839,12 @@ def _quant_embeddings(self, input_prefix):
 
     input_dir = os.path.dirname(input_prefix)
 
-    paddle.fluid.io.save_inference_model(
-        input_dir,
+    paddle.static.save_inference_model(
+        os.path.join(input_dir, self.args.output_filename_prefix),
         feed_target_names,
         fetch_targets,
         exe,
-        quant_emb_program,
-        model_filename=self.args.output_filename_prefix + ".pdmodel",
-        params_filename=self.args.output_filename_prefix + ".pdiparams",
-        export_for_deployment=True,
-        program_only=False,
+        program=quant_emb_program,
     )
 
 
