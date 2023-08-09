@@ -25,6 +25,7 @@ import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
+from paddle.fluid.dygraph.base import in_declarative_mode
 from paddle.incubate.nn import FusedMultiTransformer
 from tqdm import trange
 
@@ -235,8 +236,12 @@ def scaled_dot_product_attention(
             )
 
         attn_weights = attn_weights + attention_mask
-        with paddle.amp.auto_cast(False):
+        if in_declarative_mode():
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+        else:
+            # paddle.amp.auto_cast do not support dy2st
+            with paddle.amp.auto_cast(False):
+                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
@@ -272,6 +277,7 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     batch_size, src_length = mask.shape[0], mask.shape[-1]
     tgt_length = tgt_length if tgt_length is not None else src_length
 
+    mask.stop_gradient = True
     expanded_mask = mask[:, None, None, :].astype("bool").expand([batch_size, 1, tgt_length, src_length])
 
     return expanded_mask
@@ -301,7 +307,11 @@ class LlamaRMSNorm(nn.Layer):
         if self.config.use_fused_rms_norm:
             return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
 
-        with paddle.amp.auto_cast(False):
+        if not in_declarative_mode():
+            with paddle.amp.auto_cast(False):
+                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
+                hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
+        else:
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
             hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
 
@@ -1209,9 +1219,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         self.llama = model
         self.llama.forward = model.forward
 
-    def _get_attention_mask_input_spec(self, *args, **kwargs):
-        return paddle.static.InputSpec(shape=[None, None, None, None], dtype="bool")
-
     def prepare_inputs_for_generation(
         self, input_ids, use_cache=False, past_key_values=None, inputs_embeds=None, **kwargs
     ):
@@ -1414,11 +1421,16 @@ class FusedLlamaModel(LlamaPretrainedModel):
         head_size = config.hidden_size // config.num_attention_heads
         fused_model.embed_tokens.weight.set_value(model.llama.embed_tokens.weight)
         del model.llama.embed_tokens.weight
+
         # embed_tokens consum lot's of memory
-        paddle.device.cuda.empty_cache()
+        def empty_current_cache():
+            if not paddle.is_compiled_with_cuda():
+                return
+            paddle.device.cuda.empty_cache()
 
         fused_model.norm.weight.set_value(model.llama.norm.weight)
         del model.llama.norm.weight
+        empty_current_cache()
 
         for idx in trange(config.num_hidden_layers, desc="convert to faster model weights ..."):
             concated_qkv_weight = (
@@ -1458,10 +1470,11 @@ class FusedLlamaModel(LlamaPretrainedModel):
                 model.llama.layers[idx].post_attention_layernorm.weight
             )
             del model.llama.layers[idx].post_attention_layernorm
-            paddle.device.cuda.empty_cache()
+            empty_current_cache()
 
         # free the model.llama model to allocate the cuda cache
         del model.llama
+        empty_current_cache()
         return fused_model
 
     @staticmethod

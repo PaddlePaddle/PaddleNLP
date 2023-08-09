@@ -35,6 +35,8 @@ from .utils import get_scale_by_dtype
 
 __all__ = ["GenerationMixin"]
 
+IS_TOP_P_SAMPLING_AVALIABLE = import_module("paddle.top_p_sampling") is not None
+
 
 def get_unfinished_flag(
     input_ids: Tensor, unfinished_flag: Tensor, eos_token_id: Union[int, list[int], list[list[int]]]
@@ -1172,7 +1174,7 @@ class GenerationMixin(object):
         top_p_spec = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
         temperature = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
 
-        model_input_spec = self._get_model_input_spec()
+        model_input_spec = self._get_model_input_spec(self.config.dtype)
         assert len(model_input_spec) == 3, "the length of model input spec must be 3"
         input_spec = model_input_spec + [
             paddle.static.InputSpec(shape=[1], dtype="int64"),  # max_length
@@ -1224,9 +1226,7 @@ class GenerationMixin(object):
             input_spec.append(
                 [paddle.static.InputSpec(shape=[2, None, None, None, None], dtype=dtype) for i in range(num_layers)]
             )
-            input_spec.append(True)
         else:
-            input_spec.append(None)
             input_spec.append(None)
 
         model = paddle.jit.to_static(self.generate, input_spec=input_spec)
@@ -1265,9 +1265,8 @@ class GenerationMixin(object):
                 "you should not specify InputSpec for top_k and top_p parameters, one of InputSpec is expected"
             )
 
-        is_top_p_sampling_avaliable = import_module("paddle.top_p_sampling") is not None
         # TODO(wj-Mcat): move `use_fuse_topp_sampling` to generation_config later
-        use_topp_sampling_op = is_top_p_sampling_avaliable or model_kwargs.get("use_fuse_topp_sampling", False)
+        use_topp_sampling_op = IS_TOP_P_SAMPLING_AVALIABLE or model_kwargs.get("use_fuse_topp_sampling", False)
 
         batch_size, cur_len = paddle.shape(input_ids)
         # used for compute on gpu, avoid memcpy D2H

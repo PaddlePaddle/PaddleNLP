@@ -105,11 +105,13 @@ class TestModeling(unittest.TestCase):
 
 
 class SimplePredictor:
-    def __init__(self, model_dir: str, model_name: str = "model"):
+    def __init__(self, model_dir: str, model_name: str = "model", disable_gpu: bool = True):
         model_path = os.path.join(model_dir, model_name + ".pdmodel")
         params_path = os.path.join(model_dir, model_name + ".pdiparams")
         config = paddle.inference.Config(model_path, params_path)
-        config.disable_gpu()
+        if disable_gpu:
+            config.disable_gpu()
+
         self.predictor = paddle.inference.create_predictor(config)
 
     def infer(self, inputs):
