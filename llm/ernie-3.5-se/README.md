@@ -7,6 +7,7 @@
 - [3. 预训练](#2)
 - [4. 微调](#3)
 - [5. 预测](#4)
+- [6. 动转静](#5)
 
 
 <a name="0"></a>
@@ -229,4 +230,12 @@ python -m paddle.distributed.launch \
 python -m paddle.distributed.launch --gpus "0" predict_generation.py \
     --model_name_or_path <PATH_TO_CKPT> \
     --tokenizer_name_or_path ernie-tokenizer
+```
+
+## 动转静
+
+``` shell
+python export_generation_model.py \
+    --model_path <PATH_TO_CKPT> \
+    --output_path inference/ernie-3.5-se
 ```
