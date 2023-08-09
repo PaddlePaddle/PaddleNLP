@@ -230,7 +230,7 @@ class IndexedDataset(paddle.io.Dataset):
     @property
     def supports_prefetch(self):
         return False  # avoid prefetching to save memory
-    
+
     @property
     def doc_idx(self):
         return self._doc_idx

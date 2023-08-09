@@ -30,6 +30,7 @@ import numpy as np
 import paddle
 from paddlenlp.data.indexed_dataset import get_indexed_dataset_
 
+
 def get_local_rank():
     return int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 
