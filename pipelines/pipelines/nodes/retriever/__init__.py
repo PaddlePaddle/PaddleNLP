@@ -15,5 +15,6 @@
 from pipelines.nodes.retriever.base import BaseRetriever
 from pipelines.nodes.retriever.dense import DensePassageRetriever
 from pipelines.nodes.retriever.multimodal_retriever import MultiModalRetriever
+from pipelines.nodes.retriever.parallel_retriever import ParallelRetriever
 from pipelines.nodes.retriever.sparse import BM25Retriever
 from pipelines.nodes.retriever.web import WebRetriever

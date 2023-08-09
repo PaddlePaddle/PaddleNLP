@@ -827,7 +827,6 @@ class GPTForCausalLM(GPTPretrainedModel):
         loss = None
         if labels is not None:
             loss = self.criterion(logits, labels)
-            return loss
 
         # outputs = [output, all_hidden_states, new_caches, all_self_attentions]
         if not return_dict:

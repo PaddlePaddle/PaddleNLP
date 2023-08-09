@@ -25,12 +25,9 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.common_ops_import import convert_dtype
 
-try:
-    from paddle.utils import map_structure
-except ImportError:
-    from paddle.fluid.layers.utils import map_structure
-
-from paddle.fluid.dygraph.base import in_declarative_mode
+# TODO(guosheng): update this workaround import for in_declarative_mode
+from paddle.nn.layer.layers import in_declarative_mode
+from paddle.utils import map_structure
 
 try:
     from paddle import top_p_sampling

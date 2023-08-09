@@ -32,6 +32,7 @@ Llama2 模型的权重的使用则需要遵循[License](../../../paddlenlp/trans
 | idea-ccnl/ziya-llama-13b-v1      |
 | meta-llama/Llama-2-7b            |
 | meta-llama/Llama-2-7b-chat       |
+| linly-ai/chinese-llama-2-7b      |
 | baichuan-inc/Baichuan-7B         |
 | baichuan-inc/Baichuan-13B-Base   |
 | baichuan-inc/Baichuan-13B-Chat   |
