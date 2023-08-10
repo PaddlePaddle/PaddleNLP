@@ -624,7 +624,14 @@ class TransformerDecoderLayer(nn.Layer):
         # tgt = residual + self.dropout1(tgt)
         current_seed = "global_seed"
         if self.training:
-            with get_rng_state_tracker().rng_state(current_seed):
+
+            if "global_seed" in get_rng_state_tracker().states_:
+                with get_rng_state_tracker().rng_state(current_seed):
+                    if self.config.use_fused_dropout_add:
+                        tgt = self.fused_dropout_add1(tgt, residual)
+                    else:
+                        tgt = residual + self.dropout1(tgt)
+            else:
                 if self.config.use_fused_dropout_add:
                     tgt = self.fused_dropout_add1(tgt, residual)
                 else:
