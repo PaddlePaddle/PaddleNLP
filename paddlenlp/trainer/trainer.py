@@ -1788,13 +1788,11 @@ class Trainer:
             logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
             shutil.rmtree(checkpoint)
 
-    def _manipulate_state_dict(self, model_to_save, config_to_save=None, merge_tensor_parallel=False):
+    def _manipulate_state_dict(self, model_to_save, merge_tensor_parallel=False):
         dtype = get_parameter_dtype(model_to_save)
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
-        if config_to_save is None:
-            config_to_save = model_to_save.config
-        config_to_save = copy.deepcopy(config_to_save)
+        config_to_save = copy.deepcopy(model_to_save.config)
 
         weight_name_suffix = (
             self.args.sharded_name_suffix()
@@ -1817,9 +1815,6 @@ class Trainer:
                 # if variant is not None and "tp" in variant:
                 if "tp" in weight_name_suffix:
                     weight_name_suffix = "_".join([x for x in weight_name_suffix.split("_") if "tp" not in x])
-
-        # Attach architecture to the config
-        config_to_save.architectures = [model_to_save.__class__.__name__]
 
         if self.args.bf16 and self.args.should_save_sharding_stage1_model:
             param_names_in_master_weights = []
@@ -1859,6 +1854,7 @@ class Trainer:
                     output_dir,
                     state_dict=state_dict,
                     config_to_save=config_to_save,
+                    merge_tensor_parallel=merge_tensor_parallel,
                     variant=weight_name_suffix,
                     is_main_process=self.args.should_save,
                 )
@@ -1866,7 +1862,9 @@ class Trainer:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
                 if merge_tensor_parallel:
                     logger.warning("Trainer.model is not a `PretrainedModel`, not suppor for merge_tensor_parallel.")
-                state_dict, _, weight_name_suffix = self._manipulate_state_dict(merge_tensor_parallel=False)
+                state_dict, _, weight_name_suffix = self._manipulate_state_dict(
+                    self.model, merge_tensor_parallel=False
+                )
                 paddle.save(
                     state_dict,
                     os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, weight_name_suffix)),

@@ -2057,7 +2057,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         assert not os.path.isfile(save_dir), "Saving directory ({}) should be a directory, not a file".format(save_dir)
         os.makedirs(save_dir, exist_ok=True)
 
-        config_to_save = kwargs.get("config_to_save", False)
+        merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
+        config_to_save = kwargs.get("config_to_save", None)
         shard_format = kwargs.get("shard_format", "naive")  # support naive pipeline
         # variant = kwargs.get("variant", None)
         # is_main_process = kwargs.get("is_main_process", True)
@@ -2082,7 +2083,26 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         dtype = get_parameter_dtype(model_to_save)
         model_to_save.config.dtype = str(dtype).split(".")[1]
+        if config_to_save is None:
+            config_to_save = copy.deepcopy(model_to_save.config)
 
+        # Save the model
+        if state_dict is None:
+            state_dict = model_to_save.state_dict()
+            if config_to_save.tensor_parallel_degree > 1:
+                if merge_tensor_parallel:
+                    state_dict = model_to_save.merge_tensor_parallel(state_dict, config_to_save)
+                    config_to_save.tensor_parallel_degree = 1
+                    if config_to_save.tensor_parallel_rank != 0:
+                        logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
+                        return
+                    if variant is not None and "tp" in variant:
+                        variant = "_".join([x for x in variant.split("_") if "tp" not in x])
+                else:
+                    variant = weight_name_suffix() if variant is None else variant
+
+        # Attach architecture to the config
+        config_to_save.architectures = [model_to_save.__class__.__name__]
         # Save the config
         if is_main_process:
             config_to_save.save_pretrained(save_directory)
