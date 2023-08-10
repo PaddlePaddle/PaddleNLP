@@ -555,7 +555,7 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
 
 
 class GPTCompatibilityTest(unittest.TestCase):
-    test_model_id = "hf-internal-testing/tiny-random-gpt2"
+    test_model_id = "hf-internal-testing/tiny-random-GPT2Model"
 
     @classmethod
     @require_package("transformers", "torch")
