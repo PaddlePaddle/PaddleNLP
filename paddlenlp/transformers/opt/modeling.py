@@ -1067,17 +1067,7 @@ class OPTForCausalLM(OPTPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.config.lm_shift_labels:
-                # Shift so that tokens < n predict n
-                shift_logits = logits[:, :-1, :]
-                shift_labels = labels[:, 1:]
-            else:
-                shift_logits = logits
-                shift_labels = labels
-
-            # Flatten the tokens
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(shift_logits.reshape((-1, shift_logits.shape[-1])), shift_labels.reshape((-1,)))
+            loss = nn.functional.cross_entropy(logits, labels)
 
         if not return_dict:
             if not use_cache:
