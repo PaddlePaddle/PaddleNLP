@@ -101,5 +101,5 @@ def split_model_weight(model_dir, nranks, output_model_path):
 
 if __name__ == "__main__":
     args = parse_arguments()
-    shutil.copyfile(os.path.join(args.model_dir, "config.json"), os.path.join(args.output_model_dir, "config.json"))
     split_model_weight(args.model_dir, args.nranks, args.output_model_dir)
+    shutil.copyfile(os.path.join(args.model_dir, "config.json"), os.path.join(args.output_model_dir, "config.json"))

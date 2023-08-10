@@ -75,8 +75,6 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_dir)
     paddle.set_default_dtype(args.model_dtype)
 
-    shutil.copyfile(os.path.join(args.model_name_or_dir, "config.json"), os.path.join(args.output_dir, "config.json"))
-
     tensor_parallel_degree = paddle.distributed.get_world_size()
     if tensor_parallel_degree > 1:
         strategy = fleet.DistributedStrategy()
@@ -143,6 +141,7 @@ def main():
     tokenizer.save_pretrained(args.output_dir)
     # Generation rank_mapping.csv for distributed model
     generate_rank_mapping(os.path.join(args.output_dir, "rank_mapping.csv"))
+    shutil.copyfile(os.path.join(args.model_name_or_dir, "config.json"), os.path.join(args.output_dir, "config.json"))
 
 
 if __name__ == "__main__":

@@ -27,7 +27,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model_name_or_path",
-        require=True,
+        required=True,
         help="The directory of model.",
     )
     parser.add_argument(
