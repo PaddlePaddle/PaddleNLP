@@ -94,7 +94,7 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, tensor_parallel_output=T
     if is_fleet_init and tensor_parallel_degree > 1 and y.is_distributed:
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
         input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
-        logits = paddle.matmul(input_parallel, y, transpose_y=False)  # todo llama此处为False， gpt-3此处为True
+        logits = paddle.matmul(input_parallel, y, transpose_y=True)  # todo llama此处为False， gpt-3此处为True
 
         if tensor_parallel_output:
             return logits
@@ -102,7 +102,7 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, tensor_parallel_output=T
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
 
     else:
-        logits = paddle.matmul(x, y, transpose_y=False)  # todo llama此处为False， gpt-3此处为True
+        logits = paddle.matmul(x, y, transpose_y=True)  # todo llama此处为False， gpt-3此处为True
         return logits
 
 
@@ -402,7 +402,7 @@ class TransformerDecoder(nn.Layer):
     TransformerDecoder is a stack of N decoder layers.
     """
 
-    def __init__(self, config, decoder_layers, num_layers, norm=None, hidden_size=None):
+    def __init__(self, config, decoder_layers, norm=None, hidden_size=None):
         super(TransformerDecoder, self).__init__()
 
         self.config = config
@@ -594,10 +594,10 @@ class TransformerDecoderLayer(nn.Layer):
             self.fused_dropout_add2 = FusedDropoutAdd(config.hidden_dropout_prob, mode="upscale_in_train")
         else:
             self.dropout1 = nn.Dropout(config.attention_probs_dropout_prob, mode="upscale_in_train")
-            self.dropout2 = nn.Dropout(config.hidden_dropout_probopout, mode="upscale_in_train")
+            self.dropout2 = nn.Dropout(config.hidden_dropout_prob, mode="upscale_in_train")
 
         if config.hidden_activation == "gelu":
-            self.activation = nn.GELU(approximate=True)
+            self.activation = F.gelu
         else:
             self.activation = getattr(F, config.hidden_activation)
 
@@ -835,9 +835,7 @@ class GPTPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.gpt.config["initializer_range"],
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -1187,11 +1185,15 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
     Criterion for GPT. It calculates the final loss.
     """
 
-    def __init__(self):
+    def __init__(self, config):
         super(GPTPretrainingCriterion, self).__init__()
-        self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
+        self.config = config
+        if config.tensor_parallel_degree > 1 and config.tensor_parallel_output:
+            self.loss_func = fleet.meta_parallel.ParallelCrossEntropy(ignore_index=config.ignore_index)
+        else:
+            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=config.ignore_index)
 
-    def forward(self, prediction_scores, masked_lm_labels, loss_mask):
+    def forward(self, prediction_scores, masked_lm_labels, loss_mask=None):
         """
         Args:
             prediction_scores(Tensor):
@@ -1210,11 +1212,10 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
             Tensor: The pretraining loss. Its data type should be float32 and its shape is [1].
 
         """
-        masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
-
-        loss_mask = loss_mask.reshape([-1])
-        masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
-        loss = masked_lm_loss / loss_mask.sum()
+        with paddle.amp.auto_cast(False):
+            masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
+            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
+            loss = paddle.mean(masked_lm_loss)
         return loss
 
 
