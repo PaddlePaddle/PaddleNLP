@@ -405,7 +405,12 @@ class Trainer:
                 `bool` and equals `True`, load the last checkpoint in *args.output_dir* as saved by a previous instance
                 of [`Trainer`]. Only load model state dict.
         """
-        resume_from_checkpoint = self.check_resume_from_checkpoint(resume_from_checkpoint)
+        resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
+        # Load potential model checkpoint
+        if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
+            resume_from_checkpoint = get_last_checkpoint(self.args.output_dir)
+            if resume_from_checkpoint is None:
+                raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
         if resume_from_checkpoint is None:
             return
@@ -436,15 +441,6 @@ class Trainer:
         self._set_state_dict_in_model(state_dict)
         # release memory
         del state_dict
-
-    def check_resume_from_checkpoint(self, resume_from_checkpoint):
-        resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
-        # Load potential model checkpoint
-        if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
-            resume_from_checkpoint = get_last_checkpoint(self.args.output_dir)
-            if resume_from_checkpoint is None:
-                raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
-        return resume_from_checkpoint
 
     def _wrap_model_and_load_sharded_checkpoint(self, resume_from_checkpoint):
         # In the sharded mode, should invoke load_state_dict_from_checkpoint after _wrap_model.
@@ -480,7 +476,6 @@ class Trainer:
         """
         args = self.args
         self.is_in_train = True
-        resume_from_checkpoint = self.check_resume_from_checkpoint(resume_from_checkpoint)
 
         # memory metrics - must set up as early as possible
         self._memory_tracker.start()
