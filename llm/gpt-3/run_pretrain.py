@@ -16,6 +16,7 @@ GPT/Llama pretraining scripts.
 import math
 import os
 import random
+import sys
 import time
 from dataclasses import dataclass, field
 from typing import Optional
@@ -85,6 +86,7 @@ class DataArguments:
     input_dir: str = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
     )
+    cache_prefix: str = field(default=None, metadata={"help": "The prefix of the cached dataset."})
     split: str = field(default="949,50,1", metadata={"help": "Train/valid/test data split."})
 
     max_seq_length: int = field(
@@ -116,16 +118,19 @@ class ModelArguments:
     tokenizer_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
-    use_flash_attn: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
-
+    output_attentions: bool = field(default=False, metadata={"help": "Whether output attention weights"})
+    use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
+    fused_linear: bool = field(
+        default=False,
+        metadata={"help": "gpt, whether to fuse linear projection"},
+    )
+    fuse_attention_qkv: bool = field(
+        default=False,
+        metadata={"help": "gpt, whether to fuse attention qkv"},
+    )
     enable_fuse_transformer: bool = field(
         default=False,
         metadata={"help": "gpt, enable_fuse_transformer"},
-    )
-
-    fuse_attention_qkv: bool = field(
-        default=False,
-        metadata={"help": "gpt, fuse_attention_qkv"},
     )
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
@@ -179,7 +184,7 @@ def create_pretrained_dataset(
 
     def build_dataset(index, name):
         dataset = GPTDataset(
-            file_prefix=input_prefix,
+            file_prefix=os.path.join(data_args.cache_prefix, os.path.basename(input_prefix)),
             build_data_file=training_args.local_process_index == 0,
             micro_batch_size=training_args.per_device_train_batch_size
             if name == "train"
@@ -321,9 +326,17 @@ class PretrainingTrainer(Trainer):
 
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    else:
+        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
+
+    if data_args.cache_prefix is None:
+        data_args.cache_prefix = data_args.input_dir
+    else:
+        os.makedirs(data_args.cache_prefix, exist_ok=True)
 
     set_seed(training_args)
     paddle.set_device(training_args.device)
@@ -358,14 +371,14 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
 
     config = config_class.from_pretrained(model_args.model_name_or_path)
+    config.output_attentions = model_args.output_attentions
     config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
     config.hidden_dropout_prob = model_args.hidden_dropout_prob
     config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
     config.enable_fuse_transformer = model_args.enable_fuse_transformer
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.use_recompute = training_args.recompute
-    config.use_flash_attn = model_args.use_flash_attn
-    config.lm_shift_labels = False
+    config.use_flash_attention = model_args.use_flash_attention
 
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank

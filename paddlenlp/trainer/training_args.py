@@ -20,6 +20,7 @@ import contextlib
 import json
 import math
 import os
+import time
 import types
 import warnings
 from dataclasses import asdict, dataclass, field
@@ -232,6 +233,7 @@ class TrainingArguments:
               disable_partial_send_recv, optmize send speed for tensor parallel.
               enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
               enable_dp_comm_overlap, fuse data parallel gradient communication.
+              enable_sharding_comm_overlap, fuse sharding stage 1 parallel gradient communication.
         sharding_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
             following config is support:
@@ -533,6 +535,7 @@ class TrainingArguments:
                 "disable_partial_send_recv, optmize send speed for tensor parallel.\n"
                 "enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
                 "enable_dp_comm_overlap, fuse data parallel gradient communication. \n"
+                "enable_sharding_comm_overlap, fuse sharding stage 1 parallel gradient communication. \n"
             )
         },
     )
@@ -806,6 +809,7 @@ class TrainingArguments:
                                 "disable_partial_send_recv",
                                 "enable_delay_scale_loss",
                                 "enable_dp_comm_overlap",
+                                "enable_sharding_comm_overlap",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -822,6 +826,7 @@ class TrainingArguments:
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
                         "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config,
+                        "sharding_comm_overlap": "enable_sharding_comm_overlap" in pipeline_parallel_config,
                     }
 
                     if self.do_eval:
@@ -836,11 +841,17 @@ class TrainingArguments:
                 if tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
 
+                if tensor_parallel_degree == 1 and sharding_parallel_degree == 1:
+                    order = ["pp", "dp", "sharding", "mp"]
+                else:
+                    order = ["dp", "pp", "sharding", "mp"]
+
                 hybrid_configs = {
                     "dp_degree": self.data_parallel_degree,
                     "mp_degree": tensor_parallel_degree,
                     "pp_degree": pipeline_parallel_degree,
                     "sharding_degree": sharding_parallel_degree,
+                    "order": order,
                 }
 
                 if pipeline_parallel_degree > 1:
@@ -873,7 +884,12 @@ class TrainingArguments:
                             "The enable_stage1_tensor_fusion or enable_stage1_overlap is not supported "
                             "by current version of Paddle. Please try latest develop Paddle."
                         )
+                paddle.device.cuda.synchronize()
+                start_time = time.time()
                 fleet.init(is_collective=True, strategy=strategy)
+                paddle.device.cuda.synchronize()
+                elapsed = time.time() - start_time
+                logger.info("NCCL-Connection costs {:.2f} ms.".format(elapsed))
 
                 logger.info(strategy)
 

@@ -63,9 +63,7 @@ def main():
 
     # Load model
     if training_args.fp16_opt_level == "O2":
-        if quant_args.do_ptq:
-            dtype = "float32"
-        elif training_args.fp16:
+        if training_args.fp16:
             dtype = "float16"
         elif training_args.bf16:
             dtype = "bfloat16"
@@ -81,10 +79,7 @@ def main():
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         dtype=dtype,
     )
-    # Alreday shift label & logit in convert example
-    # lm_shift_labels should be set before model initilization for some models(ex. llama)
-    if hasattr(model_config, "lm_shift_labels"):
-        model_config.lm_shift_labels = False
+
     if hasattr(model_config, "use_flash_attention"):
         model_config.use_flash_attention = model_args.use_flash_attention
     if hasattr(model_config, "max_position_embeddings"):
@@ -101,7 +96,7 @@ def main():
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     if model.base_model_prefix == "llama":
-        tokenizer.pad_token = tokenizer.unk_token
+        tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token else "<pad>"
 
     if data_args.dataset_name_or_path is None:
         raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
@@ -122,18 +117,18 @@ def main():
         else:
             train_ds, dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["train", "dev"])
     trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
+    if data_args.intokens:
+        if model.base_model_prefix not in ["llama", "bloom"]:
+            raise NotImplementedError("InTokens data stream is only implemented for LLaMA、 Bloom so far.")
     train_ds = train_ds.map(partial(trans_func, is_test=False, intokens=data_args.intokens))
+    eval_intokens = data_args.intokens
     if data_args.intokens and data_args.eval_with_do_generation:
         logger.warning(
             "`intokens` conflicts with `eval_with_do_generation`. Setting intokens to False for the eval_dataset."
         )
         eval_intokens = False
-    else:
-        eval_intokens = data_args.intokens
     dev_ds = dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, intokens=eval_intokens))
     if data_args.intokens:
-        if model.base_model_prefix != "llama":
-            raise NotImplementedError("InTokens data stream is only implemented for LLaMA so far.")
         from paddlenlp.datasets import InTokensMapDataset
 
         logger.info("Creating InTokens Data Stream. This may take a few minutes.")
@@ -142,6 +137,12 @@ def main():
             tokenizer=tokenizer,
             max_length=data_args.intokens_max_length,
         )
+        if eval_intokens:
+            dev_ds = InTokensMapDataset(
+                dev_ds,
+                tokenizer=tokenizer,
+                max_length=data_args.intokens_max_length,
+            )
 
     if model_args.prefix_tuning:
         prefix_tuning_params = get_prefix_tuning_params(model)

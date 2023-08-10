@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import sys
 from dataclasses import dataclass, field
 from functools import partial
 
@@ -26,11 +27,7 @@ from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.peft.prefix import (
-    chatglm_pad_attention_mask,
-    chatglm_postprocess_past_key_value,
-    chatglm_v2_pad_attention_mask,
-)
+from paddlenlp.peft.prefix import chatglm_postprocess_past_key_value
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.log import logger
@@ -69,7 +66,10 @@ class ModelArgument:
 
 def main():
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    else:
+        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -110,12 +110,10 @@ def main():
     )
     if "chatglm2" in model_args.model_name_or_path:
         multi_query_group_num = model.config.multi_query_group_num
-        attention_mask_pad_fn = chatglm_v2_pad_attention_mask
+        attention_mask_pad_fn = None
     else:
         multi_query_group_num = None
-        attention_mask_pad_fn = chatglm_pad_attention_mask
-        # If ChatGLM, set lm_shift_labels to False
-        model.config.lm_shift_labels = False
+        attention_mask_pad_fn = None
 
     if model_args.prefix_tuning:
         prefix_config = PrefixConfig(

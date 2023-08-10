@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass, field
 from functools import partial
 
@@ -62,7 +63,10 @@ class ModelArgument:
 
 def main():
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
-    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    else:
+        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
     setattr(training_args, "label_smoothing", model_args.label_smoothing)
@@ -101,7 +105,6 @@ def main():
         # dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
-        lm_shift_labels=False,
     )
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced

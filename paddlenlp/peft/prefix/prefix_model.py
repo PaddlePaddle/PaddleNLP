@@ -56,11 +56,14 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         self.inference = False
         self.postprocess_past_key_value = postprocess_past_key_value
         self.pad_attention_mask = pad_attention_mask
-        if self.prefix_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
-            self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
-            logger.warning(
-                f"Reset tensor_parallel_degree of prefix_config to {self.model.config.tensor_parallel_degree}."
-            )
+        if self.model.base_model_prefix == "chatglm2":
+            self.prefix_config.tensor_parallel_degree = -1
+        else:
+            if self.prefix_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
+                self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
+                logger.warning(
+                    f"Reset tensor_parallel_degree of prefix_config to {self.model.config.tensor_parallel_degree}."
+                )
 
     def forward(
         self,
@@ -78,10 +81,24 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
                     input_ids.shape, self.prefix_config.num_prefix_tokens, attention_mask
                 )
             else:
-                prefix_attention_mask = paddle.ones(
-                    [batch_size, self.prefix_config.num_prefix_tokens], dtype=attention_mask.dtype
-                )
-                attention_mask = paddle.concat((prefix_attention_mask, attention_mask), axis=1)
+                if len(attention_mask.shape) == 2:
+                    prefix_attention_mask = paddle.ones(
+                        [batch_size, self.prefix_config.num_prefix_tokens], dtype=attention_mask.dtype
+                    )
+                elif len(attention_mask.shape) == 3:
+                    batch_size, src_seq_len, tgt_seq_len = attention_mask.shape
+                    prefix_attention_mask = paddle.ones(
+                        [batch_size, src_seq_len, self.prefix_config.num_prefix_tokens], dtype=attention_mask.dtype
+                    )
+                elif len(attention_mask.shape) == 4:
+                    batch_size, num_heads, src_seq_len, tgt_seq_len = attention_mask.shape
+                    prefix_attention_mask = paddle.ones(
+                        [batch_size, num_heads, src_seq_len, self.prefix_config.num_prefix_tokens],
+                        dtype=attention_mask.dtype,
+                    )
+                else:
+                    raise ValueError(f"Unexpected attention_mask shape: {attention_mask.shape}")
+                attention_mask = paddle.concat((prefix_attention_mask, attention_mask), axis=-1)
             kwargs["attention_mask"] = attention_mask
 
         if "past_key_values" in self.forward_keys:
@@ -289,7 +306,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
 
         return prefix_model
 
-    def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
+    def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = True, **kwargs):
         variant = kwargs.get("variant", None)
         is_main_process = kwargs.get("is_main_process", paddle.distributed.get_rank() == 0)
 
@@ -335,8 +352,12 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         # save prefix config & past key values
         if is_main_process:
             self.prefix_config.save_pretrained(save_directory)
-            self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
             np.save(os.path.join(save_directory, PAST_KEY_VALUES_FILE_NAME), past_key_values)
+
+        if self.model.base_model_prefix == "chatglm2":
+            self.prefix_config.tensor_parallel_degree = -1
+        else:
+            self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
 
     def set_state_dict(self, state_dict):
         self.prefix_encoder.set_state_dict(state_dict)

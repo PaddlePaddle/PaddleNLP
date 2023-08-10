@@ -25,16 +25,22 @@ Llama2 模型的权重的使用则需要遵循[License](../../../paddlenlp/trans
 | facebook/llama-13b               |
 | facebook/llama-30b               |
 | facebook/llama-65b               |
+| meta-llama/Llama-2-7b            |
+| meta-llama/Llama-2-7b-chat       |
+| meta-llama/Llama-2-13b           |
+| meta-llama/Llama-2-13b-chat      |
+| meta-llama/Llama-2-70b           |
+| meta-llama/Llama-2-70b-chat      |
 | ziqingyang/chinese-llama-7b      |
 | ziqingyang/chinese-llama-13b     |
 | ziqingyang/chinese-alpaca-7b     |
 | ziqingyang/chinese-alpaca-13b    |
 | idea-ccnl/ziya-llama-13b-v1      |
-| meta-llama/Llama-2-7b            |
-| meta-llama/Llama-2-7b-chat       |
+| linly-ai/chinese-llama-2-7b      |
 | baichuan-inc/Baichuan-7B         |
 | baichuan-inc/Baichuan-13B-Base   |
 | baichuan-inc/Baichuan-13B-Chat   |
+
 
 使用方法：
 
@@ -376,4 +382,3 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" server.py \
     --flask_port 8011 \
     --src_length 100
 ```
-python predict_generation.py --model_name_or_path idea-ccnl/ziya-llama-13b-v1 --data_file /root/paddlejob/work/eb_data/hcg/dev.json
