@@ -23,7 +23,7 @@ import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
 from args import parse_args
-from origin_dataset import create_pretrained_dataset
+from legacy_dataset import create_pretrained_dataset
 from paddle.distributed.fleet.meta_optimizers.sharding.utils import save_persistables
 from visualdl import LogWriter
 
