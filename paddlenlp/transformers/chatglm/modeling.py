@@ -533,7 +533,6 @@ class ChatGLMStack(nn.Layer):
         cache: Optional[Tensor] = None,
         use_cache: bool = False,
     ):
-        print("input_ids")
 
         if input_ids is not None and inputs_embeds is not None:
             input_ids = None
@@ -544,15 +543,10 @@ class ChatGLMStack(nn.Layer):
             batch_size, seq_length = inputs_embeds.shape[:2]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
-        print("inputs_embeds")
-        # print(self.word_embeddings)
-        # print(input_ids)
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
 
-        # print('inputs_embeds')
         inputs_embeds = inputs_embeds.transpose([1, 0, 2])
-        print("rotary_embeddings")
         rotary_embeds = self.rotary_embeddings(position_ids)
 
         if cache is None:
