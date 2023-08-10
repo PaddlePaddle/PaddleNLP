@@ -460,35 +460,17 @@ class Trainer:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
         return resume_from_checkpoint
 
-    def _load_checkpoint_and_wrap_model(self, resume_from_checkpoint, delay_optimizer_creation, max_steps):
-        # In the non-sharded mode, only dp0 or sharding0 save checkpoint of all parameters.
-        # Thus dp0 or sharding0 load checkpoint in load_state_dict_from_checkpoint and the _wrap_model implicitly broadcast checkpoint to the other ranks.
-        # Check if saved optimizer or scheduler states exist
-        self._load_optimizer_and_scheduler(resume_from_checkpoint)
-        self.load_state_dict_from_checkpoint(resume_from_checkpoint)
+    def _wrap_model_and_load_sharded_checkpoint(self, resume_from_checkpoint):
+        # In the sharded mode, should invoke load_state_dict_from_checkpoint after _wrap_model.
+        # In this mode, each sharding rank load sharded params, do not need to implement the broadcast logic.
         model = self._wrap_model(self.model_wrapped)
         if self.sharding_io is not None:
+            # the self.optimizer should be wrapped and it is done in _wrap_model
             self.sharding_io.set_optimizer(self.optimizer)
-        # for the rest of this function `model` is the outside model, whether it was wrapped or not
         if model is not self.model:
             self.model_wrapped = model
-        if delay_optimizer_creation:
-            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-        return model
-
-    def _wrap_model_and_load_sharded_checkpoint(self, resume_from_checkpoint, delay_optimizer_creation, max_steps):
-        # In the sharded mode, each sharding rank save checkpoint of sharded parameters.
-        # Because the _wrap_model implicitly broadcast checkpoint of sharding rank0 to other ranks, we need to load sharded parameters after _wrap_model
-        # thus each sharding rank load its own sharded parameters.
-        model = self._wrap_model(self.model_wrapped)
-        if self.sharding_io is not None:
-            self.sharding_io.set_optimizer(self.optimizer)
-        # for the rest of this function `model` is the outside model, whether it was wrapped or not
-        if model is not self.model:
-            self.model_wrapped = model
-        if delay_optimizer_creation:
-            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-        # Check if saved optimizer or scheduler states exist
+        # Should invoke load_state_dict_from_checpoint after _load_optimizer_and_scheduler
+        # because the load_state_dict_from_checkpoint method rely on the optimizer in the shareded mode.
         self._load_optimizer_and_scheduler(resume_from_checkpoint)
         self.load_state_dict_from_checkpoint(resume_from_checkpoint)
         return model
@@ -567,11 +549,22 @@ class Trainer:
         self.state = TrainerState()
 
         if self.args.should_load_sharding_stage1_model:
-            model = self._wrap_model_and_load_sharded_checkpoint(
-                resume_from_checkpoint, delay_optimizer_creation, max_steps
-            )
+            model = self._wrap_model_and_load_sharded_checkpoint(resume_from_checkpoint)
         else:
-            model = self._load_checkpoint_and_wrap_model(resume_from_checkpoint, delay_optimizer_creation, max_steps)
+            # In the non-sharded mode, should invoke load_state_dict_from_checkpoint before _wrap_model.
+            # In this mode, the rank0 load all params and the _wrap_model implicitly broadcast params from rank0 to the other ranks.
+            self.load_state_dict_from_checkpoint(resume_from_checkpoint)
+            model = self._wrap_model(self.model_wrapped)
+            if self.sharding_io is not None:
+                assert delay_optimizer_creation is False, "delay_optimizer_creation should be False"
+                # the self.optimizer should be wrapped and it is done in _wrap_model
+                self.sharding_io.set_optimizer(self.optimizer)
+            # for the rest of this function `model` is the outside model, whether it was wrapped or not
+            if model is not self.model:
+                self.model_wrapped = model
+            if delay_optimizer_creation:
+                self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+            self._load_optimizer_and_scheduler(resume_from_checkpoint)
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples:,}")
