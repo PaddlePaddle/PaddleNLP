@@ -916,6 +916,12 @@ class GPTModel(GPTPretrainedModel):
 
         self.config = config
 
+        self.pad_token_id = config.pad_token_id
+        self.eos_token_id = config.eos_token_id
+        self.bos_token_id = config.bos_token_id
+        self.eol_token_id = config.eol_token_id
+        self.vocab_size = config.vocab_size
+
         self.bias = paddle.tril(
             paddle.ones([1, 1, config.max_position_embeddings, config.max_position_embeddings], dtype="int64")
         )
