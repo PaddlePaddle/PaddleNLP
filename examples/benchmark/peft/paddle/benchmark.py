@@ -119,6 +119,9 @@ def main():
         labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
         model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
+        # shift input and labels
+        model_inputs["input_ids"] = model_inputs["input_ids"][:-1]
+        model_inputs["labels"] = model_inputs["labels"][1:]
         model_inputs["position_ids"] = list(range(len(model_inputs["input_ids"])))
         seq_length = len(model_inputs["input_ids"])
         if intokens:
@@ -135,6 +138,9 @@ def main():
         labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
         model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
+        # shift input and labels
+        model_inputs["input_ids"] = model_inputs["input_ids"][:-1]
+        model_inputs["labels"] = model_inputs["labels"][1:]
 
         context_length = model_inputs["input_ids"].index(tokenizer.bos_token_id)
         seq_length = len(model_inputs["input_ids"])
@@ -165,10 +171,13 @@ def main():
         labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
         model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
+        # shift input and labels
+        model_inputs["input_ids"] = model_inputs["input_ids"][:-1]
+        model_inputs["labels"] = model_inputs["labels"][1:]
         if intokens:
             model_inputs["attention_mask"] = np.tril(
-                np.ones([len(model_inputs["input_ids"]), len(model_inputs["input_ids"])]), 0
-            ).tolist()
+                np.ones([len(model_inputs["input_ids"]), len(model_inputs["input_ids"])], dtype="bool")
+            )
         return model_inputs
 
     if model_args.english:
