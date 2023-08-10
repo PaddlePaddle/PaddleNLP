@@ -25,6 +25,7 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
 )
 
 from paddlenlp.transformers.model_utils import _add_variant, unwrap_optimizer
+from paddlenlp.transformers.utils import paddlenlp_load
 from paddlenlp.utils.log import logger
 
 # Name of the files used for checkpointing
@@ -52,7 +53,7 @@ class ShardingIO:
     def set_optimizer(self, optimizer):
         self.optimizer = optimizer
 
-    def load_state_dict_from_checkpoint_with_reshard(self, resume_from_checkpoint, load_one_state_dict_func):
+    def load_state_dict_from_checkpoint_with_reshard(self, resume_from_checkpoint, base_weight_name):
         """load state_dict from_checkpoint with reshard, Only load model state dict."""
         parallel_config = self._load_distributed_strategy(resume_from_checkpoint)
         pp_degree = parallel_config["pp_degree"]
@@ -66,7 +67,9 @@ class ShardingIO:
         state_dict = OrderedDict()
 
         for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
-            tmp = load_one_state_dict_func(resume_from_checkpoint, self.args.sharded_name_suffix(i))
+            tmp = self._load_one_state_dict_from_checkpoint(
+                resume_from_checkpoint, base_weight_name, self.args.sharded_name_suffix(i)
+            )
             for (k, v) in tmp.items():
                 state_dict[k] = v
             del tmp
@@ -81,7 +84,29 @@ class ShardingIO:
 
         return state_dict
 
-    def load_optimizer_state_with_reshard(self, checkpoint, load_optimizer_state_func):
+    def _load_one_state_dict_from_checkpoint(self, resume_from_checkpoint, base_weight_name, weight_name_suffix):
+        """
+        load state_dict of one shard from_checkpoint, Only load model state dict.
+        """
+        file_path = os.path.join(resume_from_checkpoint, _add_variant(base_weight_name, weight_name_suffix))
+        if not os.path.isfile(file_path):
+            raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}, no {file_path}")
+
+        logger.info(f"Loading model from {resume_from_checkpoint} .")
+        # We load the model state dict on the CPU to avoid an OOM error.
+        state_dict = paddle.load(file_path, return_numpy=True)
+        return state_dict
+
+    def _load_optimizer_state_of_one_shard(self, checkpoint, base_opt_name, optimizer_name_suffix):
+        optimizer_name = _add_variant(base_opt_name, optimizer_name_suffix)
+        path = os.path.join(checkpoint, optimizer_name)
+        logger.info(f"load optimizer state from {path}")
+        if os.path.isfile(path):
+            return paddlenlp_load(path, map_location="cpu")
+        logger.info(f"{path} not exists")
+        return None
+
+    def load_optimizer_state_with_reshard(self, checkpoint, base_opt_name):
         """load state_dict of multiple shard from_checkpoint, Only load model state dict."""
         parallel_config = self._load_distributed_strategy(checkpoint)
         pp_degree = parallel_config["pp_degree"]
@@ -107,16 +132,16 @@ class ShardingIO:
 
         if not need_reshard():
             logger.info("do not need reshard")
-            return load_optimizer_state_func(checkpoint, self.args.optimizer_name_suffix)
+            return self._load_optimizer_state_of_one_shard(checkpoint, base_opt_name, self.args.optimizer_name_suffix)
         logger.info("reshard optimizer state")
         state_dict = OrderedDict()
         master_weights = OrderedDict()
         lr_scheduler = {}
 
         for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
-            tmp = load_optimizer_state_func(checkpoint, self.args.sharded_name_suffix(i))
+            tmp = self._load_optimizer_state_of_one_shard(checkpoint, base_opt_name, self.args.sharded_name_suffix(i))
 
-            if not tmp:
+            if tmp is None:
                 continue
 
             for (k, v) in tmp.items():

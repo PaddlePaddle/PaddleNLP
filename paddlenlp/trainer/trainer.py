@@ -410,46 +410,32 @@ class Trainer:
         if resume_from_checkpoint is None:
             return
 
-        state_dict = None
-        if self.args.should_load_sharding_stage1_model:
-            state_dict = self.sharding_io.load_state_dict_from_checkpoint_with_reshard(
-                resume_from_checkpoint, self.load_one_state_dict_from_checkpoint
-            )
-        else:
-            if self.args.dataset_rank == 0:
-                state_dict = self.load_one_state_dict_from_checkpoint(
-                    resume_from_checkpoint, self.args.weight_name_suffix
-                )
-            else:
-                logger.info(f"not loading ckpt :{self.args.dataset_rank}")
-
-        # If the model is on the GPU, it still works!
-        self._set_state_dict_in_model(state_dict)
-        # release memory
-        del state_dict
-
-    def load_one_state_dict_from_checkpoint(self, resume_from_checkpoint, weight_name_suffix):
-        """
-        load state_dict of one shard from_checkpoint, Only load model state dict.
-        """
         if isinstance(self.model, LoRAModel):
             weight_name = LORA_WEIGHTS_NAME
         elif isinstance(self.model, PrefixModelForCausalLM):
             weight_name = PREFIX_WEIGHTS_NAME
         else:
             weight_name = PADDLE_WEIGHTS_NAME
-        file_path = os.path.join(resume_from_checkpoint, _add_variant(weight_name, weight_name_suffix))
-        if not os.path.isfile(file_path):
-            raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}, no {file_path}")
 
-        logger.info(f"Loading model from {resume_from_checkpoint} .")
+        if not self.args.should_load_sharding_stage1_model:
+            file_path = os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
+            if not os.path.isfile(file_path):
+                raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}, no {file_path}")
 
-        # We load the model state dict on the CPU to avoid an OOM error.
-        state_dict = paddle.load(
-            os.path.join(resume_from_checkpoint, _add_variant(weight_name, weight_name_suffix)),
-            return_numpy=True,
-        )
-        return state_dict
+            logger.info(f"Loading model from {resume_from_checkpoint} .")
+
+            # We load the model state dict on the CPU to avoid an OOM error.
+            state_dict = paddle.load(file_path, return_numpy=True)
+        else:
+            state_dict = self.sharding_io.load_state_dict_from_checkpoint_with_reshard(
+                resume_from_checkpoint,
+                base_weight_name=weight_name,
+            )
+
+        # If the model is on the GPU, it still works!
+        self._set_state_dict_in_model(state_dict)
+        # release memory
+        del state_dict
 
     def check_resume_from_checkpoint(self, resume_from_checkpoint):
         resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
@@ -1915,31 +1901,35 @@ class Trainer:
             # Good practice: save your training arguments together with the trained model
             paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
 
-    def _load_optimizer_state_of_one_shard(self, checkpoint, optimizer_name_suffix):
-        optimizer_name = _add_variant(OPTIMIZER_NAME, optimizer_name_suffix)
-        path = os.path.join(checkpoint, optimizer_name)
-        logger.info(f"load optimizer state from {path}")
-        if os.path.isfile(path):
-            return paddlenlp_load(path, map_location="cpu")
-        logger.info(f"{path} not exists")
-        return None
-
     def _load_optimizer_state(self, checkpoint):
         if self.args.should_load_sharding_stage1_model:
-            return self.sharding_io.load_optimizer_state_with_reshard(
-                checkpoint, self._load_optimizer_state_of_one_shard
-            )
+            return self.sharding_io.load_optimizer_state_with_reshard(checkpoint, base_opt_name=OPTIMIZER_NAME)
         else:
-            return self._load_optimizer_state_of_one_shard(checkpoint, self.args.optimizer_name_suffix)
+            optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+            path = os.path.join(checkpoint, optimizer_name)
+            logger.info(f"load optimizer state from {path}")
+            if not os.path.isfile(path):
+                logger.info(f"{path} not exists")
+                return None
+            return paddlenlp_load(path, map_location="cpu")
 
     def _load_optimizer_and_scheduler(self, checkpoint):
         """If optimizer and scheduler states exist, load them."""
         if checkpoint is None:
             return
 
-        opt_state_dict = self._load_optimizer_state(checkpoint)
+        opt_state_dict = None
+        if self.args.should_load_sharding_stage1_model:
+            opt_state_dict = self.sharding_io.load_optimizer_state_with_reshard(
+                checkpoint, base_opt_name=OPTIMIZER_NAME
+            )
+        else:
+            optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+            path = os.path.join(checkpoint, optimizer_name)
+            if os.path.isfile(path):
+                opt_state_dict = paddlenlp_load(path, map_location="cpu")
 
-        if opt_state_dict and os.path.isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
+        if opt_state_dict is not None and os.path.isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
             # Load in optimizer and scheduler states
             self.optimizer.set_state_dict(opt_state_dict)
 
