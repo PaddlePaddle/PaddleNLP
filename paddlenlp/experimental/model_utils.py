@@ -20,7 +20,7 @@ import os
 from shutil import copyfile
 
 import paddle
-import paddle.fluid.core as core
+from paddle.framework import core
 
 from paddlenlp.transformers import PretrainedModel
 
