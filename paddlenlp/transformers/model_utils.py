@@ -2057,15 +2057,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         assert not os.path.isfile(save_dir), "Saving directory ({}) should be a directory, not a file".format(save_dir)
         os.makedirs(save_dir, exist_ok=True)
 
-        merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
+        config_to_save = kwargs.get("config_to_save", False)
         shard_format = kwargs.get("shard_format", "naive")  # support naive pipeline
         # variant = kwargs.get("variant", None)
         # is_main_process = kwargs.get("is_main_process", True)
-        is_bf16 = kwargs.get("is_bf16", False)
-        param_names_in_master_weights = list(kwargs.get("param_names_in_master_weights", []))
-        sharding_group = kwargs.get("sharding_group", None)
-        optimizer = kwargs.get("optimizer", None)
-        should_save_sharding_stage1_model = kwargs.get("should_save_sharding_stage1_model", False)
 
         save_directory = save_dir
 
@@ -2088,39 +2083,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         dtype = get_parameter_dtype(model_to_save)
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
-        config_to_save = copy.deepcopy(model_to_save.config)
-
-        # Save the model
-        if state_dict is None and config_to_save.tensor_parallel_degree > 1:
-            if merge_tensor_parallel:
-                state_dict = model_to_save.state_dict()
-                if should_save_sharding_stage1_model:
-                    state_dict = filter_sharded_params(state_dict, optimizer, sharding_group.rank)
-                state_dict = model_to_save.merge_tensor_parallel(state_dict, config_to_save)
-                config_to_save.tensor_parallel_degree = 1
-                if config_to_save.tensor_parallel_rank != 0:
-                    logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
-                    return
-                if variant is not None and "tp" in variant:
-                    variant = "_".join([x for x in variant.split("_") if "tp" not in x])
-            else:
-                variant = weight_name_suffix() if variant is None else variant
-
-        if state_dict is None:
-            state_dict = self.state_dict()
-            if should_save_sharding_stage1_model:
-                state_dict = filter_sharded_params(state_dict, optimizer, sharding_group.rank)
-
-        # Attach architecture to the config
-        config_to_save.architectures = [model_to_save.__class__.__name__]
-
-        if is_bf16 and should_save_sharding_stage1_model:
-            state_dict = exlclude_paramters_in_state_dict(state_dict, param_names_in_master_weights, sharding_group)
-            logger.info(
-                "param_names_in_master_weights len:{}, bf16 state_dict len:{}, :{}".format(
-                    len(param_names_in_master_weights), len(state_dict), state_dict
-                )
-            )
         # Save the config
         if is_main_process:
             config_to_save.save_pretrained(save_directory)

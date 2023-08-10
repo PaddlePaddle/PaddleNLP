@@ -18,6 +18,7 @@
 
 import collections
 import contextlib
+import copy
 import inspect
 import math
 import os
@@ -54,6 +55,7 @@ from ..transformers.model_utils import (
     _add_variant,
     exlclude_paramters_in_state_dict,
     filter_sharded_params,
+    get_parameter_dtype,
     paddlenlp_load,
     unwrap_model,
 )
@@ -1812,6 +1814,57 @@ class Trainer:
             logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
             shutil.rmtree(checkpoint)
 
+    def _might_update_model_to_save(self, model_to_save, config_to_save=None, merge_tensor_parallel=False):
+        # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
+        # we currently don't use this setting automatically, but may start to use with v5
+
+        dtype = get_parameter_dtype(model_to_save)
+        model_to_save.config.dtype = str(dtype).split(".")[1]
+
+        if config_to_save is None:
+            config_to_save = model_to_save.config
+        config_to_save = copy.deepcopy(config_to_save)
+
+        weight_name_suffix = (
+            self.args.sharded_name_suffix()
+            if self.args.should_save_sharding_stage1_model
+            else self.args.weight_name_suffix
+        )
+
+        state_dict = model_to_save.state_dict()
+        if self.args.should_save_sharding_stage1_model:
+            state_dict = filter_sharded_params(state_dict, self.optimizer, self.sharding_group.rank)
+
+        if config_to_save.tensor_parallel_degree > 1:
+            merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
+            if merge_tensor_parallel:
+                state_dict = model_to_save.merge_tensor_parallel(state_dict, config_to_save)
+                config_to_save.tensor_parallel_degree = 1
+                if config_to_save.tensor_parallel_rank != 0:
+                    logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
+                    return
+                # if variant is not None and "tp" in variant:
+                if "tp" in weight_name_suffix:
+                    weight_name_suffix = "_".join([x for x in weight_name_suffix.split("_") if "tp" not in x])
+
+        # Attach architecture to the config
+        config_to_save.architectures = [model_to_save.__class__.__name__]
+
+        if self.args.bf16 and self.args.should_save_sharding_stage1_model:
+            param_names_in_master_weights = []
+            optimzier_state_dict = self.optimizer.state_dict()
+            assert "master_weights" in optimzier_state_dict
+            param_names_in_master_weights = list(optimzier_state_dict["master_weights"].keys())
+            state_dict = exlclude_paramters_in_state_dict(
+                state_dict, param_names_in_master_weights, self.sharding_group
+            )
+            logger.info(
+                "param_names_in_master_weights len:{}, bf16 state_dict len:{}, :{}".format(
+                    len(param_names_in_master_weights), len(state_dict), state_dict
+                )
+            )
+        return state_dict, config_to_save, weight_name_suffix
+
     def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
         # If we are executing this function, we are the process zero, so we don't check for that.
         output_dir = output_dir if output_dir is not None else self.args.output_dir
@@ -1819,70 +1872,45 @@ class Trainer:
         logger.info(f"Saving model checkpoint to {output_dir}")
         # Save a trained model and configuration using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
-        is_bf16 = self.args.bf16
-        param_names_in_master_weights = []
-        if is_bf16:
-            optimzier_state_dict = self.optimizer.state_dict()
-            assert "master_weights" in optimzier_state_dict
-            param_names_in_master_weights = list(optimzier_state_dict["master_weights"].keys())
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
 
-        sharding_group = None
-        sharding_rank = 0
-        if paddle.distributed.get_world_size() > 1 and self.args.use_hybrid_parallel:
-            sharding_group = self.sharding_group
-            sharding_rank = sharding_group.rank
-        sharded_kwargs = {
-            "is_bf16": is_bf16,
-            "param_names_in_master_weights": param_names_in_master_weights,
-            "sharding_group": sharding_group,
-            "should_save_sharding_stage1_model": self.args.should_save_sharding_stage1_model,
-            "optimizer": self.optimizer,
-        }
-        weight_name_suffix = (
-            self.args.sharded_name_suffix()
-            if self.args.should_save_sharding_stage1_model
-            else self.args.weight_name_suffix
-        )
         if (
             not isinstance(self.model, PretrainedModel)
             and not isinstance(self.model, LoRAModel)
             and not isinstance(self.model, PrefixModelForCausalLM)
         ):
             if isinstance(unwrap_model(self.model), PretrainedModel):
+                state_dict, config_to_save, weight_name_suffix = self._might_update_model_to_save(
+                    unwrap_model(self.model), merge_tensor_parallel=merge_tensor_parallel
+                )
                 unwrap_model(self.model).save_pretrained(
                     output_dir,
-                    merge_tensor_parallel=merge_tensor_parallel,
+                    state_dict=state_dict,
+                    config_to_save=config_to_save,
                     variant=weight_name_suffix,
                     is_main_process=self.args.should_save,
-                    **sharded_kwargs,
                 )
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
                 if merge_tensor_parallel:
                     logger.warning("Trainer.model is not a `PretrainedModel`, not suppor for merge_tensor_parallel.")
-                if state_dict is None:
-                    state_dict = self.model.state_dict()
-                if self.args.should_save_sharding_stage1_model:
-                    state_dict = filter_sharded_params(state_dict, self.optimizer, sharding_rank)
-                    if is_bf16:
-                        logger.info("before exclude state_dict_to_save len:{}".format(len(state_dict)))
-                        state_dict = exlclude_paramters_in_state_dict(
-                            state_dict, param_names_in_master_weights, sharding_group
-                        )
-                        logger.info("after exclude state_dict len:{}".format(len(state_dict)))
+                state_dict, _, weight_name_suffix = self._might_update_model_to_save(merge_tensor_parallel=False)
                 paddle.save(
                     state_dict,
                     os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, weight_name_suffix)),
                 )
         else:
+            state_dict, config_to_save, weight_name_suffix = self._might_update_model_to_save(
+                self.model, merge_tensor_parallel=merge_tensor_parallel
+            )
             self.model.save_pretrained(
                 output_dir,
+                state_dict=state_dict,
+                config_to_save=config_to_save,
                 merge_tensor_parallel=merge_tensor_parallel,
                 variant=weight_name_suffix,
                 is_main_process=self.args.should_save,
-                **sharded_kwargs,
             )
         if self.args.should_save_sharding_stage1_model:
             self.sharding_io.save_distributed_model_meta(output_dir)
