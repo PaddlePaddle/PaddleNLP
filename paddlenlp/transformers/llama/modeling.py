@@ -58,13 +58,11 @@ from ..sequence_parallel_utils import (
     ScatterOp,
     mark_as_sequence_parallel_parameter,
 )
-from .configuration import LLAMA_PRETRAINED_INIT_CONFIGURATION, LlamaConfig
-
-LLAMA_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "__internal_testing__/tiny-random-llama",
-    "facebook/llama-7b",
-    "facebook/llama-13b",
-]
+from .configuration import (
+    LLAMA_PRETRAINED_INIT_CONFIGURATION,
+    LLAMA_PRETRAINED_RESOURCE_FILES_MAP,
+    LlamaConfig,
+)
 
 __all__ = [
     "LlamaModel",
@@ -759,6 +757,7 @@ class LlamaPretrainedModel(PretrainedModel):
     config_class = LlamaConfig
     base_model_prefix = "llama"
     pretrained_init_configuration = LLAMA_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = LLAMA_PRETRAINED_RESOURCE_FILES_MAP
 
     @classmethod
     def _get_name_mappings(cls, config: LlamaConfig) -> list[StateDictNameMapping]:
