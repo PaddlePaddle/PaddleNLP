@@ -86,7 +86,6 @@ def main():
         tokenizer.pad_token = tokenizer.unk_token
     model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
-        load_state_as_np=True,
         low_cpu_mem_usage=True,
         # use_flash_attention=True,
         dtype=dtype,
@@ -182,23 +181,19 @@ def main():
     if "chatglm2" in model_args.model_name_or_path:
         dataset = dataset.map(
             lambda example: preprocess_function(example, intokens=model_args.intokens),
-            remove_columns=["instruction", "input", "output"],
         )
     elif "chatglm" in model_args.model_name_or_path:
         dataset = dataset.map(
             lambda example: preprocess_function_chatglm(example, intokens=model_args.intokens),
-            remove_columns=["instruction", "input", "output"],
         )
     elif "bloom" in model_args.model_name_or_path:
 
         dataset = dataset.map(
             lambda example: preprocess_function_bloom(example, intokens=model_args.intokens),
-            remove_columns=["instruction", "input", "output"],
         )
     else:
         dataset = dataset.map(
             lambda example: preprocess_function(example, intokens=model_args.intokens),
-            remove_columns=["instruction", "input", "output"],
         )
     total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
 
