@@ -440,7 +440,7 @@ class BloomAttention(nn.Layer):
             # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
             # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
             query_states, key_states, value_states = query_layer, key_layer, value_layer
-            attention_mask = attention_mask + alibi
+            attention_mask = attention_mask.cast(alibi.dtype) + alibi
             attn_output, attn_weights = scaled_dot_product_attention(
                 config=self.config,
                 query_states=query_states,
