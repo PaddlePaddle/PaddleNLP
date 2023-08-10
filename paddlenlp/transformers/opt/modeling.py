@@ -1067,8 +1067,7 @@ class OPTForCausalLM(OPTPretrainedModel):
 
         loss = None
         if labels is not None:
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(logits, labels)
+            loss = nn.functional.cross_entropy(logits, labels)
 
         if not return_dict:
             if not use_cache:
