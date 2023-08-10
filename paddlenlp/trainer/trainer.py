@@ -972,12 +972,7 @@ class Trainer:
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
 
                     assert not availiable_no_sync, availiable_no_sync
-                    # logger.info(
-                    #     f"optimizer type:{type(self.optimizer)} sharding={self.optimizer._sharding_enable} dp={self.optimizer._dp_enable}"
-                    # )
-                    if isinstance(self.optimizer, HybridParallelOptimizer):
-                        if self.do_grad_scaling:
-                            assert not enable_dp_comm_overlap, "`dp_comm_overlap` not work under fp16"
+                    if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
                         parameters_list = obtain_optimizer_parameters_list(self.optimizer._inner_opt)
 
                         non_moe_parameters_list = [p for p in parameters_list if not getattr(p, "no_sync", False)]
