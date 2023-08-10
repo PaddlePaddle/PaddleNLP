@@ -109,6 +109,8 @@ def get_lora_target_modules(model):
             ".*down_proj.*",
             ".*up_proj.*",
         ]
+    elif model.base_model_prefix == "opt":
+        target_modules = [".*q_proj.*", ".*k_proj.*", ".*v_proj.*", ".*project_in.*", ".*project_out.*"]
     else:
         raise ValueError(
             f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama."

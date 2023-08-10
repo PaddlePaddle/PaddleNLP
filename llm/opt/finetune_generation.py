@@ -110,7 +110,7 @@ def main():
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
         lora_config = LoRAConfig(
-            target_modules=[".*q_proj.*", ".*k_proj.*", ".*v_proj.*"],
+            target_modules=[".*q_proj.*", ".*k_proj.*", ".*v_proj.*", ".*project_in.*", ".*project_out.*"],
             r=4,
             lora_alpha=8,
             merge_weights=False,
