@@ -151,7 +151,7 @@ class ModelArguments:
     )
     recompute_granularity: str = field(
         default="full",
-        metadata={"help": "full core_attn"},
+        metadata={"help": "one of full core_attn full_attn"},
     )
     virtual_pp_degree: int = field(
         default=1,
@@ -171,7 +171,6 @@ class ModelArguments:
         default=False,
         metadata={"help": "whether to use fuse sequence parallel allreduce"},
     )
-
     rope_fusion_level: Optional[str] = field(
         default=None,
         metadata={
@@ -179,6 +178,16 @@ class ModelArguments:
             "(1) 'full': fuse sin cos compute and rope embedding\n"
             "(2) 'core': only fuse rope embedding, will compute the sin and cos\n"
             "(3) None: don't fuse any part of the rope embedding"
+        },
+    )
+    no_recompute_layers: Optional[str] = field(
+        default=None,
+        metadata={"help": "Specify the full transformer layers that should not be recomputed."},
+    )
+    pp_recompute_interval: int = field(
+        default=0,
+        metadata={
+            "help": "The interval for the number of layers at which recomputation occurs. A value of 0 indicates no recomputation. Default is 0."
         },
     )
 
@@ -439,6 +448,22 @@ def main():
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
         logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
 
+    if model_args.no_recompute_layers is not None:
+        import re
+
+        def check_format(s):
+            pattern = r"^\d+(,\d+)*$"
+            return bool(re.match(pattern, s))
+
+        if check_format(model_args.no_recompute_layers) is False:
+            raise ValueError(
+                f"no_recompute_layers should be fomated like int,int,...,int but recieved {model_args.no_recompute_layers}"
+            )
+
+        model_args.no_recompute_layers = list(map(int, model_args.no_recompute_layers.split(",")))
+        model_args.no_recompute_layers.sort()
+
+    config.lm_shift_labels = False
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
@@ -448,6 +473,8 @@ def main():
     config.sequence_parallel = model_args.sequence_parallel
     config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
     config.rope_fusion_level = model_args.rope_fusion_level
+    config.no_recompute_layers = model_args.no_recompute_layers
+    config.pp_recompute_interval = model_args.pp_recompute_interval
 
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
@@ -480,6 +507,9 @@ def main():
         register_sequence_parallel_allreduce_hooks(
             model, training_args.gradient_accumulation_steps, model_args.fuse_sequence_parallel_allreduce
         )
+
+    if training_args.recompute:
+        model.recompute_enable()
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
