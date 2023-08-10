@@ -412,35 +412,35 @@ class Trainer:
             if resume_from_checkpoint is None:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
-        if resume_from_checkpoint is None:
-            return
+        if resume_from_checkpoint is not None:
+            if isinstance(self.model, LoRAModel):
+                weight_name = LORA_WEIGHTS_NAME
+            elif isinstance(self.model, PrefixModelForCausalLM):
+                weight_name = PREFIX_WEIGHTS_NAME
+            else:
+                weight_name = PADDLE_WEIGHTS_NAME
 
-        if isinstance(self.model, LoRAModel):
-            weight_name = LORA_WEIGHTS_NAME
-        elif isinstance(self.model, PrefixModelForCausalLM):
-            weight_name = PREFIX_WEIGHTS_NAME
-        else:
-            weight_name = PADDLE_WEIGHTS_NAME
+            if not self.args.should_load_sharding_stage1_model:
+                file_path = os.path.join(
+                    resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
+                )
+                if not os.path.isfile(file_path):
+                    raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}, no {file_path}")
 
-        if not self.args.should_load_sharding_stage1_model:
-            file_path = os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
-            if not os.path.isfile(file_path):
-                raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}, no {file_path}")
+                logger.info(f"Loading model from {resume_from_checkpoint} .")
 
-            logger.info(f"Loading model from {resume_from_checkpoint} .")
+                # We load the model state dict on the CPU to avoid an OOM error.
+                state_dict = paddle.load(file_path, return_numpy=True)
+            else:
+                state_dict = self.sharding_io.load_state_dict_from_checkpoint_with_reshard(
+                    resume_from_checkpoint,
+                    base_weight_name=weight_name,
+                )
 
-            # We load the model state dict on the CPU to avoid an OOM error.
-            state_dict = paddle.load(file_path, return_numpy=True)
-        else:
-            state_dict = self.sharding_io.load_state_dict_from_checkpoint_with_reshard(
-                resume_from_checkpoint,
-                base_weight_name=weight_name,
-            )
-
-        # If the model is on the GPU, it still works!
-        self._set_state_dict_in_model(state_dict)
-        # release memory
-        del state_dict
+            # If the model is on the GPU, it still works!
+            self._set_state_dict_in_model(state_dict)
+            # release memory
+            del state_dict
 
     def _wrap_model_and_load_sharded_checkpoint(self, resume_from_checkpoint):
         # In the sharded mode, should invoke load_state_dict_from_checkpoint after _wrap_model.
