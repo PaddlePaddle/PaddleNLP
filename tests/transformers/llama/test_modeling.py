@@ -24,6 +24,7 @@ from parameterized import parameterized
 from paddlenlp.transformers import LlamaConfig, LlamaForCausalLM, LlamaModel
 from tests.testing_utils import require_package, slow
 from tests.transformers.test_configuration_common import ConfigTester
+from tests.transformers.test_generation_utils import GenerationTesterMixin
 from tests.transformers.test_modeling_common import (
     ModelTesterMixin,
     ModelTesterPretrainedMixin,
@@ -100,7 +101,7 @@ class LlamaModelTester:
         self.return_dict = return_dict
 
     def prepare_config_and_inputs(self):
-        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
+        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size, dtype=paddle.int64)
 
         input_mask = None
         if self.use_input_mask:
@@ -245,19 +246,56 @@ class LlamaModelTester:
         else:
             self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
+    def check_model_position_ids(self, config, input_ids, input_mask, *args):
+        model = LlamaForCausalLM(config)
+        model.eval()
 
-class LlamaModelTest(ModelTesterMixin, unittest.TestCase):
+        result_no_position_id = model(
+            input_ids,
+            labels=input_ids if self.parent.use_labels else None,
+            return_dict=self.parent.return_dict,
+        )
+        batch_size, seq_len = input_ids.shape
+        position_ids = paddle.arange(seq_len).expand((batch_size, seq_len))
+        result_position_id = model(
+            input_ids,
+            position_ids,
+            labels=input_ids if self.parent.use_labels else None,
+            return_dict=self.parent.return_dict,
+        )
+        if self.parent.use_labels:
+            self.parent.assertTrue((result_position_id[1] == result_no_position_id[1]).all())
+        else:
+            self.parent.assertTrue((result_position_id[0] == result_no_position_id[0]).all())
+
+
+class LlamaModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     base_model_class = LlamaModel
     return_dict = False
     use_labels = False
 
     all_model_classes = (LlamaModel, LlamaForCausalLM)
+    all_generative_model_classes = {LlamaForCausalLM: (LlamaModel, "llama")}
 
     def setUp(self):
         super().setUp()
 
         self.model_tester = LlamaModelTester(self)
         self.config_tester = ConfigTester(self, config_class=LlamaConfig, vocab_size=256, hidden_size=24)
+
+    def _get_input_ids_and_config(self):
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+
+        input_ids = inputs_dict[self.input_name]
+        attention_mask = paddle.ones_like(input_ids, dtype=paddle.int64)
+
+        max_batch_size = 2
+        sequence_length = input_ids.shape[-1] // 2
+        input_ids = input_ids[:max_batch_size, :sequence_length]
+        attention_mask = attention_mask[:max_batch_size, :sequence_length]
+        max_length = 3
+
+        return config, input_ids, attention_mask, max_length
 
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
@@ -267,10 +305,12 @@ class LlamaModelTest(ModelTesterMixin, unittest.TestCase):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_model_attention_mask(*config_and_inputs)
 
-    def test_model_name_list(self):
-        pass
+    def test_model_position_ids(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.check_model_position_ids(*config_and_inputs)
 
-    def test_resize_tokens_embeddings(self):
+    def test_generate_without_input_ids(self):
+        # this requires 4-D attention mask logic, which is not supported yet
         pass
 
     def test_llama_lm_head_model(self):

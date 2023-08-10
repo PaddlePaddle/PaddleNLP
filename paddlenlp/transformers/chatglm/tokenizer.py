@@ -245,7 +245,6 @@ class ChatGLMTokenizer(PretrainedTokenizer):
                 attention_mask = np.ones((1, seq_length, seq_length))
                 attention_mask = np.tril(attention_mask)
                 attention_mask[:, :, :context_length] = 1
-                attention_mask = (attention_mask < 0.5).astype("int64")
                 encoded_inputs["attention_mask"] = attention_mask
 
             if "position_ids" not in encoded_inputs:
@@ -270,7 +269,7 @@ class ChatGLMTokenizer(PretrainedTokenizer):
                     encoded_inputs["attention_mask"],
                     pad_width=[(0, 0), (difference, 0), (difference, 0)],
                     mode="constant",
-                    constant_values=1,
+                    constant_values=0,
                 )
             if "token_type_ids" in encoded_inputs:
                 encoded_inputs["token_type_ids"] = [self.pad_token_type_id] * difference + encoded_inputs[

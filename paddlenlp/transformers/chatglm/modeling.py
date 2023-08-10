@@ -283,13 +283,7 @@ class ChatGLMAttention(nn.Layer):
             self.scale_mask_softmax.scale = attention_scale_coeff
             attention_probs = self.scale_mask_softmax(attention_scores, attention_mask)
         else:
-            if not (attention_mask == 0).all():
-                # attention_mask = attention_mask.astype(attention_scores.dtype)
-                # attention_scores = paddle.multiply(attention_scores, 1.0 - attention_mask)
-                # attention_scores = attention_scores + (-10000.0) * attention_mask
-                attention_scores = paddle.where(
-                    attention_mask > 0, paddle.full_like(attention_scores, -10000.0), attention_scores
-                )
+            attention_scores = attention_scores + attention_mask
             attention_scores = attention_scores.astype("float32")
             attention_scores = attention_scores * attention_scale_coeff
             attention_probs = F.softmax(attention_scores, axis=-1)
@@ -529,16 +523,19 @@ class ChatGLMStack(nn.Layer):
             else:
                 cache = tuple([None] * len(self.layers))
 
+        # this branch is deprecated
         if self.config.pre_seq_len is not None and attention_mask is not None:
             prefix_attention_mask = paddle.ones([batch_size, 1, input_ids.shape[-1], self.config.pre_seq_len])
             prefix_attention_mask = (prefix_attention_mask < 0.5).astype("int64")
             attention_mask = paddle.concat((prefix_attention_mask, attention_mask), axis=3)
 
+        zero = paddle.zeros(attention_mask.shape, dtype=inputs_embeds.dtype)
+        neg_inf = paddle.full_like(attention_mask, paddle.finfo(inputs_embeds.dtype).min, dtype=inputs_embeds.dtype)
+        attention_mask = paddle.where(attention_mask, zero, neg_inf)
+
         hidden_states = inputs_embeds
 
         current_caches = [] if use_cache else None
-        if attention_mask is None:
-            attention_mask = paddle.zeros([1, 1]).astype("int64")
 
         for i, layer in enumerate(self.layers):
             cache_i = cache[i]
@@ -591,18 +588,6 @@ class ChatGLMPretrainedModel(PretrainedModel):
         """Initialization hook"""
         return None
 
-    def get_masks(self, input_ids):
-        batch_size, seq_length = input_ids.shape
-        context_lengths = []
-        for seq in input_ids:
-            context_lengths.append(paddle.where(seq == self.config.bos_token_id)[0][0])
-        attention_mask = paddle.tril(paddle.ones([batch_size, seq_length, seq_length]))
-        for i, context_length in enumerate(context_lengths):
-            attention_mask[i, :, :context_length] = 1
-        attention_mask = attention_mask.unsqueeze(1)
-        attention_mask = (attention_mask < 0.5).astype("int64")
-        return attention_mask
-
     def get_position_ids(self, input_ids, mask_positions, use_gmasks=None):
         batch_size, seq_length = input_ids.shape
         if use_gmasks is None:
@@ -611,6 +596,7 @@ class ChatGLMPretrainedModel(PretrainedModel):
         context_lengths = []
         for seq in input_ids:
             context_lengths.append(paddle.where(seq == self.config.bos_token_id)[0][0])
+
         if self.config.position_encoding_2d:
             position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
             for i, context_length in enumerate(context_lengths):
@@ -713,8 +699,10 @@ class ChatGLMModel(ChatGLMPretrainedModel):
             assert position_ids is not None, "`position_ids` must be explicitly specified when input_ids is None."
             assert attention_mask is not None, "`attention_mask` must be explicitly specified when input_ids is None."
 
-        if attention_mask is None:
-            attention_mask = self.get_masks(input_ids)
+        if attention_mask is None or len(attention_mask.shape) != 4:
+            raise ValueError(f"attention mask should'nt be None or has size other than 4Dim. Found {attention_mask}")
+
+        attention_mask = attention_mask.astype("bool")
 
         if position_ids is None:
             MASK, gMASK = self.config.mask_token_id, self.config.gmask_token_id
@@ -793,10 +781,9 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
 
         if cache is not None or past_key_values is not None:
             last_token = input_ids[:, -1].unsqueeze(-1)
-            if attention_mask is not None and attention_mask.dtype == paddle.int64:
-                attention_mask = attention_mask[:, :, -1:]
-            else:
-                attention_mask = self.get_masks(input_ids)[:, :, -1:]
+
+            attention_mask = attention_mask[:, :, -1:]
+
             if position_ids is not None:
                 position_ids = position_ids[..., -1:]
             else:
@@ -804,6 +791,7 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
                     context_lengths = []
                     for seq in input_ids:
                         context_lengths.append(paddle.where(seq == self.config.bos_token_id)[0][0])
+
                     context_lengths = paddle.to_tensor(context_lengths, dtype="int64")
                     block_position_ids = seq_length - context_lengths
                     position_ids = paddle.concat(
@@ -820,14 +808,8 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
                 "position_ids": position_ids,
                 "use_cache": True,
                 "attention_mask": attention_mask,
-                **kwargs,
             }
         else:
-            if attention_mask is not None and attention_mask.dtype != paddle.int64:
-                logger.warning(f"The dtype of attention mask ({attention_mask.dtype}) is not int64")
-                attention_mask = None
-            if attention_mask is None:
-                attention_mask = self.get_masks(input_ids)
             if position_ids is None:
                 position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, use_gmasks=use_gmasks)
 
@@ -837,7 +819,6 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
                 "position_ids": position_ids,
                 "use_cache": True,
                 "attention_mask": attention_mask,
-                **kwargs,
             }
 
     def update_model_kwargs_for_generation(
@@ -853,12 +834,12 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
         # update attention mask
         if "attention_mask" in model_kwargs:
             attention_mask = model_kwargs["attention_mask"]
-            if attention_mask is not None and attention_mask.dtype == paddle.int64:
+            if attention_mask is not None:
                 attention_mask = paddle.concat(
-                    [attention_mask, paddle.ones([*attention_mask.shape[:3], 1], attention_mask.dtype)], axis=3
+                    [attention_mask, paddle.zeros([*attention_mask.shape[:3], 1], attention_mask.dtype)], axis=3
                 )
                 new_attention_mask = attention_mask[:, :, -1:].clone()
-                new_attention_mask[..., -1] = 0
+                new_attention_mask[..., -1] = 1
                 model_kwargs["attention_mask"] = paddle.concat([attention_mask, new_attention_mask], axis=2)
 
         # update position ids
