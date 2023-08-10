@@ -110,5 +110,5 @@ class ErnieBot(BaseComponent):
         :param stream: Whether to use streaming mode when making the request. Currently not in use. Defaults to False.
         """
         logger.info(query)
-        response_json = self.predict(query, history, stream)
+        response_json = self.predict(query[:2000], history, stream)
         return response_json, "output_1"
