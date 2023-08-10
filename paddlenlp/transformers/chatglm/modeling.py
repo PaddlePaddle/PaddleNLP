@@ -741,7 +741,6 @@ class ChatGLMModel(ChatGLMPretrainedModel):
                 use_gmasks.append(use_gmask)
                 mask_positions.append(paddle.where(seq == mask_token)[0][0])
             position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, use_gmasks=use_gmasks)
-        # print('use cache')
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         logits, new_caches = self.transformer(
             input_ids=input_ids,

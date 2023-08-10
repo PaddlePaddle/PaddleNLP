@@ -222,8 +222,6 @@ class ChatGLMTokenizer(PretrainedTokenizer):
         # Load from model defaults
         if return_attention_mask is None:
             return_attention_mask = "attention_mask" in self.model_input_names or "attention_mask" in encoded_inputs
-        encoded_inputs.pop("attention_mask")
-        encoded_inputs.pop("position_ids")
         assert self.padding_side == "left"
         required_input = encoded_inputs[self.model_input_names[0]]
         seq_length = len(required_input)
@@ -238,7 +236,6 @@ class ChatGLMTokenizer(PretrainedTokenizer):
 
         # Initialize attention mask if not present.
         if max_length is not None:
-            print(max_length)
             if self.bos_token_id in required_input:
                 context_length = required_input.index(self.bos_token_id)
             else:

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -26,9 +25,6 @@ from paddlenlp.datasets import InTokensMapDataset
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
-
-os.environ["http_proxy"] = "http://172.19.57.45:3128"
-os.environ["https_proxy"] = "http://172.19.57.45:3128"
 
 """
 单卡
