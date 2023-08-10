@@ -342,23 +342,24 @@ class LlamaRotaryEmbedding(nn.Layer):
         self.sin_cached = emb.sin()[None, :, None, :]
 
     def forward(self, x, seq_len=None):
-        if seq_len > self.max_seq_len_cached:
-            # https://github.com/ymcui/Chinese-LLaMA-Alpaca/pull/705/files
-            inv_freq = self.inv_freq
-            dim = self.dim
-            alpha = seq_len / 1024 - 1
-            base = self.base * alpha ** (dim / (dim - 2))
-            inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, dim, 2), dtype="float32") / dim))
+        # in pretrain seq_len == self.max_seq_len_cached, temporarily delete if
+        # if seq_len > self.max_seq_len_cached:
+        #     # https://github.com/ymcui/Chinese-LLaMA-Alpaca/pull/705/files
+        #     inv_freq = self.inv_freq
+        #     dim = self.dim
+        #     alpha = seq_len / 1024 - 1
+        #     base = self.base * alpha ** (dim / (dim - 2))
+        #     inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, dim, 2), dtype="float32") / dim))
 
-            t = paddle.arange(seq_len, dtype="float32")
-            freqs = paddle.einsum("i,j->ij", t, inv_freq)
-            emb = paddle.concat([freqs, freqs], axis=-1)
-            cos_cached = emb.cos()[None, :, None, :]
-            sin_cached = emb.sin()[None, :, None, :]
-            return (
-                cos_cached[:, :seq_len, :, ...],
-                sin_cached[:, :seq_len, :, ...],
-            )
+        #     t = paddle.arange(seq_len, dtype="float32")
+        #     freqs = paddle.einsum("i,j->ij", t, inv_freq)
+        #     emb = paddle.concat([freqs, freqs], axis=-1)
+        #     cos_cached = emb.cos()[None, :, None, :]
+        #     sin_cached = emb.sin()[None, :, None, :]
+        #     return (
+        #         cos_cached[:, :seq_len, :, ...],
+        #         sin_cached[:, :seq_len, :, ...],
+        #     )
         return (
             self.cos_cached[:, :seq_len, :, ...],
             self.sin_cached[:, :seq_len, :, ...],
@@ -913,12 +914,10 @@ class LlamaModel(LlamaPretrainedModel):
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
             if len(attention_mask.shape) == 2:
                 expanded_attn_mask = _expand_2d_mask(attention_mask, dtype, tgt_length=input_shape[-1])
-                # For decoding phase in generation, seq_length = 1, we don't need to add causal mask
-                if input_shape[-1] > 1:
-                    combined_attention_mask = _make_causal_mask(
-                        input_shape, past_key_values_length=past_key_values_length
-                    )
-                    expanded_attn_mask = expanded_attn_mask & combined_attention_mask
+                # For decoding phase in generation, seq_length = 1, we don't need to add causal mask. for we run pretrain, temporarily delete if
+                # if input_shape[-1] > 1:
+                combined_attention_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
+                expanded_attn_mask = expanded_attn_mask & combined_attention_mask
             # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
             elif len(attention_mask.shape) == 3:
                 expanded_attn_mask = attention_mask.unsqueeze(1).astype("bool")
