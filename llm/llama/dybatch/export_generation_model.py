@@ -18,7 +18,9 @@ import os
 import shutil
 
 import paddle
-from modeling import LlamaForCausalLMDyBatch
+# from modeling import LlamaForCausalLMDyBatch
+from dyquant_modeling import LlamaForCausalLMDyBatch
+
 from paddle.distributed import fleet
 from utils import generate_rank_mapping, get_infer_model_path
 
