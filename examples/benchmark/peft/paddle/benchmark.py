@@ -122,10 +122,10 @@ def main():
         # shift input and labels
         model_inputs["input_ids"] = model_inputs["input_ids"][:-1]
         model_inputs["labels"] = model_inputs["labels"][1:]
-        model_inputs["position_ids"] = list(range(len(model_inputs["input_ids"])))
         seq_length = len(model_inputs["input_ids"])
+        model_inputs["position_ids"] = list(range(seq_length))
         if intokens:
-            model_inputs["attention_mask"] = np.tril(np.ones([seq_length, seq_length], dtype="bool"))
+            model_inputs["attention_mask"] = np.tril(np.ones([seq_length, seq_length], dtype=bool))
         return model_inputs
 
     def preprocess_function_chatglm(example, max_src_length=256, max_tgt_length=384, intokens=False):
@@ -176,7 +176,7 @@ def main():
         model_inputs["labels"] = model_inputs["labels"][1:]
         if intokens:
             model_inputs["attention_mask"] = np.tril(
-                np.ones([len(model_inputs["input_ids"]), len(model_inputs["input_ids"])], dtype="bool")
+                np.ones([len(model_inputs["input_ids"]), len(model_inputs["input_ids"])], dtype=bool)
             )
         return model_inputs
 
