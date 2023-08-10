@@ -53,7 +53,7 @@ from ..peft import LoRAModel, PrefixModelForCausalLM
 from ..transformers.model_utils import (
     PretrainedModel,
     _add_variant,
-    exlclude_paramters_in_state_dict,
+    exclude_paramters_in_state_dict,
     filter_sharded_params,
     get_parameter_dtype,
     paddlenlp_load,
@@ -1826,7 +1826,7 @@ class Trainer:
             optimzier_state_dict = self.optimizer.state_dict()
             assert "master_weights" in optimzier_state_dict
             param_names_in_master_weights = list(optimzier_state_dict["master_weights"].keys())
-            state_dict = exlclude_paramters_in_state_dict(
+            state_dict = exclude_paramters_in_state_dict(
                 state_dict, param_names_in_master_weights, self.sharding_group
             )
             logger.info(

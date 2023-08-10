@@ -115,7 +115,7 @@ def filter_sharded_params(state_dict, optimizer, sharding_rank):
     return filtered_state_dict
 
 
-def exlclude_paramters_in_state_dict(
+def exclude_paramters_in_state_dict(
     model_state_dict, param_names_in_master_weights, sharding_group, should_save_sharding_stage1_model=True
 ):
     assert sharding_group is not None
