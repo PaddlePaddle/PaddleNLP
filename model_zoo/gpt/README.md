@@ -17,8 +17,6 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 ├── predict.py              # 生成文本示例demo
 ├── README.md               # 文档
 ├── run_eval.py             # 评估入口
-├── run_pretrain.py         # 预训练入口
-├── run_pretrain_static.py  # 混合并行，预训练脚本
 └── scripts/                # 训练脚本
 ```
 
