@@ -875,33 +875,16 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
         hidden_states = transformer_outputs.last_hidden_state if return_dict else transformer_outputs[0]
 
         lm_logits = self.lm_head(hidden_states)
-        lm_logits = lm_logits.transpose([1, 0, 2])
+        lm_logits = lm_logits.transpose([1, 0, 2]).astype("float32")
         loss = None
         if labels is not None:
-            """
-            for p, l in zip(lm_logits[..., :-1, :].argmax(axis=-1), labels[..., 1:]):
-                print("prediction")
-                print(self.tokenizer.decode(p[l != -100].tolist()))
-                print("labels")
-                print(self.tokenizer.decode(l[l != -100].tolist()))
-            """
-
-            if self.config.lm_shift_labels:
-                shift_logits = lm_logits[..., :-1, :]
-                shift_logits = shift_logits.reshape([-1, shift_logits.shape[-1]])
-                shift_logits = shift_logits.astype("float32")
-                shift_labels = labels[..., 1:].reshape([-1])
-            else:
-                shift_logits = lm_logits
-                shift_labels = labels
-
             if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
                 self.parallel_loss_func = fleet.meta_parallel.ParallelCrossEntropy()
-                shift_logits = shift_logits[shift_labels != -100]
-                shift_labels = shift_labels[shift_labels != -100]
-                loss = self.parallel_loss_func(shift_logits, shift_labels).mean()
+                filtered_logits = lm_logits[labels != -100]
+                filtered_labels = labels[labels != -100]
+                loss = self.parallel_loss_func(filtered_logits, filtered_labels).mean()
             else:
-                loss = nn.functional.cross_entropy(shift_logits, shift_labels, ignore_index=-100)
+                loss = nn.functional.cross_entropy(lm_logits, labels, ignore_index=-100)
             loss = loss.astype(lm_logits.dtype)
 
         if not return_dict:
