@@ -79,8 +79,10 @@ EXAMPLE_DOC_STRING = """
 class MultiControlNetModel(ModelMixin):
     r"""
     Multiple `ControlNetModel` wrapper class for Multi-ControlNet
+
     This module is a wrapper for multiple instances of the `ControlNetModel`. The `forward()` API is designed to be
     compatible with `ControlNetModel`.
+
     Args:
         controlnets (`List[ControlNetModel]`):
             Provides additional conditioning to the unet during the denoising process. You must set multiple
@@ -97,11 +99,12 @@ class MultiControlNetModel(ModelMixin):
         timestep: Union[paddle.Tensor, float, int],
         encoder_hidden_states: paddle.Tensor,
         controlnet_cond: List[paddle.Tensor],
-        conditioning_scale: Union[List[List[float]], List[float]],
+        conditioning_scale: List[float],
         class_labels: Optional[paddle.Tensor] = None,
         timestep_cond: Optional[paddle.Tensor] = None,
         attention_mask: Optional[paddle.Tensor] = None,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
+        guess_mode: bool = False,
         return_dict: bool = True,
     ) -> Union[ControlNetOutput, Tuple]:
         for i, (image, scale, controlnet) in enumerate(zip(controlnet_cond, conditioning_scale, self.nets)):
@@ -115,6 +118,7 @@ class MultiControlNetModel(ModelMixin):
                 timestep_cond,
                 attention_mask,
                 cross_attention_kwargs,
+                guess_mode,
                 return_dict,
             )
 
