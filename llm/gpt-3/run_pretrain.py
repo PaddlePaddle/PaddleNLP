@@ -23,7 +23,6 @@ from typing import Optional
 
 import numpy as np
 import paddle
-from configuration import GPTConfig
 from modeling_pp import GPTForCausalLMPipe
 
 from paddlenlp.trainer import (
@@ -36,9 +35,10 @@ from paddlenlp.trainer import (
 from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
+    GPTConfig,
+    GPTForCausalLM,
     LinearAnnealingWithWarmupDecay,
 )
-from paddlenlp.transformers.gpt.modeling import GPTForCausalLM
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 

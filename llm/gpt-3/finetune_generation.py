@@ -18,7 +18,6 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-from configuration import GPTConfig
 from modeling import GPTForCausalLM
 from modeling_pp import GPTForCausalLMPipe
 from utils import (
@@ -36,7 +35,7 @@ from paddlenlp.trainer import (
     get_last_checkpoint,
     set_seed,
 )
-from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.transformers import AutoTokenizer, GPTConfig
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {

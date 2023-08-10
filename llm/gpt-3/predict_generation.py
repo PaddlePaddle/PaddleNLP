@@ -14,11 +14,10 @@
 from __future__ import annotations
 
 import paddle
-from configuration import GPTConfig
 from modeling import GPTForCausalLM
 from utils import get_hcg, init_dist_env, set_seed
 
-from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
+from paddlenlp.transformers import GPTChineseTokenizer, GPTConfig, GPTTokenizer
 
 MODEL_CLASSES = {
     "gpt2": (GPTForCausalLM, GPTTokenizer),
