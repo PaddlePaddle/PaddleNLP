@@ -972,9 +972,9 @@ class Trainer:
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
 
                     assert not availiable_no_sync, availiable_no_sync
-                    logger.info(
-                        f"optimizer type:{type(self.optimizer)} sharding={self.optimizer._sharding_enable} dp={self.optimizer._dp_enable}"
-                    )
+                    # logger.info(
+                    #     f"optimizer type:{type(self.optimizer)} sharding={self.optimizer._sharding_enable} dp={self.optimizer._dp_enable}"
+                    # )
                     if isinstance(self.optimizer, HybridParallelOptimizer):
                         if self.do_grad_scaling:
                             assert not enable_dp_comm_overlap, "`dp_comm_overlap` not work under fp16"
@@ -1959,6 +1959,13 @@ class Trainer:
         if self.args.should_save_model_state:
             self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
 
+    def _save_moe_weights(self, output_dir):
+        # save moe optimizer and model state # TODO 默认为冗余存储
+        self.save_func(self.model.state_dict(),
+                       os.path.join(output_dir, _add_variant(PADDLE_WEIGHT_FILE_NAME, self.args.weight_name_suffix)))
+        self.save_func(self.optimizer.state_dict(),
+                       os.path.join(output_dir, _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)))
+
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
         if self.args.use_async_save:
@@ -1981,15 +1988,14 @@ class Trainer:
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
         if self.args.should_save:
-            if not self.args.use_hybrid_parallel and not self.args.use_moe:
-                self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+            if not self.args.use_hybrid_parallel:
+                self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, optimizer_name))
 
             # FIXME: manybe only save one copy
             self.save_func(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
 
             if self.do_grad_scaling:
                 self.save_func(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
-
         # Determine the new best metric / best model checkpoint
         if metrics is not None and self.args.metric_for_best_model is not None:
             metric_to_check = self.args.metric_for_best_model
@@ -2038,12 +2044,16 @@ class Trainer:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
                 if self.args.use_async_save:
+                    assert not self.args.use_moe, f'moe no support async save'
                     async_save_optimizer(
                         self.optimizer.state_dict(),
                         os.path.join(output_dir, optimizer_name),
                         saved_signal_path=saved_signal_path,
                         sync_other_task=True,
                     )
+
+                elif self.args.use_moe:
+                    self._save_moe_weights(output_dir)
                 else:
                     self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, optimizer_name))
                     with open(saved_signal_path, mode="w+") as f:

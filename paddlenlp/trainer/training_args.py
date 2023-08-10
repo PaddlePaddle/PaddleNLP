@@ -815,8 +815,9 @@ class TrainingArguments:
 
                 if tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
-
-                if tensor_parallel_degree == 1 and sharding_parallel_degree == 1:
+                if self.use_moe:
+                    order = ["sharding", "pp", "dp", "mp"]
+                elif tensor_parallel_degree == 1 and sharding_parallel_degree == 1:
                     order = ["pp", "dp", "sharding", "mp"]
                 else:
                     order = ["dp", "sharding", "pp", "mp"]
@@ -1061,7 +1062,7 @@ class TrainingArguments:
             work for data parallel, tensor parallel
             not work for sharding
         """
-        if self.save_on_each_node and not (self.use_moe):
+        if self.save_on_each_node:
             return self.local_process_index == 0
         else:
             return self.process_index == 0
@@ -1077,8 +1078,6 @@ class TrainingArguments:
             work for data parallel, tensor parallel
             not work for sharding
         """
-        if self.use_moe:
-            return True
         if self.save_on_each_node:
             return self.local_process_index == 0
         else:
