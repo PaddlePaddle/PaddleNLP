@@ -411,16 +411,16 @@ set(FT_PATCH_COMMAND
   && cp ${masked_multihead_attention_h_src} ${masked_multihead_attention_h_dst}
   && cp ${t5_bs_h_src} ${ft_dst}
   && cp ${t5_spl_h_src} ${ft_dst}
+  && cp ${open_decoder_cu_src} ${open_decoder_cu_dst}
+  && cp ${decoding_kernels_cu_src} ${decoding_kernels_cu_dst}
   && cat blank_lines ${masked_multihead_attention_utils_h_src} >> ${masked_multihead_attention_utils_h_dst}
   && cat blank_lines ${attention_kernels_cu_src} >> ${attention_kernels_cu_dst}
   && cat blank_lines ${attention_kernels_cuh_src} >> ${attention_kernels_cuh_dst}
   && cat blank_lines ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat blank_lines ${lightseq_kernels_cu_src} >> ${topk_kernels_dst}
   && cat blank_lines ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
-  && cat blank_lines ${decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
   && cat blank_lines ${topk_kernels_cuh_src} >> ${topk_kernels_cuh_dst}
   && cat blank_lines ${trans_decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
-  && cat blank_lines ${open_decoder_cu_src} >> ${open_decoder_cu_dst}
   && cat blank_lines ${open_decoder_cuh_src} >> ${open_decoder_cuh_dst}
   && cat blank_lines ${trans_kernels_cuh_src} >> ${trans_kernels_cuh_dst}
   && sed -i "s/^#define NEW_TRANSPOSE_BATCH_MAJOR 1/#define NEW_TRANSPOSE_BATCH_MAJOR 0/g" ${open_decoder_cu_dst}

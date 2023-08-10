@@ -24,6 +24,11 @@ limitations under the License. */
 
 #include "cublas_handle.h"
 #include "fastertransformer/bert_encoder_transformer.h"
+
+#ifndef CUB_NS_QUALIFIER
+#define CUB_NS_QUALIFIER ::cub
+#endif
+
 #include "fastertransformer/cuda/cub/cub.cuh"
 #include "fastertransformer/cuda/cuda_kernels.h"
 #include "fastertransformer/standard_encoder.h"

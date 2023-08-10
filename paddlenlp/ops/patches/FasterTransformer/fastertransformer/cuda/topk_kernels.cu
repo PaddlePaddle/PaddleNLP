@@ -16,6 +16,11 @@
  */
 
 #include <random>
+
+#ifndef CUB_NS_QUALIFIER
+#define CUB_NS_QUALIFIER ::cub
+#endif
+
 #include "cub/cub.cuh"
 #include "fastertransformer/cuda/topk_kernels.cuh"
 

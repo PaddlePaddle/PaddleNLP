@@ -28,6 +28,11 @@
 #ifdef HOST
 #undef HOST
 #endif
+
+#ifndef CUB_NS_QUALIFIER
+#define CUB_NS_QUALIFIER ::cub
+#endif
+
 #include "fastertransformer/cuda/cub/cub.cuh"
 #include "fastertransformer/opt.h"
 #include "fastertransformer/utils/common.h"
