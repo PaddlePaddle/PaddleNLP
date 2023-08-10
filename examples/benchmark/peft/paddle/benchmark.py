@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -25,6 +26,9 @@ from paddlenlp.datasets import InTokensMapDataset
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+
+os.environ["http_proxy"] = "http://172.19.57.45:3128"
+os.environ["https_proxy"] = "http://172.19.57.45:3128"
 
 """
 单卡
@@ -124,7 +128,8 @@ def main():
         model_inputs["position_ids"] = list(range(len(model_inputs["input_ids"])))
         seq_length = len(model_inputs["input_ids"])
         if intokens:
-            model_inputs["attention_mask"] = np.tril(np.ones([seq_length, seq_length], dtype="bool"))
+            # model_inputs["attention_mask"] = np.tril(np.ones([seq_length, seq_length], dtype="bool"))
+            model_inputs["attention_mask"] = np.tril(np.ones([seq_length, seq_length]))
         return model_inputs
 
     def preprocess_function_chatglm(example, max_src_length=256, max_tgt_length=384, intokens=False):
@@ -140,21 +145,24 @@ def main():
 
         context_length = model_inputs["input_ids"].index(tokenizer.bos_token_id)
         seq_length = len(model_inputs["input_ids"])
-        position_ids = np.arange(seq_length, dtype=np.int64)
-        block_position_ids = np.concatenate(
-            [
-                np.zeros(context_length, dtype=np.int64),
-                np.arange(1, seq_length - context_length + 1, dtype=np.int64),
-            ]
-        )
-        model_inputs["position_ids"] = np.stack([position_ids, block_position_ids], axis=0)
-        # attention mask
+
         if intokens:
+            # attention mask
             attention_mask = np.ones((seq_length, seq_length))
             attention_mask = np.tril(attention_mask)
             attention_mask[:, :context_length] = 1
-            attention_mask = (attention_mask < 0.5).astype("int64")
             model_inputs["attention_mask"] = attention_mask
+
+            # position_ids
+            position_ids = np.arange(seq_length, dtype=np.int64)
+            block_position_ids = np.concatenate(
+                [
+                    np.zeros(context_length, dtype=np.int64),
+                    np.arange(1, seq_length - context_length + 1, dtype=np.int64),
+                ]
+            )
+            model_inputs["position_ids"] = np.stack([position_ids, block_position_ids], axis=0)
+
         return model_inputs
 
     def preprocess_function_bloom(example, max_src_length=256, max_tgt_length=384, intokens=False):
@@ -170,7 +178,7 @@ def main():
         if intokens:
             model_inputs["attention_mask"] = np.tril(
                 np.ones([len(model_inputs["input_ids"]), len(model_inputs["input_ids"])]), 0
-            ).tolist()
+            )
         return model_inputs
 
     if model_args.english:

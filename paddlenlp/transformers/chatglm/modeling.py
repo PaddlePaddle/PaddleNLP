@@ -533,6 +533,7 @@ class ChatGLMStack(nn.Layer):
         cache: Optional[Tensor] = None,
         use_cache: bool = False,
     ):
+        print("input_ids")
 
         if input_ids is not None and inputs_embeds is not None:
             input_ids = None
@@ -543,11 +544,15 @@ class ChatGLMStack(nn.Layer):
             batch_size, seq_length = inputs_embeds.shape[:2]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
-
+        print("inputs_embeds")
+        # print(self.word_embeddings)
+        # print(input_ids)
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
-        inputs_embeds = inputs_embeds.transpose([1, 0, 2])
 
+        # print('inputs_embeds')
+        inputs_embeds = inputs_embeds.transpose([1, 0, 2])
+        print("rotary_embeddings")
         rotary_embeds = self.rotary_embeddings(position_ids)
 
         if cache is None:
@@ -754,7 +759,7 @@ class ChatGLMModel(ChatGLMPretrainedModel):
                 use_gmasks.append(use_gmask)
                 mask_positions.append(paddle.where(seq == mask_token)[0][0])
             position_ids = self.get_position_ids(input_ids, mask_positions=mask_positions, use_gmasks=use_gmasks)
-
+        # print('use cache')
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         logits, new_caches = self.transformer(
             input_ids=input_ids,
