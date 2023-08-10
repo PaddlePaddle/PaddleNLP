@@ -766,12 +766,6 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=config.ignore_index)
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask=None):
-
-        if self.config.lm_shift_labels:
-            # Shift so that tokens < n predict n
-            prediction_scores = prediction_scores[..., :-1, :]
-            masked_lm_labels = masked_lm_labels[..., 1:]
-
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
             masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")

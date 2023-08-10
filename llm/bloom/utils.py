@@ -44,10 +44,7 @@ class BloomTrainer(Trainer):
             loss, logits, labels = super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
             # argmax here to avoid gather all logits, which is too memory-consuming.
             # keepdim in order to maintain the same shape as logits
-            if model.config.lm_shift_labels:
-                return (loss, logits[0][..., :-1, :].argmax(axis=-1, keepdim=True), labels[..., 1:])
-            else:
-                return (loss, logits[0].argmax(axis=-1, keepdim=True), labels)
+            return (loss, logits[0].argmax(axis=-1, keepdim=True), labels)
 
         model.eval()
         with paddle.no_grad():
