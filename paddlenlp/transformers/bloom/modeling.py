@@ -401,6 +401,7 @@ class BloomAttention(nn.Layer):
         value_layer = value_layer.reshape([batch_size * self.num_heads, kv_length, self.head_dim])
 
         # [batch_size * num_heads, q_length, kv_length]
+        # alibi:[batch_size * num_heads, q_length, kv_length]
         # we use `Tensor.baddbmm` instead of `paddle.baddbmm` as the latter isn't supported by TorchScript v1.11
         attention_scores = baddbmm(
             alibi, batch1=query_layer, batch2=key_layer, beta=self.beta, alpha=self.inv_norm_factor
@@ -1182,16 +1183,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
 
         loss = None
         if labels is not None:
-            if self.config.lm_shift_labels:
-                # Shift so that tokens < n predict n
-                shift_logits = lm_logits[..., :-1, :]
-                shift_labels = labels[..., 1:]
-            else:
-                shift_logits = lm_logits
-                shift_labels = labels
-
-            # Flatten the tokens
-            loss = self.criterion(shift_logits, shift_labels)
+            loss = self.criterion(lm_logits, labels)
 
         if not return_dict:
             output = (lm_logits,) + transformer_outputs[1:]

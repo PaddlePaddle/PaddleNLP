@@ -79,10 +79,7 @@ def main():
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         dtype=dtype,
     )
-    # Alreday shift label & logit in convert example
-    # lm_shift_labels should be set before model initilization for some models(ex. llama)
-    if hasattr(model_config, "lm_shift_labels"):
-        model_config.lm_shift_labels = False
+
     if hasattr(model_config, "use_flash_attention"):
         model_config.use_flash_attention = model_args.use_flash_attention
     if hasattr(model_config, "max_position_embeddings"):
