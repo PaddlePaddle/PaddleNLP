@@ -1,5 +1,0 @@
-paddlenlp>=2.4.5
-ppdiffusers>=0.6.3
-fastcore
-visualdl
-Pillow
