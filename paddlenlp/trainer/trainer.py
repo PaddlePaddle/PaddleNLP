@@ -1788,10 +1788,7 @@ class Trainer:
             logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
             shutil.rmtree(checkpoint)
 
-    def _might_update_model_to_save(self, model_to_save, config_to_save=None, merge_tensor_parallel=False):
-        # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
-        # we currently don't use this setting automatically, but may start to use with v5
-
+    def _manipulate_state_dict(self, model_to_save, config_to_save=None, merge_tensor_parallel=False):
         dtype = get_parameter_dtype(model_to_save)
         model_to_save.config.dtype = str(dtype).split(".")[1]
 
@@ -1855,7 +1852,7 @@ class Trainer:
             and not isinstance(self.model, PrefixModelForCausalLM)
         ):
             if isinstance(unwrap_model(self.model), PretrainedModel):
-                state_dict, config_to_save, weight_name_suffix = self._might_update_model_to_save(
+                state_dict, config_to_save, weight_name_suffix = self._manipulate_state_dict(
                     unwrap_model(self.model), merge_tensor_parallel=merge_tensor_parallel
                 )
                 unwrap_model(self.model).save_pretrained(
@@ -1869,13 +1866,13 @@ class Trainer:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
                 if merge_tensor_parallel:
                     logger.warning("Trainer.model is not a `PretrainedModel`, not suppor for merge_tensor_parallel.")
-                state_dict, _, weight_name_suffix = self._might_update_model_to_save(merge_tensor_parallel=False)
+                state_dict, _, weight_name_suffix = self._manipulate_state_dict(merge_tensor_parallel=False)
                 paddle.save(
                     state_dict,
                     os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, weight_name_suffix)),
                 )
         else:
-            state_dict, config_to_save, weight_name_suffix = self._might_update_model_to_save(
+            state_dict, config_to_save, weight_name_suffix = self._manipulate_state_dict(
                 self.model, merge_tensor_parallel=merge_tensor_parallel
             )
             self.model.save_pretrained(
@@ -1895,18 +1892,6 @@ class Trainer:
 
             # Good practice: save your training arguments together with the trained model
             paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
-
-    def _load_optimizer_state(self, checkpoint):
-        if self.args.should_load_sharding_stage1_model:
-            return self.sharding_io.load_optimizer_state_with_reshard(checkpoint, base_opt_name=OPTIMIZER_NAME)
-        else:
-            optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
-            path = os.path.join(checkpoint, optimizer_name)
-            logger.info(f"load optimizer state from {path}")
-            if not os.path.isfile(path):
-                logger.info(f"{path} not exists")
-                return None
-            return paddlenlp_load(path, map_location="cpu")
 
     def _load_optimizer_and_scheduler(self, checkpoint):
         """If optimizer and scheduler states exist, load them."""
@@ -1931,10 +1916,6 @@ class Trainer:
             self.lr_scheduler.set_state_dict(paddle.load(os.path.join(checkpoint, SCHEDULER_NAME)))
             if self.do_grad_scaling and os.path.isfile(os.path.join(checkpoint, SCALER_NAME)):
                 self.scaler.load_state_dict(paddle.load(os.path.join(checkpoint, SCALER_NAME), return_numpy=True))
-        else:
-            raise ValueError(
-                f"optimizer-state-dict not found, opt:{checkpoint} scheduler:{os.path.join(checkpoint, SCHEDULER_NAME)}"
-            )
 
     def log(self, logs: Dict[str, float], **kwargs) -> None:
         """
