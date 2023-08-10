@@ -16,6 +16,11 @@ project(FasterTransformer LANGUAGES C CXX CUDA)
 
 find_package(CUDA 10.1 REQUIRED)
 
+if(${CUDA_VERSION_MAJOR} VERSION_GREATER_EQUAL "11")
+  add_definitions("-DENABLE_BF16")
+  message("CUDA_VERSION ${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR} is greater or equal than 11.0, enable -DENABLE_BF16 flag")
+endif()
+
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
   set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
@@ -46,6 +51,8 @@ option(WITH_ONNXRUNTIME "Compile demo with ONNXRuntime"                         
 option(WITH_GPTJ        "Compile with GPTJ"                                         ON)
 option(WITH_PEGASUS     "Compile with Pegasus"                                      ON)
 
+option(WITH_FT5         "Enable FasterTransformer 5.x."                             ON)
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 if(WITH_PARALLEL)
   # https://cmake.org/cmake/help/latest/module/FindMPI.html#variables-for-locating-mpi
@@ -54,13 +61,16 @@ if(WITH_PARALLEL)
   find_package(NCCL REQUIRED)
   add_definitions(-DBUILD_GPT)
   list(APPEND decoding_op_files parallel_utils.cc)
+  if(WITH_FT5)
+    add_definitions("-DBUILD_MULTI_GPU")
+  endif()
 endif()
 
 if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
 endif()
 
-list(APPEND decoding_op_files cublas_handle.cc utils.cc)
+list(APPEND decoding_op_files cublas_handle.cc utils.cc fusion_bloom_op.cc fusion_bloom_op.cu)
 
 if(WITH_TRANSFORMER)
   list(APPEND decoding_op_files fusion_decoding_op.cc fusion_decoding_op.cu fusion_force_decoding_op.cc fusion_force_decoding_op.cu)
@@ -247,12 +257,14 @@ endif()
 set(CMAKE_C_FLAGS_DEBUG    "${CMAKE_C_FLAGS_DEBUG}    -Wall -O0")
 set(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG}  -Wall -O0")
 set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G -Xcompiler -Wall")
+# set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G -Xcompiler -Wall -DCUDA_PTX_FP8_F2FP_ENABLED")
 
 set(CMAKE_CXX_STANDARD "${CXX_STD}")
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-extended-lambda")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --std=c++${CXX_STD}")
+# set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --std=c++${CXX_STD} -DCUDA_PTX_FP8_F2FP_ENABLED")
 
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 set(CMAKE_CUDA_FLAGS_RELEASE "${CMAKE_CUDA_FLAGS_RELEASE} -Xcompiler -O3")
@@ -411,16 +423,16 @@ set(FT_PATCH_COMMAND
   && cp ${masked_multihead_attention_h_src} ${masked_multihead_attention_h_dst}
   && cp ${t5_bs_h_src} ${ft_dst}
   && cp ${t5_spl_h_src} ${ft_dst}
+  && cp ${open_decoder_cu_src} ${open_decoder_cu_dst}
+  && cp ${decoding_kernels_cu_src} ${decoding_kernels_cu_dst}
   && cat blank_lines ${masked_multihead_attention_utils_h_src} >> ${masked_multihead_attention_utils_h_dst}
   && cat blank_lines ${attention_kernels_cu_src} >> ${attention_kernels_cu_dst}
   && cat blank_lines ${attention_kernels_cuh_src} >> ${attention_kernels_cuh_dst}
   && cat blank_lines ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat blank_lines ${lightseq_kernels_cu_src} >> ${topk_kernels_dst}
   && cat blank_lines ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
-  && cat blank_lines ${decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
   && cat blank_lines ${topk_kernels_cuh_src} >> ${topk_kernels_cuh_dst}
   && cat blank_lines ${trans_decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
-  && cat blank_lines ${open_decoder_cu_src} >> ${open_decoder_cu_dst}
   && cat blank_lines ${open_decoder_cuh_src} >> ${open_decoder_cuh_dst}
   && cat blank_lines ${trans_kernels_cuh_src} >> ${trans_kernels_cuh_dst}
   && sed -i "s/^#define NEW_TRANSPOSE_BATCH_MAJOR 1/#define NEW_TRANSPOSE_BATCH_MAJOR 0/g" ${open_decoder_cu_dst}
@@ -483,5 +495,82 @@ if(ON_INFER AND WITH_GPT AND WITH_SP)
 
   add_definitions(-DGPT_ON_SENTENCEPIECE)
 endif()
+
+if(WITH_FT5)
+  add_definitions(-DWITH_FT5)
+
+  set(CMAKE_CUDA_FLAGS_RELEASE "${CMAKE_CUDA_FLAGS_RELEASE} -Xcompiler -O3 -DCUDA_PTX_FP8_F2FP_ENABLED")
+  set(CMAKE_CUDA_FLAGS_RELEASE "${CMAKE_CUDA_FLAGS_RELEASE} --use_fast_math")
+  message("CMAKE_CUDA_FLAGS_RELEASE: ${CMAKE_CUDA_FLAGS_RELEASE}")
+  set(CMAKE_CUDA_FLAGS_RELEASE "${CMAKE_CUDA_FLAGS_RELEASE} -D_GLIBCXX_USE_CXX11_ABI=1")
+
+  set(FT5_NAME "fastertransformer5")
+
+  file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer5/CMakeLists.txt ft5_cmakelists_src)
+  file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${FT5_NAME}/CMakeLists.txt ft5_cmakelists_dst)
+
+  file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer5/cmake/FasterTransformerConfig.cmake.in ft5_config_cmake_src)
+  file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${FT5_NAME}/cmake/FasterTransformerConfig.cmake.in ft5_config_cmake_dst)
+
+  file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer5/src/fastertransformer/utils/allocator.h ft5_allocator_src)
+  file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${FT5_NAME}/src/fastertransformer/utils/allocator.h ft5_allocator_dst)
+
+  file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${FT5_NAME}/.gitmodules ft5_submodules)
+
+  set(FT5_UPDATE_COMMAND 
+      sed -i "1,13d" ${ft5_submodules}
+      && cp ${ft5_cmakelists_src} ${ft5_cmakelists_dst}
+      && cp ${ft5_config_cmake_src} ${ft5_config_cmake_dst}
+      && cp ${ft5_allocator_src} ${ft5_allocator_dst}
+      && eval "sed -i \"s/fastertransformer/fastertransformer5/g\" `cat file_list`"
+      && cp -rf ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${FT5_NAME}/src/fastertransformer ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${FT5_NAME}/src/fastertransformer5)
+
+  set(FT5_UPDATE_COMMAND
+      git checkout release/v5.3_tag > tmp.log 2>&1
+      && rm -f tmp.log
+      && rm -rf ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${FT5_NAME}/src/fastertransformer5/
+      && git checkout .
+      && grep -rl fastertransformer ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${FT5_NAME}/src/fastertransformer/ > file_list1
+      && grep -rl fastertransformer ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${FT5_NAME}/3rdparty/ > file_list2
+      && grep -rl fastertransformer ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${FT5_NAME}/examples/ > file_list3
+      && grep -rl fastertransformer ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${FT5_NAME}/tests/ > file_list4
+      && echo ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${FT5_NAME}/CMakeLists.txt ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${FT5_NAME}/src/CMakeLists.txt > file_list5
+      && cat file_list1 file_list2 file_list3 file_list4 file_list5 | sort | uniq > file_list
+      && ${FT5_UPDATE_COMMAND})
+
+  ExternalProject_Add(
+    extern_fastertransformer5
+    GIT_REPOSITORY    https://gitee.com/paddlepaddle/FasterTransformer.git
+    GIT_TAG           release/v5.3_tag
+    PREFIX            ${THIRD_PATH}
+    SOURCE_DIR        ${THIRD_PATH}/source/${FT5_NAME}
+    UPDATE_COMMAND    ${FT5_UPDATE_COMMAND}
+    BINARY_DIR        ${THIRD_PATH}/build/${FT5_NAME}
+    INSTALL_COMMAND   ""
+    GIT_SUBMODULES    ""
+    CMAKE_ARGS        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DSM=${SM} -DBUILD_PD=ON -DPY_CMD=${PY_CMD} -DON_INFER=${ON_INFER} -DPADDLE_LIB=${PADDLE_LIB} -DWITH_MKL=${WITH_MKL} -DWITH_STATIC_LIB=${WITH_STATIC_LIB} -DBUILD_MULTI_GPU=${WITH_PARALLEL} -DWITH_ONNXRUNTIME=${WITH_ONNXRUNTIME}
+  )
+
+  ExternalProject_Get_property(extern_${FT5_NAME} BINARY_DIR)
+  ExternalProject_Get_property(extern_${FT5_NAME} SOURCE_DIR)
+  ExternalProject_Get_property(extern_${FT5_NAME} SOURCE_SUBDIR)
+
+  set(FT5_INCLUDE_PATH ${SOURCE_DIR}/${SOURCE_SUBDIR})
+  set(FT5_LIB_PATH ${BINARY_DIR}/lib)
+
+  include_directories(
+    ${FT5_INCLUDE_PATH} ${FT5_INCLUDE_PATH}/3rdparty/cutlass/include/
+  )
+
+  link_directories(
+    ${FT5_LIB_PATH}
+  )
+endif()
+
+set(CUTLASS_HEADER_DIR ${PROJECT_SOURCE_DIR}/3rdparty/cutlass/include)
+set(CUTLASS_EXTENSIONS_DIR ${PROJECT_SOURCE_DIR}/src/fastertransformer/cutlass_extensions/include)
+
+list(APPEND COMMON_HEADER_DIRS ${CUTLASS_HEADER_DIR})
+list(APPEND COMMON_HEADER_DIRS ${CUTLASS_EXTENSIONS_DIR})
 
 add_subdirectory(fast_transformer)

@@ -24,12 +24,19 @@ limitations under the License. */
 
 #include "cublas_handle.h"
 #include "fastertransformer/bert_encoder_transformer.h"
+
+#ifndef CUB_NS_QUALIFIER
+#define CUB_NS_QUALIFIER ::cub
+#endif
+
 #include "fastertransformer/cuda/cub/cub.cuh"
 #include "fastertransformer/cuda/cuda_kernels.h"
 #include "fastertransformer/standard_encoder.h"
 #include "fusion_encoder_op.h"
 #include "pd_traits.h"
 
+
+namespace ft = fastertransformer;
 
 template <paddle::DataType D>
 std::vector<paddle::Tensor> encoder_kernel(
@@ -78,10 +85,10 @@ std::vector<paddle::Tensor> encoder_kernel(
   auto input_shape = input.shape();
   int batch_size_ = input_shape[0];
   int max_seq_len_ = input_shape[1];
-  typedef PDTraits<D> traits_;
+  typedef ft::PDTraits<D> traits_;
 
-  fastertransformer::Allocator<AllocatorType::PD>* allocator_ =
-      new fastertransformer::Allocator<AllocatorType::PD>(stream);
+  ft::Allocator<ft::AllocatorType::PD>* allocator_ =
+      new ft::Allocator<ft::AllocatorType::PD>(stream);
 
   typedef typename traits_::DataType DataType_;
   typedef typename traits_::data_t data_t_;
@@ -90,12 +97,12 @@ std::vector<paddle::Tensor> encoder_kernel(
   int layers = attn_query_weight.size();
 
   if (normalize_before == false) {
-    typedef BertEncoderTransformerTraits<traits_::OpType,
-                                        cuda::OpenMultiHeadAttention>
+    typedef ft::BertEncoderTransformerTraits<traits_::OpType,
+                                        ft::cuda::OpenMultiHeadAttention>
         EncoderTraits_;
 
     // Post-Normalization
-    BertInitParam<DataType_> encoder_param;
+    ft::BertInitParam<DataType_> encoder_param;
 
     encoder_param.stream = stream;
     encoder_param.cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
@@ -105,8 +112,8 @@ std::vector<paddle::Tensor> encoder_kernel(
     encoder_param.attr_mask =
         reinterpret_cast<const DataType_*>(attn_mask.data<data_t_>());
 
-    BertEncoderTransformer<EncoderTraits_>* encoder =
-        new BertEncoderTransformer<EncoderTraits_>(
+    ft::BertEncoderTransformer<EncoderTraits_>* encoder =
+        new ft::BertEncoderTransformer<EncoderTraits_>(
             int8_mode, allow_gemm_test, use_gelu);
 
     encoder->allocateBuffer(allocator_,
@@ -202,11 +209,11 @@ std::vector<paddle::Tensor> encoder_kernel(
     delete allocator_;
     delete encoder;
   } else {
-    typedef OpenEncoderTraits<traits_::OpType, cuda::OpenMultiHeadAttention>
+    typedef ft::OpenEncoderTraits<traits_::OpType, ft::cuda::OpenMultiHeadAttention>
         OpenEncoderTraits_;
 
     // Pre-Normalization
-    EncoderInitParam<DataType_> encoder_param;
+    ft::EncoderInitParam<DataType_> encoder_param;
 
     encoder_param.stream = stream;
     encoder_param.cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
@@ -215,8 +222,8 @@ std::vector<paddle::Tensor> encoder_kernel(
     encoder_param.attr_mask =
         reinterpret_cast<const DataType_*>(attn_mask.data<data_t_>());
 
-    OpenEncoder<OpenEncoderTraits_>* encoder =
-        new OpenEncoder<OpenEncoderTraits_>(
+    ft::OpenEncoder<OpenEncoderTraits_>* encoder =
+        new ft::OpenEncoder<OpenEncoderTraits_>(
             int8_mode, allow_gemm_test, use_gelu);
 
     encoder->allocateBuffer(allocator_,

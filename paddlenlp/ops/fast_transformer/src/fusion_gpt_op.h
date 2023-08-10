@@ -17,10 +17,6 @@
 #include <string>
 #include <vector>
 
-// #include "fastertransformer/gpt.h"
-// #include "fastertransformer/open_decoder.h"
-// #include "fastertransformer/utils/common.h"
-
 #ifdef PADDLE_ON_INFERENCE
 #include "paddle/include/experimental/ext_all.h"
 #else

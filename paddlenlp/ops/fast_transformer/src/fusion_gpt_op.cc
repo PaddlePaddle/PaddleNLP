@@ -57,11 +57,20 @@ std::vector<paddle::Tensor> GPT2Forward(
     const int& tensor_para_size = 1,
     const int& layer_para_size = 1,
     const int& layer_para_batch_size = 1) {
-  int batch_size = input.shape()[0];
-  int start_len = input.shape()[1];
-  int total_len = max_len + start_len;
-  std::vector<int64_t> output_dims({total_len, batch_size});
-  auto output_ids = paddle::Tensor(input.place(), output_dims);
+  int64_t batch_size = input.shape()[0];
+  int64_t start_len = input.shape()[1];
+  int64_t total_len = max_len + start_len;
+
+  static char* enable_ft5_env_char = std::getenv("ENABLE_FT5");
+  bool is_enable_ft5 = (enable_ft5_env_char != nullptr && (std::string(enable_ft5_env_char) == "ON" || std::string(enable_ft5_env_char) == "1")) ? true : false;
+
+  std::vector<int64_t> output_dims(2);
+  if (is_enable_ft5) {
+    output_dims = {batch_size, total_len};
+  } else {
+    output_dims = {total_len, batch_size};
+  }
+  auto output_ids = paddle::empty(output_dims, paddle::DataType::INT32, paddle::GPUPlace());
 
   if (word_embedding.place() == paddle::PlaceType::kGPU) {
     return GPT2CUDAForward(input,
@@ -147,7 +156,18 @@ std::vector<std::vector<int64_t>> GPT2InferShape(
     const int& layer_para_batch_size = 1) {
   int64_t batch_size = input_shape[0];
   int64_t start_len = input_shape[1];
-  std::vector<int64_t> output_dims({max_len + start_len, batch_size});
+  int64_t total_len = max_len + start_len;
+
+  static char* enable_ft5_env_char = std::getenv("ENABLE_FT5");
+  bool is_enable_ft5 = (enable_ft5_env_char != nullptr && (std::string(enable_ft5_env_char) == "ON" || std::string(enable_ft5_env_char) == "1")) ? true : false;
+
+  std::vector<int64_t> output_dims(2);
+  if (is_enable_ft5) {
+    output_dims = {batch_size, total_len};
+  } else {
+    output_dims = {total_len, batch_size};
+  }
+
   return {output_dims};
 }
 

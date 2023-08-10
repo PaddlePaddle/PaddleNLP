@@ -22,9 +22,17 @@ limitations under the License. */
 #include <vector>
 
 #include "cublas_handle.h"
+
+#ifndef CUB_NS_QUALIFIER
+#define CUB_NS_QUALIFIER ::cub
+#endif
+
 #include "fastertransformer/cuda/cub/cub.cuh"
 #include "fusion_bart_decoding_op.h"
 #include "pd_traits.h"
+
+
+namespace ft = fastertransformer;
 
 template <paddle::DataType D>
 std::vector<paddle::Tensor> bart_decoding_kernel(
@@ -105,27 +113,29 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
   const int memory_hidden_dim = input_dims[2];
   const int vocab_size = word_emb.shape()[0];
 
-  typedef PDTraits<D> traits_;
+  typedef ft::PDTraits<D> traits_;
   typedef typename traits_::DataType DataType_;
   typedef typename traits_::data_t data_t_;
 
-  DecodingInitParam<DataType_> decoding_params;
+  ft::DecodingInitParam<DataType_> decoding_params;
   decoding_params.cublas_handle = CublasHandle::GetInstance()->cublas_handle_;
-  decoding_params.cublaslt_handle =
-      CublasHandle::GetInstance()->cublaslt_handle_;
+  decoding_params.cublaslt_handle = CublasHandle::GetInstance()->cublaslt_handle_;
 
   decoding_params.output_ids = output_ids.mutable_data<int>(input.place());
   decoding_params.parent_ids = parent_ids.mutable_data<int>(input.place());
   decoding_params.sequence_length =
       sequence_length.mutable_data<int>(input.place());
 
-  typedef DecoderTransformerTraits<traits_::OpType> DecodingTraits_;
+  typedef ft::DecoderTransformerTraits<traits_::OpType> DecodingTraits_;
   decoding_params.stream = stream;
-  fastertransformer::Allocator<AllocatorType::PD> allocator_(stream);
+  ft::Allocator<ft::AllocatorType::PD> allocator_(stream);
 
   decoding_params.memory_tensor =
       reinterpret_cast<const DataType_*>(input.data<data_t_>());
   decoding_params.memory_sequence_length = memory_sequence_length.data<int>();
+
+  ft::DecoderInitParam<DataType_>* params =
+      new ft::DecoderInitParam<DataType_>[num_layer_];
 
  //TODO(gongenlei): Support MP & PP
   TensorParallelParam tensor_parallel_param;
@@ -138,9 +148,6 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
   layer_parallel_param.world_size = 1;
   layer_parallel_param.layers_per_group = num_layer_;
   layer_parallel_param.local_batch_size = batch_size_;
-
-  DecoderInitParam<DataType_>* params =
-      new DecoderInitParam<DataType_>[num_layer_];
 
   for (int i = 0; i < num_layer_; i++) {
     params[i].stream = stream;
@@ -274,8 +281,8 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
       ("beam_search_v3" == decoding_strategy) ? beam_width_ : beam_width_ * 2;
 
   if ("beam_search" == decoding_strategy) {
-    DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beamsearch_;
-    decoding_beamsearch_ = new DecodingBeamsearch<DecodingTraits_::OpType>(
+    ft::DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beamsearch_;
+    decoding_beamsearch_ = new ft::DecodingBeamsearch<DecodingTraits_::OpType>(
         allocator_,
         batch_size_,
         beam_width_,
@@ -313,8 +320,8 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
     delete decoding_beamsearch_;
   } else if ("beam_search_v2" == decoding_strategy ||
              "beam_search_v3" == decoding_strategy) {
-    DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beamsearch_;
-    decoding_beamsearch_ = new DecodingBeamsearch<DecodingTraits_::OpType>(
+    ft::DecodingBeamsearch<DecodingTraits_::OpType>* decoding_beamsearch_;
+    decoding_beamsearch_ = new ft::DecodingBeamsearch<DecodingTraits_::OpType>(
         allocator_,
         batch_size_,
         beam_width_,
@@ -334,7 +341,7 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
         alpha,
         false, /*normalization_before*/
         2,
-        ActivationType::GELU,
+        ft::ActivationType::GELU,
         false, /*pos_bias*/
         false, /*prefix_lm*/
         finished_candidate_num_,
@@ -353,9 +360,9 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
   } else if ("topk_sampling" == decoding_strategy ||
              "topp_sampling" == decoding_strategy ||
              "sampling" == decoding_strategy) {
-    DecodingSampling<DecodingTraits_::OpType>* decoding_sampling_;
+    ft::DecodingSampling<DecodingTraits_::OpType>* decoding_sampling_;
     decoding_sampling_ =
-        new DecodingSampling<DecodingTraits_::OpType>(allocator_,
+        new ft::DecodingSampling<DecodingTraits_::OpType>(allocator_,
                                                       batch_size_,
                                                       max_seq_len_,
                                                       head_num_,
