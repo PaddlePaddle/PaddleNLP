@@ -140,7 +140,9 @@ python merge_tp_params.py  \
 ### 3.2.7 LoRA参数合并
 为了后续的压缩和静态图推理方便，我们提供LoRA参数合并脚本，可以将LoRA参数合并到主干模型并保存相应的权重。
 ```
-python merge_lora_params.py --model_name_or_path THUDM/chatglm2-6b --lora_path ./checkpoint
+python merge_lora_params.py \
+    --model_name_or_path THUDM/chatglm2-6b \
+    --lora_path ./checkpoint
 ```
 **参数：**
 - `model_name_or_path`: 必须，预训练模型名称或者本地的模型路径，用于热启模型和分词器，默认为None。
