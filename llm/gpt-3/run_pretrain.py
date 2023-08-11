@@ -39,6 +39,10 @@ from paddlenlp.transformers import (
     GPTForCausalLM,
     LinearAnnealingWithWarmupDecay,
 )
+
+# llm/gpt-3
+# from configuration import GPTConfig
+
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 

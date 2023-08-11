@@ -31,6 +31,17 @@ from paddlenlp.transformers.gpt.modeling import (
     parallel_matmul,
 )
 
+# llm/gpt-3
+# from configuration import GPTConfig
+# from modeling import (
+#     GPTEmbeddings,
+#     GPTPretrainedModel,
+#     GPTPretrainingCriterion,
+#     TransformerDecoderLayer,
+#     parallel_matmul,
+# )
+
+
 
 def get_hcg():
     return fleet.get_hybrid_communicate_group()
