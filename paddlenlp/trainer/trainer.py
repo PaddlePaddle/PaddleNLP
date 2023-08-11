@@ -61,6 +61,7 @@ except:
 
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
+    obtain_optimizer_parameters_list,
 )
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from tqdm.auto import tqdm
@@ -794,7 +795,7 @@ class Trainer:
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
 
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
-                        parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
+                        parameters_list = obtain_optimizer_parameters_list(self.optimizer._inner_opt)
 
                         if not enable_dp_comm_overlap:
                             if self.optimizer._sharding_enable:
