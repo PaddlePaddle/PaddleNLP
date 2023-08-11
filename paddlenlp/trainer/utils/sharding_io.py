@@ -269,6 +269,7 @@ class ShardingIO:
         if self.args.should_save_sharding_stage1_model:
             state_dict = filter_sharded_params(state_dict, self.optimizer, self.sharding_group.rank)
 
+        config_to_save = None
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
         if merge_tensor_parallel:
             dtype = get_parameter_dtype(model_to_save)
