@@ -113,6 +113,7 @@ OPTIMIZER_NAME = "optimizer.pdopt"
 SCHEDULER_NAME = "scheduler.pdparams"
 SCALER_NAME = "scaler.pdparams"
 
+
 if is_datasets_available():
     import datasets
 
@@ -406,6 +407,7 @@ class Trainer:
                 of [`Trainer`]. Only load model state dict.
         """
         resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
+
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
             resume_from_checkpoint = get_last_checkpoint(self.args.output_dir)
@@ -527,6 +529,7 @@ class Trainer:
         #     and ShardingOption.SHARD_OP in self.args.sharding
         # )
         delay_optimizer_creation = False
+
         if not delay_optimizer_creation:
             self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
@@ -534,7 +537,7 @@ class Trainer:
 
         if self.args.should_load_sharding_stage1_model:
             model = self._wrap_model_and_load_sharded_checkpoint(resume_from_checkpoint)
-        else:
+        elif self.args.should_save_sharding_stage1_model:
             # In the non-sharded mode, should invoke load_state_dict_from_checkpoint before _wrap_model.
             # In this mode, the rank0 load all params and the _wrap_model implicitly broadcast params from rank0 to the other ranks.
             model = self._wrap_model(self.model_wrapped)
@@ -542,6 +545,14 @@ class Trainer:
                 assert delay_optimizer_creation is False, "delay_optimizer_creation should be False"
                 # the self.optimizer should be wrapped and it is done in _wrap_model
                 self.sharding_io.set_optimizer(self.optimizer)
+            # for the rest of this function `model` is the outside model, whether it was wrapped or not
+            if model is not self.model:
+                self.model_wrapped = model
+            if delay_optimizer_creation:
+                self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+            self._load_optimizer_and_scheduler(resume_from_checkpoint)
+        else:
+            model = self._wrap_model(self.model_wrapped)
             # for the rest of this function `model` is the outside model, whether it was wrapped or not
             if model is not self.model:
                 self.model_wrapped = model
