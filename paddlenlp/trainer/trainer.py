@@ -418,15 +418,20 @@ class Trainer:
             if resume_from_checkpoint is None:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
-        if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
-            if isinstance(self.model, LoRAModel):
-                weight_name = LORA_WEIGHTS_NAME
-            elif isinstance(self.model, PrefixModelForCausalLM):
-                weight_name = PREFIX_WEIGHTS_NAME
-            else:
-                weight_name = PADDLE_WEIGHTS_NAME
+        if isinstance(self.model, LoRAModel):
+            weight_name = LORA_WEIGHTS_NAME
+        elif isinstance(self.model, PrefixModelForCausalLM):
+            weight_name = PREFIX_WEIGHTS_NAME
+        else:
+            weight_name = PADDLE_WEIGHTS_NAME
 
-            if not self.args.should_load_sharding_stage1_model:
+        if self.args.should_load_sharding_stage1_model:
+            state_dict = self.sharding_io.load_state_dict_from_checkpoint_with_reshard(
+                resume_from_checkpoint,
+                base_weight_name=weight_name,
+            )
+        else:
+            if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
                 file_path = os.path.join(
                     resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
                 )
@@ -437,18 +442,13 @@ class Trainer:
 
                 # We load the model state dict on the CPU to avoid an OOM error.
                 state_dict = paddle.load(file_path, return_numpy=True)
-            else:
-                state_dict = self.sharding_io.load_state_dict_from_checkpoint_with_reshard(
-                    resume_from_checkpoint,
-                    base_weight_name=weight_name,
-                )
 
-            # If the model is on the GPU, it still works!
-            self._set_state_dict_in_model(state_dict)
-            # release memory
-            del state_dict
-        elif resume_from_checkpoint is not None:
-            logger.info(f"not loading ckpt :{self.args.dataset_rank}")
+                # If the model is on the GPU, it still works!
+                self._set_state_dict_in_model(state_dict)
+                # release memory
+                del state_dict
+            elif resume_from_checkpoint is not None:
+                logger.info(f"not loading ckpt :{self.args.dataset_rank}")
 
     def _wrap_model_and_load_sharded_checkpoint(self, resume_from_checkpoint):
         # In the sharded mode, should invoke load_state_dict_from_checkpoint after _wrap_model.
