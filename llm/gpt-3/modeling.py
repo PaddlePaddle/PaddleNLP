@@ -285,7 +285,7 @@ class MultiHeadAttention(nn.Layer):
             weights = incubate.softmax_mask_fuse_upper_triangle(product)
 
         if self.config.hidden_dropout_prob:
-            if self.training:
+            if self.training and "local_seed" in get_rng_state_tracker().states_:
                 with get_rng_state_tracker().rng_state("local_seed"):
                     weights = F.dropout(
                         weights, self.config.hidden_dropout_prob, training=self.training, mode="upscale_in_train"
