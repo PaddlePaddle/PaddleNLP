@@ -21,9 +21,7 @@ from sklearn.metrics import accuracy_score
 
 from paddlenlp.peft.prefix import (
     bloom_postprocess_past_key_value,
-    chatglm_pad_attention_mask,
     chatglm_postprocess_past_key_value,
-    chatglm_v2_pad_attention_mask,
     llama_postprocess_past_key_value,
 )
 from paddlenlp.trainer import Trainer
@@ -48,14 +46,14 @@ def get_prefix_tuning_params(model):
         num_attention_heads = model.config.num_attention_heads
         num_hidden_layers = model.config.num_hidden_layers
         hidden_size = model.config.hidden_size
-        pad_attention_mask = chatglm_pad_attention_mask
+        pad_attention_mask = None
         postprocess_past_key_value = chatglm_postprocess_past_key_value
         multi_query_group_num = None
     elif model.base_model_prefix == "chatglm_v2":
         num_attention_heads = model.config.num_attention_heads
         num_hidden_layers = model.config.num_layers
         hidden_size = model.config.hidden_size
-        pad_attention_mask = chatglm_v2_pad_attention_mask
+        pad_attention_mask = None
         postprocess_past_key_value = chatglm_postprocess_past_key_value
         multi_query_group_num = model.config.multi_query_group_num
     elif model.base_model_prefix == "bloom":
@@ -110,6 +108,18 @@ def get_lora_target_modules(model):
             ".*gate_proj.*",
             ".*down_proj.*",
             ".*up_proj.*",
+        ]
+    elif model.base_model_prefix == "opt":
+        target_modules = [
+            ".*project_in.*",
+            ".*project_out.*",
+            ".*q_proj.*",
+            ".*k_proj.*",
+            ".*v_proj.*",
+            ".*qkv_proj.*",
+            ".*out_proj.*",
+            ".*linear1.*",
+            ".*linear2.*",
         ]
     else:
         raise ValueError(

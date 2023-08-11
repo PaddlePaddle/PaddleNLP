@@ -379,7 +379,6 @@ def main():
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.use_recompute = training_args.recompute
     config.use_flash_attention = model_args.use_flash_attention
-    config.lm_shift_labels = False
 
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank

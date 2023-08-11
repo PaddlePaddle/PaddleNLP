@@ -61,7 +61,6 @@ class TestLlama(unittest.TestCase):
             num_attention_heads=32,
             tensor_parallel_degree=tp_degree,
             tensor_parallel_rank=hcg.get_model_parallel_rank(),
-            lm_shift_labels=True,
             tensor_parallel_output=False,
             # use_flash_attention=True,
         )
@@ -100,7 +99,6 @@ class TestLlama(unittest.TestCase):
 
         single_model = LlamaForCausalLM.from_pretrained(
             model_name_or_path,
-            lm_shift_labels=True,
             num_attention_heads=32,
             tensor_parallel_output=False,
         )

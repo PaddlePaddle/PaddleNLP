@@ -197,18 +197,18 @@ def convert_example(
 
     outputs = tokenizer(
         output_seq,
-        max_seq_len=max_target_length,
+        max_length=max_target_length,
         # pad_to_max_seq_len=True,
         truncation_strategy="longest_first",
-        return_attention_mask=True,
+        return_attention_mask=False,
         return_token_type_ids=False,
     )
     inputs = tokenizer(
         input_seq,
-        max_seq_len=max_source_length,
+        max_length=max_source_length,
         # pad_to_max_seq_len=True,
         truncation_strategy="longest_first",
-        return_attention_mask=True,
+        return_attention_mask=False,
         return_length=False,
     )
 
@@ -217,6 +217,10 @@ def convert_example(
         final[k] = inputs[k] + outputs[k]
         if k == "input_ids":
             final["labels"] = [tokenizer.pad_token_id] * len(inputs["input_ids"]) + outputs[k]
+
+    # shift inputs and labels
+    final["input_ids"] = final["input_ids"][:-1]
+    final["labels"] = final["labels"][1:]
     return final
 
 
@@ -318,10 +322,7 @@ class GPTTrainer(Trainer):
             loss, logits, labels = super().prediction_step(model, inputs, prediction_loss_only, ignore_keys)
             # argmax here to avoid gather all logits, which is too memory-consuming.
             # keepdim in order to maintain the same shape as logits
-            if model.config.lm_shift_labels:
-                return (loss, logits[..., :-1, :].argmax(axis=-1, keepdim=True), labels[..., 1:])
-            else:
-                return (loss, logits.argmax(axis=-1, keepdim=True), labels)
+            return (loss, logits.argmax(axis=-1, keepdim=True), labels)
 
         model.eval()
 

@@ -183,7 +183,7 @@ class LoRAModel(nn.Layer):
             lora_state_dict[name] = action(tensor)
         return lora_state_dict
 
-    def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
+    def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = True, **kwargs):
         variant = kwargs.get("variant", None)
         is_main_process = kwargs.get("is_main_process", paddle.distributed.get_rank() == 0)
 
@@ -214,7 +214,7 @@ class LoRAModel(nn.Layer):
         # save lora config
         if is_main_process:
             self.lora_config.save_pretrained(save_directory)
-            self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
+        self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
 
     def _find_and_replace_module(self, model, module_name, lora_config, enable_lora):
         parent_module = model

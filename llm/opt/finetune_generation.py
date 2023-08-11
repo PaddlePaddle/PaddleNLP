@@ -105,12 +105,21 @@ def main():
         # dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
-        lm_shift_labels=False,
     )
     if model_args.lora:
         # TODO: hardcode parameters for now. Change after MergedLoRA is introduced
         lora_config = LoRAConfig(
-            target_modules=[".*q_proj.*", ".*k_proj.*", ".*v_proj.*"],
+            target_modules=[
+                ".*project_in.*",
+                ".*project_out.*",
+                ".*q_proj.*",
+                ".*k_proj.*",
+                ".*v_proj.*",
+                ".*qkv_proj.*",
+                ".*out_proj.*",
+                ".*linear1.*",
+                ".*linear2.*",
+            ],
             r=4,
             lora_alpha=8,
             merge_weights=False,

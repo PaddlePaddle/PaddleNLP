@@ -176,6 +176,14 @@ class LlamaConfig(PretrainedConfig):
             (1) 'full': fuse sin cos compute and rope embedding
             (2) 'core': only fuse rope embedding, will compute the sin and cos
             (3) None: don't fuse any part of the rope embedding
+        num_key_value_heads (`int`, *optional*):
+            This is the number of key_value heads that should be used to implement Grouped Query Attention. If
+            `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
+            `num_key_value_heads=1 the model will use Multi Query Attention (MQA) otherwise GQA is used. When
+            converting a multi-head checkpoint to a GQA checkpoint, each group key and value head should be constructed
+            by meanpooling all the original heads within that group. For more details checkout [this
+            paper](https://arxiv.org/pdf/2305.13245.pdf). If it is not specified, will default to
+            `num_attention_heads`.
         Example:
     ```python
     >>> from paddlenlp.transformer import LlamaModel, LlamaConfig
@@ -198,7 +206,6 @@ class LlamaConfig(PretrainedConfig):
         "n_inner": "intermediate_size",
         "activation_function": "hidden_act",
     }
-    pretrained_init_configuration = LLAMA_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
         self,
@@ -206,8 +213,10 @@ class LlamaConfig(PretrainedConfig):
         hidden_size=4096,
         intermediate_size=11008,
         max_position_embeddings=2048,
+        seq_length=2048,
         num_hidden_layers=32,
         num_attention_heads=32,
+        num_key_value_heads=None,
         initializer_range=0.02,
         rms_norm_eps=1e-6,
         use_cache=True,
@@ -220,7 +229,6 @@ class LlamaConfig(PretrainedConfig):
         tensor_parallel_output=True,
         sequence_parallel=False,
         fuse_sequence_parallel_allreduce=False,
-        lm_shift_labels=True,
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
@@ -233,8 +241,14 @@ class LlamaConfig(PretrainedConfig):
         self.hidden_size = hidden_size
         self.intermediate_size = intermediate_size
         self.max_position_embeddings = max_position_embeddings
+        self.seq_length = seq_length
         self.num_hidden_layers = num_hidden_layers
         self.num_attention_heads = num_attention_heads
+
+        if num_key_value_heads is None:
+            num_key_value_heads = num_attention_heads
+        self.num_key_value_heads = num_key_value_heads
+
         self.initializer_range = initializer_range
         self.rms_norm_eps = rms_norm_eps
 
@@ -248,7 +262,6 @@ class LlamaConfig(PretrainedConfig):
         self.tensor_parallel_output = tensor_parallel_output
         self.sequence_parallel = sequence_parallel
         self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
-        self.lm_shift_labels = lm_shift_labels
 
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
