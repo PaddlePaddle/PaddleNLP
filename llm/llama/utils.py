@@ -113,15 +113,11 @@ class BenchmarkCallback(TrainerCallback):
 class LlamaTrainer(Trainer):
     def __init__(self, do_generation: bool, **kwargs):
         super().__init__(**kwargs)
-        if self.args.benchmark or self.args.profiler_options is not None:
-            self.add_callback(
-                BenchmarkCallback(benchmark=self.args.benchmark, profiler_options=self.args.profiler_options)
-            )
-            if self.args.benchmark:
-                if self.args.disable_tqdm:
-                    self.pop_callback(PrinterCallback)
-                else:
-                    self.pop_callback(ProgressCallback)
+        self.add_callback(BenchmarkCallback(benchmark=True, profiler_options=self.args.profiler_options))
+        if self.args.disable_tqdm:
+            self.pop_callback(PrinterCallback)
+        else:
+            self.pop_callback(ProgressCallback)
         self.do_generation = do_generation
 
     def prediction_step(
