@@ -21,7 +21,6 @@ import os
 import re
 import tempfile
 import warnings
-from collections import OrderedDict
 from contextlib import contextmanager
 
 # from pathlib import Path
