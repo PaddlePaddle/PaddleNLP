@@ -145,7 +145,6 @@ def main():
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         use_flash_attention=model_args.use_flash_attention,
         dtype=dtype,  # todo enable set dtype to avoid additional mem usage
-        lm_shift_labels=False,
     )
     if model_args.lora:
         if model_args.lora_path is None:
