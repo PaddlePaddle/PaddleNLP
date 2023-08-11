@@ -1832,8 +1832,8 @@ class Trainer:
             )
         elif not isinstance(self.model, PretrainedModel):
             if isinstance(unwrap_model(self.model), PretrainedModel):
-                config_to_save = None
                 if self.args.should_save_sharding_stage1_model:
+                    config_to_save = None
                     state_dict, config_to_save, weight_name_suffix = self.sharding_io.manipulate_state_dict_and_config(
                         unwrap_model(self.model), merge_tensor_parallel=merge_tensor_parallel
                     )
