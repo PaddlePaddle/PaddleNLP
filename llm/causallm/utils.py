@@ -21,7 +21,6 @@ from sklearn.metrics import accuracy_score
 
 from paddlenlp.peft.prefix import (
     bloom_postprocess_past_key_value,
-    chatglm_pad_attention_mask,
     chatglm_postprocess_past_key_value,
     llama_postprocess_past_key_value,
 )
@@ -47,7 +46,7 @@ def get_prefix_tuning_params(model):
         num_attention_heads = model.config.num_attention_heads
         num_hidden_layers = model.config.num_hidden_layers
         hidden_size = model.config.hidden_size
-        pad_attention_mask = chatglm_pad_attention_mask
+        pad_attention_mask = None
         postprocess_past_key_value = chatglm_postprocess_past_key_value
         multi_query_group_num = None
     elif model.base_model_prefix == "chatglm_v2":
