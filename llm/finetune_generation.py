@@ -173,7 +173,7 @@ def main():
                 target_modules=target_modules,
                 r=model_args.lora_rank,
                 lora_alpha=2 * model_args.lora_rank,
-                merge_weights=model_args.lora_merge_weights,
+                merge_weights=False,
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 dtype=dtype,
             )

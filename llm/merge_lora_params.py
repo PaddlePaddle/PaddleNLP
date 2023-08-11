@@ -25,7 +25,7 @@ def parse_arguments():
     parser.add_argument(
         "--lora_path", default=None, required=True, help="The directory of LoRA parameters. Default to None"
     )
-    parser.add_argument("--output_path", default=None, help="The directory of merged parameters. Default to None")
+    parser.add_argument("--merge_model_path", default=None, help="The directory of merged parameters. Default to None")
     parser.add_argument("--device", type=str, default="gpu", help="Device")
     return parser.parse_args()
 
@@ -43,14 +43,14 @@ def merge():
     )
     model = LoRAModel.from_pretrained(model=model, lora_path=args.lora_path, lora_config=lora_config)
     model.eval()
-    if args.output_path is None:
-        args.output_path = args.lora_path
+    if args.merge_model_path is None:
+        args.merge_model_path = args.lora_path
 
     model_state_dict = model.model.state_dict()
     for key in list(model_state_dict):
         if "lora" in key:
             del model_state_dict[key]
-    model.model.save_pretrained(args.output_path, state_dict=model_state_dict)
+    model.model.save_pretrained(args.merge_model_path, state_dict=model_state_dict)
 
 
 if __name__ == "__main__":

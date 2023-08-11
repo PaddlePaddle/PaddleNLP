@@ -144,7 +144,7 @@ class PredictorServer(Predictor):
         # do not support start ui service in one command
         from multiprocessing import Process
 
-        from ui import main
+        from gradio_ui import main
 
         p = Process(target=main, args=(args,))
         p.daemon = True

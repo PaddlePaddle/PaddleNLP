@@ -37,7 +37,7 @@ def get_parser():
     parser.add_argument("--top_k", type=int, default=1, help="top_k parameter for generation")
     parser.add_argument("--top_p", type=float, default=1.0, help="top_p parameter for generation")
     parser.add_argument("--temperature", type=float, default=0.95, help="top_p parameter for generation")
-    parser.add_argument("--data_file", default=None, help="data file directory")
+    parser.add_argument("--data_file", required=True, default=None, help="data file directory")
     parser.add_argument("--output_file", default="output.json", help="predict result file directory")
     parser.add_argument("--device", type=str, default="gpu", help="Device")
     parser.add_argument("--dtype", type=str, default=None, help="Model dtype")
@@ -91,7 +91,7 @@ class Predictor(object):
         else:
             raise ValueError("Please specific the model dtype.")
         if self.args.gpt:
-            sys.path.append("../gpt-3")
+            sys.path.append("./gpt-3")
             from modeling import GPTForCausalLM
 
             self.model = GPTForCausalLM.from_pretrained(

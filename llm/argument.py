@@ -27,7 +27,7 @@ class DataArgument:
     )
     intokens: bool = field(default=False, metadata={"help": "Whether to use InTokens data stream"})
     intokens_max_length: int = field(
-        default=1024,
+        default=2048,
         metadata={"help": "The max length for InTokens data stream. Only effective when intokens is True"},
     )
 
@@ -43,9 +43,6 @@ class ModelArgument:
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
     lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
     lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
-    lora_merge_weights: bool = field(
-        default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
-    )
 
     # prefix tuning related parameters
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
@@ -97,9 +94,4 @@ class GenerateArgument:
     )
     top_p: float = field(
         default=1.0, metadata={"help": "The cumulative probability for top-p-filtering in the sampling strategy."}
-    )
-    num_beams: int = field(default=1, metadata={"help": "The number of beams in the beam_search strategy."})
-    decode_strategy: str = field(default="sampling", metadata={"help": "The decoding strategy in generation."})
-    repetition_penalty: float = field(
-        default=1.0, metadata={"help": "The parameter for repetition penalty. 1.0 means no penalty."}
     )
