@@ -43,8 +43,22 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding
 )
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
     HybridParallelOptimizer,
-    _obtain_optimizer_parameters_list,
 )
+
+try:
+    from paddle.distributed.fleet.utils.hybrid_parallel_util import (
+        obtain_optimizer_parameters_list,
+    )
+
+    _obtain_optimizer_parameters_list = obtain_optimizer_parameters_list
+except:
+    try:
+        from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
+            _obtain_optimizer_parameters_list,
+        )
+    except:
+        _obtain_optimizer_parameters_list = None
+
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
