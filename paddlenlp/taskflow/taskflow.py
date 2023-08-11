@@ -33,7 +33,7 @@ from .pos_tagging import POSTaggingTask
 from .question_answering import QuestionAnsweringTask
 from .question_generation import QuestionGenerationTask
 from .sentiment_analysis import SentaTask, SkepTask, UIESentaTask
-from .text2text_generation import ChatGLMTask, LlamaTask
+from .text2text_generation import ChatGLMTask, LlamaTask, BloomTask
 from .text_classification import TextClassificationTask
 from .text_correction import CSCTask
 from .text_feature_extraction import (
@@ -493,6 +493,18 @@ TASKS = {
                 "task_class": LlamaTask,
                 "task_flag": "text_generation-ziqingyang/chinese-alpaca-7b",
             },
+            "linly-ai/chinese-llama-2-7b": {
+                "task_class": LlamaTask,
+                "task_flag": "text_generation-ziqingyang/linly-ai-chinese-llama-2-7b",
+            },
+            "bigscience/bloomz-7b1-mt": {
+                "task_class": BloomTask,
+                "task_flag": "text_generation-bigscience-bloomz-7b1-mt",
+            },
+            "bellegroup/belle-7b-2m": {
+                "task_class": BloomTask,
+                "task_flag": "text_generation-bigscience-belle-7b-2m",
+            }
         },
         "default": {"model": "THUDM/chatglm-6b-v1.1"},
     },
@@ -729,6 +741,7 @@ support_schema_list = [
     "__internal_testing__/tiny-random-uie",
     "__internal_testing__/tiny-random-uie-m",
     "__internal_testing__/tiny-random-uie-x",
+    "bellegroup/belle-7b-2m"
 ]
 
 support_argument_list = [
@@ -762,6 +775,9 @@ support_argument_list = [
     "idea-ccnl/ziya-llama-13b-v1",
     "baichuan-13b-chat",
     "ziqingyang/chinese-alpaca-7b",
+    "linly-ai/chinese-llama-2-7b",
+    "bigscience/bloomz-7b1-mt",
+    "bellegroup/belle-7b-2m"
 ]
 
 

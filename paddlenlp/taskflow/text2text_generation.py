@@ -20,6 +20,7 @@ from ..transformers import (
     ChatGLMForCausalLM,
     ChatGLMTokenizer,
     LlamaConfig,
+    BloomConfig
 )
 from ..utils.log import logger
 from .task import Task
@@ -296,7 +297,9 @@ class LlamaTask(ChatGLMTask):
         self._has_pre_cache_inputs = None
 
         # TODO(wj-Mcat): init with the model-name
-        self.config = LlamaConfig.from_pretrained(self._task_path)
+        self.config: LlamaConfig = LlamaConfig.from_pretrained(self._task_path)
+        self._pre_cache_length = kwargs.get("pre_cache_length", 64)
+        self._tokenizer.pad_token = "<unk>"
 
     @property
     def has_pre_cache_inputs(self):
@@ -330,24 +333,17 @@ class LlamaTask(ChatGLMTask):
                 )
 
                 input_ids_shape = tokenized_output["input_ids"].shape
-                attention_mask = (
-                    paddle.tril(paddle.ones([input_ids_shape[-1], input_ids_shape[-1]], dtype=self._dtype))
-                    .unsqueeze_(0)
-                    .unsqueeze_(0)
-                )
+                attention_mask = paddle.tril(paddle.ones([input_ids_shape[-1], input_ids_shape[-1]], dtype="bool")).unsqueeze(
+                    [0, 1]
+                ).numpy()
+                tokenized_output["attention_mask"] = attention_mask
 
-                attention_mask = paddle.tile(attention_mask, [input_ids_shape[0], 1, 1, 1])
-                attention_mask = (1 - attention_mask) * paddle.finfo(DTYPE_STRING_MAPPING[self._dtype]).min
-
-                tokenized_output["attention_mask"] = attention_mask.numpy()
-
-                tokenized_output["max_length"] = np.array(self._tgt_length, dtype="int64")
+                tokenized_output["max_length"] = np.array(self._tgt_length - input_ids_shape[-1], dtype="int64")
                 tokenized_output["top_p"] = np.array(self._top_p, dtype="float32")
                 tokenized_output["temperature"] = np.array(self._temperature, dtype="float32")
 
                 if self._prefix:
                     pre_caches_numpy = kwargs.get("pre_caches_numpy", None)
-
                     if pre_caches_numpy is not None:
 
                         # init pre_caches inputs for static model
@@ -363,18 +359,86 @@ class LlamaTask(ChatGLMTask):
                         # init attention_mask for pre_caches
                         pre_caches_length = pre_caches[0].shape[-2]
                         batch_size = tokenized_output["input_ids"].shape[0]
-                        pre_cache_attention_mask = paddle.zeros(
+                        pre_cache_attention_mask = np.zeros(
                             [batch_size, 1, tokenized_output["input_ids"].shape[-1], pre_caches_length],
                             dtype=attention_mask.dtype,
                         )
-                        attention_mask = paddle.concat([pre_cache_attention_mask, attention_mask], axis=3)
-                        tokenized_output["attention_mask"] = attention_mask.numpy()
+                        attention_mask = np.concatenate([pre_cache_attention_mask, attention_mask], axis=3)
+                        tokenized_output["attention_mask"] = attention_mask
                     else:
                         for i in range(self.config.num_hidden_layers):
-                            tokenized_output["pre_caches_{}".format(i)] = np.ones([1]).astype("float16")
+                            head_dim = self.config.hidden_size // self.config.num_attention_heads
+                            tokenized_output["pre_caches_{}".format(i)] = np.zeros([2, 1, self.config.num_attention_heads, self._pre_cache_length, head_dim]).astype("float16")
+
+                        batch_size = tokenized_output["input_ids"].shape[0]
+                        pre_cache_attention_mask = np.full(
+                            [batch_size, 1, tokenized_output["input_ids"].shape[-1], self._pre_cache_length],
+                            np.finfo(np.float16).min,
+                            dtype=attention_mask.dtype,
+                        )
+                        attention_mask = np.concatenate([pre_cache_attention_mask, attention_mask], axis=3)
+                        tokenized_output["attention_mask"] = attention_mask
 
                     tokenized_output["use_pre_caches"] = np.array(pre_caches_numpy is not None)
+                    tokenized_output["use_pre_caches"] = np.array(True)
 
+            else:
+                tokenized_output = self._tokenizer(
+                    input_text,
+                    return_tensors="pd",
+                    padding=True,
+                    max_length=self._max_seq_length,
+                    truncation=True,
+                    truncation_side="left",
+                )
+            examples.append(tokenized_output)
+        outputs = {}
+        outputs["text"] = inputs
+        outputs["data_loader"] = examples
+        return outputs
+
+    def _construct_tokenizer(self, model):
+        """
+        Construct the tokenizer for the predictor.
+        """
+        try:
+            tokenizer_instance = AutoTokenizer.from_pretrained(self._task_path)
+        except:
+            tokenizer_instance = AutoTokenizer.from_pretrained(model)
+
+        self._tokenizer = tokenizer_instance
+
+
+class BloomTask(ChatGLMTask):
+    def __init__(self, task, model, **kwargs):
+        super().__init__(task, model, **kwargs)
+        self._tokenizer.pad_token = "<unk>"
+
+    def _preprocess(self, inputs, padding=True, add_special_tokens=True, **kwargs):
+        """
+        Transform the raw text to the model inputs, two steps involved:
+           1) Transform the raw text to token ids.
+           2) Generate the other model inputs from the raw text and token ids.
+        """
+        inputs = self._check_input_text(inputs)
+        # Get the config from the kwargs
+        batch_size = self.kwargs["batch_size"] if "batch_size" in self.kwargs else 1
+        batches = self._batchify(inputs, batch_size)
+        examples = []
+        for input_text in batches:
+            if self._static_mode:
+                tokenized_output = self._tokenizer(
+                    input_text,
+                    padding=True,
+                    return_tensors="np",
+                    max_length=self._max_seq_length,
+                    return_attention_mask=True,
+                    return_position_ids=True,
+                )
+                tokenized_output["max_length"] = np.array(self._tgt_length, dtype="int64")
+                tokenized_output["top_p"] = np.array(self._top_p, dtype="float32")
+                tokenized_output["top_k"] = np.array(self._top_k, dtype="int64")
+                tokenized_output["temperature"] = np.array(self._temperature, dtype="float32")
             else:
                 tokenized_output = self._tokenizer(
                     input_text,
