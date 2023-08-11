@@ -60,7 +60,6 @@ class TestLlama(unittest.TestCase):
 
         config = LlamaConfig.from_pretrained(model_name_or_path)
         config.seq_length = seq_len
-        config.lm_shift_labels = False
         config.use_flash_attention = False
         config.use_fused_rms_norm = False
         config.fuse_attention_qkv = False

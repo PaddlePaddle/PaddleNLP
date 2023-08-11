@@ -20,6 +20,7 @@ import contextlib
 import json
 import math
 import os
+import time
 import types
 import warnings
 from dataclasses import asdict, dataclass, field
@@ -849,6 +850,7 @@ class TrainingArguments:
                     "dp_degree": self.data_parallel_degree,
                     "mp_degree": tensor_parallel_degree,
                     "pp_degree": pipeline_parallel_degree,
+                    "order": order,
                     "sharding_degree": sharding_parallel_degree,
                     "order": order,
                 }
@@ -883,7 +885,12 @@ class TrainingArguments:
                             "The enable_stage1_tensor_fusion or enable_stage1_overlap is not supported "
                             "by current version of Paddle. Please try latest develop Paddle."
                         )
+                paddle.device.cuda.synchronize()
+                start_time = time.time()
                 fleet.init(is_collective=True, strategy=strategy)
+                paddle.device.cuda.synchronize()
+                elapsed = time.time() - start_time
+                logger.info("NCCL-Connection costs {:.2f} ms.".format(elapsed))
 
                 logger.info(strategy)
 

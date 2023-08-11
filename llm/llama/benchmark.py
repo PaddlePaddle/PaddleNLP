@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
+import json
 import os
 import sys
 from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-from data import convert_example, custom_instruction_convert_example, read_local_dataset
 from modeling_pp import LlamaForCausalLMPipe
 from utils import LlamaTrainer, compute_metrics, compute_metrics_not_do_generation
 
@@ -38,7 +39,6 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class DataArgument:
-
     data_name: str = field(default=None, metadata={"help": "The name of data."})
     task_name_or_path: str = field(default=None, metadata={"help": "The name of task."})
     src_length: int = field(default=512, metadata={"help": "The max length of source text."})
@@ -55,10 +55,6 @@ class ModelArgument:
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
     eval_with_do_generation: bool = field(
         default=False, metadata={"help": "Evaluate with generation, instead for calc loss."}
-    )
-    benchmark: bool = field(
-        default=False,
-        metadata={"help": "Whether or not run benchmark."},
     )
     profiler_options: str = field(
         default=None,
@@ -80,6 +76,79 @@ class ModelArgument:
     qat_type: str = field(default="A8W8", metadata={"help": "Quantization type. Supported values: A8W8, W4,A8W4"})
 
 
+PROMPT_DICT = {
+    "prompt_input": (
+        "Below is an instruction that describes a task, paired with an input that provides further context. "
+        "Write a response that appropriately completes the request.\n\n"
+        "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:"
+    ),
+    "prompt_no_input": (
+        "Below is an instruction that describes a task. "
+        "Write a response that appropriately completes the request.\n\n"
+        "### Instruction:\n{instruction}\n\n### Response:"
+    ),
+}
+
+
+def read_local_dataset(path):
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            json_line = json.loads(line)
+            yield json_line
+
+
+def custom_instruction_convert_example(example, tokenizer, data_args, is_test=False, model_max_length=512):
+    """
+    Convert an example into necessary features.
+    """
+
+    prompt_input, prompt_no_input = PROMPT_DICT["prompt_input"], PROMPT_DICT["prompt_no_input"]
+
+    if example.get("input", "") != "":
+        input_seq = prompt_input.format_map(example)
+    else:
+        input_seq = prompt_no_input.format_map(example)
+
+    output_seq = example["output"] + tokenizer.eos_token
+
+    # To compatible with compile training mode in benchmark, input will be pad to fix length
+    source_tokenized = tokenizer(
+        input_seq,
+        return_tensors="pd",
+        max_length=model_max_length,
+        truncation=True,
+    )
+
+    source_input_ids_len = (
+        source_tokenized["input_ids"].not_equal(paddle.to_tensor(tokenizer.pad_token_id)).sum().item()
+    )
+
+    example_tokenized = tokenizer(
+        input_seq + output_seq,
+        return_tensors="pd",
+        max_length=model_max_length,
+        truncation=True,
+    )
+
+    input_ids = example_tokenized["input_ids"][0]
+    labels = copy.deepcopy(input_ids)
+    labels[:source_input_ids_len] = -100
+
+    if is_test:
+        return dict(
+            input_ids=source_tokenized["input_ids"][0],
+            labels=labels,
+        )
+
+    # shift labels
+    input_ids, labels = input_ids[:-1], labels[1:]
+
+    return dict(
+        input_ids=input_ids,
+        labels=labels,
+    )
+
+
 def main():
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
@@ -91,7 +160,6 @@ def main():
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
-    training_args.benchmark = model_args.benchmark
     training_args.tgt_length = data_args.tgt_length
 
     training_args.profiler_options = model_args.profiler_options
@@ -237,46 +305,14 @@ def main():
     tokenizer.pad_token = tokenizer.unk_token
 
     # Load the dataset.
-    if training_args.benchmark:
-        train_ds = load_dataset(read_local_dataset, path="./data/train.txt", lazy=False)
-        training_args.do_eval = False
-        data_args.always_pad_to_max_length = True
-        trans_func = partial(
-            custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args, benchmark=True
-        )
-    elif training_args.do_train or training_args.do_eval:
-        if os.path.exists(os.path.join(data_args.task_name_or_path, "train.json")) and os.path.exists(
-            os.path.join(data_args.task_name_or_path, "dev.json")
-        ):
-            train_ds = load_dataset(
-                read_local_dataset, path=os.path.join(data_args.task_name_or_path, "train.json"), lazy=False
-            )
-            dev_ds = load_dataset(
-                read_local_dataset, path=os.path.join(data_args.task_name_or_path, "dev.json"), lazy=False
-            )
-        elif data_args.data_name is not None:
-            if data_args.task_name_or_path is not None:
-                train_ds, dev_ds = load_dataset(
-                    data_args.data_name, data_args.task_name_or_path, splits=["train", "dev"]
-                )
-            else:
-                raise ValueError(
-                    "`data_args.task_name_or_path` and `data_args.data_name` should be specified together"
-                )
-        else:
-            if data_args.task_name_or_path == "squad":
-                train_ds, dev_ds = load_dataset("squad", splits=["train_v1", "dev_v1"])
-            else:
-                train_ds, dev_ds = load_dataset(data_args.task_name_or_path, splits=["train", "dev"])
-        trans_func = partial(convert_example, tokenizer=tokenizer, data_args=data_args)
+    train_ds = load_dataset(read_local_dataset, path="./data/train.txt", lazy=False)
+    training_args.do_eval = False
+    data_args.always_pad_to_max_length = True
+    trans_func = partial(custom_instruction_convert_example, tokenizer=tokenizer, data_args=data_args)
 
-    if training_args.do_train:
-        train_ds = train_ds.map(partial(trans_func))
-    if training_args.do_eval:
-        # pipeline_parallel eval is the same as training.
-        dev_ds = dev_ds.map(partial(trans_func, is_test=model_args.eval_with_do_generation))
+    train_ds = train_ds.map(partial(trans_func))
 
-    model_max_length = data_args.src_length + data_args.tgt_length if not training_args.benchmark else 512
+    model_max_length = 512
     collate_fn = DataCollatorForSeq2Seq(
         return_tensors="pd",
         tokenizer=tokenizer,
@@ -312,7 +348,6 @@ def main():
         model=model,
         args=training_args,
         train_dataset=train_ds if training_args.do_train else None,
-        eval_dataset=dev_ds if training_args.do_eval else None,
         tokenizer=tokenizer,
         compute_metrics=compute_metrics_func
         if model_args.eval_with_do_generation
