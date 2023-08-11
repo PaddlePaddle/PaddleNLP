@@ -13,7 +13,7 @@
 | [OPT](./opt) | WIP | ✅ | ✅ | WIP| WIP| ✅ |
 | [GLM](./glm) | NA | ✅ | ✅ | WIP| WIP| ✅ |
 
-# 3. 大预言模型全流程工具介绍
+# 3. LLM模型全流程工具介绍
 我们提供了模型预训练、精调（SFT、LoRA、PrefixTuning）、量化、动态图推理、静态图推理、服务化部署全流程脚本，开发者可以根据自己的需求定制化自己的大语言模型。
 
 ## 3.1 预训练
@@ -201,4 +201,16 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" flask_server.py \
 
 ### 3.5.1 PTQ量化
 
+```
+python  finetune_generation.py ./chatglm_v2/ptq_argument.json
+```
+
 ### 3.5.2 GPTQ量化
+
+```
+python  finetune_generation.py ./chatglm_v2/gptq_argument.json
+```
+
+### 量化参数介绍
+
+**生成参数(QuantArgument):**
