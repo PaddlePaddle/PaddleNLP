@@ -42,7 +42,6 @@ from paddlenlp.transformers.gpt.modeling import (
 # )
 
 
-
 def get_hcg():
     return fleet.get_hybrid_communicate_group()
 

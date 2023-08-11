@@ -18,15 +18,6 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-
-# transformers/gpt
-from paddlenlp.transformers import GPTConfig
-from paddlenlp.transformers.gpt.modeling import GPTForCausalLM
-
-# llm/gpt-3
-# from modeling import GPTForCausalLM
-# from configuration import GPTConfig
-
 from modeling_pp import GPTForCausalLMPipe
 from utils import (
     DataCollatorForSupervisedDataset,
@@ -43,8 +34,16 @@ from paddlenlp.trainer import (
     get_last_checkpoint,
     set_seed,
 )
-from paddlenlp.transformers import AutoTokenizer
+
+# transformers/gpt
+from paddlenlp.transformers import AutoTokenizer, GPTConfig
+from paddlenlp.transformers.gpt.modeling import GPTForCausalLM
 from paddlenlp.utils.log import logger
+
+# llm/gpt-3
+# from modeling import GPTForCausalLM
+# from configuration import GPTConfig
+
 
 MODEL_CLASSES = {
     "gpt": (GPTConfig, GPTForCausalLM),
