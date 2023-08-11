@@ -56,7 +56,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         self.inference = False
         self.postprocess_past_key_value = postprocess_past_key_value
         self.pad_attention_mask = pad_attention_mask
-        if self.model.base_model_prefix == "chatglm2":
+        if self.model.base_model_prefix == "chatglm_v2":
             self.prefix_config.tensor_parallel_degree = -1
         else:
             if self.prefix_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
@@ -161,7 +161,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             self.num_heads = self.prefix_config.num_attention_heads
         if self.prefix_config.prefix_projection:
             activation = nn.Tanh()
-            if self.config.tensor_parallel_degree > 1:
+            if self.prefix_config.tensor_parallel_degree > 1:
                 prefix_embedding = fleet.meta_parallel.VocabParallelEmbedding(
                     self.prefix_config.num_prefix_tokens,
                     self.head_dim * self.num_heads,
@@ -193,7 +193,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
                 )
             prefix_encoder = nn.Sequential(prefix_embedding, prefix_proj_0, activation, prefix_proj_1, prefix_dropout)
         else:
-            if self.config.tensor_parallel_degree > 1:
+            if self.prefix_config.tensor_parallel_degree > 1:
                 prefix_embedding = fleet.meta_parallel.VocabParallelEmbedding(
                     self.prefix_config.num_prefix_tokens,
                     self.head_dim * self.num_heads * self.prefix_config.num_hidden_layers * 2,
@@ -212,10 +212,12 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         past_key_values = self.prefix_encoder(self.prefix_tokens.unsqueeze(0).expand([batch_size, -1]))
 
         # (bs, prefixlen, hidden_dim*layer_num*2/tensor_parallel_degree)
-        if self.config.tensor_parallel_degree > 1:
-            split_past_key_values = past_key_values.split(num_or_sections=self.config.tensor_parallel_degree, axis=2)
+        if self.prefix_config.tensor_parallel_degree > 1:
+            split_past_key_values = past_key_values.split(
+                num_or_sections=self.prefix_config.tensor_parallel_degree, axis=2
+            )
             past_key_values = split_past_key_values[self.model.config.tensor_parallel_rank]
-            num_heads_per_partition = self.num_heads // self.config.tensor_parallel_degree
+            num_heads_per_partition = self.num_heads // self.prefix_config.tensor_parallel_degree
         else:
             num_heads_per_partition = self.num_heads
 
@@ -330,7 +332,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         # (num_layers, 2, num_heads, prefixlen, head_dim)
         past_key_values = paddle.transpose(past_key_values, perm=[2, 1, 3, 0, 4]).numpy()
 
-        if merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
+        if merge_tensor_parallel and self.prefix_config.tensor_parallel_degree > 1:
             trainable_state_dict = self.prefix_encoder.state_dict()
             trainable_state_dict = self._merge_trainable_tensor_parallel(trainable_state_dict)
             if not is_main_process:
@@ -340,7 +342,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             self.prefix_config.tensor_parallel_degree = -1
         else:
             trainable_state_dict = self.prefix_encoder.state_dict()
-            if self.model.config.tensor_parallel_degree > 1:
+            if self.prefix_config.tensor_parallel_degree > 1:
                 if variant is None:
                     variant = f"tp{self.model.config.tensor_parallel_rank:0>2d}"
 
@@ -354,7 +356,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             self.prefix_config.save_pretrained(save_directory)
             np.save(os.path.join(save_directory, PAST_KEY_VALUES_FILE_NAME), past_key_values)
 
-        if self.model.base_model_prefix == "chatglm2":
+        if self.model.base_model_prefix == "chatglm_v2":
             self.prefix_config.tensor_parallel_degree = -1
         else:
             self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
@@ -368,7 +370,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
 
         fn = split_or_merge_func(
             is_split=False,
-            tensor_parallel_degree=self.model.config.tensor_parallel_degree,
+            tensor_parallel_degree=self.prefix_config.tensor_parallel_degree,
             tensor_parallel_rank=self.model.config.tensor_parallel_rank,
             num_attention_heads=self.model.config.num_attention_heads,
         )

@@ -18,8 +18,6 @@ import paddle
 def bloom_postprocess_past_key_value(past_key_values):
     # (layer_num, bs, head_num/tensor_parallel_degree, prefixlen, head_dim)*2
     past_key_values = paddle.transpose(past_key_values, perm=[2, 0, 3, 1, 4]).split(2)
-    # (layer_num, bs, head_num/tensor_parallel_degree, prefixlen, head_dim)
-    num_hidden_layers, batch_size, num_attention_heads, num_prefix_tokens, head_hidden_size = past_key_values[0].shape
     # keys: [layer_num, bs, head_num/tensor_parallel_degree, head_dim, prefixlen]
     # value: [layer_num, bs, head_num/tensor_parallel_degree, prefixlen, head_dim]
     keys, values = past_key_values[0].transpose([0, 1, 2, 4, 3]), past_key_values[1]
