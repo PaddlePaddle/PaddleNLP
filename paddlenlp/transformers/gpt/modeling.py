@@ -651,7 +651,17 @@ class TransformerDecoderLayer(nn.Layer):
             tgt = self.norm2(tgt)
 
         if self.training:
-            with get_rng_state_tracker().rng_state(current_seed):
+            if "global_seed" in get_rng_state_tracker().states_:
+                with get_rng_state_tracker().rng_state(current_seed):
+                    if not self.config.use_fused_dropout_add:
+                        tgt = residual + self.dropout2(
+                            self.linear2(self.activation(self.linear1(tgt), approximate=True))
+                        )
+                    else:
+                        tgt = self.fused_dropout_add2(
+                            self.linear2(self.activation(self.linear1(tgt), approximate=True)), residual
+                        )
+            else:
                 if not self.config.use_fused_dropout_add:
                     tgt = residual + self.dropout2(self.linear2(self.activation(self.linear1(tgt), approximate=True)))
                 else:
