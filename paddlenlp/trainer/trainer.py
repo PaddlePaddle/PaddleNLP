@@ -634,7 +634,9 @@ class Trainer:
 
         epoch_iterator = train_dataloader
         # steps_in_epoch = len(epoch_iterator)
-        global_steps_in_epoch = len(epoch_iterator) if len_dataloader is not None else args.max_steps
+        steps_in_epoch = (
+            len(epoch_iterator) if len_dataloader is not None else args.max_steps * args.gradient_accumulation_steps
+        )
         if len_dataloader is not None:
             if self.args.gradient_accumulation_steps > len(epoch_iterator):
                 logger.warning(
@@ -671,10 +673,10 @@ class Trainer:
             ):
                 train_dataloader.batch_sampler.set_epoch(epoch)
 
-            step = 0
+            step_control = 0  # used in loop control, reset to 0 after every step
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
-            for _, inputs in enumerate(epoch_iterator):
+            for step, inputs in enumerate(epoch_iterator):
                 self.timers and self.timers("read-data").stop()
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
@@ -691,7 +693,7 @@ class Trainer:
                             steps_trained_progress_bar.close()
                             steps_trained_progress_bar = None
                         self._load_rng_state(resume_from_checkpoint)
-                    # step += steps_trained_in_current_epoch
+                    step += steps_trained_in_current_epoch
                 elif steps_trained_in_current_epoch > 0:
                     steps_trained_in_current_epoch -= 1
                     if steps_trained_progress_bar is not None:
@@ -703,9 +705,10 @@ class Trainer:
                     steps_trained_progress_bar.close()
                     steps_trained_progress_bar = None
 
-                if step % args.gradient_accumulation_steps == 0:
+                if step_control % args.gradient_accumulation_steps == 0:
                     self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
                     self.timers and self.timers("forward-backward").start()
+
                 dp_enabled = (
                     self.args.data_parallel_degree > 1 if self.args.use_hybrid_parallel else args.local_rank != -1
                 )
@@ -722,7 +725,7 @@ class Trainer:
                 availiable_no_sync = dp_enabled and not forbidden_no_sync
 
                 is_no_sync = (
-                    ((step + 1) % args.gradient_accumulation_steps != 0)
+                    ((step_control + 1) % args.gradient_accumulation_steps != 0)
                     and availiable_no_sync
                     and args._no_sync_in_gradient_accumulation
                 ) or (args.recompute and availiable_no_sync)
@@ -738,7 +741,11 @@ class Trainer:
 
                 tr_loss += tr_loss_step
 
-                if (step + 1) % args.gradient_accumulation_steps == 0:
+                if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
+                    # last step in epoch but step is always smaller than gradient_accumulation_steps
+                    steps_in_epoch <= args.gradient_accumulation_steps
+                    and (step + 1) == steps_in_epoch
+                ):
                     self.timers and self.timers("forward-backward").stop()
                     # Maunally collect gradients when group_sharded_parallel can't accept dp_group
                     # Case 1: Use sharding stage 2/3 with dp
@@ -821,14 +828,14 @@ class Trainer:
                     )
 
                     self.state.global_step += 1
-                    self.state.epoch = epoch + self.state.global_step / global_steps_in_epoch
+                    self.state.epoch = epoch + self.state.global_step / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
                     self._print_timer()
-                    step = 0
+                    step_control = 0
                 else:
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
-                    step += 1
+                    step_control += 1
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break

@@ -757,9 +757,9 @@ class TrainingArguments:
                 raise ValueError(
                     "Temporarily amp master grad only suport for tensor/pipeline parallel. please set amp_master_grad to False."
                 )
-            # if not (self.bf16 or self.fp16):
-            #     logger.warning("set amp_master_grad to false since amp is disabled.")
-            #     self.amp_master_grad = False
+            if not (self.bf16 or self.fp16):
+                logger.warning("set amp_master_grad to false since amp is disabled.")
+                self.amp_master_grad = False
 
         if self.use_hybrid_parallel:
             world_size = paddle.distributed.get_world_size()
