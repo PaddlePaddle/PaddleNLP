@@ -850,6 +850,7 @@ class TrainingArguments:
                     "dp_degree": self.data_parallel_degree,
                     "mp_degree": tensor_parallel_degree,
                     "pp_degree": pipeline_parallel_degree,
+                    "order": order,
                     "sharding_degree": sharding_parallel_degree,
                     "order": order,
                 }
