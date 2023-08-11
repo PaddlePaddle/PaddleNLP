@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import json
 import os
 from collections import OrderedDict
@@ -37,6 +38,53 @@ SCHEDULER_NAME = "scheduler.pdparams"
 SCALER_NAME = "scaler.pdparams"
 MODEL_META_NAME = "model_meta.json"
 SHARDING_META_NAME = "shard_meta.json"
+
+
+def filter_sharded_params(state_dict, optimizer, sharding_rank):
+    from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
+        DygraphShardingOptimizer,
+    )
+
+    logger.info(f"filter sharded_params not placed in sharding_rank {sharding_rank} .")
+
+    optimizer = unwrap_optimizer(optimizer, DygraphShardingOptimizer)
+    if optimizer is None:
+        return state_dict
+    filtered_state_dict = OrderedDict()
+    for (k, v) in state_dict.items():
+        assert v.name in optimizer._param2rank
+        sharded_rank = optimizer._param2rank[v.name]
+        if sharded_rank != sharding_rank:
+            continue
+        filtered_state_dict[k] = v
+    return filtered_state_dict
+
+
+def exclude_paramters_in_state_dict(
+    model_state_dict, param_names_in_master_weights, sharding_group, should_save_sharding_stage1_model=True
+):
+    assert sharding_group is not None
+    assert isinstance(model_state_dict, dict) and isinstance(
+        param_names_in_master_weights, (list, set)
+    ), "param_names_in_master_weights type:{}".format(type(param_names_in_master_weights))
+    state_param_names = [v.name for k, v in model_state_dict.items()]
+    logger.debug(
+        "param_names_in_master_weights:{}, state_param_names:{}".format(
+            param_names_in_master_weights, state_param_names
+        )
+    )
+    if not should_save_sharding_stage1_model:
+        # allgather parameter names in sharding group
+        tmp = []
+        paddle.distributed.all_gather_object(tmp, param_names_in_master_weights, group=sharding_group)
+        param_names_in_master_weights = [v for item in tmp for v in item]
+        logger.info("sharding_group_param_names:{}".format(param_names_in_master_weights))
+    non_parameters_state_dict = copy.copy(model_state_dict)
+    for k, v in model_state_dict.items():
+        if v.name in param_names_in_master_weights:
+            non_parameters_state_dict.pop(k)
+
+    return non_parameters_state_dict
 
 
 class ShardingIO:
