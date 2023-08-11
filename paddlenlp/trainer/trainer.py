@@ -836,17 +836,24 @@ class Trainer:
                 f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
             )
             if isinstance(self.model, LoRAModel):
-                weight_name = LORA_WEIGHTS_NAME
+                best_model_path = os.path.join(self.state.best_model_checkpoint, LORA_WEIGHTS_NAME)
             elif isinstance(self.model, PrefixModelForCausalLM):
-                weight_name = PREFIX_WEIGHTS_NAME
+                best_model_path = os.path.join(self.state.best_model_checkpoint, PREFIX_WEIGHTS_NAME)
             else:
                 weight_name = PADDLE_WEIGHTS_NAME
-            best_model_path = os.path.join(
-                self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
-            )
+                best_model_path = os.path.join(
+                    self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
+                )
             if os.path.exists(best_model_path):
                 # We load the model state dict on the CPU to avoid an OOM error.
                 state_dict = paddle.load(best_model_path, return_numpy=True)
+                if isinstance(self.model, LoRAModel) and self.model.lora_config.tensor_parallel_degree > 1:
+                    state_dict = self.model._convert_tensor_parallel(lora_state_dict=state_dict)
+                elif (
+                    isinstance(self.model, PrefixModelForCausalLM)
+                    and self.model.prefix_config.tensor_parallel_degree > 1
+                ):
+                    state_dict = self.model._convert_tensor_parallel(prefix_state_dict=state_dict)
                 # If the model is on the GPU, it still works!
                 self._set_state_dict_in_model(state_dict)
             else:
