@@ -1863,12 +1863,26 @@ class Trainer:
                     os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix)),
                 )
         else:
-            self.model.save_pretrained(
-                output_dir,
-                merge_tensor_parallel=merge_tensor_parallel,
-                variant=self.args.weight_name_suffix,
-                is_main_process=self.args.should_save,
-            )
+            if isinstance(self.model, PretrainedModel) and self.args.should_save_sharding_stage1_model:
+                config_to_save = None
+                state_dict, config_to_save, weight_name_suffix = self.sharding_io.manipulate_state_dict_and_config(
+                    self.model, merge_tensor_parallel=merge_tensor_parallel
+                )
+                self.model.save_pretrained(
+                    output_dir,
+                    state_dict=state_dict,
+                    config_to_save=config_to_save,
+                    merge_tensor_parallel=merge_tensor_parallel,
+                    variant=weight_name_suffix,
+                    is_main_process=self.args.should_save,
+                )
+            else:
+                self.model.save_pretrained(
+                    output_dir,
+                    merge_tensor_parallel=merge_tensor_parallel,
+                    variant=self.args.weight_name_suffix,
+                    is_main_process=self.args.should_save,
+                )
         if self.args.should_save_sharding_stage1_model:
             self.sharding_io.save_distributed_model_meta(output_dir)
 

@@ -503,12 +503,20 @@ class TrainingArguments:
     )
     save_sharded_model: bool = field(
         default=False,
-        metadata={"help": ("whether saved sharded model when sharding_parallel_degree > 1")},
+        metadata={
+            "help": (
+                "When use sharding stage1 and set save_sharded_model True, each shanding rank only save part of the model. It reduce time to save the model."
+            )
+        },
     )
 
     load_sharded_model: bool = field(
         default=False,
-        metadata={"help": ("whether load a sharded model when sharding_parallel_degree > 1")},
+        metadata={
+            "help": (
+                "When use sharding stage1 and set load_sharded_model True, it means loading the sharded model. The sharded model is saved when we set save_sharded_model True."
+            )
+        },
     )
     tensor_parallel_degree: int = field(
         default=-1,
