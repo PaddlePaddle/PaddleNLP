@@ -122,7 +122,10 @@ try:
 except:
     mix_precision_utils = None
 
-from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
+try:
+    from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
+except:
+    from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
 
 
 def is_dp_group_support_in_group_sharded_parallel():
