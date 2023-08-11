@@ -58,13 +58,11 @@ from ..sequence_parallel_utils import (
     ScatterOp,
     mark_as_sequence_parallel_parameter,
 )
-from .configuration import LLAMA_PRETRAINED_INIT_CONFIGURATION, LlamaConfig
-
-LLAMA_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "__internal_testing__/tiny-random-llama",
-    "facebook/llama-7b",
-    "facebook/llama-13b",
-]
+from .configuration import (
+    LLAMA_PRETRAINED_INIT_CONFIGURATION,
+    LLAMA_PRETRAINED_RESOURCE_FILES_MAP,
+    LlamaConfig,
+)
 
 __all__ = [
     "LlamaModel",
@@ -759,6 +757,7 @@ class LlamaPretrainedModel(PretrainedModel):
     config_class = LlamaConfig
     base_model_prefix = "llama"
     pretrained_init_configuration = LLAMA_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = LLAMA_PRETRAINED_RESOURCE_FILES_MAP
 
     @classmethod
     def _get_name_mappings(cls, config: LlamaConfig) -> list[StateDictNameMapping]:
@@ -1132,7 +1131,6 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         super(LlamaPretrainingCriterion, self).__init__()
         self.ignore_index = getattr(config, "ignore_index", -100)
         self.config = config
-        self.lm_shift_labels = config.lm_shift_labels
         self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
 
         if self.enable_parallel_cross_entropy:  # and False: # and lm_head is distributed
@@ -1147,11 +1145,6 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
                     f"enable_parallel_cross_entropy, the vocab_size should be splited: {prediction_scores.shape[-1]}, {self.config.vocab_size}"
                 )
                 self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
-
-        if self.lm_shift_labels:
-            # Shift so that tokens < n predict n
-            prediction_scores = prediction_scores[..., :-1, :]
-            masked_lm_labels = masked_lm_labels[..., 1:]
 
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))

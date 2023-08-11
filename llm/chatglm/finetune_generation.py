@@ -114,8 +114,6 @@ def main():
     else:
         multi_query_group_num = None
         attention_mask_pad_fn = None
-        # If ChatGLM, set lm_shift_labels to False
-        model.config.lm_shift_labels = False
 
     if model_args.prefix_tuning:
         prefix_config = PrefixConfig(

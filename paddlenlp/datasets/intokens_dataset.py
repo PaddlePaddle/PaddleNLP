@@ -20,17 +20,20 @@ from scipy.linalg import block_diag
 class InTokens:
     required_input_keys = {"input_ids", "labels"}
     required_output_keys = {"input_ids", "labels", "attention_mask"}
+    # Only supported the following keys for InTokens. Keys outside of the set will be ignored.
+    supported_input_keys = {"input_ids", "labels", "attention_mask", "position_ids"}
 
     @classmethod
     def _pad_batch_records(cls, batch_records):
         # TODO: support pad_to_max_length for Pipeline parallel
-        # check required_keys
-        input_keys = batch_records[0].keys()
+        # Only consider supported input keys
+        input_keys = set(batch_records[0].keys()).intersection(cls.supported_input_keys)
+        # Check required_keys
         for key in cls.required_input_keys:
             if key not in input_keys:
                 raise ValueError(f"feature `{key}` is required for InTokensDataset")
 
-        output_keys = set(input_keys).union(cls.required_output_keys)
+        output_keys = input_keys.union(cls.required_output_keys)
         batched_features = {key: [] for key in output_keys}
         for record in batch_records:
             batched_features["input_ids"].extend(record["input_ids"])

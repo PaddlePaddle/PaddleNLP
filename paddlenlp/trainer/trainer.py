@@ -38,8 +38,12 @@ import paddle.distributed as dist
 import paddle.nn as nn
 from packaging import version
 from paddle.distributed import fleet
-from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
+from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding_optimizer import (
     DygraphShardingOptimizer,
+)
+from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
+    HybridParallelOptimizer,
+    _obtain_optimizer_parameters_list,
 )
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
@@ -118,7 +122,10 @@ try:
 except:
     mix_precision_utils = None
 
-from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
+try:
+    from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
+except:
+    from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
 
 
 def is_dp_group_support_in_group_sharded_parallel():
@@ -742,14 +749,29 @@ class Trainer:
                     elif args.recompute and availiable_no_sync:
                         fused_allreduce_gradients(list(model.parameters()), None)
 
+                    pipeline_parallel_config = set(args.pipeline_parallel_config.split(" "))
+                    enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
+                    enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
+
+                    if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
+                        parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
+
+                        if not enable_dp_comm_overlap:
+                            if self.optimizer._sharding_enable:
+                                assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
+                                self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
+
+                            if self.optimizer._dp_enable:
+                                fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
+
                     # pipeline parallel mode,  handle gradient merge here
-                    if args.pipeline_parallel_degree > 1 and getattr(model, "_delay_scale_loss", False):
+                    if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
                         for p in model._layers.parameters():
                             if hasattr(p, "main_grad") and p.main_grad is not None:
                                 assert p.grad is None
-                                p.main_grad = p.main_grad.scale(1.0 / self.args.gradient_accumulation_steps)
+                                p.main_grad.scale_(1.0 / self.args.gradient_accumulation_steps)
                             elif p.grad is not None:
-                                p.grad = p.grad.scale(1.0 / self.args.gradient_accumulation_steps)
+                                p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
 
                     # Optimizer step
                     self.callback_handler.on_optimizer_begin(
@@ -766,6 +788,8 @@ class Trainer:
                             logger.warning(
                                 f"optimizer not run, scale_before: {scale_before[0]}, scale_after: {scale_after[0]}"
                             )
+                    elif isinstance(self.optimizer, HybridParallelOptimizer):
+                        self.optimizer._step(parameters_list)
                     else:
                         self.optimizer.step()
 
@@ -815,17 +839,24 @@ class Trainer:
                 f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
             )
             if isinstance(self.model, LoRAModel):
-                weight_name = LORA_WEIGHTS_NAME
+                best_model_path = os.path.join(self.state.best_model_checkpoint, LORA_WEIGHTS_NAME)
             elif isinstance(self.model, PrefixModelForCausalLM):
-                weight_name = PREFIX_WEIGHTS_NAME
+                best_model_path = os.path.join(self.state.best_model_checkpoint, PREFIX_WEIGHTS_NAME)
             else:
                 weight_name = PADDLE_WEIGHTS_NAME
-            best_model_path = os.path.join(
-                self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
-            )
+                best_model_path = os.path.join(
+                    self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
+                )
             if os.path.exists(best_model_path):
                 # We load the model state dict on the CPU to avoid an OOM error.
                 state_dict = paddle.load(best_model_path, return_numpy=True)
+                if isinstance(self.model, LoRAModel) and self.model.lora_config.tensor_parallel_degree > 1:
+                    state_dict = self.model._convert_tensor_parallel(lora_state_dict=state_dict)
+                elif (
+                    isinstance(self.model, PrefixModelForCausalLM)
+                    and self.model.prefix_config.tensor_parallel_degree > 1
+                ):
+                    state_dict = self.model._convert_tensor_parallel(prefix_state_dict=state_dict)
                 # If the model is on the GPU, it still works!
                 self._set_state_dict_in_model(state_dict)
             else:
@@ -1577,8 +1608,8 @@ class Trainer:
         if len(self._pp_data_buffer) != self.args.gradient_accumulation_steps:
             return paddle.zeros([])
 
-        for v in self._pp_data_buffer[0].values():
-            assert isinstance(v, paddle.Tensor), f"Only support tensor as pipeline mode input, got type {type(v)}"
+        # for v in self._pp_data_buffer[0].values():
+        #     assert isinstance(v, paddle.Tensor), f"Only support tensor as pipeline mode input, got type {type(v)}"
 
         inputs = model._prepare_pipeline_inputs_func(self._pp_data_buffer)
         self._pp_data_buffer = []
@@ -1592,7 +1623,16 @@ class Trainer:
         model.micro_batch_size = self.args.per_device_train_batch_size
         model.accumulate_steps = self.args.gradient_accumulation_steps
 
-        inputs = model._prepare_training(inputs, self.optimizer, self.lr_scheduler)
+        if model._dp_comm_overlap or model._sharding_comm_overlap:
+            for _, buffers in model._chunk_2_comm_buffers.items():
+                for buffer in buffers:
+                    buffer._acc_steps = self.args.gradient_accumulation_steps
+
+        inputs = model._prepare_training(
+            inputs, self.optimizer, self.lr_scheduler
+        )  # None, None => [optimizer, lr_scheduler]
+        model.optimizer = None  # we do not use `PipelineParallel` to handler optimizer step
+        model.lr_scheduler = None
 
         with self.autocast_smart_context_manager():
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
@@ -1775,11 +1815,15 @@ class Trainer:
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
 
-        if (
-            not isinstance(self.model, PretrainedModel)
-            and not isinstance(self.model, LoRAModel)
-            and not isinstance(self.model, PrefixModelForCausalLM)
-        ):
+        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+            # lugimzzz: Force merge_tensor_parallel to True for LoRA & Prefix Model until there is an option to merge params during training.
+            self.model.save_pretrained(
+                output_dir,
+                variant=self.args.weight_name_suffix,
+                merge_tensor_parallel=True,
+                is_main_process=self.args.should_save,
+            )
+        elif not isinstance(self.model, PretrainedModel):
             if isinstance(unwrap_model(self.model), PretrainedModel):
                 unwrap_model(self.model).save_pretrained(
                     output_dir,
