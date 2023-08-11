@@ -18,6 +18,7 @@ import os
 import paddle
 
 from paddlenlp.peft import LoRAConfig, LoRAModel
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaConfig
 
 
@@ -25,20 +26,28 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model_path",
-        default="checkpoints",
+        default="ziqingyang/chinese-alpaca-7b",
         type=str,
         required=False,
         help="Path of the trained model to be exported.",
     )
     parser.add_argument(
         "--output_path",
-        default="inference/llama",
+        default="inference",
         type=str,
         help="The output file prefix used to save the exported inference model.",
     )
-    parser.add_argument("--dtype", default=None, help="The data type of exported model")
+    parser.add_argument("--dtype", default="float16", help="The data type of exported model")
     parser.add_argument("--tgt_length", type=int, default=100, help="The batch size of data.")
     parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
+
+    parser.add_argument(
+        "--export_pre_caches",
+        default="False",
+        type=strtobool,
+        help="whether use pre_caches",
+    )
+
     args = parser.parse_args()
     return args
 
@@ -54,8 +63,10 @@ def main():
     elif args.dtype is not None:
         dtype = args.dtype
     else:
-        config = LlamaConfig.from_pretrained(args.model_name_or_path)
+        config = LlamaConfig.from_pretrained(args.model_path)
         dtype = "float16" if config.dtype is None else config.dtype
+
+    paddle.set_default_dtype(dtype)
 
     model = AutoModelForCausalLM.from_pretrained(
         args.model_path,
@@ -64,64 +75,21 @@ def main():
         use_cache=True,
         dtype=dtype,
     )
-    model.config.fp16_opt_level = None  # For dygraph to static only
+
     if args.lora_path is not None:
         model = LoRAModel.from_pretrained(model, args.lora_path)
-    model.eval()
-    model = paddle.jit.to_static(
-        model.generate,
-        input_spec=[
-            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
-            None,  # position_ids
-            args.tgt_length,  # max length
-            # min_length
-            0,
-            # decode_strategy
-            "sampling",
-            # temperature
-            1.0,
-            # top_k
-            1,
-            # top_p
-            1.0,
-            # repetition_penalty
-            1,
-            # num_beams
-            1,
-            # num_beam_groups
-            1,
-            # length_penalty
-            0.0,
-            # early_stopping
-            False,
-            # bos_token_id
-            tokenizer.bos_token_id,
-            # eos_token_id
-            tokenizer.eos_token_id,
-            # pad_token_id
-            tokenizer.pad_token_id,
-            # decoder_start_token_id
-            None,
-            # forced_bos_token_id
-            None,
-            # forced_eos_token_id
-            None,
-            # no_repeat_ngram_size
-            None,
-            # num_return_sequences
-            1,
-            # diversity_rate
-            0.0,
-            # use_cache
-            True,
-        ],
-    )
 
-    # Save converted static graph model
-    paddle.jit.save(model, args.output_path)
-    # Also save tokenizer for inference usage
-    tokenizer.save_pretrained(os.path.dirname(args.output_path))
+    model.config.tensor_parallel_degree = 1
+
+    config = {
+        "use_top_p": True,
+        "pad_token_id": tokenizer.pad_token_id,
+        "eos_token_id": tokenizer.eos_token_id,
+        "bos_token_id": tokenizer.bos_token_id,
+    }
+    model.to_static(os.path.join(args.output_path, "model"), config)
+    model.config.save_pretrained(args.output_path)
+    tokenizer.save_pretrained(args.output_path)
 
 
 if __name__ == "__main__":

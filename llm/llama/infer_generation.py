@@ -11,9 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import os
 
+import numpy as np
 import paddle
 
 from paddlenlp.transformers import AutoTokenizer
@@ -32,8 +34,12 @@ def parse_arguments():
         choices=["gpu", "cpu"],
         help="Type of inference device, support 'cpu' or 'gpu'.",
     )
-    parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
-    parser.add_argument("--src_length", type=int, default=50, help="The batch size of data.")
+    parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
+    parser.add_argument("--src_length", type=int, default=1024, help="the source length")
+    parser.add_argument("--max_length", type=int, default=1024, help="the max sequence of decoding length")
+    parser.add_argument("--temperature", type=float, default=0.95, help="temperature parameter for decoding")
+    parser.add_argument("--top_p", type=float, default=0.7, help="top_p parameter for decoding")
+
     return parser.parse_args()
 
 
@@ -49,9 +55,10 @@ def batchfy_text(texts, batch_size):
 class Predictor(object):
     def __init__(self, args):
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
-        self.tokenizer.pad_token = self.tokenizer.unk_token
+        self.tokenizer.pad_token = self.tokenizer.eos_token if self.tokenizer.eos_token else "<unk>"
         self.batch_size = args.batch_size
         self.src_length = args.src_length
+        self.args = args
 
         model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
         params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
@@ -76,6 +83,11 @@ class Predictor(object):
             return_attention_mask=True,
             return_position_ids=True,
         )
+        max_length = max(self.args.max_length - inputs["input_ids"].shape[-1], 1)
+        inputs["max_length"] = np.array(max_length, dtype="int64")
+
+        inputs["top_p"] = np.array(self.args.top_p, dtype="float32")
+        inputs["temperature"] = np.array(self.args.temperature, dtype="float32")
         return inputs
 
     def infer(self, inputs):
