@@ -142,23 +142,21 @@ def main():
         model_inputs["input_ids"] = model_inputs["input_ids"][:-1]
         model_inputs["labels"] = model_inputs["labels"][1:]
 
-        context_length = model_inputs["input_ids"].index(tokenizer.bos_token_id)
-        seq_length = len(model_inputs["input_ids"])
-        position_ids = np.arange(seq_length, dtype=np.int64)
-        block_position_ids = np.concatenate(
-            [
-                np.zeros(context_length, dtype=np.int64),
-                np.arange(1, seq_length - context_length + 1, dtype=np.int64),
-            ]
-        )
-        model_inputs["position_ids"] = np.stack([position_ids, block_position_ids], axis=0)
-        # attention mask
         if intokens:
-            attention_mask = np.ones((seq_length, seq_length))
-            attention_mask = np.tril(attention_mask)
+            context_length = model_inputs["input_ids"].index(tokenizer.bos_token_id)
+            seq_length = len(model_inputs["input_ids"])
+            position_ids = np.arange(seq_length, dtype=np.int64)
+            block_position_ids = np.concatenate(
+                [
+                    np.zeros(context_length, dtype=np.int64),
+                    np.arange(1, seq_length - context_length + 1, dtype=np.int64),
+                ]
+            )
+            model_inputs["position_ids"] = np.stack([position_ids, block_position_ids], axis=0)
+            attention_mask = np.tri(seq_length, seq_length, dtype=bool)
             attention_mask[:, :context_length] = 1
-            attention_mask = (attention_mask < 0.5).astype("int64")
             model_inputs["attention_mask"] = attention_mask
+
         return model_inputs
 
     def preprocess_function_bloom(example, max_src_length=256, max_tgt_length=384, intokens=False):
