@@ -51,37 +51,40 @@ class ModelArgument:
 
 @dataclass
 class QuantArgument:
-    quant_type: str = field(default="A8W8", metadata={"help": "Quantization type. Supported values: A8W8, W4,A8W4"})
+    quant_type: str = field(
+        default="A8W8", metadata={"help": "Quantization type. Supported values: A8W8, WINT4,WINT8"}
+    )
 
     # QAT related parameters
+    # Not Yet support
     do_qat: bool = field(default=False, metadata={"help": "Whether to use QAT technique"})
-
-    # GPTQ related parameters
-    do_gptq: bool = field(default=False, metadata={"help": "Whether to use GPTQ"})
-    gptq_step: int = field(default=8, metadata={"help": "Step for GPTQ"})
 
     # PTQ related parameters
     do_ptq: bool = field(default=False, metadata={"help": "Whether to use PTQ"})
-    ptq_step: int = field(default=8, metadata={"help": "Step for PTQ"})
+    ptq_step: int = field(default=32, metadata={"help": "Step for PTQ"})
 
     shift: bool = field(default=False, metadata={"help": "Whether to use Shift"})
     shift_all_linears: bool = field(default=False, metadata={"help": "Whether to shift all linears"})
     shift_sampler: str = field(
         default="ema", metadata={"help": "The name of shift sampler, choosen from ['ema', 'none']"}
     )
-    shift_step: int = field(default=8, metadata={"help": "Sample steps when shift"})
+    shift_step: int = field(default=32, metadata={"help": "Sample steps when shift"})
 
     smooth: bool = field(default=False, metadata={"help": "Whether to use Smooth"})
     smooth_all_linears: bool = field(default=False, metadata={"help": "Whether to smooth all linears"})
     smooth_sampler: str = field(
         default="none", metadata={"help": "The name of smooth sampler, choosen from ['multi_step','none']"}
     )
-    smooth_step: int = field(default=8, metadata={"help": "Sample steps when smooth"})
+    smooth_step: int = field(default=32, metadata={"help": "Sample steps when smooth"})
     smooth_piecewise_search: bool = field(
         default=False, metadata={"help": "The number of piece in piecewise search for smooth strategy."}
     )
-    smooth_k_piece: int = field(default=6, metadata={"help": "Number of pieces for K-search"})
+    smooth_k_piece: int = field(default=3, metadata={"help": "Number of pieces for K-search"})
     smooth_search_piece: bool = field(default=False, metadata={"help": "Whether search k_piece when piecewise search"})
+
+    # GPTQ related parameters
+    do_gptq: bool = field(default=False, metadata={"help": "Whether to use GPTQ"})
+    gptq_step: int = field(default=8, metadata={"help": "Step for GPTQ"})
 
 
 @dataclass

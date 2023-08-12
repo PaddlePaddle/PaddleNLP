@@ -38,6 +38,7 @@ from paddleslim.quant.quanters import PACTQuanter
 from paddlenlp.peft import PrefixModelForCausalLM
 from paddlenlp.peft.lora import LoRALinear
 from paddlenlp.peft.lora.lora_quant_layers import QuantedLoRALinear
+from paddlenlp.utils.log import logger
 
 
 def create_qat_model(quant_args, model, dtype):
@@ -49,14 +50,17 @@ def create_qat_model(quant_args, model, dtype):
     if quant_args.quant_type == "A8W8":
         activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
         weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype="float32")
-    elif quant_args.quant_type == "W4":
+    elif quant_args.quant_type == "WINT4":
         activation = None
         weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
+    elif quant_args.quant_type == "WINT8":
+        activation = None
+        weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype="float32")
     elif quant_args.quant_type == "A8W4":
         activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserverLayer, init_value=20, dtype=dtype)
         weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
     else:
-        raise ValueError("quant_type should be one of ['A8W8', 'W4', 'A8W4']")
+        raise ValueError("quant_type should be one of ['A8W8', 'WINT4', 'WINT8']")
     q_config.add_type_config(LoRALinear, weight=weight, activation=activation)
     q_config.add_type_config(nn.Linear, weight=weight, activation=activation)
 
@@ -66,6 +70,7 @@ def create_qat_model(quant_args, model, dtype):
 
 
 def apply_shift(quant_args, trainer, ptq_dataloader, ptq_model_config):
+    logger.info("***** Running Shift *****")
     shift_sampler = EMASampler() if quant_args.shift_sampler == "ema" else None
     shift = Shift(
         model=trainer.model,
@@ -81,9 +86,11 @@ def apply_shift(quant_args, trainer, ptq_dataloader, ptq_model_config):
     )
     shift.update_weight()
     del shift, shift_sampler
+    logger.info("***** Shift done *****")
 
 
 def apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config):
+    logger.info("***** Running Smooth *****")
     smooth_sampler = MultiStepSampler() if quant_args.smooth_sampler == "multi_step" else None
     if quant_args.smooth_piecewise_search:
         search_func = PieceWiseSearch(
@@ -115,22 +122,24 @@ def apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config):
 
     smooth.update_weight()
     del smooth, smooth_sampler, search_func
+    logger.info("***** Smooth done *****")
 
 
 def apply_ptq(quant_args, trainer, ptq_dataloader):
+    logger.info("***** Running PTQ *****")
     q_config = QuantConfig(activation=None, weight=None)
 
     if quant_args.quant_type == "A8W8":
         activation = AVGObserver(quant_bits=8)
         weight = AbsMaxChannelWiseWeightObserver(quant_bits=8)
-    elif quant_args.quant_type == "W4":
+    elif quant_args.quant_type == "WINT4":
         activation = None
         weight = AbsMaxChannelWiseWeightObserver(quant_bits=4)
-    elif quant_args.quant_type == "A8W4":
-        activation = AVGObserver(quant_bits=8)
-        weight = AbsMaxChannelWiseWeightObserver(quant_bits=4)
+    elif quant_args.quant_type == "WINT8":
+        activation = None
+        weight = AbsMaxChannelWiseWeightObserver(quant_bits=8)
     else:
-        raise ValueError("quant_type should be one of ['A8W8', 'W4', 'A8W4']")
+        raise ValueError("quant_type should be one of ['A8W8', 'WINT4', 'WINT8']")
 
     q_config.add_qat_layer_mapping(ColumnParallelLinear, QuantizedColumnParallelLinear)
     q_config.add_qat_layer_mapping(RowParallelLinear, QuantizedRowParallelLinear)
@@ -148,15 +157,17 @@ def apply_ptq(quant_args, trainer, ptq_dataloader):
         max_eval_iters=quant_args.ptq_step,
     )
     trainer.model = ptq.convert(trainer.model, inplace=True)
+    logger.info("***** PTQ done *****")
 
 
 def apply_gptq(quant_args, trainer, ptq_dataloader):
+    logger.info("***** Running GPTQ *****")
     num_layer = 0
     model = trainer.model
     for cur_name, cur_layer in model.named_sublayers():
         if type(cur_layer) in [paddle.nn.Linear, ColumnParallelLinear, RowParallelLinear]:
             num_layer += 1
-            print("GPTQ layer", num_layer, cur_name)
+            logger.info("GPTQ layer", num_layer, cur_name)
             parent_layer, sub_name = find_parent_layer_and_sub_name(model, cur_name)
             cur_quant_layer = GPTQ(cur_layer)
             setattr(parent_layer, sub_name, cur_quant_layer)
@@ -168,6 +179,7 @@ def apply_gptq(quant_args, trainer, ptq_dataloader):
             cur_quant_layer.fasterquant(percdamp=0.1, groupsize=-1, actorder=True)
             del cur_quant_layer
             setattr(parent_layer, sub_name, cur_layer)
+    logger.info("***** GPTQ done *****")
 
 
 def get_ptq_model_config(model):
@@ -186,6 +198,6 @@ def get_ptq_model_config(model):
         model_config = {"fused_qkv": False, "parallel_ffn": True}
     else:
         raise ValueError(
-            f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama."
+            f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm_V2, bloom, llama."
         )
     return model_config

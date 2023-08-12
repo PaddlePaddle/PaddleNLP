@@ -3,18 +3,23 @@
 
 
 # 2. 全流程适配情况
-| Model | Pretrain | SFT | LoRA | PrefixTuning | Model Compression | Generation |
+| Model | Pretrain | SFT | LoRA | PrefixTuning | Generation | Quantization |
 | --- | --- | --- | --- | --- | --- | --- |
 | [LLaMA v1/v2](./llama) | ✅  | ✅ | ✅ | ✅ | ✅ | ✅  |
 | [ChatGLM-6B v1](./chatglm) |  NA |  ✅  |  ✅  |  ✅  |  ✅  |  ✅  |
 | [ChatGLM-6B v2](./chatglm_v2) |  NA |  ✅  |  ✅  |  ✅  |  ✅  |  ✅  |
 | [Bloom](./bloom) | NA | ✅ | ✅ | ✅ | ✅ | ✅ |
-| [GPT-3](./gpt-3) |   ✅  |  ✅  |  ✅  |  WIP  |  WIP  |  ✅  |
-| [OPT](./opt) | WIP | ✅ | ✅ | WIP| WIP| ✅ |
-| [GLM](./glm) | NA | ✅ | ✅ | WIP| WIP| ✅ |
+| [GPT-3](./gpt-3) |   ✅  |  ✅  |  ✅  |  WIP  | ✅    | WIP |
+| [OPT](./opt) | WIP | ✅ | ✅ | WIP|  ✅ | WIP |
+| [GLM](./glm) | NA | ✅ | ✅ | WIP|  ✅ | WIP |
 
 # 3. LLM模型全流程工具介绍
-我们提供了模型预训练、精调（SFT、LoRA、PrefixTuning）、量化、动态图推理、静态图推理、服务化部署全流程脚本，开发者可以根据自己的需求定制化自己的大语言模型。
+我们提供了模型预训练、精调（SFT、LoRA、PrefixTuning）、量化、动态图推理、服务化部署全流程脚本，开发者可以根据自己的需求定制化自己的大语言模型。
+
+## 3.0 环境准备
+
+- PaddlePaddle >= 2.5.0
+- PaddleNLP >= 2.6.0
 
 ## 3.1 预训练
 [LLaMA v1/v2](./llama)、[GPT-3](./gpt-3) 目录中提供了模型预训练的数据准备和训练细节，后续我们将支持更多的模型预训练。
@@ -138,7 +143,7 @@ python merge_tp_params.py  \
 - `device`: 运行环境，默认为gpu。
 
 ### 3.2.7 LoRA参数合并
-为了后续的压缩和静态图推理方便，我们提供LoRA参数合并脚本，可以将LoRA参数合并到主干模型并保存相应的权重。
+为了后续的**压缩**和**静态图推理**方便，我们提供LoRA参数合并脚本，可以将LoRA参数合并到主干模型并保存相应的权重。
 ```
 python merge_lora_params.py \
     --model_name_or_path THUDM/chatglm2-6b \
@@ -178,6 +183,11 @@ python predict_generation.py \
 
 ## 3.4 服务化部署
 
+### 3.4.0 环境准备
+- python >= 3.8
+- gradio
+- flask
+
 ### 3.4.1 Flask & Gradio UI服务化部署
 
 我们提供了一套简单易用的UI服务化部署脚本:
@@ -197,7 +207,13 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" flask_server.py \
 - `port`: Gradio UI 服务端口号，默认8011。
 - `flask_port`: Flask服务端口号，默认8010。
 
-## 3.5 压缩
+## 3.5 量化
+
+**注**：量化后模型暂不支持推理，相关开源工作正在进行中，敬请期待。
+量化算法可以将模型输入和模型权重用更低比特数值表示，能够有效减少内存占用和计算开销。下面我们提供PTQ、GPTQ两种量化算法进行量化，更多技术细节详见[量化策略详细教程](https://github.com/PaddlePaddle/PaddleSlim/blob/develop/docs/zh_cn/tutorials/quant/advanced_quantization.md)
+
+### 3.5.0 环境安装
+- PaddleSlim develop版本
 
 ### 3.5.1 PTQ量化
 
@@ -211,6 +227,26 @@ python  finetune_generation.py ./chatglm_v2/ptq_argument.json
 python  finetune_generation.py ./chatglm_v2/gptq_argument.json
 ```
 
-### 量化参数介绍
+### 3.5.3 量化参数介绍
 
 **生成参数(QuantArgument):**
+- `quant_type`: PTQ,QAT量化类型，默认为A8W8。支持A8W8,WINT4，WINT8：A8W8指对激活（输入）进行INT8量化，对模型权重进行INT8量化；WINT4指仅对模型权重进行INT4量化，后续使用WeightOnly进行推理；WINT8指仅对模型权重进行INT8量化，后续使用WeightOnly进行推理。
+- `do_ptq`: 是否进行PTQ量化，默认为False。
+- `ptq_step`: PTQ量化步数，也即模型前向次数，默认为32。
+- `shift`: 是否在PTQ量化前进行[Shift策略](https://arxiv.org/abs/2304.09145)，默认为False。使用Shift策略需要设`do_ptq`为True。
+- `shift_all_linear`: 是否对模型中所有Linear层应用Shift，如果为True，将会对非LayerNorm-Linear组合的Linear进行Shift，并且添加两个op，默认为False
+- `shift_sampler`: Shift策略使用的sampler，默认为none。可选none，ema：none指直接利用MinMax计算Shift中的零点；ema指使用指数平均计算Shift中零点。
+- `shift_step`: Shift采样步数，也即模型前向次数，默认为32。
+- `smooth`: 是否在PTQ量化前进行[SmoothQuant策略](https://arxiv.org/abs/2211.10438)，默认为False。使用Smooth策略需要设`do_ptq`为True。
+- `smooth_all_linears`: 是否对模型中所有Linear层应用Smooth，如果为True，将会对非LayerNorm-Linear组合的Linear进行Smooth，并且添加两个op，默认为False
+- `smooth_sampler`: Smooth策略使用的sampler，默认为none，可选none，multi_step。multi_step会保存多轮前向结果进行计算，需要更大的显存。
+- `smooth_step`: Smooth采样步数，也即模型前向次数，默认为32。
+- `smooth_piecewise_search`: Smooth是否进行分段搜索,默认为False。分段搜索根据数值大小将激活分成K段，对于每一段进行alhpa和scale的搜索。
+- `smooth_k_piece`: 使用分段搜索功能时分段数量，默认为3。根据经验建议10B模型设置为3，100B模型设置为6。
+- `smooth_search_piece`: 使用分段搜索功能时，是否搜索分段数量，默认为False。设为True时，`smooth_k_piece`建议设为6，搜索分段数量耗时较长，如需加速Smooth过程建议关闭。
+- `do_gptq`: 是否进行GPTQ量化，GPTQ对模型进行WINT4量化，相比于普通PTQ量化精度更高，量化时间较长。默认为False。
+- `gptq_step`: GPTQ量化步数，也即模型前向次数，默认为8。
+
+## 3.6 静态图推理
+
+Coming soon.

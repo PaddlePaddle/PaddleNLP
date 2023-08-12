@@ -229,7 +229,6 @@ class CausalLMTrainer(Trainer):
         else:
             raise ValueError("Only support for paddle.io.DataLoader")
 
-        logger.info(f"***** Running {description} *****")
         if has_length(dataloader):
             logger.info(f"  Num examples = {self.num_examples(dataloader)}")
             if max_eval_iters > 0:
@@ -248,4 +247,3 @@ class CausalLMTrainer(Trainer):
             self.prediction_step(model=self.model, inputs=inputs, prediction_loss_only=True, ignore_keys=None)
             if max_eval_iters > 0 and step >= max_eval_iters - 1:
                 break
-        logger.info(f"***** {description} done *****")
