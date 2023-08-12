@@ -55,7 +55,7 @@ class InTokens:
         batched_features["attention_mask"] = np.expand_dims(block_attention_mask, axis=0)
         if "position_ids" in batched_features:
             # Accomodate both 1D and 2D position ids
-            batched_features["position_ids"] = np.concatenate(batched_features["position_ids"], axis=-1)
+            batched_features["position_ids"] = np.concatenate(batched_features["position_ids"], axis=-1).tolist()
         return batched_features
 
 
