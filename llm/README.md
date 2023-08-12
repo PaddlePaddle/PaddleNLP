@@ -215,19 +215,23 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" flask_server.py \
 ### 3.5.0 环境安装
 - PaddleSlim develop版本
 
-### 3.5.1 PTQ量化
+### 3.5.1 数据准备
+
+量化中默认使用训练集作为校正（Calibartion）数据集，开发集作为评估数据集。如果希望使用其他数据作为校正数据集，则在数据目录下新增`quant.json`文件，文件格式请参照精调训练数据格式。
+
+### 3.5.2 PTQ量化
 
 ```
 python  finetune_generation.py ./chatglm_v2/ptq_argument.json
 ```
 
-### 3.5.2 GPTQ量化
+### 3.5.3 GPTQ量化
 
 ```
 python  finetune_generation.py ./chatglm_v2/gptq_argument.json
 ```
 
-### 3.5.3 量化参数介绍
+### 3.5.4 量化参数介绍
 
 **生成参数(QuantArgument):**
 - `quant_type`: PTQ,QAT量化类型，默认为A8W8。支持A8W8,WINT4，WINT8：A8W8指对激活（输入）进行INT8量化，对模型权重进行INT8量化；WINT4指仅对模型权重进行INT4量化，后续使用WeightOnly进行推理；WINT8指仅对模型权重进行INT8量化，后续使用WeightOnly进行推理。
@@ -246,6 +250,12 @@ python  finetune_generation.py ./chatglm_v2/gptq_argument.json
 - `smooth_search_piece`: 使用分段搜索功能时，是否搜索分段数量，默认为False。设为True时，`smooth_k_piece`建议设为6，搜索分段数量耗时较长，如需加速Smooth过程建议关闭。
 - `do_gptq`: 是否进行GPTQ量化，GPTQ对模型进行WINT4量化，相比于普通PTQ量化精度更高，量化时间较长。默认为False。
 - `gptq_step`: GPTQ量化步数，也即模型前向次数，默认为8。
+
+**其他参数:**
+
+- `per_device_train_batch_size`: 量化前向批大小，默认为8。量化过程只有模型前向，相比于普通训练需要显存较少。
+
+其他参数详见精调参数介绍。
 
 ## 3.6 静态图推理
 

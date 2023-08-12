@@ -260,15 +260,15 @@ def main():
 
         trainer.model.eval()
         # Prepare ptq dataloader
-        if os.path.exists(os.path.join(data_args.dataset_name_or_path, "ptq.json")):
+        if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
             ptq_ds = load_dataset(
-                read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "ptq.json"), lazy=False
+                read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
             )
             ptq_ds = ptq_ds.map(partial(trans_func, is_test=False))
         else:
             ptq_ds = train_ds
             logger.info(
-                f"Not found ptq.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
+                f"Not found quant.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
             )
         ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
         if quant_args.shift or quant_args.smooth:
@@ -288,6 +288,19 @@ def main():
                 "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
             )
         from quant import apply_gptq
+
+        # Prepare ptq dataloader
+        if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
+            ptq_ds = load_dataset(
+                read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
+            )
+            ptq_ds = ptq_ds.map(partial(trans_func, is_test=False))
+        else:
+            ptq_ds = train_ds
+            logger.info(
+                f"Not found quant.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
+            )
+        ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
 
         apply_gptq(quant_args, trainer, ptq_dataloader)
 

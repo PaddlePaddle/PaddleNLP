@@ -1,5 +1,5 @@
 {
-    "model_name_or_path": "THUDM/chatglm2-6b",
+    "model_name_or_path": "bigscience/bloomz-7b1-mt",
     "dataset_name_or_path": "./data",
     "output_dir": "./checkpoints/",
     "per_device_train_batch_size": 4,
