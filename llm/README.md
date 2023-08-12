@@ -38,10 +38,6 @@ SFT(Supervised Fine-Tuning)支持数据并行(DP)、[张量并行（TP, Tensor P
 ```
 # 张量并行分布式训练（常用）
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py ./chatglm_v2/sft_argument.json
-
-# 流水线并行分布式训练（仅支持Llama）
-# 将lora_argument.json中pipeline_parallel_degree修改为4
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py ./chatglm_v2/sft_argument.json
 ```
 
 ### 3.2.3 LoRA

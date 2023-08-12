@@ -64,7 +64,7 @@ class Predictor(object):
         self.args = args
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
         if isinstance(self.tokenizer, LlamaTokenizer):
-            self.tokenizer.pad_token = self.tokenizer.eos_token
+            self.tokenizer.pad_token = self.tokenizer.eos_token if self.tokenizer.eos_token else "<pad>"
         tensor_parallel_degree = paddle.distributed.get_world_size()
         self.tensor_parallel_rank = 0
         if tensor_parallel_degree > 1:

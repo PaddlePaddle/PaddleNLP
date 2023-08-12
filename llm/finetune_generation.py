@@ -31,7 +31,12 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
-from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+from paddlenlp.transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    LlamaTokenizer,
+)
 from paddlenlp.utils.log import logger
 
 
@@ -87,15 +92,24 @@ def main():
             raise ValueError(
                 f"The src_length + tgt_length ({data_args.src_length + data_args.tgt_length}) must be smaller than max_position_embeddings({model_config.max_position_embeddings})."
             )
+    if training_args.pipeline_parallel_degree > 1:
+        if data_args.eval_with_do_generation and training_args.do_eval:
+            raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
+        from llama.modeling_pp import LlamaForCausalLMPipe
 
-    model = AutoModelForCausalLM.from_pretrained(
-        model_args.model_name_or_path,
-        config=model_config,
-    )
+        model = LlamaForCausalLMPipe.from_pretrained(
+            model_args.model_name_or_path,
+            config=model_config,
+        )
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            model_args.model_name_or_path,
+            config=model_config,
+        )
 
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    if model.base_model_prefix == "llama":
+    if isinstance(tokenizer, LlamaTokenizer):
         tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token else "<pad>"
 
     if data_args.dataset_name_or_path is None:
@@ -116,7 +130,12 @@ def main():
             )
         else:
             train_ds, dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["train", "dev"])
-    trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
+    if training_args.pipeline_parallel_degree > 1:
+        from data import convert_example_common
+
+        trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
+    else:
+        trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
     if data_args.intokens:
         if model.base_model_prefix not in ["llama", "bloom"]:
             raise NotImplementedError("InTokens data stream is only implemented for LLaMA、 Bloom so far.")
@@ -220,8 +239,13 @@ def main():
         compute_metrics=compute_metrics_do_generation if data_args.eval_with_do_generation else compute_metrics,
         data_collator=DataCollatorForSeq2Seq(
             tokenizer=tokenizer,
-            max_length=data_args.src_length + data_args.tgt_length,
-            padding=True,
+            max_length=data_args.src_length + data_args.tgt_length
+            if training_args.pipeline_parallel_degree > 1
+            else -1,
+            padding="max_length" if training_args.pipeline_parallel_degree > 1 else True,
+            max_label_length=data_args.src_length + data_args.tgt_length
+            if training_args.pipeline_parallel_degree > 1
+            else None,
             return_tensors="np",
         ),
         do_generation=data_args.eval_with_do_generation,
