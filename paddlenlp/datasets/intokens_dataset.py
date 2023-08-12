@@ -18,29 +18,33 @@ from scipy.linalg import block_diag
 
 
 class InTokens:
-    required_input_keys = {"input_ids", "labels"}
-    required_output_keys = {"input_ids", "labels", "attention_mask"}
+    required_input_keys = ["input_ids", "labels"]
+    required_output_keys = ["input_ids", "labels", "attention_mask"]
     # Only supported the following keys for InTokens. Keys outside of the set will be ignored.
-    supported_input_keys = {"input_ids", "labels", "attention_mask", "position_ids"}
+    supported_input_keys = ["input_ids", "labels", "attention_mask", "position_ids"]
 
     @classmethod
     def _pad_batch_records(cls, batch_records):
         # TODO: support pad_to_max_length for Pipeline parallel
         # Only consider supported input keys
-        input_keys = set(batch_records[0].keys()).intersection(cls.supported_input_keys)
+        input_keys = [key for key in batch_records[0].keys() if key in cls.supported_input_keys]
+
         # Check required_keys
         for key in cls.required_input_keys:
             if key not in input_keys:
                 raise ValueError(f"feature `{key}` is required for InTokensDataset")
+        # Output features must include all required output keys
+        for key in cls.required_output_keys:
+            if key not in input_keys:
+                input_keys.append(key)
 
-        output_keys = input_keys.union(cls.required_output_keys)
-        batched_features = {key: [] for key in output_keys}
+        batched_features = {key: [] for key in input_keys}
         for record in batch_records:
             batched_features["input_ids"].extend(record["input_ids"])
             batched_features["labels"].extend(record["labels"])
             seq_length = len(record["input_ids"])
             # If attention_mask is not given, assume it's causal mask
-            attention_mask = record.get("attention_mask", np.tril(np.ones([seq_length, seq_length], dtype="bool")))
+            attention_mask = record.get("attention_mask", np.tril(np.ones([seq_length, seq_length], dtype=bool)))
             batched_features["attention_mask"].append(attention_mask)
             # TODO: to adapt to chatglm position_2d
             # NOTE: position_ids is optional and not required by every model
@@ -49,6 +53,10 @@ class InTokens:
         block_attention_mask = block_diag(*batched_features["attention_mask"])
         # convert to 3-D [batch_size(1), seq_length, seq_length]
         batched_features["attention_mask"] = np.expand_dims(block_attention_mask, axis=0)
+        # batched_features["input_ids"] = np.array(batched_features["input_ids"], dtype=np.int64)
+        # batched_features["labels"] = np.array(batched_features["labels"], dtype=np.int64)
+        # if "position_ids" in record:
+        #     batched_features["position_ids"] = np.array(batched_features["position_ids"], dtype=np.int64)
         return batched_features
 
 
@@ -56,7 +64,7 @@ class InTokensMapDataset(InTokens, Dataset):
     def __init__(self, data, tokenizer, max_length):
         self.tokenizer = tokenizer
         self.max_length = max_length
-        self.data = self._create_intokens_data(data)
+        self.new_data = self._create_intokens_data(data)
 
     def _create_intokens_data(self, data):
         batch_records, max_len = [], 0
@@ -88,10 +96,10 @@ class InTokensMapDataset(InTokens, Dataset):
         return total_data
 
     def __getitem__(self, idx):
-        return self.data[idx]
+        return self.new_data[idx]
 
     def __len__(self):
-        return len(self.data)
+        return len(self.new_data)
 
 
 class InTokensIterableDataset(InTokens, IterableDataset):
