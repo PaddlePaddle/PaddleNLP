@@ -45,7 +45,7 @@
 ### 3.2 SFT
 SFT(Supervised Fine-Tuning)依托飞桨提出的[4D混合分布式并行]](https://ai.baidu.com/forum/topic/show/987996)能力，支持使用Trainer API轻松切换数据并行(DP)、[张量并行（TP, Tensor Parallelism）](https://arxiv.org/abs/1909.08053)、[流水线并行（PP, Pipeline Parallelism）](https://arxiv.org/abs/1811.06965)（目前仅支持Llama）等多种分布式训练策略。
 
-4D 混合并行策略如何组合？如图所示，在单机内使用通信量较大，适合使用机器内的卡间通信的张量并行（张量并行又称模型并行，MP）和分组参数切片（Sharding）组合的2D策略；训练千亿规模模型需要再叠加流水线并行策略，使用多台机器共同分担；同时叠加了数据并行来增加并发数量，提升训练速度。
+4D 混合并行策略如何组合？如图所示，在单机内使用通信量较大，适合使用机器内的卡间通信的张量并行（张量并行又称模型并行，MP）和分组参数切片（Sharding）的2D组合策略；训练千亿规模模型时，叠加流水线并行策略使用多台机器共同分担；同时叠加数据并行来增加并发数量，提升训练速度。
 <div align="center">
     <img width="700" alt="llm" src="https://ai.bdstatic.com/file/63F5EBB1E188457ABAFD311CFC1D8658">
 </div>
@@ -161,8 +161,8 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 
 ```
 python merge_tp_params.py  \
-    --model_name_or_path ./checkpoint \
-    --merge_model_path ./checkpoint_merge \
+    --model_name_or_path ./checkpoints/chatglm_v2_sft_ckpts/checkpoint-7163 \
+    --merge_model_path ./checkpoints/chatglm_v2_sft_ckpts/checkpoint_merge \
     --dtype "float16" \
     --with_tokenizer
 ```
@@ -179,7 +179,7 @@ python merge_tp_params.py  \
 ```
 python merge_lora_params.py \
     --model_name_or_path THUDM/chatglm2-6b \
-    --lora_path ./checkpoint
+    --lora_path ./checkpoints/chatglm_v2_lora_ckpts
 ```
 **参数：**
 - `model_name_or_path`: 必须，预训练模型名称或者本地的模型路径，用于热启模型和分词器，默认为None。
@@ -195,6 +195,20 @@ python predict_generation.py \
     --batch_size 1 \
     --data_file ./data/dev.json \
     --dtype "float16"
+
+# 加载LoRA参数
+python predict_generation.py \
+    --model_name_or_path THUDM/chatglm2-6b \
+    --batch_size 1 \
+    --data_file ./data/dev.json \
+    --lora_path ./checkpoints/chatglm_v2_lora_ckpts
+
+# 加载Prefix Tuning参数
+python predict_generation.py \
+    --model_name_or_path THUDM/chatglm2-6b \
+    --batch_size 1 \
+    --data_file ./data/dev.json \
+    --prefix_path ./checkpoints/chatglm_v2_pt_ckpts
 ```
 
 **参数：**
@@ -216,6 +230,7 @@ python predict_generation.py \
 ## 5. 服务化部署
 
 ### 5.1 环境准备
+
 - python >= 3.8
 - gradio
 - flask
