@@ -1,48 +1,72 @@
-# 1. 飞桨大语言模型
-飞桨大模型套件PaddleFleetX是基于PaddlePaddle的4D分布式并行能力的大模型全流程套件，旨在提供高性能、灵活易用大模型工具，可以根据自己的需求轻易来定制化百亿和千亿大模型训练，同时支持高性能的压缩推理和服务化，最终使用大模型能力提升业务效果。
+# 飞桨大语言模型
+飞桨大模型套件PaddleFleetX是基于PaddlePaddle的[4D分布式并行能力](https://ai.baidu.com/forum/topic/show/987996)的大模型全流程套件，旨在提供高性能、灵活易用大模型工具，可以根据自己的需求轻易来定制化百亿和千亿大模型训练，同时支持高性能的压缩推理和服务化，最终使用大模型能力提升业务效果。
 
 
-# 2. 全流程适配情况
+# 全流程工具适配情况
 | Model | Pretrain | SFT | LoRA | PrefixTuning | Generation | Quantization |
 | --- | --- | --- | --- | --- | --- | --- |
 | [LLaMA v1/v2](./llama) | ✅  | ✅ | ✅ | ✅ | ✅ | ✅  |
-| [ChatGLM-6B v1](./chatglm) |  NA |  ✅  |  ✅  |  ✅  |  ✅  |  ✅  |
-| [ChatGLM-6B v2](./chatglm_v2) |  NA |  ✅  |  ✅  |  ✅  |  ✅  |  ✅  |
-| [Bloom](./bloom) | NA | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [ChatGLM-6B v1](./chatglm) |  N/A |  ✅  |  ✅  |  ✅  |  ✅  |  ✅  |
+| [ChatGLM-6B v2](./chatglm_v2) |  N/A |  ✅  |  ✅  |  ✅  |  ✅  |  ✅  |
+| [Bloom](./bloom) | N/A | ✅ | ✅ | ✅ | ✅ | ✅ |
 | [GPT-3](./gpt-3) |   ✅  |  ✅  |  ✅  |  WIP  | ✅    | WIP |
 | [OPT](./opt) | WIP | ✅ | ✅ | WIP|  ✅ | WIP |
-| [GLM](./glm) | NA | ✅ | ✅ | WIP|  ✅ | WIP |
+| [GLM](./glm) |N/A | ✅ | ✅ | WIP|  ✅ | WIP |
 
-# 3. LLM模型全流程工具介绍
+
+
+<div align="center">
+    <img width="700" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/1a65c4e2-885a-4948-a139-f9ff4e649457">
+</div>
+
+<div align="center">
+    <font size ="1">
+    LLM全流程工具流程图（上图：PaddleNLP 2.6进展 下图：最终目标）
+     </font>
+</div>
+
+
+
+
+# LLM全流程工具介绍
 我们提供了模型预训练、精调（SFT、LoRA、PrefixTuning）、量化、动态图推理、服务化部署全流程脚本，开发者可以根据自己的需求定制化自己的大语言模型。
 
-## 3.0 环境准备
+## 1. 环境准备
 
-- PaddlePaddle >= 2.5.0
+- PaddlePaddle >= 2.5.1
 - PaddleNLP >= 2.6.0
 
-## 3.1 预训练
+## 2. 预训练
 [LLaMA v1/v2](./llama)、[GPT-3](./gpt-3) 目录中提供了模型预训练的数据准备和训练细节，后续我们将支持更多的模型预训练。
 
-## 3.2 精调
-目前精调统一脚本只支持[LLaMA v1/v2](./llama)、[ChatGLM-6B](./chatglm)、[ChatGLM-6B v2](./chatglm_v2)、[Bloom](./bloom)、[OPT](./opt)，其他模型精调使用详见对应模型目录。接下来我们将以**ChatGLM-6B v2**为例介绍如何使用统一脚本进行SFT、[LoRA、Prefix Tuning](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/peft.md)。
+## 3. 精调
+目前精调统一脚本只支持[LLaMA v1/v2](./llama)、[ChatGLM-6B](./chatglm)、[ChatGLM-6B v2](./chatglm_v2)、[Bloom](./bloom)、[OPT](./opt)，其他模型精调使用详见对应模型目录。接下来我们将以**ChatGLM-6B v2**为例介绍如何使用统一脚本进行SFT、LoRA、Prefix Tuning。更多LoRA、Prefix Tuning请参见[PEFT文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/peft.md)。
 
-### 3.2.1 精调训练数据格式
+### 3.1 精调训练数据格式
 
 为了方便用户测试，我们也提供示例数据集[广告生成数据集](https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz)，用户也可以仿照数据集的格式制作自己的数据集进行精调。我们支持的数据格式是每行包含一个字典，每个字典包含以下字段：
 - `src` : `str, List(str)`, 模型的输入指令（instruction）、提示（prompt），模型应该执行的任务。
 - `tgt` : `str, List(str)`, 模型的输出。
 
-### 3.2.2 SFT
-SFT(Supervised Fine-Tuning)支持数据并行(DP)、[张量并行（TP, Tensor Parallelism）](https://arxiv.org/abs/1909.08053)、[流水线并行（PP, Pipeline Parallelism）](https://arxiv.org/abs/1811.06965)（仅支持Llama）等多种分布式训练策略，可以通过控制`tensor_parallel_degree`, `pipeline_parallel_degree`调整并行训练策略。
+### 3.2 SFT
+SFT(Supervised Fine-Tuning)支持数据并行(DP)、[张量并行（TP, Tensor Parallelism）](https://arxiv.org/abs/1909.08053)、[流水线并行（PP, Pipeline Parallelism）](https://arxiv.org/abs/1811.06965)（目前仅支持Llama）等多种分布式训练策略，可以通过控制`tensor_parallel_degree`, `pipeline_parallel_degree`调整并行训练策略。
 ```
 # 张量并行分布式训练（常用）
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py ./chatglm_v2/sft_argument.json
 ```
 
-### 3.2.3 LoRA
+### 3.3 LoRA
 
-[LoRA](https://arxiv.org/abs/2106.09685)支持数据并行、张量并行等多种分布式训练策略，可以通过控制`tensor_parallel_degree` 调整并行训练策略。LoRA策略默认应用在所有Linear层。
+Transformer模型中包含许多Linear层需要进行密集的矩阵乘法计算，而这些通常具有全秩(full rank)。[LoRA](https://arxiv.org/abs/2106.09685)提出冻结预训练的权重矩阵, 通过引入两个低 rank 矩阵 $AB$(图中橙色的两个矩阵) 来近似权重的更新过程 $W_0+\Delta W=W_0+B A$ , 其中 $B \in \mathbb{R}^{d \times r}, A \in \mathbb{R}^{r \times k}$， 其中 $r<<d$ ，实验表面将输入表达随机投影到较小的子空间模型仍然可以有效地学习下游任务还可以节约大量的计算显存需求。
+
+<div align="center">
+<img src=https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/63d56558-247a-4a8d-a6ca-121c820f7534 width=50% height=50% />
+</div>
+
+
+PaddleNLP LoRA API支持数据并行、张量并行等多种分布式训练策略，可以通过控制`tensor_parallel_degree` 调整并行训练策略。LoRA策略默认应用在所有Linear层，可拓展至**单机LoRA千亿模型**。
+
+
 ```
 # 单卡训练
 python  finetune_generation.py ./chatglm_v2/lora_argument.json
@@ -53,8 +77,15 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 ```
 
 
-### 3.2.4 Prefix Tuning
-[Prefix Tuning](https://arxiv.org/abs/2101.00190)支持数据并行、张量并行等多种分布式训练策略，可以通过控制`tensor_parallel_degree` 调整并行训练策略。
+### 3.4 Prefix Tuning
+
+[Prefix Tuning](https://arxiv.org/abs/2101.00190)受提示学习（Prompt learning）的影响，加入的一部分 prefix embedding 作为连续型提示进行训练。prefix embedding是由专门的 prefix encoder 网络生成的数个张量，会以 past_key_value的方式被插入到语言模型每一层的 hidden_state之前。
+
+<div align="center">
+<img src=https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/8baf6943-4540-4c02-8540-35f977acc077 width=40% height=40% />
+</div>
+
+PaddleNLP Prefix Tuning API支持数据并行、张量并行等多种分布式训练策略，可以通过控制`tensor_parallel_degree` 调整并行训练策略。
 ```
 # 单卡训练
 python  finetune_generation.py ./chatglm_v2/pt_argument.json
@@ -63,7 +94,7 @@ python  finetune_generation.py ./chatglm_v2/pt_argument.json
 # 将pt_argument.json中tensor_parallel_degree修改为2
 python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./chatglm_v2/pt_argument.json
 ```
-### 3.2.5 精调参数介绍
+### 3.5 精调参数介绍
 
 **模型参数(ModelArgument)：**
 
@@ -93,7 +124,7 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 
 **训练参数(TrainingArguments)：**
 
-以下仅介绍TrainingArguments部分常用参数，详情请参见[TrainingArguments文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D)。
+以下仅介绍TrainingArguments部分常用参数，详情请参见[TrainingArguments文档](https://paddlenlp.readthedocs.io/zh/latest/trainer.html)。
 
 - `output_dir`: 用于保存相关的文件目录，主要包括模型相关文件、训练过程中的checkpoint、分词器相关文件、评估的结果文件，默认为None。
 - `per_device_train_batch_size`: 训练集训练过程批处理大小，对应 micro batch size，默认为8。该参数需要根据具体的数据集来设定，该参数越大，占用显存越高，训练代价越大；反之，占用显存越小，训练速度越快。
@@ -120,7 +151,7 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 - `pipeline_parallel_degree`: 表示划分流水线的大小.(假设该参数为4, 模型12层, 则每一个pp stage 包含3层模型) 默认值-1, 表示不启用流水线并行。
 
 
-### 3.2.6 张量并行参数合并
+### 3.6 张量并行参数合并
 我们使用张量并行(TP，Tensor Parallelism)训练过程中，为了节省TP参数合并时间往往在中间checkpoint将参数存储为多个TP参数分片，可以使用提供的分片合并参数脚本进行参数合并。
 
 ```
@@ -138,7 +169,7 @@ python merge_tp_params.py  \
 - `with_tokenizer`: 是否同时保存分词器，默认为False。
 - `device`: 运行环境，默认为gpu。
 
-### 3.2.7 LoRA参数合并
+### 3.7 LoRA参数合并
 为了后续的**压缩**和**静态图推理**方便，我们提供LoRA参数合并脚本，可以将LoRA参数合并到主干模型并保存相应的权重。
 ```
 python merge_lora_params.py \
@@ -151,7 +182,7 @@ python merge_lora_params.py \
 - `merge_model_path`: 必须，合并参数后保存路径，默认为None。
 - `device`: 运行环境，默认为gpu。
 
-## 3.3 动态图推理
+## 4. 动态图推理
 
 ```
 python predict_generation.py \
@@ -177,14 +208,14 @@ python predict_generation.py \
 - `dtype`: 模型参数dtype，默认为None。如果没有传入`lora_path`、`prefix_path`则必须传入
 - `gpt`: 是否使用GPTForCausalLM模型，默认为False。
 
-## 3.4 服务化部署
+## 5. 服务化部署
 
-### 3.4.0 环境准备
+### 5.1 环境准备
 - python >= 3.8
 - gradio
 - flask
 
-### 3.4.1 Flask & Gradio UI服务化部署
+### 5.2 Flask & Gradio UI服务化部署
 
 我们提供了一套简单易用的UI服务化部署脚本:
 
@@ -203,31 +234,31 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" flask_server.py \
 - `port`: Gradio UI 服务端口号，默认8011。
 - `flask_port`: Flask服务端口号，默认8010。
 
-## 3.5 量化
+## 6. 量化
 
 **注**：量化后模型暂不支持推理，相关开源工作正在进行中，敬请期待。
 量化算法可以将模型输入和模型权重用更低比特数值表示，能够有效减少内存占用和计算开销。下面我们提供PTQ、GPTQ两种量化算法进行量化，更多技术细节详见[量化策略详细教程](https://github.com/PaddlePaddle/PaddleSlim/blob/develop/docs/zh_cn/tutorials/quant/advanced_quantization.md)
 
-### 3.5.0 环境安装
+### 6.1 环境安装
 - PaddleSlim develop版本
 
-### 3.5.1 数据准备
+### 6.2 数据准备
 
 量化中默认使用训练集作为校正（Calibartion）数据集，开发集作为评估数据集。如果希望使用其他数据作为校正数据集，则在数据目录下新增`quant.json`文件，文件格式请参照精调训练数据格式。
 
-### 3.5.2 PTQ量化
+### 6.3 PTQ量化
 
 ```
 python  finetune_generation.py ./chatglm_v2/ptq_argument.json
 ```
 
-### 3.5.3 GPTQ量化
+### 6.4 GPTQ量化
 
 ```
 python  finetune_generation.py ./chatglm_v2/gptq_argument.json
 ```
 
-### 3.5.4 量化参数介绍
+### 6.5 量化参数介绍
 
 **生成参数(QuantArgument):**
 - `quant_type`: PTQ,QAT量化类型，默认为A8W8。支持A8W8,WINT4，WINT8：A8W8指对激活（输入）进行INT8量化，对模型权重进行INT8量化；WINT4指仅对模型权重进行INT4量化，后续使用WeightOnly进行推理；WINT8指仅对模型权重进行INT8量化，后续使用WeightOnly进行推理。
@@ -253,6 +284,6 @@ python  finetune_generation.py ./chatglm_v2/gptq_argument.json
 
 其他参数详见精调参数介绍。
 
-## 3.6 静态图推理
+## 7. 静态图推理
 
 Coming soon.
