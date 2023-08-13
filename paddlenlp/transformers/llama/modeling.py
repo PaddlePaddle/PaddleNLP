@@ -704,9 +704,11 @@ class LlamaAttention(nn.Layer):
         if not output_attentions:
             attn_weights = None
 
-        outputs = [attn_output, attn_weights, past_key_value]
-        outputs = [output for output in outputs if output is not None]
-        return outputs[0] if len(outputs) == 1 else outputs
+        outputs = dict()
+        outputs["attn_output"] = attn_output
+        outputs["attn_weights"] = attn_weights
+        outputs["past_key_value"] = past_key_value
+        return outputs
 
 
 class LlamaDecoderLayer(nn.Layer):
@@ -776,14 +778,9 @@ class LlamaDecoderLayer(nn.Layer):
                 alibi,
             )
 
-        if use_cache and output_attentions:
-            hidden_states, self_attn_weights, present_key_value = outputs
-        elif use_cache:
-            hidden_states, present_key_value = outputs
-        elif output_attentions:
-            hidden_states, self_attn_weights = outputs
-        else:
-            hidden_states = outputs
+        hidden_states = outputs.get("attn_output")
+        self_attn_weights = outputs.get("attn_weights", None)
+        present_key_value = outputs.get("past_key_value", None)
 
         hidden_states = residual + hidden_states
 
