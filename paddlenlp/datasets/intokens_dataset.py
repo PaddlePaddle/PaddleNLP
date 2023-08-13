@@ -46,17 +46,16 @@ class InTokens:
             # If attention_mask is not given, assume it's causal mask
             attention_mask = record.get("attention_mask", np.tril(np.ones([seq_length, seq_length], dtype=bool)))
             batched_features["attention_mask"].append(attention_mask)
-            # TODO: to adapt to chatglm position_2d
             # NOTE: position_ids is optional and not required by every model
+            # We append instead of extend here to accomodate 2D position ids
             if "position_ids" in record:
-                batched_features["position_ids"].extend(record["position_ids"])
+                batched_features["position_ids"].append(record["position_ids"])
         block_attention_mask = block_diag(*batched_features["attention_mask"])
         # convert to 3-D [batch_size(1), seq_length, seq_length]
         batched_features["attention_mask"] = np.expand_dims(block_attention_mask, axis=0)
-        # batched_features["input_ids"] = np.array(batched_features["input_ids"], dtype=np.int64)
-        # batched_features["labels"] = np.array(batched_features["labels"], dtype=np.int64)
-        # if "position_ids" in record:
-        #     batched_features["position_ids"] = np.array(batched_features["position_ids"], dtype=np.int64)
+        if "position_ids" in batched_features:
+            # Accomodate both 1D and 2D position ids
+            batched_features["position_ids"] = np.concatenate(batched_features["position_ids"], axis=-1).tolist()
         return batched_features
 
 

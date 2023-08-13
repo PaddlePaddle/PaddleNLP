@@ -88,7 +88,7 @@ def convert_example_common(example, tokenizer, data_args, is_test=True, intokens
         input_ids = tokenized_source["input_ids"] + tokenized_target_input_ids
         source_length = len(tokenized_source["input_ids"])
         labels = [-100] * source_length + input_ids[source_length:]
-        # shift labels
+        # shift input_ids and labels
         input_ids, labels = input_ids[:-1], labels[1:]
         features = {
             "input_ids": input_ids,
@@ -97,7 +97,7 @@ def convert_example_common(example, tokenizer, data_args, is_test=True, intokens
         seq_length = len(input_ids)
         if intokens:
             features["position_ids"] = list(range(seq_length))
-            features["attention_mask"] = np.tril(np.ones((seq_length, seq_length), dtype="bool"))
+            features["attention_mask"] = np.tri((seq_length, seq_length), dtype=bool)
 
         return features
 
@@ -115,15 +115,28 @@ def convert_example_chatglm(example, tokenizer, data_args, is_test=True, intoken
     else:
         input_ids = tokenized_source["input_ids"] + tokenized_target_input_ids
         bos_position = len(tokenized_source["input_ids"]) - 1
-
-        attention_mask = np.tri(len(input_ids), len(input_ids))
-        attention_mask[:, :bos_position] = 1
-        attention_mask = attention_mask[None, :, :]
-
         labels = [-100] * bos_position + input_ids[bos_position:]
-
-        # shift labels
+        # shift input_ids and labels
         input_ids, labels = input_ids[:-1], labels[1:]
-        attention_mask = attention_mask[..., :-1, :-1]
+        features = {
+            "input_ids": input_ids,
+            "labels": labels,
+        }
 
-        return dict(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+        if intokens:
+            seq_length = len(input_ids)
+            # attention_mask
+            attention_mask = np.tri(seq_length, seq_length, dtype=bool)
+            attention_mask[:, :bos_position] = 1
+            features["attention_mask"] = attention_mask
+            # 2d position_ids
+            position_ids = np.arange(seq_length, dtype=np.int64)
+            block_position_ids = np.concatenate(
+                [
+                    np.zeros(bos_position, dtype=np.int64),
+                    np.arange(1, seq_length - bos_position + 1, dtype=np.int64),
+                ]
+            )
+            features["position_ids"] = np.stack([position_ids, block_position_ids], axis=0)
+
+        return features
