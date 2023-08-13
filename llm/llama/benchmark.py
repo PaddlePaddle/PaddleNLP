@@ -20,8 +20,12 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
+from benchmark_utils import (
+    LlamaTrainer,
+    compute_metrics,
+    compute_metrics_not_do_generation,
+)
 from modeling_pp import LlamaForCausalLMPipe
-from utils import LlamaTrainer, compute_metrics, compute_metrics_not_do_generation
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
