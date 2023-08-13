@@ -47,13 +47,9 @@ SFT(Supervised Fine-Tuning)依托飞桨提出的[4D混合分布式并行](https:
 
 4D 混合并行策略如何组合？如图所示，在单机内使用通信量较大，适合使用机器内的卡间通信的张量并行（张量并行又称模型并行，MP）和分组参数切片（Sharding）的2D组合策略；训练千亿规模模型时，叠加流水线并行策略使用多台机器共同分担；同时叠加数据并行来增加并发数量，提升训练速度。
 <div align="center">
-    <img width="700" alt="llm" src="https://ai.bdstatic.com/file/63F5EBB1E188457ABAFD311CFC1D8658">
+    <img src="https://ai.bdstatic.com/file/63F5EBB1E188457ABAFD311CFC1D8658" width=50% height=50%>
 </div>
-<div align="center">
-    <font size ="1">
-    4D 混合并行示意图
-     </font>
-</div>
+
 
 ```
 # 张量并行分布式训练（常用）
@@ -62,7 +58,8 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py 
 
 ### 3.3 LoRA
 
-Transformer模型中包含许多Linear层需要进行密集的矩阵乘法计算，而这些通常具有全秩(full rank)。[LoRA](https://arxiv.org/abs/2106.09685)提出冻结预训练的权重矩阵, 通过引入两个低 rank 矩阵 $AB$(图中橙色的两个矩阵) 来近似权重的更新过程 $W_0+\Delta W=W_0+B A$ , 其中 $B \in \mathbb{R}^{d \times r}, A \in \mathbb{R}^{r \times k}$， 其中 $r<<d$ ，实验表面将输入表达随机投影到较小的子空间模型仍然可以有效地学习下游任务还可以节约大量的计算显存需求。
+Transformer模型中包含许多Linear层需要进行密集的矩阵乘法计算，而这些通常具有全秩(full rank)。[LoRA](https://arxiv.org/abs/2106.09685)提出冻结预训练的权重矩阵, 通过引入两个低 rank 矩阵 $AB$(图中橙色的两个矩阵) 来近似权重的更新过程 $W_0+\Delta W=W_0+B A$ , 其中 $B \in \mathbb{R}^{d \times r}, A \in \mathbb{R}^{r \times k}$，实验表面将输入表达随机投影到较小的子空间模型仍然可以有效地学习下游任务还可以节约大量的计算显存需求。
+
 
 <div align="center">
 <img src=https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/63d56558-247a-4a8d-a6ca-121c820f7534 width=50% height=50% />
