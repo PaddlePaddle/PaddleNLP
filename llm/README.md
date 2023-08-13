@@ -14,6 +14,8 @@
 | [GLM](./glm) |N/A | ✅ | ✅ | WIP|  ✅ | WIP |
 
 
+# LLM全流程工具介绍
+我们提供了模型预训练、精调（SFT、LoRA、PrefixTuning）、量化、动态图推理、服务化部署全流程脚本，开发者可以根据自己的需求定制化自己的大语言模型。
 
 <div align="center">
     <img width="700" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/1a65c4e2-885a-4948-a139-f9ff4e649457">
@@ -24,12 +26,6 @@
     LLM全流程工具流程图（上图：PaddleNLP 2.6进展 下图：最终目标）
      </font>
 </div>
-
-
-
-
-# LLM全流程工具介绍
-我们提供了模型预训练、精调（SFT、LoRA、PrefixTuning）、量化、动态图推理、服务化部署全流程脚本，开发者可以根据自己的需求定制化自己的大语言模型。
 
 ## 1. 环境准备
 
