@@ -1,5 +1,5 @@
 # 飞桨大语言模型
-飞桨大模型套件PaddleFleetX是基于PaddlePaddle的[4D分布式并行能力](https://ai.baidu.com/forum/topic/show/987996)的大模型全流程套件，旨在提供高性能、灵活易用大模型工具，可以根据自己的需求轻易来定制化百亿和千亿大模型训练，同时支持高性能的压缩推理和服务化，最终使用大模型能力提升业务效果。
+大模型全流程工具基于PaddlePaddle的4D分布式并行能力旨在提供高性能、灵活易用大模型工具，可以根据自己的需求轻易来定制化百亿和千亿大模型训练，同时支持高性能的压缩推理和服务化，最终使用大模型能力提升业务效果。
 
 
 # 全流程工具适配情况
@@ -49,7 +49,18 @@
 - `tgt` : `str, List(str)`, 模型的输出。
 
 ### 3.2 SFT
-SFT(Supervised Fine-Tuning)支持数据并行(DP)、[张量并行（TP, Tensor Parallelism）](https://arxiv.org/abs/1909.08053)、[流水线并行（PP, Pipeline Parallelism）](https://arxiv.org/abs/1811.06965)（目前仅支持Llama）等多种分布式训练策略，可以通过控制`tensor_parallel_degree`, `pipeline_parallel_degree`调整并行训练策略。
+SFT(Supervised Fine-Tuning)依托飞桨提出的[4D混合分布式并行]](https://ai.baidu.com/forum/topic/show/987996)能力，支持使用Trainer API轻松切换数据并行(DP)、[张量并行（TP, Tensor Parallelism）](https://arxiv.org/abs/1909.08053)、[流水线并行（PP, Pipeline Parallelism）](https://arxiv.org/abs/1811.06965)（目前仅支持Llama）等多种分布式训练策略。
+
+4D 混合并行策略如何组合？如图所示，在单机内使用通信量较大，适合使用机器内的卡间通信的张量并行（张量并行又称模型并行，MP）和分组参数切片（Sharding）组合的2D策略；训练千亿规模模型需要再叠加流水线并行策略，使用多台机器共同分担；同时叠加了数据并行来增加并发数量，提升训练速度。
+<div align="center">
+    <img width="700" alt="llm" src="https://ai.bdstatic.com/file/63F5EBB1E188457ABAFD311CFC1D8658">
+</div>
+<div align="center">
+    <font size ="1">
+    4D 混合并行示意图
+     </font>
+</div>
+
 ```
 # 张量并行分布式训练（常用）
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py ./chatglm_v2/sft_argument.json
