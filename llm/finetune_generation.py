@@ -179,7 +179,6 @@ def main():
         model = PrefixModelForCausalLM(
             model=model,
             prefix_config=prefix_config,
-            pad_attention_mask=prefix_tuning_params["pad_attention_mask"],
             postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
         )
         model.mark_only_prefix_as_trainable()

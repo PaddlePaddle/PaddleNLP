@@ -46,28 +46,24 @@ def get_prefix_tuning_params(model):
         num_attention_heads = model.config.num_attention_heads
         num_hidden_layers = model.config.num_hidden_layers
         hidden_size = model.config.hidden_size
-        pad_attention_mask = None
         postprocess_past_key_value = chatglm_postprocess_past_key_value
         multi_query_group_num = None
     elif model.base_model_prefix == "chatglm_v2":
         num_attention_heads = model.config.num_attention_heads
         num_hidden_layers = model.config.num_layers
         hidden_size = model.config.hidden_size
-        pad_attention_mask = None
         postprocess_past_key_value = chatglm_postprocess_past_key_value
         multi_query_group_num = model.config.multi_query_group_num
     elif model.base_model_prefix == "bloom":
         num_attention_heads = model.config.num_attention_heads
         num_hidden_layers = model.config.n_layer
         hidden_size = model.config.n_embed
-        pad_attention_mask = None
         postprocess_past_key_value = bloom_postprocess_past_key_value
         multi_query_group_num = None
     elif model.base_model_prefix == "llama":
         num_attention_heads = model.config.n_head
         num_hidden_layers = model.config.n_layer
         hidden_size = model.config.hidden_size
-        pad_attention_mask = None
         postprocess_past_key_value = llama_postprocess_past_key_value
         multi_query_group_num = None
     else:
@@ -76,7 +72,6 @@ def get_prefix_tuning_params(model):
         num_attention_heads=num_attention_heads,
         num_hidden_layers=num_hidden_layers,
         hidden_size=hidden_size,
-        pad_attention_mask=pad_attention_mask,
         postprocess_past_key_value=postprocess_past_key_value,
         multi_query_group_num=multi_query_group_num,
     )
