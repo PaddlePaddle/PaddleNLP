@@ -43,8 +43,22 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding
 )
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
     HybridParallelOptimizer,
-    _obtain_optimizer_parameters_list,
 )
+
+try:
+    from paddle.distributed.fleet.utils.hybrid_parallel_util import (
+        obtain_optimizer_parameters_list,
+    )
+
+    _obtain_optimizer_parameters_list = obtain_optimizer_parameters_list
+except:
+    try:
+        from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
+            _obtain_optimizer_parameters_list,
+        )
+    except:
+        _obtain_optimizer_parameters_list = None
+
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
@@ -101,6 +115,7 @@ from .utils.helper import (  # nested_truncate,
     nested_numpify,
     nested_truncate,
 )
+from .utils.sharding_io import ShardingIO
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
 DEFAULT_PROGRESS_CALLBACK = ProgressCallback
@@ -271,6 +286,9 @@ class Trainer:
         self.control = TrainerControl()
         self._signature_columns = None
         self.optimizer_grouped_parameters = None
+        self.sharding_io = None
+        if self.args.should_save_sharding_stage1_model or self.args.should_load_sharding_stage1_model:
+            self.sharding_io = ShardingIO(self.args, self.model, self.optimizer)
 
         if self.sharding is not None and self.optimizer is not None:
             raise RuntimeError(
@@ -414,33 +432,52 @@ class Trainer:
             if resume_from_checkpoint is None:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
-        if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
-            if isinstance(self.model, LoRAModel):
-                weight_name = LORA_WEIGHTS_NAME
-            elif isinstance(self.model, PrefixModelForCausalLM):
-                weight_name = PREFIX_WEIGHTS_NAME
-            else:
-                weight_name = PADDLE_WEIGHTS_NAME
+        if isinstance(self.model, LoRAModel):
+            weight_name = LORA_WEIGHTS_NAME
+        elif isinstance(self.model, PrefixModelForCausalLM):
+            weight_name = PREFIX_WEIGHTS_NAME
+        else:
+            weight_name = PADDLE_WEIGHTS_NAME
 
-            if not os.path.isfile(
-                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
-            ):
-                raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
-
-            logger.info(f"Loading model from {resume_from_checkpoint} .")
-
-            # We load the model state dict on the CPU to avoid an OOM error.
-            state_dict = paddle.load(
-                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)),
-                return_numpy=True,
+        if self.args.should_load_sharding_stage1_model:
+            state_dict = self.sharding_io.load_state_dict_from_checkpoint_with_reshard(
+                resume_from_checkpoint,
+                base_weight_name=weight_name,
             )
-            # If the model is on the GPU, it still works!
-            self._set_state_dict_in_model(state_dict)
+        else:
+            if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
+                file_path = os.path.join(
+                    resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
+                )
+                if not os.path.isfile(file_path):
+                    raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}, no {file_path}")
 
-            # release memory
-            del state_dict
-        elif resume_from_checkpoint is not None:
-            logger.info(f"not loading ckpt :{self.args.dataset_rank}")
+                logger.info(f"Loading model from {resume_from_checkpoint} .")
+
+                # We load the model state dict on the CPU to avoid an OOM error.
+                state_dict = paddle.load(file_path, return_numpy=True)
+
+                # If the model is on the GPU, it still works!
+                self._set_state_dict_in_model(state_dict)
+                # release memory
+                del state_dict
+            elif resume_from_checkpoint is not None:
+                logger.info(f"not loading ckpt :{self.args.dataset_rank}")
+
+    def _wrap_model_and_load_sharded_checkpoint(self, resume_from_checkpoint):
+        # In the sharded mode, should invoke load_state_dict_from_checkpoint after _wrap_model.
+        # In this mode, each sharding rank load sharded params, do not need to implement the broadcast logic.
+        model = self._wrap_model(self.model_wrapped)
+        if self.sharding_io is not None:
+            # the self.optimizer should be wrapped and it is done in _wrap_model
+            self.sharding_io.set_optimizer(self.optimizer)
+        if model is not self.model:
+            self.model_wrapped = model
+        # Should invoke load_state_dict_from_checpoint after _load_optimizer_and_scheduler
+        # because the load_state_dict_from_checkpoint method rely on the optimizer in the shareded mode.
+        self._load_optimizer_and_scheduler(resume_from_checkpoint)
+        self.load_state_dict_from_checkpoint(resume_from_checkpoint)
+        return model
 
     def train(
         self,
@@ -461,43 +498,12 @@ class Trainer:
         """
         args = self.args
         self.is_in_train = True
-        resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
 
         # memory metrics - must set up as early as possible
         self._memory_tracker.start()
 
-        # Load potential model checkpoint
-        if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
-            resume_from_checkpoint = get_last_checkpoint(args.output_dir)
-            if resume_from_checkpoint is None:
-                raise ValueError(f"No valid checkpoint found in output directory ({args.output_dir})")
-
-        if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
-            if isinstance(self.model, LoRAModel):
-                weight_name = LORA_WEIGHTS_NAME
-            elif isinstance(self.model, PrefixModelForCausalLM):
-                weight_name = PREFIX_WEIGHTS_NAME
-            else:
-                weight_name = PADDLE_WEIGHTS_NAME
-            if not os.path.isfile(
-                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
-            ):
-                raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
-
-            logger.info(f"Loading model from {resume_from_checkpoint} .")
-
-            # TODO: Need to load the model state dict on the CPU to avoid an OOM error.
-            state_dict = paddle.load(
-                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)),
-                return_numpy=True,
-            )
-            # If the model is on the GPU, it still works!
-            self._set_state_dict_in_model(state_dict)
-
-            # release memory
-            del state_dict
-        elif resume_from_checkpoint is not None:
-            logger.info(f"not loading ckpt :{self.args.dataset_rank}")
+        if not self.args.should_load_sharding_stage1_model:
+            self.load_state_dict_from_checkpoint(resume_from_checkpoint)
 
         train_dataloader = self.get_train_dataloader()
 
@@ -549,17 +555,30 @@ class Trainer:
 
         self.state = TrainerState()
 
-        model = self._wrap_model(self.model_wrapped)
-
-        # for the rest of this function `model` is the outside model, whether it was wrapped or not
-        if model is not self.model:
-            self.model_wrapped = model
-
-        if delay_optimizer_creation:
-            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-
-        # Check if saved optimizer or scheduler states exist
-        self._load_optimizer_and_scheduler(resume_from_checkpoint)
+        if self.args.should_load_sharding_stage1_model:
+            model = self._wrap_model_and_load_sharded_checkpoint(resume_from_checkpoint)
+        elif self.args.should_save_sharding_stage1_model:
+            # In the non-sharded mode, should invoke load_state_dict_from_checkpoint before _wrap_model.
+            # In this mode, the rank0 load all params and the _wrap_model implicitly broadcast params from rank0 to the other ranks.
+            model = self._wrap_model(self.model_wrapped)
+            if self.sharding_io is not None:
+                assert delay_optimizer_creation is False, "delay_optimizer_creation should be False"
+                # the self.optimizer should be wrapped and it is done in _wrap_model
+                self.sharding_io.set_optimizer(self.optimizer)
+            # for the rest of this function `model` is the outside model, whether it was wrapped or not
+            if model is not self.model:
+                self.model_wrapped = model
+            if delay_optimizer_creation:
+                self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+            self._load_optimizer_and_scheduler(resume_from_checkpoint)
+        else:
+            model = self._wrap_model(self.model_wrapped)
+            # for the rest of this function `model` is the outside model, whether it was wrapped or not
+            if model is not self.model:
+                self.model_wrapped = model
+            if delay_optimizer_creation:
+                self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+            self._load_optimizer_and_scheduler(resume_from_checkpoint)
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples:,}")
@@ -828,7 +847,7 @@ class Trainer:
                     )
 
                     self.state.global_step += 1
-                    self.state.epoch = epoch + self.state.global_step / steps_in_epoch
+                    self.state.epoch = epoch + (step + 1) / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
                     self._print_timer()
@@ -1879,12 +1898,26 @@ class Trainer:
             )
         elif not isinstance(self.model, PretrainedModel):
             if isinstance(unwrap_model(self.model), PretrainedModel):
-                unwrap_model(self.model).save_pretrained(
-                    output_dir,
-                    merge_tensor_parallel=merge_tensor_parallel,
-                    variant=self.args.weight_name_suffix,
-                    is_main_process=self.args.should_save,
-                )
+                if self.args.should_save_sharding_stage1_model:
+                    config_to_save = None
+                    state_dict, config_to_save, weight_name_suffix = self.sharding_io.manipulate_state_dict_and_config(
+                        unwrap_model(self.model), merge_tensor_parallel=merge_tensor_parallel
+                    )
+                    unwrap_model(self.model).save_pretrained(
+                        output_dir,
+                        state_dict=state_dict,
+                        config_to_save=config_to_save,
+                        merge_tensor_parallel=merge_tensor_parallel,
+                        variant=weight_name_suffix,
+                        is_main_process=self.args.should_save,
+                    )
+                else:
+                    unwrap_model(self.model).save_pretrained(
+                        output_dir,
+                        merge_tensor_parallel=merge_tensor_parallel,
+                        variant=self.args.weight_name_suffix,
+                        is_main_process=self.args.should_save,
+                    )
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
                 if merge_tensor_parallel:
@@ -1896,12 +1929,28 @@ class Trainer:
                     os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix)),
                 )
         else:
-            self.model.save_pretrained(
-                output_dir,
-                merge_tensor_parallel=merge_tensor_parallel,
-                variant=self.args.weight_name_suffix,
-                is_main_process=self.args.should_save,
-            )
+            if isinstance(self.model, PretrainedModel) and self.args.should_save_sharding_stage1_model:
+                config_to_save = None
+                state_dict, config_to_save, weight_name_suffix = self.sharding_io.manipulate_state_dict_and_config(
+                    self.model, merge_tensor_parallel=merge_tensor_parallel
+                )
+                self.model.save_pretrained(
+                    output_dir,
+                    state_dict=state_dict,
+                    config_to_save=config_to_save,
+                    merge_tensor_parallel=merge_tensor_parallel,
+                    variant=weight_name_suffix,
+                    is_main_process=self.args.should_save,
+                )
+            else:
+                self.model.save_pretrained(
+                    output_dir,
+                    merge_tensor_parallel=merge_tensor_parallel,
+                    variant=self.args.weight_name_suffix,
+                    is_main_process=self.args.should_save,
+                )
+        if self.args.should_save_sharding_stage1_model:
+            self.sharding_io.save_distributed_model_meta(output_dir)
 
         if self.args.should_save:
             if self.tokenizer is not None:
@@ -1915,13 +1964,20 @@ class Trainer:
         if checkpoint is None:
             return
 
-        optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+        opt_state_dict = None
+        if self.args.should_load_sharding_stage1_model:
+            opt_state_dict = self.sharding_io.load_optimizer_state_with_reshard(
+                checkpoint, base_opt_name=OPTIMIZER_NAME
+            )
+        else:
+            optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+            path = os.path.join(checkpoint, optimizer_name)
+            if os.path.isfile(path):
+                opt_state_dict = paddlenlp_load(path, map_location="cpu")
 
-        if os.path.isfile(os.path.join(checkpoint, optimizer_name)) and os.path.isfile(
-            os.path.join(checkpoint, SCHEDULER_NAME)
-        ):
+        if opt_state_dict is not None and os.path.isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
             # Load in optimizer and scheduler states
-            self.optimizer.set_state_dict(paddlenlp_load(os.path.join(checkpoint, optimizer_name), map_location="cpu"))
+            self.optimizer.set_state_dict(opt_state_dict)
 
             self.lr_scheduler.set_state_dict(paddle.load(os.path.join(checkpoint, SCHEDULER_NAME)))
             if self.do_grad_scaling and os.path.isfile(os.path.join(checkpoint, SCALER_NAME)):
