@@ -1,28 +1,8 @@
 # ERNIE-3.5-SE
 
-**目录**
+## 1. 模型介绍
 
-- [1. 模型介绍](#0)
-- [2. 模型结构&训练策略](#1)
-- [3. 预训练](#2)
-- [4. 微调](#3)
-- [5. 预测](#4)
-- [6. 动转静](#5)
-
-
-<a name="0"></a>
-
-## 模型介绍
-
-ERNIE-3.5-SE 的代码开源主要包括模型组网、分布式预训练代码、微调以及预测服务。
-
-
-<a name="1"></a>
-
-## 模型结构&训练策略
-
-
-* 模型结构：我们采用了Attention和FFN并行的Parallel Transformer的实现方式，将FFN和Attention层进行并行计算。通过这样的设计，我们可以把Attention和FFN需要的线形层计算进行算子融合，降低kernel调用以及通讯次数，提升并行训练的效率。并且我们发现第一层的FFN和最后一层的Attn作用不大，因此采用了“掐头去尾”策略，将底层的FFN的计算量挪到模型的顶层，在同FLOPs下效果和传统Transformer结构一致，但有更好的训练速度和吞吐。
+我们采用了Attention和FFN并行的Parallel Transformer的实现方式，将FFN和Attention层进行并行计算。通过这样的设计，我们可以把Attention和FFN需要的线形层计算进行算子融合，降低kernel调用以及通讯次数，提升并行训练的效率。并且我们发现第一层的FFN和最后一层的Attn作用不大，因此采用了“掐头去尾”策略，将底层的FFN的计算量挪到模型的顶层，在同FLOPs下效果和传统Transformer结构一致，但有更好的训练速度和吞吐。
 
 <table>
 <tr>
@@ -43,9 +23,7 @@ ERNIE-3.5-SE 的代码开源主要包括模型组网、分布式预训练代码�
 * Sequence Length Warmup：通过动态调整前期训练的序列长度，提升模型的收敛效率。
 
 
-<a name="2"></a>
-
-## 预训练
+## 2. 预训练
 
 预训练数据制作参考[此处](../../model_zoo/ernie-1.0/preprocess/docs/OpenWebText2.md)
 
@@ -114,13 +92,11 @@ python -u -m paddle.distributed.launch \
 4. `use_fused_ln` 需要安装[此目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt-3/external_ops)下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置PYTHONPATH
 5. 当前脚本为sharding版本，需要4D并行训练（数据、sharding、张量、流水线并行）的用户，可另外调整相关参数。
 
-<a name="3"></a>
 
-## 微调
 
-微调脚本具体可见 run_finetune.sh。
+## 3. 精调
 
-### 多卡微调
+### SFT
 ```shell
 python -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
@@ -154,12 +130,9 @@ python -m paddle.distributed.launch \
     --sharding_parallel_degree 8
 ```
 
-### 单卡 LoRA 微调
+### LoRA
 ```shell
-python -m paddle.distributed.launch \
-    --gpus "0" \
-    --log_dir "output_sft/$task_name""_log" \
-    finetune_generation.py \
+python finetune_generation.py \
     --output_dir ./checkpoints/ \
     --per_device_train_batch_size 4 \
     --gradient_accumulation_steps 2 \
@@ -220,22 +193,11 @@ python -m paddle.distributed.launch \
 - `data_name`: 内置数据集名，定义数据集名必须同时定义数据集任务名
 - `dataset_path`: 自定义数据集路径。
 
-<a name="4"></a>
 
-## 预测
-
-预测脚本具体可见 run_predict.sh。
+## 4. 动态图预测
 
 ```shell
-python -m paddle.distributed.launch --gpus "0" predict_generation.py \
+python predict_generation.py \
     --model_name_or_path <PATH_TO_CKPT> \
     --tokenizer_name_or_path ernie-tokenizer
-```
-
-## 动转静
-
-``` shell
-python export_generation_model.py \
-    --model_path <PATH_TO_CKPT> \
-    --output_path inference/ernie-3.5-se
 ```
