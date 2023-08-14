@@ -1179,8 +1179,8 @@ class GenerationD2STest(unittest.TestCase):
                 params_path = os.path.join(tempdir, "model.pdiparams")
                 config = paddle.inference.Config(model_path, params_path)
 
-                # config.disable_gpu()
-                # config.disable_glog_info()
+                config.disable_gpu()
+                config.disable_glog_info()
                 predictor = paddle.inference.create_predictor(config)
 
                 model_kwargs["top_k"] = 1
