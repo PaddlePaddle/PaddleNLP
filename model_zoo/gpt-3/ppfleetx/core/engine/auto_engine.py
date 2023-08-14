@@ -31,29 +31,6 @@ from ppfleetx.utils.device import synchronize as device_synchronize
 from ppfleetx.utils.log import convert_timestamp_to_data, get_timestamp, logger
 from ppfleetx.utils.version import version_check
 
-def print_param(program):
-    print("======="*8)
-    from paddle.fluid.framework import Parameter
-    def is_parameter(var):
-        return isinstance(var, Parameter)
-    def is_persist(var):
-        return var.persistable
-    def get_tensor(var):
-        t = paddle.fluid.global_scope().find_var(var.name).get_tensor()
-        return np.array(t)
-    def get_name(var):
-        return var.name
-    parameter_list = list(filter(is_persist, program.list_vars()))
-    # for p in sorted(parameter_list, key=get_name):
-    #     print(p)
-    for p in sorted(parameter_list, key=get_name):
-        if p.name in ['create_py_reader_0', 'double_buffer_0', 'create_py_reader_1', 'double_buffer_1']:
-            continue
-        if "comm" in p.name or "feed" in p.name or "fetch" in p.name:
-            continue
-        print(p.name, np.sum(np.abs(get_tensor(p))))
-    print("======="*8)
-
 
 class AutoEngine(BasicEngine):
     def __init__(self, configs, module=None, mode="train"):
@@ -115,8 +92,6 @@ class AutoEngine(BasicEngine):
             self._use_increments = configs.Optimizer.lr.pop("use_increments", False)
             self._lr_scheduler_mode = configs.Optimizer.lr.pop("run_mode", "step")
             assert self._lr_scheduler_mode in ["epoch", "step"], "lr.run_mode must be epoch or step"
-        # if configs.Optimizer.lr.get("name") == "CosineAnnealingWithWarmupDecay":
-        #     configs.Optimizer.lr["global_batch_size"] = configs.Global.global_batch_size
         self._lr_scheduler = build_lr_scheduler(configs.Optimizer.lr) if mode == "train" else None
         self._optimizer = build_optimizer(configs.Optimizer, model, self._lr_scheduler) if mode == "train" else None
 
@@ -157,7 +132,6 @@ class AutoEngine(BasicEngine):
         eval_finished_step = 0
 
         self._auto_engine.prepare(mode="train")
-        print(self._auto_engine.main_program)
 
         for step, batch in enumerate(train_data_loader):
             if epoch_index == self._load_recovery["epoch"]:
@@ -252,7 +226,7 @@ class AutoEngine(BasicEngine):
                 mode="train",
             )
         if valid_dataset:
-            valid_data_loader = self._auto_engine.dataloader(
+            valid_data_loader = self._auto_engine.dataloader_from_generator(
                 dataset=train_dataset,
                 batch_size=self._global_batch_size,
                 steps_per_epoch=self._max_steps,
