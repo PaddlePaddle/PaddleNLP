@@ -262,7 +262,6 @@ def create_pretrained_dataset(
     max_seq_len=1024,
     places=None,
     data_holders=None,
-    pipeline_mode=False,
 ):
     device_world_size = paddle.distributed.get_world_size()
     device_world_rank = paddle.distributed.get_rank()
@@ -322,41 +321,27 @@ def create_pretrained_dataset(
             drop_last=True,
         )
 
-        if pipeline_mode:
-
-            def data_gen():
-                for data in dataset:
-                    yield tuple([np.expand_dims(np.array(x), axis=0) for x in data])
-
-            data_loader = paddle.fluid.reader.DataLoader.from_generator(
-                feed_list=data_holders, capacity=70, iterable=False
-            )
-            data_loader.set_batch_generator(data_gen, places)
-        else:
-            data_loader = DataLoader(
-                dataset=dataset,
-                places=places,
-                feed_list=data_holders,
-                batch_sampler=batch_sampler,
-                num_workers=0,
-                worker_init_fn=worker_init,
-                collate_fn=Tuple(Stack(), Stack(), Stack(), Stack(), Stack()),
-                return_list=False,
-            )
+        data_loader = DataLoader(
+            dataset=dataset,
+            places=places,
+            feed_list=data_holders,
+            batch_sampler=batch_sampler,
+            num_workers=0,
+            worker_init_fn=worker_init,
+            collate_fn=Tuple(Stack(), Stack(), Stack(), Stack(), Stack()),
+            return_list=False,
+        )
         return data_loader
 
     # Note, data should be broardcast to all devices.
     # for train, valid, test, the distinct data num is data_world_size
     train_data_loader = build_dataset(0, "train", args.micro_batch_size * args.max_steps * data_world_size)
-    if pipeline_mode:
-        valid_data_loader, test_data_loader = None, None
-    else:
-        valid_data_loader = build_dataset(
-            1,
-            "valid",
-            args.micro_batch_size * (args.max_steps // args.eval_freq + 1) * args.eval_iters * data_world_size,
-        )
-        test_data_loader = build_dataset(2, "test", args.micro_batch_size * args.test_iters * data_world_size)
+    valid_data_loader = build_dataset(
+        1,
+        "valid",
+        args.micro_batch_size * (args.max_steps // args.eval_freq + 1) * args.eval_iters * data_world_size,
+    )
+    test_data_loader = build_dataset(2, "test", args.micro_batch_size * args.test_iters * data_world_size)
 
     return train_data_loader, valid_data_loader, test_data_loader
 

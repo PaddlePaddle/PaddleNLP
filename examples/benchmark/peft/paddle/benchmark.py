@@ -87,7 +87,6 @@ def main():
         tokenizer.pad_token = tokenizer.unk_token
     model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
-        load_state_as_np=True,
         low_cpu_mem_usage=True,
         use_flash_attention=model_args.use_flash_attention,
         dtype=dtype,
@@ -121,11 +120,13 @@ def main():
         labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
         model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
-        model_inputs["position_ids"] = list(range(len(model_inputs["input_ids"])))
+        # shift input and labels
+        model_inputs["input_ids"] = model_inputs["input_ids"][:-1]
+        model_inputs["labels"] = model_inputs["labels"][1:]
         seq_length = len(model_inputs["input_ids"])
+        model_inputs["position_ids"] = list(range(seq_length))
         if intokens:
-            # model_inputs["attention_mask"] = np.tril(np.ones([seq_length, seq_length], dtype="bool"))
-            model_inputs["attention_mask"] = np.tril(np.ones([seq_length, seq_length]))
+            model_inputs["attention_mask"] = np.tril(np.ones([seq_length, seq_length], dtype=bool))
         return model_inputs
 
     def preprocess_function_chatglm(example, max_src_length=256, max_tgt_length=384, intokens=False):
@@ -138,18 +139,13 @@ def main():
         labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
         model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
-
-        context_length = model_inputs["input_ids"].index(tokenizer.bos_token_id)
-        seq_length = len(model_inputs["input_ids"])
+        # shift input and labels
+        model_inputs["input_ids"] = model_inputs["input_ids"][:-1]
+        model_inputs["labels"] = model_inputs["labels"][1:]
 
         if intokens:
-            # attention mask
-            attention_mask = np.ones((seq_length, seq_length))
-            attention_mask = np.tril(attention_mask)
-            attention_mask[:, :context_length] = 1
-            model_inputs["attention_mask"] = attention_mask
-
-            # position_ids
+            context_length = model_inputs["input_ids"].index(tokenizer.bos_token_id)
+            seq_length = len(model_inputs["input_ids"])
             position_ids = np.arange(seq_length, dtype=np.int64)
             block_position_ids = np.concatenate(
                 [
@@ -158,6 +154,9 @@ def main():
                 ]
             )
             model_inputs["position_ids"] = np.stack([position_ids, block_position_ids], axis=0)
+            attention_mask = np.tri(seq_length, seq_length, dtype=bool)
+            attention_mask[:, :context_length] = 1
+            model_inputs["attention_mask"] = attention_mask
 
         return model_inputs
 
@@ -171,41 +170,38 @@ def main():
         labels_input_ids = labels["input_ids"] + [tokenizer.eos_token_id]
         model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
+        # shift input and labels
+        model_inputs["input_ids"] = model_inputs["input_ids"][:-1]
+        model_inputs["labels"] = model_inputs["labels"][1:]
         if intokens:
             model_inputs["attention_mask"] = np.tril(
-                np.ones([len(model_inputs["input_ids"]), len(model_inputs["input_ids"])]), 0
+                np.ones([len(model_inputs["input_ids"]), len(model_inputs["input_ids"])], dtype=bool)
             )
         return model_inputs
 
     if model_args.english:
         dataset = load_dataset("tatsu-lab/alpaca")
-        columns = ["instruction", "input", "output", "text"]
     else:
         dataset = load_dataset("Chinese-Vicuna/guanaco_belle_merge_v1.0")
-        columns = ["instruction", "input", "output"]
 
     # select first 10k examples for benchmarking
     dataset = dataset["train"].select(range(model_args.train_data_size))
     if "chatglm2" in model_args.model_name_or_path:
         dataset = dataset.map(
             lambda example: preprocess_function(example, intokens=model_args.intokens),
-            remove_columns=["instruction", "input", "output"],
         )
     elif "chatglm" in model_args.model_name_or_path:
         dataset = dataset.map(
             lambda example: preprocess_function_chatglm(example, intokens=model_args.intokens),
-            remove_columns=columns,
         )
     elif "bloom" in model_args.model_name_or_path:
 
         dataset = dataset.map(
             lambda example: preprocess_function_bloom(example, intokens=model_args.intokens),
-            remove_columns=columns,
         )
     else:
         dataset = dataset.map(
             lambda example: preprocess_function(example, intokens=model_args.intokens),
-            remove_columns=columns,
         )
     total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
 
