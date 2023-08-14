@@ -127,8 +127,8 @@ class AutoEngine(BasicEngine):
 
         total_train_batch = self._max_steps if self._run_mode == "step" else len(train_data_loader)
         total_train_step = self._max_steps if self._run_mode == "step" else total_train_batch * self._num_train_epochs
-        total_eval_batch = len(valid_data_loader) if valid_data_loader is not None else 0
-        valid_data_loader = valid_data_loader() if valid_data_loader is not None else None
+        total_eval_batch = valid_data_loader._steps if valid_data_loader is not None else 0
+        valid_data_loader = valid_data_loader if valid_data_loader is not None else None
         eval_finished_step = 0
 
         self._auto_engine.prepare(mode="train")
@@ -225,7 +225,7 @@ class AutoEngine(BasicEngine):
                 sample_split=train_dataset.sample_split,
                 mode="train",
             )
-        if valid_dataset:
+        if valid_dataset and self._eval_freq <= self._max_steps:
             valid_data_loader = self._auto_engine.dataloader_from_generator(
                 dataset=train_dataset,
                 batch_size=self._global_batch_size,
