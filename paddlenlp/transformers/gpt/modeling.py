@@ -65,6 +65,8 @@ __all__ = [
     "GPTForTokenClassification",
     "GPTForSequenceClassification",
     "GPTForCausalLM",
+    "GPTEmbeddings",
+    "GPTDecoderLayer",
 ]
 
 
@@ -1760,3 +1762,4 @@ class GPTForSequenceClassification(GPTPretrainedModel):
 
 
 GPTForCausalLM = GPTLMHeadModel
+GPTDecoderLayer = TransformerDecoderLayer

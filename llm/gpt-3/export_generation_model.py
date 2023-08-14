@@ -17,10 +17,12 @@ import os
 
 import paddle
 
-from paddlenlp.transformers import GPTChineseTokenizer, GPTConfig, GPTTokenizer
-from paddlenlp.transformers.gpt.modeling import GPTForCausalLM
-
-# from modeling import GPTForCausalLM
+from paddlenlp.transformers import (
+    GPTChineseTokenizer,
+    GPTConfig,
+    GPTForCausalLM,
+    GPTTokenizer,
+)
 
 MODEL_CLASSES = {
     "gpt2": (GPTForCausalLM, GPTTokenizer),

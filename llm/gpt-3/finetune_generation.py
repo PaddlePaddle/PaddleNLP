@@ -34,12 +34,8 @@ from paddlenlp.trainer import (
     get_last_checkpoint,
     set_seed,
 )
-from paddlenlp.transformers import AutoTokenizer, GPTConfig
-from paddlenlp.transformers.gpt.modeling import GPTForCausalLM
+from paddlenlp.transformers import AutoTokenizer, GPTConfig, GPTForCausalLM
 from paddlenlp.utils.log import logger
-
-# from modeling import GPTForCausalLM
-
 
 MODEL_CLASSES = {
     "gpt": (GPTConfig, GPTForCausalLM),
