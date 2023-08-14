@@ -37,9 +37,9 @@ tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat")
 
 ## 2. 模型协议
 
-Llama 模型的权重的使用则需要遵循[License](../../../paddlenlp/transformers/llama/LICENSE)。
+Llama 模型的权重的使用则需要遵循[License](../../paddlenlp/transformers/llama/LICENSE)。
 
-Llama2 模型的权重的使用则需要遵循[License](../../../paddlenlp/transformers/llama/Llama2.LICENSE)。
+Llama2 模型的权重的使用则需要遵循[License](../../paddlenlp/transformers/llama/Llama2.LICENSE)。
 
 
 ## 3. 预训练
