@@ -222,7 +222,7 @@ def create_predictor(args):
     Returns:
         Predictor: the instance of predictor
     """
-    if os.path.exists(args.model_name_or_path):
+    if os.path.isdir(args.model_name_or_path):
 
         # if there is model_state.pdparams file, it should be DygraphPredictor
         if os.path.exists(os.path.join(args.model_name_or_path, "model_state.pdparams")):
