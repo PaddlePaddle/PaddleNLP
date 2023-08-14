@@ -43,7 +43,7 @@ def get_parser():
     parser.add_argument("--top_k", type=int, default=1, help="top_k parameter for generation")
     parser.add_argument("--top_p", type=float, default=1.0, help="top_p parameter for generation")
     parser.add_argument("--temperature", type=float, default=0.95, help="top_p parameter for generation")
-    parser.add_argument("--data_file", required=True, default=None, help="data file directory")
+    parser.add_argument("--data_file", default=None, help="data file directory")
     parser.add_argument("--output_file", default="output.json", help="predict result file directory")
     parser.add_argument("--device", type=str, default="gpu", help="Device")
     parser.add_argument("--dtype", type=str, default=None, help="Model dtype")
@@ -237,24 +237,30 @@ def create_predictor(args):
 
 
 def predict():
-    args = parse_arguments().parse_args()
+    args = parse_arguments()
     paddle.set_device(args.device)
 
     predictor = create_predictor(args)
 
     source_texts = []
     target_texts = []
-    with open(args.data_file, "r", encoding="utf-8") as f:
-        for line in f:
-            example = json.loads(line)
-            source_texts.append(example["src"])
-            target_texts.append(example["tgt"])
+    if args.data_file:
+        with open(args.data_file, "r", encoding="utf-8") as f:
+            for line in f:
+                example = json.loads(line)
+                source_texts.append(example["src"])
+                target_texts.append(example["tgt"])
+    else:
+        source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
+        target_texts = ["", ""]
+
     batch_source_texts = batchfy_text(source_texts, args.batch_size)
     batch_target_texts = batchfy_text(target_texts, args.batch_size)
 
     with open(args.output_file, "w", encoding="utf-8") as f:
         for bs, batch_source_text in enumerate(batch_source_texts):
             outputs = predictor.predict(batch_source_text)
+
             for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
                 print("***********Source**********")
                 print(source)
