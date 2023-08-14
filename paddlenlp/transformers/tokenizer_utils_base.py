@@ -2821,7 +2821,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             return_attention_mask = "attention_mask" in self.model_input_names
         if return_position_ids is None:
             return_position_ids = "position_ids" in self.model_input_names
-
         encoded_inputs = {}
         # Truncation: Handle max sequence length
         total_len = len_ids + len_pair_ids + (self.num_special_tokens_to_add(pair=pair) if add_special_tokens else 0)
