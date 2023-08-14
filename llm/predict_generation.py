@@ -30,7 +30,7 @@ def get_parser():
     parser.add_argument("--model_name_or_path", default=None, required=True, help="The directory of model.")
     parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
     parser.add_argument("--src_length", type=int, default=1024, help="The max length of source text.")
-    parser.add_argument("--tgt_length", type=int, default=100, help="The max length of target text.")
+    parser.add_argument("--tgt_length", type=int, default=1024, help="The max length of target text.")
     parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     parser.add_argument(
         "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
