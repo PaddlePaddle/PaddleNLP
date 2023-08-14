@@ -39,8 +39,15 @@
 ### 3.1 精调训练数据格式
 
 为了方便用户测试，我们也提供示例数据集[广告生成数据集](https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz)，用户也可以仿照数据集的格式制作自己的数据集进行精调。我们支持的数据格式是每行包含一个字典，每个字典包含以下字段：
+
 - `src` : `str, List(str)`, 模型的输入指令（instruction）、提示（prompt），模型应该执行的任务。
 - `tgt` : `str, List(str)`, 模型的输出。
+
+样例数据：
+```
+{"src": "类型#裙*颜色#蓝色*风格#清新*图案#蝴蝶结", "tgt": "裙身处采用立体蝴蝶结装饰辅以蓝色条带点缀，令衣身造型饱满富有层次的同时为其注入一丝甜美气息。将女孩清新娇俏的一面衬托而出。"}
+...
+```
 
 ### 3.2 SFT
 SFT(Supervised Fine-Tuning)依托飞桨提出的[4D混合分布式并行](https://ai.baidu.com/forum/topic/show/987996)能力，支持使用Trainer API轻松切换数据并行(DP)、[张量并行（TP, Tensor Parallelism）](https://arxiv.org/abs/1909.08053)、[流水线并行（PP, Pipeline Parallelism）](https://arxiv.org/abs/1811.06965)（目前仅支持Llama）等多种分布式训练策略。
@@ -50,10 +57,13 @@ SFT(Supervised Fine-Tuning)依托飞桨提出的[4D混合分布式并行](https:
     <img src="https://ai.bdstatic.com/file/63F5EBB1E188457ABAFD311CFC1D8658" width=50% height=50%>
 </div>
 
-
 ```
 # 张量并行分布式训练（常用）
+# 目前OPT不支持张量并行
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py ./chatglm_v2/sft_argument.json
+
+# 张量并行&流水线并行分布式训练（目前仅支持Llama）
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py ./llama/sft_pp_argument.json
 ```
 
 ### 3.3 LoRA
@@ -66,7 +76,7 @@ Transformer模型中包含许多Linear层需要进行密集的矩阵乘法计算
 </div>
 
 
-PaddleNLP LoRA API支持数据并行、张量并行等多种分布式训练策略，可以通过控制`tensor_parallel_degree` 调整并行训练策略。LoRA策略默认应用在所有Linear层，可拓展至**单机LoRA千亿模型**。
+PaddleNLP LoRA API支持数据并行、张量并行等多种分布式训练策略，可以通过控制`tensor_parallel_degree` 调整并行训练策略。LoRA策略默认应用在所有Linear层，可拓展至**单机LoRA微调千亿模型**。
 
 
 ```
@@ -254,10 +264,11 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" flask_server.py \
 ## 6. 量化
 
 **注**：量化后模型暂不支持推理，相关开源工作正在进行中，敬请期待。
-量化算法可以将模型输入和模型权重用更低比特数值表示，能够有效减少内存占用和计算开销。下面我们提供PTQ、GPTQ两种量化算法进行量化，更多技术细节详见[量化策略详细教程](https://github.com/PaddlePaddle/PaddleSlim/blob/develop/docs/zh_cn/tutorials/quant/advanced_quantization.md)
+量化算法可以将模型输入和模型权重用更低比特数值表示，能够有效减少内存占用和计算开销。下面我们提供PTQ、GPTQ两种量化算法结合**PaddleSlim自研策略**进行量化，更多技术细节详见[量化策略详细教程](https://github.com/PaddlePaddle/PaddleSlim/blob/develop/docs/zh_cn/tutorials/quant/advanced_quantization.md)
 
 ### 6.1 环境安装
 - PaddleSlim develop版本
+- PaddlePaddle develop版本
 
 ### 6.2 数据准备
 

@@ -37,11 +37,12 @@ def get_parser():
     parser.add_argument("--top_k", type=int, default=1, help="top_k parameter for generation")
     parser.add_argument("--top_p", type=float, default=1.0, help="top_p parameter for generation")
     parser.add_argument("--temperature", type=float, default=0.95, help="top_p parameter for generation")
-    parser.add_argument("--data_file", required=True, default=None, help="data file directory")
+    parser.add_argument("--data_file", default=None, help="data file directory")
     parser.add_argument("--output_file", default="output.json", help="predict result file directory")
     parser.add_argument("--device", type=str, default="gpu", help="Device")
     parser.add_argument("--dtype", type=str, default=None, help="Model dtype")
     parser.add_argument("--gpt", type=bool, default=False, help="GPTForCausalLM")
+    parser.add_argument("--ernie", type=bool, default=False, help="Ernie35ForCausalLM")
     return parser
 
 
@@ -62,9 +63,6 @@ def batchfy_text(texts, batch_size):
 class Predictor(object):
     def __init__(self, args):
         self.args = args
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
-        if isinstance(self.tokenizer, LlamaTokenizer):
-            self.tokenizer.pad_token = self.tokenizer.eos_token if self.tokenizer.eos_token else "<pad>"
         tensor_parallel_degree = paddle.distributed.get_world_size()
         self.tensor_parallel_rank = 0
         if tensor_parallel_degree > 1:
@@ -121,6 +119,9 @@ class Predictor(object):
                 pad_attention_mask=prefix_tuning_params["pad_attention_mask"],
             )
         self.model.eval()
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
+        if isinstance(self.tokenizer, LlamaTokenizer):
+            self.tokenizer.pad_token = self.tokenizer.eos_token if self.tokenizer.eos_token else "<pad>"
 
     def preprocess(self, source):
         tokenized_source = self.tokenizer(
@@ -164,7 +165,7 @@ class Predictor(object):
 
 
 def predict():
-    args = parse_arguments().parse_args()
+    args = parse_arguments()
     paddle.set_device(args.device)
     predictor = Predictor(args)
 
