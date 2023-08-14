@@ -94,7 +94,7 @@ python -u -m paddle.distributed.launch \
 
 
 
-## 3. 微调
+## 3. 精调
 
 ### SFT
 ```shell
