@@ -309,6 +309,7 @@ class FusedMultiTransformerDyquant(Layer):
         embed_dim,
         num_heads,
         dim_feedforward,
+        quant_bits, 
         dropout_rate=0.0,
         activation="gelu",
         norm_type="layernorm",
@@ -354,7 +355,12 @@ class FusedMultiTransformerDyquant(Layer):
             dim_feedforward
         )
         self.algo="weight_only"
-        self.quant_bits = 8
+        self.quant_bits = quant_bits
+        assert (
+            self.quant_bits == 8 or self.quant_bits == 4
+        ), "Expected quant_bits equal to 4 or 8, but received {}".format(
+            self.quant_bits
+        )
 
         self.normalize_before = normalize_before
         self._dtype = self._helper.get_default_dtype()
@@ -365,6 +371,7 @@ class FusedMultiTransformerDyquant(Layer):
         self.norm_type = norm_type
         self.use_neox_rotary_style = use_neox_rotary_style
 
+        
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
@@ -433,13 +440,14 @@ class FusedMultiTransformerDyquant(Layer):
             ln_bias = self.create_parameter(
                 attr=ln_bias_attr, shape=[embed_dim], is_bias=True,
             )
+
+            qkv_weight_shape = [3 * num_heads * self.head_dim, embed_dim] if trans_qkvw else [embed_dim * 3 * num_heads, self.head_dim]
+            print(qkv_weight_shape)
+            if self.quant_bits == 4: 
+                qkv_weight_shape[0] //= 2
+                
             qkv_weight = self.create_parameter(
-                # shape=[3, num_heads, self.head_dim, embed_dim]
-                # if trans_qkvw
-                # else [embed_dim, 3, num_heads, self.head_dim],
-                shape=[3 * num_heads * self.head_dim, embed_dim]
-                if trans_qkvw
-                else [embed_dim * 3 * num_heads, self.head_dim],
+                qkv_weight_shape,
                 attr=qkv_weight_attr,
                 dtype="int8",
                 is_bias=False,
@@ -457,8 +465,13 @@ class FusedMultiTransformerDyquant(Layer):
                 dtype=self._dtype,
                 is_bias=True,
             )
+
+            linear_weight_shape = [num_heads * self.head_dim, embed_dim]
+            if self.quant_bits == 4: 
+                linear_weight_shape[0] //= 2
+
             linear_weight = self.create_parameter(
-                shape=[num_heads * self.head_dim, embed_dim],
+                shape=linear_weight_shape,
                 attr=linear_weight_attr,
                 dtype="int8",
                 is_bias=False,
@@ -487,8 +500,13 @@ class FusedMultiTransformerDyquant(Layer):
             ffn_ln_bias = self.create_parameter(
                 shape=[embed_dim], attr=ffn_ln_bias_attr, is_bias=True,
             )
+
+            ffn1_weight_shape = [dim_feedforward * 2, embed_dim]
+            if self.quant_bits == 4: 
+                ffn1_weight_shape[0] //= 2
+
             ffn1_weight = self.create_parameter(
-                shape=[dim_feedforward * 2, embed_dim],
+                shape=ffn1_weight_shape,
                 attr=ffn1_weight_attr,
                 dtype="int8",
                 is_bias=False,
@@ -505,8 +523,13 @@ class FusedMultiTransformerDyquant(Layer):
                 dtype=self._dtype,
                 is_bias=True,
             )
+
+            ffn2_weight_shape = [embed_dim, dim_feedforward]
+            if self.quant_bits == 4: 
+                ffn2_weight_shape[0] //= 2
+
             ffn2_weight = self.create_parameter(
-                shape=[embed_dim, dim_feedforward],
+                shape=ffn2_weight_shape,
                 attr=ffn2_weight_attr,
                 dtype="int8",
                 is_bias=False,

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export PYTHONPATH=$PYTHONPATH:../../..
+export PYTHONPATH=$PYTHONPATH:../../..:/root/paddlejob/workspace/env_run/zhengzekang/PaddleNLP
 
 export FLAGS_cache_inference_while_scope=1
 export FLAGS_call_stack_level=2
@@ -24,6 +24,16 @@ export FLAGS_allocator_strategy=naive_best_fit
 export FLAGS_fraction_of_gpu_memory_to_use=0.95
 export FLAGS_use_cutlass_fmha=1
 
-python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
+# python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
+#            predict_generation.py \
+#            --model_name_or_path=${1}
+
+# python -m paddle.distributed.launch --gpus "1" \
+#            predict_generation.py \
+#            --model_name_or_path=/root/paddlejob/workspace/env_run/zhengzekang/zhenyunLLAMAint4/llama-7b \
+#            --quant_bits=4
+
+python -m paddle.distributed.launch --gpus "1" \
            predict_generation.py \
-           --model_name_or_path=${1}
+           --model_name_or_path=/root/.paddlenlp/models/facebook/llama-7b/ \
+           --quant_bits=4

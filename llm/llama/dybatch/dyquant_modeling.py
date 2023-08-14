@@ -198,6 +198,9 @@ class LlamaModel(LlamaPretrainedModel):
         self.num_layers = config.num_hidden_layers
         self.epsilon = config.rms_norm_eps
         self.max_position_embeddings = config.max_position_embeddings
+        self.quant_bits = config.quant_bits
+
+        print("Quant bits is: ", self.quant_bits)
 
         if config.tensor_parallel_degree > 1:
             self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
@@ -265,6 +268,7 @@ class LlamaModel(LlamaPretrainedModel):
             self.hidden_size,
             self.num_attention_heads,
             self.intermediate_size,
+            quant_bits=self.quant_bits, 
             activation="swiglu",
             num_layers=config.num_hidden_layers,
             nranks=config.tensor_parallel_degree,
@@ -384,6 +388,8 @@ class LlamaModel(LlamaPretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict, use_structured_name=True):
+        quant_bits = self.quant_bits
+
         unfused_state_dict = {}
         head_size = self.hidden_size // self.num_attention_heads
 
@@ -422,13 +428,13 @@ class LlamaModel(LlamaPretrainedModel):
 
             qkv_weight_tensor = paddle.to_tensor(concated_qkv_weight)
             qkv_weight_tensor = paddle.transpose(qkv_weight_tensor, perm=[1, 0])
-            qkv_quanted_weight_tensor, qkv_weight_scale_tensor = F.quant_for_compress(qkv_weight_tensor)
+            qkv_quanted_weight_tensor, qkv_weight_scale_tensor = F.quant_for_compress(qkv_weight_tensor, bits=self.quant_bits)
             self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor)
             self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor)
 
 
             linear_weight_tensor = paddle.to_tensor(state_dict["layers.{}.self_attn.o_proj.weight".format(idx)])
-            linear_quanted_weight_tensor, linear_weight_scale_tensor = F.quant_for_compress(linear_weight_tensor)
+            linear_quanted_weight_tensor, linear_weight_scale_tensor = F.quant_for_compress(linear_weight_tensor, bits=self.quant_bits)
             self.transformer_block.linear_weights[idx].set_value(
                 linear_quanted_weight_tensor
             )
@@ -452,7 +458,7 @@ class LlamaModel(LlamaPretrainedModel):
             )
 
             ffn1_weight_tensor = paddle.to_tensor(concated_ffn1_weight)
-            ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = F.quant_for_compress(ffn1_weight_tensor)
+            ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = F.quant_for_compress(ffn1_weight_tensor, bits=self.quant_bits)
             self.transformer_block.ffn1_weights[idx].set_value(
                 ffn1_quanted_weight_tensor
             )
@@ -461,7 +467,7 @@ class LlamaModel(LlamaPretrainedModel):
             )
 
             ffn2_weight_tensor = paddle.to_tensor(state_dict["layers.{}.mlp.down_proj.weight".format(idx)])
-            ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = F.quant_for_compress(ffn2_weight_tensor)
+            ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = F.quant_for_compress(ffn2_weight_tensor, bits=self.quant_bits)
             self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
             self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
 
