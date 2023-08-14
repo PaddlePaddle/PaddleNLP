@@ -31,8 +31,6 @@ from paddlenlp.transformers.gpt.modeling import (
     parallel_matmul,
 )
 
-# llm/gpt-3
-# from configuration import GPTConfig
 # from modeling import (
 #     GPTEmbeddings,
 #     GPTPretrainedModel,

@@ -42,10 +42,6 @@ from paddlenlp.transformers import (
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
-# llm/gpt-3
-# from configuration import GPTConfig
-
-
 MODEL_CLASSES = {
     "gpt": (
         GPTConfig,

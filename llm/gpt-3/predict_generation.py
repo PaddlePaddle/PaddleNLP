@@ -19,8 +19,6 @@ from utils import get_hcg, init_dist_env, set_seed
 from paddlenlp.transformers import GPTChineseTokenizer, GPTConfig, GPTTokenizer
 from paddlenlp.transformers.gpt.modeling import GPTForCausalLM
 
-# llm/gpt-3
-# from configuration import GPTConfig
 # from modeling import GPTForCausalLM
 
 MODEL_CLASSES = {
