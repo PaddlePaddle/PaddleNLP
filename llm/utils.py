@@ -71,9 +71,7 @@ def get_prefix_tuning_params(model):
         postprocess_past_key_value = llama_postprocess_past_key_value
         multi_query_group_num = None
     else:
-        raise ValueError(
-            f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama."
-        )
+        raise ValueError(f"Unknown base_model_prefix: {model.base_model_prefix}. ")
     return dict(
         num_attention_heads=num_attention_heads,
         num_hidden_layers=num_hidden_layers,
@@ -122,9 +120,7 @@ def get_lora_target_modules(model):
             ".*linear2.*",
         ]
     else:
-        raise ValueError(
-            f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama."
-        )
+        raise ValueError(f"Unknown base_model_prefix: {model.base_model_prefix}.")
     return target_modules
 
 

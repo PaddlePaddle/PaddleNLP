@@ -233,7 +233,6 @@ python predict_generation.py \
 - `device`: 运行环境，默认为gpu。
 - `dtype`: 模型参数dtype，默认为None。如果没有传入`lora_path`、`prefix_path`则必须传入
 - `gpt`: 是否使用GPTForCausalLM模型，默认为False。
-- `ernie`: 是否使用Ernie35ForCausalLM模型，默认为False。
 
 ## 5. 服务化部署
 

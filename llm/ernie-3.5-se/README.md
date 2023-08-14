@@ -96,9 +96,7 @@ python -u -m paddle.distributed.launch \
 
 ## 3. 微调
 
-微调脚本具体可见 run_finetune.sh。
-
-### 多卡微调
+### SFT
 ```shell
 python -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
@@ -132,12 +130,9 @@ python -m paddle.distributed.launch \
     --sharding_parallel_degree 8
 ```
 
-### 单卡 LoRA 微调
+### LoRA
 ```shell
-python -m paddle.distributed.launch \
-    --gpus "0" \
-    --log_dir "output_sft/$task_name""_log" \
-    finetune_generation.py \
+python finetune_generation.py \
     --output_dir ./checkpoints/ \
     --per_device_train_batch_size 4 \
     --gradient_accumulation_steps 2 \
@@ -198,14 +193,11 @@ python -m paddle.distributed.launch \
 - `data_name`: 内置数据集名，定义数据集名必须同时定义数据集任务名
 - `dataset_path`: 自定义数据集路径。
 
-<a name="4"></a>
 
-## 预测
-
-预测脚本具体可见 run_predict.sh。
+## 4. 动态图预测
 
 ```shell
-python -m paddle.distributed.launch --gpus "0" predict_generation.py \
+python predict_generation.py \
     --model_name_or_path <PATH_TO_CKPT> \
     --tokenizer_name_or_path ernie-tokenizer
 ```
