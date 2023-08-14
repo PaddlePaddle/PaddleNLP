@@ -16,10 +16,15 @@ import argparse
 import os
 
 import paddle
-from configuration import GPTConfig
-from modeling import GPTForCausalLM
 
-from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
+from paddlenlp.transformers import GPTChineseTokenizer, GPTConfig, GPTTokenizer
+
+# transformers/gpt/modeling
+from paddlenlp.transformers.gpt.modeling import GPTForCausalLM
+
+# llm/gpt-3/modeling
+# from modeling import GPTForCausalLM
+# from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
 
 MODEL_CLASSES = {
     "gpt2": (GPTForCausalLM, GPTTokenizer),
