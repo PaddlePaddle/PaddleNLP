@@ -84,6 +84,16 @@ __all__ = [
 ]
 
 
+def unwrap_optimizer(optimizer, optimizer_instances=()):
+    if optimizer is None:
+        return None
+    while hasattr(optimizer, "_inner_opt") and not isinstance(optimizer, optimizer_instances):
+        optimizer = optimizer._inner_opt
+    if isinstance(optimizer, optimizer_instances):
+        return optimizer
+    return None
+
+
 if is_safetensors_available():
 
     from safetensors import safe_open
@@ -2000,6 +2010,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         os.makedirs(save_dir, exist_ok=True)
 
         merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
+        config_to_save = kwargs.get("config_to_save", None)
         shard_format = kwargs.get("shard_format", "naive")  # support naive pipeline
         # variant = kwargs.get("variant", None)
         # is_main_process = kwargs.get("is_main_process", True)
@@ -2024,24 +2035,23 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         dtype = get_parameter_dtype(model_to_save)
         model_to_save.config.dtype = str(dtype).split(".")[1]
-
-        config_to_save = copy.deepcopy(model_to_save.config)
+        if config_to_save is None:
+            config_to_save = copy.deepcopy(model_to_save.config)
 
         # Save the model
-        if state_dict is None and config_to_save.tensor_parallel_degree > 1:
-            if merge_tensor_parallel:
-                state_dict = model_to_save.merge_tensor_parallel(model_to_save.state_dict(), config_to_save)
-                config_to_save.tensor_parallel_degree = 1
-                if config_to_save.tensor_parallel_rank != 0:
-                    logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
-                    return
-                if variant is not None and "tp" in variant:
-                    variant = "_".join([x for x in variant.split("_") if "tp" not in x])
-            else:
-                variant = weight_name_suffix() if variant is None else variant
-
         if state_dict is None:
-            state_dict = self.state_dict()
+            state_dict = model_to_save.state_dict()
+            if config_to_save.tensor_parallel_degree > 1:
+                if merge_tensor_parallel:
+                    state_dict = model_to_save.merge_tensor_parallel(state_dict, config_to_save)
+                    config_to_save.tensor_parallel_degree = 1
+                    if config_to_save.tensor_parallel_rank != 0:
+                        logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
+                        return
+                    if variant is not None and "tp" in variant:
+                        variant = "_".join([x for x in variant.split("_") if "tp" not in x])
+                else:
+                    variant = weight_name_suffix() if variant is None else variant
 
         # Attach architecture to the config
         config_to_save.architectures = [model_to_save.__class__.__name__]
