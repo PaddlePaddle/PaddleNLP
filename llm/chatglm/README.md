@@ -8,7 +8,8 @@ ChatGLM-6B 是一个开源的、支持中英双语问答的对话语言模型，
 
 | Model                            |
 |----------------------------------|
-| THUDM/chatglm-6b               |
+| THUDM/chatglm-6b                 |
+| THUDM/chatglm-6b-v1.1            |
 
 ## 2. 模型协议
 
