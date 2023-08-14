@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import collections
+import contextlib
 import math
 
 import numpy as np
@@ -107,10 +108,11 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, tensor_parallel_output=T
 
 
 def seed_guard_context(name=None):
-     if name in get_rng_state_tracker().states_:
-         return get_rng_state_tracker().rng_state(name)
-     else:
-         return contextlib.nullcontext()
+    if name in get_rng_state_tracker().states_:
+        return get_rng_state_tracker().rng_state(name)
+    else:
+        return contextlib.nullcontext()
+
 
 class MultiHeadAttention(nn.Layer):
     """
@@ -329,8 +331,9 @@ class MultiHeadAttention(nn.Layer):
 
         if self.config.hidden_dropout_prob:
             with seed_guard_context("local_seed"):
-                weights = F.dropout(weights, self.config.hidden_dropout_prob, training=self.training, mode="upscale_in_train")
-
+                weights = F.dropout(
+                    weights, self.config.hidden_dropout_prob, training=self.training, mode="upscale_in_train"
+                )
 
         out = paddle.matmul(weights, v)
 
@@ -625,7 +628,7 @@ class TransformerDecoderLayer(nn.Layer):
             if self.config.use_fused_dropout_add:
                 tgt = self.fused_dropout_add1(tgt, residual)
             else:
-                 tgt = residual + self.dropout1(tgt)
+                tgt = residual + self.dropout1(tgt)
 
         if not self.config.normalize_before:
             tgt = self.norm1(tgt)
@@ -633,7 +636,7 @@ class TransformerDecoderLayer(nn.Layer):
         residual = tgt
         if self.config.normalize_before:
             tgt = self.norm2(tgt)
-            
+
         with seed_guard_context("global_seed"):
             if not self.config.use_fused_dropout_add:
                 tgt = residual + self.dropout2(self.linear2(self.activation(self.linear1(tgt), approximate=True)))
