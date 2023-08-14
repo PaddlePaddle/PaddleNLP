@@ -11,14 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
-import sys
+from __future__ import annotations
 
+import json
+import os
+import sys
+from abc import abstractmethod
+
+import numpy as np
 import paddle
 from paddle.distributed import fleet
 from utils import get_prefix_tuning_params
 
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaTokenizer
 
 
@@ -59,12 +65,45 @@ def batchfy_text(texts, batch_size):
     return batch_texts
 
 
-class Predictor(object):
+class BasePredictor:
     def __init__(self, args):
         self.args = args
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
         if isinstance(self.tokenizer, LlamaTokenizer):
             self.tokenizer.pad_token = self.tokenizer.eos_token if self.tokenizer.eos_token else "<pad>"
+
+    def preprocess(self, source):
+        tokenized_source = self.tokenizer(
+            source,
+            max_length=self.args.src_length,
+            truncation=True,
+            truncation_side="left",
+            return_tensors="pd",
+            padding=True,
+            add_special_tokens=True,
+        )
+        return tokenized_source
+
+    @abstractmethod
+    def infer(self, inputs):
+        raise NotImplementedError
+
+    def postprocess(self, predictions):
+        decoded_predictions = self.tokenizer.batch_decode(
+            predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False
+        )
+        return decoded_predictions
+
+    def predict(self, source):
+        tokenized_source = self.preprocess(source)
+        predictions = self.infer(tokenized_source)
+        decoded_predictions = self.postprocess(predictions)
+        return decoded_predictions
+
+
+class DygraphPredictor(BasePredictor):
+    def __init__(self, args):
+        super().__init__(args)
         tensor_parallel_degree = paddle.distributed.get_world_size()
         self.tensor_parallel_rank = 0
         if tensor_parallel_degree > 1:
@@ -122,18 +161,6 @@ class Predictor(object):
             )
         self.model.eval()
 
-    def preprocess(self, source):
-        tokenized_source = self.tokenizer(
-            source,
-            max_length=self.args.src_length,
-            truncation=True,
-            truncation_side="left",
-            return_tensors="pd",
-            padding=True,
-            add_special_tokens=True,
-        )
-        return tokenized_source
-
     def infer(self, inputs):
         with paddle.no_grad():
             result = self.model.generate(
@@ -150,23 +177,70 @@ class Predictor(object):
         result = result[0]
         return result
 
-    def postprocess(self, predictions):
-        decoded_predictions = self.tokenizer.batch_decode(
-            predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False
-        )
-        return decoded_predictions
 
-    def predict(self, source):
-        tokenized_source = self.preprocess(source)
-        predictions = self.infer(tokenized_source)
-        decoded_predictions = self.postprocess(predictions)
-        return decoded_predictions
+class StaticGraphPredictor(BasePredictor):
+    def __init__(self, args):
+        super().__init__(args)
+
+        model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
+        params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
+        config = paddle.inference.Config(model_path, params_path)
+
+        if args.device == "gpu":
+            # set GPU configs accordingly
+            config.enable_use_gpu(100, 0)
+        elif args.device == "cpu":
+            # set CPU configs accordingly,
+            # such as enable_mkldnn, set_cpu_math_library_num_threads
+            config.disable_gpu()
+        config.disable_glog_info()
+
+        with static_mode_guard():
+            self.predictor = paddle.inference.create_predictor(config)
+
+    def preprocess(self, input_text):
+        inputs = super().preprocess(input_text)
+
+        # reduce the max_length to prevent length overflow
+        max_length = max(self.args.max_length - inputs["input_ids"].shape[-1], 1)
+        inputs["max_length"] = np.array(max_length, dtype="int64")
+
+        inputs["top_p"] = np.array(self.args.top_p, dtype="float32")
+        inputs["temperature"] = np.array(self.args.temperature, dtype="float32")
+        inputs["top_k"] = np.array(self.args.top_k, dtype="int64")
+        inputs["repetition_penalty"] = np.array(self.args.repetition_penalty, dtype="float32")
+
+        return inputs
+
+
+def create_predictor(args):
+    """create predictor instance by args, and support dygraph model and static inference model
+
+    Args:
+        args (Argument): the argument instance from commandline
+
+    Returns:
+        Predictor: the instance of predictor
+    """
+    if os.path.exists(args.model_name_or_path):
+
+        # if there is model_state.pdparams file, it should be DygraphPredictor
+        if os.path.exists(os.path.join(args.model_name_or_path, "model_state.pdparams")):
+            return DygraphPredictor(args)
+
+        if any(
+            [file.endswith("pdiparams") and file.endswith("pdmodel") for file in os.listdir(args.model_name_or_path)]
+        ):
+            return StaticGraphPredictor(args)
+
+    return DygraphPredictor(args)
 
 
 def predict():
     args = parse_arguments().parse_args()
     paddle.set_device(args.device)
-    predictor = Predictor(args)
+
+    predictor = create_predictor(args)
 
     source_texts = []
     target_texts = []
