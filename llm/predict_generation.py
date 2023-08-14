@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import os
 import sys
 
 import paddle
@@ -29,7 +30,7 @@ def get_parser():
     parser.add_argument("--model_name_or_path", default=None, required=True, help="The directory of model.")
     parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
     parser.add_argument("--src_length", type=int, default=1024, help="The max length of source text.")
-    parser.add_argument("--tgt_length", type=int, default=1024, help="The max length of target text.")
+    parser.add_argument("--tgt_length", type=int, default=100, help="The max length of target text.")
     parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
     parser.add_argument(
         "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
@@ -37,11 +38,12 @@ def get_parser():
     parser.add_argument("--top_k", type=int, default=1, help="top_k parameter for generation")
     parser.add_argument("--top_p", type=float, default=1.0, help="top_p parameter for generation")
     parser.add_argument("--temperature", type=float, default=0.95, help="top_p parameter for generation")
-    parser.add_argument("--data_file", required=True, default=None, help="data file directory")
+    parser.add_argument("--data_file", default=None, help="data file directory")
     parser.add_argument("--output_file", default="output.json", help="predict result file directory")
     parser.add_argument("--device", type=str, default="gpu", help="Device")
     parser.add_argument("--dtype", type=str, default=None, help="Model dtype")
     parser.add_argument("--gpt", type=bool, default=False, help="GPTForCausalLM")
+    parser.add_argument("--ernie", type=bool, default=False, help="Ernie35ForCausalLM")
     return parser
 
 
@@ -62,9 +64,6 @@ def batchfy_text(texts, batch_size):
 class Predictor(object):
     def __init__(self, args):
         self.args = args
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
-        if isinstance(self.tokenizer, LlamaTokenizer):
-            self.tokenizer.pad_token = self.tokenizer.eos_token if self.tokenizer.eos_token else "<pad>"
         tensor_parallel_degree = paddle.distributed.get_world_size()
         self.tensor_parallel_rank = 0
         if tensor_parallel_degree > 1:
@@ -100,6 +99,23 @@ class Predictor(object):
                 tensor_parallel_degree=tensor_parallel_degree,
                 tensor_parallel_rank=self.tensor_parallel_rank,
             )
+        elif self.args.ernie:
+            sys.path.append("./ernie-3.5-se")
+            from modeling import Ernie35ForCausalLM
+
+            self.model = Ernie35ForCausalLM.from_pretrained(
+                args.model_name_or_path,
+                dtype=dtype,
+                tensor_parallel_degree=tensor_parallel_degree,
+                tensor_parallel_rank=self.tensor_parallel_rank,
+                use_flash_attention=False,
+            )
+            if self.args.src_length + self.args.tgt_length > 4096:
+                self.model.pos_decoding_interval = max(
+                    self.model.config.max_position_embeddings // (self.tgt_length + self.src_length), 1
+                )
+            else:
+                self.model.pos_decoding_interval = 8
         else:
             self.model = AutoModelForCausalLM.from_pretrained(
                 args.model_name_or_path,
@@ -121,6 +137,15 @@ class Predictor(object):
                 pad_attention_mask=prefix_tuning_params["pad_attention_mask"],
             )
         self.model.eval()
+        if self.args.ernie:
+            from tokenizer import Ernie35Tokenizer
+
+            self.tokenizer = Ernie35Tokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
+            self.tokenizer.pad_token = self.tokenizer.eos_token if self.tokenizer.eos_token else "<pad>"
+        else:
+            self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
+            if isinstance(self.tokenizer, LlamaTokenizer):
+                self.tokenizer.pad_token = self.tokenizer.eos_token if self.tokenizer.eos_token else "<pad>"
 
     def preprocess(self, source):
         tokenized_source = self.tokenizer(
@@ -135,6 +160,13 @@ class Predictor(object):
         return tokenized_source
 
     def infer(self, inputs):
+        if self.args.ernie:
+            if self.model.pos_decoding_interval > 1 and "position_ids" in inputs:
+                inputs["position_ids"] = inputs["position_ids"] * self.model.pos_decoding_interval + (
+                    self.model.pos_decoding_interval - 1
+                )
+            os.environ["pos_decoding_interval"] = str(self.model.pos_decoding_interval)
+        print(inputs)
         with paddle.no_grad():
             result = self.model.generate(
                 **inputs,
@@ -164,7 +196,7 @@ class Predictor(object):
 
 
 def predict():
-    args = parse_arguments().parse_args()
+    args = parse_arguments()
     paddle.set_device(args.device)
     predictor = Predictor(args)
 

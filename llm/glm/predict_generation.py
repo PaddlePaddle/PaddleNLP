@@ -15,7 +15,7 @@
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.layers import LoRAConfig, LoRAModel
+from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForConditionalGeneration,

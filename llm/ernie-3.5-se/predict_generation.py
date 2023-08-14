@@ -184,8 +184,8 @@ if __name__ == "__main__":
     predictor = Predictor(args)
     if args.data_file is None:
         all_texts = [
-            "The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, ",
-            "Hello, it is a great day! nice to ",
+            # "The Broncos took an early lead in Super Bowl 50 and never trailed. Newton was limited by Denver's defense, ",
+            # "Hello, it is a great day! nice to ",
             "a b c d e f g ",
         ]
     else:

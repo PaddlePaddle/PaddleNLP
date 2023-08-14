@@ -61,6 +61,9 @@ SFT(Supervised Fine-Tuning)依托飞桨提出的[4D混合分布式并行](https:
 ```
 # 张量并行分布式训练（常用）
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py ./chatglm_v2/sft_argument.json
+
+# 张量并行&流水线并行分布式训练（目前仅支持Llama）
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py ./llama/sft_pp_argument.json
 ```
 
 ### 3.3 LoRA
@@ -230,6 +233,7 @@ python predict_generation.py \
 - `device`: 运行环境，默认为gpu。
 - `dtype`: 模型参数dtype，默认为None。如果没有传入`lora_path`、`prefix_path`则必须传入
 - `gpt`: 是否使用GPTForCausalLM模型，默认为False。
+- `ernie`: 是否使用Ernie35ForCausalLM模型，默认为False。
 
 ## 5. 服务化部署
 
@@ -265,6 +269,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" flask_server.py \
 
 ### 6.1 环境安装
 - PaddleSlim develop版本
+- PaddlePaddle develop版本
 
 ### 6.2 数据准备
 
