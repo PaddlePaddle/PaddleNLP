@@ -64,6 +64,7 @@ parser.add_argument("--port", type=str, default="9200", help="port of ANN search
 parser.add_argument("--es_chunk_size", default=500, type=int, help="Number of docs in one chunk sent to es")
 parser.add_argument("--es_thread_count", default=32, type=int, help="Size of the threadpool to use for the bulk requests")
 parser.add_argument("--es_queue_size", default=32, type=int, help="Size of the task queue between the main thread (producing chunks to send) and the processing threads.")
+parser.add_argument('--indexing', default=False, type=bool, help='Whether indexing is enabled.')
 args = parser.parse_args()
 # yapf: enable
 
@@ -120,15 +121,16 @@ def chat_markdown_tutorial():
     text_splitter = CharacterTextSplitter(
         separator="\n", chunk_size=args.data_chunk_size, chunk_overlap=0, filters=["\n"]
     )
-    indexing_pipeline = Pipeline()
-    indexing_pipeline.add_node(component=markdown_converter, name="MarkdownConverter", inputs=["File"])
-    indexing_pipeline.add_node(component=text_splitter, name="Splitter", inputs=["MarkdownConverter"])
-    indexing_pipeline.add_node(component=retriever, name="Retriever", inputs=["Splitter"])
-    indexing_pipeline.add_node(component=document_store, name="DocumentStore", inputs=["Retriever"])
-    files = glob.glob(args.file_paths + "/**/*.md", recursive=True)
-    if len(files) == 0:
-        raise Exception("file should not be empty")
-    indexing_pipeline.run(file_paths=files)
+    if args.indexing:
+        indexing_pipeline = Pipeline()
+        indexing_pipeline.add_node(component=markdown_converter, name="MarkdownConverter", inputs=["File"])
+        indexing_pipeline.add_node(component=text_splitter, name="Splitter", inputs=["MarkdownConverter"])
+        indexing_pipeline.add_node(component=retriever, name="Retriever", inputs=["Splitter"])
+        indexing_pipeline.add_node(component=document_store, name="DocumentStore", inputs=["Retriever"])
+        files = glob.glob(args.file_paths + "/**/*.md", recursive=True)
+        if len(files) == 0:
+            raise Exception("file should not be empty")
+        indexing_pipeline.run(file_paths=files)
 
     # Query Markdowns
     if args.chatbot in ["ernie_bot"]:
@@ -150,7 +152,7 @@ def chat_markdown_tutorial():
         component=TruncatedConversationHistory(max_length=256), name="TruncateHistory", inputs=["Template"]
     )
     query_pipeline.add_node(component=ernie_bot, name="ErnieBot", inputs=["TruncateHistory"])
-    query = "Aistudio最火的项目是哪个?"
+    query = "理财产品的认购期是多久？"
     start_time = time.time()
     prediction = query_pipeline.run(query=query, params={"DenseRetriever": {"top_k": 10}, "Ranker": {"top_k": 5}})
     end_time = time.time()
