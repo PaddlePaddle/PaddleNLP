@@ -25,7 +25,7 @@ def parse_arguments():
     parser.add_argument("--merge_model_path", default=None, required=True, help="The directory of merged model.")
     parser.add_argument("--device", type=str, default="gpu", help="Device")
     parser.add_argument("--dtype", type=str, default=None, required=True, help="Model dtype")
-    parser.add_argument("--with_tokenizer", type=bool, default=True, help="Save tokenizer at the same time")
+    parser.add_argument("--with_tokenizer", type=bool, default=False, help="Save tokenizer at the same time")
     return parser.parse_args()
 
 
@@ -52,10 +52,11 @@ def merge():
         tensor_parallel_degree=tensor_parallel_degree,
         tensor_parallel_rank=tensor_parallel_rank,
     )
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     if tensor_parallel_rank == 0:
         model.save_pretrained(args.merge_model_path, merge_tensor_parallel=tensor_parallel_degree > 1)
-        tokenizer.save_pretrained(args.merge_model_path)
+        if args.with_tokenizer:
+            tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+            tokenizer.save_pretrained(args.merge_model_path)
 
 
 if __name__ == "__main__":

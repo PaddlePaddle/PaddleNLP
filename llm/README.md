@@ -167,11 +167,11 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 我们使用张量并行(TP，Tensor Parallelism)训练过程中，为了节省TP参数合并时间往往在中间checkpoint将参数存储为多个TP参数分片，可以使用提供的分片合并参数脚本进行参数合并。
 
 ```
-python merge_tp_params.py  \
+python -m paddle.distributed.launch --gpus "0,1,2,3" merge_tp_params.py  \
     --model_name_or_path ./checkpoints/chatglm_v2_sft_ckpts/checkpoint-7163 \
     --merge_model_path ./checkpoints/chatglm_v2_sft_ckpts/checkpoint_merge \
     --dtype "float16" \
-    --with_tokenizer
+    --with_tokenizer True
 ```
 
 **参数：**
