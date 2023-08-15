@@ -751,7 +751,7 @@ class ChatGLMHead(nn.Layer):
 
 
 class ChatGLMForCausalLM(ChatGLMPretrainedModel):
-    _keys_to_ignore_on_save = [r"lm_head.weight"]
+    _keys_to_ignore_on_save = [r"lm_head.decoder_weight"]
     _tied_weights_keys = ["lm_head.weight"]
 
     def __init__(self, config: ChatGLMConfig):
