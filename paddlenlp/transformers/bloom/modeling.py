@@ -114,6 +114,7 @@ def _expand_2d_mask(mask: Tensor, tgt_length: int) -> Tensor:
     batch_size, src_length = mask.shape[0], mask.shape[-1]
     tgt_length = tgt_length if tgt_length is not None else src_length
 
+    mask.stop_gradient = True
     return mask.unsqueeze(axis=[1, 2]).expand([batch_size, 1, tgt_length, src_length])
 
 

@@ -72,13 +72,15 @@ class BasePredictor:
         if isinstance(self.tokenizer, LlamaTokenizer):
             self.tokenizer.pad_token = self.tokenizer.eos_token if self.tokenizer.eos_token else "<pad>"
 
+        self.return_tensors = "pd"
+
     def preprocess(self, source):
         tokenized_source = self.tokenizer(
             source,
             max_length=self.args.src_length,
             truncation=True,
             truncation_side="left",
-            return_tensors="pd",
+            return_tensors=self.return_tensors,
             padding=True,
             add_special_tokens=True,
         )
@@ -197,6 +199,8 @@ class StaticGraphPredictor(BasePredictor):
 
         with static_mode_guard():
             self.predictor = paddle.inference.create_predictor(config)
+
+        self.return_tensors = "np"
 
     def preprocess(self, input_text):
         inputs = super().preprocess(input_text)

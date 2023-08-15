@@ -983,6 +983,12 @@ class OPTForCausalLM(OPTPretrainedModel):
             embedding_weights=self.opt.embeddings.word_embeddings.weight,
         )
 
+    def _get_model_inputs_spec(self, dtype: str):
+        input_ids = paddle.static.InputSpec(shape=[None, None], dtype="int64")
+        attention_mask = None
+        position_ids = None
+        return input_ids, attention_mask, position_ids
+
     def forward(
         self,
         input_ids=None,

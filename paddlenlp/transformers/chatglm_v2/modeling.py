@@ -811,6 +811,7 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
             "position_ids": position_ids,
             "attention_mask": attention_mask,
             "return_last_logit": True,
+            "use_cache": True,
         }
 
     def forward(
