@@ -1927,10 +1927,8 @@ def TopPProcess(probs, top_p, min_tokens_to_keep):
     org_probs = probs
     if probs.dtype == paddle.bfloat16:
         probs = paddle.cast(probs, paddle.float32)
-        sorted_indices = paddle.argsort(probs, descending=True)
-    else:
-        sorted_indices = paddle.argsort(probs, descending=True)
 
+    sorted_indices = paddle.argsort(probs, descending=True)
     if isinstance(sorted_indices, tuple):
         sorted_probs, sorted_indices = sorted_indices
     else:
