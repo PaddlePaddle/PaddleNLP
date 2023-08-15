@@ -1398,8 +1398,8 @@ class GenerationMixin(object):
                         unfinished_flag,
                         model_kwargs,
                     )
-                paddle.increment(cur_len)
-                paddle.increment(cur_len_gpu)
+                    paddle.increment(cur_len)
+                    paddle.increment(cur_len_gpu)
         else:
             while cur_len < max_length and paddle.any(unfinished_flag):
                 input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
@@ -1411,8 +1411,8 @@ class GenerationMixin(object):
                     unfinished_flag,
                     model_kwargs,
                 )
-            paddle.increment(cur_len)
-            paddle.increment(cur_len_gpu)
+                paddle.increment(cur_len)
+                paddle.increment(cur_len_gpu)
 
         return input_ids[:, origin_len:], scores
 
