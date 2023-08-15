@@ -48,6 +48,7 @@ def get_parser():
     parser.add_argument("--device", type=str, default="gpu", help="Device")
     parser.add_argument("--dtype", type=str, default=None, help="Model dtype")
     parser.add_argument("--gpt", type=bool, default=False, help="GPTForCausalLM")
+    parser.add_argument("--ernie", type=bool, default=False, help="Ernie35ForCausalLM")
     return parser
 
 
@@ -159,9 +160,11 @@ class DygraphPredictor(BasePredictor):
                 model=self.model,
                 prefix_path=self.args.prefix_path,
                 postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
-                pad_attention_mask=prefix_tuning_params["pad_attention_mask"],
             )
         self.model.eval()
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
+        if isinstance(self.tokenizer, LlamaTokenizer):
+            self.tokenizer.pad_token = self.tokenizer.eos_token if self.tokenizer.eos_token else "<pad>"
 
     def infer(self, inputs):
         with paddle.no_grad():
