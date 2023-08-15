@@ -77,21 +77,6 @@ def main():
     else:
         dtype = "float32"
 
-    model_config = AutoConfig.from_pretrained(
-        model_args.model_name_or_path,
-        tensor_parallel_output=False,
-        tensor_parallel_degree=training_args.tensor_parallel_degree,
-        tensor_parallel_rank=training_args.tensor_parallel_rank,
-        dtype=dtype,
-    )
-
-    if hasattr(model_config, "use_flash_attention"):
-        model_config.use_flash_attention = model_args.use_flash_attention
-    if hasattr(model_config, "max_position_embeddings"):
-        if model_config.max_position_embeddings < data_args.src_length + data_args.tgt_length:
-            raise ValueError(
-                f"The src_length + tgt_length ({data_args.src_length + data_args.tgt_length}) must be smaller than max_position_embeddings({model_config.max_position_embeddings})."
-            )
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
             raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
@@ -99,9 +84,27 @@ def main():
 
         model = LlamaForCausalLMPipe.from_pretrained(
             model_args.model_name_or_path,
-            config=model_config,
+            tensor_parallel_output=False,
+            tensor_parallel_degree=training_args.tensor_parallel_degree,
+            tensor_parallel_rank=training_args.tensor_parallel_rank,
+            use_flash_attention=model_args.use_flash_attention,
+            dtype=dtype,
         )
     else:
+        model_config = AutoConfig.from_pretrained(
+            model_args.model_name_or_path,
+            tensor_parallel_output=False,
+            tensor_parallel_degree=training_args.tensor_parallel_degree,
+            tensor_parallel_rank=training_args.tensor_parallel_rank,
+            dtype=dtype,
+        )
+        if hasattr(model_config, "use_flash_attention"):
+            model_config.use_flash_attention = model_args.use_flash_attention
+        if hasattr(model_config, "max_position_embeddings"):
+            if model_config.max_position_embeddings < data_args.src_length + data_args.tgt_length:
+                raise ValueError(
+                    f"The src_length + tgt_length ({data_args.src_length + data_args.tgt_length}) must be smaller than max_position_embeddings({model_config.max_position_embeddings})."
+                )
         model = AutoModelForCausalLM.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
@@ -176,7 +179,6 @@ def main():
         model = PrefixModelForCausalLM(
             model=model,
             prefix_config=prefix_config,
-            pad_attention_mask=prefix_tuning_params["pad_attention_mask"],
             postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
         )
         model.mark_only_prefix_as_trainable()

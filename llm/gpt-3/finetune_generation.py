@@ -162,7 +162,6 @@ def main():
                 ".*linear2.*",
                 ".*out_proj.*",
             ]
-
             lora_config = LoRAConfig(
                 target_modules=target_modules,
                 r=model_args.lora_rank,
