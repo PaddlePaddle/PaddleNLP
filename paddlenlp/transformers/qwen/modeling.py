@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import importlib
 import math
 from typing import List, Optional
 
 import paddle
 import paddle.nn.functional as F
+from paddle import Tensor, nn
+from paddle.distributed.fleet.utils import recompute
 
-# from paddlenlp.transformers.generation_utils import LogitsProcessorList
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPast,
     CausalLMOutputWithPast,
@@ -28,161 +28,7 @@ from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.utils.log import logger
 
 from ...utils.converter import StateDictNameMapping, init_name_mappings
-
-# import paddle.utils.checkpoint
-# from torch.cuda.amp import autocast
-
-try:
-    from einops import rearrange
-except ImportError:
-    rearrange = None
-
-from paddle import Tensor, nn
-
 from .configuration import QWenConfig
-
-# SUPPORT_CUDA = torch.cuda.is_available()
-# SUPPORT_BF16 = SUPPORT_CUDA and torch.cuda.is_bf16_supported()
-# SUPPORT_FP16 = SUPPORT_CUDA and torch.cuda.get_device_capability(0)[0] >= 7
-
-
-# from .qwen_generation_utils import (
-#    make_context,
-#    decode_tokens,
-#    get_stop_words_ids,
-#    StopWordsLogitsProcessor,
-# )
-
-
-_CHECKPOINT_FOR_DOC = "qwen"
-_CONFIG_FOR_DOC = "QWenConfig"
-
-QWen_PRETRAINED_MODEL_ARCHIVE_LIST = ["qwen-7b"]
-
-_ERROR_BAD_CHAT_FORMAT = """\
-We detect you are probably using the pretrained model (rather than chat model) for chatting, since the chat_format in generation_config is not "chatml".
-If you are directly using the model downloaded from Huggingface, please make sure you are using our "Qwen/Qwen-7B-Chat" Huggingface model (rather than "Qwen/Qwen-7B") when you call model.chat().
-我们检测到您可能在使用预训练模型（而非chat模型）进行多轮chat，因为您当前在generation_config指定的chat_format，并未设置为我们在对话中所支持的"chatml"格式。
-如果您在直接使用我们从Huggingface提供的模型，请确保您在调用model.chat()时，使用的是"Qwen/Qwen-7B-Chat"模型（而非"Qwen/Qwen-7B"预训练模型）。
-"""
-
-_SENTINEL = object()
-_ERROR_STREAM_IN_CHAT = """\
-Pass argument `stream` to model.chat() is buggy, deprecated, and marked for removal. Please use model.chat_stream(...) instead of model.chat(..., stream=True).
-向model.chat()传入参数stream的用法可能存在Bug，该用法已被废弃，将在未来被移除。请使用model.chat_stream(...)代替model.chat(..., stream=True)。
-"""
-
-apply_rotary_emb_func = None
-rms_norm = None
-flash_attn_unpadded_func = None
-
-
-def _import_flash_attn():
-    global apply_rotary_emb_func, rms_norm, flash_attn_unpadded_func
-    try:
-        from flash_attn.layers.rotary import (
-            apply_rotary_emb_func as __apply_rotary_emb_func,
-        )
-
-        apply_rotary_emb_func = __apply_rotary_emb_func
-    except ImportError:
-        logger.warn(
-            "Warning: import flash_attn rotary fail, please install FlashAttention rotary to get higher efficiency "
-            "https://github.com/Dao-AILab/flash-attention/tree/main/csrc/rotary"
-        )
-
-    try:
-        from flash_attn.ops.rms_norm import rms_norm as __rms_norm
-
-        rms_norm = __rms_norm
-    except ImportError:
-        logger.warn(
-            "Warning: import flash_attn rms_norm fail, please install FlashAttention layer_norm to get higher efficiency "
-            "https://github.com/Dao-AILab/flash-attention/tree/main/csrc/layer_norm"
-        )
-
-    try:
-        import flash_attn
-
-        if not hasattr(flash_attn, "__version__"):
-            from flash_attn.flash_attn_interface import (
-                flash_attn_unpadded_func as __flash_attn_unpadded_func,
-            )
-        else:
-            if int(flash_attn.__version__.split(".")[0]) >= 2:
-                from flash_attn.flash_attn_interface import (
-                    flash_attn_varlen_func as __flash_attn_unpadded_func,
-                )
-            else:
-                from flash_attn.flash_attn_interface import (
-                    flash_attn_unpadded_func as __flash_attn_unpadded_func,
-                )
-        flash_attn_unpadded_func = __flash_attn_unpadded_func
-    except ImportError:
-        logger.warn(
-            "Warning: import flash_attn fail, please install FlashAttention to get higher efficiency "
-            "https://github.com/Dao-AILab/flash-attention"
-        )
-
-
-class FlashSelfAttention(nn.Layer):
-    def __init__(
-        self,
-        causal=False,
-        softmax_scale=None,
-        attention_dropout=0.0,
-    ):
-        super().__init__()
-        assert flash_attn_unpadded_func is not None, (
-            "Please install FlashAttention first, " "e.g., with pip install flash-attn"
-        )
-        assert rearrange is not None, "Please install einops first, e.g., with pip install einops"
-        self.causal = causal
-        self.softmax_scale = softmax_scale
-        self.dropout_p = attention_dropout
-
-    def forward(self, q, k, v):
-        assert all((i.dtype in [paddle.float16, paddle.bfloat16] for i in (q, k, v)))
-        assert all((i.is_cuda for i in (q, k, v)))
-        batch_size, seqlen_q = q.shape[0], q.shape[1]
-        seqlen_k = k.shape[1]
-        q, k, v = [rearrange(x, "b s ... -> (b s) ...") for x in [q, k, v]]
-        cu_seqlens_q = paddle.arange(
-            0,
-            (batch_size + 1) * seqlen_q,
-            step=seqlen_q,
-            dtype=paddle.int32,
-        )
-
-        if self.training:
-            assert seqlen_k == seqlen_q
-
-            is_causal = self.causal
-            cu_seqlens_k = cu_seqlens_q
-        else:
-            is_causal = seqlen_q == seqlen_k
-            cu_seqlens_k = paddle.arange(
-                0,
-                (batch_size + 1) * seqlen_k,
-                step=seqlen_k,
-                dtype=paddle.int32,
-            )
-            self.dropout_p = 0
-        output = flash_attn_unpadded_func(
-            q,
-            k,
-            v,
-            cu_seqlens_q,
-            cu_seqlens_k,
-            seqlen_q,
-            seqlen_k,
-            self.dropout_p,
-            softmax_scale=self.softmax_scale,
-            causal=is_causal,
-        )
-
-        output = rearrange(output, "(b s) ... -> b s ...", b=batch_size)
-        return output
 
 
 class QWenAttention(nn.Layer):
@@ -206,7 +52,6 @@ class QWenAttention(nn.Layer):
         self.head_dim = self.hidden_size // self.num_heads
         self.inv_norm_factor = 1.0 / math.sqrt(self.head_dim)
 
-        self.use_flash_attn = config.use_flash_attn
         self.scale_attn_weights = True
 
         self.projection_size = config.kv_channels * config.num_attention_heads
@@ -219,8 +64,6 @@ class QWenAttention(nn.Layer):
         self.c_proj = nn.Linear(config.hidden_size, self.projection_size, bias_attr=not config.no_bias)
 
         self.is_fp32 = not (config.bf16 or config.fp16)
-        if self.use_flash_attn and flash_attn_unpadded_func is not None and not self.is_fp32:
-            self.core_attention_flash = FlashSelfAttention(causal=True, attention_dropout=config.attn_dropout_prob)
 
         self.bf16 = config.bf16
 
@@ -246,11 +89,6 @@ class QWenAttention(nn.Layer):
 
         if self.scale_attn_weights:
             attn_weights = attn_weights * self.inv_norm_factor
-            # attn_weights = attn_weights / paddle.full(
-            #    [],
-            #    value.shape[-1] ** 0.5,
-            #    dtype=attn_weights.dtype,
-            # )
 
         query_length, key_length = query.shape[-2], key.shape[-2]
         causal_mask = self.bias[:, :, key_length - query_length : key_length, :key_length]
@@ -270,59 +108,6 @@ class QWenAttention(nn.Layer):
         attn_output = attn_output.transpose([0, 2, 1, 3])
 
         return attn_output, attn_weights
-
-    # def _upcast_and_reordered_attn(
-    #    self, query, key, value, attention_mask=None, head_mask=None
-    # ):
-    #    bsz, num_heads, q_seq_len, dk = query.shape
-    #    _, _, k_seq_len, _ = key.shape
-
-    #    attn_weights = paddle.empty(
-    #        bsz * num_heads,
-    #        q_seq_len,
-    #        k_seq_len,
-    #        dtype=torch.float32,
-    #    )
-
-    #    scale_factor = 1.0
-    #    if self.scale_attn_weights:
-    #        scale_factor /= float(value.shape[-1]) ** 0.5
-
-    #    with autocast(enabled=False):
-    #        q, k = query.reshape([-1, q_seq_len, dk]), key.transpose(-1, -2).reshape(
-    #            [-1, dk, k_seq_len]
-    #        )
-    #        attn_weights = torch.baddbmm(
-    #            attn_weights, q.float(), k.float(), beta=0, alpha=scale_factor
-    #        )
-    #        attn_weights = attn_weights.reshape([bsz, num_heads, q_seq_len, k_seq_len])
-
-    #    query_length, key_length = query.shape[-2], key.shape[-2]
-    #    causal_mask = self.bias[
-    #        :, :, key_length - query_length : key_length, :key_length
-    #    ]
-    #    mask_value = torch.finfo(attn_weights.dtype).min
-    #    mask_value = torch.tensor(mask_value, dtype=attn_weights.dtype)
-    #    attn_weights = torch.where(causal_mask, attn_weights, mask_value)
-
-    #    if attention_mask is not None:
-    #        attn_weights = attn_weights + attention_mask
-
-    #    attn_weights = nn.functional.softmax(attn_weights, dim=-1)
-
-    #    if attn_weights.dtype != torch.float32:
-    #        raise RuntimeError(
-    #            "Error with upcasting, attn_weights does not have dtype torch.float32"
-    #        )
-    #    attn_weights = attn_weights.type(value.dtype)
-    #    attn_weights = self.attn_dropout(attn_weights)
-
-    #    if head_mask is not None:
-    #        attn_weights = attn_weights * head_mask
-
-    #    attn_output = torch.matmul(attn_weights, value)
-
-    #    return attn_output, attn_weights
 
     def _split_heads(self, tensor, num_heads, attn_head_size):
         new_shape = tensor.shape[:-1] + [num_heads, attn_head_size]
@@ -400,25 +185,16 @@ class QWenAttention(nn.Layer):
             logn_tensor = self.logn_tensor[:, seq_start:seq_end, :, :]
             query = query * logn_tensor.expand_as(query)
 
-        if self.use_flash_attn and flash_attn_unpadded_func is not None and not self.is_fp32 and query.is_cuda:
-            q, k, v = query, key, value
-            context_layer = self.core_attention_flash(q, k, v)
-
-            context_layer = rearrange(context_layer, "b s h d -> b s (h d)")
-        else:
-            query = query.transpose([0, 2, 1, 3])
-            key = key.transpose([0, 2, 1, 3])
-            value = value.transpose([0, 2, 1, 3])
-            attn_output, attn_weight = self._attn(query, key, value, attention_mask, head_mask)
-            context_layer = self._merge_heads(attn_output, self.num_heads, self.head_dim)
+        query = query.transpose([0, 2, 1, 3])
+        key = key.transpose([0, 2, 1, 3])
+        value = value.transpose([0, 2, 1, 3])
+        attn_output, attn_weight = self._attn(query, key, value, attention_mask, head_mask)
+        context_layer = self._merge_heads(attn_output, self.num_heads, self.head_dim)
 
         attn_output = self.c_proj(context_layer)
         outputs = (attn_output, present)
         if output_attentions:
-            if self.use_flash_attn and flash_attn_unpadded_func is not None and not self.is_fp32:
-                raise ValueError("Cannot output attentions while using flash-attn")
-            else:
-                outputs += (attn_weight,)
+            outputs += (attn_weight,)
 
         return outputs
 
@@ -588,17 +364,6 @@ class QWenPreTrainedModel(PretrainedModel):
             if getattr(module, "bias", None) is not None:
                 module.weight.set_value(paddle.zeros(shape=module.weight.shape, dtype=paddle.get_default_dtype()))
 
-        # if isinstance(module, nn.Linear):
-        #    module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
-        #    if module.bias is not None:
-        #        module.bias.data.zero_()
-        # elif isinstance(module, nn.Embedding):
-        #    module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
-        #    if module.padding_idx is not None:
-        #        module.weight.data[module.padding_idx].zero_()
-        # elif isinstance(module, RMSNorm):
-        #    module.weight.data.fill_(1.0)
-
         for name, p in module.named_parameters():
             if name == "c_proj.weight":
                 p.set_value(
@@ -608,11 +373,6 @@ class QWenPreTrainedModel(PretrainedModel):
                         shape=p.shape,
                     )
                 )
-                #    mean=0.0,
-                #    std=(
-                #        self.config.initializer_range
-                #        / math.sqrt(2 * self.config.num_hidden_layers)
-                #    ),
 
     def _set_gradient_checkpointing(self, module, value=False):
         if isinstance(module, QWenModel):
@@ -686,6 +446,39 @@ class QWenModel(QWenPreTrainedModel):
             head_mask = [None] * num_hidden_layers
 
         return head_mask
+
+    @paddle.jit.not_to_static
+    def recompute_training(
+        self,
+        block,
+        hidden_states,
+        layer_past,
+        attention_mask,
+        head_mask,
+        encoder_hidden_states,
+        encoder_attention_mask,
+        use_cache,
+        output_attentions,
+    ):
+        def create_custom_forward(module):
+            def custom_forward(*inputs):
+                return module(*inputs)
+
+            return custom_forward
+
+        hidden_states = recompute(
+            create_custom_forward(block),
+            hidden_states,
+            layer_past,
+            attention_mask,
+            head_mask,
+            encoder_hidden_states,
+            encoder_attention_mask,
+            use_cache,
+            output_attentions,
+            use_reentrant=False,
+        )
+        return hidden_states
 
     def forward(
         self,
@@ -779,24 +572,17 @@ class QWenModel(QWenPreTrainedModel):
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
             if self.enable_recompute and self.training:
-                pass
-                # TODO recompute
-                # def create_custom_forward(module):
-                #    def custom_forward(*inputs):
-                #        # None for past_key_value
-                #        return module(*inputs, use_cache, output_attentions)
-
-                #    return custom_forward
-
-                # outputs = torch.utils.checkpoint.checkpoint(
-                #    create_custom_forward(block),
-                #    hidden_states,
-                #    None,
-                #    attention_mask,
-                #    head_mask[i],
-                #    encoder_hidden_states,
-                #    encoder_attention_mask,
-                # )
+                outputs = self.recompute_training(
+                    block,
+                    hidden_states,
+                    layer_past=layer_past,
+                    attention_mask=attention_mask,
+                    head_mask=head_mask[i],
+                    encoder_hidden_states=encoder_hidden_states,
+                    encoder_attention_mask=encoder_attention_mask,
+                    use_cache=use_cache,
+                    output_attentions=output_attentions,
+                )
             else:
                 outputs = block(
                     hidden_states,
@@ -839,62 +625,8 @@ class QWenLMHeadModel(QWenPreTrainedModel):
 
     def __init__(self, config):
         super().__init__(config)
-        # assert (
-        #    config.bf16 + config.fp16 + config.fp32 <= 1
-        # ), "Only one of \"bf16\", \"fp16\", \"fp32\" can be true"
-
-        # autoset_precision = config.bf16 + config.fp16 + config.fp32 == 0
-
-        # if autoset_precision:
-        #    if SUPPORT_BF16:
-        #        logger.warn(
-        #            "The model is automatically converting to bf16 for faster inference. "
-        #            "If you want to disable the automatic precision, please manually add bf16/fp16/fp32=True to \"AutoModelForCausalLM.from_pretrained\"."
-        #        )
-        #        config.bf16 = True
-        #    elif SUPPORT_FP16:
-        #        logger.warn(
-        #            "The model is automatically converting to fp16 for faster inference. "
-        #            "If you want to disable the automatic precision, please manually add bf16/fp16/fp32=True to \"AutoModelForCausalLM.from_pretrained\"."
-        #        )
-        #        config.fp16 = True
-        #    else:
-        #        config.fp32 = True
-
-        # if config.bf16 and SUPPORT_CUDA and not SUPPORT_BF16:
-        #    logger.warn("Your device does NOT seem to support bf16, you can switch to fp16 or fp32 by by passing fp16/fp32=True in \"AutoModelForCausalLM.from_pretrained\".")
-        # if config.fp16 and SUPPORT_CUDA and not SUPPORT_FP16:
-        #    logger.warn("Your device does NOT support faster inference with fp16, please switch to fp32 which is likely to be faster")
-        # if config.fp32:
-        #    if SUPPORT_BF16:
-        #        logger.warn("Your device support faster inference by passing bf16=True in \"AutoModelForCausalLM.from_pretrained\".")
-        #    elif SUPPORT_FP16:
-        #        logger.warn("Your device support faster inference by passing fp16=True in \"AutoModelForCausalLM.from_pretrained\".")
-
-        # if config.use_flash_attn == "auto":
-        #    if config.bf16 or config.fp16:
-        #        logger.warn("Try importing flash-attention for faster inference...")
-        #        config.use_flash_attn = True
-        #    else:
-        #        config.use_flash_attn = False
-        config.use_flash_attn = False
-
-        # if config.use_flash_attn and config.fp32:
-        #    logger.warn("Flash attention will be disabled because it does NOT support fp32.")
-
-        # if config.use_flash_attn:
-        #    _import_flash_attn()
-
         self.transformer = QWenModel(config)
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
-
-        # if config.bf16:
-        #    self.transformer.bfloat16()
-        #    self.lm_head.bfloat16()
-        # if config.fp16:
-        #    self.transformer.half()
-        #    self.lm_head.half()
-        # self.post_init()
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -913,8 +645,8 @@ class QWenLMHeadModel(QWenPreTrainedModel):
         position_ids = kwargs.get("position_ids", None)
 
         if attention_mask is not None and position_ids is None:
-            position_ids = attention_mask.long().cumsum(-1) - 1
-            position_ids.masked_fill_(attention_mask == 0, 1)
+            position_ids = attention_mask.cumsum(axis=-1) - 1
+            paddle.where(attention_mask == 0, paddle.ones_like(position_ids, dtype=position_ids.dtype), position_ids)
             if past_key_values:
                 position_ids = position_ids[:, -1].unsqueeze(-1)
         else:
@@ -935,6 +667,21 @@ class QWenLMHeadModel(QWenPreTrainedModel):
             }
         )
         return model_inputs
+
+    @staticmethod
+    def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
+        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(input_ids == pad_token_id).item()
+        is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
+            (eos_token_id is not None) and (pad_token_id != eos_token_id)
+        )
+        if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
+            attention_mask = (input_ids != pad_token_id).astype(paddle.int64)
+        else:
+            import pdb
+
+            pdb.set_trace()
+            attention_mask = paddle.ones_like(input_ids, dtype=paddle.int64)
+        return attention_mask
 
     def forward(
         self,
@@ -996,164 +743,6 @@ class QWenLMHeadModel(QWenPreTrainedModel):
             attentions=transformer_outputs.attentions,
         )
 
-    # @staticmethod
-    # def _reorder_cache(
-    #    past_key_values: Tuple[Tuple[torch.Tensor]], beam_idx: torch.Tensor
-    # ) -> Tuple[Tuple[torch.Tensor]]:
-
-    #    return tuple(
-    #        tuple(
-    #            past_state.index_select(0, beam_idx.to(past_state.device))
-    #            for past_state in layer_past
-    #        )
-    #        for layer_past in past_key_values
-    #    )
-
-    # def chat(
-    #    self,
-    #    tokenizer,
-    #    query,
-    #    history,
-    #    system="You are a helpful assistant.",
-    #    append_history=True,
-    #    stream=_SENTINEL,
-    #    stop_words_ids=None,
-    #    **kwargs,
-    # ):
-    #    assert stream is _SENTINEL, _ERROR_STREAM_IN_CHAT
-    #    assert self.generation_config.chat_format == "chatml", _ERROR_BAD_CHAT_FORMAT
-    #    if history is None:
-    #        history = []
-    #    if stop_words_ids is None:
-    #        stop_words_ids = []
-
-    #    max_window_size = kwargs.get("max_window_size", None)
-    #    if max_window_size is None:
-    #        max_window_size = self.generation_config.max_window_size
-    #    raw_text, context_tokens = make_context(
-    #        tokenizer,
-    #        query,
-    #        history=history,
-    #        system=system,
-    #        max_window_size=max_window_size,
-    #        chat_format=self.generation_config.chat_format,
-    #    )
-
-    #    stop_words_ids.extend(get_stop_words_ids(self.generation_config.chat_format, tokenizer))
-    #    input_ids = paddle.to_tensor([context_tokens])
-    #    outputs = self.generate(
-    #        input_ids,
-    #        stop_words_ids=stop_words_ids,
-    #        return_dict_in_generate=False,
-    #        **kwargs,
-    #    )
-
-    #    response = decode_tokens(
-    #        outputs[0],
-    #        tokenizer,
-    #        raw_text_len=len(raw_text),
-    #        context_length=len(context_tokens),
-    #        chat_format=self.generation_config.chat_format,
-    #        verbose=False,
-    #        errors="replace",
-    #    )
-
-    #    if append_history:
-    #        history.append((query, response))
-
-    #    return response, history
-
-    # def chat_stream(
-    #        self,
-    #        tokenizer,
-    #        query,
-    #        history,
-    #        system = "You are a helpful assistant.",
-    #        stop_words_ids = None,
-    #        logits_processor = None,
-    #        **kwargs,
-    # ):
-    #    assert self.generation_config.chat_format == 'chatml', _ERROR_BAD_CHAT_FORMAT
-    #    if history is None:
-    #        history = []
-    #    if stop_words_ids is None:
-    #        stop_words_ids = []
-
-    #    max_window_size = kwargs.get('max_window_size', None)
-    #    if max_window_size is None:
-    #        max_window_size = self.generation_config.max_window_size
-    #    raw_text, context_tokens = make_context(
-    #        tokenizer,
-    #        query,
-    #        history=history,
-    #        system=system,
-    #        max_window_size=max_window_size,
-    #        chat_format=self.generation_config.chat_format,
-    #    )
-
-    #    stop_words_ids.extend(get_stop_words_ids(
-    #        self.generation_config.chat_format, tokenizer
-    #    ))
-    #    if stop_words_ids is not None:
-    #        stop_words_logits_processor = StopWordsLogitsProcessor(
-    #            stop_words_ids=stop_words_ids,
-    #            eos_token_id=self.generation_config.eos_token_id,
-    #        )
-    #        if logits_processor is None:
-    #            logits_processor = LogitsProcessorList([stop_words_logits_processor])
-    #        else:
-    #            logits_processor.append(stop_words_logits_processor)
-    #    input_ids = torch.tensor([context_tokens]).to(self.device)
-
-    #    from transformers_stream_generator.main import NewGenerationMixin, StreamGenerationConfig
-    #    self.__class__.generate_stream = NewGenerationMixin.generate
-    #    self.__class__.sample_stream = NewGenerationMixin.sample_stream
-    #    stream_config = StreamGenerationConfig(**self.generation_config.to_dict(), do_stream=True)
-    #    def stream_generator():
-    #        outputs = []
-    #        for token in self.generate_stream(
-    #                input_ids,
-    #                return_dict_in_generate=False,
-    #                generation_config=stream_config,
-    #                logits_processor=logits_processor,
-    #                seed=-1,
-    #                **kwargs):
-    #            outputs.append(token.item())
-    #            yield tokenizer.decode(outputs, skip_special_tokens=True, errors='ignore')
-
-    #    return stream_generator()
-
-    # def generate(
-    #    self,
-    #    inputs=None,
-    #    generation_config=None,
-    #    logits_processor=None,
-    #    **kwargs,
-    # ):
-    #    # Process stop_words_ids.
-    #    stop_words_ids = kwargs.pop("stop_words_ids", None)
-    #    if stop_words_ids is None and generation_config is not None:
-    #        stop_words_ids = getattr(generation_config, "stop_words_ids", None)
-    #    if stop_words_ids is None:
-    #        stop_words_ids = getattr(self.generation_config, "stop_words_ids", None)
-
-    #    if stop_words_ids is not None:
-    #        stop_words_logits_processor = StopWordsLogitsProcessor(
-    #            stop_words_ids=stop_words_ids,
-    #            eos_token_id=self.generation_config.eos_token_id,
-    #        )
-    #        if logits_processor is None:
-    #            logits_processor = LogitsProcessorList([stop_words_logits_processor])
-    #        else:
-    #            logits_processor.append(stop_words_logits_processor)
-
-    #    return super().generate(
-    #        inputs,
-    #        generation_config=generation_config,
-    #        logits_processor=logits_processor,
-    #        **kwargs,
-    #    )
-
 
 class RotaryEmbedding(nn.Layer):
     def __init__(self, dim, base=10000):
@@ -1161,9 +750,6 @@ class RotaryEmbedding(nn.Layer):
         self.dim = dim
         self.base = base
         self.inv_freq = 1.0 / (base ** (paddle.arange(0, dim, 2, dtype=paddle.float32) / dim))
-        if importlib.util.find_spec("einops") is None:
-            raise RuntimeError("einops is required for Rotary Embedding")
-
         self._rotary_pos_emb_cache = None
         self._seq_len_cached = 0
         self._ntk_alpha_cached = 1.0
@@ -1178,9 +764,8 @@ class RotaryEmbedding(nn.Layer):
             seq = paddle.arange(self._seq_len_cached)
             freqs = paddle.outer(seq.astype(self.inv_freq.dtype), self.inv_freq)
             emb = paddle.concat([freqs, freqs], axis=-1)
-            from einops import rearrange
 
-            self._rotary_pos_emb_cache = rearrange(emb, "n d -> 1 n 1 d")
+            self._rotary_pos_emb_cache = emb.unsqueeze([0, 2])
 
     def forward(self, max_seq_len, offset=0, ntk_alpha=1.0):
         self.update_rotary_pos_emb_cache(max_seq_len, offset, ntk_alpha)
@@ -1188,35 +773,25 @@ class RotaryEmbedding(nn.Layer):
 
 
 def _rotate_half(x):
-    from einops import rearrange
 
-    x = rearrange(x, "... (j d) -> ... j d", j=2)
+    x = x.reshape(x.shape[:-1] + [2, -1])
     x1, x2 = x.unbind(axis=-2)
     return paddle.concat([-x2, x1], axis=-1)
 
 
 def apply_rotary_pos_emb(t, freqs):
-    if apply_rotary_emb_func is not None:
-        t_ = t.astype(paddle.float32)
-        freqs = freqs.squeeze(0).squeeze(1)
-        cos = freqs[:, : freqs.shape[-1] // 2].cos()
-        sin = freqs[:, : freqs.shape[-1] // 2].sin()
-        output = apply_rotary_emb_func(t_, cos, sin).astype(t.dtype)
-        return output
-    else:
-        rot_dim = freqs.shape[-1]
-        t_, t_pass_ = t[..., :rot_dim], t[..., rot_dim:]
-        t_ = t_.astype(paddle.float32)
-        t_pass_ = t_pass_.astype(paddle.float32)
-        t_ = (t_ * freqs.cos()) + (_rotate_half(t_) * freqs.sin())
-        return paddle.concat([t_, t_pass_], axis=-1).astype(t.dtype)
+    rot_dim = freqs.shape[-1]
+    t_, t_pass_ = t[..., :rot_dim], t[..., rot_dim:]
+    t_ = t_.astype(paddle.float32)
+    t_pass_ = t_pass_.astype(paddle.float32)
+    t_ = (t_ * freqs.cos()) + (_rotate_half(t_) * freqs.sin())
+    return paddle.concat([t_, t_pass_], axis=-1).astype(t.dtype)
 
 
 class RMSNorm(nn.Layer):
     def __init__(self, dim: int, eps: float = 1e-6):
         super().__init__()
         self.eps = eps
-        # self.weight = nn.Parameter(paddle.ones(dim))
         self.weight = paddle.create_parameter(
             shape=[dim],
             dtype=paddle.get_default_dtype(),
@@ -1227,8 +802,5 @@ class RMSNorm(nn.Layer):
         return x * paddle.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
 
     def forward(self, x):
-        if rms_norm is not None:
-            return rms_norm(x, self.weight, self.eps)
-        else:
-            output = self._norm(x.astype(paddle.float32)).astype(x.dtype)
-            return output * self.weight
+        output = self._norm(x.astype(paddle.float32)).astype(x.dtype)
+        return output * self.weight
