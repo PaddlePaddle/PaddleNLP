@@ -97,7 +97,7 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, tensor_parallel_output=T
     if is_fleet_init and tensor_parallel_degree > 1 and y.is_distributed:
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
         input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
-        logits = paddle.matmul(input_parallel, y, transpose_y=True)  # todo llama此处为False， gpt-3此处为True
+        logits = paddle.matmul(input_parallel, y, transpose_y=True)
 
         if tensor_parallel_output:
             return logits
@@ -105,7 +105,7 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, tensor_parallel_output=T
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
 
     else:
-        logits = paddle.matmul(x, y, transpose_y=True)  # todo llama此处为False， gpt-3此处为True
+        logits = paddle.matmul(x, y, transpose_y=True)
         return logits
 
 
@@ -204,9 +204,7 @@ class MultiHeadAttention(nn.Layer):
     def _fuse_prepare_qkv(self, query, use_cache=False, cache=None):
         mix_layer = self.qkv_proj(query)
         # bs, seqlen, nhead, headdim
-        mix_layer = paddle.reshape_(
-            mix_layer, [0, 0, self.num_attention_heads, 3 * self.head_dim]
-        )  # todo 需要判断参数类型及实际含义，后续修改此处及concat
+        mix_layer = paddle.reshape_(mix_layer, [0, 0, self.num_attention_heads, 3 * self.head_dim])
         # bs, nhead, seqlen, headdim
         if not self.config.use_flash_attention:
             # falsh attn need: [ bz, seqlen, nhead, head_dim]
@@ -236,7 +234,7 @@ class MultiHeadAttention(nn.Layer):
         q = tensor.reshape(x=q, shape=[0, 0, self.num_attention_heads, self.head_dim])
         if not self.config.use_flash_attention:
             # falsh attn need: [ bz, seqlen, nhead, head_dim]
-            q = tensor.transpose(x=q, perm=[0, 2, 1, 3])  # todo：需要判断参数类型及实际含义，后续修改此处及concat
+            q = tensor.transpose(x=q, perm=[0, 2, 1, 3])
 
         if isinstance(cache, self.StaticCache):
             # for encoder-decoder attention in inference and has cached
