@@ -116,7 +116,6 @@ class Predictor(object):
                 model=self.model,
                 prefix_path=self.args.prefix_path,
                 postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
-                pad_attention_mask=prefix_tuning_params["pad_attention_mask"],
             )
         self.model.eval()
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
