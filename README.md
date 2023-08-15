@@ -38,7 +38,7 @@
 ### 环境依赖
 
 - python >= 3.7
-- paddlepaddle >= 2.3.0
+- paddlepaddle >= 2.5.1
 - 如需大模型功能，请使用 paddlepaddle-gpu >= 2.5.1
 
 ### pip安装
