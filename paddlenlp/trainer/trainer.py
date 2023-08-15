@@ -1745,14 +1745,13 @@ class Trainer:
 
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
-        if paddle.distributed.get_world_size() > 1:
-            if self.args.use_hybrid_parallel:
-                if self.dp_group.rank <= 0:
-                    os.makedirs(output_dir, exist_ok=True)
-                    paddle.save(
-                        self.optimizer.state_dict(),
-                        os.path.join(output_dir, optimizer_name),
-                    )
+        if self.args.use_hybrid_parallel:
+            if self.dp_group.rank <= 0:
+                os.makedirs(output_dir, exist_ok=True)
+                paddle.save(
+                    self.optimizer.state_dict(),
+                    os.path.join(output_dir, optimizer_name),
+                )
 
         if self.args.should_save:
             if not self.args.use_hybrid_parallel:
