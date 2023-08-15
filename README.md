@@ -30,7 +30,7 @@
 
 ## News 📢
 
-* **2023.8.15 [PaddleNLP v2.6](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0)**： 发布[全流程大模型工具链](./llm)，涵盖预训练，精调，压缩，推理以及部署等各个环节，为用户提供端到端的大模型方案，一站式的体验；内置[4D并行分布式Trainer](./docs/trainer.md)，[高效微调算法LoRA/Prefix Tuning](./llm#33-lora), [主流以及自研量化算法](./llm#6-量化)等等；全面支持[LLaMA 1/2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/llama), [BLOOM](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/bloom), [ChatGLM 1/2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/chatglm), [GLM](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/glm), [OPT](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/opt)等主流开源大模型
+* **2023.8.15 [PaddleNLP v2.6](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0)**： 发布[全流程大模型工具链](./llm)，涵盖预训练，精调，压缩，推理以及部署等各个环节，为用户提供端到端的大模型方案和一站式的开发体验；内置[分布式全场景Trainer](./docs/trainer.md)，[高效微调算法LoRA/Prefix Tuning](./llm#33-lora), [自研int8/int4量化算法](./llm#6-量化)等等；全面支持[LLaMA 1/2](./llm/llama), [BLOOM](.llm/bloom), [ChatGLM 1/2](./llm/chatglm), [GLM](./llm/glm), [OPT](./llm/opt)等主流中文大模型
 
 
 ## 安装
@@ -38,7 +38,8 @@
 ### 环境依赖
 
 - python >= 3.7
-- paddlepaddle >= 2.5.1
+- paddlepaddle >= 2.3.0
+- 如需大模型功能，请使用 paddlepaddle >= 2.5.1
 
 ### pip安装
 
@@ -56,11 +57,24 @@ pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/pad
 
 ## 快速开始
 
-这里以信息抽取-命名实体识别任务，UIE模型为例，来说明如何快速使用PaddleNLP:
 
-### 一键预测
+### 大模型文本生成
 
-PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练，直接输入数据即可开放域抽取结果：
+PaddleNLP提供了方便易用的Auto API，能够快速的加载模型和Tokenizer。这里以使用 `linly-ai/chinese-llama-2-7b` 大模型做文本生成为例：
+
+```python
+>>> from paddlenlp.transformers import AutoTokenizer, AutoModelForCausalLM
+>>> tokenizer = AutoTokenizer.from_pretrained("linly-ai/chinese-llama-2-7b")
+>>> model = AutoModelForCausalLM.from_pretrained("linly-ai/chinese-llama-2-7b", dtype="float16")
+>>> input_features = tokenizer("你好！请自我介绍一下。", return_tensors="pd")
+>>> outputs = model.generate(**input_features, max_length=128)
+>>> tokenizer.batch_decode(outputs[0])
+['\n你好！我是一个AI语言模型，可以回答你的问题和提供帮助。']
+```
+
+### 一键UIE预测
+
+PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练，直接输入数据即可开放域抽取结果。这里以信息抽取-命名实体识别任务，UIE模型为例：
 
 ```python
 >>> from pprint import pprint
@@ -83,14 +97,12 @@ PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练
           'text': '谷爱凌'}]}]
 ```
 
-### 小样本学习
-
-如果对一键预测效果不满意，也可以使用少量数据进行模型精调，进一步提升特定场景的效果，详见[UIE小样本定制训练](./model_zoo/uie/)。
-
 更多PaddleNLP内容可参考：
+- [大模型全流程工具链](./llm)，包含主流中文大模型的全流程方案。
 - [精选模型库](./model_zoo)，包含优质预训练模型的端到端全流程使用。
 - [多场景示例](./examples)，了解如何使用PaddleNLP解决NLP多种技术问题，包含基础技术、系统应用与拓展应用。
 - [交互式教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)，在🆓免费算力平台AI Studio上快速学习PaddleNLP。
+
 
 ## 特性
 
