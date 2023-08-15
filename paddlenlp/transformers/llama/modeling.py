@@ -452,7 +452,7 @@ class LlamaMLP(nn.Layer):
 class LlamaAttention(nn.Layer):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    def __init__(self, config: LlamaConfig, do_recompute: bool = False):
+    def __init__(self, config: LlamaConfig, layerwise_recompute: bool = False):
         super().__init__()
 
         self.config = config
@@ -475,10 +475,10 @@ class LlamaAttention(nn.Layer):
             )
 
         self.kv_indices = None
-        # Note that we will actually perform a recompute only if both enable_recompute and do_recompute are set to True
+        # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
         # Enable_recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
-        self.do_recompute = do_recompute
+        self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
         if config.tensor_parallel_degree > 1:
             assert (
@@ -669,7 +669,12 @@ class LlamaAttention(nn.Layer):
         value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
-        if self.enable_recompute and self.do_recompute and has_gradient and self.recompute_granularity == "core_attn":
+        if (
+            self.enable_recompute
+            and self.layerwise_recompute
+            and has_gradient
+            and self.recompute_granularity == "core_attn"
+        ):
             outputs = recompute(
                 scaled_dot_product_attention,
                 query_states,
@@ -712,18 +717,18 @@ class LlamaAttention(nn.Layer):
 
 
 class LlamaDecoderLayer(nn.Layer):
-    def __init__(self, config, do_recompute: bool = False):
+    def __init__(self, config, layerwise_recompute: bool = False):
         super().__init__()
         self.hidden_size = config.hidden_size
-        self.self_attn = LlamaAttention(config, do_recompute)
+        self.self_attn = LlamaAttention(config, layerwise_recompute)
         self.mlp = LlamaMLP(config)
         self.input_layernorm = LlamaRMSNorm(config)
         self.post_attention_layernorm = LlamaRMSNorm(config)
         self.sequence_parallel = config.sequence_parallel
-        # Note that we will actually perform a recompute only if both enable_recompute and do_recompute are set to True
+        # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
         # Enable_recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
-        self.do_recompute = do_recompute
+        self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
 
     def forward(
@@ -756,7 +761,12 @@ class LlamaDecoderLayer(nn.Layer):
 
         # Self Attention
         has_gradient = not hidden_states.stop_gradient
-        if self.enable_recompute and self.do_recompute and has_gradient and self.recompute_granularity == "full_attn":
+        if (
+            self.enable_recompute
+            and self.layerwise_recompute
+            and has_gradient
+            and self.recompute_granularity == "full_attn"
+        ):
             outputs = recompute(
                 self.self_attn,
                 hidden_states,
