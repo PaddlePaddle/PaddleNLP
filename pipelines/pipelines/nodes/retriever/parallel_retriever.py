@@ -20,7 +20,6 @@ except ImportError:
     from typing_extensions import Literal
 
 import multiprocessing
-import socket
 import time
 from copy import deepcopy
 from multiprocessing import Pool
@@ -103,8 +102,8 @@ class TritonRunner:
                 inputs=infer_inputs,
                 outputs=self._outputs_req,
             )
-        except socket.timeout as e:
-            print(e)
+        except Exception as e:
+            logger.error("InferenceServerClient infer error {}".format(e))
         results = {name: results.as_numpy(name) for name in self._output_names}
         for doc, emb in zip(documents, results["embedding"]):
             doc["embedding"] = emb
@@ -130,8 +129,8 @@ class TritonRunner:
                 inputs=infer_inputs,
                 outputs=self._outputs_req,
             )
-        except socket.timeout as e:
-            print(e)
+        except Exception as e:
+            logger.error("InferenceServerClient infer error {}".format(e))
         results = {name: results.as_numpy(name) for name in self._output_names}
         return results["embedding"]
 
