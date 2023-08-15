@@ -167,18 +167,12 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 我们使用张量并行(TP，Tensor Parallelism)训练过程中，为了节省TP参数合并时间往往在中间checkpoint将参数存储为多个TP参数分片，可以使用提供的分片合并参数脚本进行参数合并。
 
 ```
-python merge_tp_params.py  \
-    --model_name_or_path ./checkpoints/chatglm_v2_sft_ckpts/checkpoint-7163 \
-    --merge_model_path ./checkpoints/chatglm_v2_sft_ckpts/checkpoint_merge \
-    --dtype "float16" \
-    --with_tokenizer
+python merge_tp_params.py \
+    --model_name_or_path ./checkpoints/chatglm_v2_sft_ckpts/checkpoint-100
 ```
 
 **参数：**
-- `model_name_or_path`: 必须，预训练模型名称或者本地的模型路径，用于热启模型和分词器，默认为None。
-- `merge_model_path`: 必须，合并参数后保存路径，默认为None。
-- `dtype`: 必须，模型参数dtype，默认为None。
-- `with_tokenizer`: 是否同时保存分词器，默认为False。
+- `model_name_or_path`: 必须，本地的TP模型参数路径，默认为None。
 - `device`: 运行环境，默认为gpu。
 
 ### 3.7 LoRA参数合并
