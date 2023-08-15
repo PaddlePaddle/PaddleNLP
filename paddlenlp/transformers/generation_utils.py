@@ -1924,7 +1924,13 @@ def TopKProcess(probs, top_k, min_tokens_to_keep):
 
 
 def TopPProcess(probs, top_p, min_tokens_to_keep):
-    sorted_indices = paddle.argsort(probs, descending=True)
+    if probs.dtype == paddle.bfloat16:
+        probs = paddle.cast(probs, paddle.float32)
+        sorted_indices = paddle.argsort(probs, descending=True)
+        sorted_indices = paddle.cast(sorted_indices, dtype="int64")
+    else:
+        sorted_indices = paddle.argsort(probs, descending=True)
+
     if isinstance(sorted_indices, tuple):
         sorted_probs, sorted_indices = sorted_indices
     else:
