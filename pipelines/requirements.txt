@@ -30,3 +30,4 @@ events
 sseclient-py==1.7.2
 typing_extensions==4.5
 spacy
+tritonclient[all]
