@@ -34,19 +34,14 @@ def run_custom(op_name, inputs_names, inputs_var, attrs_names, attrs_val, output
     ret = []
 
     if paddle.in_dynamic_mode():
-        # TODO(guosheng): wrong _run_custom_op usage in latest paddle, fix it
-        ctx = core.CustomOpKernelContext()
-
-        for ins in inputs_var:
-            ctx.add_inputs(ins)
-        for ats in attrs_val:
-            ctx.add_attr(ats)
-
-        for name in outputs_names:
-            ret.append(core.eager.Tensor())
-            ctx.add_outputs(ret[-1])
-
-        core.eager._run_custom_op(ctx, op_name, True)
+        new_inputs_var = []
+        for k, v in zip(inputs_names, inputs_var):
+            if not k.endswith("@VECTOR") and isinstance(v, (list, tuple)) and len(v) == 1:
+                new_inputs_var.append(v[0])
+            else:
+                new_inputs_var.append(v)
+        outs = core.eager._run_custom_op(op_name, *new_inputs_var, *attrs_val)
+        return outs[0] if len(outs) == 1 else outs
     else:
         inputs = dict(zip(inputs_names, inputs_var))
         attrs = dict(zip(attrs_names, attrs_val))
