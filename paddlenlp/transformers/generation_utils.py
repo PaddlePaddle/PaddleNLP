@@ -1923,6 +1923,7 @@ def TopKProcess(probs, top_k, min_tokens_to_keep):
     return probs
 
 
+
 def TopPProcess(probs, top_p, min_tokens_to_keep):
     org_dtype = probs.dtype
     if org_dtype == paddle.bfloat16:
