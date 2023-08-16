@@ -41,7 +41,7 @@ class PredictorArgument:
     model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
     src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
-    max_length: int = field(default=1024, metadata={"help": "The max length of target text."})
+    max_length: int = field(default=1024, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=1, metadata={"help": "top_k parameter for generation"})
     top_p: float = field(default=1.0, metadata={"help": "top_p parameter for generation"})
     temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
@@ -167,9 +167,12 @@ class DygraphPredictor(BasePredictor):
 
     @paddle.no_grad()
     def infer(self, inputs: dict[str, paddle.Tensor]):
+        # the `max_length` of generate is: max_new_length, it will occur error when `max_length` + sequence_length > max_position_embeddings.
+        # so change max_length to control the length of decoding.
+        max_length = self.args.max_length - inputs["input_ids"].shape[-1]
         result = self.model.generate(
             **inputs,
-            max_length=self.args.max_length,
+            max_length=max_length,
             bos_token_id=self.tokenizer.bos_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
             pad_token_id=self.tokenizer.pad_token_id,
@@ -208,6 +211,7 @@ class StaticGraphPredictor(BasePredictor):
         inputs = super().preprocess(input_text)
 
         # reduce the max_length to prevent length overflow
+        # same as DygraphPredictor
         max_length = max(self.args.max_length - inputs["input_ids"].shape[-1], 1)
         inputs["max_length"] = np.array(max_length, dtype="int64")
 
@@ -218,7 +222,7 @@ class StaticGraphPredictor(BasePredictor):
 
         return inputs
 
-    def infer(self, inputs):
+    def infer(self, inputs: dict[str, np.ndarray]):
         for name in self.predictor.get_input_names():
             self.predictor.get_input_handle(name).copy_from_cpu(inputs[name])
 
@@ -226,6 +230,7 @@ class StaticGraphPredictor(BasePredictor):
         output_names = self.predictor.get_output_names()
         output_handle = self.predictor.get_output_handle(output_names[0])
         results = output_handle.copy_to_cpu()
+        # the first result is decoding_ids
         decoded_ids = results.tolist()
         return decoded_ids
 
