@@ -230,7 +230,6 @@ function gpt_175B_DP1_MP8_PP1_sp() {
 function gpt_175B_DP1_MP1_PP8() {
     echo "=========== $FUNCNAME run begin ==========="
     rm -rf log
-    export PADDLE_USE_FOUR_DIRECTIONS_P2P=True # TDDO:nccl to 2.15
     python -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" tools/train.py\
         -c ppfleetx/configs/nlp/gpt/pretrain_gpt_175B_mp8_pp16.yaml \
         -o Model.hidden_size=1024 -o Model.num_layers=32 -o Model.num_attention_heads=16 \
@@ -243,7 +242,6 @@ function gpt_175B_DP1_MP1_PP8() {
         -o Model.sequence_parallel=False \
         >>${log_path}/$FUNCNAME 2>&1
     check_result $FUNCNAME
-    unset PADDLE_USE_FOUR_DIRECTIONS_P2P
     echo "=========== $FUNCNAME run  end ==========="
 }
 
