@@ -100,6 +100,21 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
         "eos_token_id": 50256,
         "eol_token_id": 198,
     },
+    "gpt3-6.7B-en": {  # 6.7B
+        "vocab_size": 50304,
+        "hidden_size": 1024,
+        "num_hidden_layers": 32,
+        "num_attention_heads": 32,
+        "intermediate_size": 16384,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "attention_probs_dropout_prob": 0.1,
+        "max_position_embeddings": 1024,
+        "type_vocab_size": 16,  # no use
+        "initializer_range": 0.02,
+        "eos_token_id": 50256,
+        "eol_token_id": 198,
+    },
     "gpt3-1.3B-en": {  # 1.3B
         "vocab_size": 50304,
         "hidden_size": 2048,
