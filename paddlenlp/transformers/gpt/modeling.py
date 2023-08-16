@@ -18,6 +18,7 @@ from __future__ import annotations
 import collections
 import contextlib
 import math
+from functools import partial
 
 import numpy as np
 import paddle
@@ -724,6 +725,53 @@ class GPTPretrainedModel(PretrainedModel):
     config_class = GPTConfig
     pretrained_init_configuration = GPT_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = GPT_PRETRAINED_RESOURCE_FILES_MAP
+
+    @classmethod
+    def _get_tensor_parallel_mappings(cls, config, is_split=True):
+
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+
+        fn = split_or_merge_func(
+            is_split=is_split,
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_rank=config.tensor_parallel_rank,
+            num_attention_heads=config.num_attention_heads,
+        )
+
+        def get_tensor_parallel_split_mappings(num_layers):
+            final_actions = {}
+            base_actions = {
+                # Column Linear
+                "layers.0.linear1.weight": partial(fn, is_column=True),
+                "layers.0.linear1.bias": partial(fn, is_column=True),
+                # Row Linear
+                "word_embeddings.weight": partial(fn, is_column=False),
+                "layers.0.self_attn.out_proj.weight": partial(fn, is_column=False),
+                "layers.0.linear2.weight": partial(fn, is_column=False),
+            }
+
+            if config.fuse_attention_qkv:
+                base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.qkv_proj.bias"] = partial(fn, is_column=True)
+            else:
+                base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.q_proj.bias"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.k_proj.bias"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.v_proj.bias"] = partial(fn, is_column=True)
+
+            for key, action in base_actions.items():
+                if "layers.0." in key:
+                    for i in range(num_layers):
+                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
+                final_actions[key] = action
+
+            return final_actions
+
+        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+
+        return mappings
 
     @classmethod
     def _get_name_mappings(cls, config: GPTConfig) -> list[StateDictNameMapping]:
