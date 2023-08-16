@@ -332,13 +332,13 @@ class LlamaRotaryEmbedding(nn.Layer):
         self.base = base
         self.max_seq_len_cached = max_position_embeddings
 
-        dtype = paddle.get_default_dtype()
+        # use float32
         inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, dim, 2), dtype="float32") / dim))  # [dim / 2]
-        self.register_buffer("inv_freq", inv_freq.cast(dtype))
+        self.register_buffer("inv_freq", inv_freq)
 
         # higher acc using float32
         t = paddle.arange(max_position_embeddings, dtype="float32")  # [max_position_embeddings]
-        freqs = paddle.einsum("i,j->ij", t, self.inv_freq.cast("float32"))  # [max_position_embeddings, dim/2]
+        freqs = paddle.einsum("i,j->ij", t, self.inv_freq)  # [max_position_embeddings, dim/2]
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         emb = paddle.concat([freqs, freqs], axis=-1)  # [max_position_embeddings, dim]
         # [bs, seqlen, nhead, head_dim]
@@ -631,7 +631,9 @@ class LlamaAttention(nn.Layer):
 
         if self.config.rope:
             if self.rope_fusion_level is not None:
-                assert past_key_value is None, "fuse rotary not support cache kv for now"
+                assert (
+                    past_key_value is None or position_ids is not None
+                ), "fuse rotary not support cache kv and position_ids for now"
 
             if self.rope_fusion_level == "full":
                 query_states, key_states, _ = fused_rotary_position_embedding(query_states, key_states, v=None)
@@ -641,8 +643,19 @@ class LlamaAttention(nn.Layer):
                     query_states, key_states, v=None, sin=sin, cos=cos
                 )
             else:
-                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-                query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+                query_dtype, key_dtype = query_states.dtype, key_states.dtype
+                if query_dtype in [paddle.float16, paddle.bfloat16]:
+                    with paddle.amp.auto_cast(enable=False):
+                        cos, sin = self.rotary_emb(value_states.astype("float32"), seq_len=kv_seq_len)
+                        query_states, key_states = apply_rotary_pos_emb(
+                            query_states.astype("float32"), key_states.astype("float32"), cos, sin, position_ids
+                        )
+
+                    query_states = query_states.astype(query_dtype)
+                    key_states = key_states.astype(key_dtype)
+                else:
+                    cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+                    query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
         # [bsz, nh, t, hd]
         if past_key_value is not None:
