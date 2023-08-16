@@ -526,7 +526,7 @@ class TransformerDecoder(nn.Layer):
         r"""
         Generates cache for `forward` usage. The generated cache is a list, and
         each element in it is a tuple( :code:`(incremental_cache, static_cache)` )
-        produced by `TransformerDecoderLayer.gen_cache`. See `TransformerDecoderLayer.gen_cache`
+        produced by `GPTDecoderLayer.gen_cache`. See `GPTDecoderLayer.gen_cache`
         for more details. If `do_zip` is True, apply `zip` on these tuples to get
         a list with two elements.
         """
@@ -536,7 +536,7 @@ class TransformerDecoder(nn.Layer):
         return cache
 
 
-class TransformerDecoderLayer(nn.Layer):
+class GPTDecoderLayer(nn.Layer):
     """
     The transformer decoder layer.
 
@@ -544,7 +544,7 @@ class TransformerDecoderLayer(nn.Layer):
     """
 
     def __init__(self, config: GPTConfig):
-        super(TransformerDecoderLayer, self).__init__()
+        super(GPTDecoderLayer, self).__init__()
         self.config = config
 
         # Recompute defaults to False and is controlled by Trainer
@@ -553,21 +553,9 @@ class TransformerDecoderLayer(nn.Layer):
         if not FusedDropoutAdd:
             config.use_fused_dropout_add = False
 
-        # d_model = config.hidden_size
-        # nhead = config.num_attention_heads
-        # dim_feedforward = config.intermediate_size
-        # dropout = config.hidden_dropout_prob
-        # activation = config.hidden_act
-
-        attn_dropout = config.attention_probs_dropout_prob
-        act_dropout = config.hidden_dropout_prob
         self._config = locals()
         self._config.pop("self")
         self._config.pop("__class__", None)  # py3
-
-        # attn_dropout = dropout if attn_dropout is None else attn_dropout
-        # act_dropout = dropout if act_dropout is None else act_dropout
-        # self.normalize_before = normalize_before
 
         self.self_attn = MultiHeadAttention(config=config)
 
@@ -876,7 +864,7 @@ class GPTPretrainedModel(PretrainedModel):
         # sublayer is init first
         # scale RowParallelLinear weight
         with paddle.no_grad():
-            if isinstance(layer, TransformerDecoderLayer):
+            if isinstance(layer, GPTDecoderLayer):
                 factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
                 layer.linear2.weight.scale_(factor)
             if isinstance(layer, MultiHeadAttention):
@@ -963,7 +951,7 @@ class GPTModel(GPTPretrainedModel):
 
         decoder_layers = nn.LayerList()
         for i in range(config.num_hidden_layers):
-            decoder_layers.append(TransformerDecoderLayer(config))
+            decoder_layers.append(GPTDecoderLayer(config))
 
         self.decoder = TransformerDecoder(
             config,
@@ -1353,7 +1341,7 @@ class GPTLMHead(nn.Layer):
         return logits
 
 
-class GPTLMHeadModel(GPTPretrainedModel):
+class GPTForCausalLM(GPTPretrainedModel):
     """
     The GPT Model with a `language modeling` head on top.
 
@@ -1364,7 +1352,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
     """
 
     def __init__(self, config: GPTConfig):
-        super(GPTLMHeadModel, self).__init__(config)
+        super(GPTForCausalLM, self).__init__(config)
         self.gpt = GPTModel(config)
         self.lm_head = GPTLMHead(config)
         self.tie_weights()
@@ -1807,5 +1795,4 @@ class GPTForSequenceClassification(GPTPretrainedModel):
         )
 
 
-GPTForCausalLM = GPTLMHeadModel
-GPTDecoderLayer = TransformerDecoderLayer
+GPTLMHeadModel = GPTForCausalLM
