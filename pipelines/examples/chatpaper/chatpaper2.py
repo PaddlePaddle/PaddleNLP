@@ -17,12 +17,9 @@ import time
 
 import arxiv
 import gradio as gr
-from utils import (  # single_paper_sum,
-    merge_summary,
-    pdf2image,
-    single_paper_abs_sum,
-    translation,
-)
+
+# from ulits import  single_paper_sum
+from utils import merge_summary, pdf2image, single_paper_abs_sum, translation
 
 from pipelines.document_stores import FAISSDocumentStore
 from pipelines.nodes import (
