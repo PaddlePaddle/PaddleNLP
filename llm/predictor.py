@@ -137,41 +137,38 @@ class DygraphPredictor(BasePredictor):
     ):
         super().__init__(config, tokenizer)
         self.model = model
-        self._model_init()
-        self.model.eval()
-
-    def _model_init(self):
-        if self.config.lora_path is not None:
-            lora_config = LoRAConfig.from_pretrained(self.config.lora_path)
+        if config.lora_path is not None:
+            lora_config = LoRAConfig.from_pretrained(config.lora_path)
             dtype = lora_config.dtype
             lora_config.merge_weights = True
-        elif self.config.prefix_path is not None:
-            prefix_config = PrefixConfig.from_pretrained(self.config.prefix_path)
+        elif config.prefix_path is not None:
+            prefix_config = PrefixConfig.from_pretrained(config.prefix_path)
             dtype = prefix_config.dtype
-        elif self.config.dtype is not None:
-            dtype = self.config.dtype
+        elif config.dtype is not None:
+            dtype = config.dtype
         else:
             raise ValueError("Please specific the model dtype.")
 
         if self.model is None:
             self.model = AutoModelForCausalLM.from_pretrained(
-                self.config.model_name_or_path,
+                config.model_name_or_path,
                 dtype=dtype,
                 tensor_parallel_degree=self.tensor_parallel_degree,
                 tensor_parallel_rank=self.tensor_parallel_rank,
             )
 
-        if self.config.lora_path is not None:
+        if config.lora_path is not None:
             self.model = LoRAModel.from_pretrained(
-                model=self.model, lora_path=self.config.lora_path, lora_config=lora_config
+                model=self.model, lora_path=config.lora_path, lora_config=lora_config
             )
-        if self.config.prefix_path is not None:
+        if config.prefix_path is not None:
             prefix_tuning_params = get_prefix_tuning_params(self.model)
             self.model = PrefixModelForCausalLM.from_pretrained(
                 model=self.model,
-                prefix_path=self.config.prefix_path,
+                prefix_path=config.prefix_path,
                 postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
             )
+        self.model.eval()
 
     @paddle.no_grad()
     def _infer(self, inputs: dict[str, paddle.Tensor]):
@@ -197,10 +194,6 @@ class StaticGraphPredictor(BasePredictor):
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
         super().__init__(config, tokenizer)
 
-        self._init_predictor()
-        self.return_tensors = "np"
-
-    def _init_predictor(self):
         params_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdiparams")
         model_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdmodel")
         inference_config = paddle.inference.Config(model_path, params_path)
@@ -216,6 +209,8 @@ class StaticGraphPredictor(BasePredictor):
 
         with static_mode_guard():
             self.predictor = paddle.inference.create_predictor(inference_config)
+
+        self.return_tensors = "np"
 
     def _preprocess(self, input_text: str | list[str]):
         inputs = super()._preprocess(input_text)
