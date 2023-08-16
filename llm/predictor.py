@@ -197,14 +197,18 @@ class StaticGraphPredictor(BasePredictor):
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
         super().__init__(config, tokenizer)
 
-        model_path = os.path.join(config.model_name_or_path, config.model_prefix + ".pdmodel")
-        params_path = os.path.join(config.model_name_or_path, config.model_prefix + ".pdiparams")
+        self._init_predictor()
+        self.return_tensors = "np"
+
+    def _init_predictor(self):
+        params_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdiparams")
+        model_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdmodel")
         inference_config = paddle.inference.Config(model_path, params_path)
 
-        if config.device == "gpu":
+        if self.config.device == "gpu":
             # set GPU configs accordingly
             inference_config.enable_use_gpu(100, 0)
-        elif config.device == "cpu":
+        elif self.config.device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             inference_config.disable_gpu()
@@ -212,8 +216,6 @@ class StaticGraphPredictor(BasePredictor):
 
         with static_mode_guard():
             self.predictor = paddle.inference.create_predictor(inference_config)
-
-        self.return_tensors = "np"
 
     def _preprocess(self, input_text: str | list[str]):
         inputs = super()._preprocess(input_text)
