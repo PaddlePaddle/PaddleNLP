@@ -34,7 +34,7 @@ from pipelines.nodes import (
 )
 
 os.environ["no_proxy"] = "localhost,10.9.189.4,::1"
-from build_base import chat_papers
+from create_base import chat_papers
 
 from pipelines.pipelines import Pipeline
 
