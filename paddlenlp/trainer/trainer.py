@@ -503,7 +503,7 @@ class Trainer:
         self._memory_tracker.start()
 
         if not self.args.should_load_sharding_stage1_model:
-            self.load_state_dict_from_checkpoint(resume_from_checkpoint)
+            self.load_state_dict_from_checkpoint(resume_from_checkpoint)  # 加载模型参数逻辑,后续需要进行修改
 
         train_dataloader = self.get_train_dataloader()
 
@@ -578,7 +578,7 @@ class Trainer:
                 self.model_wrapped = model
             if delay_optimizer_creation:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-            self._load_optimizer_and_scheduler(resume_from_checkpoint)
+            self._load_optimizer_and_scheduler(resume_from_checkpoint)  # 加载优化器逻辑,这部分可以暂时不改动
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples:,}")
@@ -1028,7 +1028,7 @@ class Trainer:
                 metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
 
         if self.control.should_save:
-            self._save_checkpoint(model, metrics=metrics)
+            self._save_checkpoint(model, metrics=metrics)  # 针对 save ckpt 逻辑,在此处进行修改.
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
 
     def _get_learning_rate(self):
@@ -1741,10 +1741,12 @@ class Trainer:
             # TODO(ZHUI) fix it and set convert2cpu=True to save gpu memory
             model.get_all_parameters(convert2cpu=False)
 
+        # 模型保存
         self.save_model(output_dir)
 
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
+        # 优化器保存
         if self.args.use_hybrid_parallel:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
