@@ -1935,7 +1935,6 @@ def TopPProcess(probs, top_p, min_tokens_to_keep):
         sorted_probs = paddle.sort(probs, descending=True)
 
     cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)
-
     # Remove tokens with cumulative probs above the top_p, But keep at
     # least min_tokens_to_keep tokens
     sorted_indices_to_remove = cumulative_probs > top_p
@@ -1952,9 +1951,9 @@ def TopPProcess(probs, top_p, min_tokens_to_keep):
     condition = paddle.scatter(
         sorted_indices_to_remove.flatten(), sorted_indices.flatten(), sorted_indices_to_remove.flatten()
     )
+
     condition = paddle.cast(condition, "bool").reshape(probs.shape)
     probs = paddle.where(condition, paddle.full_like(probs, 0.0), probs)
-
     if org_dtype == paddle.bfloat16:
         probs = paddle.cast(probs, paddle.bfloat16)
     return probs
