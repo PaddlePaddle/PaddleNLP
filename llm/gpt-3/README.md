@@ -1,18 +1,10 @@
 # GPT
 
+## 1. 模型介绍
+
 GPT-3是一种预训练语言模型，它能够模拟人类语言思维和表达。GPT-3拥有巨大的参数，包含了1750亿个参数，这使得它具有强大的语言理解和生成能力。它可以完成的任务包括文本生成、文本摘要、回答问题、翻译、阅读理解等。GPT-3的预训练过程使用了大量的语料库，包括互联网上的大量文本。它通过分析这些文本，学习如何生成和理解人类语言。GPT-3在自然语言处理领域具有很高的影响力，它可以模拟人类对话和生成文本，这使得它在许多应用领域都有广泛的应用，比如智能客服、自然语言处理、游戏设计等。
 
-**目录**
-
-- [1. 预训练](#0)
-- [2. 微调](#1)
-- [3. 模型预测](#2)
-- [4. 动转静](#3)
-- [5. 模型推理](#4)
-
-<a name="0"></a>
-
-## 预训练
+## 2. 预训练
 
 预训练数据制作参考[此处](../../model_zoo/ernie-1.0/preprocess/docs/OpenWebText2.md)
 
@@ -111,7 +103,8 @@ python -u  -m paddle.distributed.launch \
 <a name="1"></a>
 
 
-## 微调
+## 3. 微调
+### SFT
 
 ```shell
 task_name="gpt3_hybid"
@@ -153,7 +146,7 @@ python -u  -m paddle.distributed.launch \
     --device "gpu"
 ```
 
-## lora微调
+### LoRA
 
 ```shell
 export PYTHONPATH="../../PaddleNLP/"
@@ -193,30 +186,9 @@ python finetune_generation.py \
 ```
 
 
-<a name="2"></a>
-
-## 模型预测
+## 3. 动态图推理
 
 ```shell
 python predict_generation.py
 
-```
-
-<a name="3"></a>
-
-## 动转静
-
-```shell
-python export_generation_model.py
-```
-
-
-<a name="4"></a>
-
-## 模型推理
-
-```shell
-python infer_generation.py \
-    --model_dir inference \
-    --model_prefix gpt
 ```

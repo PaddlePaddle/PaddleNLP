@@ -22,6 +22,11 @@ from pipelines.nodes.base import BaseComponent
 
 logger = logging.getLogger(__name__)
 
+ernie_dict = {
+    "ERNIE-Bot-turbo": " https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/eb-instant?access_token={}",
+    "ERNIE-Bot": "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions?access_token={}",
+}
+
 
 class ErnieBot(BaseComponent):
     """
@@ -34,7 +39,7 @@ class ErnieBot(BaseComponent):
     outgoing_edges = 1
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
 
-    def __init__(self, api_key=None, secret_key=None):
+    def __init__(self, api_key=None, secret_key=None, model_name="ERNIE-Bot-turbo"):
         """
         Initialize the ErnieBot instance with the provided api_key and secret_key.
 
@@ -43,6 +48,7 @@ class ErnieBot(BaseComponent):
         """
         api_key = api_key or os.environ.get("ERNIE_BOT_API_KEY", None)
         secret_key = secret_key or os.environ.get("ERNIE_BOT_SECRET_KEY", None)
+        self.model_name = model_name
         if api_key is None or secret_key is None:
             raise Exception(
                 "Please apply api_key and secret_key from https://cloud.baidu.com/doc/WENXINWORKSHOP/s/flfmc9do2"
@@ -81,9 +87,7 @@ class ErnieBot(BaseComponent):
         # Do not use stream for now
         if stream:
             payload["stream"] = True
-        chat_url = (
-            f"https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions?access_token={self.token}"
-        )
+        chat_url = ernie_dict[self.model_name].format(self.token)
         response = requests.request("POST", chat_url, headers=self.headers, data=json.dumps(payload))
         response_json = json.loads(response.text)
         if history is None:

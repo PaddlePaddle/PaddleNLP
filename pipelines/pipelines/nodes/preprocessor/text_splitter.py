@@ -391,7 +391,6 @@ class MarkdownHeaderTextSplitter(BaseComponent):
         # header_stack: List[Dict[str, Union[int, str]]] = []
         header_stack: List[HeaderType] = []
         initial_metadata: Dict[str, str] = {}
-
         for line in lines:
             stripped_line = line.strip()
             # Check each line against each of the header types (e.g., #, ##)
@@ -495,9 +494,9 @@ class MarkdownHeaderTextSplitter(BaseComponent):
         # We now want to combine these smaller pieces into medium size
         # chunks to send to the LLM.
         if chunk_size is None:
-            chunk_size = self.chunk_size
+            chunk_size = self._chunk_size
         if chunk_overlap is None:
-            chunk_overlap = self.chunk_overlap
+            chunk_overlap = self._chunk_overlap
         if separator is None:
             separator = self._separator
         separator_len = self._length_function(separator)

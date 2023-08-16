@@ -30,7 +30,6 @@ from configuration import (
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
-from paddle.fluid import layers
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
 from paddlenlp.transformers.model_outputs import CausalLMOutputWithCrossAttentions
@@ -237,11 +236,11 @@ class MultiHeadAttention(nn.Layer):
             k, v = self.compute_kv(key, value)
             return self.StaticCache(k, v)
         elif value is None:  # incremental_state
-            k = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_attention_heads, 0, self.head_dim], dtype=key.dtype, value=0
+            k = paddle.full(
+                shape=[key.shape[0], self.num_attention_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0
             )
-            v = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_attention_heads, 0, self.head_dim], dtype=key.dtype, value=0
+            v = paddle.full(
+                shape=[key.shape[0], self.num_attention_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0
             )
             return self.Cache(k, v)
         else:
