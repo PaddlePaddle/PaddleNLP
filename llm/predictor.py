@@ -76,18 +76,19 @@ def batchfy_text(texts, batch_size):
 
 
 class BasePredictor:
-    def __init__(self, args: PredictorArgument, tokenizer: PretrainedTokenizer = None):
-        self.args: PredictorArgument = args
+    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
+        self.config: PredictorArgument = config
         if tokenizer is None:
-            tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
+            tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path, padding_side="left")
 
         self.tokenizer = tokenizer
         self.return_tensors = "pd"
+        self._init_dist_env()
 
-    def preprocess(self, source):
+    def _preprocess(self, source):
         tokenized_source = self.tokenizer(
             source,
-            max_length=self.args.src_length,
+            max_length=self.config.src_length,
             truncation=True,
             truncation_side="left",
             return_tensors=self.return_tensors,
@@ -96,26 +97,7 @@ class BasePredictor:
         )
         return tokenized_source
 
-    @abstractmethod
-    def infer(self, inputs):
-        raise NotImplementedError
-
-    def postprocess(self, predictions):
-        decoded_predictions = self.tokenizer.batch_decode(
-            predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False
-        )
-        return decoded_predictions
-
-    def predict(self, source):
-        tokenized_source = self.preprocess(source)
-        predictions = self.infer(tokenized_source)
-        decoded_predictions = self.postprocess(predictions)
-        return decoded_predictions
-
-
-class DygraphPredictor(BasePredictor):
-    def __init__(self, args: PredictorArgument, model: PretrainedModel = None, tokenizer: PretrainedTokenizer = None):
-        super().__init__(args, tokenizer)
+    def _init_dist_env(self):
         tensor_parallel_degree = paddle.distributed.get_world_size()
         tensor_parallel_rank = paddle.distributed.get_rank()
         if tensor_parallel_degree > 1:
@@ -129,47 +111,73 @@ class DygraphPredictor(BasePredictor):
             fleet.init(is_collective=True, strategy=strategy)
             hcg = fleet.get_hybrid_communicate_group()
             self.tensor_parallel_rank = hcg.get_model_parallel_rank()
+        self.tensor_parallel_rank = tensor_parallel_rank
+        self.tensor_parallel_degree = tensor_parallel_degree
 
-        if self.args.lora_path is not None:
-            lora_config = LoRAConfig.from_pretrained(self.args.lora_path)
+    @abstractmethod
+    def _infer(self, inputs):
+        raise NotImplementedError
+
+    def _postprocess(self, predictions):
+        decoded_predictions = self.tokenizer.batch_decode(
+            predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False
+        )
+        return decoded_predictions
+
+    def predict(self, source):
+        tokenized_source = self._preprocess(source)
+        predictions = self._infer(tokenized_source)
+        decoded_predictions = self._postprocess(predictions)
+        return decoded_predictions
+
+
+class DygraphPredictor(BasePredictor):
+    def __init__(
+        self, config: PredictorArgument, model: PretrainedModel = None, tokenizer: PretrainedTokenizer = None
+    ):
+        super().__init__(config, tokenizer)
+        self.model = model
+        self._model_init()
+        self.model.eval()
+
+    def _model_init(self):
+        if self.config.lora_path is not None:
+            lora_config = LoRAConfig.from_pretrained(self.config.lora_path)
             dtype = lora_config.dtype
             lora_config.merge_weights = True
-        elif self.args.prefix_path is not None:
-            prefix_config = PrefixConfig.from_pretrained(self.args.prefix_path)
+        elif self.config.prefix_path is not None:
+            prefix_config = PrefixConfig.from_pretrained(self.config.prefix_path)
             dtype = prefix_config.dtype
-        elif self.args.dtype is not None:
-            dtype = self.args.dtype
+        elif self.config.dtype is not None:
+            dtype = self.config.dtype
         else:
             raise ValueError("Please specific the model dtype.")
 
-        if model is None:
-            model = AutoModelForCausalLM.from_pretrained(
-                args.model_name_or_path,
+        if self.model is None:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.config.model_name_or_path,
                 dtype=dtype,
-                tensor_parallel_degree=tensor_parallel_degree,
-                tensor_parallel_rank=tensor_parallel_rank,
+                tensor_parallel_degree=self.tensor_parallel_degree,
+                tensor_parallel_rank=self.tensor_parallel_rank,
             )
 
-        self.model = model
-
-        if self.args.lora_path is not None:
+        if self.config.lora_path is not None:
             self.model = LoRAModel.from_pretrained(
-                model=self.model, lora_path=self.args.lora_path, lora_config=lora_config
+                model=self.model, lora_path=self.config.lora_path, lora_config=lora_config
             )
-        if self.args.prefix_path is not None:
+        if self.config.prefix_path is not None:
             prefix_tuning_params = get_prefix_tuning_params(self.model)
             self.model = PrefixModelForCausalLM.from_pretrained(
                 model=self.model,
-                prefix_path=self.args.prefix_path,
+                prefix_path=self.config.prefix_path,
                 postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
             )
-        self.model.eval()
 
     @paddle.no_grad()
-    def infer(self, inputs: dict[str, paddle.Tensor]):
+    def _infer(self, inputs: dict[str, paddle.Tensor]):
         # the `max_length` of generate is: max_new_length, it will occur error when `max_length` + sequence_length > max_position_embeddings.
         # so change max_length to control the length of decoding.
-        max_length = self.args.max_length - inputs["input_ids"].shape[-1]
+        max_length = max(self.config.max_length - inputs["input_ids"].shape[-1], 1)
         result = self.model.generate(
             **inputs,
             max_length=max_length,
@@ -177,52 +185,52 @@ class DygraphPredictor(BasePredictor):
             eos_token_id=self.tokenizer.eos_token_id,
             pad_token_id=self.tokenizer.pad_token_id,
             decode_strategy="sampling",
-            temperature=self.args.temperature,
-            top_k=self.args.top_k,
-            top_p=self.args.top_p,
+            temperature=self.config.temperature,
+            top_k=self.config.top_k,
+            top_p=self.config.top_p,
         )
         result = result[0]
         return result
 
 
 class StaticGraphPredictor(BasePredictor):
-    def __init__(self, args: PredictorArgument, tokenizer: PretrainedTokenizer = None):
-        super().__init__(args, tokenizer)
+    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
+        super().__init__(config, tokenizer)
 
-        model_path = os.path.join(args.model_name_or_path, args.model_prefix + ".pdmodel")
-        params_path = os.path.join(args.model_name_or_path, args.model_prefix + ".pdiparams")
-        config = paddle.inference.Config(model_path, params_path)
+        model_path = os.path.join(config.model_name_or_path, config.model_prefix + ".pdmodel")
+        params_path = os.path.join(config.model_name_or_path, config.model_prefix + ".pdiparams")
+        inference_config = paddle.inference.Config(model_path, params_path)
 
-        if args.device == "gpu":
+        if config.device == "gpu":
             # set GPU configs accordingly
-            config.enable_use_gpu(100, 0)
-        elif args.device == "cpu":
+            inference_config.enable_use_gpu(100, 0)
+        elif config.device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
-            config.disable_gpu()
-        config.disable_glog_info()
+            inference_config.disable_gpu()
+        inference_config.disable_glog_info()
 
         with static_mode_guard():
-            self.predictor = paddle.inference.create_predictor(config)
+            self.predictor = paddle.inference.create_predictor(inference_config)
 
         self.return_tensors = "np"
 
-    def preprocess(self, input_text: str | list[str]):
-        inputs = super().preprocess(input_text)
+    def _preprocess(self, input_text: str | list[str]):
+        inputs = super()._preprocess(input_text)
 
         # reduce the max_length to prevent length overflow
         # same as DygraphPredictor
-        max_length = max(self.args.max_length - inputs["input_ids"].shape[-1], 1)
+        max_length = max(self.config.max_length - inputs["input_ids"].shape[-1], 1)
         inputs["max_length"] = np.array(max_length, dtype="int64")
 
-        inputs["top_p"] = np.array(self.args.top_p, dtype="float32")
-        inputs["temperature"] = np.array(self.args.temperature, dtype="float32")
-        inputs["top_k"] = np.array(self.args.top_k, dtype="int64")
-        inputs["repetition_penalty"] = np.array(self.args.repetition_penalty, dtype="float32")
+        inputs["top_p"] = np.array(self.config.top_p, dtype="float32")
+        inputs["temperature"] = np.array(self.config.temperature, dtype="float32")
+        inputs["top_k"] = np.array(self.config.top_k, dtype="int64")
+        inputs["repetition_penalty"] = np.array(self.config.repetition_penalty, dtype="float32")
 
         return inputs
 
-    def infer(self, inputs: dict[str, np.ndarray]):
+    def _infer(self, inputs: dict[str, np.ndarray]):
         for name in self.predictor.get_input_names():
             self.predictor.get_input_handle(name).copy_from_cpu(inputs[name])
 
