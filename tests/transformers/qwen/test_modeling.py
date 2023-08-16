@@ -86,7 +86,7 @@ class QWenModelTester:
         self.output_attentions = output_attentions
 
     def prepare_config_and_inputs(self):
-        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
+        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size, dtype="int64")
 
         input_mask = None
         if self.use_input_mask:
