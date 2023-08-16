@@ -13,14 +13,10 @@
 # limitations under the License.
 
 import os
-import sys
 import time
 
 import arxiv
 import gradio as gr
-
-sys.path = ["/qingzhong/qingzhong/PaddleNLP", "/qingzhong/qingzhong/langchain"] + sys.path
-sys.path.append("/qingzhong/qingzhong/PaddleNLP/pipelines")
 from utils import (  # single_paper_sum,
     merge_summary,
     pdf2image,
@@ -64,8 +60,8 @@ def chat_file(
     query,
     history=None,
     index_paper=None,
-    api_key="48xZSoN7Xe0HoWhS2rbkLLwm",
-    secret_key="lAIVFS5n1736PZRsWjWZRNdwildwZAGk",
+    api_key="",
+    secret_key="",
 ):
     if history is None:
         history = []
@@ -137,8 +133,8 @@ def mul_tackle(
     p_m,
     root_path_list,
     path_list,
-    api_key="48xZSoN7Xe0HoWhS2rbkLLwm",
-    secret_key="lAIVFS5n1736PZRsWjWZRNdwildwZAGk",
+    api_key="",
+    secret_key="",
     lang="简体中文",
 ):
     from functools import partial
@@ -155,8 +151,8 @@ def predict(
     file_upload,
     input1=None,
     lang="简体中文",
-    api_key="48xZSoN7Xe0HoWhS2rbkLLwm",
-    secret_key="lAIVFS5n1736PZRsWjWZRNdwildwZAGk",
+    api_key="",
+    secret_key="",
 ):
 
     if os.path.exists("faiss_document_store.db"):
@@ -249,8 +245,8 @@ def sum_result(file_name):
 def retriever_papers(
     query,
     history=None,
-    api_key="48xZSoN7Xe0HoWhS2rbkLLwm",
-    secret_key="lAIVFS5n1736PZRsWjWZRNdwildwZAGk",
+    api_key="",
+    secret_key="",
     retriever_top=30,
     ranker_top=3,
 ):

@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import os
 import re
 import sys
 import time
-
-sys.path = ["/qingzhong/qingzhong/PaddleNLP", "/qingzhong/qingzhong/langchain"] + sys.path
-sys.path.append("/qingzhong/qingzhong/PaddleNLP/pipelines")
-import logging
 
 import fitz
 
