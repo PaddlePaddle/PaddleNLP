@@ -1952,6 +1952,7 @@ def TopPProcess(probs, top_p, min_tokens_to_keep):
     condition = paddle.scatter(
         sorted_indices_to_remove.flatten(), sorted_indices.flatten(), sorted_indices_to_remove.flatten()
     )
+
     condition = paddle.cast(condition, "bool").reshape(probs.shape)
     probs = paddle.where(condition, paddle.full_like(probs, 0.0), probs)
 
