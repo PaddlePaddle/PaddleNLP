@@ -76,12 +76,12 @@ def batchfy_text(texts, batch_size):
 
 
 class BasePredictor:
-    def __init__(self, args: PredictorArgument):
+    def __init__(self, args: PredictorArgument, tokenizer: PretrainedTokenizer = None):
         self.args: PredictorArgument = args
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
-        if isinstance(self.tokenizer, LlamaTokenizer):
-            self.tokenizer.pad_token = self.tokenizer.eos_token if self.tokenizer.eos_token else "<pad>"
+        if tokenizer is None:
+            tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
 
+        self.tokenizer = tokenizer
         self.return_tensors = "pd"
 
     def preprocess(self, source):
@@ -115,7 +115,7 @@ class BasePredictor:
 
 class DygraphPredictor(BasePredictor):
     def __init__(self, args: PredictorArgument, model: PretrainedModel = None, tokenizer: PretrainedTokenizer = None):
-        super().__init__(args)
+        super().__init__(args, tokenizer)
         tensor_parallel_degree = paddle.distributed.get_world_size()
         tensor_parallel_rank = paddle.distributed.get_rank()
         if tensor_parallel_degree > 1:
@@ -165,11 +165,6 @@ class DygraphPredictor(BasePredictor):
             )
         self.model.eval()
 
-        if tokenizer is None:
-            tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
-
-        self.tokenizer = tokenizer
-
     @paddle.no_grad()
     def infer(self, inputs: dict[str, paddle.Tensor]):
         result = self.model.generate(
@@ -188,8 +183,8 @@ class DygraphPredictor(BasePredictor):
 
 
 class StaticGraphPredictor(BasePredictor):
-    def __init__(self, args: PredictorArgument):
-        super().__init__(args)
+    def __init__(self, args: PredictorArgument, tokenizer: PretrainedTokenizer = None):
+        super().__init__(args, tokenizer)
 
         model_path = os.path.join(args.model_name_or_path, args.model_prefix + ".pdmodel")
         params_path = os.path.join(args.model_name_or_path, args.model_prefix + ".pdiparams")
