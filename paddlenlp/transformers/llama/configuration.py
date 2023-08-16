@@ -58,6 +58,24 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "use_recompute": False,
         "use_flash_attention": False,
     },
+    "__internal_testing__/distributed-projection-llama-7b": {
+        "hidden_size": 2048,
+        "embedding_output_size": 4096,
+        "initializer_range": 0.02,
+        "intermediate_size": 5504,
+        "max_position_embeddings": 2048,
+        "model_type": "llama",
+        "num_attention_heads": 16,
+        "num_hidden_layers": 2,
+        "rms_norm_eps": 1e-06,
+        "vocab_size": 32000,
+        "bos_token_id": 1,
+        "eos_token_id": 2,
+        "pad_token_id": 0,
+        "use_cache": False,
+        "use_recompute": False,
+        "use_flash_attention": False,
+    },
     "facebook/llama-7b": {
         "hidden_size": 4096,
         "initializer_range": 0.02,
@@ -236,10 +254,14 @@ class LlamaConfig(PretrainedConfig):
         tie_word_embeddings=False,
         alibi=False,
         rope_fusion_level=None,
+        embedding_output_size=None,
         **kwargs,
     ):
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
+        if embedding_output_size is None:
+            embedding_output_size = hidden_size
+        self.embedding_output_size = embedding_output_size
         self.intermediate_size = intermediate_size
         self.max_position_embeddings = max_position_embeddings
         self.num_hidden_layers = num_hidden_layers

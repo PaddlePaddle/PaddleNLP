@@ -284,8 +284,9 @@ class LlamaRMSNorm(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.hidden_size = config.hidden_size
+        self.embedding_output_size = config.embedding_output_size
         self.weight = paddle.create_parameter(
-            shape=[self.hidden_size],
+            shape=[self.embedding_output_size],
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(1.0),
         )
@@ -385,6 +386,7 @@ class LlamaMLP(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.hidden_size = config.hidden_size
+        self.embedding_output_size = config.embedding_output_size
         self.intermediate_size = config.intermediate_size
         self.tensor_parallel_degree = config.tensor_parallel_degree
         self.fuse_attention_ffn = config.fuse_attention_ffn
@@ -399,20 +401,20 @@ class LlamaMLP(nn.Layer):
         if config.tensor_parallel_degree > 1:
             if config.fuse_attention_ffn:
                 self.gate_up_fused_proj = ColumnParallelLinear(
-                    self.hidden_size,
+                    self.embedding_output_size,
                     self.intermediate_size * 2,
                     gather_output=False,
                     has_bias=False,
                 )
             else:
                 self.gate_proj = ColumnParallelLinear(
-                    self.hidden_size,
+                    self.embedding_output_size,
                     self.intermediate_size,
                     gather_output=False,
                     has_bias=False,
                 )
                 self.up_proj = ColumnParallelLinear(
-                    self.hidden_size,
+                    self.embedding_output_size,
                     self.intermediate_size,
                     gather_output=False,
                     has_bias=False,
@@ -420,18 +422,20 @@ class LlamaMLP(nn.Layer):
 
             self.down_proj = RowParallelLinear(
                 self.intermediate_size,
-                self.hidden_size,
+                self.embedding_output_size,
                 input_is_parallel=True,
                 has_bias=False,
             )
         else:
             if config.fuse_attention_ffn:
-                self.gate_up_fused_proj = nn.Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
+                self.gate_up_fused_proj = nn.Linear(
+                    self.embedding_output_size, self.intermediate_size * 2, bias_attr=False
+                )
             else:
-                self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-                self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+                self.gate_proj = nn.Linear(self.embedding_output_size, self.intermediate_size, bias_attr=False)
+                self.up_proj = nn.Linear(self.embedding_output_size, self.intermediate_size, bias_attr=False)
 
-            self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
+            self.down_proj = nn.Linear(self.intermediate_size, self.embedding_output_size, bias_attr=False)
 
     def forward(self, x):
         if self.fuse_attention_ffn:
@@ -450,6 +454,7 @@ class LlamaAttention(nn.Layer):
 
         self.config = config
         self.hidden_size = config.hidden_size
+        self.embedding_output_size = config.embedding_output_size
         self.num_heads = config.num_attention_heads
 
         self.head_dim = self.hidden_size // config.num_attention_heads
@@ -504,39 +509,39 @@ class LlamaAttention(nn.Layer):
         if config.tensor_parallel_degree > 1:
             if self.fuse_attention_qkv:
                 self.qkv_proj = ColumnParallelLinear(
-                    self.hidden_size,
+                    self.embedding_output_size,
                     3 * self.hidden_size,
                     has_bias=False,
                     gather_output=False,
                 )
             else:
                 self.q_proj = ColumnParallelLinear(
-                    self.hidden_size,
+                    self.embedding_output_size,
                     self.hidden_size,
                     has_bias=False,
                     gather_output=False,
                 )
                 if self.kv_indices is None:
                     self.k_proj = ColumnParallelLinear(
-                        self.hidden_size,
+                        self.embedding_output_size,
                         self.config.num_key_value_heads * self.head_dim,
                         has_bias=False,
                         gather_output=False,
                     )
                     self.v_proj = ColumnParallelLinear(
-                        self.hidden_size,
+                        self.embedding_output_size,
                         self.config.num_key_value_heads * self.head_dim,
                         has_bias=False,
                         gather_output=False,
                     )
                 else:
                     self.k_proj = nn.Linear(
-                        self.hidden_size,
+                        self.embedding_output_size,
                         self.config.num_key_value_heads * self.head_dim,
                         bias_attr=False,
                     )
                     self.v_proj = nn.Linear(
-                        self.hidden_size,
+                        self.embedding_output_size,
                         self.config.num_key_value_heads * self.head_dim,
                         bias_attr=False,
                     )
@@ -544,23 +549,23 @@ class LlamaAttention(nn.Layer):
         else:
             if self.fuse_attention_qkv:
                 self.qkv_proj = nn.Linear(
-                    self.hidden_size,
+                    self.embedding_output_size,
                     3 * self.hidden_size,
                     bias_attr=False,
                 )
             else:
                 self.q_proj = nn.Linear(
-                    self.hidden_size,
+                    self.embedding_output_size,
                     self.hidden_size,
                     bias_attr=False,
                 )
                 self.k_proj = nn.Linear(
-                    self.hidden_size,
+                    self.embedding_output_size,
                     self.config.num_key_value_heads * self.head_dim,
                     bias_attr=False,
                 )
                 self.v_proj = nn.Linear(
-                    self.hidden_size,
+                    self.embedding_output_size,
                     self.config.num_key_value_heads * self.head_dim,
                     bias_attr=False,
                 )
@@ -568,14 +573,14 @@ class LlamaAttention(nn.Layer):
         if config.tensor_parallel_degree > 1:
             self.o_proj = RowParallelLinear(
                 self.hidden_size,
-                self.hidden_size,
+                self.embedding_output_size,
                 has_bias=False,
                 input_is_parallel=True,
             )
         else:
             self.o_proj = nn.Linear(
                 self.hidden_size,
-                self.hidden_size,
+                self.embedding_output_size,
                 bias_attr=False,
             )
 
@@ -882,19 +887,20 @@ class LlamaModel(LlamaPretrainedModel):
         super().__init__(config)
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
+        self.embedding_output_size = config.embedding_output_size
         self.sequence_parallel = config.sequence_parallel
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
         if config.tensor_parallel_degree > 1:
             self.embed_tokens = mpu.VocabParallelEmbedding(
                 self.vocab_size,
-                self.hidden_size,
+                self.embedding_output_size,
                 weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
             )
         else:
             self.embed_tokens = nn.Embedding(
                 self.vocab_size,
-                self.hidden_size,
+                self.embedding_output_size,
             )
 
         self.layers = nn.LayerList([LlamaDecoderLayer(config) for _ in range(config.num_hidden_layers)])
@@ -1147,7 +1153,7 @@ class LlamaLMHead(nn.Layer):
             vocab_size = config.vocab_size
 
         self.weight = self.create_parameter(
-            shape=[config.hidden_size, vocab_size],
+            shape=[config.embedding_output_size, vocab_size],
             dtype=paddle.get_default_dtype(),
         )
         # Must set distributed attr for Tensor Parallel !
