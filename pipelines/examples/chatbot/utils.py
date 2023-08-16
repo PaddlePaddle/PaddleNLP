@@ -17,8 +17,11 @@ import re
 import sys
 import time
 
+sys.path = ["/qingzhong/qingzhong/PaddleNLP", "/qingzhong/qingzhong/langchain"] + sys.path
+sys.path.append("/qingzhong/qingzhong/PaddleNLP/pipelines")
+import logging
+
 import fitz
-import scipdf
 
 from pipelines.nodes import ErnieBot, PDFToTextConverter
 from pipelines.nodes.combine_documents import (
@@ -30,6 +33,8 @@ from pipelines.nodes.preprocessor.text_splitter import (
     CharacterTextSplitter,
     SpacyTextSplitter,
 )
+
+logging.getLogger().setLevel(logging.INFO)
 
 
 def pdf2image(pdfPath, imgPath, zoom_x=10, zoom_y=10, rotation_angle=0):
@@ -51,6 +56,8 @@ def pdf2image(pdfPath, imgPath, zoom_x=10, zoom_y=10, rotation_angle=0):
 
 def parse_pdf(path):
     try:
+        import scipdf
+
         pdf = scipdf.parse_pdf_to_dict(path, as_list=False)
         # 下面这段内容，可以加，也可以删除
         pdf["authors"] = pdf["authors"].split("; ")
@@ -78,7 +85,7 @@ def single_paper_sum(root_path, path, api_key, secret_key, filters=["\n"]):
         content_split = pdf_splitter.split_text(content)
     except:
         pdf_splitter = CharacterTextSplitter(separator="\n", filters="\n", chunk_size=500, chunk_overlap=0)
-    content_split = pdf_splitter.split_text(content)
+        content_split = pdf_splitter.split_text(content)
     for item in content_split:
         item = clean(item, filters)
         document_paper.append({"content": item, "meta": {"name": path}})

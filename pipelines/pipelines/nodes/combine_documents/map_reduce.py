@@ -58,6 +58,9 @@ class MapReduceDocuments(BaseCombineDocuments):
             map_results.append(txt)
         result_docs = []
         for i, r in enumerate(map_results):
-            result_docs.append({"content": r, "meta": docs[i]["meta"]})
+            if "meta" in docs[i]:
+                result_docs.append({"content": r, "meta": docs[i]["meta"]})
+            else:
+                result_docs.append({"content": r, "meta": {}})
         result = self.reduce_documents.combine_docs(result_docs, token_max=token_max, **kwargs)
         return result

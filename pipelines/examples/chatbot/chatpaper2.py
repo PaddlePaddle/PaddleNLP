@@ -13,10 +13,14 @@
 # limitations under the License.
 
 import os
+import sys
 import time
 
 import arxiv
 import gradio as gr
+
+sys.path = ["/qingzhong/qingzhong/PaddleNLP", "/qingzhong/qingzhong/langchain"] + sys.path
+sys.path.append("/qingzhong/qingzhong/PaddleNLP/pipelines")
 from utils import (  # single_paper_sum,
     merge_summary,
     pdf2image,
@@ -32,6 +36,10 @@ from pipelines.nodes import (
     PromptTemplate,
     TruncatedConversationHistory,
 )
+
+os.environ["no_proxy"] = "localhost,10.9.189.4,::1"
+from build_base import chat_papers
+
 from pipelines.pipelines import Pipeline
 
 paper_all = []
@@ -52,11 +60,13 @@ def clear_session():
     return None, "https://arxiv.org/abs/2303.08774"
 
 
-api_key = ""
-secret_key = ""
-
-
-def chat_file(query, index_paper=None, api_key=api_key, secret_key=secret_key, history=None):
+def chat_file(
+    query,
+    history=None,
+    index_paper=None,
+    api_key="48xZSoN7Xe0HoWhS2rbkLLwm",
+    secret_key="lAIVFS5n1736PZRsWjWZRNdwildwZAGk",
+):
     if history is None:
         history = []
     if index_paper is None:
@@ -110,7 +120,6 @@ def tackle_paper(root_path, path, api_key, secret_key, lang="简体中文"):
         ]
     else:
         data_split, sum_str, sum_file = single_paper_abs_sum(root_path, path, api_key=api_key, secret_key=secret_key)
-        # data_split, sum_str, sum_file = single_paper_sum(root_path, path, api_key=api_key, secret_key=secret_key)
         all_data_result[path.split("/")[-1].replace(".pdf", "").replace(".", "_")] = [
             pdf_image,
             path,
@@ -128,8 +137,8 @@ def mul_tackle(
     p_m,
     root_path_list,
     path_list,
-    api_key,
-    secret_key,
+    api_key="48xZSoN7Xe0HoWhS2rbkLLwm",
+    secret_key="lAIVFS5n1736PZRsWjWZRNdwildwZAGk",
     lang="简体中文",
 ):
     from functools import partial
@@ -142,7 +151,14 @@ def mul_tackle(
     return result
 
 
-def predict(file_upload, input1=None, lang="简体中文", api_key=api_key, secret_key=secret_key):
+def predict(
+    file_upload,
+    input1=None,
+    lang="简体中文",
+    api_key="48xZSoN7Xe0HoWhS2rbkLLwm",
+    secret_key="lAIVFS5n1736PZRsWjWZRNdwildwZAGk",
+):
+
     if os.path.exists("faiss_document_store.db"):
         os.remove("faiss_document_store.db")
     if os.path.exists(index_name):
@@ -157,17 +173,19 @@ def predict(file_upload, input1=None, lang="简体中文", api_key=api_key, secr
             paths = input1.split(";")
             path_list = []
             root_path_list = ["./" for i in range(len(path_list))]
-
+            root_path = root_path_list[0]
             for index, path_item in enumerate(paths):
                 paper = next(arxiv.Search(id_list=[path_item.split("/")[-1]]).results())
                 path_name = "{}.pdf".format(path_item.split("/")[-1])
-                paper.download_pdf(dirpath=root_path_list[index], filename=path_name)
-                path = os.path.join(root_path_list[index], path_name)
+                paper.download_pdf(dirpath=root_path, filename=path_name)
+                path = os.path.join(root_path, path_name)
                 path_list.append(path)
     else:
         path_list = [path.name for path in file_upload]
         root_path_list = [os.path.dirname(path) for path in path_list]
-        document_store = FAISSDocumentStore(embedding_dim=768, faiss_index_factory_str="Flat")
+        document_store = FAISSDocumentStore(
+            embedding_dim=768, faiss_index_factory_str="Flat", duplicate_documents="skip"
+        )
         retriever = DensePassageRetriever(
             document_store=document_store,
             query_embedding_model="moka-ai/m3e-base",
@@ -180,14 +198,16 @@ def predict(file_upload, input1=None, lang="简体中文", api_key=api_key, secr
             embed_title=False,
             pooling_mode="mean_tokens",
         )
+    # import pdb;pdb.set_trace()
     multi_result = mul_tackle(
         p_m=3, root_path_list=root_path_list, path_list=path_list, api_key=api_key, secret_key=secret_key, lang=lang
     )
     for index, split_text in multi_result:
+        split_text = retriever.run_indexing(split_text)[0]["documents"]
         document_store.write_documents(split_text, index=str(index))
-        document_store.update_embeddings(retriever, index=str(index))
+        # document_store.update_embeddings(retriever,index=str(index))
         document_store.write_documents(split_text)
-    document_store.update_embeddings(retriever)
+    # document_store.update_embeddings(retriever)
     document_store.save(index_name)
     mul_sum = merge_summary(papers_sum, api_key=api_key, secret_key=secret_key)
     file_name_sum = root_path_list[0] + "/" + "mul_papers_sum.txt"
@@ -224,6 +244,24 @@ def sum_result(file_name):
         else:
             time.sleep(60)
     return sum_result[:2] + sum_result[4:]
+
+
+def retriever_papers(
+    query,
+    history=None,
+    api_key="48xZSoN7Xe0HoWhS2rbkLLwm",
+    secret_key="lAIVFS5n1736PZRsWjWZRNdwildwZAGk",
+    retriever_top=30,
+    ranker_top=3,
+):
+    if history is not None:
+        history = []
+    message = chat_papers(
+        query, api_key=api_key, secret_key=secret_key, retriever_top=retriever_top, ranker_top=ranker_top
+    )
+    # import pdb;pdb.set_trace()
+    history.append(["user: {}".format(query), "assistant: {}".format(message["result"])])
+    return "", history, history
 
 
 def Dropdown_list(papers, inputs):
@@ -280,7 +318,7 @@ with gr.Blocks() as demo:
                                 )
                                 submit_button = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
                                 submit_button.click(
-                                    chat_file, inputs=[textbox, file_name], outputs=[textbox, chatbot, state]
+                                    chat_file, inputs=[textbox, state, file_name], outputs=[textbox, chatbot, state]
                                 )
             with gr.Tab("单文总结"):  # 包含下载功能
                 file_sum = gr.Dropdown(choices=[""], max_choices=1, label="选择论文")
@@ -308,7 +346,7 @@ with gr.Blocks() as demo:
                                 )
                                 submit_button = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
                                 submit_button.click(
-                                    chat_file, inputs=[textbox, file_sum], outputs=[textbox, chatbot, state]
+                                    chat_file, inputs=[textbox, state, file_sum], outputs=[textbox, chatbot, state]
                                 )
             with gr.Tab("多文总结"):  # 包含下载功能
                 with gr.Accordion("   "):
@@ -327,7 +365,7 @@ with gr.Blocks() as demo:
                                 scale=10,
                             )
                             submit_button = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
-                            submit_button.click(chat_file, inputs=[textbox], outputs=[textbox, chatbot, state])
+                            submit_button.click(chat_file, inputs=[textbox, state], outputs=[textbox, chatbot, state])
             file_upload.change(Dropdown_list, inputs=[file_upload, input1], outputs=[file_name, file_sum])
             input1.change(Dropdown_list, inputs=[file_upload, input1], outputs=[file_name, file_sum])
             submit.click(
@@ -361,6 +399,7 @@ with gr.Blocks() as demo:
     with gr.Tab("学术检索"):
         with gr.Group():
             chatbot = gr.Chatbot(label="Chatbot")
+            state = gr.State()
             with gr.Row():
                 textbox = gr.Textbox(
                     container=False,
@@ -369,4 +408,5 @@ with gr.Blocks() as demo:
                     scale=10,
                 )
                 submit_button = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
+            submit_button.click(retriever_papers, inputs=[textbox, state], outputs=[textbox, chatbot, state])
 demo.launch(server_name="0.0.0.0", server_port=8084)
