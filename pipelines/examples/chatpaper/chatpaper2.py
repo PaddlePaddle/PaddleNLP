@@ -11,14 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import argparse
 import os
 import time
 
 import arxiv
 import gradio as gr
-
-# from ulits import  single_paper_sum
+from create_base import chat_papers
 from utils import merge_summary, pdf2image, single_paper_abs_sum, translation
 
 from pipelines.document_stores import FAISSDocumentStore
@@ -29,10 +28,6 @@ from pipelines.nodes import (
     PromptTemplate,
     TruncatedConversationHistory,
 )
-
-os.environ["no_proxy"] = "localhost,10.9.189.4,::1"
-from create_base import chat_papers
-
 from pipelines.pipelines import Pipeline
 
 paper_all = []
@@ -43,6 +38,56 @@ from multiprocessing import Manager, Pool
 manager = Manager()
 all_data_result = manager.dict()
 papers_sum = manager.list()
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--device",
+    choices=["cpu", "gpu"],
+    default="gpu",
+    help="Select which device to run dense_qa system, defaults to gpu.",
+)
+parser.add_argument("--index_name", default="dureader_index", type=str, help="The ann index name of ANN.")
+parser.add_argument(
+    "--max_seq_len_query", default=64, type=int, help="The maximum total length of query after tokenization."
+)
+parser.add_argument(
+    "--max_seq_len_passage", default=256, type=int, help="The maximum total length of passage after tokenization."
+)
+parser.add_argument(
+    "--retriever_batch_size",
+    default=16,
+    type=int,
+    help="The batch size of retriever to extract passage embedding for building ANN index.",
+)
+parser.add_argument(
+    "--query_embedding_model", default="moka-ai/m3e-base", type=str, help="The query_embedding_model path"
+)
+parser.add_argument(
+    "--passage_embedding_model", default="moka-ai/m3e-base", type=str, help="The passage_embedding_model path"
+)
+parser.add_argument(
+    "--params_path", default="checkpoints/model_40/model_state.pdparams", type=str, help="The checkpoint path"
+)
+parser.add_argument("--embedding_dim", default=768, type=int, help="The embedding_dim of index")
+parser.add_argument("--chunk_size", default=384, type=int, help="The length of data for indexing by retriever")
+parser.add_argument("--host", type=str, default="localhost", help="host ip of ANN search engine")
+parser.add_argument("--embed_title", default=False, type=bool, help="The title to be  embedded into embedding")
+parser.add_argument(
+    "--model_type",
+    choices=["ernie_search", "ernie", "bert", "neural_search"],
+    default="ernie",
+    help="the ernie model types",
+)
+parser.add_argument("--api_key", default=" ", type=str, help="The API Key.")
+parser.add_argument("--secret_key", default=" ", type=str, help="The secret key.")
+parser.add_argument(
+    "--pooling_mode",
+    default="mean_tokens",
+    choices=["max_tokens", "mean_tokens", "mean_sqrt_len_tokens", "cls_token"],
+    type=str,
+    help="The type of sentence embedding.",
+)
+args = parser.parse_args()
 
 
 def clear_session():
@@ -57,8 +102,8 @@ def chat_file(
     query,
     history=None,
     index_paper=None,
-    api_key="",
-    secret_key="",
+    api_key=args.api_key,
+    secret_key=args.secret_key,
 ):
     if history is None:
         history = []
@@ -67,20 +112,20 @@ def chat_file(
     else:
         index = index_paper.split("/")[-1].replace(".pdf", "").replace(".", "_")
     document_store = FAISSDocumentStore.load(index_name)
+    use_gpu = True if args.device == "gpu" else False
     retriever = DensePassageRetriever(
         document_store=document_store,
-        query_embedding_model="moka-ai/m3e-base",
-        passage_embedding_model="moka-ai/m3e-base",
-        params_path="checkpoints/model_40/model_state.pdparams",
-        output_emb_size=None,
-        max_seq_len_query=64,
-        max_seq_len_passage=256,
-        batch_size=16,
-        use_gpu=True,
-        embed_title=False,
-        pooling_mode="mean_tokens",
+        query_embedding_model=args.query_embedding_model,
+        passage_embedding_model=args.passage_embedding_model,
+        output_emb_size=args.embedding_dim if args.model_type in ["ernie_search", "neural_search"] else None,
+        max_seq_len_query=args.max_seq_len_query,
+        max_seq_len_passage=args.max_seq_len_passage,
+        batch_size=args.retriever_batch_size,
+        use_gpu=use_gpu,
+        embed_title=args.embed_title,
+        pooling_mode=args.pooling_mode,
     )
-    ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=True)
+    ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
     query_pipeline = Pipeline()
     query_pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
     query_pipeline.add_node(component=ranker, name="Ranker", inputs=["Retriever"])
@@ -130,8 +175,8 @@ def mul_tackle(
     p_m,
     root_path_list,
     path_list,
-    api_key="",
-    secret_key="",
+    api_key=" ",
+    secret_key=" ",
     lang="简体中文",
 ):
     from functools import partial
@@ -144,13 +189,7 @@ def mul_tackle(
     return result
 
 
-def predict(
-    file_upload,
-    input1=None,
-    lang="简体中文",
-    api_key="",
-    secret_key="",
-):
+def predict(file_upload, input1=None, lang="简体中文", api_key=args.api_key, secret_key=args.secret_key, p_m=3):
 
     if os.path.exists("faiss_document_store.db"):
         os.remove("faiss_document_store.db")
@@ -179,28 +218,26 @@ def predict(
         document_store = FAISSDocumentStore(
             embedding_dim=768, faiss_index_factory_str="Flat", duplicate_documents="skip"
         )
+        use_gpu = True if args.device == "gpu" else False
         retriever = DensePassageRetriever(
             document_store=document_store,
-            query_embedding_model="moka-ai/m3e-base",
-            passage_embedding_model="moka-ai/m3e-base",
-            output_emb_size=None,
-            max_seq_len_query=64,
-            max_seq_len_passage=256,
-            batch_size=16,
-            use_gpu=True,
-            embed_title=False,
-            pooling_mode="mean_tokens",
+            query_embedding_model=args.query_embedding_model,
+            passage_embedding_model=args.passage_embedding_model,
+            output_emb_size=args.embedding_dim if args.model_type in ["ernie_search", "neural_search"] else None,
+            max_seq_len_query=args.max_seq_len_query,
+            max_seq_len_passage=args.max_seq_len_passage,
+            batch_size=args.retriever_batch_size,
+            use_gpu=use_gpu,
+            embed_title=args.embed_title,
+            pooling_mode=args.pooling_mode,
         )
-    # import pdb;pdb.set_trace()
     multi_result = mul_tackle(
-        p_m=3, root_path_list=root_path_list, path_list=path_list, api_key=api_key, secret_key=secret_key, lang=lang
+        p_m=p_m, root_path_list=root_path_list, path_list=path_list, api_key=api_key, secret_key=secret_key, lang=lang
     )
     for index, split_text in multi_result:
         split_text = retriever.run_indexing(split_text)[0]["documents"]
         document_store.write_documents(split_text, index=str(index))
-        # document_store.update_embeddings(retriever,index=str(index))
         document_store.write_documents(split_text)
-    # document_store.update_embeddings(retriever)
     document_store.save(index_name)
     mul_sum = merge_summary(papers_sum, api_key=api_key, secret_key=secret_key)
     file_name_sum = root_path_list[0] + "/" + "mul_papers_sum.txt"
@@ -242,8 +279,8 @@ def sum_result(file_name):
 def retriever_papers(
     query,
     history=None,
-    api_key="",
-    secret_key="",
+    api_key=args.api_key,
+    secret_key=args.secret_key,
     retriever_top=30,
     ranker_top=3,
 ):
@@ -252,7 +289,6 @@ def retriever_papers(
     message = chat_papers(
         query, api_key=api_key, secret_key=secret_key, retriever_top=retriever_top, ranker_top=ranker_top
     )
-    # import pdb;pdb.set_trace()
     history.append(["user: {}".format(query), "assistant: {}".format(message["result"])])
     return "", history, history
 
@@ -267,6 +303,10 @@ def Dropdown_list(papers, inputs):
     return gr.Dropdown.update(choices=paper_all, value=paper_all[0]), gr.Dropdown.update(
         choices=paper_all, value=paper_all[0]
     )
+
+
+def Button_display():
+    return gr.Button.update("结果展示", scale=1, variant="primary", size="sm", visible=True)
 
 
 with gr.Blocks() as demo:
@@ -285,8 +325,11 @@ with gr.Blocks() as demo:
             submit = gr.Button(value="开始翻译精读")
 
         with gr.Accordion("论文翻译总结：输出区", open=True, elem_id="input-panel") as area_input_primary:
+
             with gr.Tab("单文翻译"):  # 包含下载功能
-                file_name = gr.Dropdown(choices=[""], max_choices=1, label="选择展示论文")
+                with gr.Row():
+                    file_tr = gr.Dropdown(choices=[""], max_choices=1, scale=4, label="选择展示论文")
+                    tr_display = gr.Button("翻译结果展示", scale=1, variant="primary", size="sm", visible=False)
                 with gr.Row():
                     with gr.Column():
                         gr.Dropdown(choices=["英文", "中文"], max_choices=1, label="论文原文-PDF插件-支持下载；此处为PDF占位符")
@@ -299,7 +342,7 @@ with gr.Blocks() as demo:
                         trans_paper = gr.Textbox(label="翻译结果", value="", max_lines=10)
                         trans_down = gr.File(label="翻译下载链接")
                         with gr.Group():
-                            start_chatfile_tr = textbox = gr.Textbox(value="暂时无法问答", label="问答启动")
+                            start_chatfile_tr = gr.Textbox(value="暂时无法问答", label="问答启动")
                             chatbot = gr.Chatbot(label="Chatbot")
                             state = gr.State()
                             with gr.Row():
@@ -311,10 +354,12 @@ with gr.Blocks() as demo:
                                 )
                                 submit_button = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
                                 submit_button.click(
-                                    chat_file, inputs=[textbox, state, file_name], outputs=[textbox, chatbot, state]
+                                    chat_file, inputs=[textbox, state, file_tr], outputs=[textbox, chatbot, state]
                                 )
             with gr.Tab("单文总结"):  # 包含下载功能
-                file_sum = gr.Dropdown(choices=[""], max_choices=1, label="选择论文")
+                with gr.Row():
+                    file_sum = gr.Dropdown(choices=[""], scale=4, max_choices=1, label="选择论文")
+                    sum_display = gr.Button("精读结果展示", scale=1, variant="primary", size="sm", visible=False)
                 with gr.Row():
                     with gr.Column():
                         gr.Dropdown(choices=["英文", "中文"], max_choices=1, label="论文原文-PDF插件-支持下载；此处为PDF占位符")
@@ -327,7 +372,7 @@ with gr.Blocks() as demo:
                         sum_parper = gr.Markdown(label="精读全文", value="")
                         sum_down = gr.File(label="全文精度链接 ")
                         with gr.Group():
-                            start_chatfile_sum = textbox = gr.Textbox(value="暂时无法问答", label="问答启动")
+                            start_chatfile_sum = gr.Textbox(value="暂时无法问答", label="问答启动")
                             chatbot = gr.Chatbot(label="Chatbot")
                             state = gr.State()
                             with gr.Row():
@@ -344,7 +389,7 @@ with gr.Blocks() as demo:
             with gr.Tab("多文总结"):  # 包含下载功能
                 with gr.Accordion("   "):
                     gr.Dropdown(choices=["英文", "中文"], max_choices=1, label="完整总结插件-支持下载，此处为多文总结占位符，需要支持上下拖动")
-                    sum_mul_papers = gr.Textbox(label="多文档摘要", value="")
+                    sum_mul_papers = gr.Textbox(label="多文档摘要", value="", max_lines=10)
                     sum_mul_papers_down = gr.File(label="全文精度链接 ")
                     with gr.Group():
                         start_chatfile_mul = gr.Textbox(value="暂时无法问答", label="问答启动")
@@ -359,8 +404,8 @@ with gr.Blocks() as demo:
                             )
                             submit_button = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
                             submit_button.click(chat_file, inputs=[textbox, state], outputs=[textbox, chatbot, state])
-            file_upload.change(Dropdown_list, inputs=[file_upload, input1], outputs=[file_name, file_sum])
-            input1.change(Dropdown_list, inputs=[file_upload, input1], outputs=[file_name, file_sum])
+            file_upload.change(Dropdown_list, inputs=[file_upload, input1], outputs=[file_tr, file_sum])
+            input1.change(Dropdown_list, inputs=[file_upload, input1], outputs=[file_tr, file_sum])
             submit.click(
                 predict,
                 inputs=[file_upload, input1, output2],
@@ -373,9 +418,10 @@ with gr.Blocks() as demo:
                 ],
             )
             clear.click(clear_session, inputs=[], outputs=[file_upload, input1])
-            file_name.change(tr_result, inputs=file_name, outputs=[ori_paper, ori_pdf, trans_paper, trans_down])
-            # file_name.change(tr_result,inputs=file_name,outputs=[ori_paper,ori_pdf,trans_paper,trans_down])
-            file_sum.change(sum_result, inputs=file_sum, outputs=[ori_paper_c, ori_pdf_c, sum_parper, sum_down])
+            file_tr.change(Button_display, inputs=[], outputs=[tr_display])
+            file_sum.change(Button_display, inputs=[], outputs=[sum_display])
+            tr_display.click(tr_result, inputs=file_tr, outputs=[ori_paper, ori_pdf, trans_paper, trans_down])
+            sum_display.click(sum_result, inputs=file_sum, outputs=[ori_paper_c, ori_pdf_c, sum_parper, sum_down])
 
     with gr.Tab("技术综述"):
         with gr.Group():

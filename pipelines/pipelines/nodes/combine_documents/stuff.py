@@ -33,13 +33,21 @@ class StuffDocuments(BaseCombineDocuments):
         document_prompt: str = "文件{index}: 文件内容{content}",
         document_separator: str = "\n\n",
         llm_prompt: Optional[str] = None,
+        len_str: int = 10000,
         **kwargs
     ):
         super().__init__(**kwargs)
+
+        """
+        :param document_prompt: the prompt for geting and merging multiple documents
+        :param llm_prompt: the prompt for multiple document summaries
+        :param len_str: maximum document length
+        """
         self.document_prompt = document_prompt
         self.document_separator = document_separator
         self.llm_prompt = llm_prompt
         self.llm = ErnieBot(api_key, secret_key)
+        self.len_str = len_str
         """
         示例：
         document_prompt='文件{index}: 文件内容{content}'
@@ -66,8 +74,8 @@ class StuffDocuments(BaseCombineDocuments):
         inputs = self._get_inputs(docs, **kwargs)  # 多个文件合并为一个文件
         if self.llm_prompt is not None:
             inputs = self.llm_prompt.format(inputs)
-        if len(inputs) > 2000:
+        if len(inputs) > self.len_str:
             logger.info("文本输入长度过长")
-            inputs = inputs[:2000]
+            inputs = inputs[: self.len_str]
         # Call predict on the LLM.
         return self.llm.run(inputs)

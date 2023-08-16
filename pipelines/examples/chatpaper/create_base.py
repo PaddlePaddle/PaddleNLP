@@ -11,8 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import multiprocessing
 import os
 import re
+import shutil
+from functools import partial
+from multiprocessing import Manager, Pool
 
 from pipelines.document_stores import FAISSDocumentStore
 from pipelines.nodes import (
@@ -33,14 +37,15 @@ from pipelines.nodes.preprocessor.text_splitter import (
 )
 from pipelines.pipelines import Pipeline
 
+manager = Manager()
+all_data_result = manager.dict()
+document_abs = manager.list()
 index_name = "knowledge_base_all"
 
 
 def summary_confine(text_list, api_key, secret_key):
-    # document_prompt ="你的认识总结输入内容，保留输入内容的主体内容，输入内容：{content}"
     document_prompt = "这是一篇论文摘要的第{index}部分的内容：{content}"
     llm_prompt = "我需要你的帮助来阅读和总结以下问题{}\n1.标记论文关键词\n根据以下四点进行总结。(专有名词需要用英语标记）\n-（1）：论文研究背景是什么？\n-（2）：过去的方法是什么？他们有什么问题？这种方法是否有良好的动机？\n-（3）：论文提出的研究方法是什么？\n-（4）：在什么任务上，通过论文的方法实现了什么性能？表现能支持他们的目标吗？\n-（5）意义是什么？\n-（6）从创新点、绩效和工作量三个维度总结论文优势和劣势\n请遵循以下输出格式：\n1.关键词：xxx\n\n2.摘要：\n\n8.结论：\n\nxxx；\n创新点：xxx；业绩：xxx；工作量：xxx；\n语句尽可能简洁和学术，不要有太多重复的信息，数值使用原始数字，一定要严格遵循格式，将相应的内容输出到xxx，按照\n换行"
-    # reduce_prompt ="合并并总结输入内容 {}"
     sum_prompt = "总结输入的内容，保留主要内容，输入内容:{}"
     combine_documents = StuffDocuments(
         api_key=api_key, secret_key=secret_key, llm_prompt=llm_prompt, document_prompt=document_prompt
@@ -57,14 +62,6 @@ def clean(txt, filters):
     for special_character in filters:
         txt = txt.replace(special_character, "")
     return txt
-
-
-import multiprocessing
-from multiprocessing import Manager, Pool
-
-manager = Manager()
-all_data_result = manager.dict()
-document_abs = manager.list()
 
 
 def chatfile_base(indexes, query, api_key, secret_key):
@@ -87,21 +84,11 @@ def chatfile_base(indexes, query, api_key, secret_key):
     query_pipeline = Pipeline()
     query_pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
     query_pipeline.add_node(component=ranker, name="Ranker", inputs=["Retriever"])
-    # query_pipeline.add_node(component=PromptTemplate("背景：{documents} 问题：{query}"), name="Template", inputs=["Ranker"])
-    # query_pipeline.add_node(
-    #         component=TruncatedConversationHistory(max_length=256), name="TruncateHistory", inputs=["Template"]
-    #     )
-    # ernie_bot=ErnieBot(api_key=api_key,secret_key=secret_key)
-    # query_pipeline.add_node(component=ernie_bot, name="ErnieBot", inputs=["TruncateHistory"])
-    import pdb
-
-    pdb.set_trace()
     all_doc = []
     for index in indexes:
         doc = query_pipeline.run(
             query=query, params={"Retriever": {"top_k": 30, "index": index}, "Ranker": {"top_k": 2}}
         )
-        # print(prediction)
         all_doc.extend(doc["documents"])
     prompt = PromptTemplate("背景：{documents} 问题：{query}").run(query, all_doc)
     prompt = prompt[0]["query"]
@@ -146,25 +133,18 @@ def get_summary(path, api_key, secret_key, filters=["\n"]):
 
 
 def mul_tackle(p_m, path_list, api_key, secret_key, filters=["\n"]):
-    # import pdb;pdb.set_trace()
-    from functools import partial
-
     func = partial(get_summary, api_key=api_key, secret_key=secret_key, filters=filters)
     pool = Pool(processes=min(p_m, multiprocessing.cpu_count()))
     result = pool.map(func, path_list)
     pool.close()
     pool.join()
-    # import pdb;pdb.set_trace()
     return result
 
 
 def bulid_base(paths, api_key, secret_key, filters=["\n"]):
     if os.path.exists("faiss_base_store_all.db"):
         os.remove("faiss_base_store_all.db")
-    # import pdb;pdb.set_trace()
     if os.path.exists(index_name):
-        import shutil
-
         shutil.rmtree(index_name)
     document_store = FAISSDocumentStore(
         embedding_dim=768,
@@ -186,26 +166,16 @@ def bulid_base(paths, api_key, secret_key, filters=["\n"]):
         duplicate_documents="skip",
     )
     results = mul_tackle(1, paths, api_key=api_key, secret_key=secret_key, filters=filters)
-    # import pdb;pdb.set_trace()
     for split, path in results:
         index = path.split("/")[-1].replace(".pdf", "")
-        # import pdb;pdb.set_trace()
-        # document_store.write_documents(split,index=str(index))
         split = retriever.run_indexing(split)[0]["documents"]
         document_store.write_documents(split, index=str(index))
-        # document_store.update_embeddings(retriever,index=str(index))
-    # document_store.write_documents(document_abs,index='document')
-    # document_store.update_embeddings(retriever,index='document')
     document_abs_embed = retriever.run_indexing(document_abs)[0]["documents"]
     document_store.write_documents(document_abs_embed)
-    # import pdb;pdb.set_trace()
-
-    # document_store.update_embeddings(retriever)
     document_store.save(index_name)
 
 
 def chat_papers(query, api_key, secret_key, retriever_top=30, ranker_top=3):
-    # import pdb;pdb.set_trace()
     document_store = FAISSDocumentStore.load(index_name)
     retriever = DensePassageRetriever(
         document_store=document_store,
@@ -224,17 +194,21 @@ def chat_papers(query, api_key, secret_key, retriever_top=30, ranker_top=3):
     query_pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
     query_pipeline.add_node(component=ranker, name="Ranker", inputs=["Retriever"])
     prediction = query_pipeline.run(query=query, params={"Retriever": {"top_k": 30}, "Ranker": {"top_k": 3}})
-    # import pdb;pdb.set_trace()
     paths = [item.meta["name"] for item in prediction["documents"] if os.path.isfile(item.meta["name"])]
     indexes = [path.split("/")[-1].replace(".pdf", "") for path in paths]
-    # import pdb;pdb.set_trace()
     result = chatfile_base(indexes, query=query, api_key=api_key, secret_key=secret_key)
     return result
 
 
 if __name__ == "__main__":
-    # import pdb;pdb.set_trace()
-    dirname = ""
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--api_key", default=" ", type=str, help="The API Key.")
+    parser.add_argument("--secret_key", default="", type=str, help="The secret key.")
+    parser.add_argument("--file_dir", default="", type=str, help="The dirname of PDF files")
+    args = parser.parse_args()
+    dirname = parser.file_dir
     files = []
-    bulid_base(files, api_key="", secret_key="")
+    bulid_base(files, api_key=args.api_key, secret_key=args.secret_key)
     result = chat_papers(query="商业银行薪酬制度的政策效应", api_key="", secret_key="")

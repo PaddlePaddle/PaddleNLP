@@ -29,13 +29,15 @@ class MapReduceDocuments(BaseCombineDocuments):
         secret_key: str,
         llm_prompt: str,
         reduce_documents: BaseCombineDocuments,
-        return_intermediate_steps: bool = False,
-        llm_output_key: str = "result",
+        **kwargs,
     ):
+        """
+        :param llm_prompt: 单文档总结的提示
+        :param reduce_documents: 多文档摘要生成
+        :param token_max: Maximum length of collapsing documents
+        """
         self.llm_prompt = llm_prompt
         self.reduce_documents = reduce_documents
-        self.return_intermediate_steps = return_intermediate_steps
-        self.llm_output_key = llm_output_key
         self.llm = ErnieBot(api_key, secret_key)
         assert isinstance(
             self.reduce_documents, ReduceDocuments

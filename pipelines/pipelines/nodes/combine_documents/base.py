@@ -26,6 +26,9 @@ class BaseCombineDocuments(BaseComponent):
 
     def __init__(self, input_key="contens"):
         self.input_key = input_key
+        """
+        :param input_key: the key values corresponding to document content
+        """
 
     def prompt_length(self, docs: List[dict], **kwargs: Any) -> Optional[int]:
         return None
@@ -47,8 +50,11 @@ class BaseCombineDocuments(BaseComponent):
     def run(
         self,
         documents: Union[dict, List[dict]],
+        **kwargs,
     ) -> Tuple[dict, str]:
-
+        """
+        :param documents: Documents used for multi document summary generation
+        """
         # Other keys are assumed to be needed for LLM prediction
         output, _ = self.combine_docs(documents)
         return output, "output_1"

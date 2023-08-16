@@ -28,6 +28,7 @@ class CombineDocsProtocol(Protocol):
 
 
 # 保证每个文档数小于设定的tokens
+# ensure that the length of documents is less than the set tokens
 def _split_list_of_docs(docs: List[dict], length_func: Callable, token_max: int, **kwargs: Any) -> List[List[dict]]:
     new_result_doc_list = []
     _sub_result_docs = []
@@ -69,8 +70,13 @@ class ReduceDocuments(BaseCombineDocuments):
         self,
         combine_documents: BaseCombineDocuments,
         collapse_documents: Optional[BaseCombineDocuments] = None,
-        token_max: int = 2000,
+        token_max: int = 10000,
     ):
+        """
+        :param combine_documents: Generate multiple document summaries
+        :param collapse_documents: Iteratively collapse multiple documents to ensure that the total number of tokens for the final merged documents is less than the set value
+        :param token_max: Maximum length of collapsing documents
+        """
         self.combine_documents = combine_documents
         self.collapse_documents = collapse_documents
         self.token_max = token_max

@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import glob
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -208,7 +208,6 @@ class FAISSDocumentStore(SQLDocumentStore):
         # used when creating the original FAISS index
         logger.info(f"document_cnt:{self.get_document_count()}\tembedding_cnt:{self.get_embedding_count()}")
         if not self.get_document_count() == self.get_embedding_count():
-            # import pdb;pdb.set_trace()
             raise ValueError(
                 "The number of documents present in the SQL database does not "
                 "match the number of embeddings in FAISS. Make sure your FAISS "
@@ -257,7 +256,6 @@ class FAISSDocumentStore(SQLDocumentStore):
         :raises DuplicateDocumentError: Exception trigger on duplicate document
         :return: None
         """
-        # import pdb;pdb.set_trace()
         if headers:
             raise NotImplementedError("FAISSDocumentStore does not support headers.")
 
@@ -281,7 +279,6 @@ class FAISSDocumentStore(SQLDocumentStore):
         document_objects = self._handle_duplicate_documents(
             documents=document_objects, index=index, duplicate_documents=duplicate_documents
         )
-        # import pdb;pdb.set_trace()
         if len(document_objects) > 0:
             add_vectors = False if document_objects[0].embedding is None else True
 
@@ -291,7 +288,6 @@ class FAISSDocumentStore(SQLDocumentStore):
                     "`FAISSDocumentStore` does not support update in existing `faiss_index`.\n"
                     "Please call `update_embeddings` method to repopulate `faiss_index`"
                 )
-            # import pdb;pdb.set_trace()
             vector_id = self.faiss_indexes[index].ntotal
             with tqdm(
                 total=len(document_objects), disable=not self.progress_bar, position=0, desc="Writing Documents"
@@ -313,7 +309,6 @@ class FAISSDocumentStore(SQLDocumentStore):
                             meta["vector_id"] = str(vector_id) + "_" + index
                             vector_id += 1
                         docs_to_write_in_sql.append(doc)
-                    # import pdb;pdb.set_trace()
                     super(FAISSDocumentStore, self).write_documents(
                         docs_to_write_in_sql,
                         index=index,
@@ -369,7 +364,6 @@ class FAISSDocumentStore(SQLDocumentStore):
             return
 
         logger.info(f"Updating embeddings for {document_count} docs...")
-        # import pdb;pdb.set_trace()
         vector_id = sum([index.ntotal for index in self.faiss_indexes.values()])
 
         # Query texts from SQL.
@@ -396,7 +390,6 @@ class FAISSDocumentStore(SQLDocumentStore):
                 self.faiss_indexes[index].add(embeddings_to_index)
 
                 vector_id_map = {}
-                # import pdb;pdb.set_trace()
                 for doc in document_batch:
                     vector_id_map[str(doc.id)] = str(vector_id)
                     vector_id += 1
@@ -590,7 +583,6 @@ class FAISSDocumentStore(SQLDocumentStore):
         :param return_embedding: To return document embedding. Unlike other document stores, FAISS will return normalized embeddings
         :return:
         """
-        # import pdb;pdb.set_trace()
         if headers:
             raise NotImplementedError("FAISSDocumentStore does not support headers.")
 
@@ -623,7 +615,6 @@ class FAISSDocumentStore(SQLDocumentStore):
 
             if return_embedding is True:
                 doc.embedding = self.faiss_indexes[index].reconstruct(int(doc.meta["vector_id"].split("_")[0]))
-        # import pdb;pdb.set_trace()
         return documents
 
     def save(self, index_path: Union[str, Path], config_path: Optional[Union[str, Path]] = None):
@@ -716,9 +707,6 @@ class FAISSDocumentStore(SQLDocumentStore):
             Can be created via calling `save()`
         """
         if os.path.isdir(index_path):
-            import glob
-
             config_path = glob.glob(index_path + "/**/*.json", recursive=True)
             index_path = [path.replace(".json", "") for path in config_path]
-        # import pdb;pdb.set_trace()
         return cls(faiss_index_path=index_path, faiss_config_path=config_path)
