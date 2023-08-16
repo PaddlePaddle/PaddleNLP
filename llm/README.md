@@ -191,25 +191,28 @@ python merge_lora_params.py \
 ## 4. 动态图推理
 
 ```
-python predict_generation.py \
+python predictor.py \
     --model_name_or_path THUDM/chatglm2-6b \
     --batch_size 1 \
     --data_file ./data/dev.json \
-    --dtype "float16"
+    --dtype "float16" \
+    --type dygraph
 
 # 加载LoRA参数
-python predict_generation.py \
+python predictor.py \
     --model_name_or_path THUDM/chatglm2-6b \
     --batch_size 1 \
     --data_file ./data/dev.json \
-    --lora_path ./checkpoints/chatglm_v2_lora_ckpts
+    --lora_path ./checkpoints/chatglm_v2_lora_ckpts \
+    --type dygraph
 
 # 加载Prefix Tuning参数
-python predict_generation.py \
+python predictor.py \
     --model_name_or_path THUDM/chatglm2-6b \
     --batch_size 1 \
     --data_file ./data/dev.json \
-    --prefix_path ./checkpoints/chatglm_v2_pt_ckpts
+    --prefix_path ./checkpoints/chatglm_v2_pt_ckpts \
+    --type dygraph
 ```
 
 **参数：**
@@ -308,4 +311,11 @@ python  finetune_generation.py ./chatglm_v2/gptq_argument.json
 
 ## 7. 静态图推理
 
-Coming soon.
+
+```shell
+python predictor.py \
+    --model_name_or_path inference \
+    --batch_size 1 \
+    --data_file ./data/dev.json \
+    --type static
+```

@@ -17,6 +17,7 @@ import json
 import os
 import sys
 from abc import abstractmethod
+from dataclasses import dataclass, field
 
 import numpy as np
 import paddle
@@ -25,36 +26,44 @@ from utils import get_prefix_tuning_params
 
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
-from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaTokenizer
+from paddlenlp.trainer import PdArgumentParser
+from paddlenlp.transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    LlamaTokenizer,
+    PretrainedModel,
+    PretrainedTokenizer,
+)
 
 
-def get_parser():
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name_or_path", default=None, required=True, help="The directory of model.")
-    parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
-    parser.add_argument("--src_length", type=int, default=1024, help="The max length of source text.")
-    parser.add_argument("--tgt_length", type=int, default=1024, help="The max length of target text.")
-    parser.add_argument("--lora_path", default=None, help="The directory of LoRA parameters. Default to None")
-    parser.add_argument(
-        "--prefix_path", default=None, help="The directory of Prefix Tuning parameters. Default to None"
+@dataclass
+class PredictorArgument:
+    model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
+    model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
+    src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
+    max_length: int = field(default=1024, metadata={"help": "The max length of target text."})
+    top_k: int = field(default=1, metadata={"help": "top_k parameter for generation"})
+    top_p: float = field(default=1.0, metadata={"help": "top_p parameter for generation"})
+    temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
+    repetition_penalty: float = field(default=1.0, metadata={"help": "repetition penalty parameter for generation"})
+    device: str = field(default="gpu", metadata={"help": "Device"})
+    dtype: str = field(default=None, metadata={"help": "Model dtype"})
+    lora_path: str = field(default=None, metadata={"help": "The directory of LoRA parameters. Default to None"})
+    prefix_path: str = field(
+        default=None, metadata={"help": "The directory of Prefix Tuning parameters. Default to None"}
     )
-    parser.add_argument("--top_k", type=int, default=1, help="top_k parameter for generation")
-    parser.add_argument("--top_p", type=float, default=1.0, help="top_p parameter for generation")
-    parser.add_argument("--temperature", type=float, default=0.95, help="top_p parameter for generation")
-    parser.add_argument("--data_file", default=None, help="data file directory")
-    parser.add_argument("--output_file", default="output.json", help="predict result file directory")
-    parser.add_argument("--device", type=str, default="gpu", help="Device")
-    parser.add_argument("--dtype", type=str, default=None, help="Model dtype")
-    parser.add_argument("--gpt", type=bool, default=False, help="GPTForCausalLM")
-    parser.add_argument("--ernie", type=bool, default=False, help="Ernie35ForCausalLM")
-    return parser
+    type: str = field(
+        default="dygraph", metadata={"help": "the type of predictor, it should be one of [dygraph, static]"}
+    )
 
 
-def parse_arguments():
-    parser = get_parser()
-    return parser.parse_args()
+@dataclass
+class ModelArgument:
+    gpt: bool = field(default=False, metadata={"help": "GPTForCausalLM"})
+    ernie: bool = field(default=False, metadata={"help": "Ernie35ForCausalLM"})
+    data_file: None = field(default=None, metadata={"help": "data file directory"})
+    output_file: str = field(default="output.json", metadata={"help": "predict result file directory"})
+    batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
 
 
 def batchfy_text(texts, batch_size):
@@ -67,8 +76,8 @@ def batchfy_text(texts, batch_size):
 
 
 class BasePredictor:
-    def __init__(self, args):
-        self.args = args
+    def __init__(self, args: PredictorArgument):
+        self.args: PredictorArgument = args
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
         if isinstance(self.tokenizer, LlamaTokenizer):
             self.tokenizer.pad_token = self.tokenizer.eos_token if self.tokenizer.eos_token else "<pad>"
@@ -105,10 +114,10 @@ class BasePredictor:
 
 
 class DygraphPredictor(BasePredictor):
-    def __init__(self, args):
+    def __init__(self, args: PredictorArgument, model: PretrainedModel = None, tokenizer: PretrainedTokenizer = None):
         super().__init__(args)
         tensor_parallel_degree = paddle.distributed.get_world_size()
-        self.tensor_parallel_rank = 0
+        tensor_parallel_rank = paddle.distributed.get_rank()
         if tensor_parallel_degree > 1:
             strategy = fleet.DistributedStrategy()
             strategy.hybrid_configs = {
@@ -132,23 +141,16 @@ class DygraphPredictor(BasePredictor):
             dtype = self.args.dtype
         else:
             raise ValueError("Please specific the model dtype.")
-        if self.args.gpt:
-            sys.path.append("./gpt-3")
-            from modeling import GPTForCausalLM
 
-            self.model = GPTForCausalLM.from_pretrained(
+        if model is None:
+            model = AutoModelForCausalLM.from_pretrained(
                 args.model_name_or_path,
                 dtype=dtype,
                 tensor_parallel_degree=tensor_parallel_degree,
-                tensor_parallel_rank=self.tensor_parallel_rank,
+                tensor_parallel_rank=tensor_parallel_rank,
             )
-        else:
-            self.model = AutoModelForCausalLM.from_pretrained(
-                args.model_name_or_path,
-                dtype=dtype,
-                tensor_parallel_degree=tensor_parallel_degree,
-                tensor_parallel_rank=self.tensor_parallel_rank,
-            )
+
+        self.model = model
 
         if self.args.lora_path is not None:
             self.model = LoRAModel.from_pretrained(
@@ -162,33 +164,35 @@ class DygraphPredictor(BasePredictor):
                 postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
             )
         self.model.eval()
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
-        if isinstance(self.tokenizer, LlamaTokenizer):
-            self.tokenizer.pad_token = self.tokenizer.eos_token if self.tokenizer.eos_token else "<pad>"
 
-    def infer(self, inputs):
-        with paddle.no_grad():
-            result = self.model.generate(
-                **inputs,
-                max_length=self.args.tgt_length,
-                bos_token_id=self.tokenizer.bos_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
-                pad_token_id=self.tokenizer.pad_token_id,
-                decode_strategy="sampling",
-                temperature=self.args.temperature,
-                top_k=self.args.top_k,
-                top_p=self.args.top_p,
-            )
+        if tokenizer is None:
+            tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, padding_side="left")
+
+        self.tokenizer = tokenizer
+
+    @paddle.no_grad()
+    def infer(self, inputs: dict[str, paddle.Tensor]):
+        result = self.model.generate(
+            **inputs,
+            max_length=self.args.max_length,
+            bos_token_id=self.tokenizer.bos_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
+            pad_token_id=self.tokenizer.pad_token_id,
+            decode_strategy="sampling",
+            temperature=self.args.temperature,
+            top_k=self.args.top_k,
+            top_p=self.args.top_p,
+        )
         result = result[0]
         return result
 
 
 class StaticGraphPredictor(BasePredictor):
-    def __init__(self, args):
+    def __init__(self, args: PredictorArgument):
         super().__init__(args)
 
-        model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
-        params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
+        model_path = os.path.join(args.model_name_or_path, args.model_prefix + ".pdmodel")
+        params_path = os.path.join(args.model_name_or_path, args.model_prefix + ".pdiparams")
         config = paddle.inference.Config(model_path, params_path)
 
         if args.device == "gpu":
@@ -205,7 +209,7 @@ class StaticGraphPredictor(BasePredictor):
 
         self.return_tensors = "np"
 
-    def preprocess(self, input_text):
+    def preprocess(self, input_text: str | list[str]):
         inputs = super().preprocess(input_text)
 
         # reduce the max_length to prevent length overflow
@@ -219,40 +223,67 @@ class StaticGraphPredictor(BasePredictor):
 
         return inputs
 
+    def infer(self, inputs):
+        for name in self.predictor.get_input_names():
+            self.predictor.get_input_handle(name).copy_from_cpu(inputs[name])
 
-def create_predictor(args):
-    """create predictor instance by args, and support dygraph model and static inference model
-
-    Args:
-        args (Argument): the argument instance from commandline
-
-    Returns:
-        Predictor: the instance of predictor
-    """
-    if os.path.isdir(args.model_name_or_path):
-
-        # if there is model_state.pdparams file, it should be DygraphPredictor
-        if os.path.exists(os.path.join(args.model_name_or_path, "model_state.pdparams")):
-            return DygraphPredictor(args)
-
-        if any(
-            [file.endswith("pdiparams") and file.endswith("pdmodel") for file in os.listdir(args.model_name_or_path)]
-        ):
-            return StaticGraphPredictor(args)
-
-    return DygraphPredictor(args)
+        self.predictor.run()
+        output_names = self.predictor.get_output_names()
+        output_handle = self.predictor.get_output_handle(output_names[0])
+        results = output_handle.copy_to_cpu()
+        decoded_ids = results.tolist()
+        return decoded_ids
 
 
 def predict():
-    args = parse_arguments()
-    paddle.set_device(args.device)
+    parser = PdArgumentParser((PredictorArgument, ModelArgument))
+    predictor_args, model_args = parser.parse_args_into_dataclasses()
+    paddle.set_device(predictor_args.device)
 
-    predictor = create_predictor(args)
+    tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
+    # TODO(wj-Mcat): fix llama tokenzier pad_token bug
+    if isinstance(tokenizer, LlamaTokenizer):
+        tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token else "<pad>"
+
+    if predictor_args.type == "dygraph":
+        model = None
+        if model_args.gpt:
+            sys.path.append("./gpt-3")
+            from modeling import GPTForCausalLM
+
+            tensor_parallel_degree = paddle.distributed.get_world_size()
+            tensor_parallel_rank = paddle.distributed.get_rank()
+            model = GPTForCausalLM.from_pretrained(
+                predictor_args.model_name_or_path,
+                dtype=predictor_args.dtype,
+                tensor_parallel_degree=tensor_parallel_degree,
+                tensor_parallel_rank=tensor_parallel_rank,
+            )
+        elif model_args.ernie:
+            sys.path.append("./gpt-3")
+            from modeling import Ernie35ForCausalLM
+
+            tensor_parallel_degree = paddle.distributed.get_world_size()
+            tensor_parallel_rank = paddle.distributed.get_rank()
+            model = Ernie35ForCausalLM.from_pretrained(
+                predictor_args.model_name_or_path,
+                dtype=predictor_args.dtype,
+                tensor_parallel_degree=tensor_parallel_degree,
+                tensor_parallel_rank=tensor_parallel_rank,
+            )
+
+        predictor = DygraphPredictor(predictor_args, model=model, tokenizer=tokenizer)
+    elif predictor_args.type == "static":
+        predictor = StaticGraphPredictor(predictor_args)
+    else:
+        raise ValueError(
+            f"receive unexpected predictor type: {predictor_args.type}, it should be one of [dygraph, static]"
+        )
 
     source_texts = []
     target_texts = []
-    if args.data_file:
-        with open(args.data_file, "r", encoding="utf-8") as f:
+    if model_args.data_file:
+        with open(model_args.data_file, "r", encoding="utf-8") as f:
             for line in f:
                 example = json.loads(line)
                 source_texts.append(example["src"])
@@ -261,10 +292,10 @@ def predict():
         source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
         target_texts = ["", ""]
 
-    batch_source_texts = batchfy_text(source_texts, args.batch_size)
-    batch_target_texts = batchfy_text(target_texts, args.batch_size)
+    batch_source_texts = batchfy_text(source_texts, model_args.batch_size)
+    batch_target_texts = batchfy_text(target_texts, model_args.batch_size)
 
-    with open(args.output_file, "w", encoding="utf-8") as f:
+    with open(model_args.output_file, "w", encoding="utf-8") as f:
         for bs, batch_source_text in enumerate(batch_source_texts):
             outputs = predictor.predict(batch_source_text)
 
