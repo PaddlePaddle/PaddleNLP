@@ -73,6 +73,12 @@ class ReduceDocuments(BaseCombineDocuments):
         token_max: int = 10000,
     ):
         """
+        The ReduceDocuments class is a subclass of the BaseCombineDocuments class,
+        which is designed to collapse multi document summary.
+        Fisrt,the number of tokens for multiple output documents is greater than the token_max.
+        Then, the ReduceDocuments collapses multiple documents  (the number of tokens for collapsing documents should not exceed the token_max).
+        Ultimately, it ensures that the total number of tokens for all documents does not exceed the token_max and implements multi document summary generation.
+
         :param combine_documents: Generate multiple document summaries
         :param collapse_documents: Iteratively collapse multiple documents to ensure that the total number of tokens for the final merged documents is less than the set value
         :param token_max: Maximum length of collapsing documents

@@ -39,6 +39,11 @@ class StuffDocuments(BaseCombineDocuments):
         super().__init__(**kwargs)
 
         """
+        The StuffDocuments class is a subclass of the BaseCombineDocuments class,
+        which is designed to generate multi document summary.
+        First, merge multiple documents, and then generate a multi document summary .
+        Ensuring that the number of tokens for all documents does not exceed the len_str.
+
         :param document_prompt: the prompt for geting and merging multiple documents
         :param llm_prompt: the prompt for multiple document summaries
         :param len_str: maximum document length
@@ -71,11 +76,12 @@ class StuffDocuments(BaseCombineDocuments):
         return self.get_num_tokens(prompt)
 
     def combine_docs(self, docs: List[dict], **kwargs: Any) -> Tuple[dict, str]:
-        inputs = self._get_inputs(docs, **kwargs)  # 多个文件合并为一个文件
+        # Merge multiple files into one file
+        inputs = self._get_inputs(docs, **kwargs)
         if self.llm_prompt is not None:
             inputs = self.llm_prompt.format(inputs)
         if len(inputs) > self.len_str:
-            logger.info("文本输入长度过长")
+            logger.info("the length of text is too long")
             inputs = inputs[: self.len_str]
         # Call predict on the LLM.
         return self.llm.run(inputs)

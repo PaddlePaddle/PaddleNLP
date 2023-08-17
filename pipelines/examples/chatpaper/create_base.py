@@ -70,7 +70,6 @@ def chatfile_base(indexes, query, api_key, secret_key):
         document_store=document_store,
         query_embedding_model="moka-ai/m3e-base",
         passage_embedding_model="moka-ai/m3e-base",
-        params_path="checkpoints/model_40/model_state.pdparams",
         output_emb_size=None,
         max_seq_len_query=64,
         max_seq_len_passage=256,

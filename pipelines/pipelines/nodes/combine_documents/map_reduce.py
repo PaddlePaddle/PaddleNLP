@@ -32,9 +32,13 @@ class MapReduceDocuments(BaseCombineDocuments):
         **kwargs,
     ):
         """
-        :param llm_prompt: 单文档总结的提示
-        :param reduce_documents: 多文档摘要生成
-        :param token_max: Maximum length of collapsing documents
+        The MapReduceDocuments class is a subclass of the BaseCombineDocuments class,
+        which is designed to implement multiple document summaries.
+        It first conducts a single document summary, followed by a collapsed multi document summary.
+
+        :param llm_prompt: the prompt for single document summary
+        :param reduce_documents: the collapse multi document summary generation
+        :param token_max: the maximum length of collapsing documents
         """
         self.llm_prompt = llm_prompt
         self.reduce_documents = reduce_documents
