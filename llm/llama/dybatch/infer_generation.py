@@ -20,7 +20,7 @@ import paddle
 import paddle.distributed as dist
 import paddle.distributed.fleet as fleet
 from utils import dybatch_preprocess, get_infer_model_path, load_real_time_tokens
-
+import time
 from paddlenlp.transformers import AutoTokenizer, LlamaConfig
 
 
@@ -151,6 +151,7 @@ class Predictor(object):
 
     def preprocess(self, input_text):
         inputs = dybatch_preprocess(self.tokenizer, input_text, self.config, self.args)
+        # print(inputs["input_ids"].shape)
         for i in range(inputs["input_ids"].shape[0]):
             length = inputs["seq_len_encoder"][i][0]
             self.attention_mask[i, 0, :length, :length] = paddle.tril(
@@ -181,6 +182,7 @@ class Predictor(object):
             tokens = load_real_time_tokens()
             result = []
             for x in tokens.tolist():
+                # print("Out shape is: ", len(x)) 
                 res = self.tokenizer.decode(x, skip_special_tokens=True)
                 result.append(res)
             out_dict = {"result": result}
@@ -204,7 +206,34 @@ if __name__ == "__main__":
         "Today is",
     ]
 
-    outputs = predictor.predict(all_texts)
-    for text, result in zip(all_texts, outputs["result"]):
-        print("=" * 20)
-        print("Query: {}\nAnsert: {}".format(text, result))
+    src_length = args.src_length
+    warmup_times = 2 
+    test_times = 10
+    print("Src length is: ", src_length)
+    # infer_dials = ["My name is " + "<PAD>" * (src_length-3)]
+    # infer_dials = ["My " * src_length]
+    # infer_dials = ["My name is My name is My name is My name is My name is My name is My name is My name is My name is My name is My name is My name is My name is My name is My name is "]
+    
+    test_text = "<pad>"* (src_length // 2 - 3) + "My name is "
+    # test_text = "My name is"
+    infer_dials = [test_text for _ in range(args.batch_size)]
+
+    print(infer_dials)
+    for _ in range(warmup_times): 
+        for idx in range(0, len(infer_dials), args.batch_size):
+            batch_dials = infer_dials[idx : idx + args.batch_size]
+            # print("Batch dials is: ", batch_dials)
+            batch_outputs = predictor.predict(batch_dials)
+            # print("Batch outputs is: ", batch_outputs)
+    
+
+    start_time = time.time()
+    for _ in range(test_times): 
+        each_step_start_time = time.time()
+        for idx in range(0, len(infer_dials), args.batch_size): 
+            batch_dials = infer_dials[idx : idx + args.batch_size]
+            batch_outputs = predictor.predict(batch_dials)
+        print(f"Average step {_}, elapse {(time.time() - each_step_start_time)}")
+        
+    print(f"Average step elapse {(time.time() - start_time) / test_times}")
+

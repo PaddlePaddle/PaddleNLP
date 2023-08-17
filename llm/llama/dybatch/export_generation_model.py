@@ -62,6 +62,7 @@ def parse_args():
         type=int,
         help="max length of input sentence",
     )
+    parser.add_argument("--quant_bits", type=int, default=8, help="The quant weight dtype.")
     parser.add_argument(
         "--max_length",
         default=1024,
@@ -91,6 +92,7 @@ def main():
     config = LlamaConfig.from_pretrained(args.model_name_or_dir)
     config.tensor_parallel_degree = tensor_parallel_degree
     config.dtype = args.model_dtype
+    config.quant_bits = args.quant_bits
     model = LlamaForCausalLMDyBatch.from_pretrained(args.model_name_or_dir, config=config)
 
     model.eval()

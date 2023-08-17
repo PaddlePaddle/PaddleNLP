@@ -14,7 +14,9 @@
 
 import numpy as np
 import paddle
-from modeling import LlamaForCausalLMDyBatch
+# from modeling import LlamaForCausalLMDyBatch
+from dyquant_modeling import LlamaForCausalLMDyBatch
+
 from paddle.distributed import fleet
 from utils import dybatch_preprocess, load_real_time_tokens
 
@@ -36,6 +38,7 @@ def parse_arguments():
         help="The directory of model to merge tensor parallel parts.",
     )
     parser.add_argument("--batch_size", type=int, default=4, help="The batch size of data.")
+    parser.add_argument("--quant_bits", type=int, default=8, help="The quant weight dtype.")
     parser.add_argument("--src_length", type=int, default=1024, help="The batch size of data.")
     parser.add_argument("--tgt_length", type=int, default=100, help="The batch size of data.")
     return parser.parse_args()
@@ -66,6 +69,7 @@ class Predictor(object):
         self.config.dtype = "float16"
         dtype = "float16" if self.config.dtype is None else self.config.dtype
         paddle.set_default_dtype(dtype)
+        self.config.quant_bits = args.quant_bits
         self.model = LlamaForCausalLMDyBatch.from_pretrained(args.model_name_or_path, config=self.config)
 
         self.model.eval()

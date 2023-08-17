@@ -200,8 +200,6 @@ class LlamaModel(LlamaPretrainedModel):
         self.max_position_embeddings = config.max_position_embeddings
         self.quant_bits = config.quant_bits
 
-        print("Quant bits is: ", self.quant_bits)
-
         if config.tensor_parallel_degree > 1:
             self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
                 self.vocab_size,
@@ -388,8 +386,6 @@ class LlamaModel(LlamaPretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict, use_structured_name=True):
-        quant_bits = self.quant_bits
-
         unfused_state_dict = {}
         head_size = self.hidden_size // self.num_attention_heads
 

@@ -176,10 +176,20 @@ def dybatch_preprocess(tokenizer, texts, config, args):
         .astype("int64")
         .reshape((-1, 1))
     )
+    # inputs["min_length"] = (
+    #     np.array(
+    #         [
+    #             2,
+    #         ]
+    #         * bs
+    #     )
+    #     .astype("int64")
+    #     .reshape((-1, 1))
+    # )
     inputs["min_length"] = (
         np.array(
             [
-                2,
+                args.tgt_length,
             ]
             * bs
         )

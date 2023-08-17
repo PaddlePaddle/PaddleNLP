@@ -442,7 +442,6 @@ class FusedMultiTransformerDyquant(Layer):
             )
 
             qkv_weight_shape = [3 * num_heads * self.head_dim, embed_dim] if trans_qkvw else [embed_dim * 3 * num_heads, self.head_dim]
-            print(qkv_weight_shape)
             if self.quant_bits == 4: 
                 qkv_weight_shape[0] //= 2
                 
@@ -618,7 +617,6 @@ class FusedMultiTransformerDyquant(Layer):
         seq_lens=None,
         time_step=None,
     ):
-        # print("Time step is: ", time_step)
         r"""
         Applies multi transformer layers on the input.
 
