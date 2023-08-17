@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+cd ../llm/llama
+python -m pip install tool_helpers
+
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
 
 mkdir data
 mv llama_openwebtext_100k_ids.npy ./data
 mv llama_openwebtext_100k_idx.npz ./data
-
-cd ../llm/
-sed -i "s/python3/python3.7/g" Makefile
-cd -

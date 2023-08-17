@@ -19,14 +19,14 @@ tensor_parallel_degree="2"
 pipeline_parallel_degree="2"
 virtual_pp_degree="1"
 sequence_parallel="0"
-sharding_degree="4"
+sharding_degree="2"
 max_steps="200"
 save_steps="200"
 sharding="stage1"
 recompute="1"
 run_mode="DP1-MP1-PP1-SD8"
 device_num="N1C8"
-global_batch_size=32
+global_batch_size=16
 
 cd ./tests
 bash ./test_tipc/dygraph/hybrid_parallelism/llama/benchmark_common/prepare.sh

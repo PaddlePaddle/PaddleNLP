@@ -18,19 +18,22 @@
 # Usage：bash benchmark/run_benchmark.sh ${model_name_or_path} ${per_device_train_batch_size} ${use_flash_attention} ${tensor_parallel_degree} ${pipeline_parallel_degree} ${virtual_pp_degree} ${sequence_parallel} ${sharding_degree} ${max_steps} ${save_steps} ${sharding} ${recompute} ${run_mode} ${device_num}
 function _set_params(){
     model_name_or_path=${1:-"facebook/llama-7b"}
+
     per_device_train_batch_size=${2:-""}
     use_flash_attention=${3:-"1"}
     tensor_parallel_degree=${4:-"2"}
     pipeline_parallel_degree=${5:-"2"}
+
     virtual_pp_degree=${6:-"1"}
     sequence_parallel=${7:-"0"}
     sharding_degree=${8:-"1"}      # (可选)
-    max_steps=${8:-"200"}
-    save_steps=${9:-"200"}
-    sharding=${10:-"stage1"}
-    recompute=${11:-"1"}
-    run_mode=${12:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP2-MP8-PP2|DP1-MP8-PP4|DP4-MP8-PP1
-    device_num=${13:-"N2C32"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
+    max_steps=${9:-"200"}
+    save_steps=${10:-"200"}
+    sharding=${11:-"stage1"}
+    recompute=${12:-"1"}
+    run_mode=${13:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP2-MP8-PP2|DP1-MP8-PP4|DP4-MP8-PP1
+    device_num=${14:-"N2C32"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
+    global_batch_size=${15:-"16"}
 
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递
     model_repo="PaddleNLP"          # (必选) 模型套件的名字
@@ -39,8 +42,9 @@ function _set_params(){
     keyword="ips:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
 
+    fp_item="fp16"
     # 以下为通用执行命令，无特殊可不用修改
-    model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
+    model_name=${model_name_or_path}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
     arr=(${device})
     num_gpu_devices=${#arr[*]}
@@ -48,25 +52,24 @@ function _set_params(){
     profiling_log_path=${PROFILING_LOG_DIR:-$(pwd)}  # （必填） PROFILING_LOG_DIR benchmark框架设置该参数为全局变量
     speed_log_path=${LOG_PATH_INDEX_DIR:-$(pwd)}
     train_log_file=${run_log_path}/${model_repo}_${model_name}_${device_num}_log
+    mkdir -p $(dirname ${train_log_file})
+
     profiling_log_file=${profiling_log_path}/${model_repo}_${model_name}_${device_num}_profiling
+    mkdir -p $(dirname ${profiling_log_file})
+
     speed_log_file=${speed_log_path}/${model_repo}_${model_name}_${device_num}_speed
+    mkdir -p $(dirname ${speed_log_file})
 
     OUTPUT_PATH=${run_log_path}/output
 }
 
 function _train(){
-    batch_size=${local_batch_size}  # 如果模型跑多卡单进程时,请在_train函数中计算出多卡需要的bs
+    batch_size=${per_device_train_batch_size}  # 如果模型跑多卡单进程时,请在_train函数中计算出多卡需要的bs
 
     if [ -d $OUTPUT_PATH ]; then
         rm -rf $OUTPUT_PATH
     fi
     mkdir $OUTPUT_PATH
-
-    # if [ ${model_item} = "gpt3_moe" ];then
-    #     static_scripts="../examples/language_model/gpt-moe/dygraph/"
-    # else
-    #     echo "not supported model item: ${model_item}"; exit 1;
-    # fi
 
     echo "current CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}, model_name=${model_name}, device_num=${device_num}, is profiling=${profiling}"
 
@@ -82,13 +85,8 @@ function _train(){
         use_fp16_cmd="--use_amp true"
     fi
 
-    # data_path="./data/"
-
     use_pure_fp16=False
 
-    model_config="gpt2-medium-en"
-    [ ${mp_degree} -lt 8 ] && model_config="gpt2-small-en"
-    if [ "fp16" = ${fp_item} ]; then use_pure_fp16=True; fi
     train_cmd="    --model_type llama \
             --model_name_or_path ${model_name_or_path} \
             --tokenizer_name_or_path ${model_name_or_path} \
@@ -102,7 +100,7 @@ function _train(){
             --use_flash_attention ${use_flash_attention} \
             --use_fused_rms_norm 0 \
             --fp16  \
-            --fp16_opt_level "O2"  \
+            --fp16_opt_level O2  \
             --scale_loss 512 \
             --tensor_parallel_degree ${tensor_parallel_degree} \
             --pipeline_parallel_degree ${pipeline_parallel_degree} \
@@ -159,13 +157,14 @@ function _train(){
         *) echo "choose run_mode "; exit 1;
         esac
     fi
-    cd ../llm/
+    cd ../llm/llama
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     python -c "import paddlenlp"
-    if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间
+    if [[ ${model_name_or_path} =~ "CE" ]];then # CE精度-不限制执行时间
         ${train_cmd} > ${log_file} 2>&1
     else
         timeout 15m ${train_cmd} > ${log_file} 2>&1
+        # echo ${train_cmd}
     fi
     if [ $? -ne 0 ];then
         echo -e "${model_name}, FAIL"
