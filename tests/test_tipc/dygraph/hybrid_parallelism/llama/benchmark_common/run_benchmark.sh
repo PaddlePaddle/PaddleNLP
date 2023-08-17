@@ -45,7 +45,9 @@ function _set_params(){
 
     fp_item="fp16"
     # 以下为通用执行命令，无特殊可不用修改
-    model_name=${model_name_or_path}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
+    # replace the `/` with `-` character
+    model_item="${model_name_or_path/\//-}" 
+    model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
     arr=(${device})
     num_gpu_devices=${#arr[*]}
