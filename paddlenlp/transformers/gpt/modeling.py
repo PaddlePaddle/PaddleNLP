@@ -313,7 +313,6 @@ class MultiHeadAttention(nn.Layer):
         v = tensor.transpose(x=v, perm=perm)
 
         # scale dot product attention
-
         scale_qk_coeff = self.config.scale_qk_coeff * self.head_dim**0.5
         product = paddle.matmul(x=q.scale(1.0 / scale_qk_coeff), y=k, transpose_y=True)
 
@@ -1319,13 +1318,10 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         src_ids = input_ids
         nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
         src_ids = paddle.concat([src_ids, nid], axis=1)
-        cur_len = 0
-        while cur_len < self.max_predict_len:
+        for cur_len in range(self.max_predict_len):
             output, cached_kvs = self.model(nid, use_cache=True, cache=cached_kvs)
-
             nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
             src_ids = paddle.concat([src_ids, nid], axis=1)
-            cur_len += 1
             if paddle.max(nid) == self.eol_token_id:
                 break
         return src_ids
