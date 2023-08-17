@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-model_name_or_path="facebook/llama-7b"
+model_name_or_path="facebook/llama-13b"
 per_device_train_batch_size="2"
-use_flash_attention="0"
+use_flash_attention="1"
 tensor_parallel_degree="2"
 pipeline_parallel_degree="2"
 virtual_pp_degree="1"
@@ -24,7 +24,7 @@ max_steps="200"
 save_steps="200"
 sharding="stage1"
 recompute="1"
-run_mode="DP1-MP1-PP1-SD8"
+run_mode="DP1-MP2-PP2-SD2"
 device_num="N1C8"
 global_batch_size=16
 

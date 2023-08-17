@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+python -m pip install -r ../requirements.txt
 
 cd ../llm/llama
 python -m pip install tool_helpers
