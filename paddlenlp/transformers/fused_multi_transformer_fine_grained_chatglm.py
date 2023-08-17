@@ -73,48 +73,47 @@ def fused_act_bias_wrapper(
             quant_max_bound,
             quant_min_bound,
         )
+    helper = LayerHelper("fused_bias_act")
+    if x.dtype == "int32":
+        if compute_dtype == "bf16":
+            dtype = "uint16"
+        elif compute_dtype == "fp16":
+            dtype = "float16"
+        elif compute_dtype == "fp32":
+            dtype = "float32"
+        out = helper.create_variable_for_type_inference(dtype=dtype)
     else:
-        helper = LayerHelper("fused_bias_act")
-        if x.dtype == "int32":
-            if compute_dtype == "bf16":
-                dtype = "uint16"
-            elif compute_dtype == "fp16":
-                dtype = "float16"
-            elif compute_dtype == "fp32":
-                dtype = "float32"
-            out = helper.create_variable_for_type_inference(dtype=dtype)
-        else:
-            out = helper.create_variable_for_type_inference(dtype=x.dtype)
+        out = helper.create_variable_for_type_inference(dtype=x.dtype)
 
-        inputs = {}
-        inputs["x"] = x
-        if bias is not None:
-            inputs["bias"] = bias
-        if dequant_scales is not None:
-            inputs["bias"] = dequant_scales
+    inputs = {}
+    inputs["x"] = x
+    if bias is not None:
+        inputs["bias"] = bias
+    if dequant_scales is not None:
+        inputs["bias"] = dequant_scales
 
-        if shift is not None:
-            inputs["shift"] = shift
+    if shift is not None:
+        inputs["shift"] = shift
 
-        if smooth is not None:
-            inputs["smooth"] = smooth
+    if smooth is not None:
+        inputs["smooth"] = smooth
 
-        attrs = {
-            "act_method": act_method,
-            "compute_dtype": compute_dtype,
-            "quant_scale": quant_scale,
-            "quant_round_type": quant_round_type,
-            "quant_max_bound": quant_max_bound,
-            "quant_min_bound": quant_min_bound,
-        }
+    attrs = {
+        "act_method": act_method,
+        "compute_dtype": compute_dtype,
+        "quant_scale": quant_scale,
+        "quant_round_type": quant_round_type,
+        "quant_max_bound": quant_max_bound,
+        "quant_min_bound": quant_min_bound,
+    }
 
-        helper.append_op(
-            type="fused_bias_act",
-            inputs=inputs,
-            outputs={"out": out},
-            attrs=attrs,
-        )
-        return out
+    helper.append_op(
+        type="fused_bias_act",
+        inputs=inputs,
+        outputs={"out": out},
+        attrs=attrs,
+    )
+    return out
 
 
 class FusedMultiTransformer(Layer):
@@ -169,6 +168,7 @@ class FusedMultiTransformer(Layer):
         else:
             self.norm_func = fused_rms_norm
         self.use_neox_rotary_style = use_neox_rotary_style
+        self._norm_weight_dtype = "float32" if self.norm_type == "layernorm" else self._dtype
 
         self.embed_dim = embed_dim
         self.num_heads = num_heads
@@ -202,6 +202,8 @@ class FusedMultiTransformer(Layer):
             return attrs
 
         def _add_parameter(param):
+            if param is None:
+                return
             assert param.name not in self._parameters
             self._parameters[param.name] = param
 
@@ -224,7 +226,7 @@ class FusedMultiTransformer(Layer):
                 attr=ln_scale_attr,
                 shape=[embed_dim],
                 default_initializer=Constant(value=1.0),
-                dtype="float32",
+                dtype=self._norm_weight_dtype,
             )
             ln_bias = self.create_parameter(
                 attr=ln_bias_attr,
@@ -351,7 +353,6 @@ class FusedMultiTransformer(Layer):
         padding_offset=None,
         attn_mask=None,
         caches=None,
-        pre_caches=None,
         rotary_embs=None,
         rotary_emb_dims=0,
         seq_lens=None,
@@ -431,23 +432,13 @@ class FusedMultiTransformer(Layer):
                 fmha_out = transpose_remove_padding(qktv_out, seq_lens, padding_offset)
             else:
                 fmha_out = masked_multihead_attention(
-                    qkv_out,
-                    caches[i],
-                    attn_mask,
-                    None,
-                    seq_lens,
-                    rotary_embs,
-                    None,
-                    None,
-                    None,
-                    None,
-                    1,
-                    rotary_emb_dims,
-                    self.use_neox_rotary_style,
-                    -1,
-                    1,
-                    127.0,
-                    -127.0,
+                    x=qkv_out,
+                    cache_kv=caches[i],
+                    src_mask=attn_mask,
+                    sequence_lengths=seq_lens,
+                    rotary_tensor=rotary_embs,
+                    rotary_emb_dims=rotary_emb_dims,
+                    use_neox_rotary_style=self.use_neox_rotary_style,
                 )[0]
 
             # out_linear
