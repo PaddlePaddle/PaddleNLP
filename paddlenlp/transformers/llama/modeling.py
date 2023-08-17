@@ -326,31 +326,63 @@ def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
 
 
 class LlamaRotaryEmbedding(nn.Layer):
-    def __init__(self, dim, max_position_embeddings=2048, base=10000, scaling_factor=1.0):
+    def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
         self.dim = dim
-        self.base = base
         self.max_position_embeddings = max_position_embeddings
+        self.base = base
         self.dtype = paddle.get_default_dtype()
         # [dim / 2]
-        inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, dim, 2), dtype="float32") / dim))
-        self._set_cos_sin_cache(seq_len=max_position_embeddings, inv_freq=inv_freq)
+        inv_freq = 1.0 / (self.base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype="float32") / self.dim))
+        self.register_buffer("inv_freq", inv_freq, persistable=False)
+        self._set_cos_sin_cache(seq_len=max_position_embeddings)
 
-    def _set_cos_sin_cache(self, seq_len, inv_freq):
+    def _set_cos_sin_cache(self, seq_len):
+        self.max_seq_len_cached = seq_len
         # [seq_len]
         t = paddle.arange(seq_len, dtype="float32")
-        t = t / self.scaling_factor
         # [seq_len, dim/2]
-        freqs = paddle.einsum("i,j->ij", t, inv_freq)
+        freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         # [seq_len, dim]
         emb = paddle.concat([freqs, freqs], axis=-1)
         # [1, seqlen, 1, dim]
-        self.cos_cached = emb.cos()[None, :, None, :].cast(self.dtype)
-        self.sin_cached = emb.sin()[None, :, None, :].cast(self.dtype)
+        self.register_buffer("cos_cached", emb.cos()[None, :, None, :].cast(self.dtype), persistable=False)
+        self.register_buffer("sin_cached", emb.sin()[None, :, None, :].cast(self.dtype), persistable=False)
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
+        if seq_len > self.max_seq_len_cached:
+            self._set_cos_sin_cache(seq_len)
+        return (
+            self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
+            self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
+        )
+
+
+class LlamaLinearScalingRotaryEmbedding(nn.Layer):
+    def __init__(self, dim, max_position_embeddings=2048, base=10000, scaling_factor=1.0):
+        self.scaling_factor = scaling_factor
+        super().__init__(dim, max_position_embeddings, base)
+
+    def _set_cos_sin_cache(self, seq_len):
+        self.max_seq_len_cached = seq_len
+        # [seq_len]
+        t = paddle.arange(seq_len, dtype="float32")
+        t = t / self.scaling_factor
+        # [seq_len, dim/2]
+        freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
+        # Different from paper, but it uses a different permutation in order to obtain the same calculation
+        # [seq_len, dim]
+        emb = paddle.concat([freqs, freqs], axis=-1)
+        # [1, seqlen, 1, dim]
+        self.register_buffer("cos_cached", emb.cos()[None, :, None, :].cast(self.dtype), persistable=False)
+        self.register_buffer("sin_cached", emb.sin()[None, :, None, :].cast(self.dtype), persistable=False)
+
+    def forward(self, x, seq_len=None):
+        # x: [bs, num_attention_heads, seq_len, head_size]
+        if seq_len > self.max_seq_len_cached:
+            self._set_cos_sin_cache(seq_len)
         return (
             self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
             self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
@@ -358,11 +390,11 @@ class LlamaRotaryEmbedding(nn.Layer):
 
 
 class LlamaNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
-    """LlamaRotaryEmbedding extended with Dynamic NTK scaling. https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/"""
+    """LlamaRotaryEmbedding extended with NTK scaling. https://www.reddit.com/r/LocalLLaMA/comments/14lz7j5/ntkaware_scaled_rope_allows_llama_models_to_have/"""
 
     def __init__(self, dim, max_position_embeddings=2048, base=10000, scaling_factor=1.0):
-        self.scaling_factor = scaling_factor
         base = scaling_factor ** (dim / (dim - 2))
+        self.scaling_factor = scaling_factor
         super().__init__(dim, max_position_embeddings, base)
 
 
@@ -626,19 +658,24 @@ class LlamaAttention(nn.Layer):
         self.config = config
 
     def _init_rope(self):
-        if self.config.rope_scaling_type is None or self.config.rope_scaling_type == "linear":
+        if self.config.rope_scaling_type is None:
             self.rotary_emb = LlamaRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
-                scaling_factor=self.config.rope_scaling_factor,
             )
-        elif self.config.rope_scaling_type == "dynamic-ntk":
-            self.rotary_emb = LlamaNTKScalingRotaryEmbedding(
+        elif self.config.rope_scaling_type == "linear":
+            self.rotary_emb = LlamaLinearScalingRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
                 scaling_factor=self.config.rope_scaling_factor,
             )
         elif self.config.rope_scaling_type == "ntk":
+            self.rotary_emb = LlamaNTKScalingRotaryEmbedding(
+                self.head_dim,
+                max_position_embeddings=self.max_position_embeddings,
+                scaling_factor=self.config.rope_scaling_factor,
+            )
+        elif self.config.rope_scaling_type == "dynamic_ntk":
             self.rotary_emb = LlamaDynamicNTKScalingRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
