@@ -40,9 +40,35 @@ class LanguageModuleAuto(BasicModule):
 
         self.loss_fn = self.get_loss_fn()
 
+        self.best_metric = 0.0
+
     def process_configs(self, configs):
         configs = process_configs(configs)
         return configs
+
+    def validation_step_end(self, log_dict):
+        speed = 1.0 / log_dict["eval_cost"]
+        logger.info(
+            "[eval] epoch: %d, batch: %d/%d, loss: %.9f, avg_eval_cost: %.5f sec, speed: %.2f step/s"
+            % (
+                log_dict["epoch"],
+                log_dict["batch"],
+                log_dict["total_batch"],
+                log_dict["loss"],
+                log_dict["eval_cost"],
+                speed,
+            )
+        )
+
+    def test_step_end(self, log_dict):
+        speed = 1.0 / log_dict["test_cost"]
+        logger.info(
+            "[test] epoch: %d, batch: %d, loss: %.9f, avg_test_cost: %.5f sec, speed: %.2f step/s"
+            % (log_dict["epoch"], log_dict["batch"], log_dict["loss"], log_dict["test_cost"], speed)
+        )
+
+    def training_epoch_end(self, log_dict):
+        logger.info("[Training] epoch: %d, total time: %.5f sec" % (log_dict["epoch"], log_dict["train_cost"]))
 
 
 class GPTModuleAuto(LanguageModuleAuto):
