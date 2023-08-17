@@ -26,7 +26,7 @@ export FLAGS_use_cutlass_fmha=1
 
 python -m paddle.distributed.launch --gpus "7" \
            predict_generation.py --fp16 \
-           --model_name_or_path /root/paddlejob/workspace/output/zhengshifeng/Chatglm/FastLLMDeploy/models/chatglm/THUDM/chatglm-6b/ 
+           --model_name_or_path=${1}
 
 
 

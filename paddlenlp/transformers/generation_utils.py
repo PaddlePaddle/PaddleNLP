@@ -1790,7 +1790,6 @@ class GenerationDyBatch(GenerationMixin):
         else:
             model_kwargs["tgt_ids"] = next_tokens
             if config.position_encoding_2d is True:
-                print("config.position_encoding")
                 tgt_pos = model_kwargs["tgt_pos"]
                 new_position_id = tgt_pos[:, 0, :].clone()
                 new_block_id = tgt_pos[:, 1, :].clone()

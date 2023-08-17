@@ -26,5 +26,5 @@ export FLAGS_use_cutlass_fmha=1
 
 python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
       infer_generation.py \
-      --model_dir=./inference_model_float_16_rank8 \
+      --model_dir=${1} \
       --model_prefix=chatglm 2>&1

@@ -28,7 +28,6 @@ def get_weight_path(model_dir, cls):
 
 def get_state_dict(model_dir, cls, config):
     weight_file = get_weight_path(model_dir, cls)[0]
-    print(weight_file)
 
     world_size = paddle.distributed.get_world_size()
     if world_size > 1 and weight_file.endswith("model_state.pdparams"):
@@ -127,7 +126,6 @@ def dybatch_preprocess(tokenizer, texts, config, args):
 
     for text in texts:
         tokens = tokenizer(text, return_tensors="np", padding=True)
-        print(tokens)
         input_ids.append(tokens["input_ids"][0])
         position_ids.append(tokens["position_ids"][0])
 
