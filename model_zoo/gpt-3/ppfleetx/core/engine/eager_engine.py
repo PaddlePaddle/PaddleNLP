@@ -361,7 +361,8 @@ class EagerEngine(BasicEngine):
 
                         if eval_step >= self._eval_iters - 1:
                             break
-
+                    
+                    eval_losses = [float(loss) for loss in eval_losses]
                     eval_step_cost = get_timestamp() - eval_step_start
                     eval_loss = sum(eval_losses) / len(eval_losses)
 

@@ -178,12 +178,14 @@ class AutoEngine(BasicEngine):
 
                     for eval_step, batch in enumerate(valid_data_loader):
                         eval_finished_step += 1
-                        loss = self._evaluate_impl(batch)
-                        eval_losses.append(loss)
+                        # loss = self._evaluate_impl(batch)
+                        outs = self._auto_engine.run(batch, mode="eval")
+                        eval_losses.append(outs["loss"])
 
                         if eval_step >= self._eval_iters - 1:
                             break
-
+                    
+                    eval_losses =  [float(loss) for loss in eval_losses]
                     eval_step_cost = get_timestamp() - eval_step_start
                     eval_loss = sum(eval_losses) / len(eval_losses)
 
@@ -227,11 +229,11 @@ class AutoEngine(BasicEngine):
             )
         if valid_dataset and self._eval_freq <= self._max_steps:
             valid_data_loader = self._auto_engine.dataloader_from_generator(
-                dataset=train_dataset,
+                dataset=valid_dataset,
                 batch_size=self._global_batch_size,
                 steps_per_epoch=self._max_steps,
                 epochs=self._num_train_epochs,
-                collate_fn=train_dataset.collate_fn,
+                collate_fn=valid_dataset.collate_fn,
                 sample_split=valid_dataset.sample_split,
                 mode="eval",
             )
@@ -275,25 +277,101 @@ class AutoEngine(BasicEngine):
         if self.profiler:
             self._profiler_done()
 
-    def evaluate(self, valid_dataset=None):
+    def evaluate(self, epoch=1, valid_dataset=None):
 
-        self._auto_engine.evaluate(
-            valid_data=valid_dataset,
-            valid_sample_split=valid_dataset.sample_split,
-            batch_size=self.batch_size,
-            steps=self._max_steps,
-            collate_fn=valid_dataset.collate_fn,
-        )
+        valid_data_loader = None
+        if valid_dataset:
+            valid_data_loader = self._auto_engine.dataloader_from_generator(
+                dataset=valid_dataset,
+                batch_size=self._global_batch_size,
+                steps_per_epoch=self._max_steps,
+                epochs=self._num_train_epochs,
+                collate_fn=valid_dataset.collate_fn,
+                sample_split=valid_dataset.sample_split,
+                mode="eval",
+            )
 
-    def predict(self, test_dataset=None):
+        for epoch_index in range(epoch):
+            eval_epoch_start = get_timestamp()
+            self._evaluate_one_epoch(epoch_index, valid_data_loader)
 
-        self._auto_engine.predict(
-            test_data=test_dataset,
-            test_sample_split=test_dataset.sample_split,
-            batch_size=self.batch_size,
-            steps=self._max_steps,
-            collate_fn=test_dataset.collate_fn,
-        )
+            eval_epoch_cost = get_timestamp() - eval_epoch_start
+            log_dict = {
+                "epoch": epoch_index,
+                "eval_cost": eval_epoch_cost,
+            }
+            self._module.validation_epoch_end(log_dict)
+
+        logger.info("The evaluting process is complete.")
+        del valid_data_loader
+        return
+    
+    def _evaluate_one_epoch(self, epoch=1, valid_data_loader=None):
+
+        eval_step_start = get_timestamp()
+        eval_losses = []
+        total_eval_batch = len(valid_data_loader)
+        valid_data_loader = valid_data_loader() if valid_data_loader is not None else None
+        for eval_step, batch in enumerate(valid_data_loader):
+            # batch = self._module.pretreating_batch(batch)
+            outs = self._auto_engine.run(batch, mode="eval")
+            eval_losses.append(outs["loss"])
+
+            if eval_step % self._logging_freq == 0:
+                # eval_losses = [float(loss) for loss in eval_losses]
+                eval_step_cost = get_timestamp() - eval_step_start
+                log_dict = {
+                    "loss": sum(eval_losses) / len(eval_losses),
+                    "epoch": epoch,
+                    "batch": eval_step,
+                    "total_batch": total_eval_batch,
+                    "eval_cost": eval_step_cost if eval_step == 0 else eval_step_cost / self._logging_freq,
+                }
+                self._module.validation_step_end(log_dict)
+                eval_step_start = get_timestamp()
+                eval_losses = []
+
+            if self._run_mode == "step" and eval_step >= self._max_steps:
+                logger.info("[eval] epoch {} : evaluting process is complete.".format(epoch))
+                return
+
+    def predict(self, epoch=1, test_dataset=None):
+
+        test_data_loader = None
+        if test_dataset:
+            test_data_loader = self._auto_engine.dataloader_from_generator(
+                dataset=test_dataset,
+                batch_size=self._global_batch_size,
+                steps_per_epoch=self._max_steps,
+                epochs=self._num_train_epochs,
+                collate_fn=test_dataset.collate_fn,
+                sample_split=test_dataset.sample_split,
+                mode="predict",
+            )
+
+        test_start = get_timestamp()
+        test_losses = []
+        for test_step, batch in enumerate(test_data_loader):
+            outs = self._auto_engine.run(batch, mode="predict")
+            test_losses.append(outs["loss"])
+
+            if test_step % self._logging_freq == 0:
+                # test_losses = [float(loss) for loss in test_losses]
+                test_cost = get_timestamp() - test_start
+                log_dict = {
+                    "loss": sum(test_losses) / len(test_losses),
+                    "epoch": epoch,
+                    "batch": test_step,
+                    "test_cost": test_cost if test_step == 0 else test_cost / self._logging_freq,
+                }
+                self._module.test_step_end(log_dict)
+                test_start = get_timestamp()
+                test_losses = []
+
+            if test_step >= self._max_steps:
+                logger.info("The predicting process is complete.")
+                del test_data_loader
+                return
 
     def export(self):
         self._auto_engine.prepare(self._module.input_spec(), mode="predict")
