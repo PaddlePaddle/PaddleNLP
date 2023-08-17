@@ -362,17 +362,10 @@ class ChatGLMGenerationD2STest(GenerationD2STestMixin, unittest.TestCase):
 
         max_length = self.max_length
 
-        bos_token_id = getattr(model, "bos_token_id", None)
-        eos_token_id = getattr(model, "eos_token_id", None)
-        pad_token_id = getattr(model, "pad_token_id", None)
-
         model_kwargs["use_cache"] = True
         model_kwargs["max_length"] = max_length + model_kwargs["input_ids"].shape[-1]
 
         decoded_ids = model.greedy_search(
-            bos_token_id=bos_token_id,
-            pad_token_id=pad_token_id,
-            eos_token_id=eos_token_id,
             logits_processors=None,
             **model_kwargs,
         )[0]
@@ -385,9 +378,6 @@ class ChatGLMGenerationD2STest(GenerationD2STestMixin, unittest.TestCase):
                 model.to_static(
                     path,
                     config=dict(
-                        bos_token_id=bos_token_id,
-                        pad_token_id=pad_token_id,
-                        eos_token_id=eos_token_id,
                         use_top_p=False,
                     ),
                 )
@@ -448,10 +438,6 @@ class ChatGLMGenerationD2STest(GenerationD2STestMixin, unittest.TestCase):
 
         max_length = self.max_length
 
-        bos_token_id = getattr(model, "bos_token_id", None)
-        eos_token_id = getattr(model, "eos_token_id", None)
-        pad_token_id = getattr(model, "pad_token_id", None)
-
         model_kwargs["use_cache"] = True
         model_kwargs["max_length"] = max_length + model_kwargs["input_ids"].shape[-1]
 
@@ -462,9 +448,6 @@ class ChatGLMGenerationD2STest(GenerationD2STestMixin, unittest.TestCase):
                 model.to_static(
                     path,
                     config=dict(
-                        bos_token_id=bos_token_id,
-                        pad_token_id=pad_token_id,
-                        eos_token_id=eos_token_id,
                         use_top_p=False,
                     ),
                 )

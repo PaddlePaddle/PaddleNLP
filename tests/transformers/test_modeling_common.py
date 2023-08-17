@@ -935,17 +935,10 @@ class GenerationD2STestMixin:
 
         model.eval()
 
-        bos_token_id = getattr(model, "bos_token_id", None)
-        eos_token_id = getattr(model, "eos_token_id", None)
-        pad_token_id = getattr(model, "pad_token_id", None)
-
         model_kwargs["use_cache"] = True
         model_kwargs["max_length"] = self.max_length
 
         decoded_ids = model.greedy_search(
-            bos_token_id=bos_token_id,
-            pad_token_id=pad_token_id,
-            eos_token_id=eos_token_id,
             logits_processors=None,
             **model_kwargs,
         )[0]
@@ -958,9 +951,6 @@ class GenerationD2STestMixin:
                 model.to_static(
                     path,
                     config=dict(
-                        bos_token_id=bos_token_id,
-                        pad_token_id=pad_token_id,
-                        eos_token_id=eos_token_id,
                         use_top_p=False,
                     ),
                 )
@@ -1017,10 +1007,6 @@ class GenerationD2STestMixin:
 
         model.eval()
 
-        bos_token_id = getattr(model, "bos_token_id", None)
-        eos_token_id = getattr(model, "eos_token_id", None)
-        pad_token_id = getattr(model, "pad_token_id", None)
-
         model_kwargs["use_cache"] = True
         model_kwargs["max_length"] = self.max_length
 
@@ -1031,9 +1017,6 @@ class GenerationD2STestMixin:
                 model.to_static(
                     path,
                     config=dict(
-                        bos_token_id=bos_token_id,
-                        pad_token_id=pad_token_id,
-                        eos_token_id=eos_token_id,
                         use_top_p=False,
                     ),
                 )

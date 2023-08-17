@@ -30,7 +30,6 @@ try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
 except ImportError:
     fused_rotary_position_embedding = None
-from paddle.fluid.dygraph.base import in_declarative_mode
 from paddle.utils import try_import
 
 from paddlenlp.transformers.conversion_utils import (
@@ -235,7 +234,7 @@ def scaled_dot_product_attention(
             )
 
         attn_weights = attn_weights + attention_mask
-        if in_declarative_mode():
+        if not paddle.in_dynamic_mode():
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
         else:
             with paddle.amp.auto_cast(False):
@@ -309,7 +308,7 @@ class LlamaRMSNorm(nn.Layer):
         if self.config.use_fused_rms_norm:
             return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
 
-        if not in_declarative_mode():
+        if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
                 variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
                 hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
