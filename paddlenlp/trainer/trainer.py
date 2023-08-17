@@ -1827,13 +1827,17 @@ class Trainer:
         model.micro_batch_size, model.accumulate_steps = config_backup
         if model.is_pipeline_last_stage():
             buf = [
-                {k: v.item() if isinstance(v, paddle.Tensor) else v for k, v in model._layers._loss_fn.info.items()}
+                {
+                    k: (v.item() if isinstance(v, paddle.Tensor) else v) / self.args.gradient_accumulation_steps
+                    for k, v in model._layers._loss_fn.info.items()
+                }
             ]
         else:
             buf = [None]
         hcg = fleet.get_hybrid_communicate_group()
         dist.broadcast_object_list(buf, src=hcg._pp_comm_group.ranks[-1], group=hcg.get_pipe_parallel_group())
         info = buf[0]
+        model._layers._loss_fn.info = {}
         if isinstance(info, dict) and "loss" in info:
             loss = paddle.to_tensor(info.pop("loss"))
         return loss.detach(), info
@@ -1857,10 +1861,14 @@ class Trainer:
 
     def _save_moe_weights(self, output_dir):
         # save moe optimizer and model state # TODO 默认为冗余存储
-        self.save_func(self.model.state_dict(),
-                       os.path.join(output_dir, _add_variant(PADDLE_WEIGHT_FILE_NAME, self.args.weight_name_suffix)))
-        self.save_func(self.optimizer.state_dict(),
-                       os.path.join(output_dir, _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)))
+        self.save_func(
+            self.model.state_dict(),
+            os.path.join(output_dir, _add_variant(PADDLE_WEIGHT_FILE_NAME, self.args.weight_name_suffix)),
+        )
+        self.save_func(
+            self.optimizer.state_dict(),
+            os.path.join(output_dir, _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)),
+        )
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
