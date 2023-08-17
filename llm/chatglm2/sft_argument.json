@@ -1,13 +1,13 @@
 {
     "model_name_or_path": "THUDM/chatglm2-6b",
     "dataset_name_or_path": "./data",
-    "output_dir": "./checkpoints/chatglm_v2_lora_ckpts",
+    "output_dir": "./checkpoints/chatglm2_sft_ckpts",
     "per_device_train_batch_size": 4,
     "gradient_accumulation_steps": 4,
     "per_device_eval_batch_size": 8,
     "eval_accumulation_steps":16,
     "num_train_epochs": 3,
-    "learning_rate": 3e-04,
+    "learning_rate": 3e-05,
     "warmup_steps": 30,
     "logging_steps": 1,
     "evaluation_strategy": "epoch",
@@ -24,7 +24,6 @@
     "metric_for_best_model": "accuracy",
     "recompute": true,
     "save_total_limit": 1,
-    "tensor_parallel_degree": 1,
-    "pipeline_parallel_degree": 1,
-    "lora": true
+    "sharding_parallel_degree": 4,
+    "sharding": "stage3"
   }
