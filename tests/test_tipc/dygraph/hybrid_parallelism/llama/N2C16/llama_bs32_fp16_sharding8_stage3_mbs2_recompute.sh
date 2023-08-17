@@ -25,7 +25,7 @@ save_steps="200"
 sharding="stage1"
 recompute="1"
 run_mode="DP1-MP1-PP1-SD8"
-device_num="N1C8"
+device_num="N2C16"
 global_batch_size=32
 
 cd ./tests
