@@ -1179,10 +1179,10 @@ class GenerationMixin(object):
         return input_ids[:, origin_len:], scores
 
     def _get_model_inputs_spec(self, dtype: str):
-        input_ids = paddle.static.InputSpec(shape=[None, None], dtype="int64")
-        attention_mask = paddle.static.InputSpec(shape=[None, None], dtype="int64")
-        position_ids = None
-        return input_ids, attention_mask, position_ids
+        return {
+            "input_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            "attention_mask": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+        }
 
     def to_static(self, path: str, config: dict):
         """export generation model to static
@@ -1204,12 +1204,12 @@ class GenerationMixin(object):
         temperature = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
         dtype = config.get("dtype", paddle.get_default_dtype())
 
-        input_ids, attention_mask, position_ids = self._get_model_inputs_spec(dtype)
+        model_inputs_spec = self._get_model_inputs_spec(dtype)
 
         input_spec = [
-            input_ids,
-            attention_mask,
-            position_ids,
+            model_inputs_spec["input_ids"],
+            model_inputs_spec.get("attention_mask", None),
+            model_inputs_spec.get("position_ids", None),
             paddle.static.InputSpec(shape=[1], dtype="int64"),  # max_length
             0,  # min_length
             "sampling",  # decode_strategy

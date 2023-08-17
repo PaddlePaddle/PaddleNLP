@@ -625,10 +625,11 @@ class ChatGLMPretrainedModel(PretrainedModel):
         return position_ids
 
     def _get_model_inputs_spec(self, dtype: str):
-        input_ids = paddle.static.InputSpec(shape=[None, None], dtype="int64")
-        attention_mask = paddle.static.InputSpec(shape=[None, None, None, None], dtype="int64")
-        position_ids = paddle.static.InputSpec(shape=[None, 2, None], dtype="int64")
-        return input_ids, attention_mask, position_ids
+        return {
+            "input_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            "attention_mask": paddle.static.InputSpec(shape=[None, None, None, None], dtype="int64"),
+            "position_ids": paddle.static.InputSpec(shape=[None, 2, None], dtype="int64"),
+        }
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):

@@ -940,6 +940,9 @@ class GenerationD2STestMixin:
 
         decoded_ids = model.greedy_search(
             logits_processors=None,
+            bos_token_id=model.config.bos_token_id,
+            pad_token_id=model.config.pad_token_id,
+            eos_token_id=model.config.eos_token_id,
             **model_kwargs,
         )[0]
 
