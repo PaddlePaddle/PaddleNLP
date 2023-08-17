@@ -100,6 +100,7 @@ class BasePredictor:
     def _init_dist_env(self):
         tensor_parallel_degree = paddle.distributed.get_world_size()
         tensor_parallel_rank = paddle.distributed.get_rank()
+        print("tensor_parallel_degree ===>", tensor_parallel_degree)
         if tensor_parallel_degree > 1:
             strategy = fleet.DistributedStrategy()
             strategy.hybrid_configs = {
@@ -124,8 +125,8 @@ class BasePredictor:
         )
         return decoded_predictions
 
-    def predict(self, source):
-        tokenized_source = self._preprocess(source)
+    def predict(self, input_texts: str | list[str]):
+        tokenized_source = self._preprocess(input_texts)
         predictions = self._infer(tokenized_source)
         decoded_predictions = self._postprocess(predictions)
         return decoded_predictions
@@ -185,6 +186,7 @@ class DygraphPredictor(BasePredictor):
             temperature=self.config.temperature,
             top_k=self.config.top_k,
             top_p=self.config.top_p,
+            repetition_penalty=self.config.repetition_penalty,
         )
         result = result[0]
         return result
@@ -240,11 +242,7 @@ class StaticGraphPredictor(BasePredictor):
         return decoded_ids
 
 
-def predict():
-    parser = PdArgumentParser((PredictorArgument, ModelArgument))
-    predictor_args, model_args = parser.parse_args_into_dataclasses()
-    paddle.set_device(predictor_args.device)
-
+def create_predictor(predictor_args: PredictorArgument, model_args: ModelArgument):
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer):
@@ -265,7 +263,7 @@ def predict():
                 tensor_parallel_rank=tensor_parallel_rank,
             )
         elif model_args.ernie:
-            sys.path.append("./gpt-3")
+            sys.path.append("./ernie-3.5-se")
             from modeling import Ernie35ForCausalLM
 
             tensor_parallel_degree = paddle.distributed.get_world_size()
@@ -279,12 +277,20 @@ def predict():
 
         predictor = DygraphPredictor(predictor_args, model=model, tokenizer=tokenizer)
     elif predictor_args.type == "static":
-        predictor = StaticGraphPredictor(predictor_args)
+        predictor = StaticGraphPredictor(predictor_args, tokenizer=tokenizer)
     else:
         raise ValueError(
             f"receive unexpected predictor type: {predictor_args.type}, it should be one of [dygraph, static]"
         )
+    return predictor
 
+
+def predict():
+    parser = PdArgumentParser((PredictorArgument, ModelArgument))
+    predictor_args, model_args = parser.parse_args_into_dataclasses()
+    paddle.set_device(predictor_args.device)
+
+    predictor = create_predictor(predictor_args, model_args)
     source_texts = []
     target_texts = []
     if model_args.data_file:

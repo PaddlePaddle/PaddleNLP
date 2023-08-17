@@ -137,7 +137,7 @@ def build_alibi_tensor(attention_mask: Tensor, num_heads: int, dtype) -> Tensor:
     """
     # _, seq_length = attention_mask.shape[0], attention_mask.shape[-1]
     closest_power_of_2 = 2 ** math.floor(math.log2(num_heads))
-    base = paddle.to_tensor(2 ** (-(2 ** -(math.log2(closest_power_of_2) - 3))), dtype=paddle.float32)
+    base = paddle.full([], 2 ** (-(2 ** -(math.log2(closest_power_of_2) - 3))), dtype=paddle.float32)
     powers = paddle.arange(1, 1 + closest_power_of_2, dtype=paddle.float32)
     slopes = paddle.pow(base, powers)
 

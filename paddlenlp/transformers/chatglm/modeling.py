@@ -125,8 +125,12 @@ class RotaryEmbeddings(nn.Layer):
             else:
                 t = paddle.arange(start=0, end=seq_len, dtype=self.inv_freq.dtype)
             # [s, h/n/2]
-            # TODO: Failed for fp16 when converting to static graph.
-            freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
+            if not paddle.in_dynamic_mode():
+                inv_freq = paddle.cast(self.inv_freq, "float32")
+                t = paddle.cast(t, "float32")
+                freqs = paddle.einsum("i,j->ij", t, inv_freq)
+            else:
+                freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
             freqs = freqs.cast(self.default_dtype)
             # [s, h/n]
             emb = paddle.concat([freqs, freqs], axis=-1)
