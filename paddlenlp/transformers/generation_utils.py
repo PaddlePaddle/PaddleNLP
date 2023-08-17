@@ -1767,6 +1767,7 @@ class GenerationDyBatch(GenerationMixin):
         if cache is None:
             # encoder's generation
             model_kwargs["tgt_ids"] = paddle.where(just_decoder, model_kwargs["tgt_ids"], next_tokens)
+
             if config.position_encoding_2d is True:
                 tgt_pos = model_kwargs["tgt_pos"]
                 new_position_id = tgt_pos[:, 0, :].clone()
@@ -1814,7 +1815,7 @@ class GenerationDyBatch(GenerationMixin):
                 model_kwargs["seq_len_decoder"],
                 model_kwargs["seq_len_decoder"] + 1,
             )
-        return model_kwargs
+        return model_kwargs, next_tokens
 
     def sample(
         self,
@@ -1873,7 +1874,7 @@ class GenerationDyBatch(GenerationMixin):
             if self.model.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
 
-            model_kwargs = self.update_model_kwargs_for_generation(
+            model_kwargs, next_tokens = self.update_model_kwargs_for_generation(
                 cache, just_decoder, next_tokens, eos_token_id, self.model.config, model_kwargs
             )
 
