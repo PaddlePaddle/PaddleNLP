@@ -1021,11 +1021,11 @@ class Trainer:
 
                     # Case 3: hack dp with master_grad
                     if hack_dp_master_grad and not (args.recompute and availiable_no_sync):
-                        fused_allreduce_gradients(list(model.parameters()), None)                        
+                        fused_allreduce_gradients(list(model.parameters()), None)
 
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
-                    
+
                     # pipeline parallel mode,  handle gradient merge here
                     if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
                         for p in model._layers.parameters():
@@ -1071,7 +1071,9 @@ class Trainer:
                     self.state.global_step += 1
                     self.state.epoch = epoch + self.state.global_step / global_steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
-                    self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+                    self._maybe_log_save_evaluate(
+                        tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs, outputs=outputs
+                    )
                     self._print_timer()
 
                     step = 0
@@ -1924,6 +1926,9 @@ class Trainer:
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
 
         model.micro_batch_size, model.accumulate_steps = config_backup
+        if not hasattr(model._layers._loss_fn, "info"):
+            return loss.detach(), {}
+
         if model.is_pipeline_last_stage():
             buf = [
                 {
@@ -2047,7 +2052,7 @@ class Trainer:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
                 if self.args.use_async_save:
-                    assert not self.args.use_moe, f'moe no support async save'
+                    assert not self.args.use_moe, "moe no support async save"
                     async_save_optimizer(
                         self.optimizer.state_dict(),
                         os.path.join(output_dir, optimizer_name),
@@ -2055,12 +2060,13 @@ class Trainer:
                         sync_other_task=True,
                     )
 
-                elif self.args.use_moe:
-                    self._save_moe_weights(output_dir)
                 else:
                     self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, optimizer_name))
                     with open(saved_signal_path, mode="w+") as f:
                         f.write("1")
+
+        if self.args.use_moe:
+            self._save_moe_weights(output_dir)
 
         # Maybe delete some older checkpoints.
         if self.args.should_save and (True if not self.args.use_hybrid_parallel else self.args.local_rank == 0):
