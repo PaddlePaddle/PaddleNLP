@@ -104,6 +104,10 @@ python examples/chatbot/ParallelRetriever_example.py \
                                             --api_key ... \
                                             --secret_key ... \
 ```
+参数含义说明
+* `file_paths`: 文件的路径
+* `api_key`: 文心一言的apk key
+* `secret_key`: 文心一言的secret key
 
 ## 配置修改
 
