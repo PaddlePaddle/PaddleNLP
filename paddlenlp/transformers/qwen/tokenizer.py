@@ -95,6 +95,11 @@ class QWenTokenizer(PretrainedTokenizer):
         self.im_start_id = self.special_tokens[IMSTART]
         self.im_end_id = self.special_tokens[IMEND]
 
+        if "pad_token_id" in kwargs:
+            self.pad_token_id = kwargs["pad_token_id"]
+        if "eos_token_id" in kwargs:
+            self.eos_token_id = kwargs["eos_token_id"]
+
     def __len__(self) -> int:
         return self.tokenizer.n_vocab
 
