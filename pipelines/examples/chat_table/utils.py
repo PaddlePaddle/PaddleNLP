@@ -19,8 +19,6 @@ import re
 import shutil
 
 from pipelines.document_stores import FAISSDocumentStore
-
-# from pipelines.nodes import ErnieRanker
 from pipelines.nodes import (
     DensePassageRetriever,
     ErnieBot,
@@ -38,9 +36,9 @@ def get_json(path):
     data_all = []
     with open(path, mode="r", encoding="utf-8") as f:
         data = json.load(f)
-    keys = data.keys()
     for keys, value in data.items():
         try:
+            assert keys != "hqchartdata"
             content = path.split("/")[-1].replace(".json", "")
             meta = {}
             value_str = str(value)
@@ -88,7 +86,6 @@ def create_table_db(index_name, all_tables):
         use_gpu=True,
         embed_title=False,
         pooling_mode="mean_tokens",
-        # similarity_function='cosine',
     )
     all_tables = retriever.run_indexing(all_tables)[0]["documents"]
     document_store.write_documents(all_tables)
@@ -110,16 +107,9 @@ def chat_table(query, history=[], api_key=None, secret_key=None, index=None):
         use_gpu=True,
         embed_title=False,
         pooling_mode="mean_tokens",
-        # similarity_function='cosine',
     )
-    # print(query)
-    # ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=True)
     query_pipeline = Pipeline()
     query_pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
-    # query_pipeline.add_node(component=ranker, name="Ranker", inputs=["Retriever"])
-    # indexes = query_pipeline.run(
-    #     query=query, params={"Retriever": {"top_k": 30, "index": str(index)}, "Ranker": {"top_k": 3}}
-    # )
     indexes = query_pipeline.run(query=query, params={"Retriever": {"top_k": 3, "index": str(index)}})
     content = ""
     for item in indexes["documents"]:
@@ -147,6 +137,7 @@ if __name__ == "__main__":
     files = glob.glob(args.dirname + "/*.json", recursive=True)
     # create_index
     all_tables = get_all_tables(files)
+    print(len(all_tables))
     create_table_db(index_name, all_tables)
     # query
     query = "贵州茅台2022年货币资金是多少"

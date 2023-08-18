@@ -35,12 +35,10 @@ def predict(query, history=[], api_key=args.api_key, secret_key=args.secret_key,
         index = "document"
     try:
         message = chat_table(query, history_index[index], api_key, secret_key, index)
-        # history_index[index] = message["history"]
         history.append(["user: {}".format(query), "assistant: {}".format(message["result"])])
     except:
         history_index[index] = []
         message = chat_table(query, history_index[index], api_key, secret_key, index)
-        # history_index[index] = message["history"]
         history.append(["user: {}".format(query), "assistant: {}".format(message["result"])])
     return "", history, history
 
