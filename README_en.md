@@ -1,5 +1,5 @@
 
-[简体中文🀄](./README.MD) | **English🌎**
+[简体中文🀄](./README.md) | **English🌎**
 
 <p align="center"> <img src="https://user-images.githubusercontent.com/1371212/175816733-8ec25eb0-9af3-4380-9218-27c154518258.png" align="middle"  width="500" /> </p>
 
@@ -58,7 +58,7 @@
 
 ### Out-of-Box NLP Toolset
 
-Taskflow aims to provide off-the-shelf NLP pre-built task covering NLU and NLG technique, in the meanwhile with extreamly fast infernece satisfying industrial scenario.
+Taskflow aims to provide off-the-shelf NLP pre-built task covering NLU and NLG technique, in the meanwhile with extremely fast inference satisfying industrial scenario.
 
 ![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
@@ -114,7 +114,7 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 
 #### Wide-range NLP Task Support
 
-PaddleNLP provides rich examples covering mainstream NLP task to help developers accelerate problem solving. You can find our powerful transformer [Model Zoo](./model_zoo), and wide-range NLP application [exmaples](./examples) with detailed instructions.
+PaddleNLP provides rich examples covering mainstream NLP task to help developers accelerate problem solving. You can find our powerful transformer [Model Zoo](./model_zoo), and wide-range NLP application [examples](./examples) with detailed instructions.
 
 Also you can run our interactive [Notebook tutorial](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995) on AI Studio, a powerful platform with **FREE** computing resource.
 
@@ -169,9 +169,9 @@ For more pretrained model usage, please refer to [Transformer API Docs](./docs/m
 
 ### Industrial End-to-end System
 
-We provide high value scenarios including information extraction, semantic retrieval, questionn answering high-value.
+We provide high value scenarios including information extraction, semantic retrieval, question answering high-value.
 
-For more details industial cases please refer to [Applications](./applications).
+For more details industrial cases please refer to [Applications](./applications).
 
 
 #### 🔍 Neural Search System
@@ -231,7 +231,7 @@ AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 
 Set `use_fast=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FastTokenizer](./fast_tokenizer).
 
-#### ⚡ FastGeneration: High Perforance Generation Library
+#### ⚡ FastGeneration: High Performance Generation Library
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407831-914dced0-3a5a-40b8-8a65-ec82bf13e53c.gif" width="400">
@@ -280,7 +280,7 @@ pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/pad
 
 ## Quick Start
 
-**Taskflow** aims to provide off-the-shelf NLP pre-built task covering NLU and NLG scenario, in the meanwhile with extreamly fast infernece satisfying industrial applications.
+**Taskflow** aims to provide off-the-shelf NLP pre-built task covering NLU and NLG scenario, in the meanwhile with extremely fast inference satisfying industrial applications.
 
 ```python
 from paddlenlp import Taskflow
