@@ -1318,12 +1318,15 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         src_ids = input_ids
         nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
         src_ids = paddle.concat([src_ids, nid], axis=1)
-        for cur_len in range(self.max_predict_len):
-            output, cached_kvs = self.model(nid, use_cache=True, cache=cached_kvs)
-            nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
-            src_ids = paddle.concat([src_ids, nid], axis=1)
-            if paddle.max(nid) == self.eol_token_id:
-                break
+        cur_len = 0
+        with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
+            while cur_len < self.max_predict_len:
+                output, cached_kvs = self.model(nid, use_cache=True, cache=cached_kvs)
+                nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
+                src_ids = paddle.concat([src_ids, nid], axis=1)
+                cur_len += 1
+                if paddle.max(nid) == self.eol_token_id:
+                    break
         return src_ids
 
 
