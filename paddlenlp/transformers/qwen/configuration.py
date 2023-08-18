@@ -44,6 +44,7 @@ class QWenConfig(PretrainedConfig):
         intermediate_size=22016,
         no_bias=True,
         tie_word_embeddings=False,
+        dtype="bfloat16",
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -58,9 +59,6 @@ class QWenConfig(PretrainedConfig):
         self.scale_attn_weights = scale_attn_weights
         self.use_cache = use_cache
         self.max_position_embeddings = max_position_embeddings
-        self.bf16 = bf16
-        self.fp16 = fp16
-        self.fp32 = fp32
         self.kv_channels = kv_channels
         self.rotary_pct = rotary_pct
         self.rotary_emb_base = rotary_emb_base
@@ -68,4 +66,5 @@ class QWenConfig(PretrainedConfig):
         self.use_logn_attn = use_logn_attn
         self.use_flash_attn = use_flash_attn
         self.no_bias = no_bias
+        self.dtype = dtype
         super().__init__(tie_word_embeddings=tie_word_embeddings, **kwargs)

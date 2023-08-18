@@ -52,7 +52,7 @@ def _load_tiktoken_bpe(tiktoken_bpe_file: str) -> Dict[bytes, int]:
 class QWenTokenizer(PretrainedTokenizer):
     """QWen tokenizer."""
 
-    model_input_names = ["input_ids", "attention_mask", "position_ids"]
+    model_input_names = ["input_ids", "attention_mask"]
     resource_files_names = VOCAB_FILES_NAMES
 
     def __init__(
