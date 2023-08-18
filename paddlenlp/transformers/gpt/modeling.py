@@ -1203,7 +1203,7 @@ class GPTForPretraining(GPTPretrainedModel):
             loss_mask = loss_mask.reshape([-1])
             masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
             loss = masked_lm_loss / loss_mask.sum()
-            return loss
+            return loss, logits
 
 
 class GPTPretrainingCriterion(paddle.nn.Layer):
