@@ -180,9 +180,7 @@ def bulid_base(paths, api_key, secret_key, filters=["\n"]):
     document_store.save(index_name)
 
 
-def chat_papers(query, api_key, secret_key, retriever_top=30, ranker_top=3, history=None):
-    if history is None:
-        history = []
+def chat_papers(query, api_key, secret_key, retriever_top=30, ranker_top=3, history=[]):
     document_store = FAISSDocumentStore.load(index_name)
     retriever = DensePassageRetriever(
         document_store=document_store,
