@@ -234,8 +234,11 @@ def scaled_dot_product_attention(
             )
 
         attn_weights = attn_weights + attention_mask
-        with paddle.amp.auto_cast(False):
+        if not paddle.in_dynamic_mode():
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+        else:
+            with paddle.amp.auto_cast(False):
+                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
@@ -274,7 +277,9 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     batch_size, src_length = mask.shape[0], mask.shape[-1]
     tgt_length = tgt_length if tgt_length is not None else src_length
 
-    expanded_mask = mask[:, None, None, :].astype("bool").expand([batch_size, 1, tgt_length, src_length])
+    mask = mask[:, None, None, :].astype("bool")
+    mask.stop_gradient = True
+    expanded_mask = mask.expand([batch_size, 1, tgt_length, src_length])
 
     return expanded_mask
 
@@ -303,7 +308,11 @@ class LlamaRMSNorm(nn.Layer):
         if self.config.use_fused_rms_norm:
             return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
 
-        with paddle.amp.auto_cast(False):
+        if paddle.in_dynamic_mode():
+            with paddle.amp.auto_cast(False):
+                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
+                hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
+        else:
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
             hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
 
