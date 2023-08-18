@@ -532,6 +532,30 @@ class TrainingArguments:
             )
         },
     )
+    mp_async_allreduce: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "Support all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear when it set True, which can accelerate model parallel performance."
+            )
+        },
+    )
+    mp_skip_c_identity: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "Support skip c_identity in ColumnParallelLinear and RowParallelLinear. Only works when mp_async_allreduce is True. It can accelerate model parallel further."
+            )
+        },
+    )
+    mp_fused_linear_param_grad_add: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "Support fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). Only works when mp_async_allreduce is true.  It can accelerate model parallel further."
+            )
+        },
+    )
     pipeline_parallel_degree: int = field(
         default=-1,
         metadata={
@@ -888,6 +912,21 @@ class TrainingArguments:
 
                 # setter once https://github.com/PaddlePaddle/Paddle/blob/b7295120b0e78b293cd7ae29706e21769d06a3cc/python/paddle/distributed/fleet/base/distributed_strategy.py#L1692
                 strategy.hybrid_configs = hybrid_configs
+
+                if tensor_parallel_degree > 1:
+                    strategy.hybrid_configs["mp_configs"].mp_async_allreduce = self.mp_async_allreduce
+                    strategy.hybrid_configs["mp_configs"].mp_skip_c_identity = (
+                        self.mp_async_allreduce and self.mp_skip_c_identity
+                    )
+                    strategy.hybrid_configs["mp_configs"].mp_fused_linear_param_grad_add = (
+                        self.mp_async_allreduce and self.mp_fused_linear_param_grad_add
+                    )
+                    if not self.mp_async_allreduce and self.mp_skip_c_identity:
+                        warnings.warn("mp_skip_c_identity only works with mp_async_allreduce. It will not work.")
+                    if not self.mp_async_allreduce and self.mp_fused_linear_param_grad_add:
+                        warnings.warn(
+                            "mp_fused_linear_param_grad_add only works with mp_async_allreduce. It will not work."
+                        )
 
                 if sharding_parallel_degree > 1:
                     sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
