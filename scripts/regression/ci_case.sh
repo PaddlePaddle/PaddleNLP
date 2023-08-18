@@ -278,32 +278,44 @@ print_info $? gpt_deploy_C_FT
 }
 # 8 gpt
 gpt(){
-
-# TODO(wj-Mcat): revert the gpt run_pretrain.py code, remove it later.
-
 cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
 sed -i "s/python3/python/g" Makefile
 sed -i "s/python-config/python3.7m-config/g" Makefile
 #pretrain
 cd ${nlp_dir}/model_zoo/gpt/
-mkdir pre_data
-cd ./pre_data
+mkdir data
+cd ./data
 wget -q https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
 wget -q https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
 cd ../
-time (python -m paddle.distributed.launch run_pretrain.py \
-    --model_type gpt \
-    --model_name_or_path gpt2-en \
-    --input_dir "./pre_data"\
-    --output_dir "output"\
-    --weight_decay 0.01\
-    --grad_clip 1.0\
-    --max_steps 2\
-    --save_steps 2\
-    --decay_steps 320000\
-    --warmup_rate 0.01\
-    --micro_batch_size 2 \
-    --device gpu >${log_path}/gpt_pretrain) >>${log_path}/gpt_pretrain 2>&1
+
+time (python run_pretrain_trainer.py \
+    --model_type "gpt" \
+    --model_name_or_path "gpt2-en" \
+    --tokenizer_name_or_path "gpt2-en" \
+    --input_dir "./data" \
+    --output_dir "output" \
+    --split 949,50,1 \
+    --max_seq_length 1024 \
+    --per_device_train_batch_size 8 \
+    --per_device_eval_batch_size 8 \
+    --fp16  \
+    --fp16_opt_level "O2"  \
+    --learning_rate 0.0001 \
+    --min_learning_rate 0.00001 \
+    --max_steps 10 \
+    --save_steps 5 \
+    --weight_decay 0.01 \
+    --warmup_ratio 0.01 \
+    --max_grad_norm 1.0 \
+    --logging_steps 1 \
+    --dataloader_num_workers 1 \
+    --eval_steps 5 \
+    --report_to "visualdl" \
+    --disable_tqdm true \
+    --do_train \
+    --do_eval \
+    --device "gpu" >${log_path}/gpt_pretrain) >>${log_path}/gpt_pretrain 2>&1
 print_info $? gpt_pretrain
 time (
 python export_model.py --model_type=gpt \
@@ -321,7 +333,7 @@ cd ${nlp_dir}
 python -m pytest ./tests/model_zoo/test_gpt.py >${log_path}/gpt >>${log_path}/gpt 2>&1
 print_info $? gpt
 
-# fast_gpt
+fast_gpt
 cd ${nlp_dir}/fast_generation/samples
 python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
 print_info $? fast_generation_gpt
