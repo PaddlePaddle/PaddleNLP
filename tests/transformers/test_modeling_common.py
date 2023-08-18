@@ -914,7 +914,7 @@ class GenerationD2STestMixin:
 
     TokenizerClass = AutoTokenizer
     CausalLMClass = AutoModelForCausalLM
-    max_length = 50
+    max_length = 20
 
     def test_to_static_use_top_k(self):
         tokenizer = self.TokenizerClass.from_pretrained(self.internal_testing_model)
