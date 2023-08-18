@@ -29,7 +29,7 @@ class MapReduceDocuments(BaseCombineDocuments):
         reduce_documents: BaseCombineDocuments,
         api_key: str = "",
         secret_key: str = "",
-        ernie_bot=None,
+        llm=None,
         **kwargs,
     ):
         """
@@ -40,12 +40,12 @@ class MapReduceDocuments(BaseCombineDocuments):
         :param llm_prompt: the prompt for single document summary
         :param reduce_documents: the collapse multi document summary generation
         :param token_max: the maximum length of collapsing documents
-        :param ernie_bot: the  Language Model
+        :param llm: the  Language Model
         """
         self.llm_prompt = llm_prompt
         self.reduce_documents = reduce_documents
-        if ernie_bot is not None:
-            self.llm = ernie_bot
+        if llm is not None:
+            self.llm = llm
         else:
             self.llm = ErnieBot(api_key, secret_key)
         assert isinstance(

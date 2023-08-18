@@ -98,27 +98,31 @@ args = parser.parse_args()
 
 def clear_session():
     global all_data_result
-    global papers_all
+    global paper_all
     global papers_sum
     global chat_file_history
     global chat_base_history
     all_data_result = manager.dict()
     papers_sum = manager.list()
-    papers_all = []
+    paper_all = []
     chat_file_history = defaultdict(list)
     chat_base_history = []
-    return None, "https://arxiv.org/abs/2303.08774"
+    return None, "", "", [], "", [], "", []
+
+
+def clear_base():
+    global chat_base_history
+    chat_base_history = []
+    return "", []
 
 
 def chat_file(
     query,
-    history=None,
+    history=[],
     index_paper=None,
     api_key=args.api_key,
     secret_key=args.secret_key,
 ):
-    if history is None:
-        history = []
     if index_paper is None:
         index = "document"
     else:
@@ -305,14 +309,12 @@ def sum_result(file_name):
 
 def retriever_papers(
     query,
-    history=None,
+    history=[],
     api_key=args.api_key,
     secret_key=args.secret_key,
     retriever_top=30,
     ranker_top=3,
 ):
-    if history is None:
-        history = []
     global chat_base_history
     message = chat_papers(
         query,
@@ -333,10 +335,13 @@ def Dropdown_list(papers, inputs):
         paper_list = [paper.name.split("/")[-1] for paper in papers]
     else:
         paper_list = inputs.split(";")
-    paper_all += [i for i in paper_list if i not in paper_all]
-    return gr.Dropdown.update(choices=paper_all, value=paper_all[0]), gr.Dropdown.update(
-        choices=paper_all, value=paper_all[0]
-    )
+    paper_all += [i for i in paper_list if i not in paper_all and i != "" and i is not None]
+    if len(paper_all) > 0:
+        value = paper_all[0]
+    else:
+        value = None
+    print(value)
+    return gr.Dropdown.update(choices=paper_all, value=value), gr.Dropdown.update(choices=paper_all, value=value)
 
 
 def Button_display():
@@ -378,8 +383,8 @@ with gr.Blocks() as demo:
                         trans_down = gr.File(label="翻译下载链接")
                         with gr.Group():
                             start_chatfile_tr = gr.Textbox(value="暂时无法问答", label="问答启动")
-                            chatbot = gr.Chatbot(label="Chatbot")
-                            state = gr.State()
+                            chatbot_tr = gr.Chatbot(label="Chatbot")
+                            state_tr = gr.State([])
                             with gr.Row():
                                 textbox = gr.Textbox(
                                     container=False,
@@ -389,7 +394,9 @@ with gr.Blocks() as demo:
                                 )
                                 submit_button = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
                                 submit_button.click(
-                                    chat_file, inputs=[textbox, state, file_tr], outputs=[textbox, chatbot, state]
+                                    chat_file,
+                                    inputs=[textbox, state_tr, file_tr],
+                                    outputs=[textbox, chatbot_tr, state_tr],
                                 )
             with gr.Tab("单文总结"):  # 包含下载功能
                 with gr.Row():
@@ -408,8 +415,8 @@ with gr.Blocks() as demo:
                         sum_down = gr.File(label="全文精度链接 ")
                         with gr.Group():
                             start_chatfile_sum = gr.Textbox(value="暂时无法问答", label="问答启动")
-                            chatbot = gr.Chatbot(label="Chatbot")
-                            state = gr.State()
+                            chatbot_sum = gr.Chatbot(label="Chatbot")
+                            state_sum = gr.State([])
                             with gr.Row():
                                 textbox = gr.Textbox(
                                     container=False,
@@ -419,7 +426,9 @@ with gr.Blocks() as demo:
                                 )
                                 submit_button = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
                                 submit_button.click(
-                                    chat_file, inputs=[textbox, state, file_sum], outputs=[textbox, chatbot, state]
+                                    chat_file,
+                                    inputs=[textbox, state_sum, file_sum],
+                                    outputs=[textbox, chatbot_sum, state_sum],
                                 )
             with gr.Tab("多文总结"):  # 包含下载功能
                 with gr.Accordion("   "):
@@ -432,7 +441,7 @@ with gr.Blocks() as demo:
                     with gr.Group():
                         start_chatfile_mul = gr.Textbox(value="暂时无法问答", label="问答启动")
                         chatbot = gr.Chatbot(label="Chatbot")
-                        state = gr.State()
+                        state = gr.State([])
                         with gr.Row():
                             textbox = gr.Textbox(
                                 container=False,
@@ -456,7 +465,11 @@ with gr.Blocks() as demo:
                     sum_mul_papers_down,
                 ],
             )
-            clear.click(clear_session, inputs=[], outputs=[file_upload, input1])
+            clear.click(
+                clear_session,
+                inputs=[],
+                outputs=[file_upload, input1, chatbot_tr, state_tr, chatbot_sum, state_sum, chatbot, state],
+            )
             file_tr.change(Button_display, inputs=[], outputs=[tr_display])
             file_sum.change(Button_display, inputs=[], outputs=[sum_display])
             tr_display.click(tr_result, inputs=file_tr, outputs=[ori_paper, ori_pdf, trans_paper, trans_down])
@@ -477,7 +490,7 @@ with gr.Blocks() as demo:
     with gr.Tab("学术检索"):
         with gr.Group():
             chatbot = gr.Chatbot(label="Chatbot")
-            state = gr.State()
+            state = gr.State([])
             with gr.Row():
                 textbox = gr.Textbox(
                     container=False,
@@ -486,5 +499,7 @@ with gr.Blocks() as demo:
                     scale=10,
                 )
                 submit_button = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
+                clear_button = gr.Button("清除历史记录", variant="primary", scale=2, min_width=0)
             submit_button.click(retriever_papers, inputs=[textbox, state], outputs=[textbox, chatbot, state])
+            clear_button.click(clear_base, inputs=[], outputs=[chatbot, state])
 demo.launch(server_name="0.0.0.0", server_port=8084)

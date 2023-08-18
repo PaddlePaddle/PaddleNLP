@@ -8,6 +8,7 @@ cd PaddleNLP/pipelines/examples/chatpaper
 pip install -r requirements.txt
 ```
 ## 2. 快速开始
+如果要实现基于本地知识库的问答，首先需要建立本地知识库
 建立本地知识库（中文pdf）
 ```
 python create_base.py \

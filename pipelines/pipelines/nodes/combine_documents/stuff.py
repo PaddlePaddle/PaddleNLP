@@ -30,7 +30,7 @@ class StuffDocuments(BaseCombineDocuments):
         self,
         api_key: str = "",
         secret_key: str = "",
-        ernie_bot=None,
+        llm=None,
         document_prompt: str = "文件{index}: 文件内容{content}",
         document_separator: str = "\n\n",
         llm_prompt: Optional[str] = None,
@@ -48,13 +48,13 @@ class StuffDocuments(BaseCombineDocuments):
         :param document_prompt: the prompt for geting and merging multiple documents
         :param llm_prompt: the prompt for multiple document summaries
         :param len_str: maximum document length
-        :param ernie_bot: the  Language Model
+        :param llm: the  Language Model
         """
         self.document_prompt = document_prompt
         self.document_separator = document_separator
         self.llm_prompt = llm_prompt
-        if ernie_bot is not None:
-            self.llm = ernie_bot
+        if llm is not None:
+            self.llm = llm
         else:
             self.llm = ErnieBot(api_key, secret_key)
         self.len_str = len_str
