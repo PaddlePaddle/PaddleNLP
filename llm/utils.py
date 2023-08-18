@@ -121,6 +121,14 @@ def get_lora_target_modules(model):
             ".*linear1.*",
             ".*linear2.*",
         ]
+    elif model.base_model_prefix == "transformer":
+        target_modules = [
+            ".*attn.c_attn.*",
+            ".*attn.c_proj.*",
+            ".*mlp.w1.*",
+            ".*mlp.w2.*",
+            ".*mlp.c_proj.*",
+        ]
     else:
         raise ValueError(
             f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama."

@@ -125,6 +125,7 @@ MAPPING_NAMES = OrderedDict(
         ("BlipVision", "blip"),
         ("Blip", "blip"),
         ("Bloom", "bloom"),
+        ("QWen", "qwen"),
     ]
 )
 
@@ -232,6 +233,7 @@ class _BaseAutoModelClass:
                     model_name = model_flag + "Model"
                     break
         if model_name is None:
+            print(cls, init_class, model_name)
             raise AttributeError(
                 f"Unable to parse 'architectures' or 'init_class' from {config_file_path}. Also unable to infer model class from 'pretrained_model_name_or_path'"
             )

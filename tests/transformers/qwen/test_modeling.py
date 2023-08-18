@@ -18,7 +18,7 @@ import unittest
 from parameterized import parameterized_class
 
 from paddlenlp.transformers.qwen.configuration import QWenConfig
-from paddlenlp.transformers.qwen.modeling import QWenLMHeadModel, QWenModel
+from paddlenlp.transformers.qwen.modeling import QWenForCausalLM, QWenModel
 from tests.transformers.test_generation_utils import GenerationTesterMixin
 
 from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
@@ -188,7 +188,7 @@ class QWenModelTester:
         token_labels,
         choice_labels,
     ):
-        model = QWenLMHeadModel(config)
+        model = QWenForCausalLM(config)
         model.eval()
         result = model(
             input_ids,
@@ -218,9 +218,9 @@ class QWenModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
 
     all_model_classes = (
         QWenModel,
-        QWenLMHeadModel,
+        QWenForCausalLM,
     )
-    all_generative_model_classes = {QWenLMHeadModel: (QWenModel, "qwen")}
+    all_generative_model_classes = {QWenForCausalLM: (QWenModel, "qwen")}
 
     def setUp(self):
         self.model_tester = QWenModelTester(self)

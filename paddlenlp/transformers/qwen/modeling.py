@@ -13,11 +13,14 @@
 # limitations under the License.
 
 import math
+from functools import partial
 from typing import List, Optional
 
 import paddle
+import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
 from paddle import Tensor, nn
+from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
 from paddlenlp.transformers.model_outputs import (
@@ -29,6 +32,31 @@ from paddlenlp.utils.log import logger
 
 from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .configuration import QWenConfig
+
+
+def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
+    is_fleet_init = True
+    tensor_parallel_degree = 1
+    try:
+        hcg = fleet.get_hybrid_communicate_group()
+        model_parallel_group = hcg.get_model_parallel_group()
+        tensor_parallel_degree = hcg.get_model_parallel_world_size()
+    except:
+        is_fleet_init = False
+
+    if is_fleet_init and tensor_parallel_degree > 1 and y.is_distributed:
+        # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
+        input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
+        logits = paddle.matmul(input_parallel, y, transpose_y=False)
+
+        if tensor_parallel_output:
+            return logits
+
+        return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
+
+    else:
+        logits = paddle.matmul(x, y, transpose_y=False)
+        return logits
 
 
 class QWenAttention(nn.Layer):
@@ -59,9 +87,25 @@ class QWenAttention(nn.Layer):
         assert self.projection_size % config.num_attention_heads == 0
         self.hidden_size_per_attention_head = self.projection_size // config.num_attention_heads
 
-        self.c_attn = nn.Linear(config.hidden_size, 3 * self.projection_size)
-
-        self.c_proj = nn.Linear(config.hidden_size, self.projection_size, bias_attr=not config.no_bias)
+        if config.tensor_parallel_degree > 1:
+            if config.num_attention_heads % config.tensor_parallel_degree != 0:
+                raise ValueError("num_attention_heads has to be divisible by tensor_parallel_degree")
+            self.num_heads = config.num_attention_heads // config.tensor_parallel_degree
+            self.c_attn = mpu.ColumnParallelLinear(
+                config.hidden_size,
+                3 * self.projection_size,
+                has_bias=True,
+                gather_output=False,
+            )
+            self.c_proj = mpu.RowParallelLinear(
+                config.hidden_size,
+                self.projection_size,
+                has_bias=not config.no_bias,
+                input_is_parallel=True,
+            )
+        else:
+            self.c_attn = nn.Linear(config.hidden_size, 3 * self.projection_size, bias_attr=True)
+            self.c_proj = nn.Linear(config.hidden_size, self.projection_size, bias_attr=not config.no_bias)
 
         self.is_fp32 = not (config.bf16 or config.fp16)
 
@@ -131,7 +175,6 @@ class QWenAttention(nn.Layer):
         output_attentions=False,
         use_cache=False,
     ):
-
         mixed_x_layer = self.c_attn(hidden_states)
         query, key, value = paddle.split(mixed_x_layer, num_or_sections=3, axis=-1)
 
@@ -183,7 +226,7 @@ class QWenAttention(nn.Layer):
             seq_start = key.shape[1] - query.shape[1]
             seq_end = key.shape[1]
             logn_tensor = self.logn_tensor[:, seq_start:seq_end, :, :]
-            query = query * logn_tensor.expand_as(query)
+            query = query * logn_tensor.expand(query.shape)
 
         query = query.transpose([0, 2, 1, 3])
         key = key.transpose([0, 2, 1, 3])
@@ -202,15 +245,38 @@ class QWenAttention(nn.Layer):
 class QWenMLP(nn.Layer):
     def __init__(self, config):
         super().__init__()
-        self.w1 = nn.Linear(config.hidden_size, config.intermediate_size // 2, bias_attr=not config.no_bias)
-        self.w2 = nn.Linear(config.hidden_size, config.intermediate_size // 2, bias_attr=not config.no_bias)
         ff_dim_in = config.intermediate_size // 2
-        self.c_proj = nn.Linear(ff_dim_in, config.hidden_size, bias_attr=not config.no_bias)
+        if config.tensor_parallel_degree > 1:
+            self.w1 = mpu.ColumnParallelLinear(
+                config.hidden_size,
+                ff_dim_in,
+                gather_output=False,
+                has_bias=False,
+            )
+            self.w2 = mpu.ColumnParallelLinear(
+                config.hidden_size,
+                ff_dim_in,
+                gather_output=False,
+                has_bias=False,
+            )
+            self.c_proj = mpu.RowParallelLinear(
+                ff_dim_in,
+                config.hidden_size,
+                input_is_parallel=True,
+                has_bias=False,
+            )
+        else:
+            self.w1 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=not config.no_bias)
+            self.w2 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=not config.no_bias)
+            self.c_proj = nn.Linear(ff_dim_in, config.hidden_size, bias_attr=not config.no_bias)
 
     def forward(self, hidden_states):
+        # up
         a1 = self.w1(hidden_states)
+        # gate
         a2 = self.w2(hidden_states)
         intermediate_parallel = a1 * F.silu(a2)
+        # down
         output = self.c_proj(intermediate_parallel)
         return output
 
@@ -286,6 +352,44 @@ class QWenPreTrainedModel(PretrainedModel):
         super().__init__(*inputs, **kwargs)
 
     @classmethod
+    def _get_tensor_parallel_mappings(cls, config, is_split=True):
+
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+
+        fn = split_or_merge_func(
+            is_split=is_split,
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_rank=config.tensor_parallel_rank,
+            num_attention_heads=config.num_attention_heads,
+        )
+
+        def get_tensor_parallel_split_mappings(num_hidden_layers):
+            final_actions = {}
+            base_actions = {
+                # Column Linear
+                "lm_head.weight": partial(fn, is_column=True),
+                "transformer.h.0.mlp.w2.weight": partial(fn, is_column=True),
+                "transformer.h.0.mlp.w1.weight": partial(fn, is_column=True),
+                "transformer.h.0.attn.c_attn.weight": partial(fn, is_column=True, is_naive_3fuse=True),
+                "transformer.h.0.attn.c_attn.bias": partial(fn, is_column=True, is_naive_3fuse=True),
+                # Row Linear
+                "transformer.wte.weight": partial(fn, is_column=False),
+                "transformer.h.0.mlp.c_proj.weight": partial(fn, is_column=False),
+                "transformer.h.0.attn.c_proj.weight": partial(fn, is_column=False),
+            }
+            for key, action in base_actions.items():
+                if "h.0." in key:
+                    for i in range(num_hidden_layers):
+                        final_actions[key.replace("h.0.", f"h.{i}.")] = action
+                final_actions[key] = action
+
+            return final_actions
+
+        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+
+        return mappings
+
+    @classmethod
     def _get_name_mappings(cls, config: QWenConfig) -> List[StateDictNameMapping]:
         mappings = [
             "wte.weight",
@@ -357,7 +461,17 @@ class QWenPreTrainedModel(PretrainedModel):
 
     def _init_weights(self, module):
         """Initialize the weights."""
-        if isinstance(module, (nn.Linear, nn.Embedding)):
+        if isinstance(
+            module,
+            (
+                nn.Linear,
+                nn.Embedding,
+                mpu.ColumnParallelLinear,
+                mpu.RowParallelLinear,
+                mpu.VocabParallelEmbedding,
+                QWenLMHead,
+            ),
+        ):
             module.weight.set_value(
                 paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=module.weight.shape)
             )
@@ -390,7 +504,13 @@ class QWenModel(QWenPreTrainedModel):
 
         self.enable_recompute = False
 
-        self.wte = nn.Embedding(self.vocab_size, self.embed_dim)
+        if config.tensor_parallel_degree > 1:
+            self.wte = mpu.VocabParallelEmbedding(
+                self.vocab_size,
+                self.embed_dim,
+            )
+        else:
+            self.wte = nn.Embedding(self.vocab_size, self.embed_dim)
 
         self.drop = nn.Dropout(config.emb_dropout_prob)
         self.h = nn.LayerList(
@@ -619,14 +739,41 @@ class QWenModel(QWenPreTrainedModel):
         )
 
 
-class QWenLMHeadModel(QWenPreTrainedModel):
+class QWenLMHead(nn.Layer):
+    def __init__(self, config: QWenConfig):
+        super(QWenLMHead, self).__init__()
+        self.config = config
+        if config.tensor_parallel_degree > 1:
+            vocab_size = config.vocab_size // config.tensor_parallel_degree
+        else:
+            vocab_size = config.vocab_size
+
+        self.weight = self.create_parameter(
+            shape=[config.hidden_size, vocab_size],
+            dtype=paddle.get_default_dtype(),
+        )
+        # Must set distributed attr for Tensor Parallel !
+        self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
+        if self.weight.is_distributed:
+            self.weight.split_axis = 1
+
+    def forward(self, hidden_states, tensor_parallel_output=None):
+        if tensor_parallel_output is None:
+            tensor_parallel_output = self.config.tensor_parallel_output
+
+        logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
+        return logits
+
+
+class QWenForCausalLM(QWenPreTrainedModel):
     _keys_to_ignore_on_load_missing = [r"h\.\d+\.attn\.rotary_emb\.inv_freq"]
     _keys_to_ignore_on_load_unexpected = [r"h\.\d+\.attn\.masked_bias"]
 
     def __init__(self, config):
         super().__init__(config)
         self.transformer = QWenModel(config)
-        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
+        # self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
+        self.lm_head = QWenLMHead(config)
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -677,9 +824,6 @@ class QWenLMHeadModel(QWenPreTrainedModel):
         if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
             attention_mask = (input_ids != pad_token_id).astype(paddle.int64)
         else:
-            import pdb
-
-            pdb.set_trace()
             attention_mask = paddle.ones_like(input_ids, dtype=paddle.int64)
         return attention_mask
 

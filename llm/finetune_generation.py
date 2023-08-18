@@ -36,6 +36,7 @@ from paddlenlp.transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     LlamaTokenizer,
+    QWenTokenizer,
 )
 from paddlenlp.utils.log import logger
 
@@ -111,6 +112,10 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     if isinstance(tokenizer, LlamaTokenizer):
         tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token else "<pad>"
+
+    if isinstance(tokenizer, QWenTokenizer):
+        tokenizer.pad_token_id = 151643
+        tokenizer.eos_token_id = 151643
 
     if data_args.dataset_name_or_path is None:
         raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
