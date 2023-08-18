@@ -809,8 +809,8 @@ class TrainingArguments:
             if sharding_parallel_degree > 1 and ShardingOption.SHARD_OP in self.sharding:
                 assert self.data_parallel_degree == 1, "sharding stage1 can not coexist with dp for now"
 
-            if ShardingOption.OFFLOAD in self.sharding or ShardingOption.FULL_SHARD in self.sharding:
-                warnings.warn("`offload` and `stage3` is not supported NOW!")
+            if ShardingOption.OFFLOAD in self.sharding:
+                warnings.warn("`offload` is not supported NOW!")
 
             if pipeline_parallel_degree > 1:
                 if ShardingOption.FULL_SHARD in self.sharding or ShardingOption.SHARD_GRAD_OP in self.sharding:
