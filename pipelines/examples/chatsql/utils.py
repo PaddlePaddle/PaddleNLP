@@ -95,7 +95,7 @@ def create_table_db(index_name, all_tables):
     document_store.save(index_name)
 
 
-def chat_sql(query, history=[], api_key=None, secret_key=None, index=None):
+def chat_table(query, history=[], api_key=None, secret_key=None, index=None):
     if index is None:
         index = "document"
     document_store = FAISSDocumentStore.load(index_name)
@@ -150,5 +150,5 @@ if __name__ == "__main__":
     create_table_db(index_name, all_tables)
     # query
     query = "贵州茅台2022年货币资金是多少"
-    result = chat_sql(query, api_key=args.api_key, secret_key=args.secret_key)
+    result = chat_table(query, api_key=args.api_key, secret_key=args.secret_key)
     print(result["result"])
