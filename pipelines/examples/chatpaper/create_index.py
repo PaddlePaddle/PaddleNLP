@@ -68,9 +68,7 @@ def clean(txt, filters):
     return txt
 
 
-def chatfile_base(indexes, query, api_key, secret_key, history=None):
-    if history is None:
-        history = []
+def chatfile_base(indexes, query, api_key, secret_key, history=[]):
     document_store = FAISSDocumentStore.load(index_name)
     retriever = DensePassageRetriever(
         document_store=document_store,

@@ -1,6 +1,6 @@
 # ChatPaper
 ## 1. 功能概述
-ChatPaper 是一个文献阅读助手，可以随时随地不厌其烦地回答您的疑问，帮助您理解文献。具体功能包含论文【单篇/多篇】翻译、精读、多轮问答以及基于本地知识库的多轮问答。目前对英文论文仅提供翻译和精读功能，中文论文【单篇/多篇】提供精读、多轮问答以及基于本地知识库问答功能。
+ChatPaper 是一个文献阅读助手，可以随时随地不厌其烦地回答您的疑问，帮助您理解文献。具体功能包含论文【单篇/多篇】翻译、精读、多轮问答以及基于本地知识库的多轮问答。目前对英文论文仅提供翻译和精读功能，中文论文【单篇/多篇】提供精读、多轮问答以及学术检索功能。
 ## 2. 安装依赖
 ```
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
@@ -8,10 +8,10 @@ cd PaddleNLP/pipelines/examples/chatpaper
 pip install -r requirements.txt
 ```
 ## 2. 快速开始
-如果要实现基于本地知识库的问答，首先需要建立本地知识库
+如果要实现学术检索功能，首先需要建立本地知识库
 建立本地知识库（中文pdf）
 ```
-python create_base.py \
+python create_index.py \
 --api_key ... \
 --secret_key ... \
 --dirname ...
