@@ -112,7 +112,10 @@ class RotaryEmbeddings(nn.Layer):
         return paddle.stack([cos, sin], axis=0)
 
     def forward(self, position_ids):
+
         seq_len = position_ids.max() + 1
+        # seq_len = position_ids.shape[-1]
+
         if self.max_seq_len_cached < 0 or seq_len > self.max_seq_len_cached:
             self.max_seq_len_cached = seq_len
 
@@ -125,8 +128,12 @@ class RotaryEmbeddings(nn.Layer):
             else:
                 t = paddle.arange(start=0, end=seq_len, dtype=self.inv_freq.dtype)
             # [s, h/n/2]
-            # TODO: Failed for fp16 when converting to static graph.
-            freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
+            if not paddle.in_dynamic_mode():
+                inv_freq = paddle.cast(self.inv_freq, "float32")
+                t = paddle.cast(t, "float32")
+                freqs = paddle.einsum("i,j->ij", t, inv_freq)
+            else:
+                freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
             freqs = freqs.cast(self.default_dtype)
             # [s, h/n]
             emb = paddle.concat([freqs, freqs], axis=-1)
@@ -140,7 +147,14 @@ class RotaryEmbeddings(nn.Layer):
                 cos_cached = cos_cached.astype(self.default_dtype)
                 sin_cached = sin_cached.astype(self.default_dtype)
 
-            self.cos_cached, self.sin_cached = cos_cached, sin_cached
+            if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+                # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
+                # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+                # removed after static graphs support inplace and stride.
+                with paddle.framework._no_check_dy2st_diff():
+                    self.cos_cached, self.sin_cached = cos_cached, sin_cached
+            else:
+                self.cos_cached, self.sin_cached = cos_cached, sin_cached
 
         cos, sin = self.cos_cached[:seq_len, ...], self.sin_cached[:seq_len, ...]
         if self.position_encoding_2d:
@@ -619,6 +633,13 @@ class ChatGLMPretrainedModel(PretrainedModel):
                     position_ids[context_length:] = mask_positions[i]
 
         return position_ids
+
+    def _get_model_inputs_spec(self, dtype: str):
+        return {
+            "input_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            "attention_mask": paddle.static.InputSpec(shape=[None, None, None, None], dtype="int64"),
+            "position_ids": paddle.static.InputSpec(shape=[None, 2, None], dtype="int64"),
+        }
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):

@@ -1178,6 +1178,12 @@ class GenerationMixin(object):
             )
         return input_ids[:, origin_len:], scores
 
+    def _get_model_inputs_spec(self, dtype: str):
+        return {
+            "input_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            "attention_mask": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+        }
+
     def to_static(self, path: str, config: dict):
         """export generation model to static
 
@@ -1196,18 +1202,21 @@ class GenerationMixin(object):
 
         top_p_spec = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
         temperature = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
+        dtype = config.get("dtype", paddle.get_default_dtype())
+
+        model_inputs_spec = self._get_model_inputs_spec(dtype)
 
         input_spec = [
-            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
-            None,  # position_ids
+            model_inputs_spec["input_ids"],
+            model_inputs_spec.get("attention_mask", None),
+            model_inputs_spec.get("position_ids", None),
             paddle.static.InputSpec(shape=[1], dtype="int64"),  # max_length
             0,  # min_length
             "sampling",  # decode_strategy
             temperature,  # temperature
             top_k_spec,  # top_k
             top_p_spec,  # top_p
-            1,  # repetition_penalty
+            config.get("repetition_penalty", 1.0),  # repetition_penalty
             # num_beams
             1,
             # num_beam_groups
