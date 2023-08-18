@@ -393,7 +393,7 @@ class LlamaNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
     """LlamaRotaryEmbedding extended with NTK scaling. https://www.reddit.com/r/LocalLLaMA/comments/14lz7j5/ntkaware_scaled_rope_allows_llama_models_to_have/"""
 
     def __init__(self, dim, max_position_embeddings=2048, base=10000, scaling_factor=1.0):
-        base = scaling_factor ** (dim / (dim - 2))
+        base = base * scaling_factor ** (dim / (dim - 2))
         self.scaling_factor = scaling_factor
         super().__init__(dim, max_position_embeddings, base)
 

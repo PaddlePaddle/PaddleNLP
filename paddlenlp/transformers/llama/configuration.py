@@ -237,7 +237,7 @@ class LlamaConfig(PretrainedConfig):
         alibi=False,
         rope_fusion_level=None,
         rope_scaling_factor=1.0,
-        rope_scaling_type="linear",
+        rope_scaling_type=None,
         **kwargs,
     ):
         self.vocab_size = vocab_size
