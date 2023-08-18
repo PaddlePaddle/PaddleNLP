@@ -1070,13 +1070,11 @@ class Trainer:
                     process_index=self.args.dataset_rank,
                 )
 
-            return _DataLoader(
+            return DataLoader(
                 train_dataset,
-                batch_size=None,  # we do data collation in Stream
+                batch_size=self.args.per_device_train_batch_size,
                 collate_fn=self.data_collator,
                 num_workers=self.args.dataloader_num_workers,
-                use_shared_memory=True,
-                prefetch_factor=self.args.prefetch_factor,
             )
 
         if self.args.need_data:
