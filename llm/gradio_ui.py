@@ -116,15 +116,15 @@ def launch(args):
                 max_length = gr.Slider(minimum=1, maximum=1024, value=10, step=1, label="Max Length")
             with gr.Column(scale=4):
                 state = gr.State({})
-                context_chatbot = gr.Chatbot(label="context")
-                utt_text = gr.Textbox(placeholder="请输入...", label="utterance")
+                context_chatbot = gr.Chatbot(label="Context")
+                utt_text = gr.Textbox(placeholder="请输入...", label="Utterance")
                 with gr.Row():
                     clear_btn = gr.Button("清空")
                     rollback_btn = gr.Button("撤回")
                     regen_btn = gr.Button("重新生成")
                     send_btn = gr.Button("发送")
                 with gr.Row():
-                    raw_context_json = gr.JSON(label="raw context")
+                    raw_context_json = gr.JSON(label="Raw Context")
 
             utt_text.submit(
                 infer,

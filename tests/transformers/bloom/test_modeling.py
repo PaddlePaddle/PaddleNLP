@@ -12,8 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# from __future__ import annotations
-#
+from __future__ import annotations
+
 import copy
 import math
 import random
@@ -37,6 +37,7 @@ from paddlenlp.transformers.bloom.modeling import BloomForGeneration
 from tests.testing_utils import PaddleNLPModelTest, require_package, slow
 from tests.transformers.test_generation_utils import GenerationTesterMixin
 from tests.transformers.test_modeling_common import (
+    GenerationD2STestMixin,
     ModelTesterMixin,
     floats_tensor,
     ids_tensor,
@@ -674,3 +675,8 @@ class BloomModelLanguageGenerationTest(PaddleNLPModelTest):
 
         self.assertEqual(output_seq_strs[0], EXPECTED_OUTPUT_STR)
         self.assertEqual(output_str, EXPECTED_OUTPUT_STR)
+
+
+class BloomGenerationD2STest(GenerationD2STestMixin, unittest.TestCase):
+    max_length = 100
+    internal_testing_model = "__internal_testing__/tiny-random-bloom"

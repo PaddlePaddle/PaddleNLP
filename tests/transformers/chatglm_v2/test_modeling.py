@@ -20,6 +20,7 @@ from parameterized import parameterized_class
 from paddlenlp.transformers import ChatGLMv2Config, ChatGLMv2ForCausalLM, ChatGLMv2Model
 from tests.transformers.test_generation_utils import GenerationTesterMixin
 from tests.transformers.test_modeling_common import (
+    GenerationD2STestMixin,
     ModelTesterMixin,
     ids_tensor,
     random_attention_mask,
@@ -218,6 +219,10 @@ class ChatGLMv2Test(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     def test_model_attention_mask(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_model_attention_mask(*config_and_inputs)
+
+
+class ChatGLMV2GenerationD2STest(GenerationD2STestMixin, unittest.TestCase):
+    internal_testing_model = "__internal_testing__/tiny-random-chatglm2"
 
 
 if __name__ == "__main__":

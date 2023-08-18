@@ -307,7 +307,7 @@ def translation(root_path, pdf_path, api_key, secret_key, task="翻译"):
     for section_index, section_name in enumerate(paper_pdf["section_names"]):
         if len(paper_pdf["section_texts"][section_index]) > 0:
             text = paper_pdf["section_texts"][section_index]
-            title = chat_check_title(section_name)
+            title = chat_check_title(section_name, api_key, secret_key)
             cur_title = "\n" + "## " + title + "\n"
             result = chat_translate_part(text, api_key, secret_key)
             cur_str = "\n"
@@ -324,7 +324,7 @@ def translation(root_path, pdf_path, api_key, secret_key, task="翻译"):
                 summarize_txt += cur_title + result
             with open(md_file, "a", encoding="utf-8") as f:
                 f.write(cur_str)
-    summary = summarize(summarize_txt)
+    summary = summarize(summarize_txt, api_key, secret_key)
     htmls = []
     htmls.append("## Basic Information:")
     htmls.append("\n\n\n")
