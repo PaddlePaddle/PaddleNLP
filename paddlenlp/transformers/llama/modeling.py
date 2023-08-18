@@ -32,6 +32,7 @@ except ImportError:
     fused_rotary_position_embedding = None
 from paddle.utils import try_import
 
+from paddlenlp.layers import RotaryEmbedding
 from paddlenlp.transformers.conversion_utils import (
     StateDictNameMapping,
     init_name_mappings,
@@ -325,67 +326,6 @@ def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
     return hidden_states.reshape([batch, slen, num_key_value_heads * n_rep, head_dim])
 
 
-class LlamaRotaryEmbedding(nn.Layer):
-    def __init__(self, dim, max_position_embeddings=2048, base=10000):
-        super().__init__()
-        self.dim = dim
-        self.base = base
-        self.max_seq_len_cached = max_position_embeddings
-
-        dtype = paddle.get_default_dtype()
-        inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, dim, 2), dtype="float32") / dim))  # [dim / 2]
-        self.register_buffer("inv_freq", inv_freq.cast(dtype))
-
-        # higher acc using float32
-        t = paddle.arange(max_position_embeddings, dtype="float32")  # [max_position_embeddings]
-        freqs = paddle.einsum("i,j->ij", t, self.inv_freq.cast("float32"))  # [max_position_embeddings, dim/2]
-        # Different from paper, but it uses a different permutation in order to obtain the same calculation
-        emb = paddle.concat([freqs, freqs], axis=-1)  # [max_position_embeddings, dim]
-        # [bs, seqlen, nhead, head_dim]
-        self.cos_cached = emb.cos()[None, :, None, :]  # [1, max_pos, 1, dim]
-        self.sin_cached = emb.sin()[None, :, None, :]
-
-    def forward(self, x, seq_len=None):
-        if seq_len > self.max_seq_len_cached:
-            # https://github.com/ymcui/Chinese-LLaMA-Alpaca/pull/705/files
-            inv_freq = self.inv_freq
-            dim = self.dim
-            alpha = seq_len / 1024 - 1
-            base = self.base * alpha ** (dim / (dim - 2))
-            inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, dim, 2), dtype="float32") / dim))
-
-            t = paddle.arange(seq_len, dtype="float32")
-            freqs = paddle.einsum("i,j->ij", t, inv_freq)
-            emb = paddle.concat([freqs, freqs], axis=-1)
-            cos_cached = emb.cos()[None, :, None, :]
-            sin_cached = emb.sin()[None, :, None, :]
-            return (
-                cos_cached[:, :seq_len, :, ...],
-                sin_cached[:, :seq_len, :, ...],
-            )
-        return (
-            self.cos_cached[:, :seq_len, :, ...],
-            self.sin_cached[:, :seq_len, :, ...],
-        )
-
-
-def rotate_half(x):
-    """Rotates half the hidden dims of the input."""
-    x1 = x[..., : x.shape[-1] // 2]
-    x2 = x[..., x.shape[-1] // 2 :]
-    return paddle.concat([-x2, x1], axis=-1)  # shape is the same as x
-
-
-def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
-    cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
-    sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
-    cos = cos[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
-    sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
-    q_embed = (q * cos) + (rotate_half(q) * sin)
-    k_embed = (k * cos) + (rotate_half(k) * sin)
-    return q_embed, k_embed
-
-
 class LlamaMLP(nn.Layer):
     def __init__(self, config):
         super().__init__()
@@ -586,7 +526,7 @@ class LlamaAttention(nn.Layer):
             )
 
         if config.rope and self.rope_fusion_level != "full":
-            self.rotary_emb = LlamaRotaryEmbedding(self.head_dim, max_position_embeddings=self.max_position_embeddings)
+            self.rotary_emb = RotaryEmbedding(self.head_dim, max_position_embeddings=self.max_position_embeddings)
 
         self.config = config
 
@@ -642,7 +582,9 @@ class LlamaAttention(nn.Layer):
                 )
             else:
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-                query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+                query_states, key_states = RotaryEmbedding.apply_rotary_pos_emb(
+                    query_states, key_states, cos, sin, position_ids
+                )
 
         # [bsz, nh, t, hd]
         if past_key_value is not None:
