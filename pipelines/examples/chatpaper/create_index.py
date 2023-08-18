@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import glob
+import logging
 import multiprocessing
 import os
 import re
@@ -25,6 +27,7 @@ from pipelines.nodes import (
     ErnieRanker,
     PDFToTextConverter,
     PromptTemplate,
+    TruncatedConversationHistory,
 )
 from pipelines.nodes.combine_documents import (
     MapReduceDocuments,
@@ -37,6 +40,7 @@ from pipelines.nodes.preprocessor.text_splitter import (
 )
 from pipelines.pipelines import Pipeline
 
+logging.getLogger().setLevel(logging.INFO)
 manager = Manager()
 all_data_result = manager.dict()
 document_abs = manager.list()
@@ -64,7 +68,7 @@ def clean(txt, filters):
     return txt
 
 
-def chatfile_base(indexes, query, api_key, secret_key):
+def chatfile_base(indexes, query, api_key, secret_key, history=[]):
     document_store = FAISSDocumentStore.load(index_name)
     retriever = DensePassageRetriever(
         document_store=document_store,
@@ -91,8 +95,9 @@ def chatfile_base(indexes, query, api_key, secret_key):
         all_doc.extend(doc["documents"])
     prompt = PromptTemplate("背景：{documents} 问题：{query}").run(query, all_doc)
     prompt = prompt[0]["query"]
+    history = TruncatedConversationHistory(max_length=1000).run(prompt, history)
     ernie_bot = ErnieBot(api_key=api_key, secret_key=secret_key)
-    prediction = ernie_bot.run(prompt)
+    prediction = ernie_bot.run(history[0])
     return prediction[0]
 
 
@@ -165,6 +170,7 @@ def bulid_base(paths, api_key, secret_key, filters=["\n"]):
         duplicate_documents="skip",
     )
     results = mul_tackle(1, paths, api_key=api_key, secret_key=secret_key, filters=filters)
+    results = [item for item in results if item is not None]
     for split, path in results:
         index = path.split("/")[-1].replace(".pdf", "")
         split = retriever.run_indexing(split)[0]["documents"]
@@ -174,7 +180,7 @@ def bulid_base(paths, api_key, secret_key, filters=["\n"]):
     document_store.save(index_name)
 
 
-def chat_papers(query, api_key, secret_key, retriever_top=30, ranker_top=3):
+def chat_papers(query, api_key, secret_key, retriever_top=30, ranker_top=3, history=[]):
     document_store = FAISSDocumentStore.load(index_name)
     retriever = DensePassageRetriever(
         document_store=document_store,
@@ -195,7 +201,7 @@ def chat_papers(query, api_key, secret_key, retriever_top=30, ranker_top=3):
     prediction = query_pipeline.run(query=query, params={"Retriever": {"top_k": 30}, "Ranker": {"top_k": 3}})
     paths = [item.meta["name"] for item in prediction["documents"] if os.path.isfile(item.meta["name"])]
     indexes = [path.split("/")[-1].replace(".pdf", "") for path in paths]
-    result = chatfile_base(indexes, query=query, api_key=api_key, secret_key=secret_key)
+    result = chatfile_base(indexes, query=query, api_key=api_key, secret_key=secret_key, history=history)
     return result
 
 
@@ -203,11 +209,11 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--api_key", default=" ", type=str, help="The API Key.")
+    parser.add_argument("--api_key", default="", type=str, help="The API Key.")
     parser.add_argument("--secret_key", default="", type=str, help="The secret key.")
-    parser.add_argument("--file_dir", default="", type=str, help="The dirname of PDF files")
+    parser.add_argument("--dirname", default="./", type=str, help="The dirname of PDF files")
     args = parser.parse_args()
-    dirname = parser.file_dir
-    files = []
+    dirname = args.dirname
+    files = glob.glob(dirname + "/*/*.pdf", recursive=True)
     bulid_base(files, api_key=args.api_key, secret_key=args.secret_key)
-    result = chat_papers(query="商业银行薪酬制度的政策效应", api_key="", secret_key="")
+    result = chat_papers(query="商业银行薪酬制度的政策效应", api_key=args.api_key, secret_key=args.secret_key)
