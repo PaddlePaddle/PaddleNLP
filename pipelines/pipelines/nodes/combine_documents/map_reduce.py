@@ -25,10 +25,11 @@ logger = logging.getLogger(__name__)
 class MapReduceDocuments(BaseCombineDocuments):
     def __init__(
         self,
-        api_key: str,
-        secret_key: str,
         llm_prompt: str,
         reduce_documents: BaseCombineDocuments,
+        api_key: str = "",
+        secret_key: str = "",
+        llm=None,
         **kwargs,
     ):
         """
@@ -39,10 +40,14 @@ class MapReduceDocuments(BaseCombineDocuments):
         :param llm_prompt: the prompt for single document summary
         :param reduce_documents: the collapse multi document summary generation
         :param token_max: the maximum length of collapsing documents
+        :param llm: the  Language Model
         """
         self.llm_prompt = llm_prompt
         self.reduce_documents = reduce_documents
-        self.llm = ErnieBot(api_key, secret_key)
+        if llm is not None:
+            self.llm = llm
+        else:
+            self.llm = ErnieBot(api_key, secret_key)
         assert isinstance(
             self.reduce_documents, ReduceDocuments
         ), f"`reduce_documents` is of type {type(self.reduce_documents)} so it does not have this attribute."
