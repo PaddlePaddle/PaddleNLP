@@ -65,7 +65,12 @@ from paddle.distributed.fleet.utils.hybrid_parallel_util import (
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from tqdm.auto import tqdm
 
-from ..data import DataCollator, DataCollatorWithPadding, default_data_collator
+from ..data import (
+    DataCollator,
+    DataCollatorWithPadding,
+    DistDataLoader,
+    default_data_collator,
+)
 from ..peft import LoRAModel, PrefixModelForCausalLM
 from ..transformers.model_utils import (
     PretrainedModel,
@@ -1043,12 +1048,17 @@ class Trainer:
 
         Subclass and override this method if you want to inject some custom behavior.
         """
-        if self.train_dataset is None:
+        if self.args.need_data and self.train_dataset is None:
             raise ValueError("Trainer: training requires a train_dataset.")
 
         train_dataset = self.train_dataset
         if is_datasets_available() and isinstance(train_dataset, datasets.Dataset):
             train_dataset = self._remove_unused_columns(train_dataset, description="training")
+        _DataLoader = (
+            DistDataLoader
+            if (self.args.tensor_parallel_degree > 1 or self.args.pipeline_parallel_degree > 1)
+            else DataLoader
+        )
 
         if self._is_iterable_dataset(train_dataset):
             if self.args.dataset_world_size > 1:
@@ -1060,16 +1070,21 @@ class Trainer:
                     process_index=self.args.dataset_rank,
                 )
 
-            return DataLoader(
+            return _DataLoader(
                 train_dataset,
-                batch_size=self.args.per_device_train_batch_size,
+                batch_size=None,  # we do data collation in Stream
                 collate_fn=self.data_collator,
                 num_workers=self.args.dataloader_num_workers,
+                use_shared_memory=True,
+                prefetch_factor=self.args.prefetch_factor,
             )
 
-        train_sampler = self._get_train_sampler()
+        if self.args.need_data:
+            train_sampler = self._get_train_sampler()
+        else:
+            train_sampler = None
 
-        return DataLoader(
+        return _DataLoader(
             train_dataset,
             batch_sampler=train_sampler,
             collate_fn=self.data_collator,

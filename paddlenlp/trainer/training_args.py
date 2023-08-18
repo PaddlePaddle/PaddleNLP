@@ -665,6 +665,9 @@ class TrainingArguments:
         default=True,
         metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl"},
     )
+    need_data: Optional[bool] = field(
+        default=True, metadata={"help": "whether the current worker need to read data directly."}
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
