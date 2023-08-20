@@ -17,9 +17,9 @@ from typing import Optional
 
 import numpy as np
 import paddle.profiler as profiler
-from configuration import GPTConfig
 from datasets import load_dataset
 from modeling import GPTForCausalLM
+from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from utils import CustomTrainer, ProfilerCallback
 
 from paddlenlp.data import DataCollatorForSeq2Seq
@@ -91,16 +91,17 @@ def main():
         tokenizer.pad_token = tokenizer.unk_token
 
     if model_args.model_name_or_path in ["gpt3-6.7B-en", "gpt3-13B-en"]:
-        config = GPTConfig.from_pretrained(
+        model = GPTForCausalLM.from_pretrained(
             model_args.model_name_or_path,
-            use_flash_attention=model_args.use_flash_attention,
             low_cpu_mem_usage=True,
+            use_flash_attention=model_args.use_flash_attention,
             dtype=dtype,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             tensor_parallel_rank=training_args.tensor_parallel_rank,
         )
-        model = GPTForCausalLM(config)
-
+        tracker = get_rng_state_tracker()
+        tracker.add("global_seed", 111)
+        tracker.add("local_seed", 222)
     else:
         model = AutoModelForCausalLM.from_pretrained(
             model_args.model_name_or_path,
