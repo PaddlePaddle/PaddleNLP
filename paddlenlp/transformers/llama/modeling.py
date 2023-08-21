@@ -190,21 +190,23 @@ def scaled_dot_product_attention(
         # Current Flash Attention doesn't support attn maskt
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
-
-        # attn_output, attn_weights = flash_attention(
-        #     query_states,
-        #     key_states,
-        #     value_states,
-        #     causal=is_causal and query_states.shape[1] != 1,
-        #     return_softmax=output_attentions,
-        # )
-        attn_output, attn_weights = F.scaled_dot_product_attention(
-            query_states,
-            key_states,
-            value_states,
-            attn_mask=attention_mask,
-            is_causal=is_causal and query_states.shape[1] != 1,
-        )
+        if attention_mask is not None:
+            attn_output = F.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=attention_mask,
+                is_causal=False,
+            )
+        else:
+            attn_output = F.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=attention_mask,
+                is_causal=is_causal,
+            )
+        attn_weights = None
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
