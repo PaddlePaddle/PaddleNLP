@@ -49,9 +49,12 @@ class FusedLlamaRMSNorm(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states):
-        return paddle.incubate.nn.functional.fused_rms_norm(
+        result = paddle.incubate.nn.functional.fused_rms_norm(
             hidden_states, self.weight, None, self.variance_epsilon, begin_norm_axis=1
         )
+        if isinstance(result, tuple):
+            return result[0]
+        return result
 
 
 @register_base_model
@@ -298,36 +301,32 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaForCausalLM)
         self.model = LlamaInferenceModel(config)
         self.lm_head = LlamaLMHead(config)
 
-    def get_cache_kvs(self, max_batch_size: int, max_length: int | None = None, dtype: str | None = None):
+    @classmethod
+    def get_cache_kvs_shape(
+        cls, config: LlamaConfig, max_batch_size: int = None, max_length: int = None
+    ) -> list[list[int]]:
         """get cache_kvs tensor for llama model
 
         Args:
             max_batch_size (int): the max batch size
             max_length (int | None, optional): the max_length of cache_kvs. Defaults to None.
-            dtype (str | None, optional): the dtype of current model. Defaults to None.
 
         Returns:
-            list[paddle.Tensor]: the list tensor for cache
+            list[paddle.Tensor]: the list tensor shape for cache
         """
         if max_length is None:
-            max_length = self.config.max_position_embeddings
-
-        if dtype is None:
-            dtype = self.config.dtype or paddle.get_default_dtype()
+            max_length = config.max_position_embeddings
 
         cache_kvs = []
-        for _ in range(self.config.num_hidden_layers):
+        for _ in range(config.num_hidden_layers):
             cache_kvs.append(
-                paddle.zeros(
-                    [
-                        2,
-                        max_batch_size,
-                        self.config.num_attention_heads // max(self.config.tensor_parallel_degree, 1),
-                        max_length,
-                        self.config.hidden_size // self.config.num_attention_heads,
-                    ],
-                    dtype=dtype,
-                )
+                [
+                    2,
+                    max_batch_size,
+                    config.num_attention_heads // max(config.tensor_parallel_degree, 1),
+                    max_length,
+                    config.hidden_size // config.num_attention_heads,
+                ]
             )
         return cache_kvs
 
