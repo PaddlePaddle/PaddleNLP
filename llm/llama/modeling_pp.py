@@ -216,18 +216,18 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     def __init__(
         self,
         config,
-        # use_recompute=None,
         # scale_qk_by_layer_num=True,
-        # recompute_granularity="full",
         # virtual_pp_degree=4,
-        # sequence_parallel=False,
-        # no_recompute_layers=None,
-        pp_recompute_interval=1,
     ):
         self.config = config
 
-        use_recompute = self.config.use_recompute
-        recompute_granularity = self.config.recompute_granularity
+        self.use_recompute = self.config.use_recompute
+        self.recompute_granularity = self.config.recompute_granularity
+        self.pp_recompute_interval = self.config.pp_recompute_interval
+        self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
+        if self.recompute_granularity == "full":
+            assert len(self.no_recompute_layers) == 0, "for pp with full recompute, no_recompute_layers is not support"
+
         # virtual_pp_degree = self.config.virtual_pp_degree
         virtual_pp_degree = getattr(self.config, "virtual_pp_degree", 1)
 
@@ -240,17 +240,20 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
         self.add_sequential_layer(LayerDesc(LlamaEmbeddingPipe, config=config), "llama")
         for i in range(config.num_hidden_layers):
-            self.add_sequential_layer(LayerDesc(LlamaDecoderLayerPipe, config=config), f"llama.layers.{i}")
+            self.add_sequential_layer(
+                LayerDesc(LlamaDecoderLayerPipe, config=config, layerwise_recompute=i not in self.no_recompute_layers),
+                f"llama.layers.{i}",
+            )
 
         self.add_sequential_layer(LayerDesc(LlamaRMSNormPipe, config=config), "llama.norm")
         self.add_sequential_layer(LayerDesc(LlamaLMHead, config=config), "lm_head")
 
         recompute_interval = 0
-        if use_recompute and recompute_granularity == "full":
-            assert pp_recompute_interval <= config.num_hidden_layers // (
+        if self.use_recompute and self.recompute_granularity == "full":
+            assert self.config.pp_recompute_interval <= config.num_hidden_layers // (
                 virtual_pp_degree * get_hcg().topology().get_dim_size("pipe")
             ), "pp recompute interval should smaller than num layers of each pp chunk"
-            recompute_interval = pp_recompute_interval
+            recompute_interval = self.config.pp_recompute_interval
 
         seg_method = "layer:LlamaDecoderLayer"
         if config.num_hidden_layers % get_hcg().topology().get_dim_size("pipe") != 0:
