@@ -175,9 +175,9 @@ def scaled_dot_product_attention(
     value_states,
     attention_mask,
     output_attentions,
-    is_causal=True,
     alibi=None,
     sequence_parallel=False,
+    is_causal=True,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
@@ -201,7 +201,7 @@ def scaled_dot_product_attention(
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
             attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
-        return attn_output, attn_weights
+        return (attn_output, attn_weights) if output_attentions else attn_output
     else:
         query_states = paddle.transpose(query_states, [0, 2, 1, 3])
         # merge with the next tranpose
@@ -246,7 +246,7 @@ def scaled_dot_product_attention(
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
             attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
-        return attn_output, attn_weights
+        return (attn_output, attn_weights) if output_attentions else attn_output
 
 
 def masked_fill(x, mask, value):
@@ -459,7 +459,7 @@ class LlamaMLP(nn.Layer):
 class LlamaAttention(nn.Layer):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    def __init__(self, config: LlamaConfig):
+    def __init__(self, config: LlamaConfig, layerwise_recompute: bool = False):
         super().__init__()
 
         self.config = config
@@ -482,6 +482,11 @@ class LlamaAttention(nn.Layer):
             )
 
         self.kv_indices = None
+        # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
+        # Enable_recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
+        self.layerwise_recompute = layerwise_recompute
+        self.recompute_granularity = config.recompute_granularity
         if config.tensor_parallel_degree > 1:
             assert (
                 self.num_heads % config.tensor_parallel_degree == 0
@@ -670,16 +675,39 @@ class LlamaAttention(nn.Layer):
         key_states = repeat_kv(key_states, self.num_key_value_groups)
         value_states = repeat_kv(value_states, self.num_key_value_groups)
 
-        attn_output, attn_weights = scaled_dot_product_attention(
-            config=self.config,
-            query_states=query_states,
-            key_states=key_states,
-            value_states=value_states,
-            attention_mask=attention_mask,
-            output_attentions=output_attentions,
-            alibi=alibi,
-            sequence_parallel=self.sequence_parallel,
-        )
+        has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
+        if (
+            self.enable_recompute
+            and self.layerwise_recompute
+            and has_gradient
+            and self.recompute_granularity == "core_attn"
+        ):
+            outputs = recompute(
+                scaled_dot_product_attention,
+                query_states,
+                self.config,
+                key_states,
+                value_states,
+                attention_mask,
+                output_attentions,
+                alibi,
+                self.sequence_parallel,
+            )
+        else:
+            outputs = scaled_dot_product_attention(
+                query_states,
+                self.config,
+                key_states,
+                value_states,
+                attention_mask,
+                output_attentions,
+                alibi,
+                self.sequence_parallel,
+            )
+        if output_attentions:
+            attn_output, attn_weights = outputs
+        else:
+            attn_output = outputs
 
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
@@ -688,18 +716,27 @@ class LlamaAttention(nn.Layer):
         if not output_attentions:
             attn_weights = None
 
-        return attn_output, attn_weights, past_key_value
+        outputs = dict()
+        outputs["attn_output"] = attn_output
+        outputs["attn_weights"] = attn_weights
+        outputs["past_key_value"] = past_key_value
+        return outputs
 
 
 class LlamaDecoderLayer(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config, layerwise_recompute: bool = False):
         super().__init__()
         self.hidden_size = config.hidden_size
-        self.self_attn = LlamaAttention(config)
+        self.self_attn = LlamaAttention(config, layerwise_recompute)
         self.mlp = LlamaMLP(config)
         self.input_layernorm = LlamaRMSNorm(config)
         self.post_attention_layernorm = LlamaRMSNorm(config)
         self.sequence_parallel = config.sequence_parallel
+        # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
+        # Enable_recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
+        self.layerwise_recompute = layerwise_recompute
+        self.recompute_granularity = config.recompute_granularity
 
     def forward(
         self,
@@ -730,15 +767,38 @@ class LlamaDecoderLayer(nn.Layer):
         hidden_states = self.input_layernorm(hidden_states)
 
         # Self Attention
-        hidden_states, self_attn_weights, present_key_value = self.self_attn(
-            hidden_states=hidden_states,
-            position_ids=position_ids,
-            past_key_value=past_key_value,
-            attention_mask=attention_mask,
-            output_attentions=output_attentions,
-            use_cache=use_cache,
-            alibi=alibi,
-        )
+        has_gradient = not hidden_states.stop_gradient
+        if (
+            self.enable_recompute
+            and self.layerwise_recompute
+            and has_gradient
+            and self.recompute_granularity == "full_attn"
+        ):
+            outputs = recompute(
+                self.self_attn,
+                hidden_states,
+                position_ids,
+                past_key_value,
+                attention_mask,
+                output_attentions,
+                use_cache,
+                alibi,
+            )
+        else:
+            outputs = self.self_attn(
+                hidden_states,
+                position_ids,
+                past_key_value,
+                attention_mask,
+                output_attentions,
+                use_cache,
+                alibi,
+            )
+
+        hidden_states = outputs.get("attn_output")
+        self_attn_weights = outputs.get("attn_weights", None)
+        present_key_value = outputs.get("past_key_value", None)
+
         hidden_states = residual + hidden_states
 
         # Fully Connected
@@ -906,6 +966,9 @@ class LlamaModel(LlamaPretrainedModel):
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
         self.sequence_parallel = config.sequence_parallel
+        self.recompute_granularity = config.recompute_granularity
+        self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
+
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
         if config.tensor_parallel_degree > 1:
@@ -920,7 +983,9 @@ class LlamaModel(LlamaPretrainedModel):
                 self.hidden_size,
             )
 
-        self.layers = nn.LayerList([LlamaDecoderLayer(config) for _ in range(config.num_hidden_layers)])
+        self.layers = nn.LayerList(
+            [LlamaDecoderLayer(config, i not in self.no_recompute_layers) for i in range(config.num_hidden_layers)]
+        )
         self.norm = LlamaRMSNorm(config)
 
         self.gradient_checkpointing = False
@@ -956,13 +1021,13 @@ class LlamaModel(LlamaPretrainedModel):
         return expanded_attn_mask
 
     @paddle.jit.not_to_static
-    def recompute_training(
+    def recompute_training_full(
         self,
         layer_module: nn.Layer,
         hidden_states: Tensor,
         position_ids: Optional[Tensor],
         attention_mask: Tensor,
-        output_attentions: Tensor,
+        output_attentions: bool,
         past_key_value: Tensor,
         use_cache: bool,
         alibi=None,
@@ -982,8 +1047,8 @@ class LlamaModel(LlamaPretrainedModel):
             past_key_value,
             use_cache,
             alibi,
-            use_reentrant=False,
         )
+
         return hidden_states
 
     def forward(
@@ -1078,8 +1143,13 @@ class LlamaModel(LlamaPretrainedModel):
             past_key_value = past_key_values[idx] if past_key_values is not None else None
 
             has_gradient = not hidden_states.stop_gradient
-            if self.enable_recompute and has_gradient:
-                layer_outputs = self.recompute_training(
+            if (
+                self.enable_recompute
+                and idx not in self.no_recompute_layers
+                and has_gradient
+                and self.recompute_granularity == "full"
+            ):
+                layer_outputs = self.recompute_training_full(
                     decoder_layer,
                     hidden_states,
                     position_ids,
