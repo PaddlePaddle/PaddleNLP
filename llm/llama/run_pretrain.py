@@ -20,7 +20,7 @@ import random
 import sys
 import time
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import List, Optional
 
 import numpy as np
 import paddle
@@ -151,7 +151,7 @@ class ModelArguments:
     )
     recompute_granularity: str = field(
         default="full",
-        metadata={"help": "one of full core_attn full_attn"},
+        metadata={"help": "Choose among ['full', 'core_attn', 'full_attn']"},
     )
     virtual_pp_degree: int = field(
         default=1,
@@ -180,7 +180,7 @@ class ModelArguments:
             "(3) None: don't fuse any part of the rope embedding"
         },
     )
-    no_recompute_layers: Optional[str] = field(
+    no_recompute_layers: Optional[List[int]] = field(
         default=None,
         metadata={"help": "Specify the full transformer layers that should not be recomputed."},
     )
@@ -449,21 +449,8 @@ def main():
         logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
 
     if model_args.no_recompute_layers is not None:
-        import re
-
-        def check_format(s):
-            pattern = r"^\d+(,\d+)*$"
-            return bool(re.match(pattern, s))
-
-        if check_format(model_args.no_recompute_layers) is False:
-            raise ValueError(
-                f"no_recompute_layers should be fomated like int,int,...,int but recieved {model_args.no_recompute_layers}"
-            )
-
-        model_args.no_recompute_layers = list(map(int, model_args.no_recompute_layers.split(",")))
         model_args.no_recompute_layers.sort()
 
-    config.lm_shift_labels = False
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
