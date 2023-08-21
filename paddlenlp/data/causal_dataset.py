@@ -1,5 +1,3 @@
-
-
 # Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
 
 """GPT style dataset."""
@@ -332,7 +330,6 @@ def _build_index_mappings(
 
     # rng state
     np_rng = np.random.RandomState(seed=seed)
-
     # Filename of the index mappings.
     desc = "GPT Dataset\n\n"
     desc += f"Data prefix {data_prefix}\n"
@@ -610,4 +607,3 @@ def _build_shuffle_idx(num_samples, total_size, np_rng):
     np_rng.shuffle(shuffle_idx_last)
 
     return np.concatenate((shuffle_idx_first, shuffle_idx_last))
-
