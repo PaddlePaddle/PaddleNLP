@@ -275,7 +275,6 @@ class ChatGLMAttention(nn.Layer):
             v_layer = paddle.transpose(v_layer, [1, 0, 2, 3])
             query_states, key_states, value_states = q_layer, k_layer, v_layer
 
-            # breakpoint()
             if attention_mask is not None:
                 attn_output = F.scaled_dot_product_attention(
                     query_states,

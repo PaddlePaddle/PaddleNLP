@@ -388,6 +388,7 @@ class BloomAttention(nn.Layer):
 
             if attention_mask is not None:
                 attention_mask = attention_mask.cast(alibi.dtype) + alibi
+                attention_mask = attention_mask.unsqueeze(1)
                 attn_output = F.scaled_dot_product_attention(
                     query_states,
                     key_states,
@@ -400,7 +401,8 @@ class BloomAttention(nn.Layer):
                     query_states, key_states, value_states, attn_mask=attention_mask, is_causal=True
                 )
             attn_weights = None
-            # [ seq_len, batch_size, nhead, head_dim] = > [ seq_len, batch_size, hidden_size]
+            # [batch_size, seq_len, num_heads, head_dim] = > [batch_size, seq_len, hidden_size]
+            attn_output = attn_output.reshape([attn_output.shape[0], attn_output.shape[1], -1])
             output_tensor = self.dense(attn_output)
             present = None
         else:
