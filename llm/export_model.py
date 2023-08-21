@@ -17,6 +17,7 @@ import os
 from dataclasses import dataclass, field
 
 import paddle
+from paddle.distributed import fleet
 from predictor import ModelArgument, PredictorArgument, create_predictor
 from utils import generate_rank_mapping, get_infer_model_path
 
@@ -33,9 +34,22 @@ def main():
     predictor_args, model_args, export_args = parser.parse_args_into_dataclasses()
 
     paddle.set_default_dtype(predictor_args.dtype)
+    tensor_parallel_degree = paddle.distributed.get_world_size()
+    tensor_parallel_rank = paddle.distributed.get_rank()
+    if tensor_parallel_degree > 1:
+        strategy = fleet.DistributedStrategy()
+        strategy.hybrid_configs = {
+            "dp_degree": 1,
+            "mp_degree": tensor_parallel_degree,
+            "pp_degree": 1,
+            "sharding_degree": 1,
+        }
+        fleet.init(is_collective=True, strategy=strategy)
+        hcg = fleet.get_hybrid_communicate_group()
+        tensor_parallel_rank = hcg.get_model_parallel_rank()
 
     # set predictor type
-    predictor = create_predictor(predictor_args, model_args)
+    predictor = create_predictor(predictor_args, model_args, tensor_parallel_degree, tensor_parallel_rank)
     predictor.model.eval()
 
     predictor.model.to_static(

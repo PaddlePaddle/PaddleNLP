@@ -284,7 +284,7 @@ class StaticInferencePredictor(BasePredictor):
         self.predictor = self._create_predictor(config)
         self.model_config = AutoConfig.from_pretrained(config.model_name_or_path)
 
-    def _create_predictor(self, config: PredictorArgument):
+    def _create_predictor(self, predictor_args: PredictorArgument):
         if not is_paddlenlp_ops_available():
             raise ValueError(
                 "you should install the paddlenlp ops to run inference predictor, "
@@ -299,7 +299,7 @@ class StaticInferencePredictor(BasePredictor):
         import_module("paddlenlp_ops.transpose_remove_padding")
         import_module("paddlenlp_ops.write_cache_kv")
 
-        infer_model_path = get_infer_model_path(config.model_name_or_path, config.model_prefix)
+        infer_model_path = get_infer_model_path(predictor_args.model_name_or_path, predictor_args.model_prefix)
 
         config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
 
@@ -318,7 +318,7 @@ class StaticInferencePredictor(BasePredictor):
             dist_config.set_endpoints(trainer_endpoints, current_endpoint)
             dist_config.enable_dist_model(True)
 
-            dist_config.set_comm_init_config(os.path.join(config.model_name_or_path, "rank_mapping.csv"))
+            dist_config.set_comm_init_config(os.path.join(predictor_args.model_name_or_path, "rank_mapping.csv"))
             config.set_dist_config(dist_config)
 
         predictor = paddle.inference.create_predictor(config)
@@ -547,6 +547,8 @@ def predict():
         for bs, batch_source_text in enumerate(batch_source_texts):
             outputs = predictor.predict(batch_source_text)
 
+            if predictor.tensor_parallel_rank > 0:
+                continue
             for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
                 print("***********Source**********")
                 print(source)

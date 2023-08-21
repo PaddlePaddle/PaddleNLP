@@ -153,10 +153,7 @@ def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
     except:
         is_fleet_init = False
 
-    if paddle.in_dynamic_mode():
-        x_is_distributed = getattr(x, "is_distributed", False)
-    else:
-        x_is_distributed = tensor_parallel_degree > 1
+    x_is_distributed = getattr(x, "is_distributed", tensor_parallel_degree > 1)
 
     if is_fleet_init and tensor_parallel_degree > 1 and x_is_distributed:
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
