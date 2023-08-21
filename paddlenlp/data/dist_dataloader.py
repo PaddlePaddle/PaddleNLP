@@ -111,10 +111,10 @@ class DistDataLoader(paddle.io.DataLoader):
             )
 
     @property
-    def _dataloder_iter(self):
+    def _dataloader_iter(self):
         if self._lazy_dataloader_iter is None:
-            self._lazy_dataloader_iter = iter(self._dataloder)
-            return self._lazy_dataloader_iter
+            self._lazy_dataloader_iter = iter(self._dataloader)
+        return self._lazy_dataloader_iter
 
     def __len__(self):
         if self._need_data:
@@ -140,33 +140,33 @@ class DistDataLoader(paddle.io.DataLoader):
 
     def __next__(self):
         if self._need_data:
-            # {'input_ids': int64, 'labels': int64, 'data_id': int64}
-            data = next(self._dataloder_iter)
-            input_ids, labels, data_id, src_id = data["input_ids"], data["labels"], data["data_id"], data["src_id"]
-            assert {input_ids.dtype, labels.dtype, data_id.dtype, src_id.dtype} == {
+            # {'input_ids': int64, 'labels': int64}
+            data = next(self._dataloader_iter)
+            input_ids, labels = data["input_ids"], data["labels"]
+            assert {input_ids.dtype, labels.dtype} == {
                 paddle.int64
-            }, f"Distloader requires dtype == `int64`, got:{[input_ids.dtype, labels.dtype, data_id.dtype, src_id.dtype]}"
+            }, f"Distloader requires dtype == `int64`, got:{[input_ids.dtype, labels.dtype]}"
         else:
-            input_ids, labels, data_id, src_id = None, None, None, None
+            input_ids, labels = None, None
 
         # broadcast data
         if self.mp_group is not None and self.pp_rank == 0:
-            input_ids, labels, data_id, src_id = broadcast_data_list(
-                [input_ids, labels, data_id, src_id], paddle.int64, self.mp_rank, self.mp_group, self.mp_src_rank
+            input_ids, labels = broadcast_data_list(
+                [input_ids, labels], paddle.int64, self.mp_rank, self.mp_group, self.mp_src_rank
             )
 
         if self._pp_data_group is not None:
-            # Note(daisimng): In last stage of pp, we don't need input_ids and data_id.
+            # Note(daisimng): In last stage of pp, we don't need input_ids.
             # It will be removed in future.
-            input_ids, labels, data_id, src_id = broadcast_data_list(
-                [input_ids, labels, data_id, src_id],
+            input_ids, labels = broadcast_data_list(
+                [input_ids, labels],
                 paddle.int64,
                 self.pp_rank,
                 self._pp_data_group,
                 self._pp_data_group.ranks[0],
             )
 
-        return OrderedDict([("input_ids", input_ids), ("labels", labels), ("data_id", data_id), ("src_id", src_id)])
+        return OrderedDict([("input_ids", input_ids), ("labels", labels)])
 
 
 def broadcast_data_list(data_list, datatype, comm_rank=0, comm_group=None, src_rank=0):

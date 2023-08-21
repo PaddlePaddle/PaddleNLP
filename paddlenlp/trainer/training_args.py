@@ -924,6 +924,12 @@ class TrainingArguments:
 
                 logger.info(strategy)
 
+                # Set need_data
+                if self.tensor_parallel_rank == 0 and self.pipeline_parallel_rank == 0:
+                    self.need_data = True
+                else:
+                    self.need_data = False
+
         else:
             world_size = paddle.distributed.get_world_size()
             if world_size > 1:

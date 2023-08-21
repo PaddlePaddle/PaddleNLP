@@ -1082,6 +1082,8 @@ class Trainer:
         else:
             train_sampler = None
 
+        if self.args.tensor_parallel_degree > 1 or self.args.pipeline_parallel_degree > 1:
+            logger.info("using DistDataLoader")
         return _DataLoader(
             train_dataset,
             batch_sampler=train_sampler,
