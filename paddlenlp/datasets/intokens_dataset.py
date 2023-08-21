@@ -50,7 +50,6 @@ class InTokens:
             # We append instead of extend here to accomodate 2D position ids
             if "position_ids" in record:
                 batched_features["position_ids"].append(record["position_ids"])
-
         block_attention_mask = block_diag(*batched_features["attention_mask"])
         # convert to 3-D [batch_size(1), seq_length, seq_length]
         batched_features["attention_mask"] = np.expand_dims(block_attention_mask, axis=0)

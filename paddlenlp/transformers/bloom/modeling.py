@@ -429,13 +429,10 @@ class BloomAttention(nn.Layer):
             # [batch_size * num_heads, q_length, kv_length]
             # alibi:[batch_size * num_heads, q_length, kv_length]
             # we use `Tensor.baddbmm` instead of `paddle.baddbmm` as the latter isn't supported by TorchScript v1.11
-            attention_scores = baddbmm(
-                alibi, batch1=query_layer, batch2=key_layer, beta=self.beta, alpha=self.inv_norm_factor
-            )
+            attention_scores = paddle.matmul(key_layer, key_layer) * self.inv_norm_factor
+            attention_mask = attention_mask + alibi
 
             # change view to [batch_size, num_heads, q_length, kv_length]
-            # attention_scores = matmul_result.reshape([batch_size, self.num_heads, q_length, kv_length])
-
             # cast attention scores to fp32, compute scaled softmax and cast back to initial dtype - [batch_size, num_heads, q_length, kv_length]
             input_dtype = query_layer.dtype
             # `float16` has a minimum value of -65504.0, whereas `bfloat16` and `float32` have a minimum value of `-3.4e+38`
