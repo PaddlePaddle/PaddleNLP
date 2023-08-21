@@ -406,4 +406,7 @@ def weight_name_suffix(config=None):
             name.append(f"moe{dp_group.rank:0>2d}")
         return "_".join(name)
     else:
+        if config and config.moe_num_experts > 0:
+            rank = paddle.distributed.get_rank()
+            return f"moe{rank:0>2d}"
         return None
