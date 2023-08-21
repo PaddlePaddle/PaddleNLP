@@ -67,6 +67,7 @@ from tqdm.auto import tqdm
 
 from ..data import DataCollator, DataCollatorWithPadding, default_data_collator
 from ..peft import LoRAModel, PrefixModelForCausalLM
+from ..transformers.llama.modeling import LlamaRotaryEmbedding
 from ..transformers.model_utils import (
     PretrainedModel,
     _add_variant,
@@ -327,9 +328,16 @@ class Trainer:
             if self.args.fp16_opt_level == "O2":
                 if self.amp_dtype == "bfloat16":
                     # fix for paddlepaddle < 2.4.1, not support for bf16
-                    paddle.amp.decorate(models=model, level=self.args.fp16_opt_level, dtype=self.amp_dtype)
+                    paddle.amp.decorate(
+                        models=model,
+                        level=self.args.fp16_opt_level,
+                        dtype=self.amp_dtype,
+                        excluded_layers=[LlamaRotaryEmbedding],
+                    )
                 else:
-                    paddle.amp.decorate(models=model, level=self.args.fp16_opt_level)
+                    paddle.amp.decorate(
+                        models=model, level=self.args.fp16_opt_level, excluded_layers=[LlamaRotaryEmbedding]
+                    )
             # for pipeline mode and pure tensor parallel
             if self.args.pipeline_parallel_degree > 1 or (
                 self.args.tensor_parallel_degree > 1 and self.sharding is None
@@ -1388,11 +1396,18 @@ class Trainer:
             if self.amp_dtype == "bfloat16":
                 # fix for paddlepaddle < 2.4.1, not support for bf16
                 decorated = paddle.amp.decorate(
-                    models=model, optimizers=self.optimizer, level=self.args.fp16_opt_level, dtype=self.amp_dtype
+                    models=model,
+                    optimizers=self.optimizer,
+                    level=self.args.fp16_opt_level,
+                    dtype=self.amp_dtype,
+                    excluded_layers=[LlamaRotaryEmbedding],
                 )
             else:
                 decorated = paddle.amp.decorate(
-                    models=model, optimizers=self.optimizer, level=self.args.fp16_opt_level
+                    models=model,
+                    optimizers=self.optimizer,
+                    level=self.args.fp16_opt_level,
+                    excluded_layers=[LlamaRotaryEmbedding],
                 )
 
             if self.optimizer is None:
