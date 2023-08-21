@@ -11,15 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import numpy as np
 import paddle
-from fused_transformer_layers import FusedMultiTransformer
-from generation_utils import GenerationInferenceModel
 from paddle import nn
 from paddle.distributed import fleet
 from paddlenlp_ops import fused_get_rotary_embedding, get_padding_offset
 
+from paddlenlp.experimental.transformers.fused_transformer_layers import (
+    FusedMultiTransformer,
+)
+from paddlenlp.experimental.transformers.generation_utils import (
+    GenerationInferenceModel,
+)
 from paddlenlp.transformers import LlamaConfig, LlamaForCausalLM, LlamaPretrainedModel
 from paddlenlp.transformers.llama.modeling import LlamaLMHead
 from paddlenlp.transformers.model_outputs import (
@@ -27,6 +32,8 @@ from paddlenlp.transformers.model_outputs import (
     CausalLMOutputWithCrossAttentions,
 )
 from paddlenlp.transformers.model_utils import register_base_model
+
+__all__ = ["LlamaInferenceModel", "LlamaForCausalLMInferenceModel"]
 
 
 class FusedLlamaRMSNorm(nn.Layer):
@@ -48,7 +55,7 @@ class FusedLlamaRMSNorm(nn.Layer):
 
 
 @register_base_model
-class LlamaModelInferenceModel(LlamaPretrainedModel):
+class LlamaInferenceModel(LlamaPretrainedModel):
     """
     Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`LlamaDecoderLayer`]
     Args:
@@ -282,15 +289,47 @@ class LlamaModelInferenceModel(LlamaPretrainedModel):
 class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaForCausalLM):
     """
     Dynamic Batching for LLaMA Model with pretraining tasks on top.
-
     """
 
     _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
 
     def __init__(self, config):
         super().__init__(config)
-        self.model = LlamaModelInferenceModel(config)
+        self.model = LlamaInferenceModel(config)
         self.lm_head = LlamaLMHead(config)
+
+    def get_cache_kvs(self, max_batch_size: int, max_length: int | None = None, dtype: str | None = None):
+        """get cache_kvs tensor for llama model
+
+        Args:
+            max_batch_size (int): the max batch size
+            max_length (int | None, optional): the max_length of cache_kvs. Defaults to None.
+            dtype (str | None, optional): the dtype of current model. Defaults to None.
+
+        Returns:
+            list[paddle.Tensor]: the list tensor for cache
+        """
+        if max_length is None:
+            max_length = self.config.max_position_embeddings
+
+        if dtype is None:
+            dtype = self.config.dtype or paddle.get_default_dtype()
+
+        cache_kvs = []
+        for _ in range(self.config.num_hidden_layers):
+            cache_kvs.append(
+                paddle.zeros(
+                    [
+                        2,
+                        max_batch_size,
+                        self.config.num_attention_heads // max(self.config.tensor_parallel_degree, 1),
+                        max_length,
+                        self.config.hidden_size // self.config.num_attention_heads,
+                    ],
+                    dtype=dtype,
+                )
+            )
+        return cache_kvs
 
     def prepare_inputs_for_generation(
         self,

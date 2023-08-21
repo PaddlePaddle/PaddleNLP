@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import paddle
 import paddle.nn.functional as F
@@ -26,10 +27,16 @@ try:
     from paddle import top_p_sampling
 except:
     from paddlenlp_ops import top_p_sampling
+
 from paddlenlp.transformers.generation_utils import GenerationMixin
+
+__all__ = ["GenerationInferenceModel"]
 
 
 class GenerationInferenceModel(GenerationMixin):
+    def get_cache_kvs(self, max_length: int | None = None):
+        raise NotImplementedError
+
     @paddle.no_grad()
     def generate(
         self,

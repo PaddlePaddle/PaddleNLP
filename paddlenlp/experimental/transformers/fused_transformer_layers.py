@@ -11,10 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import paddle
 import paddle.distributed as dist
-from paddle.framework import LayerHelper, core, in_dynamic_mode
+from paddle.framework import LayerHelper, in_dynamic_mode
 from paddle.incubate.nn.functional import (
     fused_layer_norm,
     fused_rms_norm,
@@ -24,7 +25,10 @@ from paddle.incubate.nn.functional import (
 from paddle.nn import Layer
 from paddle.nn.initializer import Constant
 
-if core.is_compiled_with_cuda():
+from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
+from paddlenlp.utils.log import logger
+
+if is_paddlenlp_ops_available():
     from paddlenlp_ops import (
         encode_rotary_qk,
         qkv_transpose_split,
@@ -32,6 +36,14 @@ if core.is_compiled_with_cuda():
         transpose_remove_padding,
         write_cache_kv,
     )
+else:
+    logger.warning(
+        "The paddlenlp_ops package is not installed. you can read the docs and install it by hand, "
+        "you can refer to: https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
+    )
+
+
+__all__ = ["FusedMultiTransformer"]
 
 
 # for distributed tensor model parallel

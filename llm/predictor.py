@@ -22,12 +22,13 @@ from dataclasses import dataclass, field
 import numpy as np
 import paddle
 from paddle.distributed import fleet
-from utils import get_prefix_tuning_params
+from utils import dybatch_preprocess, get_prefix_tuning_params, load_real_time_tokens
 
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.transformers import (
+    AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
     LlamaTokenizer,
@@ -55,6 +56,7 @@ class PredictorArgument:
     type: str = field(
         default="dygraph", metadata={"help": "the type of predictor, it should be one of [dygraph, static]"}
     )
+    batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
 
 
 @dataclass
@@ -63,7 +65,6 @@ class ModelArgument:
     ernie: bool = field(default=False, metadata={"help": "Ernie35ForCausalLM"})
     data_file: None = field(default=None, metadata={"help": "data file directory"})
     output_file: str = field(default="output.json", metadata={"help": "predict result file directory"})
-    batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
 
 
 def batchfy_text(texts, batch_size):
@@ -242,6 +243,78 @@ class StaticGraphPredictor(BasePredictor):
         return decoded_ids
 
 
+class DygraphInferencePredictor(BasePredictor):
+    def __init__(
+        self, config: PredictorArgument, model: PretrainedModel = None, tokenizer: PretrainedTokenizer = None
+    ):
+        super().__init__(config, tokenizer)
+        self.model = model
+        if config.lora_path is not None:
+            lora_config = LoRAConfig.from_pretrained(config.lora_path)
+            dtype = lora_config.dtype
+            lora_config.merge_weights = True
+        elif config.prefix_path is not None:
+            prefix_config = PrefixConfig.from_pretrained(config.prefix_path)
+            dtype = prefix_config.dtype
+        elif config.dtype is not None:
+            dtype = config.dtype
+        else:
+            raise ValueError("Please specific the model dtype.")
+
+        self.dtype = dtype
+
+        self.cache_kvs = self.model.get_cache_kvs(config.batch_size)
+        self.pre_ids = paddle.full([config.batch_size, config.max_length], -1, dtype="int64")
+        self.attention_mask = paddle.zeros(
+            shape=(config.batch_size, 1, config.max_length, config.max_length),
+            dtype="float16",
+        )
+        self.tgt_generation_mask = paddle.zeros(
+            shape=[config.batch_size, 1, 1, config.max_length],
+            dtype="float16",
+        )
+
+    def _preprocess(self, source):
+        inputs = dybatch_preprocess(self.tokenizer, source, self.config.max_length)
+        for i in range(inputs["input_ids"].shape[0]):
+            length = inputs["seq_len_encoder"][i][0]
+            self.attention_mask[i, 0, :length, :length] = paddle.tril(
+                paddle.ones(shape=(length, length), dtype="float16")
+            )
+            inputs["attention_mask"] = self.attention_mask
+            self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype="float16")
+            inputs["tgt_generation_mask"] = self.tgt_generation_mask
+        inputs["cache_kvs"] = self.cache_kvs
+        inputs["pre_ids"] = self.pre_ids
+
+        inputs_tensor = {}
+        for key, value in inputs.items():
+            if key != "cache_kvs":
+                inputs_tensor[key] = paddle.to_tensor(value)
+            else:
+                inputs_tensor[key] = value
+        return inputs_tensor
+
+    @paddle.no_grad()
+    def _infer(self, inputs: dict[str, paddle.Tensor]):
+        # the `max_length` of generate is: max_new_length, it will occur error when `max_length` + sequence_length > max_position_embeddings.
+        # so change max_length to control the length of decoding.
+        self.model.generate(
+            **inputs,
+        )
+        return None
+
+    def _postprocess(self, predictions):
+        if paddle.distributed.get_rank() == 0:
+            tokens: np.ndarray = load_real_time_tokens()
+            decoded_predictions = self.tokenizer.batch_decode(
+                tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
+            )
+            return decoded_predictions
+        else:
+            return None
+
+
 def create_predictor(predictor_args: PredictorArgument, model_args: ModelArgument):
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
@@ -278,6 +351,17 @@ def create_predictor(predictor_args: PredictorArgument, model_args: ModelArgumen
         predictor = DygraphPredictor(predictor_args, model=model, tokenizer=tokenizer)
     elif predictor_args.type == "static":
         predictor = StaticGraphPredictor(predictor_args, tokenizer=tokenizer)
+    elif predictor_args.type == "dygraph-inference":
+        # TODO(wj-Mcat): complete AutoInferenceModel & AutoPredictor
+        assert (
+            "llama" in predictor_args.model_name_or_path
+        ), "only support llama inference model in dygraph-inference predictor"
+        from paddlenlp.experimental.transformers import LlamaForCausalLMInferenceModel
+
+        config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
+        config.tensor_parallel_degree = 1
+        model = LlamaForCausalLMInferenceModel.from_pretrained(predictor_args.model_name_or_path, config=config)
+        predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
     else:
         raise ValueError(
             f"receive unexpected predictor type: {predictor_args.type}, it should be one of [dygraph, static]"
@@ -303,8 +387,8 @@ def predict():
         source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
         target_texts = ["", ""]
 
-    batch_source_texts = batchfy_text(source_texts, model_args.batch_size)
-    batch_target_texts = batchfy_text(target_texts, model_args.batch_size)
+    batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
+    batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
 
     with open(model_args.output_file, "w", encoding="utf-8") as f:
         for bs, batch_source_text in enumerate(batch_source_texts):
