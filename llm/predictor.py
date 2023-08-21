@@ -59,9 +59,10 @@ class PredictorArgument:
     prefix_path: str = field(
         default=None, metadata={"help": "The directory of Prefix Tuning parameters. Default to None"}
     )
-    type: str = field(
+    mode: str = field(
         default="dygraph", metadata={"help": "the type of predictor, it should be one of [dygraph, static]"}
     )
+    inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
 
 
@@ -454,59 +455,72 @@ def create_predictor(
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
     tensor_parallel_rank = paddle.distributed.get_rank()
-    if predictor_args.type == "dygraph":
-        model = None
-        if model_args.gpt:
-            sys.path.append("./gpt-3")
-            from modeling import GPTForCausalLM
+    if not predictor_args.inference_model:
+        if predictor_args.mode == "dygraph":
+            if model_args.gpt:
+                sys.path.append("./gpt-3")
+                from modeling import GPTForCausalLM
 
-            model = GPTForCausalLM.from_pretrained(
-                predictor_args.model_name_or_path,
-                dtype=predictor_args.dtype,
-                tensor_parallel_degree=tensor_parallel_degree,
-                tensor_parallel_rank=tensor_parallel_rank,
-            )
-        elif model_args.ernie:
-            sys.path.append("./ernie-3.5-se")
-            from modeling import Ernie35ForCausalLM
+                model = GPTForCausalLM.from_pretrained(
+                    predictor_args.model_name_or_path,
+                    dtype=predictor_args.dtype,
+                    tensor_parallel_degree=tensor_parallel_degree,
+                    tensor_parallel_rank=tensor_parallel_rank,
+                )
+            elif model_args.ernie:
+                sys.path.append("./ernie-3.5-se")
+                from modeling import Ernie35ForCausalLM
 
-            tensor_parallel_degree = paddle.distributed.get_world_size()
-            tensor_parallel_rank = paddle.distributed.get_rank()
-            model = Ernie35ForCausalLM.from_pretrained(
-                predictor_args.model_name_or_path,
-                dtype=predictor_args.dtype,
-                tensor_parallel_degree=tensor_parallel_degree,
-                tensor_parallel_rank=tensor_parallel_rank,
-            )
+                tensor_parallel_degree = paddle.distributed.get_world_size()
+                tensor_parallel_rank = paddle.distributed.get_rank()
+                model = Ernie35ForCausalLM.from_pretrained(
+                    predictor_args.model_name_or_path,
+                    dtype=predictor_args.dtype,
+                    tensor_parallel_degree=tensor_parallel_degree,
+                    tensor_parallel_rank=tensor_parallel_rank,
+                )
+            else:
+                model = AutoModelForCausalLM.from_pretrained(
+                    predictor_args.model_name_or_path,
+                    dtype=predictor_args.dtype,
+                    low_cpu_mem_usage=True,
+                    tensor_parallel_degree=tensor_parallel_degree,
+                    tensor_parallel_rank=tensor_parallel_rank,
+                )
 
-        predictor = DygraphPredictor(predictor_args, model=model, tokenizer=tokenizer)
-    elif predictor_args.type == "static":
-        predictor = StaticGraphPredictor(predictor_args, tokenizer=tokenizer)
-    elif predictor_args.type == "dygraph-inference":
-        # TODO(wj-Mcat): complete AutoInferenceModel & AutoPredictor
-        assert (
-            "llama" in predictor_args.model_name_or_path
-        ), "only support llama inference model in dygraph-inference predictor"
-        from paddlenlp.experimental.transformers import LlamaForCausalLMInferenceModel
-
-        config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
-
-        config.tensor_parallel_degree = tensor_parallel_degree
-        config.tensor_parallel_rank = tensor_parallel_rank
-        model = LlamaForCausalLMInferenceModel.from_pretrained(predictor_args.model_name_or_path, config=config)
-        predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
-    elif predictor_args.type == "static-inference":
-        config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
-
-        # only support llama inference model currently
-        from paddlenlp.experimental.transformers import LlamaForCausalLMInferenceModel
-
-        cache_kvs_shape = LlamaForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
-        predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
+            predictor = DygraphPredictor(predictor_args, model=model, tokenizer=tokenizer)
+        elif predictor_args.mode == "static":
+            predictor = StaticGraphPredictor(predictor_args, tokenizer=tokenizer)
+        else:
+            raise ValueError("the `mode` should be one of [dygraph, static]")
     else:
-        raise ValueError(
-            f"receive unexpected predictor type: {predictor_args.type}, it should be one of [dygraph, static]"
-        )
+        if predictor_args.mode == "dygraph":
+            # TODO(wj-Mcat): complete AutoInferenceModel & AutoPredictor
+            assert (
+                "llama" in predictor_args.model_name_or_path
+            ), "only support llama inference model in dygraph-inference predictor"
+            from paddlenlp.experimental.transformers import (
+                LlamaForCausalLMInferenceModel,
+            )
+
+            config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
+
+            config.tensor_parallel_degree = tensor_parallel_degree
+            config.tensor_parallel_rank = tensor_parallel_rank
+            model = LlamaForCausalLMInferenceModel.from_pretrained(predictor_args.model_name_or_path, config=config)
+            predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
+        elif predictor_args.mode == "static":
+            config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
+
+            # only support llama inference model currently
+            from paddlenlp.experimental.transformers import (
+                LlamaForCausalLMInferenceModel,
+            )
+
+            cache_kvs_shape = LlamaForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
+            predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
+        else:
+            raise ValueError("the `mode` should be one of [dygraph, static]")
     return predictor
 
 
