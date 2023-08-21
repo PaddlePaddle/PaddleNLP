@@ -27,7 +27,7 @@ recompute="1"
 run_mode="DP1-MP2-PP2-SD4"
 device_num="N2C16"
 global_batch_size=32
-model_item="facebook-llama-13b_sharding4_stage1_mbs2_recompute"
+model_item="facebook-llama-13b_pretrain"
 train_data_size=1000
 
 cd ./tests

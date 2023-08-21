@@ -13,7 +13,6 @@
 # limitations under the License.
 
 model_name_or_path="facebook/llama-13b"
-model_name_or_path="facebook/llama-7b"
 per_device_train_batch_size="2"
 use_flash_attention="1"
 tensor_parallel_degree="2"
@@ -28,7 +27,7 @@ recompute="1"
 run_mode="DP1-MP2-PP2-SD2"
 device_num="N1C8"
 global_batch_size=16
-model_item="facebook-llama-13b_sharding2_stage1_mbs2_recompute"
+model_item="facebook-llama-13b_pretrain"
 train_data_size=1000
 
 cd ./tests
