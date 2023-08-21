@@ -151,6 +151,8 @@ class LlamaConfig(PretrainedConfig):
         use_cache=True,
         use_recompute=False,
         recompute_granularity="full",
+        pp_recompute_interval=0,
+        no_recompute_layers=None,
         fuse_attention_qkv=False,
         use_flash_attention=False,
         fuse_attention_ffn=False,
@@ -184,6 +186,8 @@ class LlamaConfig(PretrainedConfig):
         self.use_cache = use_cache
         self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
+        self.no_recompute_layers = no_recompute_layers
+        self.pp_recompute_interval = pp_recompute_interval
         self.fuse_attention_qkv = fuse_attention_qkv
         self.use_flash_attention = use_flash_attention
         self.fuse_attention_ffn = fuse_attention_ffn
