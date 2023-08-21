@@ -36,13 +36,6 @@ from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.utils.converter import StateDictNameMapping, init_name_mappings
 from paddlenlp.utils.log import logger
 
-from ..llama.modeling import scaled_dot_product_attention
-
-try:
-    from paddle.nn.functional.flash_attention import flash_attention
-except:
-    flash_attention = None
-
 from .configuration import BloomConfig
 from .processor import (
     ForcedBOSTokenLogitsProcessor,
@@ -385,21 +378,27 @@ class BloomAttention(nn.Layer):
 
         batch_size, q_length, _, _ = query_layer.shape
 
-        if self.config.use_flash_attention and flash_attention:
+        if self.config.use_flash_attention:
             # Flash Attention now ignore attention mask
             # Current Flash Attention doesn't support attn maskt
             # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
             # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
             query_states, key_states, value_states = query_layer, key_layer, value_layer
-            attention_mask = attention_mask.cast(alibi.dtype) + alibi
-            attn_output, attn_weights = scaled_dot_product_attention(
-                config=self.config,
-                query_states=query_states,
-                key_states=key_states,
-                value_states=value_states,
-                attention_mask=attention_mask,
-                output_attentions=True,
-            )
+
+            if attention_mask is not None:
+                attention_mask = attention_mask.cast(alibi.dtype) + alibi
+                attn_output = F.scaled_dot_product_attention(
+                    query_states,
+                    key_states,
+                    value_states,
+                    attn_mask=attention_mask,
+                    is_causal=False,
+                )
+            else:
+                attn_output = F.scaled_dot_product_attention(
+                    query_states, key_states, value_states, attn_mask=attention_mask, is_causal=True
+                )
+            attn_weights = None
             # [ seq_len, batch_size, nhead, head_dim] = > [ seq_len, batch_size, hidden_size]
             output_tensor = self.dense(attn_output)
             present = None

@@ -26,13 +26,6 @@ from paddle import Tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
-from ..llama.modeling import scaled_dot_product_attention
-
-try:
-    from paddle.nn.functional.flash_attention import flash_attention
-except:
-    flash_attention = None
-
 from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
@@ -256,20 +249,29 @@ class ChatGLMAttention(nn.Layer):
         # [s, b, n, h/n]
         q_layer, k_layer = self._core_attention(q_layer, k_layer, position_ids, rotary_embeds)
 
-        if self.config.use_flash_attention and flash_attention:
+        if self.config.use_flash_attention:
             # Flash Attention now ignore attention mask
             # Current Flash Attention doesn't support attn maskt
             # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
             # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
             query_states, key_states, value_states = q_layer, k_layer, v_layer
-            attn_output, attn_weights = scaled_dot_product_attention(
-                config=self.config,
-                query_states=query_states,
-                key_states=key_states,
-                value_states=value_states,
-                attention_mask=attention_mask,
-                output_attentions=True,
-            )
+            if attention_mask is not None:
+                attn_output = F.scaled_dot_product_attention(
+                    query_states,
+                    key_states,
+                    value_states,
+                    attn_mask=attention_mask,
+                    is_causal=False,
+                )
+            else:
+                attn_output = F.scaled_dot_product_attention(
+                    query_states,
+                    key_states,
+                    value_states,
+                    attn_mask=attention_mask,
+                    is_causal=True,
+                )
+            attn_weights = None
             # [ seq_len, batch_size, nhead, head_dim] = > [ seq_len, batch_size, hidden_size]
             attn_output = self.dense(attn_output)
             # print(attn_output.shape)
