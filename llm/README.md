@@ -16,7 +16,7 @@
 我们提供了模型预训练、精调（SFT、LoRA、PrefixTuning）、量化、动态图推理、服务化部署全流程脚本，开发者可以根据自己的需求定制化自己的大语言模型。
 
 <div align="center">
-    <img width="700" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/4b1a586c-e8cb-4cfa-8009-8d32129c26f0">
+    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/009bbb4e-baee-4c4a-a52e-94ac44c73c90">
 </div>
 
 <div align="center">
