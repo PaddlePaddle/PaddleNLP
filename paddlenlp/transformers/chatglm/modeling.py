@@ -268,7 +268,14 @@ class ChatGLMAttention(nn.Layer):
             # Current Flash Attention doesn't support attn maskt
             # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
             # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
+
+            # [s, b, n, h/n] = > [batch_size, seq_len, num_heads, head_dim]
+            q_layer = paddle.transpose(q_layer, [1, 0, 2, 3])
+            k_layer = paddle.transpose(k_layer, [1, 0, 2, 3])
+            v_layer = paddle.transpose(v_layer, [1, 0, 2, 3])
             query_states, key_states, value_states = q_layer, k_layer, v_layer
+
+            # breakpoint()
             if attention_mask is not None:
                 attn_output = F.scaled_dot_product_attention(
                     query_states,
@@ -286,9 +293,12 @@ class ChatGLMAttention(nn.Layer):
                     is_causal=True,
                 )
             attn_weights = None
-            # [ seq_len, batch_size, nhead, head_dim] = > [ seq_len, batch_size, hidden_size]
+            # [batch_size, seq_len, num_heads, head_dim] => [ batch_size, seq_len, hidden_size]
+            attn_output = paddle.reshape(attn_output, [attn_output.shape[0], attn_output.shape[1], -1])
+            # [ batch_size, seq_len, hidden_size] = > [ seq_len, batch_size, hidden_size]
+            attn_output = paddle.transpose(attn_output, [1, 0, 2])
             attn_output = self.dense(attn_output)
-            # print(attn_output.shape)
+
             output, cache_kv, attention_probs = attn_output, None, attn_weights
 
         else:
