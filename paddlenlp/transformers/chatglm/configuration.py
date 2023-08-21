@@ -103,7 +103,6 @@ class ChatGLMConfig(PretrainedConfig):
         attention_scale=True,
         activation="gelu",
         num_image_tokens=0,
-        lm_shift_labels=True,
         use_flash_attention=False,
         **kwargs
     ):
@@ -129,5 +128,4 @@ class ChatGLMConfig(PretrainedConfig):
         self.attention_scale = attention_scale
         self.activation = activation
         self.num_image_tokens = num_image_tokens
-        self.lm_shift_labels = lm_shift_labels
         self.use_flash_attention = use_flash_attention
