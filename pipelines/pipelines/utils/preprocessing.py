@@ -177,7 +177,7 @@ def convert_files_to_dicts_splitter(
         separator=separator,
         chunk_size=chunk_size,
         headers_to_split_on=headers_to_split_on,
-        return_each_line=False,
+        return_each_line=True,
         filters=filters,
     )
     if language == "chinese":

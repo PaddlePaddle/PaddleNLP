@@ -52,6 +52,7 @@ class LlamaTokenizer(PretrainedTokenizer):
         "facebook/llama-30b": {},
         "facebook/llama-65b": {},
     }
+    padding_side = "left"
 
     def __init__(
         self,

@@ -142,7 +142,8 @@ def scaled_dot_product_attention(
     query_states, key_states, value_states, attention_mask, output_attentions, config, is_causal=True
 ):
 
-    bsz, q_len, num_heads, head_dim = paddle.shape(query_states)
+    bsz, q_len, num_heads, _ = paddle.shape(query_states)
+    head_dim = config.hidden_size // config.num_attention_heads
     _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention is not None:

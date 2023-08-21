@@ -58,74 +58,6 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "use_recompute": False,
         "use_flash_attention": False,
     },
-    "facebook/llama-7b": {
-        "hidden_size": 4096,
-        "initializer_range": 0.02,
-        "intermediate_size": 11008,
-        "max_position_embeddings": 2048,
-        "model_type": "llama",
-        "num_attention_heads": 32,
-        "num_hidden_layers": 32,
-        "rms_norm_eps": 1e-06,
-        "vocab_size": 32000,
-        "bos_token_id": 1,
-        "eos_token_id": 2,
-        "pad_token_id": 0,
-        "use_cache": False,
-        "use_recompute": False,
-        "use_flash_attention": False,
-    },
-    "facebook/llama-13b": {
-        "hidden_size": 5120,
-        "initializer_range": 0.02,
-        "intermediate_size": 13824,
-        "max_position_embeddings": 2048,
-        "model_type": "llama",
-        "num_attention_heads": 40,
-        "num_hidden_layers": 40,
-        "rms_norm_eps": 1e-06,
-        "vocab_size": 32000,
-        "bos_token_id": 1,
-        "eos_token_id": 2,
-        "pad_token_id": 0,
-        "use_cache": False,
-        "use_recompute": False,
-        "use_flash_attention": False,
-    },
-    "facebook/llama-30b": {
-        "hidden_size": 6656,
-        "initializer_range": 0.02,
-        "intermediate_size": 17920,
-        "max_position_embeddings": 2048,
-        "model_type": "llama",
-        "num_attention_heads": 52,
-        "num_hidden_layers": 60,
-        "rms_norm_eps": 1e-06,
-        "vocab_size": 32000,
-        "bos_token_id": 1,
-        "eos_token_id": 2,
-        "pad_token_id": 0,
-        "use_cache": False,
-        "use_recompute": False,
-        "use_flash_attention": False,
-    },
-    "facebook/llama-65b": {
-        "hidden_size": 8192,
-        "initializer_range": 0.02,
-        "intermediate_size": 22016,
-        "max_position_embeddings": 2048,
-        "model_type": "llama",
-        "num_attention_heads": 64,
-        "num_hidden_layers": 80,
-        "rms_norm_eps": 1e-05,
-        "vocab_size": 32000,
-        "bos_token_id": 1,
-        "eos_token_id": 2,
-        "pad_token_id": 0,
-        "use_cache": False,
-        "use_recompute": False,
-        "use_flash_attention": False,
-    },
 }
 
 # Hypothetical model weights (tiny-random-llama) for test only
@@ -133,10 +65,6 @@ LLAMA_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
         "__internal_testing__/micro-random-llama": "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/micro-random-llama/model_state.pdparams",
         "__internal_testing__/tiny-random-llama": "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-llama/model_state.pdparams",
-        "facebook/llama-7b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-7b/model_state.pdparams",
-        "facebook/llama-13b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-13b/model_state.pdparams",
-        "facebook/llama-30b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-30b/model_state.pdparams",
-        "facebook/llama-65b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-65b/model_state.pdparams",
     },
 }
 
@@ -206,6 +134,7 @@ class LlamaConfig(PretrainedConfig):
         "n_inner": "intermediate_size",
         "activation_function": "hidden_act",
     }
+    pretrained_init_configuration = LLAMA_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
         self,
@@ -222,6 +151,8 @@ class LlamaConfig(PretrainedConfig):
         use_cache=True,
         use_recompute=False,
         recompute_granularity="full",
+        pp_recompute_interval=0,
+        no_recompute_layers=None,
         fuse_attention_qkv=False,
         use_flash_attention=False,
         fuse_attention_ffn=False,
@@ -255,6 +186,8 @@ class LlamaConfig(PretrainedConfig):
         self.use_cache = use_cache
         self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
+        self.no_recompute_layers = no_recompute_layers
+        self.pp_recompute_interval = pp_recompute_interval
         self.fuse_attention_qkv = fuse_attention_qkv
         self.use_flash_attention = use_flash_attention
         self.fuse_attention_ffn = fuse_attention_ffn
