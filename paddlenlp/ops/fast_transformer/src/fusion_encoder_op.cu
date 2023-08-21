@@ -24,7 +24,7 @@ limitations under the License. */
 
 #include "cublas_handle.h"
 #include "fastertransformer/bert_encoder_transformer.h"
-#include "fastertransformer/cuda/cub/cub.cuh"
+
 #include "fastertransformer/cuda/cuda_kernels.h"
 #include "fastertransformer/standard_encoder.h"
 #include "fusion_encoder_op.h"

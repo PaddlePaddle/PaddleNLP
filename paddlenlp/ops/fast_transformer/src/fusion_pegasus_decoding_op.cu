@@ -22,7 +22,7 @@ limitations under the License. */
 #include <vector>
 
 #include "cublas_handle.h"
-#include "fastertransformer/cuda/cub/cub.cuh"
+
 #include "fusion_pegasus_decoding_op.h"
 #include "pd_traits.h"
 
