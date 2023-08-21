@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # Test training benchmark for a model.
-# Usage：bash benchmark/run_benchmark.sh ${model_name_or_path} ${per_device_train_batch_size} ${use_flash_attention} ${tensor_parallel_degree} ${pipeline_parallel_degree} ${virtual_pp_degree} ${sequence_parallel} ${sharding_degree} ${max_steps} ${save_steps} ${sharding} ${recompute} ${run_mode} ${device_num}
+# Usage：bash benchmark/run_benchmark.sh ${model_name_or_path} ${per_device_train_batch_size} ${use_flash_attention} ${tensor_parallel_degree} ${pipeline_parallel_degree} ${virtual_pp_degree} ${sequence_parallel} ${sharding_degree} ${num_train_epochs} ${save_steps} ${sharding} ${recompute} ${run_mode} ${device_num}
 function _set_params(){
     model_name_or_path=${1:-"facebook/llama-7b"}
 
@@ -27,7 +27,7 @@ function _set_params(){
     virtual_pp_degree=${6:-"1"}
     sequence_parallel=${7:-"0"}
     sharding_degree=${8:-"1"}      # (可选)
-    max_steps=${9:-"200"}
+    num_train_epochs=${9:-"200"}
     save_steps=${10:-"200"}
     sharding=${11:-"stage1"}
     recompute=${12:-"1"}
@@ -35,13 +35,16 @@ function _set_params(){
     device_num=${14:-"N2C32"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
     global_batch_size=${15:-"16"}
     model_item=${16:-"facebook-llama-13b"}
+    train_data_size=${17:-"1000"}
+
     base_batch_size=${global_batch_size}
 
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递
     model_repo="PaddleNLP"          # (必选) 模型套件的名字
     speed_unit="tokens/s"         # (必选)速度指标单位
     skip_steps=0                  # (必选)解析日志，跳过模型前几个性能不稳定的step
-    keyword="interval_samples_per_second:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
+    keyword="ips:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
+
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
 
     fp_item="fp16"
@@ -110,10 +113,10 @@ function _train(){
             --sequence_parallel ${sequence_parallel} \
             --learning_rate 0.00001 \
             --min_learning_rate 0.000001 \
-            --max_steps ${max_steps} \
             --save_steps ${save_steps} \
             --weight_decay 0.01 \
             --warmup_ratio 0.01 \
+            --num_train_epochs ${num_train_epochs} \
             --max_grad_norm 1.0 \
             --logging_steps 10 \
             --dataloader_num_workers 1 \
@@ -123,6 +126,7 @@ function _train(){
             --disable_tqdm true \
             --continue_training 1\
             --recompute ${recompute} \
+            --train_data_size ${train_data_size} \
             --do_train \
             --device gpu"
     if [ ${PADDLE_TRAINER_ID} ]

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 model_name_or_path="facebook/llama-13b"
+model_name_or_path="facebook/llama-7b"
 per_device_train_batch_size="2"
 use_flash_attention="1"
 tensor_parallel_degree="2"
@@ -20,7 +21,7 @@ pipeline_parallel_degree="2"
 virtual_pp_degree="1"
 sequence_parallel="0"
 sharding_degree="2"
-max_steps="200"
+num_train_epochs="1"
 save_steps="200"
 sharding="stage1"
 recompute="1"
@@ -28,8 +29,9 @@ run_mode="DP1-MP2-PP2-SD2"
 device_num="N1C8"
 global_batch_size=16
 model_item="facebook-llama-13b_sharding2_stage1_mbs2_recompute"
+train_data_size=1000
 
 cd ./tests
 bash ./test_tipc/dygraph/hybrid_parallelism/llama/benchmark_common/prepare.sh
 
-bash ./test_tipc/dygraph/hybrid_parallelism/llama/benchmark_common/run_benchmark.sh ${model_name_or_path} ${per_device_train_batch_size} ${use_flash_attention} ${tensor_parallel_degree} ${pipeline_parallel_degree} ${virtual_pp_degree} ${sequence_parallel} ${sharding_degree} ${max_steps} ${save_steps} ${sharding} ${recompute} ${run_mode} ${device_num} ${global_batch_size} ${model_item}
+bash ./test_tipc/dygraph/hybrid_parallelism/llama/benchmark_common/run_benchmark.sh ${model_name_or_path} ${per_device_train_batch_size} ${use_flash_attention} ${tensor_parallel_degree} ${pipeline_parallel_degree} ${virtual_pp_degree} ${sequence_parallel} ${sharding_degree} ${num_train_epochs} ${save_steps} ${sharding} ${recompute} ${run_mode} ${device_num} ${global_batch_size} ${model_item}
