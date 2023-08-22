@@ -66,6 +66,7 @@ function _set_params(){
     mkdir -p $(dirname ${speed_log_file})
 
     OUTPUT_PATH=${run_log_path}/output
+    is_large_model=True
 }
 
 function _train(){
@@ -120,7 +121,7 @@ function _train(){
             --max_grad_norm 1.0 \
             --logging_steps 10 \
             --dataloader_num_workers 1 \
-            --eval_steps 1000 \
+            --eval_steps 100000000 \
             --report_to visualdl \
             --sharding ${sharding} \
             --disable_tqdm true \

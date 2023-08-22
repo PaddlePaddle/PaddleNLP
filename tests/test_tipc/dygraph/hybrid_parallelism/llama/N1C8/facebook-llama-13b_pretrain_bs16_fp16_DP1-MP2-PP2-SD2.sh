@@ -28,7 +28,7 @@ run_mode="DP1-MP2-PP2-SD2"
 device_num="N1C8"
 global_batch_size=16
 model_item="facebook-llama-13b_pretrain"
-train_data_size=1000
+train_data_size=5000
 
 cd ./tests
 bash ./test_tipc/dygraph/hybrid_parallelism/llama/benchmark_common/prepare.sh
