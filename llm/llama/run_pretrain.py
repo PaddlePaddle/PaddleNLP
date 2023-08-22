@@ -191,37 +191,37 @@ def create_pretrained_dataset(
     need_data=True,
 ):
 
-    train_valid_test_num_samples = [
-        training_args.per_device_train_batch_size
-        * training_args.dataset_world_size
-        * training_args.max_steps
-        * training_args.gradient_accumulation_steps,
-        training_args.per_device_eval_batch_size
-        * training_args.dataset_world_size
-        * training_args.eval_iters
-        * (training_args.max_steps // training_args.eval_steps + 1),
-        training_args.per_device_eval_batch_size * training_args.dataset_world_size * training_args.test_iters,
-    ]
+    if need_data:
+        train_valid_test_num_samples = [
+            training_args.per_device_train_batch_size
+            * training_args.dataset_world_size
+            * training_args.max_steps
+            * training_args.gradient_accumulation_steps,
+            training_args.per_device_eval_batch_size
+            * training_args.dataset_world_size
+            * training_args.eval_iters
+            * (training_args.max_steps // training_args.eval_steps + 1),
+            training_args.per_device_eval_batch_size * training_args.dataset_world_size * training_args.test_iters,
+        ]
 
-    input_prefix = data_file[0]
+        input_prefix = data_file[0]
 
-    for suffix in ["_ids.npy", "_idx.npz"]:
-        if not os.path.isfile(input_prefix + suffix):
-            raise ValueError("File Not found, %s" % (input_prefix + suffix))
+        for suffix in ["_ids.npy", "_idx.npz"]:
+            if not os.path.isfile(input_prefix + suffix):
+                raise ValueError("File Not found, %s" % (input_prefix + suffix))
 
-    sample_ids = np.load(input_prefix + "_ids.npy", mmap_mode="r", allow_pickle=True)
-    # All documment ids, extend as 1-D array.
+        sample_ids = np.load(input_prefix + "_ids.npy", mmap_mode="r", allow_pickle=True)
+        # All documment ids, extend as 1-D array.
+        process_data = np.load(input_prefix + "_idx.npz")
+        # The len(sample_lens) num of docs
+        # The sum(sample_lens) should equal len(sample_ids)
+        sample_lens = process_data["lens"]
 
-    process_data = np.load(input_prefix + "_idx.npz")
-    # The len(sample_lens) num of docs
-    # The sum(sample_lens) should equal len(sample_ids)
-    sample_lens = process_data["lens"]
-
-    splits = get_train_valid_test_split_(data_args.split, len(sample_lens))
-    assert len(sample_lens) >= splits[-1], "The document nums should larger than max of splits, but %s < %s" % (
-        len(sample_lens),
-        splits[-1],
-    )
+        splits = get_train_valid_test_split_(data_args.split, len(sample_lens))
+        assert len(sample_lens) >= splits[-1], "The document nums should larger than max of splits, but %s < %s" % (
+            len(sample_lens),
+            splits[-1],
+        )
 
     def print_dataset(data, mode="train"):
         logger.info(f"Sample data for {mode} mode")
@@ -239,10 +239,10 @@ def create_pretrained_dataset(
             else training_args.per_device_eval_batch_size,
             name="gpt_" + name,
             max_seq_len=data_args.max_seq_length,
-            num_samples=train_valid_test_num_samples[index],
-            documents=np.arange(splits[index], splits[index + 1]),
-            sample_ids=sample_ids,
-            sample_lens=sample_lens,
+            num_samples=train_valid_test_num_samples[index] if need_data else None,
+            documents=np.arange(splits[index], splits[index + 1]) if need_data else None,
+            sample_ids=sample_ids if need_data else None,
+            sample_lens=sample_lens if need_data else None,
             eos_id=tokenizer.eos_token_id,
             seed=training_args.seed,
             need_data=need_data,
