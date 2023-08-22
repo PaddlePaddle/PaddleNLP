@@ -322,7 +322,6 @@ class LlamaRMSNorm(nn.Layer):
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
             hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
 
-
         if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
             hidden_states = paddle.cast(hidden_states, self.weight.dtype)
         return hidden_states * self.weight
@@ -368,8 +367,8 @@ class LlamaRotaryEmbedding(nn.Layer):
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
-        if seq_len > self.max_seq_len_cached:
-            self._set_cos_sin_cache(seq_len)
+        # if seq_len > self.max_seq_len_cached:
+        #     self._set_cos_sin_cache(seq_len)
         return (
             self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
             self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
@@ -397,8 +396,8 @@ class LlamaLinearScalingRotaryEmbedding(nn.Layer):
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
-        # if seq_len > self.max_seq_len_cached:
-        #    self._set_cos_sin_cache(seq_len)
+        if seq_len > self.max_seq_len_cached:
+            self._set_cos_sin_cache(seq_len)
         return (
             self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
             self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),

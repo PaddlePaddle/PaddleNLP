@@ -630,6 +630,7 @@ class Trainer:
                 None,  # return_dict
             ],
         )
+        paddle.fluid.core._set_prim_forward_blacklist("expand_v2")
         start_time = time.time()
         self._globalstep_last_start_time = time.time()
         self.state.epoch = 0
