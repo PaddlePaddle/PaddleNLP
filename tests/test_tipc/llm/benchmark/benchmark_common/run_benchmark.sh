@@ -21,7 +21,7 @@ function _set_params(){
     model_name_or_path=${1:-"facebook/llama-7b"}
     dataset_name_or_path=${2:-"llm_benchmark_zh"}
     intokens_max_length=${3:-"1024"}
-    learning_rates=${4:-"3e-05"}
+    learning_rate=${4:-"3e-05"}
     recompute=${5:-"true"}
     tensor_parallel_degree=${6:-"1"}
     lora=${7:-"false"}
@@ -39,7 +39,7 @@ function _set_params(){
     speed_unit="tokens/s"         # (必选)速度指标单位
     skip_steps=0                  # (必选)解析日志，跳过模型前几个性能不稳定的step
     keyword="Effective Tokens per second:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
-    convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
+    convergence_key="train_loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
     is_large_model=True           # (可选)普通模型默认为False，如果添加大模型且只取一条ips设置为True
 
     # 以下为通用执行命令，无特殊可不用修改
@@ -95,24 +95,24 @@ function _train(){
             --num_train_epochs 1 \
             --learning_rate ${learning_rate} \
             --warmup_steps 30 \
-            --logging_steps 1 \ 
             --evaluation_strategy no \
             --save_strategy no \
+            --logging_steps 1 \
             --src_length 1024 \
             --tgt_length 1024 \
             --intokens_max_length ${intokens_max_length} \
-            --fp16 True \
+            --fp16 1 \
             --fp16_opt_level O2 \
-            --do_train True \
-            --do_eval False \
-            --disable_tqdm True \
-            --eval_with_do_generation False \
+            --do_train 1 \
+            --do_eval 0 \
+            --disable_tqdm 1 \
+            --eval_with_do_generation 0 \
             --recompute ${recompute} \
             --tensor_parallel_degree ${tensor_parallel_degree} \
             --lora ${lora} \
             --prefix_tuning ${prefix_tuning} \
-            --benchmark True \
-            --intokens True
+            --benchmark 1 \
+            --intokens 1 \
             --device gpu"
 
     # 以下为通用执行命令，无特殊可不用修改
@@ -122,19 +122,15 @@ function _train(){
     else
         rm -rf ./mylog   # 注意执行前删掉log目录
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=$CUDA_VISIBLE_DEVICES \
-            train.py ${train_cmd}" 
+            finetune_generation.py ${train_cmd}" 
     fi
 
     cd ../llm/
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
 
     python -c "import paddlenlp"
-    if [[ ${model_name_or_path} =~ "CE" ]];then # CE精度-不限制执行时间
-        ${train_cmd} > ${log_file} 2>&1
-    else
-        timeout 15m ${train_cmd} > ${log_file} 2>&1
-        # echo ${train_cmd}
-    fi
+    ${train_cmd} > ${log_file} 2>&1
+
     if [ $? -ne 0 ];then
         echo -e "${model_name}, FAIL"
     else
@@ -149,7 +145,7 @@ function _train(){
 
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
 
-# source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
+source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@
-_train       # 如果只产出训练log,不解析,可取消注释
-# _run     # 该函数在run_model.sh中,执行时会调用_train; 如果不联调只产出训练log可以注掉本行,提交时需打开
+# _train       # 如果只产出训练log,不解析,可取消注释
+_run     # 该函数在run_model.sh中,执行时会调用_train; 如果不联调只产出训练log可以注掉本行,提交时需打开

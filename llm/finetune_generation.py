@@ -249,7 +249,7 @@ def main():
             tokenizer=tokenizer,
             max_length=data_args.src_length + data_args.tgt_length
             if training_args.pipeline_parallel_degree > 1
-            else -1,
+            else None,
             padding="max_length" if training_args.pipeline_parallel_degree > 1 else True,
             max_label_length=data_args.src_length + data_args.tgt_length
             if training_args.pipeline_parallel_degree > 1
