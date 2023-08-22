@@ -13,4 +13,5 @@
 # limitations under the License.
 
 from .fused_transformer_layers import *
+from .fused_dyquant_transformer_layers import *
 from .llama import *
