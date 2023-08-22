@@ -490,7 +490,7 @@ class Trainer:
                 logger.info(f"not loading ckpt :{self.args.dataset_rank}")
 
     def _wrap_model_and_load_sharded_checkpoint(self, resume_from_checkpoint):
-        # In the sharded mode, should invoke load_state_dict_from_checkpoint after _wrap_model.
+        # In the sharded mode, should invoke _load_from_checkpoint after _wrap_model.
         # In this mode, each sharding rank load sharded params, do not need to implement the broadcast logic.
         model = self._wrap_model(self.model_wrapped)
         if self.sharding_io is not None:
@@ -583,7 +583,7 @@ class Trainer:
         if self.args.should_load_sharding_stage1_model:
             model = self._wrap_model_and_load_sharded_checkpoint(resume_from_checkpoint)
         elif self.args.should_save_sharding_stage1_model:
-            # In the non-sharded mode, should invoke load_state_dict_from_checkpoint before _wrap_model.
+            # In the non-sharded mode, should invoke _load_from_checkpoint before _wrap_model.
             # In this mode, the rank0 load all params and the _wrap_model implicitly broadcast params from rank0 to the other ranks.
             model = self._wrap_model(self.model_wrapped)
             if self.sharding_io is not None:
