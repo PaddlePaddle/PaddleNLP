@@ -15,7 +15,6 @@ GPT/Llama pretraining scripts.
 """
 import math
 import os
-import random
 import sys
 import time
 from dataclasses import dataclass, field
@@ -30,6 +29,7 @@ from paddlenlp.trainer import (
     Trainer,
     TrainingArguments,
     get_last_checkpoint,
+    set_seed,
     speed_metrics,
 )
 from paddlenlp.transformers import (
@@ -249,16 +249,6 @@ def get_train_data_file(args):
     return files
 
 
-def set_seed(args):
-    if args.device == "cpu":
-        idx = 0
-    else:
-        idx = paddle.distributed.get_rank()
-    random.seed(args.seed + idx)
-    np.random.seed(args.seed + idx)
-    paddle.seed(args.seed + idx)
-
-
 class PretrainingTrainer(Trainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -338,7 +328,7 @@ def main():
     else:
         os.makedirs(data_args.cache_prefix, exist_ok=True)
 
-    set_seed(training_args)
+    set_seed(seed=training_args.seed, args=training_args)
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
