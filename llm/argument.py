@@ -13,6 +13,13 @@
 # limitations under the License.
 from dataclasses import dataclass, field
 
+from paddlenlp.trainer import TrainingArguments
+
+
+@dataclass
+class TrainingArguments(TrainingArguments):
+    benchmark: bool = field(default=False, metadata={"help": "Whether runs benchmark"})
+
 
 @dataclass
 class DataArgument:

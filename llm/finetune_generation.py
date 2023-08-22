@@ -17,7 +17,13 @@ import sys
 from functools import partial
 
 import paddle
-from argument import DataArgument, GenerateArgument, ModelArgument, QuantArgument
+from argument import (
+    DataArgument,
+    GenerateArgument,
+    ModelArgument,
+    QuantArgument,
+    TrainingArguments,
+)
 from data import get_convert_example, read_local_dataset
 from utils import (
     CausalLMTrainer,
@@ -30,7 +36,7 @@ from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.trainer import PdArgumentParser, TrainingArguments
+from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -258,10 +264,16 @@ def main():
     # Train
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
-        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
-        trainer.log_metrics("train", train_result.metrics)
-        trainer.save_metrics("train", train_result.metrics)
-        trainer.save_state()
+        if training_args.benchmark:
+            tokens_per_second = trainer.total_observed_tokens / train_result.metrics["train_runtime"]
+            effective_tokens_per_second = trainer.total_effective_tokens / train_result.metrics["train_runtime"]
+            logger.info(f"Tokens per second: {tokens_per_second:.2f}")
+            logger.info(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
+        else:
+            trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
+            trainer.log_metrics("train", train_result.metrics)
+            trainer.save_metrics("train", train_result.metrics)
+            trainer.save_state()
 
     # QAT
     if quant_args.do_qat:

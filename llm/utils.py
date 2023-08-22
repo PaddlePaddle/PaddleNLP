@@ -125,6 +125,16 @@ class CausalLMTrainer(Trainer):
         self.do_generation = do_generation
         self.gen_args = gen_args
         self.data_args = data_args
+        self.total_observed_tokens = 0
+        self.total_effective_tokens = 0
+
+    def training_step(self, model, inputs):
+        if self.args.benchmark:
+            input_ids = inputs["input_ids"]
+            self.total_observed_tokens += int(input_ids.shape[0] * input_ids.shape[1])
+            self.total_effective_tokens += int((input_ids != self.tokenizer.pad_token_id).sum())
+
+        return super().training_step(model, inputs)
 
     def prediction_step(
         self,
