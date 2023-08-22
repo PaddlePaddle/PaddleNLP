@@ -18,15 +18,9 @@ import paddle
 def bloom_postprocess_past_key_value(past_key_values):
     # (layer_num, bs, head_num/tensor_parallel_degree, prefixlen, head_dim)*2
     past_key_values = paddle.transpose(past_key_values, perm=[2, 0, 3, 1, 4]).split(2)
-    # (layer_num, bs, head_num/tensor_parallel_degree, prefixlen, head_dim)
-    num_hidden_layers, batch_size, num_attention_heads, num_prefix_tokens, head_hidden_size = past_key_values[0].shape
-    # (layer_num, bs, prefixlen, head_num/tensor_parallel_degree, head_dim)
-    keys, values = past_key_values[0].transpose([0, 1, 3, 2, 4]), past_key_values[1].transpose([0, 1, 3, 2, 4])
-    # (layer_num, bs*head_num/tensor_parallel_degree, head_dim, prefixlen)
-    keys = keys.reshape([num_hidden_layers, batch_size * num_attention_heads, head_hidden_size, num_prefix_tokens])
-    # (layer_num, bs*head_num/tensor_parallel_degree, prefixlen, head_dim)
-    values = values.reshape([num_hidden_layers, batch_size * num_attention_heads, num_prefix_tokens, head_hidden_size])
-
+    # keys: [layer_num, bs, head_num/tensor_parallel_degree, head_dim, prefixlen]
+    # value: [layer_num, bs, head_num/tensor_parallel_degree, prefixlen, head_dim]
+    keys, values = past_key_values[0].transpose([0, 1, 2, 4, 3]), past_key_values[1]
     return tuple(zip(keys, values))
 
 
@@ -42,11 +36,3 @@ def llama_postprocess_past_key_value(past_key_values):
     keys, values = paddle.transpose(past_key_values, perm=[2, 0, 1, 3, 4]).split(2)
 
     return tuple(zip(keys, values))
-
-
-def chatglm_pad_attention_mask(input_ids_shape, num_prefix_tokens, attention_mask):
-    prefix_attention_mask = paddle.ones(
-        [input_ids_shape[0], 1, input_ids_shape[-1], num_prefix_tokens], dtype=attention_mask.dtype
-    )
-    prefix_attention_mask = (prefix_attention_mask < 0.5).astype("int64")
-    return paddle.concat((prefix_attention_mask, attention_mask), axis=3)

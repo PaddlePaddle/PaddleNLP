@@ -278,12 +278,11 @@ class GPTConfig(PretrainedConfig):
         bos_token_id: int = 0,
         eol_token_id: int = 3,
         num_partitions: int = 1,
-        lm_shift_labels: bool = True,
         normalize_before: bool = True,
         recompute_granularity: str = "full",
         scale_qk_coeff: float = 1.0,
         tensor_parallel_degree: int = 1,
-        tensor_parallel_output:bool = True,
+        tensor_parallel_output: bool = True,
         output_attentions: bool = False,
         ignore_index: int = 0,
         use_flash_attention: bool = False,
@@ -312,7 +311,6 @@ class GPTConfig(PretrainedConfig):
         self.bos_token_id = bos_token_id
         self.eol_token_id = eol_token_id
         self.num_partitions = num_partitions
-        self.lm_shift_labels = lm_shift_labels
         self.normalize_before = normalize_before
         self.recompute_granularity = recompute_granularity
         self.scale_qk_coeff = scale_qk_coeff

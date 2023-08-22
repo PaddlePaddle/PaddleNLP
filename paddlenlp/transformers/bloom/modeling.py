@@ -114,6 +114,7 @@ def _expand_2d_mask(mask: Tensor, tgt_length: int) -> Tensor:
     batch_size, src_length = mask.shape[0], mask.shape[-1]
     tgt_length = tgt_length if tgt_length is not None else src_length
 
+    mask.stop_gradient = True
     return mask.unsqueeze(axis=[1, 2]).expand([batch_size, 1, tgt_length, src_length])
 
 
@@ -136,7 +137,7 @@ def build_alibi_tensor(attention_mask: Tensor, num_heads: int, dtype) -> Tensor:
     """
     # _, seq_length = attention_mask.shape[0], attention_mask.shape[-1]
     closest_power_of_2 = 2 ** math.floor(math.log2(num_heads))
-    base = paddle.to_tensor(2 ** (-(2 ** -(math.log2(closest_power_of_2) - 3))), dtype=paddle.float32)
+    base = paddle.full([], 2 ** (-(2 ** -(math.log2(closest_power_of_2) - 3))), dtype=paddle.float32)
     powers = paddle.arange(1, 1 + closest_power_of_2, dtype=paddle.float32)
     slopes = paddle.pow(base, powers)
 
@@ -401,6 +402,7 @@ class BloomAttention(nn.Layer):
         value_layer = value_layer.reshape([batch_size * self.num_heads, kv_length, self.head_dim])
 
         # [batch_size * num_heads, q_length, kv_length]
+        # alibi:[batch_size * num_heads, q_length, kv_length]
         # we use `Tensor.baddbmm` instead of `paddle.baddbmm` as the latter isn't supported by TorchScript v1.11
         attention_scores = baddbmm(
             alibi, batch1=query_layer, batch2=key_layer, beta=self.beta, alpha=self.inv_norm_factor
@@ -1182,16 +1184,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
 
         loss = None
         if labels is not None:
-            if self.config.lm_shift_labels:
-                # Shift so that tokens < n predict n
-                shift_logits = lm_logits[..., :-1, :]
-                shift_labels = labels[..., 1:]
-            else:
-                shift_logits = lm_logits
-                shift_labels = labels
-
-            # Flatten the tokens
-            loss = self.criterion(shift_logits, shift_labels)
+            loss = self.criterion(lm_logits, labels)
 
         if not return_dict:
             output = (lm_logits,) + transformer_outputs[1:]

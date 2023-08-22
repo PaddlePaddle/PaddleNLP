@@ -43,7 +43,7 @@ from paddle.optimizer import Optimizer
 
 
 class ClipGradForShardedMOEByGlobalNorm(ClipGradForMOEByGlobalNorm):
-    @paddle.no_grad
+    @paddle.no_grad()
     def _dygraph_clip(self, params_grads):
         normal_params_grads = []
         moe_params_grads = []

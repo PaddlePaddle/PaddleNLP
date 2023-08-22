@@ -151,10 +151,6 @@ LLAMA_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
         "__internal_testing__/micro-random-llama": "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/micro-random-llama/model_state.pdparams",
         "__internal_testing__/tiny-random-llama": "https://bj.bcebos.com/paddlenlp/models/community/__internal_testing__/tiny-random-llama/model_state.pdparams",
-        "facebook/llama-7b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-7b/model_state.pdparams",
-        "facebook/llama-13b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-13b/model_state.pdparams",
-        "facebook/llama-30b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-30b/model_state.pdparams",
-        "facebook/llama-65b": "https://bj.bcebos.com/paddlenlp/models/community/facebook/llama-65b/model_state.pdparams",
     },
 }
 
@@ -232,6 +228,7 @@ class LlamaConfig(PretrainedConfig):
         hidden_size=4096,
         intermediate_size=11008,
         max_position_embeddings=2048,
+        seq_length=2048,
         num_hidden_layers=32,
         num_attention_heads=32,
         num_key_value_heads=None,
@@ -240,6 +237,8 @@ class LlamaConfig(PretrainedConfig):
         use_cache=True,
         use_recompute=False,
         recompute_granularity="full",
+        pp_recompute_interval=0,
+        no_recompute_layers=None,
         fuse_attention_qkv=False,
         use_flash_attention=False,
         fuse_attention_ffn=False,
@@ -247,13 +246,14 @@ class LlamaConfig(PretrainedConfig):
         tensor_parallel_output=True,
         sequence_parallel=False,
         fuse_sequence_parallel_allreduce=False,
-        lm_shift_labels=True,
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
         tie_word_embeddings=False,
         alibi=False,
         rope_fusion_level=None,
+        rope_scaling_factor=1.0,
+        rope_scaling_type=None,
         embedding_output_size=None,
         **kwargs,
     ):
@@ -264,6 +264,7 @@ class LlamaConfig(PretrainedConfig):
         self.embedding_output_size = embedding_output_size
         self.intermediate_size = intermediate_size
         self.max_position_embeddings = max_position_embeddings
+        self.seq_length = seq_length
         self.num_hidden_layers = num_hidden_layers
         self.num_attention_heads = num_attention_heads
 
@@ -277,6 +278,8 @@ class LlamaConfig(PretrainedConfig):
         self.use_cache = use_cache
         self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
+        self.no_recompute_layers = no_recompute_layers
+        self.pp_recompute_interval = pp_recompute_interval
         self.fuse_attention_qkv = fuse_attention_qkv
         self.use_flash_attention = use_flash_attention
         self.fuse_attention_ffn = fuse_attention_ffn
@@ -284,7 +287,6 @@ class LlamaConfig(PretrainedConfig):
         self.tensor_parallel_output = tensor_parallel_output
         self.sequence_parallel = sequence_parallel
         self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
-        self.lm_shift_labels = lm_shift_labels
 
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
@@ -292,6 +294,8 @@ class LlamaConfig(PretrainedConfig):
         self.alibi = alibi
 
         self.rope_fusion_level = rope_fusion_level
+        self.rope_scaling_factor = rope_scaling_factor
+        self.rope_scaling_type = rope_scaling_type
 
         super().__init__(
             pad_token_id=pad_token_id,
