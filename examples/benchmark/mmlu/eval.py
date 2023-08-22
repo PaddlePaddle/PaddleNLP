@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# Adapted from https://github.com/ymcui/Chinese-LLaMA-Alpaca and https://github.com/SJTU-LIT/ceval
+# Adapted from https://github.com/hendrycks/test
 import argparse
 import json
 import os
@@ -65,8 +64,8 @@ def main(args, evaluator):
         print("Average accuracy {:.3f} - {}".format(subcat_acc, subcat))
         summary[subcat] = {
             "acc:": subcat_acc,
-            "correct:": np.sum(np.concatenate(subcat_cors[subcat])),
-            "num:": np.concatenate(subcat_cors[subcat]).size,
+            "correct:": int(np.sum(np.concatenate(subcat_cors[subcat]))),
+            "num:": int(np.concatenate(subcat_cors[subcat]).size),
         }
 
     for cat in cat_cors:
@@ -77,8 +76,8 @@ def main(args, evaluator):
     print("Model:", args.model_name_or_path)
     summary["All"] = {
         "acc:": weighted_acc,
-        "correct:": np.sum(np.concatenate(all_cors)),
-        "num:": np.concatenate(all_cors).size,
+        "correct:": int(np.sum(np.concatenate(all_cors))),
+        "num:": int(np.concatenate(all_cors).size),
     }
     json.dump(
         summary,

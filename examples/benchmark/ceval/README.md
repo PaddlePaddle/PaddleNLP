@@ -10,14 +10,12 @@
 wget https://huggingface.co/datasets/ceval/ceval-exam/resolve/main/ceval-exam.zip
 unzip ceval-exam.zip -d data
 ```
-将data文件夹放置于本项目的scripts/ceval目录下。
 
 ## 运行预测脚本
 
-运行以下脚本：
+在当前目录运行以下脚本：
 
 ```
-cd scripts/ceval
 python eval.py \
     --model_name_or_path /path/to/your/model \
     --cot False \
