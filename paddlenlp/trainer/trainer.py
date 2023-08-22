@@ -476,6 +476,12 @@ class Trainer:
                 if os.path.isfile(weights_file):
                     # We load the model state dict on the CPU to avoid an OOM error.
                     state_dict = paddle.load(weights_file, return_numpy=True)
+                    if (isinstance(self.model, LoRAModel) and self.lmodel.lora_config.tensor_parallel_degree > 1) or (
+                        isinstance(self.model, PrefixModelForCausalLM)
+                        and self.model.prefix_config.tensor_parallel_degree > 1
+                    ):
+                        state_dict = self.model._convert_tensor_parallel(state_dict)
+
                     # If the model is on the GPU, it still works!
                     self._set_state_dict_in_model(state_dict)
                     # release memory
@@ -923,13 +929,11 @@ class Trainer:
             if os.path.exists(best_model_path):
                 # We load the model state dict on the CPU to avoid an OOM error.
                 state_dict = paddle.load(best_model_path, return_numpy=True)
-                if isinstance(self.model, LoRAModel) and self.model.lora_config.tensor_parallel_degree > 1:
-                    state_dict = self.model._convert_tensor_parallel(lora_state_dict=state_dict)
-                elif (
+                if (isinstance(self.model, LoRAModel) and self.model.lora_config.tensor_parallel_degree > 1) or (
                     isinstance(self.model, PrefixModelForCausalLM)
                     and self.model.prefix_config.tensor_parallel_degree > 1
                 ):
-                    state_dict = self.model._convert_tensor_parallel(prefix_state_dict=state_dict)
+                    state_dict = self.model._convert_tensor_parallel(state_dict)
                 # If the model is on the GPU, it still works!
                 self._set_state_dict_in_model(state_dict)
             else:
