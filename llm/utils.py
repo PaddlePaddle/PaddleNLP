@@ -35,6 +35,22 @@ from paddlenlp.trainer.trainer_utils import has_length
 from paddlenlp.utils.log import logger
 
 
+def get_weight_path(model_dir, cls):
+    return cls._resolve_model_file_path(model_dir)
+
+
+def get_state_dict(model_dir, cls, config):
+    weight_file = get_weight_path(model_dir, cls)[0]
+
+    world_size = paddle.distributed.get_world_size()
+    if world_size > 1 and weight_file.endswith("model_state.pdparams"):
+        state_dict = cls.convert_tensor_parallel(weight_file, config)
+    else:
+        state_dict = paddle.load(weight_file)
+
+    return state_dict
+
+
 def compute_metrics(eval_preds):
 
     flattened_preds = np.array(eval_preds.predictions).flatten()
@@ -119,14 +135,6 @@ def get_lora_target_modules(model):
             ".*out_proj.*",
             ".*linear1.*",
             ".*linear2.*",
-        ]
-    elif model.base_model_prefix == "qwen":
-        target_modules = [
-            ".*attn.c_attn.*",
-            ".*attn.c_proj.*",
-            ".*mlp.w1.*",
-            ".*mlp.w2.*",
-            ".*mlp.c_proj.*",
         ]
     else:
         raise ValueError(f"Unknown base_model_prefix: {model.base_model_prefix}.")
@@ -330,32 +338,54 @@ def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
         return inst_data.astype("int64").reshape([-1, max_len])
 
 
-def dybatch_preprocess(tokenizer, texts: list[str], max_length: int):
+def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, model_type: str):
     """Pre-process generation inputs."""
-    input_ids = []
-    if isinstance(texts, str):
-        texts = [texts]
+    if "chatglm" in model_type:
+        input_ids = []
+        position_ids = []
 
-    for text in texts:
-        tokens = tokenizer(
-            text,
-            return_tensors="np",
-            padding=False,
-            return_attention_mask=False,
-            return_token_type_ids=False,
-        )
-        input_ids.append(tokens["input_ids"][0])
+        for text in texts:
+            tokens = tokenizer(text, return_tensors="np", padding=True)
+            input_ids.append(tokens["input_ids"][0])
+            position_ids.append(tokens["position_ids"][0])
 
-    inputs = {}
-    pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][-1]
-    inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
-    bs = inputs["input_ids"].shape[0]
-    max_len = max(map(len, input_ids))
+        inputs = {}
+        pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][0]
 
-    position_ids = paddle.zeros(shape=[bs, max_len], dtype="int64")
-    for i in range(bs):
-        position_ids[i, : seq_len[i]] = paddle.arange(seq_len[i])
-    inputs["position_ids"] = position_ids
+        inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
+        bs = inputs["input_ids"].shape[0]
+        max_len = max(map(len, input_ids))
+
+        inst_data_pos = []
+        for i in range(len(position_ids)):
+            inst_data_pos.append(np.array([list(inst) + [0] * (max_len - len(inst)) for inst in position_ids[i]]))
+        inputs["position_ids"] = paddle.to_tensor(np.array(inst_data_pos))
+    else:
+        input_ids = []
+        position_ids = []
+        if isinstance(texts, str):
+            texts = [texts]
+
+        for text in texts:
+            tokens = tokenizer(
+                text,
+                return_tensors="np",
+                padding=False,
+                return_attention_mask=False,
+                return_token_type_ids=False,
+            )
+            input_ids.append(tokens["input_ids"][0])
+
+        inputs = {}
+        pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][-1]
+        inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
+        bs = inputs["input_ids"].shape[0]
+        max_len = max(map(len, input_ids))
+
+        position_ids = paddle.zeros(shape=[bs, max_len], dtype="int64")
+        for i in range(bs):
+            position_ids[i, : seq_len[i]] = paddle.arange(seq_len[i])
+        inputs["position_ids"] = position_ids
 
     tgt_ids = [input[-1:] for input in input_ids]
     tgt_pos = []
