@@ -201,7 +201,7 @@ python merge_lora_params.py \
 - `device`: 运行环境，默认为gpu。
 </div></details>
 
-## 4. 动态图推理
+## 4. 推理
 
 ### 4.1 动态图推理
 
@@ -246,7 +246,41 @@ python predictor.py \
     --type dygraph
 ```
 
-### 4.5 参数介绍
+### 4.5 InferenceModel 动态图推理
+
+```shell
+python predictor.py \
+    --model_name_or_path facebook/llama-7b \
+    --dtype float16 \
+    --max_length 1024 \
+    --output_file "predict.json"
+    --mode "dygraph" \
+    --inference_model
+```
+
+### 4.6 InferenceModel 动转静
+
+```shell
+python export_model.py \
+    --model_name_or_path facebook/llama-7b \
+    --output_path ./inference \
+    --dtype float16 \
+    --inference_model
+```
+
+### 4.7 InferenceModel 静态图推理
+
+```shell
+python predictor.py \
+    --model_name_or_path ./inference \
+    --dtype float16 \
+    --max_length 1024 \
+    --output_file "infer.json" \
+    --mode static \
+    --inference_model
+```
+
+### 4.8 参数介绍
 
 **参数：**
 
@@ -264,6 +298,8 @@ python predictor.py \
 - `device`: 运行环境，默认为gpu。
 - `dtype`: 模型参数dtype，默认为None。如果没有传入`lora_path`、`prefix_path`则必须传入
 - `gpt`: 是否使用GPTForCausalLM模型，默认为False。
+- `mode`: 使用动态图或者静态图推理，值为：[dygraph, static]，默认为 dygraph。
+- `inference_model`: 是否使用InferenceModel 推理，默认值为 False。
 
 </div></details>
 
@@ -353,14 +389,3 @@ python  finetune_generation.py ./llama/gptq_argument.json
 - 更多参数详见精调参数介绍。
 
 </div></details>
-
-## 7. 静态图推理
-
-
-```shell
-python predictor.py \
-    --model_name_or_path inference \
-    --batch_size 1 \
-    --data_file ./data/dev.json \
-    --type static
-```
