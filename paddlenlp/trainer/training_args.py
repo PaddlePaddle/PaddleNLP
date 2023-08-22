@@ -313,8 +313,6 @@ class TrainingArguments:
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
         flatten_param_grads (`bool`, *optional*):
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
-        skip_profile_timer (`bool`, *optional*):
-            Whether skip profile timer, timer will record time usage of forward/ backward/ step, etc.
         max_shard_size (`str`, *optional*):
             The max shard size for saving model state dict param files. Default is `"10GB"`.
     """
@@ -642,10 +640,6 @@ class TrainingArguments:
     lazy_data_processing: Optional[bool] = field(
         default=True,
         metadata={"help": "Whether use lazy data processing."},
-    )
-    skip_profile_timer: Optional[bool] = field(
-        default=True,
-        metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl"},
     )
     max_shard_size: Optional[str] = field(
         default="10GB",
