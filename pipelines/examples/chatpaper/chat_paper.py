@@ -290,7 +290,7 @@ def tr_result(file_name):
             break
         else:
             # Further optimization is needed
-            time.sleep(60)
+            time.sleep(30)
     return tr_result[:4]
 
 
@@ -374,7 +374,7 @@ with gr.Blocks() as demo:
                     with gr.Column():
                         gr.Dropdown(choices=["英文", "中文"], max_choices=1, label="论文原文-PDF插件-支持下载；此处为PDF占位符")
                         ori_paper = gr.Gallery(label="论文原文", show_label=False, elem_id="gallery").style(
-                            columns=[2], rows=[2], object_fit="contain", height="auto"
+                            columns=[1], rows=[1], object_fit="contain", height="1100px"
                         )
                         ori_pdf = gr.File(label="原文下载链接")
                     with gr.Accordion("   "):
@@ -406,7 +406,7 @@ with gr.Blocks() as demo:
                     with gr.Column():
                         gr.Dropdown(choices=["英文", "中文"], max_choices=1, label="论文原文-PDF插件-支持下载；此处为PDF占位符")
                         ori_paper_c = gr.Gallery(label="论文原文", show_label=False, elem_id="gallery").style(
-                            columns=[2], rows=[2], object_fit="contain", height="auto"
+                            columns=[2], rows=[2], object_fit="contain", height="1100px"
                         )
                         ori_pdf_c = gr.File(label="原文下载链接")
                     with gr.Accordion("   "):
