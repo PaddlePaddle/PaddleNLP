@@ -64,7 +64,7 @@ class QWenTokenizer(PretrainedTokenizer):
         super().__init__(**kwargs)
         if not is_tiktoken_available():
             raise ValueError("tiktoken is not installed, please install it use: pip install tiktoken")
-        global tiktoken
+
         import tiktoken as tk
 
         tiktoken = tk

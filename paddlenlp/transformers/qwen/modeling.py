@@ -66,7 +66,6 @@ class QWenAttention(nn.Layer):
     def __init__(self, config):
         super().__init__()
 
-        self.register_buffer("masked_bias", paddle.to_tensor(-1e4), persistable=False)
         self.seq_length = config.seq_length
 
         self.hidden_size = config.hidden_size
@@ -327,8 +326,6 @@ class QWenBlock(nn.Layer):
 class QWenPreTrainedModel(PretrainedModel):
     config_class = QWenConfig
     base_model_prefix = "qwen"
-    # will use in unittest
-    supports_gradient_checkpointing = True
 
     def __init__(self, *inputs, **kwargs):
         super().__init__(*inputs, **kwargs)
@@ -470,26 +467,14 @@ class QWenPreTrainedModel(PretrainedModel):
                     )
                 )
 
-    def _set_gradient_checkpointing(self, module, value=False):
-        if isinstance(module, QWenModel):
-            module.enable_recompute = value
-
 
 class QWenModel(QWenPreTrainedModel):
-    _keys_to_ignore_on_load_missing = ["attn.masked_bias"]
-
     def __init__(self, config):
         super().__init__(config)
         self.vocab_size = config.vocab_size
         self.num_hidden_layers = config.num_hidden_layers
         self.embed_dim = config.hidden_size
         self.enable_recompute = False
-        if config.dtype == "bfloat16":
-            self.dtype = paddle.bfloat16
-        elif config.dtype == "float32":
-            self.dtype = paddle.float32
-        elif config.dtype == "float16":
-            self.dtype = paddle.float16
 
         if config.tensor_parallel_degree > 1:
             self.wte = mpu.VocabParallelEmbedding(
@@ -512,8 +497,6 @@ class QWenModel(QWenPreTrainedModel):
             self.embed_dim,
             eps=config.layer_norm_epsilon,
         )
-
-        # self.post_init()
 
     def get_input_embeddings(self):
         return self.wte
@@ -554,7 +537,7 @@ class QWenModel(QWenPreTrainedModel):
 
     def get_masks(self, batch_size, seq_length, past_length, padding_mask=None):
         # casual mask
-        casual_mask = paddle.tril(paddle.ones([batch_size, 1, seq_length, seq_length])).astype("bool")
+        casual_mask = paddle.tril(paddle.ones([batch_size, 1, seq_length, seq_length], dtype="bool"))
         if past_length > 0:
             casual_mask = paddle.concat(
                 [paddle.ones([batch_size, 1, seq_length, past_length], dtype="bool"), casual_mask], axis=-1
@@ -610,25 +593,23 @@ class QWenModel(QWenPreTrainedModel):
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-        # device = input_ids.device if input_ids is not None else inputs_embeds.device
-
         if past_key_values is None:
             past_length = 0
             past_key_values = tuple([None] * len(self.h))
         else:
             past_length = past_key_values[0][0].shape[1]
 
-        # bool 4D mask
-        attention_mask = self.get_masks(input_shape[0], input_shape[1], past_length, padding_mask=attention_mask)
-        zero = paddle.zeros(attention_mask.shape, dtype=self.dtype)
-        neg_inf = paddle.full_like(attention_mask, paddle.finfo(self.dtype).min, dtype=self.dtype)
-        # dtype 4D mask
-        attention_mask = paddle.where(attention_mask, zero, neg_inf)
-
         encoder_attention_mask = None
         if inputs_embeds is None:
             inputs_embeds = self.wte(input_ids)
         hidden_states = inputs_embeds
+
+        # bool 4D mask
+        attention_mask = self.get_masks(input_shape[0], input_shape[1], past_length, padding_mask=attention_mask)
+        zero = paddle.zeros(attention_mask.shape, dtype=hidden_states.dtype)
+        neg_inf = paddle.full_like(attention_mask, paddle.finfo(hidden_states.dtype).min, dtype=hidden_states.dtype)
+        # dtype 4D mask
+        attention_mask = paddle.where(attention_mask, zero, neg_inf)
 
         hidden_states = self.drop(hidden_states)
         output_shape = input_shape + [
@@ -637,9 +618,7 @@ class QWenModel(QWenPreTrainedModel):
 
         if self.enable_recompute and self.training:
             if use_cache:
-                logger.warning_once(
-                    "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
-                )
+                logger.warning_once("`use_cache=True` is incompatible with recompute")
                 use_cache = False
 
         presents = () if use_cache else None
@@ -724,12 +703,10 @@ class QWenLMHead(nn.Layer):
 
 class QWenForCausalLM(QWenPreTrainedModel):
     _keys_to_ignore_on_load_missing = [r"h\.\d+\.attn\.rotary_emb\.inv_freq"]
-    _keys_to_ignore_on_load_unexpected = [r"h\.\d+\.attn\.masked_bias"]
 
     def __init__(self, config):
         super().__init__(config)
         self.qwen = QWenModel(config)
-        # self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
         self.lm_head = QWenLMHead(config)
 
     def get_output_embeddings(self):
@@ -828,12 +805,8 @@ class QWenForCausalLM(QWenPreTrainedModel):
 
         loss = None
         if labels is not None:
-            # TODO shift_label if
-            # labels = labels.to(lm_logits.device)
-            shift_logits = lm_logits[..., :-1, :]
-            shift_labels = labels[..., 1:]
             loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(shift_logits.reshape([-1, shift_logits.shape[-1]]), shift_labels.reshape([-1]))
+            loss = loss_fct(lm_logits, labels)
 
         if not return_dict:
             output = (lm_logits,) + transformer_outputs[1:]
