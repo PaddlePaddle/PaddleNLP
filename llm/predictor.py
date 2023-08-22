@@ -48,7 +48,7 @@ class PredictorArgument:
     model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
     src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
-    max_length: int = field(default=1024, metadata={"help": "the max length for decoding."})
+    max_length: int = field(default=2048, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=1, metadata={"help": "top_k parameter for generation"})
     top_p: float = field(default=1.0, metadata={"help": "top_p parameter for generation"})
     temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
@@ -60,7 +60,7 @@ class PredictorArgument:
         default=None, metadata={"help": "The directory of Prefix Tuning parameters. Default to None"}
     )
     mode: str = field(
-        default="dygraph", metadata={"help": "the type of predictor, it should be one of [dygraph, static]"}
+        default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
@@ -456,7 +456,7 @@ def create_predictor(
     tensor_parallel_degree = paddle.distributed.get_world_size()
     tensor_parallel_rank = paddle.distributed.get_rank()
     if not predictor_args.inference_model:
-        if predictor_args.mode == "dygraph":
+        if predictor_args.mode == "dynamic":
             if model_args.gpt:
                 sys.path.append("./gpt-3")
                 from modeling import GPTForCausalLM
@@ -492,9 +492,9 @@ def create_predictor(
         elif predictor_args.mode == "static":
             predictor = StaticGraphPredictor(predictor_args, tokenizer=tokenizer)
         else:
-            raise ValueError("the `mode` should be one of [dygraph, static]")
+            raise ValueError("the `mode` should be one of [dynamic, static]")
     else:
-        if predictor_args.mode == "dygraph":
+        if predictor_args.mode == "dynamic":
             # TODO(wj-Mcat): complete AutoInferenceModel & AutoPredictor
             assert (
                 "llama" in predictor_args.model_name_or_path
@@ -520,7 +520,7 @@ def create_predictor(
             cache_kvs_shape = LlamaForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
             predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
         else:
-            raise ValueError("the `mode` should be one of [dygraph, static]")
+            raise ValueError("the `mode` should be one of [dynamic, static]")
     return predictor
 
 

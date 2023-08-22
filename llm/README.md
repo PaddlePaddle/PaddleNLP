@@ -16,7 +16,7 @@
 我们提供了模型预训练、精调（SFT、LoRA、PrefixTuning）、量化、动态图推理、服务化部署全流程脚本，开发者可以根据自己的需求定制化自己的大语言模型。
 
 <div align="center">
-    <img width="700" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/1a65c4e2-885a-4948-a139-f9ff4e649457">
+    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/009bbb4e-baee-4c4a-a52e-94ac44c73c90">
 </div>
 
 <div align="center">
@@ -201,93 +201,102 @@ python merge_lora_params.py \
 - `device`: 运行环境，默认为gpu。
 </div></details>
 
-## 4. 推理
+## 4. 模型推理
 
 ### 4.1 动态图推理
 
 ```shell
+# 预训练&SFT动态图模型推理
 python predictor.py \
     --model_name_or_path meta-llama/Llama-2-7b-chat \
     --batch_size 1 \
     --data_file ./data/dev.json \
     --dtype "float16" \
-    --type dygraph
+    --mode "dynamic"
+
+# LoRA动态图模型推理
+python predictor.py \
+    --model_name_or_path meta-llama/Llama-2-7b-chat \
+    --batch_size 1 \
+    --data_file ./data/dev.json \
+    --lora_path ./checkpoints/llama_lora_ckpts \
+    --mode "dynamic"
+
+# Prefix Tuning动态图模型推理
+python predictor.py \
+    --model_name_or_path meta-llama/Llama-2-7b-chat \
+    --batch_size 1 \
+    --data_file ./data/dev.json \
+    --prefix_path ./checkpoints/llama_pt_ckpts \
+    --mode "dynamic"
 ```
 
 ### 4.2 静态图推理
 
 ```shell
+# 首先需要运行一下命令将动态图导出为静态图
+# LoRA需要先合并参数，详见3.7LoRA参数合并
+# Prefix Tuning暂不支持
+python export_model.py \
+    --model_name_or_path meta-llama/Llama-2-7b-chat \
+    --output_path ./inference \
+    --dtype float16 \
+
+
+# 静态图模型推理
 python predictor.py \
     --model_name_or_path inference \
     --batch_size 1 \
     --data_file ./data/dev.json \
     --dtype "float16" \
-    --type static
+    --mode "static"
 ```
 
-### 4.3 加载LoRA参数
+### 4.3 InferenceModel 动态图推理
 
 ```shell
+# InferenceModel 动态图推理
+# LoRA需要先合并参数，详见3.7LoRA参数合并
+# Prefix Tuning暂不支持
 python predictor.py \
-    --model_name_or_path THUDM/chatglm2-6b \
-    --batch_size 1 \
-    --data_file ./data/dev.json \
-    --lora_path ./checkpoints/chatglm_v2_lora_ckpts \
-    --type dygraph
-```
-
-### 4.4 加载Prefix Tuning参数
-```shell
-python predictor.py \
-    --model_name_or_path THUDM/chatglm2-6b \
-    --batch_size 1 \
-    --data_file ./data/dev.json \
-    --prefix_path ./checkpoints/chatglm_v2_pt_ckpts \
-    --type dygraph
-```
-
-### 4.5 InferenceModel 动态图推理
-
-```shell
-python predictor.py \
-    --model_name_or_path facebook/llama-7b \
+    --model_name_or_path meta-llama/Llama-2-7b-chat \
     --dtype float16 \
     --max_length 1024 \
-    --output_file "predict.json"
-    --mode "dygraph" \
+    --mode "dynamic" \
     --inference_model
 ```
 
-### 4.6 InferenceModel 动转静
+### 4.4 InferenceModel 静态图推理
 
 ```shell
+# 首先需要运行一下命令将InferenceModel动态图导出为静态图
+# LoRA需要先合并参数，详见3.7LoRA参数合并
+# Prefix Tuning暂不支持
 python export_model.py \
-    --model_name_or_path facebook/llama-7b \
+    --model_name_or_path meta-llama/Llama-2-7b-chat \
     --output_path ./inference \
     --dtype float16 \
     --inference_model
-```
 
-### 4.7 InferenceModel 静态图推理
-
-```shell
+# InferenceModel 静态图推理
 python predictor.py \
     --model_name_or_path ./inference \
     --dtype float16 \
     --max_length 1024 \
     --output_file "infer.json" \
-    --mode static \
+    --mode "static" \
     --inference_model
 ```
 
-### 4.8 参数介绍
 
-**参数：**
+### 4.5 参数介绍
+
+<details><summary>&emsp; 脚本参数介绍 </summary><div>
 
 - `model_name_or_path`: 必须，预训练模型名称或者本地的模型路径，用于热启模型和分词器，默认为None。
 - `batch_size`: 批处理大小，默认为8。该参数越大，占用显存越高；该参数越小，占用显存越低。
 - `src_length`: 模型输入上下文最大长度，默认为1024。
-- `max_length`:模型生成文本最大长度，默认为1024。
+- `max_length`:推理过程中模型输入最大长度，也即文本生成的最长长度为`max_length-len(input_ids)`, 默认为2048。
 - `lora_path`: LoRA参数和配置路径，对LoRA参数进行初始化，默认为None。
 - `prefix_path`: Prefix Tuning参数和配置路径，对Prefix Tuning参数进行初始化，默认为None。
 - `top_k`: “采样”策略中为 top-k 过滤保留的最高概率标记的数量。默认为1，等价于贪心策略。
@@ -298,7 +307,7 @@ python predictor.py \
 - `device`: 运行环境，默认为gpu。
 - `dtype`: 模型参数dtype，默认为None。如果没有传入`lora_path`、`prefix_path`则必须传入
 - `gpt`: 是否使用GPTForCausalLM模型，默认为False。
-- `mode`: 使用动态图或者静态图推理，值为：[dygraph, static]，默认为 dygraph。
+- `mode`: 使用动态图或者静态图推理，值为：[dynamic, static]，默认为 dynamic。
 - `inference_model`: 是否使用InferenceModel 推理，默认值为 False。
 
 </div></details>
