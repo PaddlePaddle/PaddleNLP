@@ -1811,6 +1811,7 @@ class Trainer:
                     merge_tensor_parallel=merge_tensor_parallel,
                     variant=self.args.weight_name_suffix,
                     is_main_process=self.args.should_save,
+                    max_shard_size=self.args.max_shard_size,
                 )
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
@@ -1828,6 +1829,7 @@ class Trainer:
                 merge_tensor_parallel=merge_tensor_parallel,
                 variant=self.args.weight_name_suffix,
                 is_main_process=self.args.should_save,
+                max_shard_size=self.args.max_shard_size,
             )
 
         if self.args.should_save:

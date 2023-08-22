@@ -313,6 +313,8 @@ class TrainingArguments:
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
         flatten_param_grads (`bool`, *optional*):
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
+        max_shard_size (`str`, *optional*):
+            The max shard size for saving model state dict param files. Default is `"10GB"`.
     """
 
     output_dir: str = field(
@@ -638,6 +640,10 @@ class TrainingArguments:
     lazy_data_processing: Optional[bool] = field(
         default=True,
         metadata={"help": "Whether use lazy data processing."},
+    )
+    max_shard_size: Optional[str] = field(
+        default="10GB",
+        metadata={"help": "The max shard size for saving model state dict param files."},
     )
 
     def __post_init__(self):
