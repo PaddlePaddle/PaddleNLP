@@ -52,6 +52,10 @@ def is_psutil_available():
     return importlib.util.find_spec("psutil") is not None
 
 
+def is_tiktoken_available():
+    return importlib.util.find_spec("tiktoken") is not None
+
+
 def is_torch_available() -> bool:
     """check if `torch` package is installed
     Returns:
