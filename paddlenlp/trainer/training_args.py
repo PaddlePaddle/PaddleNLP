@@ -317,6 +317,8 @@ class TrainingArguments:
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
         skip_profile_timer (`bool`, *optional*):
             Whether skip profile timer, timer will record time usage of forward/ backward/ step, etc.
+        max_shard_size (`str`, *optional*):
+            The max shard size for saving model state dict param files. Default is `"10GB"`.
     """
 
     output_dir: str = field(
@@ -676,6 +678,10 @@ class TrainingArguments:
     skip_profile_timer: Optional[bool] = field(
         default=True,
         metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl"},
+    )
+    max_shard_size: Optional[str] = field(
+        default="10GB",
+        metadata={"help": "The max shard size for saving model state dict param files."},
     )
 
     def __post_init__(self):
