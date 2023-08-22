@@ -121,7 +121,7 @@ def get_lora_target_modules(model):
             ".*linear1.*",
             ".*linear2.*",
         ]
-    elif model.base_model_prefix == "transformer":
+    elif model.base_model_prefix == "qwen":
         target_modules = [
             ".*attn.c_attn.*",
             ".*attn.c_proj.*",

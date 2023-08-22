@@ -326,7 +326,7 @@ class QWenBlock(nn.Layer):
 
 class QWenPreTrainedModel(PretrainedModel):
     config_class = QWenConfig
-    base_model_prefix = "transformer"
+    base_model_prefix = "qwen"
     # will use in unittest
     supports_gradient_checkpointing = True
 
@@ -350,14 +350,14 @@ class QWenPreTrainedModel(PretrainedModel):
             base_actions = {
                 # Column Linear
                 "lm_head.weight": partial(fn, is_column=True),
-                "transformer.h.0.mlp.w2.weight": partial(fn, is_column=True),
-                "transformer.h.0.mlp.w1.weight": partial(fn, is_column=True),
-                "transformer.h.0.attn.c_attn.weight": partial(fn, is_column=True, is_naive_3fuse=True),
-                "transformer.h.0.attn.c_attn.bias": partial(fn, is_column=True, is_naive_3fuse=True),
+                "qwen.h.0.mlp.w2.weight": partial(fn, is_column=True),
+                "qwen.h.0.mlp.w1.weight": partial(fn, is_column=True),
+                "qwen.h.0.attn.c_attn.weight": partial(fn, is_column=True, is_naive_3fuse=True),
+                "qwen.h.0.attn.c_attn.bias": partial(fn, is_column=True, is_naive_3fuse=True),
                 # Row Linear
-                "transformer.wte.weight": partial(fn, is_column=False),
-                "transformer.h.0.mlp.c_proj.weight": partial(fn, is_column=False),
-                "transformer.h.0.attn.c_proj.weight": partial(fn, is_column=False),
+                "qwen.wte.weight": partial(fn, is_column=False),
+                "qwen.h.0.mlp.c_proj.weight": partial(fn, is_column=False),
+                "qwen.h.0.attn.c_proj.weight": partial(fn, is_column=False),
             }
             for key, action in base_actions.items():
                 if "h.0." in key:
@@ -424,10 +424,10 @@ class QWenPreTrainedModel(PretrainedModel):
         for mapping in mappings:
             mapping[0] = "transformer." + mapping[0]
             if len(mapping) > 1 and mapping[1] is not None:
-                mapping[1] = "transformer." + mapping[1]
+                mapping[1] = "qwen." + mapping[1]
 
         if config.architectures is not None:
-            if "QWenLMHeadModel" in config.architectures:
+            if "QWenForCausalLM" in config.architectures:
                 mappings.extend(
                     [
                         [
@@ -728,7 +728,7 @@ class QWenForCausalLM(QWenPreTrainedModel):
 
     def __init__(self, config):
         super().__init__(config)
-        self.transformer = QWenModel(config)
+        self.qwen = QWenModel(config)
         # self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
         self.lm_head = QWenLMHead(config)
 
@@ -810,7 +810,7 @@ class QWenForCausalLM(QWenPreTrainedModel):
 
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        transformer_outputs = self.transformer(
+        transformer_outputs = self.qwen(
             input_ids,
             past_key_values=past_key_values,
             attention_mask=attention_mask,
