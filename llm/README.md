@@ -243,7 +243,7 @@ python export_model.py \
     --dtype float16 \
 
 
-# 预训练&SFT静态图模型推理
+# 静态图模型推理
 python predictor.py \
     --model_name_or_path inference \
     --batch_size 1 \
@@ -255,7 +255,7 @@ python predictor.py \
 ### 4.3 InferenceModel 动态图推理
 
 ```shell
-# 预训练&SFTInferenceModel 动态图推理模型推理
+# InferenceModel 动态图推理
 # LoRA需要先合并参数，详见3.7LoRA参数合并
 # Prefix Tuning暂不支持
 python predictor.py \
