@@ -317,6 +317,8 @@ class TrainingArguments:
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
         skip_profile_timer (`bool`, *optional*):
             Whether skip profile timer, timer will record time usage of forward/ backward/ step, etc.
+        use_distributed_dataloader (`bool`, **):
+            Whether to use distributed dataloader. Default is `False`.
     """
 
     output_dir: str = field(
@@ -663,10 +665,10 @@ class TrainingArguments:
     )
     skip_profile_timer: Optional[bool] = field(
         default=True,
-        metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl"},
+        metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl."},
     )
-    need_data: Optional[bool] = field(
-        default=True, metadata={"help": "whether the current worker need to read data directly."}
+    use_distributed_dataloader: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to use distributed dataloader."}
     )
 
     def __post_init__(self):
@@ -924,12 +926,6 @@ class TrainingArguments:
 
                 logger.info(strategy)
 
-                # Set need_data
-                if self.tensor_parallel_rank == 0 and self.pipeline_parallel_rank == 0:
-                    self.need_data = True
-                else:
-                    self.need_data = False
-
         else:
             world_size = paddle.distributed.get_world_size()
             if world_size > 1:
@@ -1183,6 +1179,15 @@ class TrainingArguments:
         return (
             ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.load_sharded_model
         )
+
+    @property
+    def should_load_dataset(self):
+        """
+        Load dataset only when mp_rank == 0 and pp_rank == 0, this property being used when self.distributed_dataloader is True.
+        """
+        if self.tensor_parallel_rank == 0 and self.pipeline_parallel_rank == 0:
+            return True
+        return False
 
     @contextlib.contextmanager
     def main_process_first(self, local=True, desc="work"):

@@ -128,15 +128,7 @@ def construct_samples_and_shuffle_data(
                     print("%s file is still writing or damaged, please wait a moment." % shuffle_idx_filename)
                     time.sleep(3)
 
-    if paddle.distributed.get_world_size() > 1:
-        if paddle.in_dynamic_mode():
-            paddle.distributed.barrier()
-
-    # Load mappings.
-    doc_idx = np.load(doc_idx_filename, allow_pickle=True, mmap_mode="r")
-    sample_idx = np.load(sample_idx_filename, allow_pickle=True, mmap_mode="r")
-    shuffle_idx = np.load(shuffle_idx_filename, allow_pickle=True, mmap_mode="r")
-    return doc_idx, sample_idx, shuffle_idx
+    return doc_idx_filename, sample_idx_filename, shuffle_idx_filename
 
 
 def _num_tokens(documents, lens):
@@ -360,7 +352,9 @@ class GPTDataset(paddle.io.Dataset):
         name="gpt",
         max_seq_len=1024,
         seed=1234,
+        need_data=True,
     ):
+
         self.file_prefix = file_prefix
         self.max_seq_len = max_seq_len
         self.name = name
@@ -374,19 +368,30 @@ class GPTDataset(paddle.io.Dataset):
         else:
             document_ids = documents
 
-        self.doc_idx, self.sample_idx, self.shuffle_idx = construct_samples_and_shuffle_data(
-            self.name,
-            self.file_prefix,
-            document_ids,
-            self.sample_lens,
-            num_samples,
-            max_seq_len,
-            seed,
-            build_data_file,
-        )
+        if need_data:
+            doc_idx_filename, sample_idx_filename, shuffle_idx_filename = construct_samples_and_shuffle_data(
+                self.name,
+                self.file_prefix,
+                document_ids,
+                self.sample_lens,
+                num_samples,
+                max_seq_len,
+                seed,
+                build_data_file,
+            )
 
-        # The doc cumsum start pos
-        self.start_pos = [0] + np.cumsum(self.sample_lens).tolist()
+        if paddle.distributed.get_world_size() > 1:
+            paddle.distributed.barrier()
+
+        if need_data:
+            self.doc_idx = np.load(doc_idx_filename, allow_pickle=True, mmap_mode="r")
+            self.sample_idx = np.load(sample_idx_filename, allow_pickle=True, mmap_mode="r")
+            self.shuffle_idx = np.load(shuffle_idx_filename, allow_pickle=True, mmap_mode="r")
+            # The doc cumsum start pos
+            self.start_pos = [0] + np.cumsum(self.sample_lens).tolist()
+
+        if paddle.distributed.get_world_size() > 1:
+            paddle.distributed.barrier()
 
     def _construct_sample(self, tokens):
         tokens = np.array(tokens).astype("int64").tolist()

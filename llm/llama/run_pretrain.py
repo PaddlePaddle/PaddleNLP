@@ -188,6 +188,7 @@ def create_pretrained_dataset(
     training_args,
     data_file,
     tokenizer,
+    need_data=True,
 ):
 
     train_valid_test_num_samples = [
@@ -229,7 +230,7 @@ def create_pretrained_dataset(
         # logger.info(tokenizer._decode(labels))
         # logger.info(tokenizer.convert_ids_to_tokens(input_ids))
 
-    def build_dataset(index, name):
+    def build_dataset(index, name, need_data):
         dataset = GPTDataset(
             file_prefix=os.path.join(data_args.cache_prefix, os.path.basename(input_prefix)),
             build_data_file=training_args.local_process_index == 0,
@@ -244,9 +245,13 @@ def create_pretrained_dataset(
             sample_lens=sample_lens,
             eos_id=tokenizer.eos_token_id,
             seed=training_args.seed,
+            need_data=need_data,
         )
-        print_dataset(dataset[0], name)
-        return dataset
+        if need_data:
+            print_dataset(dataset[0], name)
+            return dataset
+        else:
+            return None
 
     from paddlenlp.data import Stack
 
@@ -267,9 +272,9 @@ def create_pretrained_dataset(
 
     # Note, data should be broardcast to all devices.
     # for train, valid, test, the distinct data num is data_world_size
-    train_dataset = build_dataset(0, "train")
-    valid_dataset = build_dataset(1, "valid")
-    test_dataset = build_dataset(2, "test")
+    train_dataset = build_dataset(0, "train", need_data)
+    valid_dataset = build_dataset(1, "valid", need_data)
+    test_dataset = build_dataset(2, "test", need_data)
 
     return train_dataset, valid_dataset, test_dataset, _collate_data
 
@@ -506,7 +511,13 @@ def main():
 
     data_file = get_train_data_file(data_args)
     train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(
-        data_args, training_args, data_file, tokenizer
+        data_args,
+        training_args,
+        data_file,
+        tokenizer,
+        need_data=False
+        if training_args.use_distributed_dataloader and not training_args.should_load_dataset
+        else True,
     )
 
     trainer = PretrainingTrainer(

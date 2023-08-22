@@ -1048,8 +1048,18 @@ class Trainer:
 
         Subclass and override this method if you want to inject some custom behavior.
         """
-        if self.args.need_data and self.train_dataset is None:
-            raise ValueError("Trainer: training requires a train_dataset.")
+        if self.args.use_distributed_dataloader:
+            if self.args.should_load_dataset and self.train_dataset is None:
+                raise ValueError(
+                    "When using distributed dataloader, training requires a train_dataset when should_load_dataset is True."
+                )
+            if not self.args.should_load_dataset and self.train_dataset is not None:
+                raise ValueError(
+                    "When using distributed dataloader, we don't need train_dataset when should_load_dataset is False."
+                )
+        else:
+            if self.train_dataset is None:
+                raise ValueError("Trainer: training requires a train_dataset.")
 
         train_dataset = self.train_dataset
         if is_datasets_available() and isinstance(train_dataset, datasets.Dataset):
@@ -1077,7 +1087,9 @@ class Trainer:
                 num_workers=self.args.dataloader_num_workers,
             )
 
-        if self.args.need_data:
+        if not self.args.use_distributed_dataloader or (
+            self.args.use_distributed_dataloader and self.args.should_load_dataset
+        ):
             train_sampler = self._get_train_sampler()
         else:
             train_sampler = None
