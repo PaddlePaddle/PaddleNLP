@@ -300,6 +300,13 @@ def naive_fuse_split_tp(
     """
     axis = -1 if is_column else 0
     splited = np.split(weight, fuse_tensor_parts * tensor_parallel_degree, axis=axis)
+
+    if tensor_parallel_rank is None:
+        ret = []
+        for tensor_parallel_rank in range(tensor_parallel_degree):
+            ret.append(np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis))
+        return ret
+
     return np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis)
 
 
