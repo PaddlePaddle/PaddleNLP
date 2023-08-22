@@ -212,7 +212,7 @@ python predictor.py \
     --batch_size 1 \
     --data_file ./data/dev.json \
     --dtype "float16" \
-    --type dygraph
+    --mode "dynamic"
 
 # LoRA动态图模型推理
 python predictor.py \
@@ -220,7 +220,7 @@ python predictor.py \
     --batch_size 1 \
     --data_file ./data/dev.json \
     --lora_path ./checkpoints/llama_lora_ckpts \
-    --type dygraph
+    --mode "dynamic"
 
 # Prefix Tuning动态图模型推理
 python predictor.py \
@@ -228,21 +228,68 @@ python predictor.py \
     --batch_size 1 \
     --data_file ./data/dev.json \
     --prefix_path ./checkpoints/llama_pt_ckpts \
-    --type dygraph
+    --mode "dynamic"
 ```
 
 ### 4.2 静态图推理
 
 ```shell
+# 首先需要运行一下命令将动态图导出为静态图
+# LoRA需要先合并参数，详见3.7LoRA参数合并
+# Prefix Tuning暂不支持
+python export_model.py \
+    --model_name_or_path meta-llama/Llama-2-7b-chat \
+    --output_path ./inference \
+    --dtype float16 \
+
+
+# 预训练&SFT静态图模型推理
 python predictor.py \
     --model_name_or_path inference \
     --batch_size 1 \
     --data_file ./data/dev.json \
     --dtype "float16" \
-    --type static
+    --mode "static"
 ```
 
-### 4.3 参数介绍
+### 4.3 InferenceModel 动态图推理
+
+```shell
+# 预训练&SFTInferenceModel 动态图推理模型推理
+# LoRA需要先合并参数，详见3.7LoRA参数合并
+# Prefix Tuning暂不支持
+python predictor.py \
+    --model_name_or_path meta-llama/Llama-2-7b-chat \
+    --dtype float16 \
+    --max_length 1024 \
+    --mode "dynamic" \
+    --inference_model
+```
+
+### 4.4 InferenceModel 静态图推理
+
+```shell
+# 首先需要运行一下命令将InferenceModel动态图导出为静态图
+# LoRA需要先合并参数，详见3.7LoRA参数合并
+# Prefix Tuning暂不支持
+python export_model.py \
+    --model_name_or_path meta-llama/Llama-2-7b-chat \
+    --output_path ./inference \
+    --dtype float16 \
+    --inference_model
+
+# InferenceModel 静态图推理
+python predictor.py \
+    --model_name_or_path ./inference \
+    --dtype float16 \
+    --max_length 1024 \
+    --output_file "infer.json" \
+    --mode "static" \
+    --inference_model
+```
+
+
+### 4.5 参数介绍
 
 <details><summary>&emsp; 脚本参数介绍 </summary><div>
 
@@ -260,6 +307,8 @@ python predictor.py \
 - `device`: 运行环境，默认为gpu。
 - `dtype`: 模型参数dtype，默认为None。如果没有传入`lora_path`、`prefix_path`则必须传入
 - `gpt`: 是否使用GPTForCausalLM模型，默认为False。
+- `mode`: 使用动态图或者静态图推理，值为：[dynamic, static]，默认为 dynamic。
+- `inference_model`: 是否使用InferenceModel 推理，默认值为 False。
 
 </div></details>
 

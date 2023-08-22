@@ -79,6 +79,14 @@ def is_fast_tokenizer_available() -> bool:
     return is_package_available("fast_tokenizer")
 
 
+def is_paddlenlp_ops_available() -> bool:
+    """check if `paddlenlp_ops` ia avaliable
+    Returns:
+        bool: if `fast_tokenizer` is avaliable
+    """
+    return is_package_available("paddlenlp_ops")
+
+
 def is_transformers_available() -> bool:
     """check if `transformers` package is installed
     Returns:
