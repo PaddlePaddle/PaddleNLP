@@ -278,6 +278,12 @@ class FusedMultiTransformerDyquant(Layer):
                 dtype="int8",
                 is_bias=False,
             )
+            qkv_weight_scale = self.create_parameter(
+                shape=[3 * num_heads * self.head_dim],
+                attr=qkv_weight_scale_attr,
+                dtype=paddle.float32,
+                is_bias=False,
+            )
 
             qkv_bias = None
             if qkv_bias_attr:
@@ -295,6 +301,12 @@ class FusedMultiTransformerDyquant(Layer):
                 shape=linear_weight_shape, 
                 attr=linear_weight_attr,
                 dtype='int8',
+                is_bias=False,
+            )
+            linear_weight_scale = self.create_parameter(
+                shape=[embed_dim],
+                attr=linear_weight_scale_attr,
+                dtype=paddle.float32,
                 is_bias=False,
             )
 
@@ -334,6 +346,12 @@ class FusedMultiTransformerDyquant(Layer):
                 dtype='int8',
                 is_bias=False,
             )
+            ffn1_weight_scale = self.create_parameter(
+                shape=[dim_feedforward * 2],
+                attr=ffn1_weight_scale_attr,
+                dtype=paddle.float32,
+                is_bias=False,
+            )
 
             ffn1_bias = None
             if ffn1_bias_attr:
@@ -351,6 +369,12 @@ class FusedMultiTransformerDyquant(Layer):
                 shape=ffn2_weight_shape, 
                 attr=ffn2_weight_attr,
                 dtype='int8',
+                is_bias=False,
+            )
+            ffn2_weight_scale = self.create_parameter(
+                shape=[embed_dim],
+                attr=ffn2_weight_scale_attr,
+                dtype=paddle.float32,
                 is_bias=False,
             )
 
@@ -519,9 +543,9 @@ class FusedMultiTransformerDyquant(Layer):
                     sequence_lengths=seq_lens,
                     rotary_tensor=rotary_embs,
                     rotary_emb_dims=rotary_emb_dims,
+                    use_neox_rotary_style=self.use_neox_rotary_style
                 )[0]
             # out_linear
-            # out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i])
             out_linear_out = weight_only_linear(fmha_out, 
                                          weight=self.linear_weights[i], 
                                          weight_scale=self.linear_weights_scale[i], 
@@ -544,7 +568,6 @@ class FusedMultiTransformerDyquant(Layer):
             tmp_out, bias_residual_input = norm_out[0], norm_out[1]
 
             # ffn1 matmul
-            # ffn1_out = paddle.matmul(tmp_out, self.ffn1_weights[i])
             ffn1_out = weight_only_linear(tmp_out, 
                                           weight=self.ffn1_weights[i], 
                                           weight_scale=self.ffn1_weights_scale[i], 
@@ -553,7 +576,6 @@ class FusedMultiTransformerDyquant(Layer):
  
             ffn1_out = fused_act_bias_wrapper(ffn1_out, None, act_method=self.activation)
             # ffn2 matmul
-            # ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i])
             ffn2_out = weight_only_linear(ffn1_out, 
                                           weight=self.ffn2_weights[i], 
                                           weight_scale=self.ffn2_weights_scale[i], 

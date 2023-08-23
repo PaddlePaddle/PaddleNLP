@@ -513,7 +513,7 @@ def create_predictor(
             config.tensor_parallel_rank = tensor_parallel_rank
 
             model = None 
-            if predictor_args.quant_type == "None"
+            if predictor_args.quant_type == "None": 
                 model = LlamaForCausalLMInferenceModel.from_pretrained(predictor_args.model_name_or_path, config=config)
             elif predictor_args.quant_type.startswith("weight_only_int"): 
                 quant_bits = int(predictor_args.quant_type[-1])
