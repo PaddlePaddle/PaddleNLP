@@ -124,7 +124,7 @@ class BaseRetriever(BaseComponent):
         documents: Optional[List[dict]] = None,
         index: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
-        pooling_mode: Optional[str] = None,
+        **kwargs,
     ):
         if root_node == "Query":
             self.query_count += 1
@@ -136,12 +136,12 @@ class BaseRetriever(BaseComponent):
                 top_k=top_k,
                 index=index,
                 headers=headers,
-                pooling_mode=pooling_mode,
+                **kwargs,
             )
         elif root_node == "File":
             self.index_count += len(documents)  # type: ignore
             run_indexing = self.timing(self.run_indexing, "index_time")
-            output, stream = run_indexing(documents=documents, pooling_mode=pooling_mode)
+            output, stream = run_indexing(documents=documents, **kwargs)
         else:
             raise Exception(f"Invalid root_node '{root_node}'.")
         return output, stream
