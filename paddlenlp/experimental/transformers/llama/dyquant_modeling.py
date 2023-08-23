@@ -272,6 +272,7 @@ class LlamaDyquantInferenceModel(LlamaPretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
+        print("State dict: ", state_dict.keys())
         unfused_state_dict = {}
         head_size = self.hidden_size // self.num_attention_heads
 
@@ -313,7 +314,7 @@ class LlamaDyquantInferenceModel(LlamaPretrainedModel):
             self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor)
 
 
-            linear_weight_tensor = paddle.to_tensor(state_dict["layers.{}.self_attn.o_proj.weight".format(idx)])
+            linear_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.weight".format(idx)])
             linear_quanted_weight_tensor, linear_weight_scale_tensor = weight_quantize(linear_weight_tensor, algo=self.quant_algo)
             self.transformer_block.linear_weights[idx].set_value(
                 linear_quanted_weight_tensor
@@ -323,10 +324,10 @@ class LlamaDyquantInferenceModel(LlamaPretrainedModel):
             )
 
             unfused_state_dict["mlp.gate_proj.weight"] = state_dict[
-                "layers.{}.mlp.gate_proj.weight".format(idx)
+                "llama.layers.{}.mlp.gate_proj.weight".format(idx)
             ]
             unfused_state_dict["mlp.up_proj.weight"] = state_dict[
-                "layers.{}.mlp.up_proj.weight".format(idx)
+                "llama.layers.{}.mlp.up_proj.weight".format(idx)
             ]
 
             concated_ffn1_weight = np.concatenate(
@@ -346,7 +347,7 @@ class LlamaDyquantInferenceModel(LlamaPretrainedModel):
                 ffn1_weight_scale_tensor
             )
 
-            ffn2_weight_tensor = paddle.to_tensor(state_dict["layers.{}.mlp.down_proj.weight".format(idx)])
+            ffn2_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)])
             ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(ffn2_weight_tensor, algo=self.quant_algo)
             self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
             self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)

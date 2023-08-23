@@ -208,8 +208,8 @@ class FusedMultiTransformerDyquant(Layer):
             num_layers = len(qkv_weight_attrs)
         assert num_layers > 0
 
-        self.algo="weight_only"
         self.quant_bits = quant_bits
+        self.weight_dtype = 'int'+str(self.quant_bits)
         assert (
             self.quant_bits == 8 or self.quant_bits == 4
         ), "Expected quant_bits equal to 4 or 8, but received {}".format(
@@ -503,8 +503,7 @@ class FusedMultiTransformerDyquant(Layer):
             qkv_out = weight_only_linear(ln_out, 
                                          weight=self.qkv_weights[i], 
                                          weight_scale=self.qkv_weights_scale[i], 
-                                         bits=self.quant_bits, 
-                                         algo=self.algo)
+                                         weight_dtype=self.weight_dtype)
 
             # fmha compute
             if time_step is None:  # context
@@ -549,8 +548,7 @@ class FusedMultiTransformerDyquant(Layer):
             out_linear_out = weight_only_linear(fmha_out, 
                                          weight=self.linear_weights[i], 
                                          weight_scale=self.linear_weights_scale[i], 
-                                         bits=self.quant_bits, 
-                                         algo=self.algo)
+                                         weight_dtype=self.weight_dtype)
 
             # all_reduce
             if self.nranks > 1:
@@ -571,16 +569,14 @@ class FusedMultiTransformerDyquant(Layer):
             ffn1_out = weight_only_linear(tmp_out, 
                                           weight=self.ffn1_weights[i], 
                                           weight_scale=self.ffn1_weights_scale[i], 
-                                          bits=self.quant_bits, 
-                                          algo=self.algo)
+                                          weight_dtype=self.weight_dtype)
  
             ffn1_out = fused_act_bias_wrapper(ffn1_out, None, act_method=self.activation)
             # ffn2 matmul
             ffn2_out = weight_only_linear(ffn1_out, 
                                           weight=self.ffn2_weights[i], 
                                           weight_scale=self.ffn2_weights_scale[i], 
-                                          bits=self.quant_bits, 
-                                          algo=self.algo)
+                                          weight_dtype=self.weight_dtype)
 
             # all_reduce
             if self.nranks > 1:

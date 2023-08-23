@@ -504,7 +504,7 @@ def create_predictor(
             
             from paddlenlp.experimental.transformers import (
                 LlamaForCausalLMInferenceModel,
-                LlamaDyquantInferenceModel,
+                LlamaForCausalLMDyquantInferenceModel,
             )
 
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
@@ -518,7 +518,7 @@ def create_predictor(
             elif predictor_args.quant_type.startswith("weight_only_int"): 
                 quant_bits = int(predictor_args.quant_type[-1])
                 config.quant_bits = quant_bits
-                model = LlamaDyquantInferenceModel.from_pretrained(predictor_args.model_name_or_path, config=config)
+                model = LlamaForCausalLMDyquantInferenceModel.from_pretrained(predictor_args.model_name_or_path, config=config)
 
             predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
 
