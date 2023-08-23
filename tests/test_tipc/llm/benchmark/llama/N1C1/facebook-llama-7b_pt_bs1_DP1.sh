@@ -14,7 +14,7 @@
 
 model_name_or_path="facebook/llama-7b"
 dataset_name_or_path="llm_benchmark_en"
-intokens_max_length=4096
+intokens_max_length=3072
 learning_rates="3e-02"
 recompute="1"
 tensor_parallel_degree="1"

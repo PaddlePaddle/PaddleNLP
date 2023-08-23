@@ -267,8 +267,9 @@ def main():
         if training_args.benchmark:
             tokens_per_second = trainer.total_observed_tokens / train_result.metrics["train_runtime"]
             effective_tokens_per_second = trainer.total_effective_tokens / train_result.metrics["train_runtime"]
-            logger.info(f"Tokens per second: {tokens_per_second:.2f}")
-            logger.info(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
+            logger.info(f"Tokens_per_second: {tokens_per_second} ")
+            logger.info(f"Effective_Tokens_per_second: {effective_tokens_per_second} ")
+            logger.info("Benchmark done.")
         else:
             trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
             trainer.log_metrics("train", train_result.metrics)

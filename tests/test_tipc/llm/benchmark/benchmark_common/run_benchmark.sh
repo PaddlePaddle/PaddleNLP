@@ -33,12 +33,12 @@ function _set_params(){
     fp_item="fp16"            # (必选) fp32|fp16
     run_mode=${10:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP1-MP4-PP1
     device_num=${11:-"N1C1"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
-    profiling="flase"      # (必选) Profiling  开关，默认关闭，通过全局变量传递
+    profiling="false"      # (必选) Profiling  开关，默认关闭，通过全局变量传递
  
     model_repo="PaddleNLP"          # (必选) 模型套件的名字
     speed_unit="tokens/s"         # (必选)速度指标单位
     skip_steps=0                  # (必选)解析日志，跳过模型前几个性能不稳定的step
-    keyword="Effective Tokens per second:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
+    keyword="Effective_Tokens_per_second:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
     convergence_key="train_loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
     is_large_model=True           # (可选)普通模型默认为False，如果添加大模型且只取一条ips设置为True
 
@@ -91,7 +91,7 @@ function _train(){
             --dataset_name_or_path ${dataset_name_or_path} \
             --output_dir output \
             --per_device_train_batch_size 1 \
-            --gradient_accumulation_steps 4 \
+            --gradient_accumulation_steps 8 \
             --num_train_epochs 1 \
             --learning_rate ${learning_rate} \
             --warmup_steps 30 \
@@ -116,6 +116,7 @@ function _train(){
             --device gpu"
 
     # 以下为通用执行命令，无特殊可不用修改
+    cd ../llm/
     echo "run run_mode: ${run_mode} device_num: ${device_num}"
     if [ "N1C1" = ${device_num} ]; then
         train_cmd="python -u finetune_generation.py ${train_cmd}" 
@@ -125,7 +126,6 @@ function _train(){
             finetune_generation.py ${train_cmd}" 
     fi
 
-    cd ../llm/
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
 
     python -c "import paddlenlp"
