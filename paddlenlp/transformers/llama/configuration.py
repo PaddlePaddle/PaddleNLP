@@ -151,6 +151,8 @@ class LlamaConfig(PretrainedConfig):
         use_cache=True,
         use_recompute=False,
         recompute_granularity="full",
+        pp_recompute_interval=0,
+        no_recompute_layers=None,
         fuse_attention_qkv=False,
         use_flash_attention=False,
         fuse_attention_ffn=False,
@@ -164,6 +166,8 @@ class LlamaConfig(PretrainedConfig):
         tie_word_embeddings=False,
         alibi=False,
         rope_fusion_level=None,
+        rope_scaling_factor=1.0,
+        rope_scaling_type=None,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -184,6 +188,8 @@ class LlamaConfig(PretrainedConfig):
         self.use_cache = use_cache
         self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
+        self.no_recompute_layers = no_recompute_layers
+        self.pp_recompute_interval = pp_recompute_interval
         self.fuse_attention_qkv = fuse_attention_qkv
         self.use_flash_attention = use_flash_attention
         self.fuse_attention_ffn = fuse_attention_ffn
@@ -198,6 +204,8 @@ class LlamaConfig(PretrainedConfig):
         self.alibi = alibi
 
         self.rope_fusion_level = rope_fusion_level
+        self.rope_scaling_factor = rope_scaling_factor
+        self.rope_scaling_type = rope_scaling_type
 
         super().__init__(
             pad_token_id=pad_token_id,

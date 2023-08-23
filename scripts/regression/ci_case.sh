@@ -232,22 +232,23 @@ fast_gpt(){
 # FT
 cd ${nlp_dir}/
 export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-wget -q https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuAll-Centos-Gcc82-Cuda102-Cudnn81-Trt7234-Py38-Compile/latest/paddle_inference.tgz
+wget -q https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-TagBuild-Infer-Linux-Gpu-Cuda120-Cudnn89-Trt86-Mkl-Avx-Gcc122/latest/paddle_inference.tgz
 tar -zxf paddle_inference.tgz
 cd ${nlp_dir}/paddlenlp/ops
-export CC=/usr/local/gcc-8.2/bin/gcc
-export CXX=/usr/local/gcc-8.2/bin/g++
 #python
 mkdir build_gpt_so
 cd build_gpt_so/
-cmake ..  -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python -DWITH_GPT=ON
+cmake ..  -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python -DWITH_GPT=ON -DPADDLE_LIB=${nlp_dir}/paddle_inference/ -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/gpt.cc \
+ -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON  -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON -DPYTHON_EXECUTABLE=/opt/_internal/cpython-3.8.0/bin/python \
+ -DPYTHON_INCLUDE_DIR=/opt/_internal/cpython-3.8.0/lib -DPYTHON_LIBRARY=/opt/_internal/cpython-3.8.0/include/python3.8 
 make -j >${log_path}/GPT_python_FT >>${log_path}/gpt_python_FT 2>&1
 print_info $? gpt_python_FT
 cd ../
 #c++
 mkdir build_gpt_cc
 cd build_gpt_cc/
-cmake ..  -DWITH_GPT=ON -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=${nlp_dir}/paddle_inference/ -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/gpt.cc -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
+cmake ..  -DWITH_GPT=ON -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=${nlp_dir}/paddle_inference/ -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/gpt.cc \
+ -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON -DPYTHON_EXECUTABLE=/opt/_internal/cpython-3.8.0/bin/python -DPYTHON_INCLUDE_DIR=/opt/_internal/cpython-3.8.0/lib -DPYTHON_LIBRARY=/opt/_internal/cpython-3.8.0/include/python3.8 
 make -j >${log_path}/GPT_C_FT >>${log_path}/gpt_C_FT 2>&1
 print_info $? gpt_C_FT
 #depoly python
@@ -693,15 +694,14 @@ fast_transformer(){
 # FT
 cd ${nlp_dir}/
 export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-wget -q https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuAll-Centos-Gcc82-Cuda102-Cudnn81-Trt7234-Py38-Compile/latest/paddle_inference.tgz
+wget -q https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-TagBuild-Infer-Linux-Gpu-Cuda120-Cudnn89-Trt86-Mkl-Avx-Gcc122/latest/paddle_inference.tgz
 tar -zxf paddle_inference.tgz
-export CC=/usr/local/gcc-8.2/bin/gcc
-export CXX=/usr/local/gcc-8.2/bin/g++
 cd ${nlp_dir}/paddlenlp/ops
 #python op
 mkdir build_tr_so
 cd build_tr_so/
-cmake ..  -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python
+cmake ..  -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python -DPADDLE_LIB=${nlp_dir}/paddle_inference -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/transformer_e2e.cc \
+ -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON -DPYTHON_EXECUTABLE=/opt/_internal/cpython-3.8.0/bin/python -DPYTHON_INCLUDE_DIR=/opt/_internal/cpython-3.8.0/lib -DPYTHON_LIBRARY=/opt/_internal/cpython-3.8.0/include/python3.8 
 make -j >${log_path}/transformer_python_FT >>${log_path}/transformer_python_FT 2>&1
 print_info $? transformer_python_FT
 cd ../

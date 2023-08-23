@@ -26,7 +26,7 @@ def get_convert_example(model):
 
     if base_model_prefix == "chatglm":
         return convert_example_chatglm
-    elif base_model_prefix in ["chatglm_v2", "llama", "bloom", "opt"]:
+    elif base_model_prefix in ["chatglm_v2", "llama", "bloom", "opt", "qwen"]:
         return convert_example_common
     else:
         raise ValueError(
@@ -97,7 +97,7 @@ def convert_example_common(example, tokenizer, data_args, is_test=True, intokens
         seq_length = len(input_ids)
         if intokens:
             features["position_ids"] = list(range(seq_length))
-            features["attention_mask"] = np.tri((seq_length, seq_length), dtype=bool)
+            features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
 
         return features
 
