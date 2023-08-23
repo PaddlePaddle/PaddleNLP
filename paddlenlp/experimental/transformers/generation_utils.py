@@ -231,7 +231,7 @@ class GenerationInferenceModel(GenerationMixin):
             # compute next_tokens, use paddle.top_p_sampling
             logits = logits / temperature
 
-            _, next_tokens = top_p_sampling(probs, top_p)
+            _, next_tokens = top_p_sampling(probs, top_p, -1)
 
             if self.model.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
