@@ -119,8 +119,8 @@ class GPTModuleAuto(LanguageModuleAuto):
                                 log_dict["found_inf"],
                             )
         if "max_memory_allocated" in log_dict:
-            logger_info_str += ", max_memory_allocated: %.0f MB, max_memory_reserved: %.0f MB" \
-                                ", memory_allocated: %.0f MB, memory_reserved: %.0f MB" \
+            logger_info_str += ", max_memory_allocated: %.1f MB, max_memory_reserved: %.1f MB" \
+                                ", memory_allocated: %.1f MB, memory_reserved: %.1f MB" \
                                 % (log_dict["max_memory_allocated"], log_dict["max_memory_reserved"],log_dict["memory_allocated"], log_dict["memory_reserved"])
 
         logger.info(logger_info_str)

@@ -71,6 +71,9 @@ class AutoEngine(BasicEngine):
         self._global_batch_size = configs["Global"]["global_batch_size"]
         self._local_batch_size = configs["Global"]["local_batch_size"]
 
+        # Distributed
+        self._pp_degree = configs["Distributed"]["pp_degree"]
+
         # engine configs
         self._configs = configs["Engine"]
 
@@ -172,16 +175,35 @@ class AutoEngine(BasicEngine):
 
             fetch_list = None
             if self._strategy.amp.enable:
-                fetch_list = ["find_infinite_scale.tmp_0", "loss_scaling_0"]
-            with paddle.profiler.utils._nvprof_range(
-                    iter_id=step, start=self.nvprof_start,
-                    end=self.nvprof_end):
-                outs = self._auto_engine.run(batch,
-                                             fetch_list=fetch_list,
-                                             mode="train")
-            # pp: some devices don't have loss in outs
-            if "loss" in outs:
-                train_losses.append(outs["loss"])
+                fetch_list = [
+                ]  #["find_infinite_scale.tmp_0", "loss_scaling_0"]
+
+            if self._pp_degree == 1 and self._accumulate_steps > 1:  # gradient merge
+                local_steps = self._accumulate_steps
+            else:
+                local_steps = 1
+
+            final_loss = None
+            for _ in range(local_steps):
+                with paddle.profiler.utils._nvprof_range(
+                        iter_id=step, start=self.nvprof_start,
+                        end=self.nvprof_end):
+                    outs = self._auto_engine.run(batch,
+                                                 fetch_list=fetch_list,
+                                                 mode="train")
+                if "loss" in outs:  # pp: some devices don't have loss in outs
+                    if final_loss is None:
+                        final_loss = np.sum(outs["loss"])
+                        # final_loss = np.sum(outs["loss"]) if isinstance(outs["loss"],np.ndarray) else outs["loss"]
+                    else:
+                        final_loss += np.sum(outs["loss"])
+                        # final_loss += np.sum(outs["loss"]) if isinstance(outs["loss"],np.ndarray) else outs["loss"]
+
+            if final_loss is not None and self._accumulate_steps > 1:
+                final_loss /= self._accumulate_steps
+
+            if final_loss is not None:
+                train_losses.append(final_loss)
 
             if self._lr_scheduler is not None and self._lr_scheduler_mode == "step":
                 self._auto_engine.optimizer._learning_rate.step(
@@ -203,27 +225,28 @@ class AutoEngine(BasicEngine):
                     if len(numpy_losses) > 0 else
                     -1,  # eval_loss = -1 means this device doesn't output loss
                     "lr": self._auto_engine.optimizer.get_lr(),
-                    "found_inf": outs["fetches"]["find_infinite_scale.tmp_0"]
-                    if self._strategy.amp.enable else 0,
+                    "found_inf":
+                    0  # if self._strategy.amp.enable outs["fetches"]["find_infinite_scale.tmp_0"]
                 }
                 if self._strategy.amp.enable:
-                    log_dict["loss_scale"] = outs["fetches"]["loss_scaling_0"]
+                    log_dict[
+                        "loss_scale"] = self._strategy.amp.init_loss_scaling  # outs["fetches"]["loss_scaling_0"]
                 log_dict["dp_world_size"] = self._auto_engine._dp_world_sizes[
                     0]
 
                 if self.memory_stats:
                     log_dict[
                         "max_memory_allocated"] = paddle.device.cuda.max_memory_allocated(
-                        ) / 1000000  # convert from Byte to MB
+                        ) / (1024**2)  # convert from Byte to MB
                     log_dict[
                         "max_memory_reserved"] = paddle.device.cuda.max_memory_reserved(
-                        ) / 1000000
+                        ) / (1024**2)
                     log_dict[
                         "memory_allocated"] = paddle.device.cuda.memory_allocated(
-                        ) / 1000000
+                        ) / (1024**2)
                     log_dict[
                         "memory_reserved"] = paddle.device.cuda.memory_reserved(
-                        ) / 1000000
+                        ) / (1024**2)
 
                 self._module.training_step_end(log_dict)
 
@@ -334,7 +357,8 @@ class AutoEngine(BasicEngine):
             format(convert_timestamp_to_data(get_timestamp() - train_start)))
 
         # from-generator dataloder need to do this to exit normally
-        valid_data_loader._inner_dataloader.reset()
+        if valid_data_loader:
+            valid_data_loader._inner_dataloader.reset()
 
         if self.profiler:
             self._profiler_done()
@@ -452,7 +476,7 @@ class AutoEngine(BasicEngine):
         self._auto_engine._tune(
             tune_dataset,
             tune_sample_split=tune_dataset.sample_split,
-            batch_size=self.batch_size)
+            batch_size=self._global_batch_size)
 
     def save(self, training=True):
         if self._output_dir and isinstance(self._output_dir, str):
