@@ -347,8 +347,7 @@ class LlamaRotaryEmbedding(nn.Layer):
         self.base = base
         self.dtype = paddle.get_default_dtype()
         # [dim / 2]
-        inv_freq = 1.0 / (self.base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype="float32") / self.dim))
-        self.register_buffer("inv_freq", inv_freq, persistable=False)
+        self.inv_freq = 1.0 / (self.base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype="float32") / self.dim))
         self._set_cos_sin_cache(seq_len=max_position_embeddings)
 
     def _set_cos_sin_cache(self, seq_len):
@@ -361,8 +360,8 @@ class LlamaRotaryEmbedding(nn.Layer):
         # [seq_len, dim]
         emb = paddle.concat([freqs, freqs], axis=-1)
         # [1, seqlen, 1, dim]
-        self.register_buffer("cos_cached", emb.cos()[None, :, None, :].cast(self.dtype), persistable=False)
-        self.register_buffer("sin_cached", emb.sin()[None, :, None, :].cast(self.dtype), persistable=False)
+        self.cos_cached = emb.cos()[None, :, None, :].cast(self.dtype)
+        self.sin_cached = emb.sin()[None, :, None, :].cast(self.dtype)
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
@@ -390,8 +389,8 @@ class LlamaLinearScalingRotaryEmbedding(nn.Layer):
         # [seq_len, dim]
         emb = paddle.concat([freqs, freqs], axis=-1)
         # [1, seqlen, 1, dim]
-        self.register_buffer("cos_cached", emb.cos()[None, :, None, :].cast(self.dtype), persistable=False)
-        self.register_buffer("sin_cached", emb.sin()[None, :, None, :].cast(self.dtype), persistable=False)
+        self.cos_cached = emb.cos()[None, :, None, :].cast(self.dtype)
+        self.sin_cached = emb.sin()[None, :, None, :].cast(self.dtype)
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
