@@ -351,9 +351,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         model_result = self._get_model_result(trial_id=trial_id)
         model_config = model_result.metrics["config"]["candidates"]
         trainer = self._construct_trainer(model_config)
-        trainer.load_state_dict_from_checkpoint(
-            resume_from_checkpoint=os.path.join(model_result.log_dir, self.save_path)
-        )
+        trainer._load_from_checkpoint(resume_from_checkpoint=os.path.join(model_result.log_dir, self.save_path))
 
         if eval_dataset is not None:
             self._data_checks_and_inference([eval_dataset])
@@ -396,9 +394,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         model_config = model_result.metrics["config"]["candidates"]
 
         trainer = self._construct_trainer(model_config)
-        trainer.load_state_dict_from_checkpoint(
-            resume_from_checkpoint=os.path.join(model_result.log_dir, self.save_path)
-        )
+        trainer._load_from_checkpoint(resume_from_checkpoint=os.path.join(model_result.log_dir, self.save_path))
 
         is_utc = False
         if "utc" in model_config["model_name_or_path"]:
@@ -598,9 +594,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
         # Construct trainer
         trainer = self._construct_trainer(model_config)
-        trainer.load_state_dict_from_checkpoint(
-            resume_from_checkpoint=os.path.join(model_result.log_dir, self.save_path)
-        )
+        trainer._load_from_checkpoint(resume_from_checkpoint=os.path.join(model_result.log_dir, self.save_path))
 
         # Save static model
         input_spec = self._get_input_spec(model_config=model_config)
