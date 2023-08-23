@@ -14,5 +14,4 @@
 
 from .chatglm import *
 from .fused_transformer_layers import *
-from .fused_transformer_layers_chatglm import *
 from .llama import *

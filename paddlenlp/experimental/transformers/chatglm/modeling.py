@@ -19,11 +19,9 @@ from paddle import nn
 from paddle.distributed import fleet
 from paddlenlp_ops import get_padding_offset
 
-from paddlenlp.experimental.transformers.fused_transformer_layers_chatglm import (
+from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformer,
 )
-
-# from paddlenlp.transformers.generation_utils import GenerationDyBatch
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
