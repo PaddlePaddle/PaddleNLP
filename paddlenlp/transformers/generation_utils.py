@@ -63,11 +63,11 @@ def get_unfinished_flag(
         Tensor: the unfinished flag tensor
     """
     if isinstance(eos_token_id, int):
-        unfinished_flag = paddle.logical_and(unfinished_flag, input_ids[:, -1:] != eos_token_id)
+        unfinished_flag = paddle.logical_and(unfinished_flag, input_ids[:, -1:2147483647] != eos_token_id)
     elif isinstance(eos_token_id[0], int):
         eos_token_id_tensor = paddle.to_tensor([eos_token_id])
         is_last_tokens_equal = paddle.all(
-            paddle.equal(input_ids[:, -len(eos_token_id) :], eos_token_id_tensor), axis=-1
+            paddle.equal(input_ids[:, -len(eos_token_id) : 2147483647], eos_token_id_tensor), axis=-1
         ).unsqueeze(-1)
         unfinished_flag = paddle.logical_and(unfinished_flag, ~is_last_tokens_equal)
     else:
@@ -610,6 +610,7 @@ class GenerationMixin(object):
         use_cache=True,
         use_fast=False,
         use_fp16_decoding=False,
+        inputs_embeds=None,
         **model_kwargs
     ):
         r"""
@@ -787,6 +788,8 @@ class GenerationMixin(object):
         ], "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
             decode_strategy
         )
+ 
+        model_kwargs["inputs_embeds"] = inputs_embeds
 
         # Whether to dynamic to static
         is_tracing = False
@@ -864,7 +867,7 @@ class GenerationMixin(object):
         if input_ids is None and "inputs_embeds" not in model_kwargs:
             # Init `input_ids` with bos_token_id
             input_ids = self.prepare_input_ids_for_generation(bos_token_id)
-        elif "inputs_embeds" in model_kwargs:
+        elif "inputs_embeds" in model_kwargs and model_kwargs["inputs_embeds"] is not None :
             # Add input embeds support
             input_ids = self.prepare_input_ids_for_generation(
                 bos_token_id, encoder_output=model_kwargs["inputs_embeds"]
@@ -902,8 +905,10 @@ class GenerationMixin(object):
         if is_tracing and not paddle.is_tensor(max_length):
             min_len = input_ids.shape[-1]
             max_len = input_ids.shape[-1]
-            paddle.increment(min_len, min_length)
-            paddle.increment(max_len, max_length)
+            #paddle.increment(min_len, min_length)
+            min_len += min_length
+            max_len += max_length
+            #paddle.increment(max_len, max_length)
         else:
             input_len = input_ids.shape[-1]
             min_len = input_len + min_length
@@ -1109,6 +1114,8 @@ class GenerationMixin(object):
         origin_len = cur_len
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
+
+        print("origin_len", origin_len)
 
         while cur_len < max_length:
             # prepare model inputs & get model output
@@ -1358,7 +1365,8 @@ class GenerationMixin(object):
         input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
             outputs, input_ids, cur_len_gpu, origin_len_gpu, scores, unfinished_flag, model_kwargs
         )
-
+        print("input_ids", input_ids)
+        input_ids = input_ids.reshape(input_ids.shape, name = "大象")
         paddle.increment(cur_len)
         paddle.increment(cur_len_gpu)
 
@@ -1381,7 +1389,7 @@ class GenerationMixin(object):
             paddle.increment(cur_len)
             paddle.increment(cur_len_gpu)
 
-        return input_ids[:, origin_len:], scores
+        return input_ids[:, origin_len:2147483647], scores
 
     def beam_search(
         self,
