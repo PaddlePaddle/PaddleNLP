@@ -274,13 +274,13 @@ class StaticInferencePredictor(BasePredictor):
         self.dtype = dtype
 
         self.cache_kvs = [paddle.zeros(shape, dtype=dtype) for shape in cache_kv_shapes]
-        self.pre_ids = paddle.full([config.batch_size, config.max_length], -1, dtype="int64")
+        self.pre_ids = paddle.full([config.batch_size, config.max_length + 1], -1, dtype="int64")
         self.attention_mask = paddle.zeros(
             shape=(config.batch_size, 1, config.max_length, config.max_length),
             dtype=dtype,
         )
         self.tgt_generation_mask = paddle.zeros(
-            shape=[config.batch_size, 1, 1, config.max_length],
+            shape=[config.batch_size, 1, 1, config.max_length + 1],
             dtype=dtype,
         )
         self.predictor = self._create_predictor(config)

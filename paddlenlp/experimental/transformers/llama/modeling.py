@@ -324,7 +324,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaForCausalLM)
                     2,
                     max_batch_size,
                     config.num_attention_heads // max(config.tensor_parallel_degree, 1),
-                    max_length,
+                    max_length + 1,
                     config.hidden_size // config.num_attention_heads,
                 ]
             )
