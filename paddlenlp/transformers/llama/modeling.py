@@ -814,7 +814,7 @@ class LlamaAttention(nn.Layer):
         if not output_attentions:
             attn_weights = None
 
-        outputs = (hidden_states,)
+        outputs = (attn_output,)
 
         if output_attentions:
             outputs += (attn_weights,)
