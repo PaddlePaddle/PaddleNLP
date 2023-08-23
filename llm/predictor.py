@@ -63,6 +63,7 @@ class PredictorArgument:
         default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
+    quant_type: str = field(default="None", metadata={"help": "The quant type of inference model, support `weight_only_int8`, `weight_only_int4`."})
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
 
 
@@ -499,16 +500,28 @@ def create_predictor(
             assert (
                 "llama" in predictor_args.model_name_or_path
             ), "only support llama inference model in dygraph-inference predictor"
+
+            
             from paddlenlp.experimental.transformers import (
                 LlamaForCausalLMInferenceModel,
+                LlamaDyquantInferenceModel,
             )
 
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
 
             config.tensor_parallel_degree = tensor_parallel_degree
             config.tensor_parallel_rank = tensor_parallel_rank
-            model = LlamaForCausalLMInferenceModel.from_pretrained(predictor_args.model_name_or_path, config=config)
+
+            model = None 
+            if predictor_args.quant_type == "None"
+                model = LlamaForCausalLMInferenceModel.from_pretrained(predictor_args.model_name_or_path, config=config)
+            elif predictor_args.quant_type.startswith("weight_only_int"): 
+                quant_bits = int(predictor_args.quant_type[-1])
+                config.quant_bits = quant_bits
+                model = LlamaDyquantInferenceModel.from_pretrained(predictor_args.model_name_or_path, config=config)
+
             predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
+
         elif predictor_args.mode == "static":
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
 
