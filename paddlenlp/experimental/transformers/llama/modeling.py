@@ -324,7 +324,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaForCausalLM)
                     2,
                     max_batch_size,
                     config.num_attention_heads // max(config.tensor_parallel_degree, 1),
-                    max_length + 1,
+                    max_length,
                     config.hidden_size // config.num_attention_heads,
                 ]
             )
@@ -428,5 +428,8 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaForCausalLM)
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
+        import pdb
+
+        pdb.set_trace()
         self.lm_head.weight.set_value(state_dict["lm_head.weight"])
         self.model.set_state_dict({k: state_dict[k] for k in state_dict.keys()})

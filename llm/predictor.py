@@ -64,7 +64,7 @@ class PredictorArgument:
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
-    max_batch_size: int = field(default=2, metadata={"help": "The batch size of data."})
+    max_batch_size: int = field(default=None, metadata={"help": "The batch size of data."})
 
 
 @dataclass
@@ -528,6 +528,9 @@ def create_predictor(
 def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
+    # init `max_batch_size`
+
+    predictor_args.max_batch_size = predictor_args.max_batch_size or predictor_args.batch_size
     paddle.set_device(predictor_args.device)
     paddle.set_default_dtype(predictor_args.dtype)
 
