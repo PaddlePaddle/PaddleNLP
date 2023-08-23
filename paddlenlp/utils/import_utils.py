@@ -86,7 +86,7 @@ def is_fast_tokenizer_available() -> bool:
 def is_paddlenlp_ops_available() -> bool:
     """check if `paddlenlp_ops` ia avaliable
     Returns:
-        bool: if `fast_tokenizer` is avaliable
+        bool: if `paddlenlp_ops` is avaliable
     """
     return is_package_available("paddlenlp_ops")
 

@@ -64,6 +64,7 @@ class PredictorArgument:
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
+    max_batch_size: int = field(default=2, metadata={"help": "The batch size of data."})
 
 
 @dataclass
@@ -389,15 +390,15 @@ class DygraphInferencePredictor(BasePredictor):
 
         self.cache_kvs = [
             paddle.zeros(shape, dtype=dtype)
-            for shape in self.model.get_cache_kvs_shape(self.model.config, config.batch_size)
+            for shape in self.model.get_cache_kvs_shape(self.model.config, config.max_batch_size)
         ]
-        self.pre_ids = paddle.full([config.batch_size, config.max_length], -1, dtype="int64")
+        self.pre_ids = paddle.full([config.max_batch_size, config.max_length], -1, dtype="int64")
         self.attention_mask = paddle.zeros(
-            shape=(config.batch_size, 1, config.max_length, config.max_length),
+            shape=(config.max_batch_size, 1, config.max_length, config.max_length),
             dtype=dtype,
         )
         self.tgt_generation_mask = paddle.zeros(
-            shape=[config.batch_size, 1, 1, config.max_length],
+            shape=[config.max_batch_size, 1, 1, config.max_length],
             dtype=dtype,
         )
 
@@ -451,7 +452,7 @@ def create_predictor(
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer):
-        tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token else "<pad>"
+        tokenizer.pad_token = tokenizer.unk_token
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
     tensor_parallel_rank = paddle.distributed.get_rank()
