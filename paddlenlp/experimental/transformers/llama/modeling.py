@@ -200,18 +200,19 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
         new_rope = fused_get_rotary_embedding(input_ids, position_ids, self.head_dim_shape_tensor, 0, True)
 
-        hidden_states, _ = self.transformer_block(
-            input_ids,
-            hidden_states,
-            cum_offsets=cum_offsets,
-            padding_offset=padding_offset,
-            attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
-            caches=cache_kvs,
-            seq_lens=seq_lens,
-            rotary_embs=new_rope,
-            rotary_emb_dims=1,
-            time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
-        )
+        with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
+            hidden_states, _ = self.transformer_block(
+                input_ids,
+                hidden_states,
+                cum_offsets=cum_offsets,
+                padding_offset=padding_offset,
+                attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
+                caches=cache_kvs,
+                seq_lens=seq_lens,
+                rotary_embs=new_rope,
+                rotary_emb_dims=1,
+                time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
+            )
         hidden_states = self.norm(hidden_states)
 
         if output_hidden_states:
