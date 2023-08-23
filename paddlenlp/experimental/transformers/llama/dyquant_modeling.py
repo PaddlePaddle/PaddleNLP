@@ -20,7 +20,7 @@ from paddle.distributed import fleet
 from paddlenlp_ops import fused_get_rotary_embedding, get_padding_offset
 from paddle.nn.quant import weight_quantize
 
-from paddlenlp.experimental.transformers.fused_transformer_layers import (
+from paddlenlp.experimental.transformers.fused_dyquant_transformer_layers import (
     FusedMultiTransformerDyquant,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
@@ -107,34 +107,66 @@ class LlamaDyquantInferenceModel(LlamaPretrainedModel):
         except:
             pass
 
-        ln_scale_attrs = [paddle.ParamAttr(name="fusellama.{}.ln_scale".format(i)) for i in range(self.num_layers)]
-        qkv_weight_attrs = [paddle.ParamAttr(name="fusellama.{}.qkv_weight".format(i)) for i in range(self.num_layers)]
+        ln_scale_attrs = [
+            paddle.ParamAttr(name="fusellama.{}.ln_scale".format(i))
+            for i in range(self.num_layers)
+        ]
+        qkv_weight_attrs = [
+            paddle.ParamAttr(name="fusellama.{}.qkv_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0))
+            for i in range(self.num_layers)
+        ]
+        qkv_weight_scale_attrs = [
+            paddle.ParamAttr(name="fusellama.{}.qkv_weight_scale".format(i))
+            for i in range(self.num_layers)
+        ]
         out_proj_weight_attrs = [
-            paddle.ParamAttr(name="fusellama.{}.out_proj_weight".format(i)) for i in range(self.num_layers)
+            paddle.ParamAttr(name="fusellama.{}.out_proj_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0))
+            for i in range(self.num_layers)
+        ]
+        out_proj_weight_scale_attrs = [
+            paddle.ParamAttr(name="fusellama.{}.out_proj_weight_scale".format(i))
+            for i in range(self.num_layers)
         ]
         ffn_ln_scale_attrs = [
-            paddle.ParamAttr(name="fusellama.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
+            paddle.ParamAttr(name="fusellama.{}.ffn_ln_scale".format(i))
+            for i in range(self.num_layers)
         ]
         ffn1_weight_attrs = [
-            paddle.ParamAttr(name="fusellama.{}.ffn1_weight".format(i)) for i in range(self.num_layers)
+            paddle.ParamAttr(name="fusellama.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0))
+            for i in range(self.num_layers)
+        ]
+        ffn1_weight_scale_attrs = [
+            paddle.ParamAttr(name="fusellama.{}.ffn1_weight_scale".format(i))
+            for i in range(self.num_layers)
         ]
         ffn2_weight_attrs = [
-            paddle.ParamAttr(name="fusellama.{}.ffn2_weight".format(i)) for i in range(self.num_layers)
+            paddle.ParamAttr(name="fusellama.{}.ffn2_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0))
+            for i in range(self.num_layers)
         ]
+        ffn2_weight_scale_attrs = [
+            paddle.ParamAttr(name="fusellama.{}.ffn2_weight_scale".format(i))
+            for i in range(self.num_layers)
+        ]
+
         self.transformer_block = FusedMultiTransformerDyquant(
             self.hidden_size,
             self.num_attention_heads,
             self.intermediate_size,
+            quant_bits=self.quant_bits, 
             activation="swiglu",
             num_layers=config.num_hidden_layers,
             nranks=config.tensor_parallel_degree,
             ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
+            qkv_weight_scale_attrs=qkv_weight_scale_attrs,
             linear_weight_attrs=out_proj_weight_attrs,
+            linear_weight_scale_attrs=out_proj_weight_scale_attrs,
             ffn_ln_scale_attrs=ffn_ln_scale_attrs,
             ffn1_weight_attrs=ffn1_weight_attrs,
+            ffn1_weight_scale_attrs=ffn1_weight_scale_attrs,
             ffn2_weight_attrs=ffn2_weight_attrs,
+            ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
             epsilon=self.epsilon,
             norm_type="rmsnorm",
             use_neox_rotary_style=True,
