@@ -15,15 +15,15 @@ from paddlenlp.data.indexed_dataset import make_dataset as make_indexed_dataset
 local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 
 
-class FakeHCG:
-    def get_data_parallel_group(self):
-        return None
+# class FakeHCG:
+#     def get_data_parallel_group(self):
+#         return None
 
-    def get_pipe_parallel_group(self):
-        return None
+#     def get_pipe_parallel_group(self):
+#         return None
 
-    def get_model_parallel_group(self):
-        return None
+#     def get_model_parallel_group(self):
+#         return None
 
 
 def get_train_valid_test_split_(splits_string, size):
@@ -366,7 +366,7 @@ def _build_index_mappings(
             build_indices = False
             break
     data_cache_dir = os.path.dirname(idx_path["desc"])
-    data_cache_success = True
+    # data_cache_success = True
     # Build the indexed mapping if not exist.
     if data_cache_path is not None:
         check_rank_flag = build_indices and local_rank == 0
@@ -463,27 +463,27 @@ def _build_index_mappings(
             print("the data files are in and can be set with the --data-cache-path argument. Please")
             print("ensure you have write access to this directory or specify one that you do have")
             print("write access to.")
-            data_cache_success = False
+            # data_cache_success = False
 
     # add 7-18
-    # if paddle.distributed.get_world_size() > 1:
-    #     if paddle.in_dynamic_mode():
-    #         paddle.distributed.barrier()
+    if paddle.distributed.get_world_size() > 1:
+        if paddle.in_dynamic_mode():
+            paddle.distributed.barrier()
 
-    try:
-        hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
-    except:
-        hcg = FakeHCG()
+    # try:
+    #     hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
+    # except:
+    #     hcg = FakeHCG()
 
-    counts = paddle.to_tensor([data_cache_success], dtype="int64")
-    paddle.distributed.all_reduce(counts, group=hcg.get_data_parallel_group())
-    paddle.distributed.all_reduce(counts, group=hcg.get_pipe_parallel_group())
-    if counts[0].item() != (
-        paddle.distributed.get_world_size() // paddle.distributed.get_world_size(group=hcg.get_model_parallel_group())
-    ):
-        print_rank_0("Data index creation unsuccessful, exiting.")
-        exit()
-    paddle.distributed.barrier()
+    # counts = paddle.to_tensor([data_cache_success], dtype="int64")
+    # paddle.distributed.all_reduce(counts, group=hcg.get_data_parallel_group())
+    # paddle.distributed.all_reduce(counts, group=hcg.get_pipe_parallel_group())
+    # if counts[0].item() != (
+    #     paddle.distributed.get_world_size() // paddle.distributed.get_world_size(group=hcg.get_model_parallel_group())
+    # ):
+    #     print_rank_0("Data index creation unsuccessful, exiting.")
+    #     exit()
+    # paddle.distributed.barrier()
 
     # Load mappings.
     start_time = time.time()
