@@ -1077,7 +1077,7 @@ class Trainer:
 
         Subclass and override this method if you want to inject some custom behavior.
         """
-        if self.args.use_distributed_dataloader:
+        if self.args.distributed_dataloader:
             if self.args.should_load_dataset and self.train_dataset is None:
                 raise ValueError(
                     "When using distributed dataloader, training requires a train_dataset when should_load_dataset is True."
@@ -1091,13 +1091,9 @@ class Trainer:
                 raise ValueError("Trainer: training requires a train_dataset.")
 
         train_dataset = self.train_dataset
-        if is_datasets_available() and isinstance(train_dataset, datasets.Dataset):
+        if is_datasets_available() and train_dataset is not None and isinstance(train_dataset, datasets.Dataset):
             train_dataset = self._remove_unused_columns(train_dataset, description="training")
-        _DataLoader = (
-            DistDataLoader
-            if (self.args.tensor_parallel_degree > 1 or self.args.pipeline_parallel_degree > 1)
-            else DataLoader
-        )
+        _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
 
         if self._is_iterable_dataset(train_dataset):
             if self.args.dataset_world_size > 1:
@@ -1116,15 +1112,16 @@ class Trainer:
                 num_workers=self.args.dataloader_num_workers,
             )
 
-        if not self.args.use_distributed_dataloader or (
-            self.args.use_distributed_dataloader and self.args.should_load_dataset
+        if not self.args.distributed_dataloader or (
+            self.args.distributed_dataloader and self.args.should_load_dataset
         ):
             train_sampler = self._get_train_sampler()
         else:
             train_sampler = None
 
-        if self.args.tensor_parallel_degree > 1 or self.args.pipeline_parallel_degree > 1:
+        if self.args.distributed_dataloader:
             logger.info("using DistDataLoader")
+
         return _DataLoader(
             train_dataset,
             batch_sampler=train_sampler,
@@ -1168,12 +1165,25 @@ class Trainer:
                 If provided, will override `self.eval_dataset`. If it is an `datasets.Dataset`, columns not accepted by
                 the `model.forward()` method are automatically removed. It must implement `__len__`.
         """
-        if eval_dataset is None and self.eval_dataset is None:
-            raise ValueError("Trainer: evaluation requires an eval_dataset.")
+        if self.args.distributed_dataloader:
+            if self.args.should_load_dataset and eval_dataset is None and self.train_dataset is None:
+                raise ValueError(
+                    "When using distributed dataloader, evaluation requires an eval_dataset when should_load_dataset is True."
+                )
+            if not self.args.should_load_dataset and not (eval_dataset is None and self.train_dataset is None):
+                raise ValueError(
+                    "When using distributed dataloader, we don't need eval_dataset when should_load_dataset is False."
+                )
+        else:
+            if eval_dataset is None and self.eval_dataset is None:
+                raise ValueError("Trainer: evaluation requires an eval_dataset.")
+
         eval_dataset = eval_dataset if eval_dataset is not None else self.eval_dataset
 
-        if is_datasets_available() and isinstance(eval_dataset, datasets.Dataset):
+        if is_datasets_available() and eval_dataset is not None and isinstance(eval_dataset, datasets.Dataset):
             eval_dataset = self._remove_unused_columns(eval_dataset, description="evaluation")
+
+        _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
 
         if self._is_iterable_dataset(eval_dataset):
             if self.args.dataset_world_size > 1:
@@ -1192,9 +1202,17 @@ class Trainer:
                 num_workers=self.args.dataloader_num_workers,
             )
 
-        eval_sampler = self._get_eval_sampler(eval_dataset)
+        if not self.args.use_distributed_dataloader or (
+            self.args.use_distributed_dataloader and self.args.should_load_dataset
+        ):
+            eval_sampler = self._get_train_sampler(eval_dataset)
+        else:
+            eval_sampler = None
 
-        return DataLoader(
+        if self.args.distributed_dataloader:
+            logger.info("using DistDataLoader")
+
+        return _DataLoader(
             eval_dataset,
             batch_sampler=eval_sampler,
             collate_fn=self.data_collator,

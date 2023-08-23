@@ -317,7 +317,7 @@ class TrainingArguments:
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
         skip_profile_timer (`bool`, *optional*):
             Whether skip profile timer, timer will record time usage of forward/ backward/ step, etc.
-        use_distributed_dataloader (`bool`, **):
+        distributed_dataloader (`bool`, **):
             Whether to use distributed dataloader. Default is `False`.
     """
 
@@ -679,7 +679,7 @@ class TrainingArguments:
         default=True,
         metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl."},
     )
-    use_distributed_dataloader: Optional[bool] = field(
+    distributed_dataloader: Optional[bool] = field(
         default=False, metadata={"help": "Whether to use distributed dataloader."}
     )
 
@@ -785,6 +785,10 @@ class TrainingArguments:
 
         if len(self.sharding) > 0 or self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1:
             self.use_hybrid_parallel = True
+
+        if self.distributed_dataloader and not (self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1):
+            warnings.warn("We set `distributed_dataloader` to False if tp_degree <= 1 and pp_degree <= 1")
+            self.distributed_dataloader = False
 
         if self.amp_master_grad:
             if self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1:
