@@ -568,6 +568,18 @@ class TrainingArguments:
             )
         },
     )
+    hybrid_parallel_topo_order: str = field(
+        default=None,
+        metadata={
+            "help": (
+                "In hybrid parallelism, the order of communication groups may affect efficiency.\n"
+                "Following options are supported:\n"
+                "- pp_first. the topo order is dp, pp, sharding, mp \n"
+                "- sharding_first. the topo order is dp, sharding, pp, mp \n"
+                "Defalut is None, for pp_first"
+            )
+        },
+    )
     recompute: bool = field(
         default=False,
         metadata={
@@ -867,16 +879,19 @@ class TrainingArguments:
                 if tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
 
-                if tensor_parallel_degree == 1 and sharding_parallel_degree == 1:
-                    order = ["pp", "dp", "sharding", "mp"]
-                else:
+                if self.hybrid_parallel_topo_order is None:
+                    self.hybrid_parallel_topo_order = "pp_first"
+                assert self.hybrid_parallel_topo_order in ["pp_first", "sharding_first"]
+
+                if self.hybrid_parallel_topo_order == "pp_first":
                     order = ["dp", "pp", "sharding", "mp"]
+                if self.hybrid_parallel_topo_order == "sharding_first":
+                    order = ["dp", "sharding", "pp", "mp"]
 
                 hybrid_configs = {
                     "dp_degree": self.data_parallel_degree,
                     "mp_degree": tensor_parallel_degree,
                     "pp_degree": pipeline_parallel_degree,
-                    "order": order,
                     "sharding_degree": sharding_parallel_degree,
                     "order": order,
                 }
