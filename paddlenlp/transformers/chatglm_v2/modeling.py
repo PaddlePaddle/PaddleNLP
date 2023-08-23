@@ -231,38 +231,47 @@ class CoreAttention(nn.Layer):
         context_layer = context_layer.reshape(new_context_shape)
 
         return context_layer
-def kernel_encoder(query_layer,key_layer,value_layer,num_head,num_head_kv,dim_head):
+def kernel_encoder(query_layer,key_layer,value_layer,num_head,num_head_kv,dim_head,seq_lens):
         #仅定长
+        from flash_atten2 import flash_attn_varlen_fwd
         bs = query_layer.shape[1]
         qs = query_layer.shape[0]
         kvs = key_layer.shape[0]
-        scale = 1.0 / paddle.sqrt(dim_head)
         cu_q = paddle.arange(0, (bs + 1) * qs, qs, dtype='int32')
         cu_kv = paddle.arange(0, (bs + 1) * kvs, kvs, dtype='int32')
+        query_layer = query_layer.transpose([1, 0, 2, 3])
+        key_layer = key_layer.transpose([1, 0, 2, 3])
+        value_layer = value_layer.transpose([1, 0, 2, 3])
         qq = paddle.reshape(query_layer, [bs * qs, num_head, dim_head])
         kk = paddle.reshape(key_layer, [bs * kvs, num_head_kv, dim_head])
         vv = paddle.reshape(value_layer, [bs * kvs, num_head_kv, dim_head])
-        out=flash_attn_unpadded(
-            query=qq,
-            key=kk,
-            value=vv,
-            cu_seqlens_q=cu_q,
-            cu_seqlens_k=cu_kv,
-            max_seqlen_q=qs,
-            max_seqlen_k=kvs,
-            scale=scale,
-        )
-        encoder_out = out.transpose([1,0,2,3])
-        encoder_out = encoder_out.reshape([qs,bs,num_head*dim_head])
-        return encoder_out
+        scale = float(dim_head ** -0.5)
+        zero_tensors = False
+        is_causal = True
+        fmha_out = flash_attn_varlen_fwd(
+            qq,
+            kk, 
+            vv, 
+            cu_q,
+            cu_kv, 
+            paddle.to_tensor([seq_lens]),
+            paddle.to_tensor([seq_lens]), 
+            scale, 
+            zero_tensors, 
+            is_causal)
+        fmha_out = fmha_out.reshape([bs,-1,num_head,dim_head])
+        fmha_out = fmha_out.transpose([1,0,2,3])
+        fmha_out =fmha_out.reshape([fmha_out.shape[0],fmha_out.shape[1],fmha_out.shape[2]*fmha_out.shape[3]])
+        return fmha_out
 def kernel_decoder(q,k,v,num_head,num_head_kv,dim_head,cache_kvs=None,seq_qk=0):
         from paddle.incubate.nn.functional.masked_multiquery_attention import masked_multiquery_attention
         output_size = (1, num_head*dim_head)
         q=q.squeeze(0)
         k=k.squeeze(0)
         v=v.squeeze(0)
-        bz=q.shape[0]
-        src_mask=paddle.zeros([bz,1,1,seq_qk]).cast('float16')
+        bs=q.shape[0]
+        src_mask=paddle.zeros([bs,1,1,seq_qk]).cast('float16')
+        #import pdb;pdb.set_trace()
         out = masked_multiquery_attention(
                 query=q,
                 key=k,
@@ -275,7 +284,7 @@ def kernel_decoder(q,k,v,num_head,num_head_kv,dim_head,cache_kvs=None,seq_qk=0):
                 beam_cache_offset=None,
                 out_shift=None,
                 out_smooth=None,
-                seq_len=seq_qk,
+                seq_len=seq_qk-1,
                 rotary_emb_dims=0,
                 head_kv=num_head_kv,
                 use_neox_rotary_style=False,        
@@ -339,9 +348,9 @@ class SelfAttention(nn.Layer):
             self.hidden_size_per_attention_head * config.multi_query_group_num,
             bias_attr=config.add_qkv_bias,
         )
-        self.use_kenrel=True
+        self.use_kernel=False
 
-    def forward(self, hidden_states, attention_mask, rotary_pos_emb, kv_cache=None, use_cache=True, cache_kvs=None, seq_qk=0, is_first_forward=True):
+    def forward(self, hidden_states, attention_mask, rotary_pos_emb, kv_cache=None, use_cache=True, cache_kvs=None, cur_seq_len=0, is_first_forward=True):
         seq_length, batch_size, hidden_size = hidden_states.shape
         query_layer = self.query(hidden_states)
         key_layer = self.key(hidden_states)
@@ -357,48 +366,49 @@ class SelfAttention(nn.Layer):
         if rotary_pos_emb is not None:
             query_layer = apply_rotary_pos_emb(query_layer, rotary_pos_emb)
             key_layer = apply_rotary_pos_emb(key_layer, rotary_pos_emb)
+        
+        kernel_q = query_layer
+        kernel_v = value_layer
+        kernel_k = key_layer
+        # adjust key and value for inference
+        if use_cache:
+            if kv_cache is not None:
+                cache_k, cache_v = kv_cache
+                key_layer = paddle.concat((cache_k, key_layer), axis=0)
+                value_layer = paddle.concat((cache_v, value_layer), axis=0)
+            kv_cache = (key_layer, value_layer)
+        else:
+            kv_cache = None
     
-        if self.use_kenrel:
+        if self.use_kernel:
             if is_first_forward:
                 #encoder
-                seq_lens=key_layer.shape[0]
-                k_out=key_layer.transpose([1,2,0,3]).cast('float16')
-                v_out=value_layer.transpose([1,2,0,3]).cast('float16')
+                seq_lens=kernel_k.shape[0]
+                k_out=kernel_k.transpose([1,2,0,3]).cast('float16')
+                v_out=kernel_v.transpose([1,2,0,3]).cast('float16')
                 write_cache_kv(k_out, v_out, cache_kvs, paddle.to_tensor([seq_lens]).cast("int32"))
                 context_layer = kernel_encoder(
-                        query_layer=query_layer,
-                        key_layer=key_layer,
-                        value_layer=value_layer,
+                        query_layer=kernel_q,
+                        key_layer=kernel_k,
+                        value_layer=kernel_v,
                         num_head=self.num_attention_heads_per_partition,
                         num_head_kv=self.num_multi_query_groups_per_partition,
                         dim_head=self.hidden_size_per_attention_head,
-                        cache_kvs=cache_kvs,
-                        attention_mask=attention_mask,
+                        seq_lens=seq_lens,
                 )
             else:
                 #decoder
                 context_layer = kernel_decoder(
-                    q=query_layer,
-                    k=key_layer,
-                    v=value_layer,
-                    kv_cache=kv_cache,
+                    q=kernel_q,
+                    k=kernel_k,
+                    v=kernel_v,
                     num_head=self.num_attention_heads_per_partition,
                     num_head_kv=self.num_multi_query_groups_per_partition,
                     dim_head=self.hidden_size_per_attention_head,
                     cache_kvs=cache_kvs,
-                    seq_qk=seq_qk
+                    seq_qk=cur_seq_len
                 )
         else:
-            # adjust key and value for inference
-            if use_cache:
-                if kv_cache is not None:
-                    cache_k, cache_v = kv_cache
-                    key_layer = paddle.concat((cache_k, key_layer), axis=0)
-                    value_layer = paddle.concat((cache_v, value_layer), axis=0)
-                kv_cache = (key_layer, value_layer)
-            else:
-                kv_cache = None
-
             if self.kv_indices is not None:
                 key_layer = paddle.index_select(key_layer, self.kv_indices, axis=2)
                 value_layer = paddle.index_select(value_layer, self.kv_indices, axis=2)
@@ -508,7 +518,7 @@ class GLMBlock(nn.Layer):
         kv_cache=None,
         use_cache=True,
         cache_kvs=None,
-        seq_qk=0,
+        cur_seq_len=0,
         is_first_forward=True,
     ):
         # hidden_states: [s, b, h]
@@ -524,7 +534,7 @@ class GLMBlock(nn.Layer):
             kv_cache=kv_cache, 
             use_cache=use_cache, 
             cache_kvs=cache_kvs,
-            seq_qk=seq_qk,
+            cur_seq_len=cur_seq_len,
             is_first_forward=is_first_forward,
         )
 
@@ -584,6 +594,7 @@ class GLMTransformer(nn.Layer):
             # Final layer norm before output.
             self.final_layernorm = LayerNormFunc(config.hidden_size, epsilon=config.layernorm_epsilon)
 
+        self.cur_seq_len=0
     def _get_layer(self, layer_number):
         return self.layers[layer_number]
 
@@ -630,10 +641,10 @@ class GLMTransformer(nn.Layer):
             paddle.set_default_dtype('float16')
             self.caches = [paddle.zeros(shape=[2, 1, self.num_head_kv, self.max_sequence_length, self.head_dim],
                                         dtype=paddle.get_default_dtype()) for _ in range(self.num_hidden_layers)]
-        if hidden_states.shape[1]!=1:
-            self.seq_now = hidden_states.shape[1]
+        if is_first_forward:
+            self.cur_seq_len = hidden_states.shape[0]
         else:
-            self.seq_now = self.seq_now + 1
+            self.cur_seq_len = self.cur_seq_len + 1
         presents = () if use_cache else None
         all_self_attentions = None
         all_hidden_states = () if output_hidden_states else None
@@ -664,13 +675,12 @@ class GLMTransformer(nn.Layer):
                     kv_cache=kv_caches[index], 
                     use_cache=use_cache, 
                     cache_kvs=self.caches[index],
-                    seq_qk=self.seq_now,
+                    cur_seq_len=self.cur_seq_len,
                     is_first_forward=is_first_forward,
                 )
 
             if use_cache:
                 presents = presents + (kv_cache,)
-
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
 
