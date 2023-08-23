@@ -140,7 +140,7 @@ def main():
     else:
         trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
     if data_args.intokens:
-        if model.base_model_prefix not in ["llama", "bloom", "chatglm"]:
+        if model.base_model_prefix not in ["llama", "bloom", "chatglm"] and training_args.pipeline_parallel_degree < 1:
             raise NotImplementedError("InTokens data stream is only implemented for LLaMA, Bloom and ChatGLM so far.")
     train_ds = train_ds.map(partial(trans_func, is_test=False, intokens=data_args.intokens))
     eval_intokens = data_args.intokens
@@ -232,6 +232,13 @@ def main():
         }
 
     # Create trainer
+    if training_args.pipeline_parallel_degree > 1:
+        if data_args.intokens:
+            max_length = data_args.intokens_max_length
+        else:
+            max_length = data_args.src_length + data_args.tgt_length
+    else:
+        max_length = None
     trainer = CausalLMTrainer(
         model=model,
         args=training_args,
@@ -241,13 +248,9 @@ def main():
         compute_metrics=compute_metrics_do_generation if data_args.eval_with_do_generation else compute_metrics,
         data_collator=DataCollatorForSeq2Seq(
             tokenizer=tokenizer,
-            max_length=data_args.src_length + data_args.tgt_length
-            if training_args.pipeline_parallel_degree > 1
-            else -1,
+            max_length=max_length,
             padding="max_length" if training_args.pipeline_parallel_degree > 1 else True,
-            max_label_length=data_args.src_length + data_args.tgt_length
-            if training_args.pipeline_parallel_degree > 1
-            else None,
+            max_label_length=max_length,
             return_tensors="np",
         ),
         do_generation=data_args.eval_with_do_generation,
