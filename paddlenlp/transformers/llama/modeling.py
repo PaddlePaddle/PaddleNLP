@@ -822,7 +822,6 @@ class LlamaAttention(nn.Layer):
         if use_cache:
             outputs += (past_key_value,)
 
-        # remove empty tuple for pipeline parallel
         if type(outputs) is tuple and len(outputs) == 1:
             outputs = outputs[0]
 
