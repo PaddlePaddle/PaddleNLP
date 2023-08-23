@@ -77,12 +77,12 @@ class LlamaDyquantInferenceModel(LlamaPretrainedModel):
         self.max_position_embeddings = config.max_position_embeddings
 
         # Maybe change to QuantConfig (Author: zhengzekang)
-        self.quant_bits = config.quant_bit 
+        self.quant_bits = config.quant_bits 
         self.quant_algo = 'weight_only_int' + str(self.quant_bits)
 
         assert (
             self.quant_algo == 'weight_only_int8' or self.quant_algo == 'weight_only_int4'
-        ), "Expected quant_type equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
+        ), "Expected quant_algo equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
             self.quant_algo
         )
 
