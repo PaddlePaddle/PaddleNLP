@@ -22,6 +22,7 @@ import re
 import tempfile
 import warnings
 from contextlib import contextmanager
+from functools import partial
 
 # from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
@@ -554,7 +555,7 @@ def shard_checkpoint(
     return shards, index
 
 
-def load_sharded_checkpoint(model, folder, strict=True):
+def load_sharded_checkpoint(model, folder, variant=None, strict=True, prefer_safe=False):
     """
     This is the same as [`paddle.nn.Layer.set_state_dict`]
     but for a sharded checkpoint.
@@ -565,8 +566,12 @@ def load_sharded_checkpoint(model, folder, strict=True):
     Args:
         model (`paddle.nn.Module`): The model in which to load the checkpoint.
         folder (`str` or `os.PathLike`): A path to a folder containing the sharded checkpoint.
+        variant (`str`): The model variant.
         strict (`bool`, *optional`, defaults to `True`):
             Whether to strictly enforce that the keys in the model state dict match the keys in the sharded checkpoint.
+        prefer_safe (`bool`, *optional*, defaults to `False`):
+            If both safetensors and Paddle save files are present in checkpoint and `prefer_safe` is True, the safetensors
+            files will be loaded. Otherwise, Paddle files are always loaded when possible.
 
     Returns:
         `NamedTuple`: A named tuple with `missing_keys` and `unexpected_keys` fields
@@ -574,11 +579,35 @@ def load_sharded_checkpoint(model, folder, strict=True):
             - `unexpected_keys` is a list of str containing the unexpected keys
     """
     # Load the index
-    index_file = os.path.join(folder, PADDLE_WEIGHTS_INDEX_NAME)
-    if not os.path.isfile(index_file):
-        raise ValueError(f"Can't find a checkpoint index ({PADDLE_WEIGHTS_INDEX_NAME}) in {folder}.")
+    index_file = os.path.join(folder, _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant))
+    safe_index_file = os.path.join(folder, _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant))
 
-    with open(index_file, "r", encoding="utf-8") as f:
+    index_present = os.path.isfile(index_file)
+    safe_index_present = os.path.isfile(safe_index_file)
+
+    if not index_present and not (safe_index_present and is_safetensors_available()):
+        filenames = (
+            (_add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant), _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant))
+            if is_safetensors_available()
+            else (_add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant),)
+        )
+        raise ValueError(f"Can't find a checkpoint index ({' or '.join(filenames)}) in {folder}.")
+
+    load_safe = False
+    if safe_index_present:
+        if prefer_safe:
+            if is_safetensors_available():
+                load_safe = True  # load safe due to preference
+            else:
+                logger.warning(
+                    f"Cannot load sharded checkpoint at {folder} safely since safetensors is not installed!"
+                )
+        elif not index_present:
+            load_safe = True
+
+    load_index = safe_index_file if load_safe else index_file
+
+    with open(load_index, "r", encoding="utf-8") as f:
         index = json.load(f)
 
     shard_files = list(set(index["weight_map"].values()))
@@ -598,12 +627,14 @@ def load_sharded_checkpoint(model, folder, strict=True):
             error_message += f"\nMissing key(s): {str_unexpected_keys}."
         raise RuntimeError(error_message)
 
+    loader = safe_load_file if load_safe else partial(paddlenlp_load, map_location="cpu")
+
     for shard_file in shard_files:
-        state_dict = paddlenlp_load(os.path.join(folder, shard_file), map_location="cpu")
+        state_dict = loader(os.path.join(folder, shard_file))
         with warnings.catch_warnings():
             warnings.resetwarnings()
             warnings.filterwarnings("ignore", message=r".*is not found in the provided dict.*")
-            model.set_state_dict(state_dict)
+            logger.info(f"set state-dict: {model.set_state_dict(state_dict)}")
 
         # Make sure memory is fred before we load the next state dict.
         del state_dict
