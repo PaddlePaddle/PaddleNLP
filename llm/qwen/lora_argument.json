@@ -13,7 +13,7 @@
     "evaluation_strategy": "epoch",
     "save_strategy": "epoch",
     "src_length": 1024,
-    "tgt_length": 1024,
+    "max_length": 2048,
     "bf16": true,
     "fp16_opt_level": "O2",
     "do_train": true,
@@ -24,7 +24,7 @@
     "metric_for_best_model": "accuracy",
     "recompute": true,
     "save_total_limit": 1,
-    "tensor_parallel_degree": 4,
+    "tensor_parallel_degree": 1,
     "pipeline_parallel_degree": 1,
     "lora": true
   }
