@@ -26,6 +26,11 @@ from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 
+import paddle_xpu
+from paddle_xpu.ops.transformer_engine.model.llama import FFN
+from paddle_xpu.ops.transformer_engine.xte_meta import *
+import os
+
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
 except ImportError:
@@ -395,6 +400,15 @@ class LlamaMLP(nn.Layer):
         self.tensor_parallel_degree = config.tensor_parallel_degree
         self.fuse_attention_ffn = config.fuse_attention_ffn
 
+        if os.getenv("XPU_LLAMA_FFN") == "True":
+            print("xpu_llama_ffn.......................................................")
+            self.ffn = FFN(
+                self.hidden_size, self.intermediate_size,
+                intermediate_dtype=XTEDataType.int16,
+            ) 
+            self.step = 0
+            return
+
         if config.sequence_parallel:
             ColumnParallelLinear = ColumnSequenceParallelLinear
             RowParallelLinear = RowSequenceParallelLinear
@@ -444,7 +458,11 @@ class LlamaMLP(nn.Layer):
             gate_out, up_out = paddle.chunk(self.gate_up_fused_proj(x), chunks=2, axis=-1)
             out = self.down_proj(F.silu(gate_out) * up_out)
         else:
-            out = self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+            if os.getenv("XPU_LLAMA_FFN") == "True":
+                out = self.ffn(x, (self.step) % 16 == 0)
+            else:
+                out = self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
+            self.step = self.step + 1
         return out
 
 
@@ -879,7 +897,10 @@ class LlamaPretrainedModel(PretrainedModel):
         with paddle.no_grad():
             if isinstance(layer, LlamaMLP):
                 factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
-                layer.down_proj.weight.scale_(factor)
+                if os.getenv("XPU_LLAMA_FFN") == "True":
+                    layer.ffn.down_proj.weight.scale_(factor)
+                else:
+                    layer.down_proj.weight.scale_(factor)
             if isinstance(layer, LlamaAttention):
                 factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
                 layer.o_proj.weight.scale_(factor)

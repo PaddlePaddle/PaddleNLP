@@ -45,6 +45,7 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_
     HybridParallelOptimizer,
 )
 
+from paddle_xpu.ops.transformer_engine.xte_meta import *
 try:
     from paddle.distributed.fleet.utils.hybrid_parallel_util import (
         obtain_optimizer_parameters_list,
@@ -380,6 +381,9 @@ class Trainer:
 
         # very last
         self._memory_tracker.stop_and_update_metrics()
+        if os.getenv("XPU_LLAMA_FFN") == "True":
+            p = XPUScaleMemoryManager.instance()
+            p.init_tensor()
 
     def add_callback(self, callback):
         """
