@@ -354,7 +354,6 @@ class GPTDataset(paddle.io.Dataset):
         seed=1234,
         need_data=True,
     ):
-
         self.file_prefix = file_prefix
         self.max_seq_len = max_seq_len
         self.name = name
@@ -363,12 +362,12 @@ class GPTDataset(paddle.io.Dataset):
         self.sample_lens = sample_lens
         self.micro_batch_size = micro_batch_size
 
-        if documents is None:
-            document_ids = np.arange(0, self.sample_lens.shape[0])
-        else:
-            document_ids = documents
-
         if need_data:
+            if documents is None:
+                document_ids = np.arange(0, self.sample_lens.shape[0])
+            else:
+                document_ids = documents
+
             doc_idx_filename, sample_idx_filename, shuffle_idx_filename = construct_samples_and_shuffle_data(
                 self.name,
                 self.file_prefix,

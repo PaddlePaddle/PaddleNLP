@@ -238,7 +238,7 @@ def create_pretrained_dataset(
         # logger.info(tokenizer._decode(labels))
         # logger.info(tokenizer.convert_ids_to_tokens(input_ids))
 
-    def build_dataset(index, name, need_data):
+    def build_dataset(index, name):
         dataset = GPTDataset(
             file_prefix=os.path.join(data_args.cache_prefix, os.path.basename(input_prefix)),
             build_data_file=training_args.local_process_index == 0,
@@ -280,9 +280,9 @@ def create_pretrained_dataset(
 
     # Note, data should be broardcast to all devices.
     # for train, valid, test, the distinct data num is data_world_size
-    train_dataset = build_dataset(0, "train", need_data)
-    valid_dataset = build_dataset(1, "valid", need_data)
-    test_dataset = build_dataset(2, "test", need_data)
+    train_dataset = build_dataset(0, "train")
+    valid_dataset = build_dataset(1, "valid")
+    test_dataset = build_dataset(2, "test")
 
     return train_dataset, valid_dataset, test_dataset, _collate_data
 

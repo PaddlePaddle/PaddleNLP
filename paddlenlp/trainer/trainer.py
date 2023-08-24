@@ -27,6 +27,7 @@ import shutil
 import sys
 import time
 import types
+from collections import OrderedDict
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -1531,7 +1532,7 @@ class Trainer:
                             ret = ret[0]
                         return ret
 
-                    if type(inputs) is dict:
+                    if type(inputs) is dict or type(inputs) is OrderedDict:
                         return [
                             get_expected_keys(inputs, first_stage_keys),
                             get_expected_keys(inputs, last_stage_keys),
@@ -2228,19 +2229,23 @@ class Trainer:
                 dataloader._batch_sampler.set_epoch(consumed_samples=consumed_samples)
 
         logger.info(f"***** Running {description} *****")
-        if has_length(dataloader):
-            logger.info(f"  Num examples = {self.num_examples(dataloader)}")
-            if max_eval_iters > 0:
-                logger.info(f"  Total prediction steps = {max_eval_iters}")
-            else:
-                logger.info(f"  Total prediction steps = {len(dataloader)}")
-        else:
-            logger.info("  Num examples: Unknown")
-            if max_eval_iters > 0:
-                logger.info(f"  Total prediction steps = {max_eval_iters}")
 
-        logger.info(f"  Pre device batch size = {batch_size}")
-        logger.info(f"  Total Batch size = {batch_size * self.args.dataset_world_size}")
+        if not self.args.distributed_dataloader or (
+            self.args.distributed_dataloader and self.args.should_load_dataset
+        ):
+            if has_length(dataloader):
+                logger.info(f"  Num examples = {self.num_examples(dataloader)}")
+                if max_eval_iters > 0:
+                    logger.info(f"  Total prediction steps = {max_eval_iters}")
+                else:
+                    logger.info(f"  Total prediction steps = {len(dataloader)}")
+            else:
+                logger.info("  Num examples: Unknown")
+                if max_eval_iters > 0:
+                    logger.info(f"  Total prediction steps = {max_eval_iters}")
+
+            logger.info(f"  Pre device batch size = {batch_size}")
+            logger.info(f"  Total Batch size = {batch_size * self.args.dataset_world_size}")
 
         model.eval()
 
@@ -2271,8 +2276,7 @@ class Trainer:
             if observed_batch_size is not None:
                 observed_num_examples += observed_batch_size
                 # For batch samplers, batch_size is not known by the dataloader in advance.
-                if batch_size is None:
-                    batch_size = observed_batch_size
+                batch_size = observed_batch_size
 
             # Prediction step
             loss, logits, labels = self.prediction_step(model, inputs, prediction_loss_only, ignore_keys=ignore_keys)

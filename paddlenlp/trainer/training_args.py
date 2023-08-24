@@ -317,7 +317,7 @@ class TrainingArguments:
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
         skip_profile_timer (`bool`, *optional*):
             Whether skip profile timer, timer will record time usage of forward/ backward/ step, etc.
-        distributed_dataloader (`bool`, **):
+        distributed_dataloader (`bool`, *optional*):
             Whether to use distributed dataloader. Default is `False`.
     """
 
