@@ -56,19 +56,18 @@ class LanguageModuleAuto(BasicModule):
                 log_dict["total_batch"],
                 log_dict["loss"],
                 log_dict["eval_cost"],
-                speed,
-            )
-        )
+                speed, ))
 
     def test_step_end(self, log_dict):
         speed = 1.0 / log_dict["test_cost"]
         logger.info(
             "[test] epoch: %d, batch: %d, loss: %.9f, avg_test_cost: %.5f sec, speed: %.2f step/s"
-            % (log_dict["epoch"], log_dict["batch"], log_dict["loss"], log_dict["test_cost"], speed)
-        )
+            % (log_dict["epoch"], log_dict["batch"], log_dict["loss"],
+               log_dict["test_cost"], speed))
 
     def training_epoch_end(self, log_dict):
-        logger.info("[Training] epoch: %d, total time: %.5f sec" % (log_dict["epoch"], log_dict["train_cost"]))
+        logger.info("[Training] epoch: %d, total time: %.5f sec" %
+                    (log_dict["epoch"], log_dict["train_cost"]))
 
 
 class GPTModuleAuto(LanguageModuleAuto):
@@ -89,7 +88,8 @@ class GPTModuleAuto(LanguageModuleAuto):
         get_model_size(l, h, v, s)
 
         with LazyGuard():
-            model = gpt.GPTForPretrainingAuto(gpt.GPTModelAuto(**model_setting))
+            model = gpt.GPTForPretrainingAuto(
+                gpt.GPTModelAuto(**model_setting))
         return model
 
     def get_loss_fn(self):
@@ -99,30 +99,35 @@ class GPTModuleAuto(LanguageModuleAuto):
         speed = 1.0 / log_dict["train_cost"]
         default_global_tokens_num = self.configs.Global.global_batch_size * self.configs.Data.Train.dataset.max_seq_len
 
-        loss_scale_str = (
-            "loss_scale: %.9f," % (log_dict["loss_scale"]) if log_dict.get("loss_scale", None) is not None else ""
-        )
-        logger.info(
-            "[train] epoch: [%d/%d], batch: [%d/%d], loss: %.9f, avg_batch_cost: %.5f sec, speed: %.2f step/s, "
-            "ips_total: %.0f tokens/s, ips: %.0f tokens/s, %s learning rate: %.5e, found_inf: %.0f"
-            % (
-                log_dict["epoch"],
-                log_dict["total_epoch"],
-                log_dict["batch"],
-                log_dict["total_step"],
-                log_dict["loss"],
-                log_dict["train_cost"],
-                speed,
-                speed * default_global_tokens_num,
-                speed * default_global_tokens_num / log_dict["dp_world_size"],
-                loss_scale_str,
-                log_dict["lr"],
-                log_dict["found_inf"],
-            )
-        )
+        loss_scale_str = ("loss_scale: %.9f," % (log_dict["loss_scale"]) if
+                          log_dict.get("loss_scale", None) is not None else "")
+
+        logger_info_str = "[train] epoch: [%d/%d], batch: [%d/%d], loss: %.9f, avg_batch_cost: %.5f sec, speed: %.2f step/s, " \
+                            "ips_total: %.0f tokens/s, ips: %.0f tokens/s, %s learning rate: %.5e, found_inf: %.0f" \
+                            % (
+                                log_dict["epoch"],
+                                log_dict["total_epoch"],
+                                log_dict["batch"],
+                                log_dict["total_step"],
+                                log_dict["loss"],
+                                log_dict["train_cost"],
+                                speed,
+                                speed * default_global_tokens_num,
+                                speed * default_global_tokens_num / log_dict["dp_world_size"],
+                                loss_scale_str,
+                                log_dict["lr"],
+                                log_dict["found_inf"],
+                            )
+        if "max_memory_allocated" in log_dict:
+            logger_info_str += ", max_memory_allocated: %.1f MB, max_memory_reserved: %.1f MB" \
+                                ", memory_allocated: %.1f MB, memory_reserved: %.1f MB" \
+                                % (log_dict["max_memory_allocated"], log_dict["max_memory_reserved"],log_dict["memory_allocated"], log_dict["memory_reserved"])
+
+        logger.info(logger_info_str)
 
     def training_epoch_end(self, log_dict):
-        logger.info("[Training] epoch: %d, total time: %.5f sec" % (log_dict["epoch"], log_dict["train_cost"]))
+        logger.info("[Training] epoch: %d, total time: %.5f sec" %
+                    (log_dict["epoch"], log_dict["train_cost"]))
 
 
 class GPTGenerationModuleAuto(BasicModule):
@@ -145,9 +150,11 @@ class GPTGenerationModuleAuto(BasicModule):
         self.tokenizer = tokenizer_class.from_pretrained(pretrained_name)
 
         with LazyGuard():
-            model = gpt.GPTForGenerationAuto(gpt.GPTModelAuto(**model_setting), self.generation_cfgs)
+            model = gpt.GPTForGenerationAuto(
+                gpt.GPTModelAuto(**model_setting), self.generation_cfgs)
 
-        self.generation_cfgs["max_dec_len"] = self.adjust_length_to_model(self.generation_cfgs["max_dec_len"], 512)
+        self.generation_cfgs["max_dec_len"] = self.adjust_length_to_model(
+            self.generation_cfgs["max_dec_len"], 512)
 
         self.generation_cfgs["bos_token_id"] = self.tokenizer.eos_token_id
         self.generation_cfgs["eos_token_id"] = self.tokenizer.eos_token_id
