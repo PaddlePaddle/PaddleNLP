@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 class ErnieRetriever(DensePassageRetriever):
 
     """
-    Retriever that uses a bi-encoder (one transformer for query, one transformer for passage).
+    Retriever that uses a bi-encoder (query model for query, passage model for passage).
     """
 
     def __init__(
@@ -59,31 +59,16 @@ class ErnieRetriever(DensePassageRetriever):
 
         """
         Init the Retriever incl. the two encoder models from a local or remote model checkpoint.
-
-        **Example:**
-
-                ```python
-                |    # remote model from FAIR
-                |    DensePassageRetriever(document_store=your_doc_store,
-                |                          query_embedding_model="rocketqa-zh-dureader-query-encoder",
-                |                          passage_embedding_model="rocketqa-zh-dureader-para-encoder")
-                |    # or from local path
-                |    DensePassageRetriever(document_store=your_doc_store,
-                |                          query_embedding_model="model_directory/question-encoder",
-                |                          passage_embedding_model="model_directory/context-encoder")
-                ```
-
         :param document_store: An instance of DocumentStore from which to retrieve documents.
         :param query_embedding_model: Local path or remote name of question encoder checkpoint. The format equals the
                                       one used by paddlenlp transformers' models
-                                      Currently available remote names: ``"rocketqa-zh-dureader-query-encoder"``
+                                      Currently available remote names: ``"ernie-embedding-v1"``
         :param passage_embedding_model: Local path or remote name of passage encoder checkpoint. The format equals the
                                         one used by paddlenlp transformers' models
-                                        Currently available remote names: ``"rocketqa-zh-dureader-para-encoder"``
+                                        Currently available remote names: ``"ernie-embedding-v1"``
         :param max_seq_len_query: Longest length of each query sequence. Maximum number of tokens for the query text. Longer ones will be cut down."
         :param max_seq_len_passage: Longest length of each passage/context sequence. Maximum number of tokens for the passage text. Longer ones will be cut down."
         :param top_k: How many documents to return per query.
-        :param use_gpu: Whether to use all available GPUs or the CPU. Falls back on CPU if no GPU is available.
         :param batch_size: Number of questions or passages to encode at once. In case of multiple gpus, this will be the total batch size.
         :param embed_title: Whether to concatenate title and passage to a text pair that is then used to create the embedding.
                             This is the approach used in the original paper and is likely to improve performance if your
