@@ -129,10 +129,7 @@ class AutoEngine(BasicEngine):
         self.nvprof_start = configs.get("Profiler_auto", {}).get("nvprof_start", -1)
         self.nvprof_end = configs.get("Profiler_auto", {}).get("nvprof_end", -1)
 
-    def _train_one_epoch(self,
-                         epoch_index,
-                         train_data_loader=None,
-                         valid_data_loader=None):
+    def _train_one_epoch(self, epoch_index, train_data_loader=None, valid_data_loader=None):
 
         train_losses = []
         train_step_start = get_timestamp()
@@ -273,7 +270,8 @@ class AutoEngine(BasicEngine):
                 epochs=self._num_train_epochs,
                 collate_fn=train_dataset.collate_fn,
                 sample_split=train_dataset.sample_split,
-                mode="train", )
+                mode="train",
+            )
         if valid_dataset and self._eval_freq <= self._max_steps:
             valid_data_loader = self._auto_engine.dataloader_from_generator(
                 dataset=valid_dataset,
@@ -282,13 +280,13 @@ class AutoEngine(BasicEngine):
                 epochs=self._num_train_epochs,
                 collate_fn=valid_dataset.collate_fn,
                 sample_split=valid_dataset.sample_split,
-                mode="eval", )
+                mode="eval",
+            )
 
         for epoch_index in range(start_epoch, epoch):
             train_epoch_start = get_timestamp()
 
-            self._train_one_epoch(epoch_index, train_data_loader,
-                                  valid_data_loader)
+            self._train_one_epoch(epoch_index, train_data_loader, valid_data_loader)
 
             train_epoch_cost = get_timestamp() - train_epoch_start
             log_dict = {
@@ -337,7 +335,8 @@ class AutoEngine(BasicEngine):
                 epochs=self._num_train_epochs,
                 collate_fn=valid_dataset.collate_fn,
                 sample_split=valid_dataset.sample_split,
-                mode="eval", )
+                mode="eval",
+            )
 
         for epoch_index in range(epoch):
             eval_epoch_start = get_timestamp()
@@ -359,13 +358,9 @@ class AutoEngine(BasicEngine):
         eval_step_start = get_timestamp()
         eval_losses = []
         total_eval_batch = len(valid_data_loader)
-        valid_data_loader = valid_data_loader(
-        ) if valid_data_loader is not None else None
+        valid_data_loader = valid_data_loader() if valid_data_loader is not None else None
         for eval_step, batch in enumerate(valid_data_loader):
-            with paddle.profiler.utils._nvprof_range(
-                    iter_id=eval_step,
-                    start=self.nvprof_start,
-                    end=self.nvprof_end):
+            with paddle.profiler.utils._nvprof_range(iter_id=eval_step, start=self.nvprof_start, end=self.nvprof_end):
                 outs = self._auto_engine.run(batch, mode="eval")
             eval_losses.append(outs["loss"])
 
@@ -377,8 +372,7 @@ class AutoEngine(BasicEngine):
                     "epoch": epoch,
                     "batch": eval_step,
                     "total_batch": total_eval_batch,
-                    "eval_cost": eval_step_cost
-                    if eval_step == 0 else eval_step_cost / self._logging_freq,
+                    "eval_cost": eval_step_cost if eval_step == 0 else eval_step_cost / self._logging_freq,
                 }
                 self._module.validation_step_end(log_dict)
                 eval_step_start = get_timestamp()
@@ -400,15 +394,13 @@ class AutoEngine(BasicEngine):
                 epochs=self._num_train_epochs,
                 collate_fn=test_dataset.collate_fn,
                 sample_split=test_dataset.sample_split,
-                mode="predict", )
+                mode="predict",
+            )
 
         test_start = get_timestamp()
         test_losses = []
         for test_step, batch in enumerate(test_data_loader):
-            with paddle.profiler.utils._nvprof_range(
-                    iter_id=test_step,
-                    start=self.nvprof_start,
-                    end=self.nvprof_end):
+            with paddle.profiler.utils._nvprof_range(iter_id=test_step, start=self.nvprof_start, end=self.nvprof_end):
                 outs = self._auto_engine.run(batch, mode="predict")
             test_losses.append(outs["loss"])
 
@@ -419,8 +411,7 @@ class AutoEngine(BasicEngine):
                     "loss": sum(test_losses) / len(test_losses),
                     "epoch": epoch,
                     "batch": test_step,
-                    "test_cost": test_cost
-                    if test_step == 0 else test_cost / self._logging_freq,
+                    "test_cost": test_cost if test_step == 0 else test_cost / self._logging_freq,
                 }
                 self._module.test_step_end(log_dict)
                 test_start = get_timestamp()
@@ -436,10 +427,7 @@ class AutoEngine(BasicEngine):
         self.save(training=False)
 
     def tune(self, tune_dataset=None):
-        self._auto_engine._tune(
-            tune_dataset,
-            tune_sample_split=tune_dataset.sample_split,
-            batch_size=self._global_batch_size)
+        self._auto_engine._tune(tune_dataset, tune_sample_split=tune_dataset.sample_split, batch_size=self.batch_size)
 
     def save(self, training=True):
         if self._output_dir and isinstance(self._output_dir, str):
@@ -462,32 +450,24 @@ class AutoEngine(BasicEngine):
 
         exe = paddle.static.Executor()
 
-        [inference_program, feed_target_names,
-         fetch_targets] = paddle.static.load_inference_model(
-             path_prefix=self._ckpt_dir, executor=exe)
-        feed_targets = [
-            inference_program.global_block().var(name)
-            for name in feed_target_names
-        ]
+        [inference_program, feed_target_names, fetch_targets] = paddle.static.load_inference_model(
+            path_prefix=self._ckpt_dir, executor=exe
+        )
+        feed_targets = [inference_program.global_block().var(name) for name in feed_target_names]
 
         self._auto_engine.prepare(
             inputs=feed_targets,
             main_program=inference_program,
             startup_program=paddle.static.Program(),
-            mode="predict", )
+            mode="predict",
+        )
 
         model_dict = self._auto_engine.main_program.state_dict()
-        for param in list(
-                filter(lambda var: var.persistable,
-                       self._auto_engine.main_program.list_vars())):
-            if param.type in [
-                    core.VarDesc.VarType.FEED_MINIBATCH,
-                    core.VarDesc.VarType.FETCH_LIST
-            ]:
+        for param in list(filter(lambda var: var.persistable, self._auto_engine.main_program.list_vars())):
+            if param.type in [core.VarDesc.VarType.FEED_MINIBATCH, core.VarDesc.VarType.FETCH_LIST]:
                 continue
             if param.dtype != model_dict[param.name]._dtype():
-                model_dict[param.name] = model_dict[param.name]._as_type(
-                    param.dtype)
+                model_dict[param.name] = model_dict[param.name]._as_type(param.dtype)
         self._auto_engine.main_program.set_state_dict(model_dict)
 
         path = os.path.join(self._output_dir, "auto_dist0")
@@ -496,7 +476,8 @@ class AutoEngine(BasicEngine):
             feed_targets,
             fetch_targets,
             exe,
-            program=self._auto_engine.main_program, )
+            program=self._auto_engine.main_program,
+        )
 
         paddle.disable_static()
 

@@ -40,8 +40,6 @@ class LanguageModuleAuto(BasicModule):
 
         self.loss_fn = self.get_loss_fn()
 
-        self.best_metric = 0.0
-
     def process_configs(self, configs):
         configs = process_configs(configs)
         return configs
