@@ -30,7 +30,7 @@
 
 - PaddlePaddle >= 2.5.1
 - PaddleNLP >= 2.6.0
-- tiktoken (仅 QWEN 需要)
+- tiktoken (仅 Qwen 需要)
 
 ## 2. 预训练
 [LLaMA v1/v2](./llama)、[GPT-3](./gpt-3) 目录中提供了模型预训练的数据准备和训练细节，后续我们将支持更多的模型预训练。
