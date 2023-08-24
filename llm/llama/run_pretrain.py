@@ -200,6 +200,7 @@ def create_pretrained_dataset(
     need_data=True,
 ):
 
+    input_prefix = data_file[0]
     if need_data:
         train_valid_test_num_samples = [
             training_args.per_device_train_batch_size
@@ -212,8 +213,6 @@ def create_pretrained_dataset(
             * (training_args.max_steps // training_args.eval_steps + 1),
             training_args.per_device_eval_batch_size * training_args.dataset_world_size * training_args.test_iters,
         ]
-
-        input_prefix = data_file[0]
 
         for suffix in ["_ids.npy", "_idx.npz"]:
             if not os.path.isfile(input_prefix + suffix):
@@ -532,9 +531,7 @@ def main():
         training_args,
         data_file,
         tokenizer,
-        need_data=False
-        if training_args.use_distributed_dataloader and not training_args.should_load_dataset
-        else True,
+        need_data=False if training_args.distributed_dataloader and not training_args.should_load_dataset else True,
     )
 
     trainer = PretrainingTrainer(

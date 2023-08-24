@@ -1120,7 +1120,7 @@ class Trainer:
             train_sampler = None
 
         if self.args.distributed_dataloader:
-            logger.info("using DistDataLoader")
+            logger.info("Training using DistDataLoader.")
 
         return _DataLoader(
             train_dataset,
@@ -1166,11 +1166,11 @@ class Trainer:
                 the `model.forward()` method are automatically removed. It must implement `__len__`.
         """
         if self.args.distributed_dataloader:
-            if self.args.should_load_dataset and eval_dataset is None and self.train_dataset is None:
+            if self.args.should_load_dataset and eval_dataset is None and self.eval_dataset is None:
                 raise ValueError(
                     "When using distributed dataloader, evaluation requires an eval_dataset when should_load_dataset is True."
                 )
-            if not self.args.should_load_dataset and not (eval_dataset is None and self.train_dataset is None):
+            if not self.args.should_load_dataset and not (eval_dataset is None and self.eval_dataset is None):
                 raise ValueError(
                     "When using distributed dataloader, we don't need eval_dataset when should_load_dataset is False."
                 )
@@ -1202,15 +1202,15 @@ class Trainer:
                 num_workers=self.args.dataloader_num_workers,
             )
 
-        if not self.args.use_distributed_dataloader or (
-            self.args.use_distributed_dataloader and self.args.should_load_dataset
+        if not self.args.distributed_dataloader or (
+            self.args.distributed_dataloader and self.args.should_load_dataset
         ):
-            eval_sampler = self._get_train_sampler(eval_dataset)
+            eval_sampler = self._get_eval_sampler(eval_dataset)
         else:
             eval_sampler = None
 
         if self.args.distributed_dataloader:
-            logger.info("using DistDataLoader")
+            logger.info("Eval using DistDataLoader.")
 
         return _DataLoader(
             eval_dataset,
@@ -1230,8 +1230,23 @@ class Trainer:
                 The test dataset to use. If it is an `datasets.Dataset`, columns not accepted by the `model.forward()`
                 method are automatically removed. It must implement `__len__`.
         """
-        if is_datasets_available() and isinstance(test_dataset, datasets.Dataset):
+        if self.args.distributed_dataloader:
+            if self.args.should_load_dataset and not test_dataset:
+                raise ValueError(
+                    "When using distributed dataloader, test requires an test_dataset when should_load_dataset is True."
+                )
+            if not self.args.should_load_dataset and test_dataset is not None:
+                raise ValueError(
+                    "When using distributed dataloader, we don't need test_dataset when should_load_dataset is False."
+                )
+        else:
+            if test_dataset is None:
+                raise ValueError("Trainer: test requires a test_dataset.")
+
+        if is_datasets_available() and test_dataset is not None and isinstance(test_dataset, datasets.Dataset):
             test_dataset = self._remove_unused_columns(test_dataset, description="test")
+
+        _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
 
         if self._is_iterable_dataset(test_dataset):
             if self.args.dataset_world_size > 1:
@@ -1250,10 +1265,18 @@ class Trainer:
                 num_workers=self.args.dataloader_num_workers,
             )
 
-        test_sampler = self._get_eval_sampler(test_dataset)
+        if not self.args.distributed_dataloader or (
+            self.args.distributed_dataloader and self.args.should_load_dataset
+        ):
+            test_sampler = self._get_eval_sampler(test_dataset)
+        else:
+            test_sampler = None
+
+        if self.args.distributed_dataloader:
+            logger.info("Test using DistDataLoader.")
 
         # We use the same batch_size as for eval.
-        return DataLoader(
+        return _DataLoader(
             test_dataset,
             batch_sampler=test_sampler,
             collate_fn=self.data_collator,
