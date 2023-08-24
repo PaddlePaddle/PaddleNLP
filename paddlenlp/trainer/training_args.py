@@ -544,6 +544,18 @@ class TrainingArguments:
             )
         },
     )
+    tensor_parallel_config: str = field(
+        default="",
+        metadata={
+            "help": (
+                "Some additional configs which affect model parallel performance, we provide some option to config it."
+                "following config is support:\n"
+                "enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance. \n"
+                "enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.\n"
+                "enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true.  It can accelerate model parallel further."
+            )
+        },
+    )
     pipeline_parallel_config: str = field(
         default="",
         metadata={
@@ -879,6 +891,39 @@ class TrainingArguments:
 
                 if tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
+                    mp_config = set(self.tensor_parallel_config.split(" "))
+                    for x in mp_config:
+                        if len(x) > 0:
+                            if x not in [
+                                "enable_mp_async_allreduce",
+                                "enable_mp_skip_c_identity",
+                                "enable_mp_fused_linear_param_grad_add",
+                            ]:
+                                raise ValueError(
+                                    f"Found unknown tensor parallell config {x}, "
+                                    f"accept config is enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add"
+                                )
+                    try:
+                        if "enable_mp_async_allreduce" in mp_config:
+                            strategy.hybrid_configs["mp_configs"].mp_async_allreduce = True
+                            if "enable_mp_skip_c_identity" in mp_config:
+                                strategy.hybrid_configs["mp_configs"].mp_skip_c_identity = True
+                            if "enable_mp_fused_linear_param_grad_add" in mp_config:
+                                strategy.hybrid_configs["mp_configs"].mp_fused_linear_param_grad_add = True
+                        else:
+                            if "enable_mp_skip_c_identity" in mp_config:
+                                warnings.warn(
+                                    "enable_mp_skip_c_identity only works with enable_mp_async_allreduce. It will not work."
+                                )
+                            if "enable_mp_fused_linear_param_grad_add" in mp_config:
+                                warnings.warn(
+                                    "enable_mp_fused_linear_param_grad_add only works with enable_mp_async_allreduce. It will not work."
+                                )
+                    except:
+                        warnings.warn(
+                            "The enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add are not supported "
+                            "by current version of Paddle. Please try latest develop Paddle."
+                        )
 
                 if self.hybrid_parallel_topo_order is None:
                     self.hybrid_parallel_topo_order = "pp_first"
