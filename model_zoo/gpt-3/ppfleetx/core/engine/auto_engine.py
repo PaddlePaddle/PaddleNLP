@@ -160,12 +160,8 @@ class AutoEngine(BasicEngine):
 
             final_loss = None
             for _ in range(local_steps):
-                with paddle.profiler.utils._nvprof_range(
-                        iter_id=step, start=self.nvprof_start,
-                        end=self.nvprof_end):
-                    outs = self._auto_engine.run(batch,
-                                                 fetch_list=fetch_list,
-                                                 mode="train")
+                with paddle.profiler.utils._nvprof_range(iter_id=step, start=self.nvprof_start, end=self.nvprof_end):
+                    outs = self._auto_engine.run(batch, fetch_list=fetch_list, mode="train")
                 # pp: some devices don't have loss in outs
                 if "loss" in outs:
                     if final_loss is None:
@@ -180,9 +176,7 @@ class AutoEngine(BasicEngine):
                 train_losses.append(final_loss)
 
             if self._lr_scheduler is not None and self._lr_scheduler_mode == "step":
-                self._auto_engine.optimizer._learning_rate.step(
-                    epoch=self._global_batch_size
-                    if self._use_increments else None)
+                self._auto_engine.optimizer._learning_rate.step(epoch=self._global_batch_size if self._use_increments else None)
 
             if (step + 1) % self._logging_freq == 0:
                 train_step_cost = get_timestamp() - train_step_start
@@ -196,20 +190,18 @@ class AutoEngine(BasicEngine):
                     "train_cost": train_step_cost if step == 0 else train_step_cost / self._logging_freq,
                     "lr": self._auto_engine.optimizer.get_lr(),
                     "found_inf": 0, # if self._strategy.amp.enable outs["fetches"]["find_infinite_scale.tmp_0"]
+                    "dp_world_size": self._auto_engine._dp_world_sizes[0]
                 }
                 if len(train_losses) > 0:
                     log_dict["loss"] = sum(numpy_losses) / len(numpy_losses)
                 if self._strategy.amp.enable:
                     log_dict["loss_scale"] = self._strategy.amp.init_loss_scaling  # outs["fetches"]["loss_scaling_0"]
-                log_dict["dp_world_size"] = self._auto_engine._dp_world_sizes[0]
-
                 if self.memory_stats:
                     # convert from Byte to MB
                     log_dict["max_memory_allocated"] = paddle.device.cuda.max_memory_allocated() / (1024**2)
                     log_dict["max_memory_reserved"] = paddle.device.cuda.max_memory_reserved() / (1024**2)
                     log_dict["memory_allocated"] = paddle.device.cuda.memory_allocated() / (1024**2)
                     log_dict["memory_reserved"] = paddle.device.cuda.memory_reserved() / (1024**2)
-
                 self._module.training_step_end(log_dict)
 
                 train_step_start = get_timestamp()
@@ -285,9 +277,7 @@ class AutoEngine(BasicEngine):
 
         for epoch_index in range(start_epoch, epoch):
             train_epoch_start = get_timestamp()
-
             self._train_one_epoch(epoch_index, train_data_loader, valid_data_loader)
-
             train_epoch_cost = get_timestamp() - train_epoch_start
             log_dict = {
                 "epoch": epoch_index,
@@ -300,9 +290,7 @@ class AutoEngine(BasicEngine):
 
             if self._run_mode == "epoch" and self._eval_freq > 0 and epoch_index % self._eval_freq == 0:
                 eval_epoch_start = get_timestamp()
-
                 self._evaluate_one_epoch(epoch_index, valid_data_loader)
-
                 eval_epoch_cost = get_timestamp() - eval_epoch_start
                 log_dict = {
                     "epoch": epoch_index,
@@ -314,8 +302,10 @@ class AutoEngine(BasicEngine):
                 self.save(epoch=epoch_index, step=len(train_data_loader))
 
         logger.info(
-            "The training process is complete and total cost of time for training is : {}".
-            format(convert_timestamp_to_data(get_timestamp() - train_start)))
+            "The training process is complete and total cost of time for training is : {}".format(
+                convert_timestamp_to_data(get_timestamp() - train_start)
+            )
+        )
 
         # from-generator dataloder need to do this to exit normally
         if valid_data_loader:
