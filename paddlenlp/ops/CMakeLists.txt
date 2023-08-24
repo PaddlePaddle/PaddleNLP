@@ -24,7 +24,7 @@ endif()
 
 INCLUDE(ExternalProject)
 
-set(CXX_STD "14" CACHE STRING "C++ standard")
+set(CXX_STD "17" CACHE STRING "C++ standard")
 
 option(ON_INFER         "Compiled with inference. "                                 OFF)
 option(WITH_GPU         "Compiled with GPU/CPU, default use CPU."                   ON)
@@ -248,8 +248,8 @@ set(CMAKE_C_FLAGS_DEBUG    "${CMAKE_C_FLAGS_DEBUG}    -Wall -O0")
 set(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG}  -Wall -O0")
 set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G -Xcompiler -Wall")
 
-set(CMAKE_CXX_STANDARD "${CXX_STD}")
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX17_STANDARD_COMPILE_OPTION "-std=c++{CXX_STD}")
+set(CMAKE_CXX17_EXTENSION_COMPILE_OPTION "-std=gnu++{CXX_STD}")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-extended-lambda")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --std=c++${CXX_STD}")
@@ -387,6 +387,8 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 set(MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W decoding[^)]\\{1,\\})/ /" {})
 set(OPEN_ATTENTION_MUTE_COMMAND grep -rl "printf(\"\\[WARNING\\]" ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/ | xargs -i{} sed -i "s/printf(\"\\WWARNING\\W\\WOpenMultiHeadAttention\\W[^)]\\{1,\\})/ /" {})
 
+set(RM_OLD_CUB rm -rf ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/cub)
+
 set(FT_PATCH_COMMAND
   printf \\n\\n > blank_lines
   && cp ${allocator_src} ${allocator_dst}
@@ -428,6 +430,7 @@ set(FT_PATCH_COMMAND
   && rm blank_lines
   && ${MUTE_COMMAND}
   && ${OPEN_ATTENTION_MUTE_COMMAND}
+  && ${RM_OLD_CUB}
 )
 
 # TODO(guosheng): Use UPDATE_COMMAND instead of PATCH_COMMAND to make cmake
@@ -438,7 +441,7 @@ set(FT_UPDATE_COMMAND git checkout nccl_dependent_refine && git checkout . && ${
 
 ExternalProject_Add(
   extern_${THIRD_PARTY_NAME}
-  GIT_REPOSITORY    https://gitee.com/paddlepaddle/FasterTransformer.git
+  GIT_REPOSITORY    https://github.com/NVIDIA/FasterTransformer.git
   GIT_TAG           nccl_dependent_refine
   PREFIX            ${THIRD_PATH}
   SOURCE_DIR        ${THIRD_PATH}/source/${THIRD_PARTY_NAME}

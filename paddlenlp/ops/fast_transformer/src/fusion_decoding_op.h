@@ -24,8 +24,11 @@ limitations under the License. */
 #include "fastertransformer/utils/common.h"
 
 #ifdef PADDLE_ON_INFERENCE
-#include "paddle/include/experimental/ext_all.h"
+#include "paddle/extension.h"
+#include "paddle_inference_api.h"
+#include "paddle/phi/api/ext/exception.h"
 #else
+#include "paddle_api.h"
 #include "paddle/extension.h"
 #endif
 
