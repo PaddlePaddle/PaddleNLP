@@ -122,15 +122,14 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 
 <details><summary>&emsp; 数据参数(DataArgument) </summary><div>
 
-
 - `dataset_name_or_path`: 本地数据集目录或内置数据集名称，默认为None。
 - `task_name`: 用于选择内置数据集中的具体任务，默认为None。
-- `src_length`: 模型输入上下文最大长度，默认为1024。
-- `tgt_length`:模型生成文本最大长度，默认为1024。
 - `eval_with_do_generation`: 在模型效果评估的时候是否调用model.generate,默认为False。设置为True时，指标为ppl, accuracy；设置为False时，指标为BLEU4/Rouge，建议将`metric_for_best_model`设为bleu4。
 - `save_generation_output`: 当`eval_with_do_generation`设为True，是否将生成结果保存在`generated_output.json`文件中，默认为False。
-- `intokens`:是否使用InToken数据流（减少Padding冗余计算，大幅提升有效Token计算效率），默认为False。当`eval_with_do_generation`设为True,评估过程不支持InToken数据流。
-- `intokens_max_length`: InToken数据流模型训练最大长度，默认为2048。
+- `intokens`:是否使用InToken数据流（减少Padding冗余计算，大幅提升有效Token计算效率），默认为False。当`eval_with_do_generation`设为True,评估过程不支持InToken数据流。。
+- `src_length`: 模型输入上下文最大token长度，默认为1024。
+- `max_length`:模型输入（上下文+生成内容）的最大token长度, 默认为2048。当`intokens`设为True的时候，同时也为InToken数据流模型训练输入最大长度，通常建议设为模型允许输入最大长度，同时`per_device_train_batch_size`设为1，使用`gradient_accumulation_steps`控制batch size。
+
 </div></details>
 
 
@@ -295,8 +294,8 @@ python predictor.py \
 
 - `model_name_or_path`: 必须，预训练模型名称或者本地的模型路径，用于热启模型和分词器，默认为None。
 - `batch_size`: 批处理大小，默认为8。该参数越大，占用显存越高；该参数越小，占用显存越低。
-- `src_length`: 模型输入上下文最大长度，默认为1024。
-- `max_length`:推理过程中模型输入最大长度，也即文本生成的最长长度为`max_length-len(input_ids)`, 默认为2048。
+- `src_length`: 模型输入上下文最大token长度，默认为1024。
+- `max_length`:模型输入（上下文+生成内容）的最大token长度, 默认为2048。
 - `lora_path`: LoRA参数和配置路径，对LoRA参数进行初始化，默认为None。
 - `prefix_path`: Prefix Tuning参数和配置路径，对Prefix Tuning参数进行初始化，默认为None。
 - `top_k`: “采样”策略中为 top-k 过滤保留的最高概率标记的数量。默认为1，等价于贪心策略。

@@ -451,7 +451,7 @@ def create_predictor(
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer):
-        tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token else "<pad>"
+        tokenizer.pad_token_id = tokenizer.eos_token_id
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
     tensor_parallel_rank = paddle.distributed.get_rank()
