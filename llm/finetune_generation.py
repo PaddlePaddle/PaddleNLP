@@ -101,9 +101,9 @@ def main():
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
         if hasattr(model_config, "max_position_embeddings"):
-            if model_config.max_position_embeddings < data_args.src_length + data_args.tgt_length:
+            if model_config.max_position_embeddings < data_args.max_length:
                 raise ValueError(
-                    f"The src_length + tgt_length ({data_args.src_length + data_args.tgt_length}) must be smaller than max_position_embeddings({model_config.max_position_embeddings})."
+                    f"The max_length ({data_args.max_length}) must be smaller than max_position_embeddings({model_config.max_position_embeddings})."
                 )
         model = AutoModelForCausalLM.from_pretrained(
             model_args.model_name_or_path,
@@ -113,7 +113,7 @@ def main():
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     if isinstance(tokenizer, LlamaTokenizer):
-        tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token else "<pad>"
+        tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if data_args.dataset_name_or_path is None:
         raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
@@ -157,13 +157,13 @@ def main():
         train_ds = InTokensMapDataset(
             train_ds,
             tokenizer=tokenizer,
-            max_length=data_args.intokens_max_length,
+            max_length=data_args.max_length,
         )
         if eval_intokens:
             dev_ds = InTokensMapDataset(
                 dev_ds,
                 tokenizer=tokenizer,
-                max_length=data_args.intokens_max_length,
+                max_length=data_args.max_length,
             )
 
     if model_args.prefix_tuning:
@@ -232,13 +232,8 @@ def main():
         }
 
     # Create trainer
-    if training_args.pipeline_parallel_degree > 1:
-        if data_args.intokens:
-            max_length = data_args.intokens_max_length
-        else:
-            max_length = data_args.src_length + data_args.tgt_length
-    else:
-        max_length = None
+    max_length = data_args.max_length if training_args.pipeline_parallel_degree > 1 else None
+    padding = "max_length" if training_args.pipeline_parallel_degree > 1 else True
     trainer = CausalLMTrainer(
         model=model,
         args=training_args,
@@ -249,7 +244,7 @@ def main():
         data_collator=DataCollatorForSeq2Seq(
             tokenizer=tokenizer,
             max_length=max_length,
-            padding="max_length" if training_args.pipeline_parallel_degree > 1 else True,
+            padding=padding,
             max_label_length=max_length,
             return_tensors="np",
         ),
