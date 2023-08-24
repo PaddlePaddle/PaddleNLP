@@ -88,8 +88,7 @@ class GPTModuleAuto(LanguageModuleAuto):
         get_model_size(l, h, v, s)
 
         with LazyGuard():
-            model = gpt.GPTForPretrainingAuto(
-                gpt.GPTModelAuto(**model_setting))
+            model = gpt.GPTForPretrainingAuto(gpt.GPTModelAuto(**model_setting))
         return model
 
     def get_loss_fn(self):
@@ -150,11 +149,9 @@ class GPTGenerationModuleAuto(BasicModule):
         self.tokenizer = tokenizer_class.from_pretrained(pretrained_name)
 
         with LazyGuard():
-            model = gpt.GPTForGenerationAuto(
-                gpt.GPTModelAuto(**model_setting), self.generation_cfgs)
+            model = gpt.GPTForGenerationAuto(gpt.GPTModelAuto(**model_setting), self.generation_cfgs)
 
-        self.generation_cfgs["max_dec_len"] = self.adjust_length_to_model(
-            self.generation_cfgs["max_dec_len"], 512)
+        self.generation_cfgs["max_dec_len"] = self.adjust_length_to_model(self.generation_cfgs["max_dec_len"], 512)
 
         self.generation_cfgs["bos_token_id"] = self.tokenizer.eos_token_id
         self.generation_cfgs["eos_token_id"] = self.tokenizer.eos_token_id

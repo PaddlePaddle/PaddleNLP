@@ -119,8 +119,7 @@ class AutoEngine(BasicEngine):
         self._load_recovery = {"step": 0, "epoch": 0}
 
         self.profiler = None
-        if "Profiler" in configs and configs.get("Profiler", {}).get("enable",
-                                                                     False):
+        if "Profiler" in configs and configs.get("Profiler", {}).get("enable", False):
             self.profiler_config = configs["Profiler"]
 
             scheduler = self.profiler_config.get("scheduler", None)
@@ -147,8 +146,7 @@ class AutoEngine(BasicEngine):
             "memory_stats", False)
         self.nvprof_start = configs.get("Profiler_auto", {}).get(
             "nvprof_start", -1)
-        self.nvprof_end = configs.get("Profiler_auto", {}).get("nvprof_end",
-                                                               -1)
+        self.nvprof_end = configs.get("Profiler_auto", {}).get("nvprof_end", -1)
 
     def _train_one_epoch(self,
                          epoch_index,
