@@ -26,7 +26,7 @@ def get_convert_example(model):
 
     if base_model_prefix == "chatglm":
         return convert_example_chatglm
-    elif base_model_prefix in ["chatglm_v2", "llama", "bloom", "opt"]:
+    elif base_model_prefix in ["chatglm_v2", "llama", "bloom", "opt", "qwen"]:
         return convert_example_common
     else:
         raise ValueError(
