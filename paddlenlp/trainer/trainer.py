@@ -628,7 +628,7 @@ class Trainer:
             parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
             if parts_num > 1:
                 all_reduce_dtype = "int64"
-                if paddle.get_device().split(":")[0] == "npu":
+                if paddle.get_device().split(":")[0] in ["npu", "xpu"]:
                     # TODO(duanyanhui): fix when NPU all_reduce supports int64
                     all_reduce_dtype = "float32"
                 trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
