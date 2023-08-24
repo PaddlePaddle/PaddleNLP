@@ -357,7 +357,7 @@ class EagerEngine(BasicEngine):
                     for eval_step, batch in enumerate(valid_data_loader):
                         eval_finished_step += 1
                         loss = self._evaluate_impl(batch)
-                        eval_losses.append(loss)
+                        eval_losses.append(float(loss))
 
                         if eval_step >= self._eval_iters - 1:
                             break
