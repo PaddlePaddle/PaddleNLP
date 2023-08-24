@@ -790,6 +790,7 @@ class LlamaAttention(nn.Layer):
                 output_attentions,
                 alibi,
                 self.sequence_parallel,
+                use_reentrant=False,
             )
         else:
             outputs = scaled_dot_product_attention(
@@ -888,6 +889,7 @@ class LlamaDecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
+                use_reentrant=False,
             )
         else:
             outputs = self.self_attn(
@@ -1159,6 +1161,7 @@ class LlamaModel(LlamaPretrainedModel):
             past_key_value,
             use_cache,
             alibi,
+            use_reentrant=False,
         )
 
         return hidden_states
