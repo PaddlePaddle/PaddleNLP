@@ -10,6 +10,7 @@
 | [GPT-3](./gpt-3) |   ✅  |  ✅  |  ✅  |  WIP  | ✅    | WIP |
 | [OPT](./opt) | WIP | ✅ | ✅ | WIP|  ✅ | WIP |
 | [GLM](./glm) |N/A | ✅ | ✅ | WIP|  ✅ | WIP |
+| [Qwen](./qwen) |N/A | ✅ | ✅ | ✅ |  ✅ | WIP |
 
 
 # LLM全流程工具介绍
@@ -29,12 +30,13 @@
 
 - PaddlePaddle >= 2.5.1
 - PaddleNLP >= 2.6.0
+- tiktoken (仅 Qwen 需要)
 
 ## 2. 预训练
 [LLaMA v1/v2](./llama)、[GPT-3](./gpt-3) 目录中提供了模型预训练的数据准备和训练细节，后续我们将支持更多的模型预训练。
 
 ## 3. 精调
-目前精调统一脚本只支持[LLaMA v1/v2](./llama)、[ChatGLM-6B](./chatglm)、[ChatGLM2-6B](./chatglm2)、[Bloom](./bloom)、[OPT](./opt)，其他模型精调使用详见对应模型目录。接下来我们将以**Llama 2**为例介绍如何使用统一脚本进行SFT、LoRA、Prefix Tuning。更多LoRA、Prefix Tuning请参见[PEFT文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/peft.md)。
+目前精调统一脚本只支持[LLaMA v1/v2](./llama)、[ChatGLM-6B](./chatglm)、[ChatGLM2-6B](./chatglm2)、[Bloom](./bloom)、[OPT](./opt)、[Qwen](./qwen)，其他模型精调使用详见对应模型目录。接下来我们将以**Llama 2**为例介绍如何使用统一脚本进行SFT、LoRA、Prefix Tuning。更多LoRA、Prefix Tuning请参见[PEFT文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/peft.md)。
 
 ### 3.1 精调训练数据格式
 
