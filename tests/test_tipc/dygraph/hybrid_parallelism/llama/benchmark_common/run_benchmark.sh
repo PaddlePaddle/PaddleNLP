@@ -36,6 +36,9 @@ function _set_params(){
     global_batch_size=${15:-"16"}
     model_item=${16:-"facebook-llama-13b"}
     train_data_size=${17:-"1000"}
+    gradient_accumulation_steps=${18:-"4"}
+    pp_recompute_interval=${19:-"1"}
+
 
     base_batch_size=${global_batch_size}
 
@@ -101,7 +104,7 @@ function _train(){
             --split 949,50,1 \
             --max_seq_length 2048 \
             --per_device_train_batch_size ${per_device_train_batch_size} \
-            --gradient_accumulation_steps 4 \
+            --gradient_accumulation_steps ${gradient_accumulation_steps} \
             --per_device_eval_batch_size ${per_device_train_batch_size} \
             --use_flash_attention ${use_flash_attention} \
             --use_fused_rms_norm 0 \
@@ -116,6 +119,7 @@ function _train(){
             --min_learning_rate 0.000001 \
             --save_steps ${save_steps} \
             --weight_decay 0.01 \
+            --pp_recompute_interval ${pp_recompute_interval}\
             --warmup_ratio 0.01 \
             --num_train_epochs ${num_train_epochs} \
             --max_grad_norm 1.0 \
