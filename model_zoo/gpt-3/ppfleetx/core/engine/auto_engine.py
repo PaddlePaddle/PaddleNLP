@@ -61,8 +61,8 @@ class AutoEngine(BasicEngine):
         # lr_scheduler and optimizer
         if configs.Optimizer.lr.get("name") == "CosineAnnealingWithWarmupDecay":
             configs.Optimizer.lr["global_batch_size"] = configs.Global.global_batch_size
-        lr = build_lr_scheduler(configs.Optimizer.lr) if mode == "train" else None
-        optimizer = build_optimizer(configs.Optimizer, model, lr) if mode == "train" else None
+        self.lr = build_lr_scheduler(configs.Optimizer.lr) if mode == "train" else None
+        optimizer = build_optimizer(configs.Optimizer, model, self.lr) if mode == "train" else None
 
         # engine configs
         self._configs = configs["Engine"]
@@ -89,25 +89,46 @@ class AutoEngine(BasicEngine):
 
     def fit(self, epoch=1, train_dataset=None, valid_dataset=None):
 
-        train_sample_split = train_dataset.sample_split if train_dataset else None
-        valid_sample_split = valid_dataset.sample_split if valid_dataset else None
+        # train_sample_split = train_dataset.sample_split if train_dataset else None
+        # valid_sample_split = valid_dataset.sample_split if valid_dataset else None
 
-        self._auto_engine.fit(
-            train_data=train_dataset,
-            valid_data=valid_dataset,
-            train_sample_split=train_sample_split,
-            valid_sample_split=valid_sample_split,
-            epochs=self._num_train_epochs,
+        # self._auto_engine.fit(
+        #     train_data=train_dataset,
+        #     valid_data=valid_dataset,
+        #     train_sample_split=train_sample_split,
+        #     valid_sample_split=valid_sample_split,
+        #     epochs=self._num_train_epochs,
+        #     batch_size=self.batch_size,
+        #     steps_per_epoch=self._max_steps,
+        #     valid_steps=self._eval_iters,
+        #     valid_freq=self._eval_freq,
+        #     collate_fn=train_dataset.collate_fn,
+        #     log_freq=self._logging_freq,
+        #     save_dir=self._output_dir,
+        #     save_freq=self._save_steps,
+        #     verbose=self._verbose,
+        # )
+
+        train_sample_split = train_dataset.sample_split if train_dataset else None
+        train_dataloader = self._auto_engine.dataloader(
+            dataset=train_dataset,
             batch_size=self.batch_size,
             steps_per_epoch=self._max_steps,
-            valid_steps=self._eval_iters,
-            valid_freq=self._eval_freq,
+            epochs=self._num_train_epochs,
             collate_fn=train_dataset.collate_fn,
-            log_freq=self._logging_freq,
-            save_dir=self._output_dir,
-            save_freq=self._save_steps,
-            verbose=self._verbose,
+            sample_split=train_sample_split,
+            mode="train",
         )
+        self._auto_engine.prepare(mode="train")
+
+        for step, data in enumerate(train_dataloader):
+            outs = self._auto_engine.run(data)
+            self.lr.step()
+
+            print(f"[step: {step+1}/{self._max_steps}], loss: {outs['loss']}, lr: {self.lr.get_lr()}")
+
+            if step+1 >= self._max_steps:
+                break
 
     def evaluate(self, valid_dataset=None):
 
