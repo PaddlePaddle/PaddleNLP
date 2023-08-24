@@ -18,9 +18,11 @@ log_dir=log_auto
 rm -rf $log_dir
 
 # 10B+sharding8 run_pretrain
+# Engine.eval_freq in this bash if is set small will cause error (sharding in eval mode has problem)
 python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3,4,5,6,7" \
     ./tools/auto.py \
     -c ./ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_13B_sharding8.yaml \
     -o Engine.max_steps=1000 \
     -o Engine.logging_freq=1 \
+    -o Engine.eval_freq=10000 \
     -o Engine.verbose=3
