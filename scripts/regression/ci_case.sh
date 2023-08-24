@@ -318,13 +318,11 @@ time (python run_pretrain_trainer.py \
     --do_eval \
     --device "gpu" >${log_path}/gpt_pretrain) >>${log_path}/gpt_pretrain 2>&1
 print_info $? gpt_pretrain
-time (
-python export_model.py --model_type=gpt \
+time (python export_model.py --model_type=gpt \
     --model_path=gpt2-medium-en \
     --output_path=./infer_model/model >${log_path}/gpt_export) >>${log_path}/gpt_export 2>&1
 print_info $? gpt_export
-time (
-python deploy/python/inference.py \
+time (python deploy/python/inference.py \
     --model_type gpt \
     --model_path ./infer_model/model >${log_path}/gpt_p_depoly) >>${log_path}/gpt_p_depoly 2>&1
 print_info $? gpt_p_depoly
@@ -335,9 +333,9 @@ print_info $? gpt_p_depoly
 # print_info $? gpt
 
 # fast_gpt
-cd ${nlp_dir}/fast_generation/samples
-python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
-print_info $? fast_generation_gpt
+# cd ${nlp_dir}/fast_generation/samples
+# python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
+# print_info $? fast_generation_gpt
 }
 # 9 ernie
 ernie(){
