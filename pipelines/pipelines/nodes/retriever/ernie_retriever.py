@@ -44,8 +44,6 @@ class ErnieRetriever(DensePassageRetriever):
         document_store: BaseDocumentStore,
         query_embedding_model: Union[Path, str] = "ernie-embedding-v1",
         passage_embedding_model: Union[Path, str] = "ernie-embedding-v1",
-        max_seq_len_query: int = 64,
-        max_seq_len_passage: int = 384,
         top_k: int = 10,
         batch_size: int = 16,
         embed_title: bool = True,
@@ -66,8 +64,6 @@ class ErnieRetriever(DensePassageRetriever):
         :param passage_embedding_model: Local path or remote name of passage encoder checkpoint. The format equals the
                                         one used by paddlenlp transformers' models
                                         Currently available remote names: ``"ernie-embedding-v1"``
-        :param max_seq_len_query: Longest length of each query sequence. Maximum number of tokens for the query text. Longer ones will be cut down."
-        :param max_seq_len_passage: Longest length of each passage/context sequence. Maximum number of tokens for the passage text. Longer ones will be cut down."
         :param top_k: How many documents to return per query.
         :param batch_size: Number of questions or passages to encode at once. In case of multiple gpus, this will be the total batch size.
         :param embed_title: Whether to concatenate title and passage to a text pair that is then used to create the embedding.
