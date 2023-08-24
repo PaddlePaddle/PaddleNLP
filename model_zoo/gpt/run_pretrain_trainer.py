@@ -24,6 +24,8 @@ from typing import Optional
 
 import numpy as np
 import paddle
+from configuration import GPTConfig
+from modeling import GPTForCausalLM
 
 from paddlenlp.trainer import (
     PdArgumentParser,
@@ -35,8 +37,6 @@ from paddlenlp.trainer import (
 from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
-    GPTConfig,
-    GPTForPretraining,
     LinearAnnealingWithWarmupDecay,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
@@ -45,10 +45,9 @@ from paddlenlp.utils.log import logger
 MODEL_CLASSES = {
     "gpt": (
         GPTConfig,
-        GPTForPretraining,
+        GPTForCausalLM,
     ),
 }
-
 
 from paddlenlp.data.causal_dataset import build_train_valid_test_datasets, print_rank_0
 
@@ -203,7 +202,7 @@ def create_pretrained_dataset(
 
     from paddlenlp.data import Stack
 
-    eod_token = tokenizer.eos_token_id
+    # eod_token = tokenizer.eos_token_id
 
     def _collate_data(data, stack_fn=Stack()):
         tokens_ = stack_fn(x["text"] for x in data)
@@ -212,13 +211,16 @@ def create_pretrained_dataset(
         labels = tokens_[:, 1:]
         tokens = tokens_[:, :-1]
 
-        # Loss mask.
-        loss_mask = paddle.ones(tokens.shape, dtype=paddle.float32)
-        loss_mask[data == eod_token] = 0.0
+        # # Loss mask.
+        # loss_mask = paddle.ones(tokens.shape, dtype=paddle.float32)
+        # loss_mask[data == eod_token] = 0.0
+
+        # Attention mask.
+        attention_mask = paddle.ones(tokens.shape, dtype=paddle.int64)
 
         return {
             "input_ids": tokens,
-            "loss_mask": loss_mask,
+            "attention_mask": attention_mask,
             "labels": labels,
         }
 
