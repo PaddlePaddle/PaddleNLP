@@ -158,7 +158,7 @@ def get_notabular_information(query, index):
     return prediction["documents"][0].content
 
 
-def chat_table(query, api_key=None, secret_key=None, key=""):
+def chat_table(query, api_key=None, secret_key=None, key="", maxlen=11200):
     index = "表格"
     document_store = FAISSDocumentStore.load(index_name)
     retriever = DensePassageRetriever(
@@ -197,7 +197,7 @@ def chat_table(query, api_key=None, secret_key=None, key=""):
     else:
         ernie_bot = ErnieBot(api_key=api_key, secret_key=secret_key)
         prompt = "你是一个金融助手，你的任务是是一个抽取任务，你要抽取表格中信息来回答问题。请你记住，你输出的信息只能是表格中的内容，你只是抽取相关内容，不能生成无关的数据，不能对数据进行运算。现给你表格信息，请你抽取表格相关内容回答输入问题，输入表格信息：{documents}，输入问题：{query}"
-        documents = documents[: 11200 - 1 - len(query) - len(prompt)]
+        documents = documents[: maxlen - 1 - len(query) - len(prompt)]
         prompt = prompt.format(documents=documents, query=query)
         for _ in range(2):
             try:

@@ -51,7 +51,7 @@ all_titles = [
 ]
 
 
-def get_answer(api_key=None, secret_key=None, query=""):
+def get_answer(api_key=None, secret_key=None, query="", maxlen=11200):
     prompt = (
         """
     给你年报主要内容的28个标题，具体为
@@ -98,12 +98,12 @@ def get_answer(api_key=None, secret_key=None, query=""):
                 query_text = query + "请提取" + company + key + "的信息"
                 text += "从" + key + "角度：\n" + get_notabular_information(query_text, str(key)) + "\n"
             else:
-                query_text = "请提取" + company + key + "的信息来解答" + query + "问题"
+                query_text = "请提取" + company + key + "的信息来解答" + query + "这个问题"
                 text += "从" + key + "角度：\n" + chat_table(query_text, api_key, secret_key, key) + "\n"
     ernie_bot = ErnieBot(api_key, secret_key)
     try:
         prompt = "你现在是金融助手，请你根据背景信息回答问题。请你记住，你的回答要基于背景信息，不要胡编乱造。背景信息{information},请回答相关问题{query}"
-        information = text[: 11200 - 1 - len(query) - len(prompt)]
+        information = text[: maxlen - 1 - len(query) - len(prompt)]
         prompt = prompt.format(information=information, query=query)
         text = ernie_bot.run(prompt)[0]["result"] + "\n" + text
         return text

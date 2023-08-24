@@ -33,17 +33,20 @@ def predict(query, history=[]):
     return "", history, history
 
 
-with gr.Blocks() as demo:
-    gr.HTML("""<h1 align="center">🤖ChatTable</h1>""")
-    with gr.Accordion("输出区", open=True, elem_id="input-panel") as area_input_primary:
-        chatbot = gr.Chatbot(scale=30, height=600)
-    with gr.Accordion("输入区", open=True, elem_id="output-panel") as area_output_primary:
-        with gr.Row():
-            user_input = gr.Textbox(show_label=False, placeholder="Input...", lines=5, scale=10).style(container=False)
-            with gr.Column(scale=1):
-                submitBtn = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
-                state = gr.State([])
-                emptyBtn = gr.Button("Clear History")
-    submitBtn.click(predict, [user_input, state], [user_input, chatbot, state])
-    emptyBtn.click(reset_state, outputs=[chatbot, state], show_progress=True)
-demo.queue().launch(server_name="0.0.0.0", server_port=8084, share=False)
+if __name__ == "__main__":
+    with gr.Blocks() as demo:
+        gr.HTML("""<h1 align="center">🤖ChatTable</h1>""")
+        with gr.Accordion("输出区", open=True, elem_id="input-panel") as area_input_primary:
+            chatbot = gr.Chatbot(scale=30, height=600)
+        with gr.Accordion("输入区", open=True, elem_id="output-panel") as area_output_primary:
+            with gr.Row():
+                user_input = gr.Textbox(show_label=False, placeholder="Input...", lines=5, scale=10).style(
+                    container=False
+                )
+                with gr.Column(scale=1):
+                    submitBtn = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
+                    state = gr.State([])
+                    emptyBtn = gr.Button("Clear History")
+        submitBtn.click(predict, [user_input, state], [user_input, chatbot, state])
+        emptyBtn.click(reset_state, outputs=[chatbot, state], show_progress=True)
+    demo.queue().launch(server_name="0.0.0.0", server_port=8084, share=False)
