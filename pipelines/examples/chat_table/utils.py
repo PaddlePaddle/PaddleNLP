@@ -11,118 +11,104 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import glob
+
 import json
-import logging
-import os
-import re
-import shutil
+import time
 
-from pipelines.document_stores import FAISSDocumentStore
-from pipelines.nodes import (
-    DensePassageRetriever,
-    ErnieBot,
-    PromptTemplate,
-    TruncatedConversationHistory,
-)
-from pipelines.pipelines import Pipeline
-from pipelines.schema import Document
+from create_index import chat_table, get_notabular_information
 
-logging.getLogger().setLevel(logging.INFO)
-index_name = "cropus_base"
+from pipelines.nodes import ErnieBot
 
-
-def get_json(path):
-    data_all = []
-    with open(path, mode="r", encoding="utf-8") as f:
-        data = json.load(f)
-    for keys, value in data.items():
-        try:
-            assert keys != "hqchartdata"
-            content = path.split("/")[-1].replace(".json", "")
-            meta = {}
-            value_str = str(value)
-            column_list = re.findall(r"legend\d*.*?]", value_str)
-            assert len(column_list) > 0
-            column_name = ""
-            for item in column_list:
-                item = re.sub(r"legend\d*", "", item)
-                column_name += re.sub(r"[\[|\]\:|\']", "", item)
-            meta = {"info": value_str}
-            data_all.append({"content": content + column_name + value["text"], "meta": meta})
-        except:
-            continue
-    return data_all
+all_titles = [
+    "主营收入",
+    "公司主营业务",
+    "主要资产堆积",
+    "历年存货堆积",
+    "历年主要负债堆积",
+    "应收账款及减值准备情况",
+    "历年现金流量",
+    "日行情K线数据",
+    "历年净现比数据",
+    "历年营业总收入、归母净利润、扣非净利润数据",
+    "历年加权净资产收益率",
+    "历年毛利率和净利率数据",
+    "资产负债率数据",
+    "十大股东数据",
+    "股档户数和持股情况数据",
+    "历年期间费用数据",
+    "营业收入的主营产品构成情况",
+    "人均薪酬、创利、创收情况",
+    "流动速动比率",
+    "分产品毛利率",
+    "五大客户、供应商集中度情况",
+    "历年研发投入",
+    "投入资本回报率",
+    "营运能力各周转率",
+    "自由现金流",
+    "近年来市盈率(TTM)、市净率(LF)、市销率(TTM)变化情况",
+    "近年来市盈率(TTM)、市净率(LF)、市销率(TTM)历史分位",
+    "前五大客户和供应商占比",
+]
 
 
-def get_all_tables(paths):
-    all_tables = []
-    for path in paths:
-        company_tables = get_json(path)
-        all_tables.extend(company_tables)
-    return all_tables
-
-
-# create_index
-def create_table_db(index_name, all_tables):
-    if os.path.exists("faiss_cropus_store_all.db"):
-        os.remove("faiss_cropus_store_all.db")
-    if os.path.exists(index_name):
-        shutil.rmtree(index_name)
-    document_store = FAISSDocumentStore(
-        embedding_dim=768,
-        faiss_index_factory_str="Flat",
-        duplicate_documents="skip",
-        sql_url="sqlite:///faiss_cropus_store_all.db",
+def get_answer(api_key=None, secret_key=None, query=""):
+    prompt = (
+        """
+    给你年报主要内容的28个标题，具体为
+    主营收入；公司主营业务；主要资产堆积；历年存货堆积；历年主要负债堆积；应收账款及减值准备情况；
+    历年现金流量；日行情K线数据；历年净现比数据；历年营业总收入、归母净利润、扣非净利润数据；历年加权净资产收益率；历年毛利率和净利率数据；
+    资产负债率数据；十大股东数据；股档户数和持股情况数据；历年期间费用数据；营业收入的主营产品构成情况；
+    人均薪酬、创利、创收情况；流动速动比率；分产品毛利率；五大客户、供应商集中度情况；历年研发投入；
+    投入资本回报率；营运能力各周转率；自由现金流；近年来市盈率(TTM)、市净率(LF)、市销率(TTM)变化情况；
+    近年来市盈率(TTM)、市净率(LF)、市销率(TTM)历史分位；前五大客户和供应商占比。
+    现在给你一个问题，你需要理解这个问题，并给出这个问题涉及到公司年报哪些标题，
+    请你返回一个json格式的字符串，键值包含"公司名"和"涉及标题"，涉及标题的value是一个列表，
+    列表包含这个问题涉及到公司年报哪些标题，
+    请你保证你输出的涉及标题不要把27个标题都输出，只输出你认为与问题相关性高的标题。
+    如果问题关于公司发展情况，你只要输出['主营收入','公司主营业务','历年营业总收入、归母净利润、扣非净利润数据','营业收入的主营产品构成情况','历年毛利率和净利率数据']这些标题，就可以解决问题。
+    如果问题关于公司风险点，你只要输入['历年营业总收入、归母净利润、扣非净利润数据','公司主营业务','五大客户、供应商集中度情况','前五大客户和供应商占比','近年来市盈率(TTM)、市净率(LF)、市销率(TTM)历史分位','营运能力各周转率','应收账款及减值准备情况','历年存货堆积']这些标题，就可以解决问题。
+    如果问题关于公司股票、债券表现情况，你只要输入['公司主营业务','日行情K线数据','近年来市盈率(TTM)、市净率(LF)、市销率(TTM)变化情况','近年来市盈率(TTM)、市净率(LF)、市销率(TTM)历史分位','人均薪酬、创利、创收情况','历年加权净资产收益率','历年研发投入','历年净现比数据','历年主要负债堆积']这些标题，就可以解决问题。
+    现在让我们开始
+    输入问题："""
+        + query
+        + "\n请你记住你的输出是一个json格式的字符串,键值有两个,请你保证你输出的标题是与问题相关的标题"
     )
-    retriever = DensePassageRetriever(
-        document_store=document_store,
-        query_embedding_model="moka-ai/m3e-base",
-        passage_embedding_model="moka-ai/m3e-base",
-        output_emb_size=None,
-        max_seq_len_query=64,
-        max_seq_len_passage=256,
-        batch_size=16,
-        use_gpu=True,
-        embed_title=False,
-        pooling_mode="mean_tokens",
-    )
-    all_tables = retriever.run_indexing(all_tables)[0]["documents"]
-    document_store.write_documents(all_tables)
-    document_store.save(index_name)
-
-
-def chat_table(query, history=[], api_key=None, secret_key=None, index=None):
-    if index is None:
-        index = "document"
-    document_store = FAISSDocumentStore.load(index_name)
-    retriever = DensePassageRetriever(
-        document_store=document_store,
-        query_embedding_model="moka-ai/m3e-base",
-        passage_embedding_model="moka-ai/m3e-base",
-        output_emb_size=None,
-        max_seq_len_query=64,
-        max_seq_len_passage=256,
-        batch_size=16,
-        use_gpu=True,
-        embed_title=False,
-        pooling_mode="mean_tokens",
-    )
-    query_pipeline = Pipeline()
-    query_pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
-    indexes = query_pipeline.run(query=query, params={"Retriever": {"top_k": 3, "index": str(index)}})
-    content = ""
-    for item in indexes["documents"]:
-        content = content + item.meta["info"]
-    content = Document(content=content, content_type="text", meta={})
-    prompt = PromptTemplate(
-        "给你一些表格信息，请你根据表格回答我提出的有关信息。如果你无法回答，请输出我无法回答这个问题，请记住你的任务是基于我给出的表格信息给出回答，下面是我给出的表格信息{documents}，我的问题是{query}"
-    ).run(query, [content])
-    prompt = prompt[0]["query"]
-    history = TruncatedConversationHistory(max_length=1000).run(prompt, history)
     ernie_bot = ErnieBot(api_key=api_key, secret_key=secret_key)
-    prediction = ernie_bot.run(history[0])
-    return prediction[0]
+    query_keys = []
+    company = ""
+    for i in range(3):
+        try:
+            result = ernie_bot.run(prompt)[0]
+            result = result["result"]
+            result = result[result.find("{") :]
+            result = result[: result.find("}")] + "}"
+            result = json.loads(result)
+            company = result.get("公司名", "")
+            query_keys.extend([i.strip() for i in result["涉及标题"] if i.strip() in all_titles])
+        except:
+            time.sleep(3)
+            continue
+    query_keys = list(set(query_keys))
+    if query_keys == []:
+        return "我无法解答这个问题"
+    else:
+        text = ""
+        for key in query_keys:
+            if key in ["主营收入", "公司主营业务"]:
+                query_text = query + "请提取" + company + key + "的信息"
+                text += "从" + key + "角度：\n" + get_notabular_information(query_text, str(key)) + "\n"
+            else:
+                query_text = "请提取" + company + key + "的信息来解答" + query + "问题"
+                text += "从" + key + "角度：\n" + chat_table(query_text, api_key, secret_key, key) + "\n"
+    ernie_bot = ErnieBot(api_key, secret_key)
+    try:
+        prompt = "你现在是金融助手，请你根据背景信息回答问题。请你记住，你的回答要基于背景信息，不要胡编乱造。背景信息{information},请回答相关问题{query}"
+        information = text[: 11200 - 1 - len(query) - len(prompt)]
+        prompt = prompt.format(information=information, query=query)
+        text = ernie_bot.run(prompt)[0]["result"] + "\n" + text
+        return text
+    except:
+        return text
 
 
 if __name__ == "__main__":
@@ -131,15 +117,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--api_key", default="", type=str, help="The API Key.")
     parser.add_argument("--secret_key", default="", type=str, help="The secret key.")
-    parser.add_argument("--dirname", default="./", type=str, help="The dirname of json files")
-    parser.add_argument("--query", default="比亚迪近五年的无形资产分别是多少", type=str, help="the query")
+    parser.add_argument("--query", default="宁德时代的股票可以买吗？", type=str, help="the query")
     args = parser.parse_args()
-    files = glob.glob(args.dirname + "/*.json", recursive=True)
-    # create_index
-    all_tables = get_all_tables(files)
-    print(len(all_tables))
-    create_table_db(index_name, all_tables)
-    # query
-    query = "贵州茅台2022年货币资金是多少"
-    result = chat_table(query, api_key=args.api_key, secret_key=args.secret_key)
-    print(result["result"])
+    result = get_answer(query=args.query, api_key=args.api_key, secret_key=args.secret_key)
+    print(result)
+    result = get_notabular_information(query="宁德时代的公司主营业务", index="公司主营业务")
+    print(result)
