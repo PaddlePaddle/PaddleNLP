@@ -266,7 +266,6 @@ class DensePassageRetriever(BaseRetriever):
                 return_embedding=False,
             )
             documents.append(cur_docs)
-
         return documents
 
     def _get_predictions(self, dicts, **kwargs):

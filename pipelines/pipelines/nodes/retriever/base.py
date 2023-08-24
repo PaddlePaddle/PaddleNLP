@@ -223,7 +223,7 @@ class BaseRetriever(BaseComponent):
         return output, "output_1"
 
     def run_indexing(self, documents: List[dict], **kwargs):
-        if self.__class__.__name__ in ["DensePassageRetriever", "EmbeddingRetriever"]:
+        if self.__class__.__name__ in ["DensePassageRetriever", "EmbeddingRetriever", "ErnieRetriever"]:
             documents = deepcopy(documents)
             document_objects = [Document.from_dict(doc) for doc in documents]
             embeddings = self.embed_documents(document_objects, **kwargs)  # type: ignore
