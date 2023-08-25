@@ -138,8 +138,7 @@ class GenerationInferenceModel(GenerationMixin):
         )
         return ret
 
-    @staticmethod
-    def update_model_kwargs_for_generation(cache, just_decoder, next_tokens, eos_token_id, config, model_kwargs):
+    def update_model_kwargs_for_generation(self, cache, just_decoder, next_tokens, eos_token_id, model_kwargs):
         if cache is None:
             model_kwargs["step_idx"] = paddle.where(
                 model_kwargs["seq_len_encoder"] == 0,
@@ -163,7 +162,7 @@ class GenerationInferenceModel(GenerationMixin):
         if cache is None:
             # encoder's generation
             model_kwargs["tgt_ids"] = paddle.where(just_decoder, model_kwargs["tgt_ids"], next_tokens)
-            if config["position_encoding_2d"] and config.position_encoding_2d is True:
+            if self.model.config["position_encoding_2d"] and self.model.config.position_encoding_2d is True:
                 tgt_pos = model_kwargs["tgt_pos"]
                 new_position_id = tgt_pos[:, 0, :].clone()
                 new_block_id = tgt_pos[:, 1, :].clone()
@@ -183,7 +182,7 @@ class GenerationInferenceModel(GenerationMixin):
             )
         else:
             model_kwargs["tgt_ids"] = next_tokens
-            if config["position_encoding_2d"] and config.position_encoding_2d is True:
+            if self.model.config["position_encoding_2d"] and self.model.config.position_encoding_2d is True:
                 tgt_pos = model_kwargs["tgt_pos"]
                 new_position_id = tgt_pos[:, 0, :].clone()
                 new_block_id = tgt_pos[:, 1, :].clone()
@@ -268,7 +267,7 @@ class GenerationInferenceModel(GenerationMixin):
                 paddle.distributed.broadcast(next_tokens, 0)
 
             model_kwargs = self.update_model_kwargs_for_generation(
-                cache, just_decoder, next_tokens, eos_token_id, self.model.config, model_kwargs
+                cache, just_decoder, next_tokens, eos_token_id, model_kwargs
             )
 
             save_with_output(
