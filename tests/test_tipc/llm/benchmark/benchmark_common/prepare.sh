@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# python -m pip install -r ../requirements.txt
+python -m pip install -r ../requirements.txt
 
-# cd ../llm
+cd ../llm
 
-# wget https://bj.bcebos.com/paddlenlp/datasets/examples/llm_benchmark_en.tar.gz
-# tar -zxvf llm_benchmark_en.tar.gz
+wget https://bj.bcebos.com/paddlenlp/datasets/examples/llm_benchmark_en.tar.gz
+tar -zxvf llm_benchmark_en.tar.gz
 
