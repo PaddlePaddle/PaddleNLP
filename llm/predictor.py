@@ -64,6 +64,7 @@ class PredictorArgument:
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
+    max_batch_size: int = field(default=None, metadata={"help": "The max batch size of data during serving."})
 
 
 @dataclass
@@ -273,13 +274,13 @@ class StaticInferencePredictor(BasePredictor):
         self.dtype = dtype
 
         self.cache_kvs = [paddle.zeros(shape, dtype=dtype) for shape in cache_kv_shapes]
-        self.pre_ids = paddle.full([config.batch_size, config.max_length], -1, dtype="int64")
+        self.pre_ids = paddle.full([config.batch_size, config.max_length + 1], -1, dtype="int64")
         self.attention_mask = paddle.zeros(
             shape=(config.batch_size, 1, config.max_length, config.max_length),
             dtype=dtype,
         )
         self.tgt_generation_mask = paddle.zeros(
-            shape=[config.batch_size, 1, 1, config.max_length],
+            shape=[config.batch_size, 1, 1, config.max_length + 1],
             dtype=dtype,
         )
         self.predictor = self._create_predictor(config)
@@ -389,15 +390,15 @@ class DygraphInferencePredictor(BasePredictor):
 
         self.cache_kvs = [
             paddle.zeros(shape, dtype=dtype)
-            for shape in self.model.get_cache_kvs_shape(self.model.config, config.batch_size)
+            for shape in self.model.get_cache_kvs_shape(self.model.config, config.max_batch_size)
         ]
-        self.pre_ids = paddle.full([config.batch_size, config.max_length], -1, dtype="int64")
+        self.pre_ids = paddle.full([config.max_batch_size, config.max_length], -1, dtype="int64")
         self.attention_mask = paddle.zeros(
-            shape=(config.batch_size, 1, config.max_length, config.max_length),
+            shape=(config.max_batch_size, 1, config.max_length, config.max_length),
             dtype=dtype,
         )
         self.tgt_generation_mask = paddle.zeros(
-            shape=[config.batch_size, 1, 1, config.max_length],
+            shape=[config.max_batch_size, 1, 1, config.max_length],
             dtype=dtype,
         )
 
@@ -451,7 +452,7 @@ def create_predictor(
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer):
-        tokenizer.pad_token_id = tokenizer.eos_token_id
+        tokenizer.pad_token = tokenizer.eos_token
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
     tensor_parallel_rank = paddle.distributed.get_rank()
@@ -527,6 +528,9 @@ def create_predictor(
 def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
+    # init `max_batch_size`
+
+    predictor_args.max_batch_size = predictor_args.max_batch_size or predictor_args.batch_size
     paddle.set_device(predictor_args.device)
     paddle.set_default_dtype(predictor_args.dtype)
 
