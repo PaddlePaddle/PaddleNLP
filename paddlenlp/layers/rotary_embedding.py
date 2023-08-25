@@ -15,31 +15,45 @@
 import paddle
 from paddle import nn
 
+__all__ = [
+    "RotaryEmbedding",
+    "LinearScalingRotaryEmbedding",
+    "NTKScalingRotaryEmbedding",
+    "DynamicNTKScalingRotaryEmbedding",
+]
+
 
 class RotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
         self.dim = dim
+        self.max_position_embeddings = max_position_embeddings
         self.base = base
-        self.max_seq_len_cached = max_position_embeddings
+        self.dtype = paddle.get_default_dtype()
+        # [dim / 2]
+        self.inv_freq = 1.0 / (self.base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype="float32") / self.dim))
+        self._set_cos_sin_cache(seq_len=max_position_embeddings)
 
-        dtype = paddle.get_default_dtype()
-        inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, dim, 2), dtype="float32") / dim))  # [dim / 2]
-        self.register_buffer("inv_freq", inv_freq.cast(dtype))
-
-        # higher acc using float32
-        t = paddle.arange(max_position_embeddings, dtype="float32")  # [max_position_embeddings]
-        freqs = paddle.einsum("i,j->ij", t, self.inv_freq.cast("float32"))  # [max_position_embeddings, dim/2]
+    def _set_cos_sin_cache(self, seq_len):
+        self.max_seq_len_cached = seq_len
+        # [seq_len]
+        t = paddle.arange(seq_len, dtype="float32")
+        # [seq_len, dim/2]
+        freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
-        emb = paddle.concat([freqs, freqs], axis=-1)  # [max_position_embeddings, dim]
-        # [bs, seqlen, nhead, head_dim]
-        self.cos_cached = emb.cos()[None, :, None, :]  # [1, max_pos, 1, dim]
-        self.sin_cached = emb.sin()[None, :, None, :]
+        # [seq_len, dim]
+        emb = paddle.concat([freqs, freqs], axis=-1)
+        # [1, seqlen, 1, dim]
+        self.cos_cached = emb.cos()[None, :, None, :].cast(self.dtype)
+        self.sin_cached = emb.sin()[None, :, None, :].cast(self.dtype)
 
     def forward(self, x, seq_len=None):
+        # x: [bs, num_attention_heads, seq_len, head_size]
+        if seq_len > self.max_seq_len_cached:
+            self._set_cos_sin_cache(seq_len)
         return (
-            self.cos_cached[:, :seq_len, :, ...],
-            self.sin_cached[:, :seq_len, :, ...],
+            self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
+            self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
         )
 
     @staticmethod
@@ -60,3 +74,79 @@ class RotaryEmbedding(nn.Layer):
         q_embed = (q * cos) + (RotaryEmbedding.rotate_half(q) * sin)
         k_embed = (k * cos) + (RotaryEmbedding.rotate_half(k) * sin)
         return q_embed, k_embed
+
+
+class LinearScalingRotaryEmbedding(RotaryEmbedding):
+    def __init__(self, dim, max_position_embeddings=2048, base=10000, scaling_factor=1.0):
+        self.scaling_factor = scaling_factor
+        super().__init__(dim, max_position_embeddings, base)
+
+    def _set_cos_sin_cache(self, seq_len):
+        self.max_seq_len_cached = seq_len
+        # [seq_len]
+        t = paddle.arange(seq_len, dtype="float32")
+        t = t / self.scaling_factor
+        # [seq_len, dim/2]
+        freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
+        # Different from paper, but it uses a different permutation in order to obtain the same calculation
+        # [seq_len, dim]
+        emb = paddle.concat([freqs, freqs], axis=-1)
+        # [1, seqlen, 1, dim]
+        self.cos_cached = emb.cos()[None, :, None, :].cast(self.dtype)
+        self.sin_cached = emb.sin()[None, :, None, :].cast(self.dtype)
+
+    def forward(self, x, seq_len=None):
+        # x: [bs, num_attention_heads, seq_len, head_size]
+        if seq_len > self.max_seq_len_cached:
+            self._set_cos_sin_cache(seq_len)
+        return (
+            self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
+            self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
+        )
+
+
+class NTKScalingRotaryEmbedding(RotaryEmbedding):
+    """RotaryEmbedding extended with NTK scaling. https://www.reddit.com/r/LocalLLaMA/comments/14lz7j5/ntkaware_scaled_rope_allows_llama_models_to_have/"""
+
+    def __init__(self, dim, max_position_embeddings=2048, base=10000, scaling_factor=1.0):
+        base = base * scaling_factor ** (dim / (dim - 2))
+        self.scaling_factor = scaling_factor
+        super().__init__(dim, max_position_embeddings, base)
+
+
+class DynamicNTKScalingRotaryEmbedding(RotaryEmbedding):
+    """RotaryEmbedding extended with Dynamic NTK scaling. https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/"""
+
+    def __init__(self, dim, max_position_embeddings=2048, base=10000, scaling_factor=1.0):
+        self.scaling_factor = scaling_factor
+        super().__init__(dim, max_position_embeddings, base)
+
+    def _scale_cos_sin(self, seq_len):
+        # [seq_len]
+        t = paddle.arange(seq_len, dtype="float32")
+        # [seq_len, dim/2]
+        alpha = (self.scaling_factor * seq_len / self.max_position_embeddings) - (self.scaling_factor - 1)
+        base = self.base * alpha ** (self.dim / (self.dim - 2))
+        inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype="float32") / self.dim))
+        freqs = paddle.einsum("i,j->ij", t, inv_freq)
+        # Different from paper, but it uses a different permutation in order to obtain the same calculation
+        # [seq_len, dim]
+        emb = paddle.concat([freqs, freqs], axis=-1)
+        # [1, seqlen, 1, dim]
+        scale_cos = emb.cos()[None, :, None, :].cast(self.dtype)
+        scale_sin = emb.sin()[None, :, None, :].cast(self.dtype)
+        return scale_cos, scale_sin
+
+    def forward(self, x, seq_len=None):
+        # x: [bs, num_attention_heads, seq_len, head_size]
+        if seq_len > self.max_position_embeddings:
+            scale_cos, scale_sin = self._scale_cos_sin(seq_len=seq_len)
+            return (
+                scale_cos[:, :, :seq_len, ...].cast(x.dtype),
+                scale_sin[:, :, :seq_len, ...].cast(x.dtype),
+            )
+        else:
+            return (
+                self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
+                self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
+            )

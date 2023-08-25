@@ -19,6 +19,6 @@ from .globalpointer import (
     GPLinkerForRelationExtraction,
 )
 from .linear import Linear
-from .rotary_embedding import RotaryEmbedding
+from .rotary_embedding import *
 from .sequence import sequence_mask
 from .tcn import TCN, TemporalBlock

@@ -16,46 +16,85 @@ import unittest
 
 import paddle
 
-from paddlenlp.layers import RotaryEmbedding
+from paddlenlp.layers import (
+    DynamicNTKScalingRotaryEmbedding,
+    LinearScalingRotaryEmbedding,
+    NTKScalingRotaryEmbedding,
+    RotaryEmbedding,
+)
 
 
-class TestRotaryEmbedding(unittest.TestCase):
+class RotaryEmbeddingsTestCommon:
     batch_size, seq_length, num_heads, head_dim = 2, 7, 2, 4
     tensor_shape = [batch_size, seq_length, num_heads, head_dim]
+    query_states = paddle.rand(tensor_shape)
+    key_states = paddle.rand(tensor_shape)
+    classname = None
 
     def test_forward(self):
+        max_position_embeddings = 16
         position_ids = paddle.arange(self.seq_length).unsqueeze(0)
-        query_states = paddle.rand(self.tensor_shape)
-        key_states = paddle.rand(self.tensor_shape)
-        rope_embedding = RotaryEmbedding(dim=self.head_dim, max_position_embeddings=16)
-        cos, sin = rope_embedding(key_states, seq_len=self.seq_length)
-        query_states, key_states = RotaryEmbedding.apply_rotary_pos_emb(
-            query_states, key_states, cos, sin, position_ids
+
+        rope_embedding = self.classname(dim=self.head_dim, max_position_embeddings=max_position_embeddings)
+        cos, sin = rope_embedding(self.key_states, seq_len=self.seq_length)
+        query_states, key_states = self.classname.apply_rotary_pos_emb(
+            self.query_states, self.key_states, cos, sin, position_ids
         )
+        self.assertEqual(rope_embedding.max_seq_len_cached, max_position_embeddings)
         self.assertEqual(query_states.shape, self.tensor_shape)
         self.assertEqual(key_states.shape, self.tensor_shape)
 
-    # NOTE: Running this test on GPU causes CUDA Error and fails all other tests...
     def test_exceed_max_length(self):
-        position_ids = paddle.arange(self.seq_length).unsqueeze(0)
-        query_states = paddle.rand(self.tensor_shape)
-        key_states = paddle.rand(self.tensor_shape)
         # small max_position_embeddings
-        rope_embedding = RotaryEmbedding(dim=self.head_dim, max_position_embeddings=3)
-        cos, sin = rope_embedding(key_states, seq_len=self.seq_length)
-        with self.assertRaises(ValueError):
-            query_states, key_states = RotaryEmbedding.apply_rotary_pos_emb(
-                query_states, key_states, cos, sin, position_ids
-            )
+        max_position_embeddings = 3
+        position_ids = paddle.arange(self.seq_length).unsqueeze(0)
+        rope_embedding = self.classname(dim=self.head_dim, max_position_embeddings=max_position_embeddings)
+        self.assertEqual(rope_embedding.max_seq_len_cached, max_position_embeddings)
+        cos, sin = rope_embedding(self.key_states, seq_len=self.seq_length)
+        query_states, key_states = self.classname.apply_rotary_pos_emb(
+            self.query_states, self.key_states, cos, sin, position_ids
+        )
+        self.assertEqual(rope_embedding.max_seq_len_cached, self.seq_length)
+        self.assertEqual(query_states.shape, self.tensor_shape)
+        self.assertEqual(key_states.shape, self.tensor_shape)
 
     def test_2d_position_id(self):
         # 1D position_id
         position_ids = paddle.arange(self.seq_length)
-        query_states = paddle.rand(self.tensor_shape)
-        key_states = paddle.rand(self.tensor_shape)
-        rope_embedding = RotaryEmbedding(dim=self.head_dim, max_position_embeddings=16)
-        cos, sin = rope_embedding(key_states, seq_len=self.seq_length)
+        rope_embedding = self.classname(dim=self.head_dim, max_position_embeddings=16)
+        cos, sin = rope_embedding(self.key_states, seq_len=self.seq_length)
         with self.assertRaisesRegex(ValueError, "position_ids should be a 2D tensor"):
-            query_states, key_states = RotaryEmbedding.apply_rotary_pos_emb(
-                query_states, key_states, cos, sin, position_ids
+            query_states, key_states = self.classname.apply_rotary_pos_emb(
+                self.query_states, self.key_states, cos, sin, position_ids
             )
+
+
+class TestRotaryRotaryEmbeddings(RotaryEmbeddingsTestCommon, unittest.TestCase):
+    classname = RotaryEmbedding
+
+
+class TestLinearScalingRotaryEmbedding(RotaryEmbeddingsTestCommon, unittest.TestCase):
+    classname = LinearScalingRotaryEmbedding
+
+
+class TestNTKScalingRotaryEmbedding(RotaryEmbeddingsTestCommon, unittest.TestCase):
+    classname = NTKScalingRotaryEmbedding
+
+
+class TestDynamicNTKScalingRotaryEmbedding(RotaryEmbeddingsTestCommon, unittest.TestCase):
+    classname = DynamicNTKScalingRotaryEmbedding
+
+    def test_exceed_max_length(self):
+        # small max_position_embeddings
+        max_position_embeddings = 3
+        position_ids = paddle.arange(self.seq_length).unsqueeze(0)
+        rope_embedding = self.classname(
+            dim=self.head_dim, max_position_embeddings=max_position_embeddings, scaling_factor=2.0
+        )
+        cos, sin = rope_embedding(self.key_states, seq_len=self.seq_length)
+        query_states, key_states = self.classname.apply_rotary_pos_emb(
+            self.query_states, self.key_states, cos, sin, position_ids
+        )
+        self.assertEqual(rope_embedding.max_seq_len_cached, max_position_embeddings)
+        self.assertEqual(query_states.shape, self.tensor_shape)
+        self.assertEqual(key_states.shape, self.tensor_shape)
