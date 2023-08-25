@@ -143,8 +143,9 @@ def hierarchical_search_tutorial():
     sub_index_name = documents[0].meta["name"]
     pipe = Pipeline()
     pipe.add_node(component=dpr_retriever, name="DenseRetriever", inputs=["Query"])
+    pipe.add_node(component=ranker, name="Ranker", inputs=["DenseRetriever"])
     results = pipe.run(
-        query="P2P网络借贷的研究现状是什么？",
+        query="P2P网络借贷的研究背景是什么？",
         params={
             "DenseRetriever": {"top_k": args.dense_topk, "index": sub_index_name.lower()},
         },
