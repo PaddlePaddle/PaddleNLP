@@ -26,7 +26,6 @@ from utils import (
     dybatch_preprocess,
     get_infer_model_path,
     get_prefix_tuning_params,
-    get_state_dict,
     load_real_time_tokens,
 )
 
@@ -272,7 +271,6 @@ class StaticInferencePredictor(BasePredictor):
             raise ValueError("Please specific the model dtype.")
 
         self.model_config = AutoConfig.from_pretrained(config.model_name_or_path)
-
         self.dtype = dtype
         self.architectures = self.model_config.architectures[0].lower()
         self.cache_kvs = [paddle.zeros(shape, dtype=dtype) for shape in cache_kv_shapes]
@@ -578,10 +576,6 @@ def create_predictor(
                     config=config,
                     dtype=predictor_args.dtype,
                 )
-                state_dict = get_state_dict(
-                    predictor_args.model_name_or_path, ChatGLMForCausalLMInferenceModel, config
-                )
-                model.model.transformer.set_state_dict(state_dict)
                 model.eval()
             predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
         elif predictor_args.mode == "static":

@@ -578,7 +578,6 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
             return_dict=return_dict,
             time_step=time_step,
         )
-
         hidden_states = transformer_outputs.last_hidden_state if return_dict else transformer_outputs[0]
         if self.config.tensor_parallel_degree > 1:
             lm_logits = parallel_matmul(hidden_states, self.lm_head.weight, self.config.tensor_parallel_output)
@@ -622,3 +621,8 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
             logits=lm_logits,
             past_key_values=transformer_outputs.past_key_values,
         )
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict):
+        self.lm_head.weight.set_value(state_dict["transformer.word_embeddings.weight"])
+        self.model.transformer.set_state_dict({k: state_dict[k] for k in state_dict.keys()})

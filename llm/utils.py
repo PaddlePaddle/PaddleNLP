@@ -35,22 +35,6 @@ from paddlenlp.trainer.trainer_utils import has_length
 from paddlenlp.utils.log import logger
 
 
-def get_weight_path(model_dir, cls):
-    return cls._resolve_model_file_path(model_dir)
-
-
-def get_state_dict(model_dir, cls, config):
-    weight_file = get_weight_path(model_dir, cls)[0]
-
-    world_size = paddle.distributed.get_world_size()
-    if world_size > 1 and weight_file.endswith("model_state.pdparams"):
-        state_dict = cls.convert_tensor_parallel(weight_file, config)
-    else:
-        state_dict = paddle.load(weight_file)
-
-    return state_dict
-
-
 def compute_metrics(eval_preds):
 
     flattened_preds = np.array(eval_preds.predictions).flatten()
