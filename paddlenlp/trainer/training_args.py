@@ -20,7 +20,6 @@ import contextlib
 import json
 import math
 import os
-import time
 import types
 import warnings
 from dataclasses import asdict, dataclass, field
@@ -686,6 +685,8 @@ class TrainingArguments:
         metadata={"help": "Whether use lazy data processing."},
     )
     skip_profile_timer: Optional[bool] = field(
+      
+      
         default=True,
         metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl"},
     )
@@ -974,14 +975,8 @@ class TrainingArguments:
                             "The enable_stage1_tensor_fusion or enable_stage1_overlap is not supported "
                             "by current version of Paddle. Please try latest develop Paddle."
                         )
-                start_time = time.time()
                 fleet.init(is_collective=True, strategy=strategy)
-                paddle.device.synchronize()
-                elapsed = time.time() - start_time
-                logger.info("NCCL-Connection costs {:.2f} ms.".format(elapsed))
-
                 logger.info(strategy)
-
         else:
             world_size = paddle.distributed.get_world_size()
             if world_size > 1:
