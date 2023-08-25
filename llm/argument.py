@@ -18,17 +18,18 @@ from dataclasses import dataclass, field
 class DataArgument:
     dataset_name_or_path: str = field(default=None, metadata={"help": "Name or path for dataset"})
     task_name: str = field(default=None, metadata={"help": "Additional name to select a more specific task."})
-    src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
-    tgt_length: int = field(default=1024, metadata={"help": "The max length of target text."})
+    intokens: bool = field(default=False, metadata={"help": "Whether to use InTokens data stream"})
+    src_length: int = field(default=1024, metadata={"help": "The maximum length of source(context) tokens."})
+    max_length: int = field(
+        default=2048,
+        metadata={
+            "help": "The maximum length that model input tokens can have. When intokens is set to True, it's also the maximum length for InTokens data stream"
+        },
+    )
     eval_with_do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
     save_generation_output: bool = field(
         default=False,
         metadata={"help": "Whether to save generated text to file when eval_with_do_generation set to True."},
-    )
-    intokens: bool = field(default=False, metadata={"help": "Whether to use InTokens data stream"})
-    intokens_max_length: int = field(
-        default=2048,
-        metadata={"help": "The max length for InTokens data stream. Only effective when intokens is True"},
     )
 
 

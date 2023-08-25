@@ -5,11 +5,8 @@
 在服务化部署前，需确认
 
 - 1. 服务化镜像的软硬件环境要求和镜像拉取命令请参考[FastDeploy服务化部署](https://github.com/PaddlePaddle/FastDeploy/tree/develop/serving)
-## GPU镜像
-GPU镜像支持Paddle/ONNX模型在GPU/CPU上进行服务化部署，支持的推理后端仅包括Paddle Inference（OpenVINO、TensorRT、Paddle Inference和ONNX Runtime目前尚不支持）
-```
-docker pull registry.baidubce.com/paddlepaddle/fastdeploy:1.0.7-gpu-cuda11.4-trt8.5-21.10
-```
+- 2. FastDeploy Server镜像支持的推理后端有OpenVINO、TensorRT、Paddle Inference和ONNX Runtime，用户可以根据自己的软硬件条件进行选择。
+
 
 ## 准备模型
 
@@ -41,16 +38,21 @@ models
     └── config.pbtxt
 ```
 *注意*:如果使用TensorRT引擎，用 pipelines/examples/chatbot/config.pbtxt 替换 models/m3e_model/config.pbtxt
+
 ## 拉取并运行镜像
+
+以GPU镜像部署为例：
+
 ```bash
 # GPU镜像
 docker pull registry.baidubce.com/paddlepaddle/fastdeploy:1.0.7-gpu-cuda11.4-trt8.5-21.10
 
 # 运行
-docker run  -it --net=host --name fastdeploy_server --shm-size="1g" -v /path/m3e/models:/models registry.baidubce.com/paddlepaddle/fastdeploy:1.0.7-gpu-cuda11.4-trt8.5-21.10 bash
+nvidia-docker run  -it --net=host --name fastdeploy_server --shm-size="1g" -v /path/m3e/models:/models registry.baidubce.com/paddlepaddle/fastdeploy:1.0.7-gpu-cuda11.4-trt8.5-21.10 bash
 ```
 
 ## 部署模型
+
 serving目录包含启动pipeline服务的配置和发送预测请求的代码，包括：
 
 ```
@@ -97,11 +99,15 @@ pip install tritonclient\[all\]
 ### 示例m3eRetriever
 注意执行客户端请求时关闭代理，并根据实际情况修改m3eRetriever中的url地址(启动服务所在的机器)
 ```
-python ./pipelines/examples/chatbot/ParallelRetriever_example.py \
---file_paths ... \
---api_key ... \
---secret_key ... \
+python examples/chatbot/ParallelRetriever_example.py \
+                                            --file_paths ... \
+                                            --api_key ... \
+                                            --secret_key ... \
 ```
+参数含义说明
+* `file_paths`: 文件的路径
+* `api_key`: 文心一言的apk key
+* `secret_key`: 文心一言的secret key
 
 ## 配置修改
 

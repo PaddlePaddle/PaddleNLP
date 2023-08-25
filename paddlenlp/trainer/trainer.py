@@ -70,12 +70,18 @@ from ..peft import LoRAModel, PrefixModelForCausalLM
 from ..transformers.model_utils import (
     PretrainedModel,
     _add_variant,
+    load_sharded_checkpoint,
     paddlenlp_load,
     unwrap_model,
 )
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
-from ..utils.env import LORA_WEIGHTS_NAME, PADDLE_WEIGHTS_NAME, PREFIX_WEIGHTS_NAME
+from ..utils.env import (
+    LORA_WEIGHTS_NAME,
+    PADDLE_WEIGHTS_INDEX_NAME,
+    PADDLE_WEIGHTS_NAME,
+    PREFIX_WEIGHTS_NAME,
+)
 from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
@@ -415,7 +421,7 @@ class Trainer:
         """
         self.callback_handler.remove_callback(callback)
 
-    def load_state_dict_from_checkpoint(self, resume_from_checkpoint=None):
+    def _load_from_checkpoint(self, resume_from_checkpoint=None):
         """load state_dict from_checkpoint, Only load model state dict.
 
         Args:
@@ -439,6 +445,8 @@ class Trainer:
         else:
             weight_name = PADDLE_WEIGHTS_NAME
 
+        weight_index_name = PADDLE_WEIGHTS_INDEX_NAME  # currently set paddle as default, do not support safetensors.
+
         if self.args.should_load_sharding_stage1_model:
             state_dict = self.sharding_io.load_state_dict_from_checkpoint_with_reshard(
                 resume_from_checkpoint,
@@ -446,26 +454,49 @@ class Trainer:
             )
         else:
             if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
-                file_path = os.path.join(
+
+                weights_file = os.path.join(
                     resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
                 )
-                if not os.path.isfile(file_path):
-                    raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}, no {file_path}")
+                weights_index_file = os.path.join(
+                    resume_from_checkpoint, _add_variant(weight_index_name, self.args.weight_name_suffix)
+                )
+
+                if not any(
+                    os.path.isfile(f)
+                    for f in [
+                        weights_file,
+                        weights_index_file,
+                    ]
+                ):
+                    raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
 
                 logger.info(f"Loading model from {resume_from_checkpoint} .")
 
-                # We load the model state dict on the CPU to avoid an OOM error.
-                state_dict = paddle.load(file_path, return_numpy=True)
+                if os.path.isfile(weights_file):
+                    # We load the model state dict on the CPU to avoid an OOM error.
+                    state_dict = paddle.load(weights_file, return_numpy=True)
+                    if (isinstance(self.model, LoRAModel) and self.lmodel.lora_config.tensor_parallel_degree > 1) or (
+                        isinstance(self.model, PrefixModelForCausalLM)
+                        and self.model.prefix_config.tensor_parallel_degree > 1
+                    ):
+                        state_dict = self.model._convert_tensor_parallel(state_dict)
 
-                # If the model is on the GPU, it still works!
-                self._set_state_dict_in_model(state_dict)
-                # release memory
-                del state_dict
+                    # If the model is on the GPU, it still works!
+                    self._set_state_dict_in_model(state_dict)
+                    # release memory
+                    del state_dict
+                else:
+                    # We load the sharded checkpoint.
+                    _ = load_sharded_checkpoint(
+                        self.model, resume_from_checkpoint, self.args.weight_name_suffix, prefer_safe=False
+                    )
+
             elif resume_from_checkpoint is not None:
                 logger.info(f"not loading ckpt :{self.args.dataset_rank}")
 
     def _wrap_model_and_load_sharded_checkpoint(self, resume_from_checkpoint):
-        # In the sharded mode, should invoke load_state_dict_from_checkpoint after _wrap_model.
+        # In the sharded mode, should invoke _load_from_checkpoint after _wrap_model.
         # In this mode, each sharding rank load sharded params, do not need to implement the broadcast logic.
         model = self._wrap_model(self.model_wrapped)
         if self.sharding_io is not None:
@@ -473,10 +504,10 @@ class Trainer:
             self.sharding_io.set_optimizer(self.optimizer)
         if model is not self.model:
             self.model_wrapped = model
-        # Should invoke load_state_dict_from_checpoint after _load_optimizer_and_scheduler
-        # because the load_state_dict_from_checkpoint method rely on the optimizer in the shareded mode.
+        # Should invoke _load_from_checpoint after _load_optimizer_and_scheduler
+        # because the _load_from_checkpoint method rely on the optimizer in the shareded mode.
         self._load_optimizer_and_scheduler(resume_from_checkpoint)
-        self.load_state_dict_from_checkpoint(resume_from_checkpoint)
+        self._load_from_checkpoint(resume_from_checkpoint)
         return model
 
     def train(
@@ -503,7 +534,7 @@ class Trainer:
         self._memory_tracker.start()
 
         if not self.args.should_load_sharding_stage1_model:
-            self.load_state_dict_from_checkpoint(resume_from_checkpoint)
+            self._load_from_checkpoint(resume_from_checkpoint)
 
         train_dataloader = self.get_train_dataloader()
 
@@ -558,7 +589,7 @@ class Trainer:
         if self.args.should_load_sharding_stage1_model:
             model = self._wrap_model_and_load_sharded_checkpoint(resume_from_checkpoint)
         elif self.args.should_save_sharding_stage1_model:
-            # In the non-sharded mode, should invoke load_state_dict_from_checkpoint before _wrap_model.
+            # In the non-sharded mode, should invoke _load_from_checkpoint before _wrap_model.
             # In this mode, the rank0 load all params and the _wrap_model implicitly broadcast params from rank0 to the other ranks.
             model = self._wrap_model(self.model_wrapped)
             if self.sharding_io is not None:
@@ -597,7 +628,7 @@ class Trainer:
             parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
             if parts_num > 1:
                 all_reduce_dtype = "int64"
-                if paddle.get_device().split(":")[0] == "npu":
+                if paddle.get_device().split(":")[0] in ["npu", "xpu"]:
                     # TODO(duanyanhui): fix when NPU all_reduce supports int64
                     all_reduce_dtype = "float32"
                 trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
@@ -898,13 +929,11 @@ class Trainer:
             if os.path.exists(best_model_path):
                 # We load the model state dict on the CPU to avoid an OOM error.
                 state_dict = paddle.load(best_model_path, return_numpy=True)
-                if isinstance(self.model, LoRAModel) and self.model.lora_config.tensor_parallel_degree > 1:
-                    state_dict = self.model._convert_tensor_parallel(lora_state_dict=state_dict)
-                elif (
+                if (isinstance(self.model, LoRAModel) and self.model.lora_config.tensor_parallel_degree > 1) or (
                     isinstance(self.model, PrefixModelForCausalLM)
                     and self.model.prefix_config.tensor_parallel_degree > 1
                 ):
-                    state_dict = self.model._convert_tensor_parallel(prefix_state_dict=state_dict)
+                    state_dict = self.model._convert_tensor_parallel(state_dict)
                 # If the model is on the GPU, it still works!
                 self._set_state_dict_in_model(state_dict)
             else:
