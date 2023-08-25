@@ -100,11 +100,11 @@ class ErnieBot(BaseComponent):
             )
             response_json["history"] = return_history
         except Exception as e:
-            print(e)
-            print(response_json)
+            logger.error(e)
+            logger.error(response_json)
         return response_json
 
-    def run(self, query, history=None, stream=False, api_key=None, secret_key=None):
+    def run(self, query, history=None, stream=False, api_key=None, secret_key=None, **kwargs):
         """
         Send a request to the Ernie Bot API with the given query and optional conversation history.
         Returns the chatbot response and updates the conversation history accordingly.
@@ -113,6 +113,8 @@ class ErnieBot(BaseComponent):
         :param history: A list of dictionaries representing the conversation history,
         :param stream: Whether to use streaming mode when making the request. Currently not in use. Defaults to False.
         """
-        logger.info(query)
+        debug = kwargs.get("debug", False)
+        if debug:
+            logger.debug(f"Query: {query}")
         response_json = self.predict(query, history, stream)
         return response_json, "output_1"

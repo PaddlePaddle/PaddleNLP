@@ -18,7 +18,7 @@ import time
 
 import arxiv
 import gradio as gr
-from create_base import chat_papers
+from create_index import chat_papers
 from utils import merge_summary, pdf2image, single_paper_abs_sum, translation
 
 from pipelines.document_stores import FAISSDocumentStore
@@ -32,6 +32,10 @@ from pipelines.nodes import (
 from pipelines.pipelines import Pipeline
 
 paper_all = []
+from collections import defaultdict
+
+chat_file_history = defaultdict(list)
+chat_base_history = []
 index_name = "dureader_index"
 import multiprocessing
 from functools import partial
@@ -80,8 +84,8 @@ parser.add_argument(
     default="ernie",
     help="the ernie model types",
 )
-parser.add_argument("--api_key", default=" ", type=str, help="The API Key.")
-parser.add_argument("--secret_key", default=" ", type=str, help="The secret key.")
+parser.add_argument("--api_key", default="", type=str, help="The API Key.")
+parser.add_argument("--secret_key", default="", type=str, help="The secret key.")
 parser.add_argument(
     "--pooling_mode",
     default="mean_tokens",
@@ -94,23 +98,31 @@ args = parser.parse_args()
 
 def clear_session():
     global all_data_result
-    global papers_all
+    global paper_all
     global papers_sum
+    global chat_file_history
+    global chat_base_history
     all_data_result = manager.dict()
     papers_sum = manager.list()
-    papers_all = []
-    return None, "https://arxiv.org/abs/2303.08774"
+    paper_all = []
+    chat_file_history = defaultdict(list)
+    chat_base_history = []
+    return None, "", "", [], "", [], "", []
+
+
+def clear_base():
+    global chat_base_history
+    chat_base_history = []
+    return "", []
 
 
 def chat_file(
     query,
-    history=None,
+    history=[],
     index_paper=None,
     api_key=args.api_key,
     secret_key=args.secret_key,
 ):
-    if history is None:
-        history = []
     if index_paper is None:
         index = "document"
     else:
@@ -135,13 +147,20 @@ def chat_file(
     query_pipeline.add_node(component=ranker, name="Ranker", inputs=["Retriever"])
     query_pipeline.add_node(component=PromptTemplate("背景：{documents} 问题：{query}"), name="Template", inputs=["Ranker"])
     query_pipeline.add_node(
-        component=TruncatedConversationHistory(max_length=256), name="TruncateHistory", inputs=["Template"]
+        component=TruncatedConversationHistory(max_length=1000), name="TruncateHistory", inputs=["Template"]
     )
+    index_history = chat_file_history[index]
     ernie_bot = ErnieBot(api_key=api_key, secret_key=secret_key)
     query_pipeline.add_node(component=ernie_bot, name="ErnieBot", inputs=["TruncateHistory"])
     prediction = query_pipeline.run(
-        query=query, params={"Retriever": {"top_k": 30, "index": str(index)}, "Ranker": {"top_k": 3}}
+        query=query,
+        params={
+            "Retriever": {"top_k": 30, "index": str(index)},
+            "Ranker": {"top_k": 3},
+            "TruncateHistory": {"history": index_history},
+        },
     )
+    chat_file_history[index] = prediction["history"]
     history.append(["user: {}".format(query), "assistant: {}".format(prediction["result"])])
     return "", history, history
 
@@ -160,6 +179,7 @@ def tackle_paper(root_path, path, api_key, secret_key, lang="简体中文"):
             sum_str,
             sum_file,
         ]
+        data_split = []
     else:
         data_split, sum_str, sum_file = single_paper_abs_sum(root_path, path, api_key=api_key, secret_key=secret_key)
         all_data_result[path.split("/")[-1].replace(".pdf", "").replace(".", "_")] = [
@@ -202,7 +222,7 @@ def predict(file_upload, input1=None, lang="简体中文", api_key=args.api_key,
             root_path_list = [os.path.dirname(path) for path in path_list]
         else:
             paths = input1.split(";")
-            path_list = []
+            path_list = paths
             root_path_list = ["./" for i in range(len(path_list))]
             root_path = root_path_list[0]
             for index, path_item in enumerate(paths):
@@ -233,6 +253,15 @@ def predict(file_upload, input1=None, lang="简体中文", api_key=args.api_key,
     multi_result = mul_tackle(
         p_m=p_m, root_path_list=root_path_list, path_list=path_list, api_key=api_key, secret_key=secret_key, lang=lang
     )
+    if lang == "English":
+        return (
+            gr.Textbox.update(value="所有pdf解析完成"),
+            gr.Textbox.update(value="暂时不能chatfile功能"),
+            gr.Textbox.update(value="暂时不能chatfile功能"),
+            gr.Textbox.update(value="暂时不能chatfile功能"),
+            None,
+            None,
+        )
     for index, split_text in multi_result:
         split_text = retriever.run_indexing(split_text)[0]["documents"]
         document_store.write_documents(split_text, index=str(index))
@@ -280,17 +309,22 @@ def sum_result(file_name):
 
 def retriever_papers(
     query,
-    history=None,
+    history=[],
     api_key=args.api_key,
     secret_key=args.secret_key,
     retriever_top=30,
     ranker_top=3,
 ):
-    if history is not None:
-        history = []
+    global chat_base_history
     message = chat_papers(
-        query, api_key=api_key, secret_key=secret_key, retriever_top=retriever_top, ranker_top=ranker_top
+        query,
+        api_key=api_key,
+        secret_key=secret_key,
+        retriever_top=retriever_top,
+        ranker_top=ranker_top,
+        history=chat_base_history,
     )
+    chat_base_history = message["history"]
     history.append(["user: {}".format(query), "assistant: {}".format(message["result"])])
     return "", history, history
 
@@ -301,10 +335,13 @@ def Dropdown_list(papers, inputs):
         paper_list = [paper.name.split("/")[-1] for paper in papers]
     else:
         paper_list = inputs.split(";")
-    paper_all += [i for i in paper_list if i not in paper_all]
-    return gr.Dropdown.update(choices=paper_all, value=paper_all[0]), gr.Dropdown.update(
-        choices=paper_all, value=paper_all[0]
-    )
+    paper_all += [i for i in paper_list if i not in paper_all and i != "" and i is not None]
+    if len(paper_all) > 0:
+        value = paper_all[0]
+    else:
+        value = None
+    print(value)
+    return gr.Dropdown.update(choices=paper_all, value=value), gr.Dropdown.update(choices=paper_all, value=value)
 
 
 def Button_display():
@@ -346,8 +383,8 @@ with gr.Blocks() as demo:
                         trans_down = gr.File(label="翻译下载链接")
                         with gr.Group():
                             start_chatfile_tr = gr.Textbox(value="暂时无法问答", label="问答启动")
-                            chatbot = gr.Chatbot(label="Chatbot")
-                            state = gr.State()
+                            chatbot_tr = gr.Chatbot(label="Chatbot")
+                            state_tr = gr.State([])
                             with gr.Row():
                                 textbox = gr.Textbox(
                                     container=False,
@@ -357,7 +394,9 @@ with gr.Blocks() as demo:
                                 )
                                 submit_button = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
                                 submit_button.click(
-                                    chat_file, inputs=[textbox, state, file_tr], outputs=[textbox, chatbot, state]
+                                    chat_file,
+                                    inputs=[textbox, state_tr, file_tr],
+                                    outputs=[textbox, chatbot_tr, state_tr],
                                 )
             with gr.Tab("单文总结"):  # 包含下载功能
                 with gr.Row():
@@ -376,8 +415,8 @@ with gr.Blocks() as demo:
                         sum_down = gr.File(label="全文精度链接 ")
                         with gr.Group():
                             start_chatfile_sum = gr.Textbox(value="暂时无法问答", label="问答启动")
-                            chatbot = gr.Chatbot(label="Chatbot")
-                            state = gr.State()
+                            chatbot_sum = gr.Chatbot(label="Chatbot")
+                            state_sum = gr.State([])
                             with gr.Row():
                                 textbox = gr.Textbox(
                                     container=False,
@@ -387,17 +426,22 @@ with gr.Blocks() as demo:
                                 )
                                 submit_button = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
                                 submit_button.click(
-                                    chat_file, inputs=[textbox, state, file_sum], outputs=[textbox, chatbot, state]
+                                    chat_file,
+                                    inputs=[textbox, state_sum, file_sum],
+                                    outputs=[textbox, chatbot_sum, state_sum],
                                 )
             with gr.Tab("多文总结"):  # 包含下载功能
                 with gr.Accordion("   "):
-                    gr.Dropdown(choices=["英文", "中文"], max_choices=1, label="完整总结插件-支持下载，此处为多文总结占位符，需要支持上下拖动")
-                    sum_mul_papers = gr.Textbox(label="多文档摘要", value="", max_lines=10)
-                    sum_mul_papers_down = gr.File(label="全文精度链接 ")
+                    with gr.Row():
+                        gr.Dropdown(
+                            choices=["英文", "中文"], max_choices=1, label="完整总结插件-支持下载，此处为多文总结占位符，需要支持上下拖动", scale=1
+                        )
+                        sum_mul_papers_down = gr.File(label="全文精度链接 ", scale=1)
+                    sum_mul_papers = gr.Textbox(label="多文档摘要", max_lines=100, scale=20, lines=10)
                     with gr.Group():
                         start_chatfile_mul = gr.Textbox(value="暂时无法问答", label="问答启动")
                         chatbot = gr.Chatbot(label="Chatbot")
-                        state = gr.State()
+                        state = gr.State([])
                         with gr.Row():
                             textbox = gr.Textbox(
                                 container=False,
@@ -421,7 +465,11 @@ with gr.Blocks() as demo:
                     sum_mul_papers_down,
                 ],
             )
-            clear.click(clear_session, inputs=[], outputs=[file_upload, input1])
+            clear.click(
+                clear_session,
+                inputs=[],
+                outputs=[file_upload, input1, chatbot_tr, state_tr, chatbot_sum, state_sum, chatbot, state],
+            )
             file_tr.change(Button_display, inputs=[], outputs=[tr_display])
             file_sum.change(Button_display, inputs=[], outputs=[sum_display])
             tr_display.click(tr_result, inputs=file_tr, outputs=[ori_paper, ori_pdf, trans_paper, trans_down])
@@ -442,7 +490,7 @@ with gr.Blocks() as demo:
     with gr.Tab("学术检索"):
         with gr.Group():
             chatbot = gr.Chatbot(label="Chatbot")
-            state = gr.State()
+            state = gr.State([])
             with gr.Row():
                 textbox = gr.Textbox(
                     container=False,
@@ -451,5 +499,7 @@ with gr.Blocks() as demo:
                     scale=10,
                 )
                 submit_button = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
+                clear_button = gr.Button("清除历史记录", variant="primary", scale=2, min_width=0)
             submit_button.click(retriever_papers, inputs=[textbox, state], outputs=[textbox, chatbot, state])
-demo.launch(server_name="0.0.0.0", server_port=8084)
+            clear_button.click(clear_base, inputs=[], outputs=[chatbot, state])
+demo.launch(server_name="0.0.0.0", server_port=8085)

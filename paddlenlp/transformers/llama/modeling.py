@@ -154,7 +154,12 @@ def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
     except:
         is_fleet_init = False
 
-    if is_fleet_init and tensor_parallel_degree > 1 and y.is_distributed:
+    if paddle.in_dynamic_mode():
+        y_is_distributed = y.is_distributed
+    else:
+        y_is_distributed = tensor_parallel_degree > 1
+
+    if is_fleet_init and tensor_parallel_degree > 1 and y_is_distributed:
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
         input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
         logits = paddle.matmul(input_parallel, y, transpose_y=False)
@@ -176,9 +181,9 @@ def scaled_dot_product_attention(
     value_states,
     attention_mask,
     output_attentions,
-    is_causal=True,
     alibi=None,
     sequence_parallel=False,
+    is_causal=True,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
@@ -202,7 +207,7 @@ def scaled_dot_product_attention(
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
             attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
-        return attn_output, attn_weights
+        return (attn_output, attn_weights) if output_attentions else attn_output
     else:
         query_states = paddle.transpose(query_states, [0, 2, 1, 3])
         # merge with the next tranpose
@@ -235,8 +240,11 @@ def scaled_dot_product_attention(
             )
 
         attn_weights = attn_weights + attention_mask
-        with paddle.amp.auto_cast(False):
+        if not paddle.in_dynamic_mode():
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+        else:
+            with paddle.amp.auto_cast(False):
+                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
@@ -244,7 +252,7 @@ def scaled_dot_product_attention(
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
             attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
-        return attn_output, attn_weights
+        return (attn_output, attn_weights) if output_attentions else attn_output
 
 
 def masked_fill(x, mask, value):
@@ -275,7 +283,9 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     batch_size, src_length = mask.shape[0], mask.shape[-1]
     tgt_length = tgt_length if tgt_length is not None else src_length
 
-    expanded_mask = mask[:, None, None, :].astype("bool").expand([batch_size, 1, tgt_length, src_length])
+    mask = mask[:, None, None, :].astype("bool")
+    mask.stop_gradient = True
+    expanded_mask = mask.expand([batch_size, 1, tgt_length, src_length])
 
     return expanded_mask
 
@@ -304,7 +314,11 @@ class LlamaRMSNorm(nn.Layer):
         if self.config.use_fused_rms_norm:
             return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
 
-        with paddle.amp.auto_cast(False):
+        if paddle.in_dynamic_mode():
+            with paddle.amp.auto_cast(False):
+                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
+                hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
+        else:
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
             hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
 
@@ -324,6 +338,133 @@ def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
 
     hidden_states = hidden_states.unsqueeze(-2).tile([1, 1, 1, n_rep, 1])
     return hidden_states.reshape([batch, slen, num_key_value_heads * n_rep, head_dim])
+
+
+class LlamaRotaryEmbedding(nn.Layer):
+    def __init__(self, dim, max_position_embeddings=2048, base=10000):
+        super().__init__()
+        self.dim = dim
+        self.max_position_embeddings = max_position_embeddings
+        self.base = base
+        self.dtype = paddle.get_default_dtype()
+        # [dim / 2]
+        self.inv_freq = 1.0 / (self.base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype="float32") / self.dim))
+        self._set_cos_sin_cache(seq_len=max_position_embeddings)
+
+    def _set_cos_sin_cache(self, seq_len):
+        self.max_seq_len_cached = seq_len
+        # [seq_len]
+        t = paddle.arange(seq_len, dtype="float32")
+        # [seq_len, dim/2]
+        freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
+        # Different from paper, but it uses a different permutation in order to obtain the same calculation
+        # [seq_len, dim]
+        emb = paddle.concat([freqs, freqs], axis=-1)
+        # [1, seqlen, 1, dim]
+        self.cos_cached = emb.cos()[None, :, None, :].cast(self.dtype)
+        self.sin_cached = emb.sin()[None, :, None, :].cast(self.dtype)
+
+    def forward(self, x, seq_len=None):
+        # x: [bs, num_attention_heads, seq_len, head_size]
+        if seq_len > self.max_seq_len_cached:
+            self._set_cos_sin_cache(seq_len)
+        return (
+            self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
+            self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
+        )
+
+
+class LlamaLinearScalingRotaryEmbedding(nn.Layer):
+    def __init__(self, dim, max_position_embeddings=2048, base=10000, scaling_factor=1.0):
+        self.scaling_factor = scaling_factor
+        super().__init__(dim, max_position_embeddings, base)
+
+    def _set_cos_sin_cache(self, seq_len):
+        self.max_seq_len_cached = seq_len
+        # [seq_len]
+        t = paddle.arange(seq_len, dtype="float32")
+        t = t / self.scaling_factor
+        # [seq_len, dim/2]
+        freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
+        # Different from paper, but it uses a different permutation in order to obtain the same calculation
+        # [seq_len, dim]
+        emb = paddle.concat([freqs, freqs], axis=-1)
+        # [1, seqlen, 1, dim]
+        self.cos_cached = emb.cos()[None, :, None, :].cast(self.dtype)
+        self.sin_cached = emb.sin()[None, :, None, :].cast(self.dtype)
+
+    def forward(self, x, seq_len=None):
+        # x: [bs, num_attention_heads, seq_len, head_size]
+        if seq_len > self.max_seq_len_cached:
+            self._set_cos_sin_cache(seq_len)
+        return (
+            self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
+            self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
+        )
+
+
+class LlamaNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
+    """LlamaRotaryEmbedding extended with NTK scaling. https://www.reddit.com/r/LocalLLaMA/comments/14lz7j5/ntkaware_scaled_rope_allows_llama_models_to_have/"""
+
+    def __init__(self, dim, max_position_embeddings=2048, base=10000, scaling_factor=1.0):
+        base = base * scaling_factor ** (dim / (dim - 2))
+        self.scaling_factor = scaling_factor
+        super().__init__(dim, max_position_embeddings, base)
+
+
+class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
+    """LlamaRotaryEmbedding extended with Dynamic NTK scaling. https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/"""
+
+    def __init__(self, dim, max_position_embeddings=2048, base=10000, scaling_factor=1.0):
+        self.scaling_factor = scaling_factor
+        super().__init__(dim, max_position_embeddings, base)
+
+    def _scale_cos_sin(self, seq_len):
+        # [seq_len]
+        t = paddle.arange(seq_len, dtype="float32")
+        # [seq_len, dim/2]
+        alpha = (self.scaling_factor * seq_len / self.max_position_embeddings) - (self.scaling_factor - 1)
+        base = self.base * alpha ** (self.dim / (self.dim - 2))
+        inv_freq = 1.0 / (base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype="float32") / self.dim))
+        freqs = paddle.einsum("i,j->ij", t, inv_freq)
+        # Different from paper, but it uses a different permutation in order to obtain the same calculation
+        # [seq_len, dim]
+        emb = paddle.concat([freqs, freqs], axis=-1)
+        # [1, seqlen, 1, dim]
+        scale_cos = emb.cos()[None, :, None, :].cast(self.dtype)
+        scale_sin = emb.sin()[None, :, None, :].cast(self.dtype)
+        return scale_cos, scale_sin
+
+    def forward(self, x, seq_len=None):
+        # x: [bs, num_attention_heads, seq_len, head_size]
+        if seq_len > self.max_position_embeddings:
+            scale_cos, scale_sin = self._scale_cos_sin(seq_len=seq_len)
+            return (
+                scale_cos[:, :, :seq_len, ...].cast(x.dtype),
+                scale_sin[:, :, :seq_len, ...].cast(x.dtype),
+            )
+        else:
+            return (
+                self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
+                self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
+            )
+
+
+def rotate_half(x):
+    """Rotates half the hidden dims of the input."""
+    x1 = x[..., : x.shape[-1] // 2]
+    x2 = x[..., x.shape[-1] // 2 :]
+    return paddle.concat([-x2, x1], axis=-1)  # shape is the same as x
+
+
+def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
+    cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
+    sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
+    cos = cos[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
+    sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
+    q_embed = (q * cos) + (rotate_half(q) * sin)
+    k_embed = (k * cos) + (rotate_half(k) * sin)
+    return q_embed, k_embed
 
 
 class LlamaMLP(nn.Layer):
@@ -390,7 +531,7 @@ class LlamaMLP(nn.Layer):
 class LlamaAttention(nn.Layer):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    def __init__(self, config: LlamaConfig):
+    def __init__(self, config: LlamaConfig, layerwise_recompute: bool = False):
         super().__init__()
 
         self.config = config
@@ -413,6 +554,11 @@ class LlamaAttention(nn.Layer):
             )
 
         self.kv_indices = None
+        # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
+        # Enable_recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
+        self.layerwise_recompute = layerwise_recompute
+        self.recompute_granularity = config.recompute_granularity
         if config.tensor_parallel_degree > 1:
             assert (
                 self.num_heads % config.tensor_parallel_degree == 0
@@ -526,9 +672,36 @@ class LlamaAttention(nn.Layer):
             )
 
         if config.rope and self.rope_fusion_level != "full":
-            self.rotary_emb = RotaryEmbedding(self.head_dim, max_position_embeddings=self.max_position_embeddings)
+            self._init_rope()
 
         self.config = config
+
+    def _init_rope(self):
+        if self.config.rope_scaling_type is None:
+            self.rotary_emb = LlamaRotaryEmbedding(
+                self.head_dim,
+                max_position_embeddings=self.max_position_embeddings,
+            )
+        elif self.config.rope_scaling_type == "linear":
+            self.rotary_emb = LlamaLinearScalingRotaryEmbedding(
+                self.head_dim,
+                max_position_embeddings=self.max_position_embeddings,
+                scaling_factor=self.config.rope_scaling_factor,
+            )
+        elif self.config.rope_scaling_type == "ntk":
+            self.rotary_emb = LlamaNTKScalingRotaryEmbedding(
+                self.head_dim,
+                max_position_embeddings=self.max_position_embeddings,
+                scaling_factor=self.config.rope_scaling_factor,
+            )
+        elif self.config.rope_scaling_type == "dynamic_ntk":
+            self.rotary_emb = LlamaDynamicNTKScalingRotaryEmbedding(
+                self.head_dim,
+                max_position_embeddings=self.max_position_embeddings,
+                scaling_factor=self.config.rope_scaling_factor,
+            )
+        else:
+            raise ValueError(f"Unknown RoPE scaling type {self.config.rope_scaling_type}")
 
     def forward(
         self,
@@ -603,16 +776,39 @@ class LlamaAttention(nn.Layer):
         key_states = repeat_kv(key_states, self.num_key_value_groups)
         value_states = repeat_kv(value_states, self.num_key_value_groups)
 
-        attn_output, attn_weights = scaled_dot_product_attention(
-            config=self.config,
-            query_states=query_states,
-            key_states=key_states,
-            value_states=value_states,
-            attention_mask=attention_mask,
-            output_attentions=output_attentions,
-            alibi=alibi,
-            sequence_parallel=self.sequence_parallel,
-        )
+        has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
+        if (
+            self.enable_recompute
+            and self.layerwise_recompute
+            and has_gradient
+            and self.recompute_granularity == "core_attn"
+        ):
+            outputs = recompute(
+                scaled_dot_product_attention,
+                query_states,
+                self.config,
+                key_states,
+                value_states,
+                attention_mask,
+                output_attentions,
+                alibi,
+                self.sequence_parallel,
+            )
+        else:
+            outputs = scaled_dot_product_attention(
+                query_states,
+                self.config,
+                key_states,
+                value_states,
+                attention_mask,
+                output_attentions,
+                alibi,
+                self.sequence_parallel,
+            )
+        if output_attentions:
+            attn_output, attn_weights = outputs
+        else:
+            attn_output = outputs
 
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
@@ -621,18 +817,27 @@ class LlamaAttention(nn.Layer):
         if not output_attentions:
             attn_weights = None
 
-        return attn_output, attn_weights, past_key_value
+        outputs = dict()
+        outputs["attn_output"] = attn_output
+        outputs["attn_weights"] = attn_weights
+        outputs["past_key_value"] = past_key_value
+        return outputs
 
 
 class LlamaDecoderLayer(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config, layerwise_recompute: bool = False):
         super().__init__()
         self.hidden_size = config.hidden_size
-        self.self_attn = LlamaAttention(config)
+        self.self_attn = LlamaAttention(config, layerwise_recompute)
         self.mlp = LlamaMLP(config)
         self.input_layernorm = LlamaRMSNorm(config)
         self.post_attention_layernorm = LlamaRMSNorm(config)
         self.sequence_parallel = config.sequence_parallel
+        # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
+        # Enable_recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
+        self.layerwise_recompute = layerwise_recompute
+        self.recompute_granularity = config.recompute_granularity
 
     def forward(
         self,
@@ -663,15 +868,38 @@ class LlamaDecoderLayer(nn.Layer):
         hidden_states = self.input_layernorm(hidden_states)
 
         # Self Attention
-        hidden_states, self_attn_weights, present_key_value = self.self_attn(
-            hidden_states=hidden_states,
-            position_ids=position_ids,
-            past_key_value=past_key_value,
-            attention_mask=attention_mask,
-            output_attentions=output_attentions,
-            use_cache=use_cache,
-            alibi=alibi,
-        )
+        has_gradient = not hidden_states.stop_gradient
+        if (
+            self.enable_recompute
+            and self.layerwise_recompute
+            and has_gradient
+            and self.recompute_granularity == "full_attn"
+        ):
+            outputs = recompute(
+                self.self_attn,
+                hidden_states,
+                position_ids,
+                past_key_value,
+                attention_mask,
+                output_attentions,
+                use_cache,
+                alibi,
+            )
+        else:
+            outputs = self.self_attn(
+                hidden_states,
+                position_ids,
+                past_key_value,
+                attention_mask,
+                output_attentions,
+                use_cache,
+                alibi,
+            )
+
+        hidden_states = outputs.get("attn_output")
+        self_attn_weights = outputs.get("attn_weights", None)
+        present_key_value = outputs.get("past_key_value", None)
+
         hidden_states = residual + hidden_states
 
         # Fully Connected
@@ -839,6 +1067,9 @@ class LlamaModel(LlamaPretrainedModel):
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
         self.sequence_parallel = config.sequence_parallel
+        self.recompute_granularity = config.recompute_granularity
+        self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
+
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
         if config.tensor_parallel_degree > 1:
@@ -853,7 +1084,9 @@ class LlamaModel(LlamaPretrainedModel):
                 self.hidden_size,
             )
 
-        self.layers = nn.LayerList([LlamaDecoderLayer(config) for _ in range(config.num_hidden_layers)])
+        self.layers = nn.LayerList(
+            [LlamaDecoderLayer(config, i not in self.no_recompute_layers) for i in range(config.num_hidden_layers)]
+        )
         self.norm = LlamaRMSNorm(config)
 
         self.gradient_checkpointing = False
@@ -889,13 +1122,13 @@ class LlamaModel(LlamaPretrainedModel):
         return expanded_attn_mask
 
     @paddle.jit.not_to_static
-    def recompute_training(
+    def recompute_training_full(
         self,
         layer_module: nn.Layer,
         hidden_states: Tensor,
         position_ids: Optional[Tensor],
         attention_mask: Tensor,
-        output_attentions: Tensor,
+        output_attentions: bool,
         past_key_value: Tensor,
         use_cache: bool,
         alibi=None,
@@ -915,8 +1148,8 @@ class LlamaModel(LlamaPretrainedModel):
             past_key_value,
             use_cache,
             alibi,
-            use_reentrant=False,
         )
+
         return hidden_states
 
     def forward(
@@ -1011,8 +1244,13 @@ class LlamaModel(LlamaPretrainedModel):
             past_key_value = past_key_values[idx] if past_key_values is not None else None
 
             has_gradient = not hidden_states.stop_gradient
-            if self.enable_recompute and has_gradient:
-                layer_outputs = self.recompute_training(
+            if (
+                self.enable_recompute
+                and idx not in self.no_recompute_layers
+                and has_gradient
+                and self.recompute_granularity == "full"
+            ):
+                layer_outputs = self.recompute_training_full(
                     decoder_layer,
                     hidden_states,
                     position_ids,

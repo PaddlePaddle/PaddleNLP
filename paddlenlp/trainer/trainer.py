@@ -446,16 +446,24 @@ class Trainer:
             )
         else:
             if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
-                file_path = os.path.join(
-                    resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
-                )
-                if not os.path.isfile(file_path):
-                    raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}, no {file_path}")
+                if (isinstance(self.model, LoRAModel) and self.model.lora_config.tensor_parallel_degree > 1) or (
+                    isinstance(self.model, PrefixModelForCausalLM)
+                    and self.model.prefix_config.tensor_parallel_degree > 1
+                ):
+                    file_path = os.path.join(resume_from_checkpoint, weight_name)
+                    state_dict = paddle.load(file_path, return_numpy=True)
+                    state_dict = self.model._convert_tensor_parallel(state_dict)
+                else:
+                    file_path = os.path.join(
+                        resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
+                    )
+                    if not os.path.isfile(file_path):
+                        raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}, no {file_path}")
 
-                logger.info(f"Loading model from {resume_from_checkpoint} .")
+                    logger.info(f"Loading model from {resume_from_checkpoint} .")
 
-                # We load the model state dict on the CPU to avoid an OOM error.
-                state_dict = paddle.load(file_path, return_numpy=True)
+                    # We load the model state dict on the CPU to avoid an OOM error.
+                    state_dict = paddle.load(file_path, return_numpy=True)
 
                 # If the model is on the GPU, it still works!
                 self._set_state_dict_in_model(state_dict)
@@ -898,13 +906,11 @@ class Trainer:
             if os.path.exists(best_model_path):
                 # We load the model state dict on the CPU to avoid an OOM error.
                 state_dict = paddle.load(best_model_path, return_numpy=True)
-                if isinstance(self.model, LoRAModel) and self.model.lora_config.tensor_parallel_degree > 1:
-                    state_dict = self.model._convert_tensor_parallel(lora_state_dict=state_dict)
-                elif (
+                if (isinstance(self.model, LoRAModel) and self.model.lora_config.tensor_parallel_degree > 1) or (
                     isinstance(self.model, PrefixModelForCausalLM)
                     and self.model.prefix_config.tensor_parallel_degree > 1
                 ):
-                    state_dict = self.model._convert_tensor_parallel(prefix_state_dict=state_dict)
+                    state_dict = self.model._convert_tensor_parallel(state_dict)
                 # If the model is on the GPU, it still works!
                 self._set_state_dict_in_model(state_dict)
             else:
