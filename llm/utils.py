@@ -403,12 +403,12 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int):
         .reshape(-1, 1)
         .astype("float32")
     )
-    inputs["seq_len_encoder"] = np.array(seq_len).astype("int32").reshape(-1, 1)
-    inputs["seq_len_decoder"] = np.array(seq_len).astype("int32").reshape(-1, 1)
+    inputs["seq_len_encoder"] = seq_len.astype("int32").reshape(-1, 1)
+    inputs["seq_len_decoder"] = seq_len.astype("int32").reshape(-1, 1)
     inputs["step_idx"] = np.array(step_idx).astype("int64").reshape(-1, 1)
     inputs["tgt_ids"] = np.array(tgt_ids).astype("int64").reshape(-1, 1)
     inputs["tgt_pos"] = tgt_pos.reshape(-1, 1)
-    inputs["max_length"] = np.array([max_length - seq_len] * bs).astype("int64").reshape((-1, 1))
+    inputs["max_length"] = np.array(max_length - seq_len).astype("int64").reshape((-1, 1))
     inputs["min_length"] = (
         np.array(
             [
