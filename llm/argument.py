@@ -31,6 +31,12 @@ class DataArgument:
         default=False,
         metadata={"help": "Whether to save generated text to file when eval_with_do_generation set to True."},
     )
+    lazy: bool = field(
+        default=False,
+        metadata={
+            "help": "Weather to return `MapDataset` or an `IterDataset`.True for `IterDataset`. False for `MapDataset`."
+        },
+    )
 
 
 @dataclass
