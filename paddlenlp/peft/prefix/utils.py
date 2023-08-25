@@ -36,3 +36,10 @@ def llama_postprocess_past_key_value(past_key_values):
     keys, values = paddle.transpose(past_key_values, perm=[2, 0, 1, 3, 4]).split(2)
 
     return tuple(zip(keys, values))
+
+
+def qwen_postprocess_past_key_value(past_key_values):
+    # (layer_num, bs, prefixlen, head_num/tensor_parallel_degree, head_dim)*2
+    keys, values = paddle.transpose(past_key_values, perm=[2, 0, 1, 3, 4]).split(2)
+
+    return tuple(zip(keys, values))
