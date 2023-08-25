@@ -19,6 +19,10 @@ export cudaid1=$2
 export cudaid2=$3
 export C_COMPILER_PATH=/usr/local/gcc-12.2/bin/gcc
 export CXX_COMPILER_PATH=/usr/local/gcc-12.2/bin/g++
+
+export PYTHON_LIBRARIES=/opt/_internal/cpython-3.8.0/lib:$PYTHON_LIBRARIES
+export PYTHON_INCLUDE_DIRS=/opt/_internal/cpython-3.8.0/include/python3.8:$PYTHON_INCLUDE_DIRS
+
 if [ ! -d "model_logs" ];then
     mkdir model_logs
 fi
@@ -243,7 +247,7 @@ cd build_gpt_so/
 cmake ..  -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=${C_COMPILER_PATH} -DCMAKE_CXX_COMPILER=${CXX_COMPILER_PATH} \
 -DPADDLE_LIB=${nlp_dir}/paddle_inference/ -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/gpt.cc \
 -DPY_CMD=python -DWITH_GPT=ON -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON \
--DPYTHON_EXECUTABLE=/opt/_internal/cpython-3.8.0/bin/python -DPYTHON_INCLUDE_DIR=/opt/_internal/cpython-3.8.0/include/python3.8 -DPYTHON_LIBRARY=/opt/_internal/cpython-3.8.0/lib
+-DPYTHON_EXECUTABLE=/opt/_internal/cpython-3.8.0/bin/python -DPYTHON_INCLUDE_DIRS=/opt/_internal/cpython-3.8.0/include/python3.8 -DPYTHON_LIBRARIES=/opt/_internal/cpython-3.8.0/lib
 make -j >${log_path}/GPT_python_FT >>${log_path}/gpt_python_FT 2>&1
 print_info $? gpt_python_FT
 cd ../
@@ -253,7 +257,7 @@ cd build_gpt_cc/
 cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=${C_COMPILER_PATH} -DCMAKE_CXX_COMPILER=${CXX_COMPILER_PATH} \
 -DPADDLE_LIB=${nlp_dir}/paddle_inference/ -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/gpt.cc \
 -DWITH_GPT=ON -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON \
--DPYTHON_EXECUTABLE=/opt/_internal/cpython-3.8.0/bin/python -DPYTHON_INCLUDE_DIR=/opt/_internal/cpython-3.8.0/include/python3.8 -DPYTHON_LIBRARY=/opt/_internal/cpython-3.8.0/lib
+-DPYTHON_EXECUTABLE=/opt/_internal/cpython-3.8.0/bin/python -DPYTHON_INCLUDE_DIRS=/opt/_internal/cpython-3.8.0/include/python3.8 -DPYTHON_LIBRARIES=/opt/_internal/cpython-3.8.0/lib
 make -j >${log_path}/GPT_C_FT >>${log_path}/gpt_C_FT 2>&1
 print_info $? gpt_C_FT
 #depoly python
@@ -713,8 +717,8 @@ cmake ..  -DCMAKE_BUILD_TYPE=Release \
 -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/transformer_e2e.cc \
 -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON \
 -DPYTHON_EXECUTABLE=/opt/_internal/cpython-3.8.0/bin/python \
--DPYTHON_INCLUDE_DIR=/opt/_internal/cpython-3.8.0/include/python3.8 \
--DPYTHON_LIBRARY=/opt/_internal/cpython-3.8.0/lib
+-DPYTHON_INCLUDE_DIRS=/opt/_internal/cpython-3.8.0/include/python3.8 \
+-DPYTHON_LIBRARIES=/opt/_internal/cpython-3.8.0/lib
 make -j >${log_path}/transformer_python_FT >>${log_path}/transformer_python_FT 2>&1
 print_info $? transformer_python_FT
 cd ../
@@ -1097,8 +1101,8 @@ done
 }
 fast_generation(){
 
-export CC=/usr/local/gcc-8.2/bin/gcc
-export CXX=/usr/local/gcc-8.2/bin/g++
+export CC=/usr/local/gcc-12.2/bin/gcc
+export CXX=/usr/local/gcc-12.2/bin/g++
 
 cd ${nlp_dir}/fast_generation/samples
 python codegen_sample.py >${log_path}/fast_generation_codegen >>${log_path}/fast_generation_codegen 2>&1
