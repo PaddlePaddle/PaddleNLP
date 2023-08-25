@@ -37,7 +37,7 @@ if __name__ == "__main__":
     if dist.get_world_size() > 1:
         auto_env.init_dist_env(cfg)
 
-    # TODO: set seed for auto_parallel
+    auto_env.set_seed(cfg.Global.seed)
 
     module = build_module(cfg)
     auto_config.print_config(cfg)
