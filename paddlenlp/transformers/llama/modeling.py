@@ -790,6 +790,7 @@ class LlamaAttention(nn.Layer):
                 output_attentions,
                 alibi,
                 self.sequence_parallel,
+                use_reentrant=False,
             )
         else:
             outputs = scaled_dot_product_attention(
@@ -814,10 +815,17 @@ class LlamaAttention(nn.Layer):
         if not output_attentions:
             attn_weights = None
 
-        outputs = dict()
-        outputs["attn_output"] = attn_output
-        outputs["attn_weights"] = attn_weights
-        outputs["past_key_value"] = past_key_value
+        outputs = (attn_output,)
+
+        if output_attentions:
+            outputs += (attn_weights,)
+
+        if use_cache:
+            outputs += (past_key_value,)
+
+        if type(outputs) is tuple and len(outputs) == 1:
+            outputs = outputs[0]
+
         return outputs
 
 
@@ -881,6 +889,7 @@ class LlamaDecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
+                use_reentrant=False,
             )
         else:
             outputs = self.self_attn(
@@ -893,9 +902,16 @@ class LlamaDecoderLayer(nn.Layer):
                 alibi,
             )
 
-        hidden_states = outputs.get("attn_output")
-        self_attn_weights = outputs.get("attn_weights", None)
-        present_key_value = outputs.get("past_key_value", None)
+        if type(outputs) is tuple:
+            hidden_states = outputs[0]
+        else:
+            hidden_states = outputs
+
+        if output_attentions:
+            self_attn_weights = outputs[1]
+
+        if use_cache:
+            present_key_value = outputs[2 if output_attentions else 1]
 
         hidden_states = residual + hidden_states
 
@@ -1146,6 +1162,7 @@ class LlamaModel(LlamaPretrainedModel):
             past_key_value,
             use_cache,
             alibi,
+            use_reentrant=False,
         )
 
         return hidden_states
@@ -1268,16 +1285,17 @@ class LlamaModel(LlamaPretrainedModel):
                     use_cache,
                     alibi=alibi,
                 )
+
             if type(layer_outputs) is tuple:
                 hidden_states = layer_outputs[0]
             else:
                 hidden_states = layer_outputs
 
-            if use_cache:
-                next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
-
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
+
+            if use_cache:
+                next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
 
         hidden_states = self.norm(hidden_states)
 

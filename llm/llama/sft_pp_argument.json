@@ -13,7 +13,7 @@
     "evaluation_strategy": "epoch",
     "save_strategy": "epoch",
     "src_length": 256,
-    "tgt_length": 256,
+    "max_length": 512,
     "fp16": true,
     "fp16_opt_level": "O2",
     "do_train": true,

@@ -50,6 +50,7 @@ from pipelines.nodes.retriever import (
     BaseRetriever,
     BM25Retriever,
     DensePassageRetriever,
+    EmbeddingRetriever,
     MultiModalRetriever,
     WebRetriever,
 )
