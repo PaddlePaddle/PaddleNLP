@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import collections
+import contextlib
 import math
 from functools import partial
 
@@ -81,6 +82,13 @@ def parallel_matmul(x, y, tensor_parallel_output=True):
     else:
         logits = paddle.matmul(x, y, transpose_y=True)
         return logits
+
+
+def seed_guard_context(name=None):
+    if name in get_rng_state_tracker().states_:
+        return get_rng_state_tracker().rng_state(name)
+    else:
+        return contextlib.nullcontext()
 
 
 class MultiHeadAttention(nn.Layer):
@@ -285,12 +293,8 @@ class MultiHeadAttention(nn.Layer):
             weights = incubate.softmax_mask_fuse_upper_triangle(product)
 
         if self.config.hidden_dropout_prob:
-            if self.training:
-                with get_rng_state_tracker().rng_state("local_seed"):
-                    weights = F.dropout(
-                        weights, self.config.hidden_dropout_prob, training=self.training, mode="upscale_in_train"
-                    )
-            else:
+
+            with seed_guard_context("lcoal_seed"):
                 weights = F.dropout(
                     weights, self.config.hidden_dropout_prob, training=self.training, mode="upscale_in_train"
                 )
@@ -503,14 +507,7 @@ class TransformerDecoderLayer(nn.Layer):
         if output_attentions:
             tgt, weights = tgt
 
-        current_seed = "global_seed"
-        if self.training:
-            with get_rng_state_tracker().rng_state(current_seed):
-                if not self.config.use_fused_dropout_add:
-                    tgt = residual + self.dropout1(tgt)
-                else:
-                    tgt = self.fused_dropout_add1(tgt, residual)
-        else:
+        with seed_guard_context("global_seed"):
             if not self.config.use_fused_dropout_add:
                 tgt = residual + self.dropout1(tgt)
             else:
@@ -523,13 +520,7 @@ class TransformerDecoderLayer(nn.Layer):
         if self.config.normalize_before:
             tgt = self.norm2(tgt)
 
-        if self.training:
-            with get_rng_state_tracker().rng_state(current_seed):
-                if not self.config.use_fused_dropout_add:
-                    tgt = residual + self.linear2(F.gelu(self.linear1(tgt), approximate=True))
-                else:
-                    tgt = self.fused_dropout_add2(self.linear2(F.gelu(self.linear1(tgt), approximate=True)), residual)
-        else:
+        with seed_guard_context("global_seed"):
             if not self.config.use_fused_dropout_add:
                 tgt = residual + self.linear2(F.gelu(self.linear1(tgt), approximate=True))
             else:
@@ -897,9 +888,7 @@ class GPTForCausalLM(GPTPretrainedModel):
 
     @staticmethod
     def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
-        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
-            input_ids == pad_token_id
-        ).numpy().item()
+        is_pad_token_in_inputs_ids = (pad_token_id is not None) and float(paddle.any(input_ids == pad_token_id))
         is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
             (eos_token_id is not None) and (pad_token_id != eos_token_id)
         )

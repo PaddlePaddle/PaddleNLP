@@ -148,7 +148,7 @@ def process_strategy(config):
     """
     strategy = auto.Strategy()
     strategy.auto_mode = "semi"
-    strategy.seed = config["Global"]["seed"]
+    # strategy.seed = config["Global"]["seed"]
 
     # amp config
     amp_cfg = config.Engine.get("mix_precision", {})
