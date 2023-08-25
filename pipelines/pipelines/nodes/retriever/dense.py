@@ -147,7 +147,7 @@ class DensePassageRetriever(BaseRetriever):
             pretrained_model = AutoModel.from_pretrained(query_embedding_model)
             self.ernie_dual_encoder = SemanticIndexBatchNeg(pretrained_model, output_emb_size=output_emb_size)
             # Load Custom models
-            print("Loading Parameters from:{}".format(params_path))
+            logger.info("Loading Parameters from:{}".format(params_path))
             state_dict = paddle.load(params_path)
             self.ernie_dual_encoder.set_dict(state_dict)
             self.query_tokenizer = AutoTokenizer.from_pretrained(query_embedding_model)

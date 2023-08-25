@@ -1,4 +1,4 @@
-#   Copyright (c) 2018 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,15 +11,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import json
 import re
 import time
+from dataclasses import dataclass, field
 from multiprocessing.shared_memory import SharedMemory
 
-from predict_generation import Predictor, get_parser
+from predictor import BasePredictor, ModelArgument, PredictorArgument, create_predictor
 
+from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.utils.log import logger
+
+
+@dataclass
+class ServerArgument:
+    port: int = field(default=8011, metadata={"help": "the port of ui service"})
+    flask_port: int = field(default=8010, metadata={"help": "the port of flask service"})
 
 
 def read_shared_memory(memory: SharedMemory):
@@ -87,16 +96,21 @@ def enforce_stop_tokens(text, stop) -> str:
     return re.split(re.escape(stop), text)[0]
 
 
-class PredictorServer(Predictor):
-    def __init__(self, args):
-        super().__init__(args)
+class PredictorServer:
+    def __init__(self, args: ServerArgument, predictor: BasePredictor):
 
-        self.input_shared_memory = create_shared_memory("input", self.tensor_parallel_rank)
-        self.output_shared_memory = create_shared_memory("output", self.tensor_parallel_rank)
+        self.predictor = predictor
+        self.args = args
 
-        if self.tensor_parallel_rank == 0:
+        self.input_shared_memory = create_shared_memory("input", self.predictor.tensor_parallel_rank)
+        self.output_shared_memory = create_shared_memory("output", self.predictor.tensor_parallel_rank)
+
+        if self.predictor.tensor_parallel_rank == 0:
             write_shared_memory(self.input_shared_memory, "")
             write_shared_memory(self.output_shared_memory, "")
+
+    def predict(self, input_texts: str | list[str]):
+        return self.predictor.predict(input_texts)
 
     def start_predict(self, data):
         print("start to predict under data", data)
@@ -151,12 +165,12 @@ class PredictorServer(Predictor):
         p.start()
 
 
-def main(args, predictor: Predictor):
+def main(args, server: PredictorServer):
     from time import sleep
 
     while True:
         sleep(0.5)
-        content = read_shared_memory(predictor.input_shared_memory)
+        content = read_shared_memory(server.input_shared_memory)
 
         if content:
             content = json.loads(content)
@@ -165,42 +179,38 @@ def main(args, predictor: Predictor):
             content.pop("extra_info", None)
 
             generation_args = content
-            predictor.args.tgt_length = generation_args["max_length"]
-            predictor.args.top_p = generation_args["top_p"]
-            predictor.args.temperature = generation_args["temperature"]
+            server.predictor.config.max_length = generation_args["max_length"]
+            server.predictor.config.top_p = generation_args["top_p"]
+            server.predictor.config.temperature = generation_args["temperature"]
 
             for key, value in generation_args.items():
-                setattr(predictor.args, key, value)
+                setattr(server.args, key, value)
 
-            result = predictor.predict(context)
+            result = server.predict(context)
             result = result[0]
             if not result:
                 result = "invalid response"
-            write_shared_memory(predictor.output_shared_memory, result)
-            write_shared_memory(predictor.input_shared_memory, "")
-
-
-def parse_arguments():
-    parser = get_parser()
-    parser.add_argument("--port", default=8011, type=int, help="the port of ui service")
-    parser.add_argument("--flask_port", default=8010, type=int, help="the port of flask service")
-    return parser.parse_args()
+            write_shared_memory(server.output_shared_memory, result)
+            write_shared_memory(server.input_shared_memory, "")
 
 
 if __name__ == "__main__":
-    args = parse_arguments()
 
-    predictor = PredictorServer(args)
+    parser = PdArgumentParser((PredictorArgument, ModelArgument, ServerArgument))
+    predictor_args, model_args, server_args = parser.parse_args_into_dataclasses()
+    predictor = create_predictor(predictor_args, model_args)
 
-    if predictor.tensor_parallel_rank == 0:
-        predictor.start_ui_service(args)
+    server = PredictorServer(server_args, predictor)
+
+    if server.predictor.tensor_parallel_rank == 0:
+        server.start_ui_service(server_args)
 
         from multiprocessing import Process
 
         p = Process(
-            target=predictor.start_flask_server,
+            target=server.start_flask_server,
         )
         p.daemon = True
         p.start()
 
-    main(args, predictor)
+    main(server_args, server)
