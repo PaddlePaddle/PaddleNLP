@@ -121,10 +121,10 @@ def main():
         os.path.join(data_args.dataset_name_or_path, "dev.json")
     ):
         train_ds = load_dataset(
-            read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "train.json"), lazy=False
+            read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "train.json"), lazy=data_args.lazy
         )
         dev_ds = load_dataset(
-            read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "dev.json"), lazy=False
+            read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "dev.json"), lazy=data_args.lazy
         )
     else:
         if data_args.task_name is not None:
@@ -151,16 +151,24 @@ def main():
         eval_intokens = False
     dev_ds = dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, intokens=eval_intokens))
     if data_args.intokens:
+        if data_args.lazy:
+            from paddlenlp.datasets import InTokensIterableDataset
+
+            intoken_dataset = InTokensIterableDataset
+        else:
+            from paddlenlp.datasets import InTokensMapDataset
+
+            intoken_dataset = InTokensMapDataset
         from paddlenlp.datasets import InTokensMapDataset
 
         logger.info("Creating InTokens Data Stream. This may take a few minutes.")
-        train_ds = InTokensMapDataset(
+        train_ds = intoken_dataset(
             train_ds,
             tokenizer=tokenizer,
             max_length=data_args.max_length,
         )
         if eval_intokens:
-            dev_ds = InTokensMapDataset(
+            dev_ds = intoken_dataset(
                 dev_ds,
                 tokenizer=tokenizer,
                 max_length=data_args.max_length,
