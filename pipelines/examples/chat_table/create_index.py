@@ -187,8 +187,6 @@ def chat_table(query, api_key=None, secret_key=None, key="", maxlen=11200):
             if key in prediction["documents"][i].content:
                 documents = prediction["documents"][i].meta["info"]
                 break
-            else:
-                continue
             i += 1
     else:
         documents = prediction["documents"][0].meta["info"]
