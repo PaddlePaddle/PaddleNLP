@@ -240,8 +240,7 @@ python predictor.py \
 python export_model.py \
     --model_name_or_path meta-llama/Llama-2-7b-chat \
     --output_path ./inference \
-    --dtype float16 \
-    --model_type "llama"
+    --dtype float16
 
 
 # 静态图模型推理
@@ -264,8 +263,7 @@ python predictor.py \
     --dtype float16 \
     --max_length 1024 \
     --mode "dynamic" \
-    --inference_model \
-    --model_type "llama"
+    --inference_model
 ```
 
 ### 4.4 InferenceModel 静态图推理
@@ -278,8 +276,7 @@ python export_model.py \
     --model_name_or_path meta-llama/Llama-2-7b-chat \
     --output_path ./inference \
     --dtype float16 \
-    --inference_model \
-    --model_type "llama"
+    --inference_model
 
 # InferenceModel 静态图推理
 python predictor.py \
@@ -288,8 +285,7 @@ python predictor.py \
     --max_length 1024 \
     --output_file "infer.json" \
     --mode "static" \
-    --inference_model \
-    --model_type "llama"
+    --inference_model
 ```
 
 

@@ -346,9 +346,9 @@ def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
         return inst_data.astype("int64").reshape([-1, max_len])
 
 
-def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, model_type: str):
+def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectures: str):
     """Pre-process generation inputs."""
-    if "chatglm" in model_type:
+    if "chatglm" in architectures:
         input_ids = []
         position_ids = []
 

@@ -32,7 +32,7 @@ from paddlenlp.transformers.model_outputs import (
 )
 from paddlenlp.transformers.model_utils import register_base_model
 
-__all__ = ["ChatGLMForCausalLMDyBatch"]
+__all__ = ["ChatGLMForCausalLMInferenceModel"]
 
 
 def parallel_matmul(lm_output, logit_weights, parallel_output):
@@ -459,9 +459,9 @@ class ChatGLMModelDyBatch(ChatGLMPretrainedModel):
         return BaseModelOutputWithPastAndCrossAttentions(last_hidden_state=logits, past_key_values=new_caches)
 
 
-class ChatGLMForCausalLMDyBatch(GenerationInferenceModel, ChatGLMPretrainedModel):
+class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrainedModel):
     def __init__(self, config: ChatGLMConfig):
-        super(ChatGLMForCausalLMDyBatch, self).__init__(config)
+        super(ChatGLMForCausalLMInferenceModel, self).__init__(config)
 
         self.config = config
         self.max_sequence_length = config.max_sequence_length
