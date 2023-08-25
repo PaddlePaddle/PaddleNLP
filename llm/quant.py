@@ -167,7 +167,7 @@ def apply_gptq(quant_args, trainer, ptq_dataloader):
     for cur_name, cur_layer in model.named_sublayers():
         if type(cur_layer) in [paddle.nn.Linear, ColumnParallelLinear, RowParallelLinear]:
             num_layer += 1
-            logger.info("GPTQ layer", num_layer, cur_name)
+            logger.info(f"GPTQ layer: {num_layer}, {cur_name}")
             parent_layer, sub_name = find_parent_layer_and_sub_name(model, cur_name)
             cur_quant_layer = GPTQ(cur_layer)
             setattr(parent_layer, sub_name, cur_quant_layer)

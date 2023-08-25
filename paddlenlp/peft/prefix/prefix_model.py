@@ -121,15 +121,30 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
     def _prepare_inputs_for_generation(self, *args, **kwargs):
         model_kwargs = self.model_prepare_inputs_for_generation(*args, **kwargs)
         attention_mask = model_kwargs["attention_mask"]
+        batch_size = model_kwargs["input_ids"].shape[0]
         if self.pad_attention_mask is not None:
             attention_mask = self.pad_attention_mask(
                 model_kwargs["input_ids"].shape, self.prefix_config.num_prefix_tokens, attention_mask
             )
         else:
-            prefix_attention_mask = paddle.ones(
-                [model_kwargs["input_ids"].shape[0], self.prefix_config.num_prefix_tokens], dtype=attention_mask.dtype
-            )
-            attention_mask = paddle.concat((prefix_attention_mask, attention_mask), axis=1)
+            if len(attention_mask.shape) == 2:
+                prefix_attention_mask = paddle.ones(
+                    [batch_size, self.prefix_config.num_prefix_tokens], dtype=attention_mask.dtype
+                )
+            elif len(attention_mask.shape) == 3:
+                batch_size, src_seq_len, tgt_seq_len = attention_mask.shape
+                prefix_attention_mask = paddle.ones(
+                    [batch_size, src_seq_len, self.prefix_config.num_prefix_tokens], dtype=attention_mask.dtype
+                )
+            elif len(attention_mask.shape) == 4:
+                batch_size, num_heads, src_seq_len, tgt_seq_len = attention_mask.shape
+                prefix_attention_mask = paddle.ones(
+                    [batch_size, num_heads, src_seq_len, self.prefix_config.num_prefix_tokens],
+                    dtype=attention_mask.dtype,
+                )
+            else:
+                raise ValueError(f"Unexpected attention_mask shape: {attention_mask.shape}")
+            attention_mask = paddle.concat((prefix_attention_mask, attention_mask), axis=-1)
         model_kwargs["attention_mask"] = attention_mask
 
         if "past_key_values" in self.forward_keys:
@@ -139,7 +154,6 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         else:
             raise NotImplementedError("Model does not support past_key_values either cache")
         if model_kwargs[key] is None:
-            batch_size = model_kwargs["input_ids"].shape[0]
             past_key_values = self._get_past_key_values(batch_size)
             model_kwargs[key] = past_key_values
         return model_kwargs

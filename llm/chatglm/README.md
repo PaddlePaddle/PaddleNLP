@@ -1,4 +1,4 @@
-# ChatGLM
+# ChatGLM-6B
 
 ## 1. 模型介绍
 
