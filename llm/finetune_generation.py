@@ -106,11 +106,6 @@ def main():
         )
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
-        if hasattr(model_config, "max_position_embeddings"):
-            if model_config.max_position_embeddings < data_args.max_length:
-                raise ValueError(
-                    f"The max_length ({data_args.max_length}) must be smaller than max_position_embeddings({model_config.max_position_embeddings})."
-                )
         model = AutoModelForCausalLM.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
