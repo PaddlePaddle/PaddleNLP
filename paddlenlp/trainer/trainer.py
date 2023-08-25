@@ -1078,18 +1078,10 @@ class Trainer:
 
         Subclass and override this method if you want to inject some custom behavior.
         """
-        if self.args.distributed_dataloader:
-            if self.args.should_load_dataset and self.train_dataset is None:
-                raise ValueError(
-                    "When using distributed dataloader, training requires a train_dataset when should_load_dataset is True."
-                )
-            if not self.args.should_load_dataset and self.train_dataset is not None:
-                raise ValueError(
-                    "When using distributed dataloader, we don't need train_dataset when should_load_dataset is False."
-                )
-        else:
-            if self.train_dataset is None:
-                raise ValueError("Trainer: training requires a train_dataset.")
+        if self.args.should_load_dataset and self.train_dataset is None:
+            raise ValueError("Training requires a train_dataset when should_load_dataset is True.")
+        if not self.args.should_load_dataset and self.train_dataset is not None:
+            raise ValueError("We don't need train_dataset when should_load_dataset is False.")
 
         train_dataset = self.train_dataset
         if is_datasets_available() and train_dataset is not None and isinstance(train_dataset, datasets.Dataset):
@@ -1113,9 +1105,7 @@ class Trainer:
                 num_workers=self.args.dataloader_num_workers,
             )
 
-        if not self.args.distributed_dataloader or (
-            self.args.distributed_dataloader and self.args.should_load_dataset
-        ):
+        if self.args.should_load_dataset:
             train_sampler = self._get_train_sampler()
         else:
             train_sampler = None
@@ -1166,18 +1156,10 @@ class Trainer:
                 If provided, will override `self.eval_dataset`. If it is an `datasets.Dataset`, columns not accepted by
                 the `model.forward()` method are automatically removed. It must implement `__len__`.
         """
-        if self.args.distributed_dataloader:
-            if self.args.should_load_dataset and eval_dataset is None and self.eval_dataset is None:
-                raise ValueError(
-                    "When using distributed dataloader, evaluation requires an eval_dataset when should_load_dataset is True."
-                )
-            if not self.args.should_load_dataset and not (eval_dataset is None and self.eval_dataset is None):
-                raise ValueError(
-                    "When using distributed dataloader, we don't need eval_dataset when should_load_dataset is False."
-                )
-        else:
-            if eval_dataset is None and self.eval_dataset is None:
-                raise ValueError("Trainer: evaluation requires an eval_dataset.")
+        if self.args.should_load_dataset and eval_dataset is None and self.eval_dataset is None:
+            raise ValueError("Evaluation requires an eval_dataset when should_load_dataset is True.")
+        if not self.args.should_load_dataset and not (eval_dataset is None and self.eval_dataset is None):
+            raise ValueError("We don't need eval_dataset when should_load_dataset is False.")
 
         eval_dataset = eval_dataset if eval_dataset is not None else self.eval_dataset
 
@@ -1203,9 +1185,7 @@ class Trainer:
                 num_workers=self.args.dataloader_num_workers,
             )
 
-        if not self.args.distributed_dataloader or (
-            self.args.distributed_dataloader and self.args.should_load_dataset
-        ):
+        if self.args.should_load_dataset:
             eval_sampler = self._get_eval_sampler(eval_dataset)
         else:
             eval_sampler = None
@@ -1231,18 +1211,10 @@ class Trainer:
                 The test dataset to use. If it is an `datasets.Dataset`, columns not accepted by the `model.forward()`
                 method are automatically removed. It must implement `__len__`.
         """
-        if self.args.distributed_dataloader:
-            if self.args.should_load_dataset and not test_dataset:
-                raise ValueError(
-                    "When using distributed dataloader, test requires an test_dataset when should_load_dataset is True."
-                )
-            if not self.args.should_load_dataset and test_dataset is not None:
-                raise ValueError(
-                    "When using distributed dataloader, we don't need test_dataset when should_load_dataset is False."
-                )
-        else:
-            if test_dataset is None:
-                raise ValueError("Trainer: test requires a test_dataset.")
+        if self.args.should_load_dataset and not test_dataset:
+            raise ValueError("Test requires an test_dataset when should_load_dataset is True.")
+        if not self.args.should_load_dataset and test_dataset is not None:
+            raise ValueError("We don't need test_dataset when should_load_dataset is False.")
 
         if is_datasets_available() and test_dataset is not None and isinstance(test_dataset, datasets.Dataset):
             test_dataset = self._remove_unused_columns(test_dataset, description="test")
@@ -1266,9 +1238,7 @@ class Trainer:
                 num_workers=self.args.dataloader_num_workers,
             )
 
-        if not self.args.distributed_dataloader or (
-            self.args.distributed_dataloader and self.args.should_load_dataset
-        ):
+        if self.args.should_load_dataset:
             test_sampler = self._get_eval_sampler(test_dataset)
         else:
             test_sampler = None

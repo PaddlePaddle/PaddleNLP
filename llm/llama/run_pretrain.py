@@ -531,7 +531,7 @@ def main():
         training_args,
         data_file,
         tokenizer,
-        need_data=False if training_args.distributed_dataloader and not training_args.should_load_dataset else True,
+        need_data=training_args.should_load_dataset,
     )
 
     trainer = PretrainingTrainer(

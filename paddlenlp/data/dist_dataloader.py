@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import OrderedDict
-
 import numpy as np
 import paddle
 from paddle.distributed import fleet
@@ -166,7 +164,7 @@ class DistDataLoader(paddle.io.DataLoader):
                 self._pp_data_group.ranks[0],
             )
 
-        return OrderedDict([("input_ids", input_ids), ("labels", labels)])
+        return dict([("input_ids", input_ids), ("labels", labels)])
 
 
 def broadcast_data_list(data_list, datatype, comm_rank=0, comm_group=None, src_rank=0):

@@ -1200,12 +1200,13 @@ class TrainingArguments:
 
     @property
     def should_load_dataset(self):
-        """
-        Load dataset only when mp_rank == 0 and pp_rank == 0, this property being used when self.distributed_dataloader is True.
-        """
-        if self.tensor_parallel_rank == 0 and self.pipeline_parallel_rank == 0:
+        if not self.distributed_dataloader:
             return True
-        return False
+        else:
+            if self.tensor_parallel_rank == 0 and self.pipeline_parallel_rank == 0:
+                return True
+            else:
+                return False
 
     @contextlib.contextmanager
     def main_process_first(self, local=True, desc="work"):
