@@ -25,9 +25,9 @@ from pipelines.nodes import (
     CharacterTextSplitter,
     ChatGLMBot,
     DensePassageRetriever,
+    EmbeddingRetriever,
     ErnieBot,
     ErnieRanker,
-    ErnieRetriever,
     JoinDocuments,
     MarkdownConverter,
     PromptTemplate,
@@ -105,7 +105,7 @@ def chat_markdown_tutorial():
     use_gpu = True if args.device == "gpu" else False
 
     if args.model_type == "ernie-embedding-v1":
-        retriever = ErnieRetriever(
+        retriever = EmbeddingRetriever(
             document_store=document_store,
             retriever_batch_size=args.retriever_batch_size,
             api_key=args.embedding_api_key,
