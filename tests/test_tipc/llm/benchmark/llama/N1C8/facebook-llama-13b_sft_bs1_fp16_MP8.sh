@@ -14,16 +14,16 @@
 
 model_name_or_path="facebook/llama-13b"
 dataset_name_or_path="llm_benchmark_en"
-intokens_max_length=1024
-learning_rates="3e-02"
+max_length=3072
+learning_rate="3e-05"
 recompute="1"
-tensor_parallel_degree="1"
+tensor_parallel_degree="8"
 lora="0"
-prefix_tuning="1"
-model_item="facebook-llama-13b_pt"
-run_mode="DP1"
-device_num="N1C1"
+prefix_tuning="0"
+model_item="facebook-llama-13b_sft"
+run_mode="MP8"
+device_num="N1C8"
 
 cd ./tests
 bash ./test_tipc/llm/benchmark/benchmark_common/prepare.sh
-bash ./test_tipc/llm/benchmark/benchmark_common/run_benchmark.sh ${model_name_or_path} ${dataset_name_or_path} ${intokens_max_length} ${learning_rates} ${recompute} ${tensor_parallel_degree} ${lora} ${prefix_tuning} ${model_item} ${run_mode} ${device_num} 
+bash ./test_tipc/llm/benchmark/benchmark_common/run_benchmark.sh ${model_name_or_path} ${dataset_name_or_path} ${max_length} ${learning_rate} ${recompute} ${tensor_parallel_degree} ${lora} ${prefix_tuning} ${model_item} ${run_mode} ${device_num} 

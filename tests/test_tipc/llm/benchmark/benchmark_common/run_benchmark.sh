@@ -20,7 +20,7 @@ function _set_params(){
     # 脚本所需参数
     model_name_or_path=${1:-"facebook/llama-7b"}
     dataset_name_or_path=${2:-"llm_benchmark_zh"}
-    intokens_max_length=${3:-"1024"}
+    max_length=${3:-"1024"}
     learning_rate=${4:-"3e-05"}
     recompute=${5:-"true"}
     tensor_parallel_degree=${6:-"1"}
@@ -43,7 +43,7 @@ function _set_params(){
     is_large_model=True           # (可选)普通模型默认为False，如果添加大模型且只取一条ips设置为True
 
     # 以下为通用执行命令，无特殊可不用修改
-    model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
+    model_name=${model_item}_bs${base_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
     arr=(${device})
     num_gpu_devices=${#arr[*]}
@@ -99,8 +99,7 @@ function _train(){
             --save_strategy no \
             --logging_steps 1 \
             --src_length 1024 \
-            --tgt_length 1024 \
-            --intokens_max_length ${intokens_max_length} \
+            --max_length ${max_length} \
             --fp16 1 \
             --fp16_opt_level O2 \
             --do_train 1 \
