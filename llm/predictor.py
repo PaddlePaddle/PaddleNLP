@@ -64,7 +64,7 @@ class PredictorArgument:
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
-    max_batch_size: int = field(default=None, metadata={"help": "The batch size of data."})
+    max_batch_size: int = field(default=None, metadata={"help": "The max batch size of data during serving."})
 
 
 @dataclass
