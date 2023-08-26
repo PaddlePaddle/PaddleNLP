@@ -22,6 +22,7 @@ except ImportError:
 import multiprocessing
 import time
 from copy import deepcopy
+from functools import partial
 from multiprocessing import Pool
 from typing import Dict, List, Optional, Union
 
@@ -161,8 +162,6 @@ def embeddings_multi_doc(data, batch_size=32, num_process=10, url="0.0.0.0:8082"
         offset += [len(data)]
     data_index = zip(offset, offset[1:])
     data_list = [data[start:end] for start, end in data_index]
-    from functools import partial
-
     func = partial(run_main_doc, url=url)
     pool = Pool(processes=min(num_process, multiprocessing.cpu_count()))
     result = pool.map(func, data_list)
@@ -333,7 +332,7 @@ class ParallelRetriever(BaseRetriever):
             documents.extend(i)
         output = {"documents": documents}
         time2 = time.time()
-        logger.info(f"the time of create docs: {time2-time1:.3f} s")
+        logger.info(f"The time cost of create docs: {time2-time1:.3f} s")
         return output, "output_1"
 
     def embed_queries(self, texts: List[str], **kwargs) -> List[np.ndarray]:

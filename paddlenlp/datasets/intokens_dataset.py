@@ -25,7 +25,6 @@ class InTokens:
 
     @classmethod
     def _pad_batch_records(cls, batch_records):
-        # TODO: support pad_to_max_length for Pipeline parallel
         # Only consider supported input keys
         input_keys = [key for key in batch_records[0].keys() if key in cls.supported_input_keys]
 

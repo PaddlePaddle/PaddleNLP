@@ -59,9 +59,10 @@ def tokenize_example(tokenizer, example, data_args):
         truncation_side="left",
         add_special_tokens=True,
     )
+    tgt_max_length = data_args.max_length - len(tokenized_source["input_ids"])
     tokenized_target = tokenizer(
         target,
-        max_length=data_args.tgt_length,
+        max_length=tgt_max_length,
         truncation=True,
         truncation_side="right",
         add_special_tokens=False,
@@ -70,7 +71,7 @@ def tokenize_example(tokenizer, example, data_args):
     tokenized_target_input_ids = tokenized_target["input_ids"]
     # Add eos_token_id at the end of sequence if the sentence is not truncated.
     # Attention! In some cases(ex. ChatGLMv2), tokenized eos_token is not equal to eos_token_id.
-    if len(tokenized_target_input_ids) < data_args.tgt_length:
+    if len(tokenized_target_input_ids) < tgt_max_length:
         tokenized_target_input_ids += [tokenizer.eos_token_id]
 
     return tokenized_source, tokenized_target_input_ids
