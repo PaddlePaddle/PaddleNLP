@@ -53,7 +53,11 @@ MODEL_CLASSES = {
 from fused_layers import mock_layers
 from modeling_pp import LlamaForCausalLMPipe
 
-from paddlenlp.data.causal_dataset import build_train_valid_test_datasets, print_rank_0
+from paddlenlp.data.causal_dataset import (
+    GPTDataset,
+    build_train_valid_test_datasets,
+    print_rank_0,
+)
 
 
 def add_start_docstrings(*docstr):
@@ -510,10 +514,11 @@ def main():
         # modify the `__len__` function to change the length of dataset in current python process
         GPTDataset.__len__ = lambda *_: data_args.train_data_size
         total_effective_tokens = (
-            sum([len(train_dataset[i][0]) for i in range(data_args.train_data_size)]) * training_args.num_train_epochs
+            sum([train_dataset[i]["text"].shape[0] for i in range(data_args.train_data_size)])
+            * training_args.num_train_epochs
         )
     else:
-        total_effective_tokens = sum([len(i[0]) for i in train_dataset]) * training_args.num_train_epochs
+        total_effective_tokens = sum([i["text"].shape[0] for i in train_dataset]) * training_args.num_train_epochs
 
     trainer = PretrainingTrainer(
         model=model,
