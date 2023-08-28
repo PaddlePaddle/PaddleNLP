@@ -714,13 +714,18 @@ class TrainingArguments:
             self.use_hybrid_parallel = True
 
         if self.amp_master_grad:
-            if self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1:
-                raise ValueError(
-                    "Temporarily amp master grad only suport for tensor/pipeline parallel. please set amp_master_grad to False."
-                )
-            # if not (self.bf16 or self.fp16):
+            # if (
+            #     self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1
+            # ) or self.fp16_opt_level != "O2":
+            #     raise ValueError(
+            #         "Temporarily amp master grad only suport for tensor/pipeline parallel with fp16_opt_level O2. please set amp_master_grad to False."
+            #     )
+            # if not (self.bf16 or self.fp16) or self.fp16_opt_level != "O2":
             #     logger.warning("set amp_master_grad to false since amp is disabled.")
             #     self.amp_master_grad = False
+            if self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1 and len(self.sharding) > 1:
+                logger.warning("set amp_master_grad to false, not support pure sharding yet.")
+                self.amp_master_grad = False
 
         if self.use_hybrid_parallel:
             world_size = paddle.distributed.get_world_size()
@@ -785,11 +790,15 @@ class TrainingArguments:
                         # "delay_scale_loss": True, Fix ME
                     }
                     logger.info(f"PP configs:{strategy.pipeline_configs}, use master_grad: {self.amp_master_grad}")
+
+                    debug_hang = int(os.environ.get("PADDLE_DEBUG_HANG", 0))
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
                         "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config
+                        and not debug_hang
                         and self.data_parallel_degree > 1,
                         "sharding_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config
+                        and not debug_hang
                         and self.sharding_parallel_degree > 1,
                         "enable_timer": "enable_timer" in pipeline_parallel_config,
                     }
