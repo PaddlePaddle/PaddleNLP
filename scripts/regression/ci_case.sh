@@ -351,7 +351,8 @@ print_info $? fast_generation_gpt
 ernie(){
 #data process
 cd ${nlp_dir}/model_zoo/ernie-1.0/
-mkdir data && cd data
+mkdir data
+cd ./data
 wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_ids.npy
 wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_idx.npz
 cd ../
