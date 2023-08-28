@@ -17,11 +17,10 @@ export nlp_dir=${PWD}
 export log_path=${nlp_dir}/model_logs
 export cudaid1=$2
 export cudaid2=$3
-export C_COMPILER_PATH=/usr/local/gcc-12.2/bin/gcc
-export CXX_COMPILER_PATH=/usr/local/gcc-12.2/bin/g++
-
-export PYTHON_LIBRARIES=/opt/_internal/cpython-3.8.0/lib:$PYTHON_LIBRARIES
-export PYTHON_INCLUDE_DIRS=/opt/_internal/cpython-3.8.0/include/python3.8:$PYTHON_INCLUDE_DIRS
+export C_COMPILER_PATH=$(which gcc)
+export CXX_COMPILER_PATH=$(which g++)
+export CC=$(which gcc)
+export CXX=$(which g++)
 
 if [ ! -d "model_logs" ];then
     mkdir model_logs
@@ -1096,10 +1095,6 @@ for apicase in `ls`;do
 done
 }
 fast_generation(){
-
-export CC=/usr/local/gcc-12.2/bin/gcc
-export CXX=/usr/local/gcc-12.2/bin/g++
-
 cd ${nlp_dir}/fast_generation/samples
 python codegen_sample.py >${log_path}/fast_generation_codegen >>${log_path}/fast_generation_codegen 2>&1
 print_info $? fast_generation_codegen

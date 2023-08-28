@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import distutils
 import functools
 import hashlib
 import os
@@ -199,6 +200,10 @@ class FasterTransformerExtension(CMakeExtension):
         # version in cmake file.
         # self.cmake_args += [f"-DSM={self.sm}"] if self.sm is not None else []
         self.cmake_args += ["-DWITH_GPT=ON"]
+
+        self.cmake_args += ["-D=PYTHON_LIBRARY={}".format(distutils.sysconfig.get_config_var("LIBDIR"))]
+        self.cmake_args += ["-D=PYTHON_INCLUDE_DIR={}".format(distutils.sysconfig.get_python_inc())]
+
         if self.need_parallel:
             self.cmake_args += ["-DWITH_PARALLEL=ON"]
         try:
