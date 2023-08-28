@@ -286,6 +286,13 @@ class StaticInferencePredictor(BasePredictor):
         self.predictor = self._create_predictor(config)
         self.model_config = AutoConfig.from_pretrained(config.model_name_or_path)
 
+        if config.prefix_path:
+            prefix_cache = paddle.to_tensor(np.load(f"{config.prefix_path}/pre_caches.npy")).unsqueeze(2)
+
+            # TODO(wj-Mcat): support more model of fetching `num_hidden_layers`
+            num_layers = self.model_config.num_hidden_layers
+            self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, num_layers, axis=0)]
+
     def _create_predictor(self, predictor_args: PredictorArgument):
         if not is_paddlenlp_ops_available():
             raise ValueError(
@@ -327,13 +334,29 @@ class StaticInferencePredictor(BasePredictor):
         return predictor
 
     def _preprocess(self, source):
-        inputs = dybatch_preprocess(self.tokenizer, source, self.config.max_length)
+        pre_caches_length = 0 if self.config.prefix_path is None else self.pre_caches[0].shape[-2]
+
+        inputs = dybatch_preprocess(
+            self.tokenizer, source, self.config.max_length, pre_caches_length=pre_caches_length
+        )
         for i in range(inputs["input_ids"].shape[0]):
             length = inputs["seq_len_encoder"][i][0]
             self.attention_mask[i, 0, :length, :length] = paddle.tril(
                 paddle.ones(shape=(length, length), dtype="float16")
             )
-            self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype="float16")
+
+            if pre_caches_length > 0:
+                prefix_attention_mask = paddle.ones([1, length, pre_caches_length], dtype=self.attention_mask.dtype)
+                post_attention_mask = paddle.tril(
+                    paddle.ones(shape=(length, length), dtype=self.args.dtype)
+                ).unsqueeze_(axis=0)
+                self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
+                    [prefix_attention_mask, post_attention_mask], axis=2
+                )
+
+            self.tgt_generation_mask[i, 0, 0, : length + pre_caches_length] = paddle.ones(
+                shape=[1, length + pre_caches_length], dtype="float16"
+            )
 
         inputs["attention_mask"] = self.attention_mask
         inputs["tgt_generation_mask"] = self.tgt_generation_mask
@@ -402,18 +425,46 @@ class DygraphInferencePredictor(BasePredictor):
             dtype=dtype,
         )
 
+        if config.prefix_path:
+            prefix_cache = paddle.to_tensor(np.load(f"{config.prefix_path}/pre_caches.npy")).unsqueeze(2)
+
+            # TODO(wj-Mcat): support more model of fetching `num_hidden_layers`
+            num_layers = model.config.num_hidden_layers
+            self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, num_layers, axis=0)]
+
     def _preprocess(self, source):
-        inputs = dybatch_preprocess(self.tokenizer, source, self.config.max_length)
+        pre_caches_length = 0 if self.config.prefix_path is None else self.pre_caches[0].shape[-2]
+
+        inputs = dybatch_preprocess(
+            self.tokenizer, source, self.config.max_length, pre_caches_length=pre_caches_length
+        )
+
         for i in range(inputs["input_ids"].shape[0]):
             length = inputs["seq_len_encoder"][i][0]
             self.attention_mask[i, 0, :length, :length] = paddle.tril(
                 paddle.ones(shape=(length, length), dtype="float16")
             )
-            inputs["attention_mask"] = self.attention_mask
-            self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype="float16")
-            inputs["tgt_generation_mask"] = self.tgt_generation_mask
+
+            if pre_caches_length > 0:
+                prefix_attention_mask = paddle.ones([1, length, pre_caches_length], dtype=self.attention_mask.dtype)
+                post_attention_mask = paddle.tril(
+                    paddle.ones(shape=(length, length), dtype=self.args.dtype)
+                ).unsqueeze_(axis=0)
+                self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
+                    [prefix_attention_mask, post_attention_mask], axis=2
+                )
+
+            self.tgt_generation_mask[i, 0, 0, : length + pre_caches_length] = paddle.ones(
+                shape=[1, length + pre_caches_length], dtype="float16"
+            )
+
+        inputs["tgt_generation_mask"] = self.tgt_generation_mask
+        inputs["attention_mask"] = self.attention_mask
         inputs["cache_kvs"] = self.cache_kvs
         inputs["pre_ids"] = self.pre_ids
+
+        if self.config.prefix_path:
+            inputs["pre_caches"] = self.pre_caches
 
         inputs_tensor = {}
         for key, value in inputs.items():
