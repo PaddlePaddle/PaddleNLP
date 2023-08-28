@@ -27,6 +27,7 @@ import shutil
 import sys
 import time
 import types
+import warnings
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -998,7 +999,7 @@ class Trainer:
                 paddle_timer_info += f" | {name}: {elapsed_time:.2f}"
             paddle_pipeline_timers.log(paddle_pipeline_timers.timers.keys(), reset=True)
         except ImportError:  # paddle version too old, timer not support
-            logger.warning(f"paddle version:{paddle._git_commit__} does not support pipeline timer")
+            warnings.warn(f"paddle version:{paddle.__git_commit__} does not support pipeline timer")
         except AssertionError:  # paddle timer not enabled
             pass
 
@@ -2034,7 +2035,8 @@ class Trainer:
 
             paddle_pipeline_timers = paddle_get_timers()
         except ImportError:  # paddle version too old, timer not support
-            logger.warning(f"paddle version:{paddle._git_commit__} does not support pipeline timer")
+            warnings.warn(f"paddle version:{paddle.__git_commit__} does not support pipeline timer")
+            paddle_pipeline_timers = None
         except AssertionError:
             paddle_pipeline_timers = None
         kwargs.update(timer=self.timers, paddle_pipeline_timers=paddle_pipeline_timers)
