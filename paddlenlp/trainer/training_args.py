@@ -803,15 +803,6 @@ class TrainingArguments:
                         "enable_timer": "enable_timer" in pipeline_parallel_config,
                     }
 
-                    dygraph_pp_configs = {
-                        "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
-                        "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config
-                        and self.data_parallel_degree > 1,
-                        "sharding_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config
-                        and self.sharding_parallel_degree > 1,
-                        "enable_timer": "enable_timer" in pipeline_parallel_config,
-                    }
-
                     if self.do_eval:
                         assert (
                             self.per_device_train_batch_size * self.gradient_accumulation_steps
