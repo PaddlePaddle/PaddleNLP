@@ -186,6 +186,8 @@ def scaled_dot_product_attention(
         # Current Flash Attention doesn't support attn maskt
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
+        if alibi is not None:
+            raise ValueError("Flash Attention does not support ALiBi yet")
         if attention_mask is not None:
             attn_output = F.scaled_dot_product_attention(
                 query_states,
