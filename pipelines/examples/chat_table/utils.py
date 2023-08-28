@@ -15,7 +15,7 @@
 import json
 import time
 
-from create_index import chat_table, get_notabular_information
+from create_index import chat_table, get_text_information
 
 from pipelines.nodes import ErnieBot
 
@@ -52,6 +52,9 @@ all_titles = [
 
 
 def get_answer(api_key=None, secret_key=None, query="", maxlen=11200):
+    """
+    Get the answer to the query
+    """
     prompt = (
         """
     给你年报主要内容的28个标题，具体为
@@ -95,9 +98,9 @@ def get_answer(api_key=None, secret_key=None, query="", maxlen=11200):
         text = ""
         for key in query_keys:
             if key in ["主营收入", "公司主营业务"]:
-                query_text = query + "请提取" + company + key + "的信息"
-                text += "从" + key + "角度：\n" + get_notabular_information(query_text, str(key)) + "\n"
-            else:
+                query_text = "请提取" + company + key + "的信息,来回答" + query + "这个问题"
+                text += "从" + key + "角度：\n" + get_text_information(query_text) + "\n"
+            elif key != "日行情K线数据":
                 query_text = "请提取" + company + key + "的信息来解答" + query + "这个问题"
                 text += "从" + key + "角度：\n" + chat_table(query_text, api_key, secret_key, key) + "\n"
     ernie_bot = ErnieBot(api_key, secret_key)
@@ -121,5 +124,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     result = get_answer(query=args.query, api_key=args.api_key, secret_key=args.secret_key)
     print(result)
-    result = get_notabular_information(query="宁德时代的公司主营业务", index="公司主营业务")
+    result = get_text_information(query="宁德时代的公司主营业务")
     print(result)

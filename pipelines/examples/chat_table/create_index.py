@@ -61,7 +61,10 @@ columns_titles = {
 }
 
 
-def get_json(path):
+def preprocess(path):
+    """
+    Preprocessing json file
+    """
     with open(path, mode="r", encoding="utf-8") as f:
         data = json.load(f)
     keys = data.keys()
@@ -73,10 +76,10 @@ def get_json(path):
         if keys == "maincwdata":
             maincw = ""
             maincw += "".join([v for k, v in value.items()])
-            all_tables_dict["主营收入"].append({"content": maincw, "meta": {}})
+            all_tables_dict["text"].append({"content": maincw, "meta": {}})
         elif keys == "mainbusiness":
             mainbusiness = comname + columns_titles.get(keys, "") + ":" + value
-            all_tables_dict["公司主营业务"].append({"content": mainbusiness, "meta": {}})
+            all_tables_dict["text"].append({"content": mainbusiness, "meta": {}})
         elif keys in columns_titles and value != "":
             try:
                 meta = {}
@@ -94,7 +97,7 @@ def get_json(path):
                 meta = {"info": value_str}
                 title = "".join(title_list)
                 text = "".join(text_list)
-                all_tables_dict["表格"].append(
+                all_tables_dict["table"].append(
                     {"content": comname + columns_titles.get(keys, "") + text + title + column_name, "meta": meta}
                 )
             except:
@@ -104,11 +107,17 @@ def get_json(path):
 
 
 def get_all_tables(paths):
+    """
+    Process json files to obtain text and table information
+    """
     for path in paths:
-        get_json(path)
+        preprocess(path)
 
 
-def create_table_db(index_name, tables_dict):
+def create_index(index_name, tables_dict):
+    """
+    Creating indexes
+    """
     if os.path.exists("faiss_cropus_store_all.db"):
         os.remove("faiss_cropus_store_all.db")
     if os.path.exists(index_name):
@@ -132,13 +141,15 @@ def create_table_db(index_name, tables_dict):
         pooling_mode="mean_tokens",
     )
     for key, value in tables_dict.items():
-        print(key)
         value = retriever.run_indexing(value)[0]["documents"]
         document_store.write_documents(value, index=str(key))
     document_store.save(index_name)
 
 
-def get_notabular_information(query, index):
+def get_text_information(query, index="text"):
+    """
+    Obtain the  matching text information
+    """
     document_store = FAISSDocumentStore.load(index_name)
     retriever = DensePassageRetriever(
         document_store=document_store,
@@ -158,8 +169,10 @@ def get_notabular_information(query, index):
     return prediction["documents"][0].content
 
 
-def chat_table(query, api_key=None, secret_key=None, key="", maxlen=11200):
-    index = "表格"
+def chat_table(query, api_key=None, secret_key=None, key="", maxlen=11200, index="table"):
+    """
+    Obtain the  matching text information
+    """
     document_store = FAISSDocumentStore.load(index_name)
     retriever = DensePassageRetriever(
         document_store=document_store,
@@ -220,4 +233,4 @@ if __name__ == "__main__":
     files = glob.glob(args.dirname + "/*.json", recursive=True)
     # 建库
     get_all_tables(files)
-    create_table_db(index_name, all_tables_dict)
+    create_index(index_name, all_tables_dict)
