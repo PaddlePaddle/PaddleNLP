@@ -342,10 +342,6 @@ print_info $? fast_generation_gpt
 # 9 ernie
 ernie(){
 #data process
-cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
-sed -i "s/python3/python/g" Makefile
-sed -i "s/python-config/python3.7m-config/g" Makefile
-export CUDA_VISIBLE_DEVICES=${cudaid2}
 cd ${nlp_dir}/model_zoo/ernie-1.0/
 mkdir data && cd data
 wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_ids.npy
