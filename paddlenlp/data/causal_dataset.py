@@ -9,133 +9,21 @@ import time
 import numpy as np
 import paddle
 
+from paddlenlp.data.blendable_dataset import BlendableDataset
 from paddlenlp.data.indexed_dataset import make_dataset as make_indexed_dataset
 
 local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 
 
-class BlendableDataset(paddle.io.Dataset):
-    def __init__(self, datasets, weights, size, *, data_cache_path=None):
+# class FakeHCG:
+#     def get_data_parallel_group(self):
+#         return None
 
-        self.datasets = datasets
-        num_datasets = len(datasets)
-        assert num_datasets == len(weights)
+#     def get_pipe_parallel_group(self):
+#         return None
 
-        self.size = size
-
-        # Normalize weights.
-        weights = np.array(weights, dtype=np.float64)
-        sum_weights = np.sum(weights)
-        assert sum_weights > 0.0
-        weights /= sum_weights
-
-        # Build indicies.
-        def _build_indices():
-            start_time = time.time()
-            assert num_datasets < 255
-            dataset_index = np.zeros(self.size, dtype=np.uint8)
-            dataset_sample_index = np.zeros(self.size, dtype=np.int64)
-
-            from tool_helpers import helpers
-
-            helpers.build_blending_indices(
-                dataset_index,
-                dataset_sample_index,
-                weights,
-                num_datasets,
-                self.size,
-                local_rank == 0,
-                #    paddle.distributed.get_rank() == 0,
-            )
-            print_rank_0(
-                "> elapsed time for building blendable dataset indices: "
-                "{:.2f} (sec)".format(time.time() - start_time)
-            )
-            return dataset_index, dataset_sample_index
-
-        desc = "Blendable dataset\n\n"
-        desc += "Datasets:\n"
-        for dataset in datasets:
-            desc += dataset.desc + "\n\n"
-        desc += f"Weights: {weights}\n"
-        desc += f"Size: {size}\n"
-        self.desc = desc
-
-        if data_cache_path:
-            desc_hash = hashlib.md5(desc.encode("utf-8")).hexdigest()
-            desc_path = os.path.join(data_cache_path, desc_hash + ".dsc")
-            index_path = os.path.join(data_cache_path, desc_hash + "_index.npy")
-            sample_index_path = os.path.join(data_cache_path, desc_hash + "_sample_index.npy")
-            cache_hit = os.path.isfile(index_path) and os.path.isfile(sample_index_path)
-            # cache_success = True
-            # if paddle.distributed.get_rank() == 0 and not cache_hit:
-            if local_rank == 0 and not cache_hit:
-                print(
-                    " > WARNING: could not find index map files for blendable"
-                    " dataset, building indices on rank 0 ...",
-                    flush=True,
-                )
-                dataset_index, dataset_sample_index = _build_indices()
-                try:
-                    os.makedirs(os.path.dirname(index_path), exist_ok=True)
-                    with open(desc_path, "wt") as fd:
-                        fd.write(desc)
-                        np.save(index_path, dataset_index, allow_pickle=True)
-                        np.save(sample_index_path, dataset_sample_index, allow_pickle=True)
-                except OSError:
-                    print(f"There was an error trying to create the data cache directory ({data_cache_path})")
-                    print("or a file in it. This is set with the --data-cache-path argument. Please")
-                    print("ensure you have write access to this directory or specify one that you do have")
-                    print("write access to.")
-                    # cache_success = False
-
-            # hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
-
-            # counts = paddle.to_tensor([cache_success], dtype="int64")
-            # paddle.distributed.all_reduce(counts, group=hcg.get_data_parallel_group())
-            # paddle.distributed.all_reduce(counts, group=hcg.get_pipeline_model_parallel_group())
-            # if counts[0].item() != (
-            #     paddle.distributed.get_world_size()
-            #     // paddle.distributed.get_world_size(group=hcg.get_tensor_model_parallel_group())
-            # ):
-            #     print_rank_0("Data index creation unsuccessful, exiting.")
-            #     exit()
-
-            if paddle.distributed.get_world_size() > 1:
-                if paddle.in_dynamic_mode():
-                    paddle.distributed.barrier()
-
-            # paddle.distributed.barrier()
-            # Load on all ranks.
-            print_rank_0(f"> loading blendable dataset index: {index_path}")
-            self.dataset_index = np.load(index_path, allow_pickle=True, mmap_mode="r")
-            assert self.dataset_index.size == self.size
-
-            print_rank_0(f"> loading blendable dataset sample index: {sample_index_path}")
-            self.dataset_sample_index = np.load(sample_index_path, allow_pickle=True, mmap_mode="r")
-            assert self.dataset_sample_index.size == self.size
-        else:
-            self.dataset_index, self.dataset_sample_index = _build_indices()
-
-        # Check size
-        _ = self.__getitem__(self.size - 1)
-        try:
-            _ = self.__getitem__(self.size)
-            raise RuntimeError("BlendedDataset size is improperly bounded")
-        except IndexError:
-            pass
-        print_rank_0("> size of blendable dataset: " "{} samples".format(self.size))
-
-    def __len__(self):
-        return self.size
-
-    def __getitem__(self, idx):
-        dataset_idx = self.dataset_index[idx]
-        sample_idx = self.dataset_sample_index[idx]
-        return {
-            "dataset_idx": dataset_idx,
-            **self.datasets[dataset_idx][sample_idx],
-        }
+#     def get_model_parallel_group(self):
+#         return None
 
 
 def get_train_valid_test_split_(splits_string, size):
@@ -442,7 +330,6 @@ def _build_index_mappings(
 
     # rng state
     np_rng = np.random.RandomState(seed=seed)
-
     # Filename of the index mappings.
     desc = "GPT Dataset\n\n"
     desc += f"Data prefix {data_prefix}\n"
@@ -481,7 +368,12 @@ def _build_index_mappings(
     data_cache_dir = os.path.dirname(idx_path["desc"])
     # data_cache_success = True
     # Build the indexed mapping if not exist.
-    if build_indices and paddle.distributed.get_rank() == 0:
+    if data_cache_path is not None:
+        check_rank_flag = build_indices and local_rank == 0
+    else:
+        check_rank_flag = build_indices and paddle.distributed.get_rank() == 0
+    # if build_indices and paddle.distributed.get_rank() == 0:
+    if check_rank_flag:
         print_rank_0(" > WARNING: could not find index map files, building " "the indices on rank 0 ...")
 
         # For the last epoch, decide whether include the entire epoch
@@ -571,11 +463,27 @@ def _build_index_mappings(
             print("the data files are in and can be set with the --data-cache-path argument. Please")
             print("ensure you have write access to this directory or specify one that you do have")
             print("write access to.")
+            # data_cache_success = False
 
     # add 7-18
     if paddle.distributed.get_world_size() > 1:
         if paddle.in_dynamic_mode():
             paddle.distributed.barrier()
+
+    # try:
+    #     hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
+    # except:
+    #     hcg = FakeHCG()
+
+    # counts = paddle.to_tensor([data_cache_success], dtype="int64")
+    # paddle.distributed.all_reduce(counts, group=hcg.get_data_parallel_group())
+    # paddle.distributed.all_reduce(counts, group=hcg.get_pipe_parallel_group())
+    # if counts[0].item() != (
+    #     paddle.distributed.get_world_size() // paddle.distributed.get_world_size(group=hcg.get_model_parallel_group())
+    # ):
+    #     print_rank_0("Data index creation unsuccessful, exiting.")
+    #     exit()
+    # paddle.distributed.barrier()
 
     # Load mappings.
     start_time = time.time()

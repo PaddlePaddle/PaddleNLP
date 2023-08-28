@@ -170,7 +170,7 @@ class RowParallelLoRALinear(RowParallelLinear):
             input_mp = x
 
         # x @ W : [bz, in_f / ws] ===> [bz, out_f]
-        result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
+        result_mp = F.linear(x=input_mp, weight=self.weight, name=self.name)
 
         output = mp_ops._mp_allreduce(
             result_mp,
@@ -192,7 +192,7 @@ class RowParallelLoRALinear(RowParallelLinear):
             #  @ B: [bz, r] ===> [bz, out_f]
             delta_mp = (input_dup @ self.lora_B) * self.scaling
             output += delta_mp
-
+        output = output + self.bias if self.bias is not None else output
         return output
 
     def extra_repr(self):
