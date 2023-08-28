@@ -208,7 +208,7 @@ def _build_train_valid_test_datasets(
         paddle.distributed.barrier()
 
     def build_dataset(index, name):
-        documents = (np.arange(splits[index], splits[index + 1], 1, np.int32) if need_data else None,)
+        documents = np.arange(splits[index], splits[index + 1], 1, np.int32) if need_data else None
         dataset = GPTDataset(
             name,
             data_prefix,

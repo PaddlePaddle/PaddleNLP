@@ -25,7 +25,6 @@ from typing import List, Optional
 import numpy as np
 import paddle
 
-from paddlenlp.data.causal_dataset import GPTDataset
 from paddlenlp.trainer import (
     PdArgumentParser,
     Trainer,
@@ -54,7 +53,11 @@ MODEL_CLASSES = {
 from fused_layers import mock_layers
 from modeling_pp import LlamaForCausalLMPipe
 
-from paddlenlp.data.causal_dataset import build_train_valid_test_datasets, print_rank_0
+from paddlenlp.data.causal_dataset import (
+    GPTDataset,
+    build_train_valid_test_datasets,
+    print_rank_0,
+)
 
 
 def add_start_docstrings(*docstr):
@@ -512,15 +515,17 @@ def main():
         need_data=training_args.should_load_dataset,
     )
 
-    if data_args.train_data_size > 0:
-        # GPTDataset is the type of `paddle.io.Dataset`, which dosen't contains `select` method
-        # modify the `__len__` function to change the length of dataset in current python process
-        GPTDataset.__len__ = lambda *_: data_args.train_data_size
-        total_effective_tokens = (
-            sum([len(train_dataset[i][0]) for i in range(data_args.train_data_size)]) * training_args.num_train_epochs
-        )
-    else:
-        total_effective_tokens = sum([len(i[0]) for i in train_dataset]) * training_args.num_train_epochs
+    if training_args.should_load_dataset:
+        if data_args.train_data_size > 0:
+            # GPTDataset is the type of `paddle.io.Dataset`, which dosen't contains `select` method
+            # modify the `__len__` function to change the length of dataset in current python process
+            GPTDataset.__len__ = lambda *_: data_args.train_data_size
+            total_effective_tokens = (
+                sum([train_dataset[i]["text"].shape[0] for i in range(data_args.train_data_size)])
+                * training_args.num_train_epochs
+            )
+        else:
+            total_effective_tokens = sum([i["text"].shape[0] for i in train_dataset]) * training_args.num_train_epochs
 
     trainer = PretrainingTrainer(
         model=model,
@@ -551,9 +556,10 @@ def main():
         test_ret = trainer.predict(test_dataset)
         trainer.log_metrics("test", test_ret.metrics)
 
-    effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
-    print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
-    print(f"ips: {effective_tokens_per_second:.2f} tokens/s")
+    if training_args.should_load_dataset:
+        effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
+        print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
+        print(f"ips: {effective_tokens_per_second:.2f} tokens/s")
 
 
 if __name__ == "__main__":
