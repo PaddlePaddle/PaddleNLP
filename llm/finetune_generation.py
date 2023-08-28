@@ -307,7 +307,7 @@ def main():
         if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
             ptq_ds = load_dataset(
                 "json", data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
-            )
+            )[0]
             ptq_ds = ptq_ds.map(partial(trans_func, is_test=False))
         else:
             ptq_ds = train_ds
@@ -337,7 +337,7 @@ def main():
         if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
             ptq_ds = load_dataset(
                 "json", data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
-            )
+            )[0]
             ptq_ds = ptq_ds.map(partial(trans_func, is_test=False))
         else:
             ptq_ds = train_ds
@@ -357,7 +357,7 @@ def main():
     if training_args.do_predict:
         test_ds = load_dataset(
             "json", data_files=os.path.join(data_args.dataset_name_or_path, "test.json"), lazy=False
-        )
+        )[0]
         test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
         eval_result = trainer.predict(test_ds).metrics
         trainer.log_metrics("test", eval_result)
