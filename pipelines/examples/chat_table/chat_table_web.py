@@ -15,7 +15,7 @@
 import argparse
 
 import gradio as gr
-from utils import get_answer
+from chat_table import parsing_QA
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--api_key", default="", type=str, help="The API Key.")
@@ -28,7 +28,7 @@ def reset_state():
 
 
 def predict(query, history=[]):
-    result = get_answer(args.api_key, args.secret_key, query)
+    result = parsing_QA(args.api_key, args.secret_key, query)
     history.append(["user: {}".format(query), "assistant: {}".format(result)])
     return "", history, history
 

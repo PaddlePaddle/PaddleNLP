@@ -18,11 +18,9 @@ import logging
 import os
 import re
 import shutil
-import time
 
 from pipelines.document_stores import FAISSDocumentStore
-from pipelines.nodes import DensePassageRetriever, ErnieBot, ErnieRanker
-from pipelines.pipelines import Pipeline
+from pipelines.nodes import DensePassageRetriever
 
 logging.getLogger().setLevel(logging.INFO)
 index_name = "cropus_base"
@@ -74,7 +72,7 @@ def preprocess(path):
         comname = path.split("/")[-1].replace(".json", "")
     for keys, value in data.items():
         if keys == "maincwdata":
-            maincw = ""
+            maincw = comname + columns_titles.get(keys, "") + ":"
             maincw += "".join([v for k, v in value.items()])
             all_tables_dict["text"].append({"content": maincw, "meta": {}})
         elif keys == "mainbusiness":
@@ -146,89 +144,11 @@ def create_index(index_name, tables_dict):
     document_store.save(index_name)
 
 
-def get_text_information(query, index="text"):
-    """
-    Obtain the  matching text information
-    """
-    document_store = FAISSDocumentStore.load(index_name)
-    retriever = DensePassageRetriever(
-        document_store=document_store,
-        query_embedding_model="moka-ai/m3e-base",
-        passage_embedding_model="moka-ai/m3e-base",
-        output_emb_size=None,
-        max_seq_len_query=64,
-        max_seq_len_passage=256,
-        batch_size=16,
-        use_gpu=True,
-        embed_title=False,
-        pooling_mode="mean_tokens",
-    )
-    query_pipeline = Pipeline()
-    query_pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
-    prediction = query_pipeline.run(query=query, params={"Retriever": {"top_k": 1, "index": str(index)}})
-    return prediction["documents"][0].content
-
-
-def chat_table(query, api_key=None, secret_key=None, key="", maxlen=11200, index="table"):
-    """
-    Obtain the  matching text information
-    """
-    document_store = FAISSDocumentStore.load(index_name)
-    retriever = DensePassageRetriever(
-        document_store=document_store,
-        query_embedding_model="moka-ai/m3e-base",
-        passage_embedding_model="moka-ai/m3e-base",
-        output_emb_size=None,
-        max_seq_len_query=64,
-        max_seq_len_passage=256,
-        batch_size=16,
-        use_gpu=True,
-        embed_title=False,
-        pooling_mode="mean_tokens",
-    )
-    ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=True)
-    query_pipeline = Pipeline()
-    query_pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
-    query_pipeline.add_node(component=ranker, name="Ranker", inputs=["Retriever"])
-    prediction = query_pipeline.run(
-        query=query, params={"Retriever": {"top_k": 15, "index": str(index)}, "Ranker": {"top_k": 5}}
-    )
-    documents = ""
-    if key != "":
-        i = 0
-        while i < 5:
-            if key in prediction["documents"][i].content:
-                documents = prediction["documents"][i].meta["info"]
-                break
-            i += 1
-    else:
-        documents = prediction["documents"][0].meta["info"]
-    if documents == "":
-        return ""
-    else:
-        ernie_bot = ErnieBot(api_key=api_key, secret_key=secret_key)
-        prompt = "你是一个金融助手，你的任务是是一个抽取任务，你要抽取表格中信息来回答问题。请你记住，你输出的信息只能是表格中的内容，你只是抽取相关内容，不能生成无关的数据，不能对数据进行运算。现给你表格信息，请你抽取表格相关内容回答输入问题，输入表格信息：{documents}，输入问题：{query}"
-        documents = documents[: maxlen - 1 - len(query) - len(prompt)]
-        prompt = prompt.format(documents=documents, query=query)
-        for _ in range(2):
-            try:
-                result = ernie_bot.run(prompt)[0]
-                print(result["result"])
-                return result["result"]
-            except:
-                time.sleep(3)
-                continue
-        return "我暂时不能回答这个方面的问题"
-
-
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--api_key", default="", type=str, help="The API Key.")
-    parser.add_argument("--secret_key", default="", type=str, help="The secret key.")
     parser.add_argument("--dirname", default="./", type=str, help="The dirname of json files")
-    parser.add_argument("--query", default="比亚迪近五年的无形资产分别是多少", type=str, help="the query")
     args = parser.parse_args()
     files = glob.glob(args.dirname + "/*.json", recursive=True)
     # 建库

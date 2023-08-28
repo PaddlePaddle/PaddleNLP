@@ -16,8 +16,6 @@ cd PaddleNLP/pipelines/examples/chat_table
 根据表格数据，建立索引
 ```
 python create_index.py \
---api_key ... \
---secret_key ... \
 --dirname ...
 ```
 开始ChatTable
