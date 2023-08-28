@@ -256,7 +256,65 @@ class StateDictKeysChecker:
         return all_diff_keys
 
 
-def merge_tensor_parallel_weight(weight_list, is_column=True):
+def naive_fuse_merge_tp(weight_list, is_column=True, fuse_tensor_parts=2):
+    """
+
+    [A1 B1],[A2 B2]  => [A1, A2, B1, B2]
+
+    Args:
+        weight_list (List[np.ndarray]): The splited tensor parallel weight list.
+        is_column (bool, optional): Is ColumnLinear or RowLinear. Defaults to True.
+
+    Returns:
+        weight (np.ndarray): the merged weight.
+    """
+    if is_column:
+        axis = -1
+    else:
+        axis = 0
+
+    reorder = []
+    for item in weight_list:
+        reorder.extend(np.split(item, fuse_tensor_parts, axis=axis))
+    # 0 1 2 3 -> 0 2 1 3
+    index = (
+        np.transpose(np.arange(len(reorder)).reshape([len(weight_list), fuse_tensor_parts]), [1, 0])
+        .reshape(-1)
+        .tolist()
+    )
+    return np.concatenate([reorder[i] for i in index], axis=axis)
+
+
+def naive_fuse_split_tp(
+    weight, tensor_parallel_degree, tensor_parallel_rank=None, is_column=True, fuse_tensor_parts=2
+):
+    """
+
+    [A1, A2, B1, B2] => [A1 B1],[A2 B2]
+
+    Args:
+        weight (numpy.ndarray): the tensor weight,
+        tensor_parallel_degree (int): tensor_parallel_degree
+        tensor_parallel_rank (int): tensor_parallel_rank
+        is_column (bool, optional): is ColumnLinear . Defaults to True.
+
+    Returns:
+        tensor (numpy.ndarray): splited weight.
+
+    """
+    axis = -1 if is_column else 0
+    splited = np.split(weight, fuse_tensor_parts * tensor_parallel_degree, axis=axis)
+
+    if tensor_parallel_rank is None:
+        ret = []
+        for tensor_parallel_rank in range(tensor_parallel_degree):
+            ret.append(np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis))
+        return ret
+
+    return np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis)
+
+
+def normal_fuse_merge_tp(weight_list, is_column=True):
     """
 
     [A1],[A2]  => [A1, A2]
@@ -274,7 +332,7 @@ def merge_tensor_parallel_weight(weight_list, is_column=True):
         return np.concatenate(weight_list, axis=0)
 
 
-def split_tensor_parallel_weight(weight, tensor_parallel_degree, tensor_parallel_rank=None, is_column=True):
+def normal_fuse_split_tp(weight, tensor_parallel_degree, tensor_parallel_rank=None, is_column=True):
     """
 
     [A1, A2]  =>  [A1],[A2]
@@ -288,6 +346,29 @@ def split_tensor_parallel_weight(weight, tensor_parallel_degree, tensor_parallel
     Returns:
         tensor (numpy.ndarray): splited weight.
     """
+    dim = -1 if is_column else 0
+    if "PySafeSlice" in str(type(weight)):
+        size = weight.get_shape()[dim]
+        block_size = size // tensor_parallel_degree
+        start = tensor_parallel_rank * block_size
+        stop = (tensor_parallel_rank + 1) * block_size
+        assert (
+            size % tensor_parallel_degree == 0
+        ), f"The choosen size {size} is not compatible with sharding on {tensor_parallel_degree} shards"
+
+        if dim == 0 or len(weight.get_shape()) == 1:
+            tensor = weight[start:stop]
+        elif dim == -1:
+            tensor = weight[:, start:stop]
+        else:
+            raise NotImplementedError("Let's make that generic when needed")
+        return tensor
+
+    size = weight.shape[dim]
+    assert (
+        size % tensor_parallel_degree == 0
+    ), f"The choosen size {size} is not compatible with sharding on {tensor_parallel_degree} shards. for tensor shape {weight.shape}"
+
     if is_column:
         splited_weights = np.split(weight, tensor_parallel_degree, axis=-1)
     else:
@@ -362,13 +443,17 @@ def splited_qkv_to_tensor_parallel_qkv(weight_list, num_attention_heads):
 
 
 def get_tensor_parallel_merge_func(tensor_parallel_degree, tensor_parallel_rank, num_attention_heads=None):
-    def fn(x, is_column=True, transpose=False, is_old_qkv=False):
+    def fn(x, is_column=True, transpose=False, is_old_qkv=False, is_naive_2fuse=False, is_naive_3fuse=False):
         if x is None:
             return None
-        x = merge_tensor_parallel_weight(
-            x,
-            is_column=is_column,
-        )
+
+        if is_naive_2fuse:
+            return naive_fuse_merge_tp(x, is_column=is_column, fuse_tensor_parts=2)
+        elif is_naive_3fuse:
+            return naive_fuse_merge_tp(x, is_column=is_column, fuse_tensor_parts=3)
+        else:
+            x = normal_fuse_merge_tp(x, is_column=is_column)
+
         if is_old_qkv:
             assert is_column, "QKV tensor should be column parallel linear."
             assert num_attention_heads is not None, "is_old_qkv need num_attention_heads"
@@ -382,7 +467,7 @@ def get_tensor_parallel_merge_func(tensor_parallel_degree, tensor_parallel_rank,
 
 
 def get_tensor_parallel_split_func(tensor_parallel_degree, tensor_parallel_rank, num_attention_heads=None):
-    def fn(x, is_column=True, transpose=False, is_old_qkv=False):
+    def fn(x, is_column=True, transpose=False, is_old_qkv=False, is_naive_2fuse=False, is_naive_3fuse=False):
         if x is None:
             return None
         if transpose:
@@ -391,12 +476,16 @@ def get_tensor_parallel_split_func(tensor_parallel_degree, tensor_parallel_rank,
             assert is_column, "QKV tensor should be column parallel linear."
             assert num_attention_heads is not None, "is_old_qkv need num_attention_heads"
             x = naive_merged_qkv_to_tensor_parallel_qkv(x, num_attention_heads)
-        return split_tensor_parallel_weight(
-            x,
-            tensor_parallel_degree=tensor_parallel_degree,
-            tensor_parallel_rank=tensor_parallel_rank,
-            is_column=is_column,
-        )
+        if is_naive_2fuse:
+            return naive_fuse_split_tp(
+                x, tensor_parallel_degree, tensor_parallel_rank, is_column=is_column, fuse_tensor_parts=2
+            )
+        if is_naive_3fuse:
+            return naive_fuse_split_tp(
+                x, tensor_parallel_degree, tensor_parallel_rank, is_column=is_column, fuse_tensor_parts=3
+            )
+
+        return normal_fuse_split_tp(x, tensor_parallel_degree, tensor_parallel_rank, is_column=is_column)
 
     return fn
 
@@ -926,19 +1015,28 @@ class ConversionMixin:
         raise NotImplementedError
 
     @classmethod
+    def get_tensor_parallel_convert_actions(cls, config: PretrainedConfig, loaded_state_dict_keys, ignore_error=False):
+        name_action_mappings = cls._get_tensor_parallel_mappings(config)
+        state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), loaded_state_dict_keys, ignore_error)
+        for k, v in state_keys_map.items():
+            name_action_mappings[v] = name_action_mappings.pop(k)
+        return name_action_mappings
+
+    @classmethod
     def convert_tensor_parallel(
         cls, weight_file: str, config: PretrainedConfig, state_dict=None, ignore_error=False
     ) -> None:
         """the entry of converting config and converting model file
 
         Args:
-            input_dir (str | None): the input dir which contains `pytorch_model.bin` and `config.json` file
+            weight_file (str | None): the weight file path of `model_state.pdparams` file
             config (PretrainedConfig): the PretrainedConfig instance of model
         """
         name_action_mappings = cls._get_tensor_parallel_mappings(config)
         if state_dict is None:
             with device_guard("cpu"):
                 state_dict = paddle.load(weight_file, return_numpy=False)
+            logger.info("Starting to convert orignal state_dict to tensor parallel state_dict.")
 
         state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys(), ignore_error)
 
@@ -948,7 +1046,7 @@ class ConversionMixin:
         for name, action in name_action_mappings.items():
             if name not in state_dict:
                 if not ignore_error:
-                    logger.warning(f"key<{name}> not in the model state weight file.")
+                    logger.warning(f"Key <{name}> not in the model state weight file.")
                 continue
             tensor = state_dict.pop(name)
             new_tensor = action(tensor)
@@ -985,6 +1083,11 @@ class ConversionMixin:
                 tensor = action(ret) if is_dst else None
             else:
                 tensor = tensor.numpy() if is_dst else None
+
+            # keep state dict use paddle.tensor
+            if isinstance(tensor, np.ndarray):
+                with device_guard("cpu"):
+                    tensor = paddle.Tensor(tensor, zero_copy=True)
 
             state_dict_to_save[key] = tensor
 
@@ -1024,7 +1127,7 @@ class ConversionMixin:
                     break
             if key not in state_keys_map:
                 if not ignore_error:
-                    logger.error(f"could not find name {key} in loaded state dict!")
+                    logger.error(f"tensor parallel conversion: could not find name {key} in loaded state dict!")
             else:
                 state_keys_real.remove(state_keys_map[key])
 
