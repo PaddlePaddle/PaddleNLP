@@ -51,6 +51,8 @@
 ...
 ```
 
+
+
 ### 3.2 SFT
 SFT(Supervised Fine-Tuning)依托飞桨提出的[4D混合分布式并行](https://ai.baidu.com/forum/topic/show/987996)能力，支持使用Trainer API轻松切换数据并行(DP)、[张量并行（TP, Tensor Parallelism）](https://arxiv.org/abs/1909.08053)、[流水线并行（PP, Pipeline Parallelism）](https://arxiv.org/abs/1811.06965)（目前仅支持Llama）等多种分布式训练策略。
 
@@ -124,7 +126,7 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 
 <details><summary>&emsp; 数据参数(DataArgument) </summary><div>
 
-- `dataset_name_or_path`: 本地数据集目录或内置数据集名称，默认为None。
+- `dataset_name_or_path`: 本地数据集目录或内置数据集名称，默认为None。脚本已适配单文件和多文件，会自己寻找`dataset_name_or_path/train.json` 或者 `dataset_name_or_path/train/*.json`作为训练集文件, 以及`dataset_name_or_path/dev.json` 或者 `dataset_name_or_path/dev/*.json`作为验证集文件。
 - `task_name`: 用于选择内置数据集中的具体任务，默认为None。
 - `eval_with_do_generation`: 在模型效果评估的时候是否调用model.generate,默认为False。设置为True时，指标为ppl, accuracy；设置为False时，指标为BLEU4/Rouge，建议将`metric_for_best_model`设为bleu4。
 - `save_generation_output`: 当`eval_with_do_generation`设为True，是否将生成结果保存在`generated_output.json`文件中，默认为False。
