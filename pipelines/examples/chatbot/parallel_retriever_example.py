@@ -46,6 +46,7 @@ parser.add_argument('--title_split', default=False, type=bool, help='the markdow
 parser.add_argument("--api_key", default=None, type=str, help="The API Key.")
 parser.add_argument("--secret_key", default=None, type=str, help="The secret key.")
 parser.add_argument('--url', default='0.0.0.0:8082', type=str, help='The port of the HTTP service')
+parser.add_argument('--num_process', default=10, type=int, help='The number of process used for parallel retriever')
 parser.add_argument("--port", type=str, default="9200", help="port of ANN search engine")
 parser.add_argument("--es_thread_count", default=32, type=int, help="Size of the threadpool to use for the bulk requests")
 parser.add_argument("--es_queue_size", default=32, type=int, help="Size of the task queue between the main thread (producing chunks to send) and the processing threads.")
@@ -64,9 +65,7 @@ def ChatFile():
         separator="\n", chunk_size=args.data_chunk_size, chunk_overlap=0, filters=["\n"]
     )
     if args.search_engine == "faiss":
-        document_store = FAISSDocumentStore(
-            embedding_dim=768, faiss_index_factory_str="Flat", duplicate_documents="skip", return_embedding=True
-        )
+        document_store = FAISSDocumentStore(embedding_dim=768, faiss_index_factory_str="Flat", return_embedding=True)
     else:
         document_store = BaiduElasticsearchDocumentStore(
             embedding_dim=768,
@@ -94,6 +93,7 @@ def ChatFile():
         batch_size=args.retriever_batch_size,
         embed_title=args.embed_title,
         url=args.url,
+        num_process=args.num_process,
     )
     indexing_pipeline = Pipeline()
     indexing_pipeline.add_node(component=txt_converter, name="txt_converter", inputs=["File"])

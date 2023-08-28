@@ -48,7 +48,7 @@ class PredictorArgument:
     model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
     src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
-    max_length: int = field(default=1024, metadata={"help": "the max length for decoding."})
+    max_length: int = field(default=2048, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=1, metadata={"help": "top_k parameter for generation"})
     top_p: float = field(default=1.0, metadata={"help": "top_p parameter for generation"})
     temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
@@ -60,10 +60,11 @@ class PredictorArgument:
         default=None, metadata={"help": "The directory of Prefix Tuning parameters. Default to None"}
     )
     mode: str = field(
-        default="dygraph", metadata={"help": "the type of predictor, it should be one of [dygraph, static]"}
+        default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
+    max_batch_size: int = field(default=None, metadata={"help": "The max batch size of data during serving."})
 
 
 @dataclass
@@ -273,13 +274,13 @@ class StaticInferencePredictor(BasePredictor):
         self.dtype = dtype
 
         self.cache_kvs = [paddle.zeros(shape, dtype=dtype) for shape in cache_kv_shapes]
-        self.pre_ids = paddle.full([config.batch_size, config.max_length], -1, dtype="int64")
+        self.pre_ids = paddle.full([config.batch_size, config.max_length + 1], -1, dtype="int64")
         self.attention_mask = paddle.zeros(
             shape=(config.batch_size, 1, config.max_length, config.max_length),
             dtype=dtype,
         )
         self.tgt_generation_mask = paddle.zeros(
-            shape=[config.batch_size, 1, 1, config.max_length],
+            shape=[config.batch_size, 1, 1, config.max_length + 1],
             dtype=dtype,
         )
         self.predictor = self._create_predictor(config)
@@ -389,15 +390,15 @@ class DygraphInferencePredictor(BasePredictor):
 
         self.cache_kvs = [
             paddle.zeros(shape, dtype=dtype)
-            for shape in self.model.get_cache_kvs_shape(self.model.config, config.batch_size)
+            for shape in self.model.get_cache_kvs_shape(self.model.config, config.max_batch_size)
         ]
-        self.pre_ids = paddle.full([config.batch_size, config.max_length], -1, dtype="int64")
+        self.pre_ids = paddle.full([config.max_batch_size, config.max_length], -1, dtype="int64")
         self.attention_mask = paddle.zeros(
-            shape=(config.batch_size, 1, config.max_length, config.max_length),
+            shape=(config.max_batch_size, 1, config.max_length, config.max_length),
             dtype=dtype,
         )
         self.tgt_generation_mask = paddle.zeros(
-            shape=[config.batch_size, 1, 1, config.max_length],
+            shape=[config.max_batch_size, 1, 1, config.max_length],
             dtype=dtype,
         )
 
@@ -451,12 +452,12 @@ def create_predictor(
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer):
-        tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token else "<pad>"
+        tokenizer.pad_token = tokenizer.eos_token
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
     tensor_parallel_rank = paddle.distributed.get_rank()
     if not predictor_args.inference_model:
-        if predictor_args.mode == "dygraph":
+        if predictor_args.mode == "dynamic":
             if model_args.gpt:
                 sys.path.append("./gpt-3")
                 from modeling import GPTForCausalLM
@@ -492,9 +493,9 @@ def create_predictor(
         elif predictor_args.mode == "static":
             predictor = StaticGraphPredictor(predictor_args, tokenizer=tokenizer)
         else:
-            raise ValueError("the `mode` should be one of [dygraph, static]")
+            raise ValueError("the `mode` should be one of [dynamic, static]")
     else:
-        if predictor_args.mode == "dygraph":
+        if predictor_args.mode == "dynamic":
             # TODO(wj-Mcat): complete AutoInferenceModel & AutoPredictor
             assert (
                 "llama" in predictor_args.model_name_or_path
@@ -520,13 +521,16 @@ def create_predictor(
             cache_kvs_shape = LlamaForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
             predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
         else:
-            raise ValueError("the `mode` should be one of [dygraph, static]")
+            raise ValueError("the `mode` should be one of [dynamic, static]")
     return predictor
 
 
 def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
+    # init `max_batch_size`
+
+    predictor_args.max_batch_size = predictor_args.max_batch_size or predictor_args.batch_size
     paddle.set_device(predictor_args.device)
     paddle.set_default_dtype(predictor_args.dtype)
 
