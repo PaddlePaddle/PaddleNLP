@@ -38,7 +38,7 @@ function _set_params(){
     model_repo="PaddleNLP"          # (必选) 模型套件的名字
     speed_unit="tokens/s"         # (必选)速度指标单位
     skip_steps=0                  # (必选)解析日志，跳过模型前几个性能不稳定的step
-    keyword="Effective_Tokens_per_second:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
+    keyword="All_Tokens_per_second:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
     convergence_key="train_loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
     is_large_model=True           # (可选)普通模型默认为False，如果添加大模型且只取一条ips设置为True
 

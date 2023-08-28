@@ -260,7 +260,7 @@ def main():
         if training_args.benchmark:
             tokens_per_second = trainer.total_observed_tokens / train_result.metrics["train_runtime"]
             effective_tokens_per_second = trainer.total_effective_tokens / train_result.metrics["train_runtime"]
-            logger.info(f"Tokens_per_second: {tokens_per_second} ")
+            logger.info(f"All_Tokens_per_second: {tokens_per_second} ")
             logger.info(f"Effective_Tokens_per_second: {effective_tokens_per_second} ")
             logger.info("Benchmark done.")
         else:
