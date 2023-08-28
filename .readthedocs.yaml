@@ -4,6 +4,8 @@
 
 # Required
 version: 2
+build:
+  os: "ubuntu-22.04"
 
 submodules:
   include: all
