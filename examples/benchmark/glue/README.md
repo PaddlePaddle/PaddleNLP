@@ -97,3 +97,30 @@ eval loss: 0.549763, acc: 0.9151376146788991, eval done total : 1.82069873809814
 | MNLI       | matched acc./mismatched acc. |
 | QNLI       | acc.                         |
 | RTE        | acc.                         |
+
+#### trainer 版本
+
+```shell
+export task_name=mnli
+export learning_rate=5e-5
+
+python run_glue_trainer.py \
+--model_name_or_path roberta-large \
+--task_name $task_name \
+--do_train \
+--do_eval \
+--max_seq_length 512 \
+--per_device_train_batch_size 16 \
+--per_device_eval_batch_size 64 \
+--learning_rate $learning_rate \
+--num_train_epochs 10 \
+--output_dir ./checkpoints/$task_name/ft \
+--overwrite_output_dir \
+--logging_steps 10 \
+--evaluation_strategy epoch \
+--save_strategy epoch \
+--warmup_ratio 0.06 \
+--seed 0 \
+--weight_decay 0.1 \
+--disable_tqdm True
+```

@@ -12,4 +12,4 @@ python3 -m pip install tool_helpers -i https://mirror.baidu.com/pypi/simple
 cd ../examples/language_model/gpt-3/dygraph/
 rm -rf data
 mkdir data && cd data
-wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/train.data.json_ids.npz
+wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt2/train.data.json_ids.npz

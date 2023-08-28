@@ -69,7 +69,7 @@ def milvus_data_recall(embedding_path, index):
     embedding_ids = [i for i in range(embeddings.shape[0])]
     recall_client = RecallByMilvus()
     if index > len(embedding_ids):
-        print("Index should not be larger than embedding szie")
+        print("Index should not be larger than embedding size")
         return
     embeddings = embeddings[np.arange(index, index + 1)]
     time_start = time.time()

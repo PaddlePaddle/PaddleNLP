@@ -17,7 +17,7 @@ from pprint import pprint
 
 import numpy as np
 import yaml
-from attrdict import AttrDict
+from easydict import EasyDict as AttrDict
 
 try:
     from paddle_serving_server_gpu.web_service import WebService

@@ -218,10 +218,10 @@ def speed_metrics(split, start_time, num_samples=None, num_steps=None):
     result = {f"{split}_runtime": round(runtime, 4)}
     if num_samples is not None:
         samples_per_second = num_samples / runtime
-        result[f"{split}_samples_per_second"] = round(samples_per_second, 3)
+        result[f"{split}_samples_per_second"] = samples_per_second
     if num_steps is not None:
         steps_per_second = num_steps / runtime
-        result[f"{split}_steps_per_second"] = round(steps_per_second, 3)
+        result[f"{split}_steps_per_second"] = steps_per_second
     return result
 
 
@@ -394,6 +394,9 @@ def get_scheduler(
     learning_rate: float,
     num_warmup_steps: Optional[int] = None,
     num_training_steps: Optional[int] = None,
+    num_cycles: Optional[float] = 0.5,
+    lr_end: Optional[float] = 1e-7,
+    power: Optional[float] = 1.0,
 ):
     """
     Unified API to get any scheduler from its name.
@@ -408,6 +411,15 @@ def get_scheduler(
         num_training_steps (`int``, *optional*):
             The number of training steps to do. This is not required by all schedulers (hence the argument being
             optional), the function will raise an error if it's unset and the scheduler type requires it.
+        num_cycles (``float``, *optional*):
+            The number of waves in the cosine scheduler (the defaults is to just decrease from the max value to 0
+            following a half-cosine). This is not required by all schedulers (hence the argument being optional)
+        lr_end (``float``, *optional*):
+            The end LR in the polynomial scheduler. This is not required by all schedulers (hence the argument
+            being optional).
+        power (``float``, *optional*):
+            The power factor in the polynomial scheduler. This is not required by all schedulers (hence the argument
+            being optional).
     """
     name = SchedulerType(name)
     schedule_func = TYPE_TO_SCHEDULER_FUNCTION[name]
@@ -424,6 +436,23 @@ def get_scheduler(
     # All other schedulers require `num_training_steps`
     if num_training_steps is None:
         raise ValueError(f"{name} requires `num_training_steps`, please provide that argument.")
+
+    if name == SchedulerType.COSINE:
+        return schedule_func(
+            learning_rate,
+            num_warmup_steps=num_warmup_steps,
+            num_training_steps=num_training_steps,
+            num_cycles=num_cycles,
+        )
+
+    if name == SchedulerType.POLYNOMIAL:
+        return schedule_func(
+            learning_rate,
+            num_warmup_steps=num_warmup_steps,
+            num_training_steps=num_training_steps,
+            lr_end=lr_end,
+            power=power,
+        )
 
     return schedule_func(learning_rate, num_warmup_steps=num_warmup_steps, num_training_steps=num_training_steps)
 
@@ -639,7 +668,7 @@ class TrainerMemoryTracker:
         gc.collect()
 
         if self.paddle is not None:
-            # self.torch.cuda.reset_peak_memory_stats()?
+            # self.paddle.cuda.reset_peak_memory_stats()?
             self.paddle.device.cuda.empty_cache()
 
         # gpu
@@ -723,7 +752,7 @@ class TrainerMemoryTracker:
             # for t in ["begin", "end"]:
             #     if stage in self.cpu and t in self.cpu[stage]:
             #         metrics[f"{stage}_mem_cpu_{t}"] = self.cpu[stage][t]
-            #     if self.torch is not None and stage in self.gpu and t in self.gpu[stage]:
+            #     if self.paddle is not None and stage in self.gpu and t in self.gpu[stage]:
             #         metrics[f"{stage}_mem_gpu_{t}"] = self.gpu[stage][t]
 
         # since memory can be allocated before init, and it might be difficult to track overall
@@ -736,7 +765,7 @@ class TrainerMemoryTracker:
             # whatever the next stage was we could also report this:
             # if self.cpu["init"]["end"] != self.cpu[stage]["begin"]:
             #     metrics[f"after_init_mem_cpu_delta"] = self.cpu[stage]["begin"] - self.cpu["init"]["end"]
-            # if self.torch is not None and self.gpu["init"]["end"] != self.gpu[stage]["begin"]:
+            # if self.paddle is not None and self.gpu["init"]["end"] != self.gpu[stage]["begin"]:
             #     metrics[f"after_init_mem_gpu_delta"] = self.gpu[stage]["begin"] - self.gpu["init"]["end"]
 
     def stop_and_update_metrics(self, metrics=None):

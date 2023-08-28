@@ -1,5 +1,5 @@
 
-[简体中文🀄](./README.MD) | **English🌎**
+[简体中文🀄](./README.md) | **English🌎**
 
 <p align="center"> <img src="https://user-images.githubusercontent.com/1371212/175816733-8ec25eb0-9af3-4380-9218-27c154518258.png" align="middle"  width="500" /> </p>
 
@@ -22,6 +22,9 @@
 **PaddleNLP** is a NLP library that is both **easy to use** and **powerful**. It aggregates high-quality pretrained models in the industry and provides a **plug-and-play** development experience, covering a model library for various NLP scenarios. With practical examples from industry practices, PaddleNLP can meet the needs of developers who require **flexible customization**.
 
 ## News 📢
+
+* **2023.6.12: [Release of PaddleNLP v2.6rc](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0rc)**
+  * 🔨 LLM Tools：Introduces comprehensive examples of open-source LLM training and inference, including [Bloom](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/bloom), [ChatGLM](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/chatglm), [GLM](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/glm), [Llama](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/llama) and [OPT](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/opt). Added Tensor Parallel capability to [Trainer API](./docs/trainer.md) for distributed LLM trainin. Also released [Parameter-Efficient Finetuning](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/peft),which enables training LLMs on consumer hardware.
 
 * **2023.1.12: [Release of PaddleNLP v2.5](<https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.5.0>)**
 
@@ -55,7 +58,7 @@
 
 ### Out-of-Box NLP Toolset
 
-Taskflow aims to provide off-the-shelf NLP pre-built task covering NLU and NLG technique, in the meanwhile with extreamly fast infernece satisfying industrial scenario.
+Taskflow aims to provide off-the-shelf NLP pre-built task covering NLU and NLG technique, in the meanwhile with extremely fast inference satisfying industrial scenario.
 
 ![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
 
@@ -111,7 +114,7 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 
 #### Wide-range NLP Task Support
 
-PaddleNLP provides rich examples covering mainstream NLP task to help developers accelerate problem solving. You can find our powerful transformer [Model Zoo](./model_zoo), and wide-range NLP application [exmaples](./examples) with detailed instructions.
+PaddleNLP provides rich examples covering mainstream NLP task to help developers accelerate problem solving. You can find our powerful transformer [Model Zoo](./model_zoo), and wide-range NLP application [examples](./examples) with detailed instructions.
 
 Also you can run our interactive [Notebook tutorial](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995) on AI Studio, a powerful platform with **FREE** computing resource.
 
@@ -166,9 +169,9 @@ For more pretrained model usage, please refer to [Transformer API Docs](./docs/m
 
 ### Industrial End-to-end System
 
-We provide high value scenarios including information extraction, semantic retrieval, questionn answering high-value.
+We provide high value scenarios including information extraction, semantic retrieval, question answering high-value.
 
-For more details industial cases please refer to [Applications](./applications).
+For more details industrial cases please refer to [Applications](./applications).
 
 
 #### 🔍 Neural Search System
@@ -228,7 +231,7 @@ AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 
 Set `use_fast=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FastTokenizer](./fast_tokenizer).
 
-#### ⚡ FastGeneration: High Perforance Generation Library
+#### ⚡ FastGeneration: High Performance Generation Library
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407831-914dced0-3a5a-40b8-8a65-ec82bf13e53c.gif" width="400">
@@ -277,7 +280,7 @@ pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/pad
 
 ## Quick Start
 
-**Taskflow** aims to provide off-the-shelf NLP pre-built task covering NLU and NLG scenario, in the meanwhile with extreamly fast infernece satisfying industrial applications.
+**Taskflow** aims to provide off-the-shelf NLP pre-built task covering NLU and NLG scenario, in the meanwhile with extremely fast inference satisfying industrial applications.
 
 ```python
 from paddlenlp import Taskflow
@@ -327,7 +330,7 @@ To connect with other users and contributors, welcome to join our [Slack channel
 Scan the QR code below with your Wechat⬇️. You can access to official technical exchange group. Look forward to your participation.
 
 <div align="center">
-<img src="https://user-images.githubusercontent.com/11793384/212060369-4642d16e-f0ad-4359-aa57-b8303042f9c1.jpg" width="150" height="150" />
+<img src="https://user-images.githubusercontent.com/11987277/245085922-0aa68d24-00ff-442e-9c53-2f1e898151ce.png" width="150" height="150" />
 </div>
 
 

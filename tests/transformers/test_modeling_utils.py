@@ -19,7 +19,7 @@ from multiprocessing import Pool
 from tempfile import TemporaryDirectory
 
 from paddlenlp.transformers import BertModel, TinyBertModel
-from paddlenlp.utils.env import CONFIG_NAME, MODEL_HOME, PADDLE_WEIGHT_FILE_NAME
+from paddlenlp.utils.env import CONFIG_NAME, MODEL_HOME, PADDLE_WEIGHTS_NAME
 from tests.testing_utils import slow
 
 
@@ -43,7 +43,7 @@ class TestModeling(unittest.TestCase):
         with TemporaryDirectory() as tempdir:
             BertModel.from_pretrained(model_name, cache_dir=tempdir)
             self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, CONFIG_NAME)))
-            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, PADDLE_WEIGHT_FILE_NAME)))
+            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, PADDLE_WEIGHTS_NAME)))
             # check against double appending model_name in cache_dir
             self.assertFalse(os.path.exists(os.path.join(tempdir, model_name, model_name)))
 
@@ -53,7 +53,7 @@ class TestModeling(unittest.TestCase):
         with TemporaryDirectory() as tempdir:
             BertModel.from_pretrained(model_name, cache_dir=tempdir)
             self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, CONFIG_NAME)))
-            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, PADDLE_WEIGHT_FILE_NAME)))
+            self.assertTrue(os.path.exists(os.path.join(tempdir, model_name, PADDLE_WEIGHTS_NAME)))
             # check against double appending model_name in cache_dir
             self.assertFalse(os.path.exists(os.path.join(tempdir, model_name, model_name)))
 

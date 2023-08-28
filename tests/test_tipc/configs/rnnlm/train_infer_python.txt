@@ -2,7 +2,7 @@
 model_name:ptb
 python:python3.7
 gpu_list:0|0,1
---device:gpu
+--device:gpu|gpu
 null:null
 --epoch:null
 --save_model:./test_tipc/output/

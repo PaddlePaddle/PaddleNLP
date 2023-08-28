@@ -424,7 +424,6 @@ class Pipeline(BasePipeline):
             queue[self.root_node]["documents"] = documents
         if meta:
             queue[self.root_node]["meta"] = meta
-
         i = 0  # the first item is popped off the queue unless it is a "join" node with unprocessed predecessors
         while queue:
             node_id = list(queue.keys())[i]
@@ -442,7 +441,8 @@ class Pipeline(BasePipeline):
             predecessors = set(nx.ancestors(self.graph, node_id))
             if predecessors.isdisjoint(set(queue.keys())):  # only execute if predecessor nodes are executed
                 try:
-                    logger.debug(f"Running node `{node_id}` with input `{node_input}`")
+                    if debug:
+                        logger.debug(f"Running node `{node_id}` with input `{node_input}`")
                     node_output, stream_id = self.graph.nodes[node_id]["component"]._dispatch_run(**node_input)
                 except Exception as e:
                     tb = traceback.format_exc()

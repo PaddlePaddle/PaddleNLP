@@ -70,7 +70,7 @@ class GenerationTesterMixin:
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
 
         input_ids = inputs_dict[self.input_name]
-        attention_mask = paddle.zeros_like(input_ids, dtype=paddle.int64)
+        attention_mask = paddle.ones_like(input_ids, dtype=paddle.int64)
 
         max_batch_size = 2
         sequence_length = input_ids.shape[-1] // 2

@@ -35,6 +35,7 @@ REPO_ROOT_PATH=$(readlinkf ${BASEDIR}/../)
 FILENAME=$1
 
 # change gpu to npu in tipc txt configs
+sed -i "s/--device:gpu|gpu/--device:npu|npu/g" $FILENAME
 sed -i "s/--device:gpu/--device:npu/g" $FILENAME
 sed -i "s/state=GPU/state=NPU/g" $FILENAME
 sed -i "s/trainer:pact_train/trainer:norm_train/g" $FILENAME
@@ -43,12 +44,25 @@ sed -i "s/--device:cpu|gpu/--device:cpu|npu/g" $FILENAME
 sed -i "s/--device:gpu|cpu/--device:cpu|npu/g" $FILENAME
 sed -i "s/--benchmark:True/--benchmark:False/g" $FILENAME
 sed -i "s/--use_tensorrt:False|True/--use_tensorrt:False/g" $FILENAME
+# python has been updated to version 3.9 for npu backend
+sed -i "s/python3.7/python3.9/g" $FILENAME
 sed -i 's/\"gpu\"/\"npu\"/g' test_tipc/test_train_inference_python.sh
 
 # parser params
 dataline=`cat $FILENAME`
 IFS=$'\n'
 lines=(${dataline})
+
+# change total iters/epochs for npu to accelaration
+modelname=$(echo $FILENAME | cut -d '/' -f4)
+if  [ $modelname == "stablediffusion" ] || [ $modelname == "t5_for_conditional_generation" ] || [ $modelname == "gpt_for_sequence_classification" ] \
+    || [ $modelname == "bert_for_question_answering" ] || [ $modelname == "ernie_tiny" ] || [ $modelname == "ernie3_for_sequence_classification" ]  \
+    || [ $modelname == "seq2seq" ] || [ $modelname == "xlnet" ]; then
+    changed=$(sed -n "16p" $FILENAME | grep "max_steps" | wc -l)
+    if [ $changed == "0" ]; then
+        sed -i '16s/$/   --max_steps 10/'  $FILENAME
+    fi
+fi
 
 # pass parameters to test_train_inference_python.sh
 cmd="bash test_tipc/test_train_inference_python.sh ${FILENAME} $2"

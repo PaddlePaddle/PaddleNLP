@@ -25,7 +25,6 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.distributed import fleet
-from paddle.fluid import layers
 from paddle.nn import Layer
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
@@ -236,12 +235,8 @@ class MultiHeadAttention(nn.Layer):
             k, v = self.compute_kv(key, value)
             return self.StaticCache(k, v)
         elif value is None:  # incremental_state
-            k = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_heads, 0, self.head_dim], dtype=key.dtype, value=0
-            )
-            v = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_heads, 0, self.head_dim], dtype=key.dtype, value=0
-            )
+            k = paddle.full(shape=[key.shape[0], self.num_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0)
+            v = paddle.full(shape=[key.shape[0], self.num_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0)
             return self.Cache(k, v)
         else:
             # incremental_state with initial value, mainly for usage like UniLM
@@ -761,7 +756,7 @@ class OPTModel(OPTPretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -796,9 +791,10 @@ class OPTModel(OPTPretrainedModel):
         if attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
             expanded_attn_mask = _expand_mask(attention_mask, tgt_length=input_shape[-1])
-            combined_attention_mask = (
-                expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
-            )
+            if input_shape[-1] > 1:
+                combined_attention_mask = combined_attention_mask + expanded_attn_mask
+            else:
+                combined_attention_mask = expanded_attn_mask
 
         return combined_attention_mask
 
@@ -953,10 +949,11 @@ class OPTModel(OPTPretrainedModel):
 
 
 class OPTLMHead(Layer):
-    def __init__(self, hidden_size: int, vocab_size: int, embedding_weights=None):
+    def __init__(self, config: OPTConfig, embedding_weights=None):
         super(OPTLMHead, self).__init__()
+        self.config = config
         self.decoder_weight = (
-            self.create_parameter(shape=[vocab_size, hidden_size], dtype=paddle.get_default_dtype(), is_bias=True)
+            self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=config.dtype, is_bias=True)
             if embedding_weights is None
             else embedding_weights
         )
@@ -964,8 +961,7 @@ class OPTLMHead(Layer):
     def forward(self, hidden_states):
         if isinstance(hidden_states, BaseModelOutputWithPastAndCrossAttentions):
             hidden_states = hidden_states["last_hidden_state"]
-
-        logits = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True)
+        logits = paddle.tensor.matmul(hidden_states, self.decoder_weight.cast(hidden_states.dtype), transpose_y=True)
         return logits
 
 
@@ -983,10 +979,14 @@ class OPTForCausalLM(OPTPretrainedModel):
         super(OPTForCausalLM, self).__init__(config)
         self.opt = OPTModel(config)
         self.lm_head = OPTLMHead(
-            hidden_size=self.opt.config.hidden_size,
-            vocab_size=self.opt.config.vocab_size,
+            config,
             embedding_weights=self.opt.embeddings.word_embeddings.weight,
         )
+
+    def _get_model_inputs_spec(self, dtype: str):
+        return {
+            "input_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+        }
 
     def forward(
         self,
@@ -1072,12 +1072,7 @@ class OPTForCausalLM(OPTPretrainedModel):
 
         loss = None
         if labels is not None:
-            # Shift so that tokens < n predict n
-            shift_logits = logits[:, :-1, :]
-            shift_labels = labels[:, 1:]
-            # Flatten the tokens
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(shift_logits.reshape((-1, shift_logits.shape[-1])), shift_labels.reshape((-1,)))
+            loss = nn.functional.cross_entropy(logits, labels)
 
         if not return_dict:
             if not use_cache:
@@ -1144,9 +1139,7 @@ class OPTForCausalLM(OPTPretrainedModel):
 
     @staticmethod
     def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
-        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
-            input_ids == pad_token_id
-        ).numpy().item()
+        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(input_ids == pad_token_id).item()
         is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
             (eos_token_id is not None) and (pad_token_id != eos_token_id)
         )

@@ -1,6 +1,0 @@
-paddlenlp>=2.5.1
-Pillow
-requests
-tqdm
-paddlepaddle-gpu
-fastcore

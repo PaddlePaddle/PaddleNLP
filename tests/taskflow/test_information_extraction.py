@@ -31,12 +31,14 @@ class TestUIETask(unittest.TestCase):
             task="information_extraction",
             task_path="PaddleCI/tiny-random-uie-m",
             from_hf_hub=True,
+            convert_from_torch=False,
         )
 
         cls.uie_x = Taskflow(
             task="information_extraction",
             task_path="PaddleCI/tiny-random-uie-x",
             from_hf_hub=True,
+            convert_from_torch=False,
         )
 
     def test_entity_extraction(self):

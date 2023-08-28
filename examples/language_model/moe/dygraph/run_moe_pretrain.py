@@ -38,7 +38,7 @@ from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
     GroupShardedScaler,
 )
-from paddle.fluid.framework import core
+from paddle.framework import core
 from paddle.incubate.distributed.models import moe
 from utils import get_timers, set_timers
 from visualdl import LogWriter
@@ -80,16 +80,31 @@ def run_evaluate(args, data_loader, model, criterion, iter_steps, log_writer, gl
     local_time = time.time()
     for eval_step, batch in enumerate(data_loader):
         tokens, loss_mask, labels = batch
-        with paddle.amp.auto_cast(
-            args.use_pure_fp16,
-            custom_black_list=[
-                "reduce_sum",
-                "c_softmax_with_cross_entropy",
-                "elementwise_div",
-            ],
-            level="O2",
-        ):
-            preds = model(tokens)
+        # paddle version >= 2.5.0 or develop
+        paddle_version = float(paddle.__version__[:3])
+        if (paddle_version == 0.0) or (paddle_version >= 2.5):
+            with paddle.amp.auto_cast(
+                args.use_pure_fp16,
+                custom_black_list=[
+                    "reduce_sum",
+                    "c_softmax_with_cross_entropy",
+                    "elementwise_div",
+                ],
+                level="O2",
+                use_promote=False,
+            ):
+                preds = model(tokens)
+        else:
+            with paddle.amp.auto_cast(
+                args.use_pure_fp16,
+                custom_black_list=[
+                    "reduce_sum",
+                    "c_softmax_with_cross_entropy",
+                    "elementwise_div",
+                ],
+                level="O2",
+            ):
+                preds = model(tokens)
         preds = paddle.cast(preds, dtype="float32")
         loss = criterion(preds, labels, loss_mask)
 
@@ -162,8 +177,8 @@ def unscale_method(self, optimizer):
             for param in optimizer._parameter_list
             if (param._grad_ivar() is not None) and (param._grad_ivar().dtype == core.VarDesc.VarType.FP32)
         ]
-    temp_found_inf_fp16 = paddle.to_tensor(np.array([0]).astype(np.bool))
-    temp_found_inf_fp32 = paddle.to_tensor(np.array([0]).astype(np.bool))
+    temp_found_inf_fp16 = paddle.to_tensor(np.array([0]).astype(np.bool_))
+    temp_found_inf_fp32 = paddle.to_tensor(np.array([0]).astype(np.bool_))
 
     if len(param_grads_fp16):
         _legacy_C_ops.check_finite_and_unscale(param_grads_fp16, self._scale, param_grads_fp16, temp_found_inf_fp16)
@@ -517,7 +532,6 @@ def do_train(args):
             # many times. and start a new random dataloader.
             valid_data_loader = valid_data_loader()
             test_data_loader = test_data_loader()
-
             for step, batch in enumerate(train_data_loader()):
                 # to remove the train data that has been studyed.
                 if step < global_step - pass_num:
@@ -534,19 +548,37 @@ def do_train(args):
                     start_index = i * args.micro_batch_size
                     end_index = start_index + args.micro_batch_size
                     timers("forward-compute").start()
-                    with paddle.amp.auto_cast(
-                        args.use_pure_fp16,
-                        custom_black_list=[
-                            "reduce_sum",
-                            "c_softmax_with_cross_entropy",
-                            "elementwise_div",
-                        ],
-                        level="O2",
-                    ):
-                        preds = model(tokens[start_index:end_index, :])
-                        loss_mbs = criterion(
-                            preds, labels[start_index:end_index, :], loss_mask[start_index:end_index, :]
-                        )
+                    # paddle version >= 2.5.0 or develop
+                    paddle_version = float(paddle.__version__[:3])
+                    if (paddle_version == 0.0) or (paddle_version >= 2.5):
+                        with paddle.amp.auto_cast(
+                            args.use_pure_fp16,
+                            custom_black_list=[
+                                "reduce_sum",
+                                "c_softmax_with_cross_entropy",
+                                "elementwise_div",
+                            ],
+                            level="O2",
+                            use_promote=False,
+                        ):
+                            preds = model(tokens[start_index:end_index, :])
+                            loss_mbs = criterion(
+                                preds, labels[start_index:end_index, :], loss_mask[start_index:end_index, :]
+                            )
+                    else:
+                        with paddle.amp.auto_cast(
+                            args.use_pure_fp16,
+                            custom_black_list=[
+                                "reduce_sum",
+                                "c_softmax_with_cross_entropy",
+                                "elementwise_div",
+                            ],
+                            level="O2",
+                        ):
+                            preds = model(tokens[start_index:end_index, :])
+                            loss_mbs = criterion(
+                                preds, labels[start_index:end_index, :], loss_mask[start_index:end_index, :]
+                            )
                     timers("forward-compute").stop()
 
                     if args.gate != "naive" and args.balance_loss_weight:

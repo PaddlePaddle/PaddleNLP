@@ -37,13 +37,13 @@ def set_seed(seed):
 
 
 def do_generated_inputs(args):
-    if args.device == "gpu":
-        rank = dist.get_rank()
-        trainer_count = dist.get_world_size()
-    else:
+    if args.device == "cpu":
         rank = 0
         trainer_count = 1
         paddle.set_device("cpu")
+    else:
+        rank = dist.get_rank()
+        trainer_count = dist.get_world_size()
 
     if trainer_count > 1:
         dist.init_parallel_env()
@@ -103,10 +103,21 @@ def do_generated_inputs(args):
             cloned_inputs = clone_inputs(example_inputs)
 
             if args.use_amp:
-                with paddle.amp.auto_cast(
-                    custom_black_list=args.custom_black_list if args.amp_level == "O2" else {}, level=args.amp_level
-                ):
-                    loss, sample_per_cards = benchmark_model.forward(model, args, cloned_inputs)
+                # paddle version >= 2.5.0 or develop
+                paddle_version = float(paddle.__version__[:3])
+                if (paddle_version == 0.0) or (paddle_version >= 2.5):
+                    with paddle.amp.auto_cast(
+                        custom_black_list=args.custom_black_list if args.amp_level == "O2" else {},
+                        level=args.amp_level,
+                        use_promote=args.amp_use_promote,
+                    ):
+                        loss, sample_per_cards = benchmark_model.forward(model, args, cloned_inputs)
+                else:
+                    with paddle.amp.auto_cast(
+                        custom_black_list=args.custom_black_list if args.amp_level == "O2" else {},
+                        level=args.amp_level,
+                    ):
+                        loss, sample_per_cards = benchmark_model.forward(model, args, cloned_inputs)
 
                 scaled = scaler.scale(loss)
                 scaled.backward()
@@ -247,10 +258,21 @@ def do_train(args):
             train_reader_cost = time.time() - batch_start
 
             if args.use_amp:
-                with paddle.amp.auto_cast(
-                    custom_black_list=args.custom_black_list if args.amp_level == "O2" else {}, level=args.amp_level
-                ):
-                    loss, sample_per_cards = benchmark_model.forward(model, args, input_data)
+                # paddle version >= 2.5.0 or develop
+                paddle_version = float(paddle.__version__[:3])
+                if (paddle_version == 0.0) or (paddle_version >= 2.5):
+                    with paddle.amp.auto_cast(
+                        custom_black_list=args.custom_black_list if args.amp_level == "O2" else {},
+                        level=args.amp_level,
+                        use_promote=args.amp_use_promote,
+                    ):
+                        loss, sample_per_cards = benchmark_model.forward(model, args, input_data)
+                else:
+                    with paddle.amp.auto_cast(
+                        custom_black_list=args.custom_black_list if args.amp_level == "O2" else {},
+                        level=args.amp_level,
+                    ):
+                        loss, sample_per_cards = benchmark_model.forward(model, args, input_data)
 
                 scaled = scaler.scale(loss)
                 scaled.backward()

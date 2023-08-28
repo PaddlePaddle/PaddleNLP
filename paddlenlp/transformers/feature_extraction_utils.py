@@ -22,7 +22,9 @@ from typing import Any, Dict, Optional, Tuple, Union
 
 import numpy as np
 import paddle
+from huggingface_hub import hf_hub_download
 
+from .. import __version__
 from ..utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
 from ..utils.log import logger
 from .tokenizer_utils_base import TensorType
@@ -241,29 +243,54 @@ class FeatureExtractionMixin(object):
         Returns:
             `Tuple[Dict, Dict]`: The dictionary(ies) that will be used to instantiate the feature extractor object.
         """
-        cache_dir = resolve_cache_dir(
-            pretrained_model_name_or_path=pretrained_model_name_or_path,
-            from_hf_hub=False,  # TODO: from_hf_hub not supported yet
-            cache_dir=kwargs.pop("cache_dir", None),
-        )
+        cache_dir = kwargs.pop("cache_dir", None)
+        from_hf_hub = kwargs.pop("from_hf_hub", False)
+        subfolder = kwargs.pop("subfolder", None)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         is_local = os.path.isdir(pretrained_model_name_or_path)
         if os.path.isdir(pretrained_model_name_or_path):
-            resolved_feature_extractor_file = os.path.join(pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME)
+            if subfolder is None:
+                resolved_feature_extractor_file = os.path.join(pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME)
+            else:
+                resolved_feature_extractor_file = os.path.join(
+                    pretrained_model_name_or_path, subfolder, FEATURE_EXTRACTOR_NAME
+                )
         elif os.path.isfile(pretrained_model_name_or_path):
             resolved_feature_extractor_file = pretrained_model_name_or_path
             is_local = True
+        elif from_hf_hub:
+            feature_extractor_file = FEATURE_EXTRACTOR_NAME
+            resolved_feature_extractor_file = hf_hub_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=feature_extractor_file,
+                cache_dir=cache_dir,
+                subfolder=subfolder,
+                library_name="PaddleNLP",
+                library_version=__version__,
+            )
         else:
             # from pretrained_feature_extractor_file
             if pretrained_model_name_or_path in cls.pretrained_feature_extractor_file:
                 feature_extractor_file = cls.pretrained_feature_extractor_file[pretrained_model_name_or_path]
             else:
                 # Assuming from community-contributed pretrained models
-                feature_extractor_file = "/".join(
-                    [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME]
-                )
+                if subfolder is None:
+                    feature_extractor_file = "/".join(
+                        [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME]
+                    )
+                else:
+                    feature_extractor_file = "/".join(
+                        [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, subfolder, FEATURE_EXTRACTOR_NAME]
+                    )
+                    # update cache_dir
+                    cache_dir = os.path.join(cache_dir, subfolder)
             try:
                 resolved_feature_extractor_file = get_path_from_url_with_filelock(feature_extractor_file, cache_dir)
+            except EnvironmentError:
+                # Raise any environment error raise by `cached_file`. It will have a helpful error message adapted to
+                # the original exception.
+                raise
             except Exception:
                 # For any other exception, we throw a generic error.
                 raise EnvironmentError(
@@ -321,7 +348,6 @@ class FeatureExtractionMixin(object):
         for key in to_remove:
             kwargs.pop(key, None)
 
-        logger.info(f"Feature extractor {feature_extractor}")
         if return_unused_kwargs:
             return feature_extractor, kwargs
         else:

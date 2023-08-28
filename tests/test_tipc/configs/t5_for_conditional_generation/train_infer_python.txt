@@ -2,7 +2,7 @@
 model_name:t5_for_conditional_generation
 python:python3.7
 gpu_list:0|0,1
---device:gpu
+--device:gpu|gpu
 --use_amp:null
 --max_steps:null
 null:null
@@ -49,8 +49,6 @@ null:null
 null:null
 null:null
 null:null
-===========================to_static_train_benchmark_params===========================
-to_static_train:--to_static
 ===========================disable_train_benchmark==========================
 batch_size:2
 fp_items:fp32|fp16

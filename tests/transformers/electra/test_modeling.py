@@ -518,25 +518,6 @@ class ElectraModelCompatibilityTest(unittest.TestCase):
             )
 
     @require_package("transformers", "torch")
-    def test_electra_converter_from_local_dir_with_enable_torch(self):
-        with tempfile.TemporaryDirectory() as tempdir:
-            # 1. forward the torch  model
-            from transformers import ElectraModel
-
-            torch_model = ElectraModel.from_pretrained(self.model_id)
-            torch_model.save_pretrained(tempdir)
-
-            # 2. forward the paddle model
-            from paddlenlp.transformers import ElectraModel, model_utils
-
-            model_utils.ENABLE_TORCH_CHECKPOINT = False
-
-            with self.assertRaises(ValueError) as error:
-                ElectraModel.from_pretrained(tempdir)
-                self.assertIn("conversion is been disabled" in str(error.exception))
-            model_utils.ENABLE_TORCH_CHECKPOINT = True
-
-    @require_package("transformers", "torch")
     def test_electra_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
 
@@ -555,7 +536,7 @@ class ElectraModelCompatibilityTest(unittest.TestCase):
             # 2. forward the paddle model
             from paddlenlp.transformers import ElectraModel
 
-            paddle_model = ElectraModel.from_pretrained(tempdir)
+            paddle_model = ElectraModel.from_pretrained(tempdir, convert_from_torch=True)
             paddle_model.eval()
             paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
 
@@ -612,7 +593,7 @@ class ElectraModelCompatibilityTest(unittest.TestCase):
             from paddlenlp import transformers
 
             paddle_model_class = getattr(transformers, class_name)
-            paddle_model = paddle_model_class.from_pretrained(tempdir)
+            paddle_model = paddle_model_class.from_pretrained(tempdir, convert_from_torch=True)
             paddle_model.eval()
 
             paddle_logit = paddle_model(paddle.to_tensor(input_ids), return_dict=False)[0]
