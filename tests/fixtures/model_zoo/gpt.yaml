@@ -83,7 +83,6 @@ glue:
     device: gpu
     do_train: true
   
-
 generation:
   default:
     model_type: gpt2

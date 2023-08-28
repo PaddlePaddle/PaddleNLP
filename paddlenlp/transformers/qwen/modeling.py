@@ -625,11 +625,11 @@ class QWenModel(QWenPreTrainedModel):
         all_self_attentions = () if output_attentions else None
         all_hidden_states = () if output_hidden_states else None
         for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
-
+            has_gradient = not hidden_states.stop_gradient
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
-            if self.enable_recompute and self.training:
+            if self.enable_recompute and self.training and has_gradient:
                 outputs = self.recompute_training(
                     block,
                     hidden_states,

@@ -476,6 +476,7 @@ class FusedMultiTransformer(Layer):
                     sequence_lengths=seq_lens,
                     rotary_tensor=rotary_embs,
                     rotary_emb_dims=rotary_emb_dims,
+                    use_neox_rotary_style=self.use_neox_rotary_style,
                 )[0]
             # out_linear
             out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i])

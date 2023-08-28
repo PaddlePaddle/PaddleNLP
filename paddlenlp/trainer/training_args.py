@@ -20,7 +20,6 @@ import contextlib
 import json
 import math
 import os
-import time
 import types
 import warnings
 from dataclasses import asdict, dataclass, field
@@ -790,7 +789,9 @@ class TrainingArguments:
         if len(self.sharding) == 0 and self.sharding_parallel_degree > 0:
             warnings.warn("`--sharding_parallel_degree` is useful only when `--sharding` is specified.")
 
-        if len(self.sharding) > 0 or self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1:
+        if paddle.distributed.get_world_size() > 1 and (
+            len(self.sharding) > 0 or self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1
+        ):
             self.use_hybrid_parallel = True
 
         if self.amp_master_grad:
@@ -972,14 +973,8 @@ class TrainingArguments:
                             "The enable_stage1_tensor_fusion or enable_stage1_overlap is not supported "
                             "by current version of Paddle. Please try latest develop Paddle."
                         )
-                start_time = time.time()
                 fleet.init(is_collective=True, strategy=strategy)
-                paddle.device.cuda.synchronize()
-                elapsed = time.time() - start_time
-                logger.info("NCCL-Connection costs {:.2f} ms.".format(elapsed))
-
                 logger.info(strategy)
-
         else:
             world_size = paddle.distributed.get_world_size()
             if world_size > 1:
