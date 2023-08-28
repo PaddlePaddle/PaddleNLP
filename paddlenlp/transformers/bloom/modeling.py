@@ -431,7 +431,7 @@ class BloomAttention(nn.Layer):
             # [batch_size * num_heads, q_length, kv_length]
             # alibi:[batch_size * num_heads, q_length, kv_length]
             # we use `Tensor.baddbmm` instead of `paddle.baddbmm` as the latter isn't supported by TorchScript v1.11
-            attention_scores = paddle.matmul(key_layer, key_layer) * self.inv_norm_factor
+            attention_scores = paddle.matmul(query_layer, key_layer) * self.inv_norm_factor
             attention_mask = attention_mask + alibi
 
             # change view to [batch_size, num_heads, q_length, kv_length]
