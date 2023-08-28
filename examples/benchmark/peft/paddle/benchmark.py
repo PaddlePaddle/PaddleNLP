@@ -202,8 +202,6 @@ def main():
         model_inputs["input_ids"] = model_inputs["input_ids"][:-1]
         model_inputs["labels"] = model_inputs["labels"][1:]
 
-        seq_length = len(model_inputs["input_ids"])
-        model_inputs["position_ids"] = list(range(seq_length))
         if intokens:
             model_inputs["attention_mask"] = np.tril(
                 np.ones([len(model_inputs["input_ids"]), len(model_inputs["input_ids"])], dtype=bool)
