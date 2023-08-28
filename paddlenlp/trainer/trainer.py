@@ -2035,6 +2035,7 @@ class Trainer:
             paddle_pipeline_timers = paddle_get_timers()
         except ImportError:  # paddle version too old, timer not support
             logger.warning(f"paddle version:{paddle.__git_commit__} does not support pipeline timer")
+            paddle_pipeline_timers = None
         except AssertionError:
             paddle_pipeline_timers = None
         kwargs.update(timer=self.timers, paddle_pipeline_timers=paddle_pipeline_timers)
