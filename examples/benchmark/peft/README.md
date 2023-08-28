@@ -22,12 +22,12 @@
 
 | Model          | Setup           | Paddle Effective Tokens /s | Torch Effective Tokens /s  |  Speedup  |
 |----------------|-----------------|----------------------------|----------------------------|-----------|
-| Bloomz-7b1-mt  | bsz 8 MP4       |       4136.69              |         N/A                |   N/A     |
-| Bloomz-7b1-mt  | bsz 8 ZeRO 3    |                     |     1702.00                |   256%    |
-| Bloomz-7b1-mt  | bsz 8 ZeRO 2    |                     |     1891.16                |   175%    |
-| Bloomz-7b1-mt  | bsz 16 MP4      |      4359.72               |         N/A                |   N/A     |
-| Bloomz-7b1-mt  | bsz 16 ZeRO 3   |                     |      2849.90               |   104     |
-| Bloomz-7b1-mt  | bsz 16 ZeRO 2   |                     |     2719.92                |   105%    |
+| Bloomz-7b1-mt  | bsz 8 MP4       |       7421.09              |         N/A                |   N/A     |
+| Bloomz-7b1-mt  | bsz 8 ZeRO 3    |       6063.23              |     1702.00                |   256%    |
+| Bloomz-7b1-mt  | bsz 8 ZeRO 2    |      5191.47               |     1891.16                |   175%    |
+| Bloomz-7b1-mt  | bsz 16 MP4      |      8214.55               |         N/A                |   N/A     |
+| Bloomz-7b1-mt  | bsz 16 ZeRO 3   |      5822.23               |      2849.90               |   104     |
+| Bloomz-7b1-mt  | bsz 16 ZeRO 2   |    5572.13                 |     2719.92                |   105%    |
 
 
 ### Llama
