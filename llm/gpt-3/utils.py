@@ -328,7 +328,7 @@ class GPTTrainer(Trainer):
 
         preds = model.generate(
             input_ids=inputs["input_ids"],
-            attention_mask=inputs["attention_mask"],
+            attention_mask=inputs["attention_mask"] if "attention_mask" in inputs else None,
             max_length=self.args.tgt_length,
             min_length=0,
             use_cache=True,

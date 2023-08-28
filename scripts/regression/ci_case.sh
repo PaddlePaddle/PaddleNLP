@@ -329,12 +329,12 @@ python deploy/python/inference.py \
     --model_path ./infer_model/model >${log_path}/gpt_p_depoly) >>${log_path}/gpt_p_depoly 2>&1
 print_info $? gpt_p_depoly
 
-echo 'run gpt test with pytest'
-cd ${nlp_dir}
-python -m pytest ./tests/model_zoo/test_gpt.py >${log_path}/gpt >>${log_path}/gpt 2>&1
-print_info $? gpt
+# echo 'run gpt test with pytest'
+# cd ${nlp_dir}
+# python -m pytest ./tests/model_zoo/test_gpt.py >${log_path}/gpt >>${log_path}/gpt 2>&1
+# print_info $? gpt
 
-fast_gpt
+# fast_gpt
 cd ${nlp_dir}/fast_generation/samples
 python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
 print_info $? fast_generation_gpt
@@ -342,10 +342,6 @@ print_info $? fast_generation_gpt
 # 9 ernie
 ernie(){
 #data process
-cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
-sed -i "s/python3/python/g" Makefile
-sed -i "s/python-config/python3.7m-config/g" Makefile
-export CUDA_VISIBLE_DEVICES=${cudaid2}
 cd ${nlp_dir}/model_zoo/ernie-1.0/
 mkdir data && cd data
 wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_ids.npy

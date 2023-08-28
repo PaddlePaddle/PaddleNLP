@@ -318,9 +318,7 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike], tensor_parallel_sp
             )
         if metadata["format"] == "pd":
             raise ValueError("Currently unsupport paddle weights file, use numpy instead.")
-            return safe_load_file(checkpoint_file)
         if metadata["format"] == "np":
-            logger.warning("loading safe.")
             state_dict = {}
             with safe_open(checkpoint_file, framework="np") as f:
                 for key in f.keys():
@@ -331,12 +329,10 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike], tensor_parallel_sp
                         weight = py_safe_slice_[:]
                     state_dict[key] = weight
 
-            logger.warning("loading done.")
             for k in list(state_dict.keys()):
                 with device_guard():
                     state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
 
-            logger.warning("copy paddle tensor done.")
             return state_dict
 
     state_dict = paddlenlp_load(checkpoint_file, map_location="cpu")
