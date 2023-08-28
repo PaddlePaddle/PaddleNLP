@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import math
+import warnings
 from functools import partial
 from typing import Optional, Tuple
 
@@ -30,7 +31,7 @@ try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
 except ImportError:
     fused_rotary_position_embedding = None
-import warnings
+
 
 from paddle.utils import try_import
 
@@ -188,22 +189,15 @@ def scaled_dot_product_attention(
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
         if alibi is not None:
             raise ValueError("Flash Attention does not support ALiBi yet")
-        if attention_mask is not None:
-            attn_output = F.scaled_dot_product_attention(
-                query_states,
-                key_states,
-                value_states,
-                attn_mask=attention_mask,
-                is_causal=False,
-            )
-        else:
-            attn_output = F.scaled_dot_product_attention(
-                query_states,
-                key_states,
-                value_states,
-                attn_mask=attention_mask,
-                is_causal=is_causal,
-            )
+
+        attn_output = F.scaled_dot_product_attention(
+            query_states,
+            key_states,
+            value_states,
+            attn_mask=attention_mask,
+            is_causal=attention_mask is None,
+        )
+
         attn_weights = None
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])

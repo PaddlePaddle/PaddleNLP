@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -27,6 +28,9 @@ from paddlenlp.datasets import InTokensMapDataset
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+
+os.environ["http_proxy"] = "http://172.19.56.199:3128"
+os.environ["https_proxy"] = "http://172.19.56.199:3128"
 
 """
 单卡
@@ -153,8 +157,6 @@ def main():
         model_inputs["labels"] = model_inputs["labels"][1:]
         seq_length = len(model_inputs["input_ids"])
         model_inputs["position_ids"] = list(range(seq_length))
-        if "token_type_ids" in model_inputs:
-            model_inputs.pop("token_type_ids")
         if intokens:
             model_inputs["attention_mask"] = np.tril(np.ones([seq_length, seq_length], dtype=bool))
         return model_inputs
@@ -259,10 +261,8 @@ def main():
 
     if model_args.english:
         dataset = load_dataset("tatsu-lab/alpaca")
-        columns = ["instruction", "input", "output", "text"]
     else:
         dataset = load_dataset("Chinese-Vicuna/guanaco_belle_merge_v1.0")
-        columns = ["instruction", "input", "output"]
 
     # select first 10k examples for benchmarking
     dataset = dataset["train"].select(range(model_args.train_data_size))
@@ -284,10 +284,7 @@ def main():
             lambda example: preprocess_function_gpt(example, intokens=model_args.intokens),
         )
     else:
-        dataset = dataset.map(
-            lambda example: preprocess_function(example, intokens=model_args.intokens),
-            remove_columns=columns,
-        )
+        dataset = dataset.map(lambda example: preprocess_function(example, intokens=model_args.intokens))
     total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
     if model_args.intokens:
         dataset = InTokensMapDataset(
