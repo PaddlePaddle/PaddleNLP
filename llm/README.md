@@ -244,7 +244,7 @@ python predictor.py \
 python export_model.py \
     --model_name_or_path meta-llama/Llama-2-7b-chat \
     --output_path ./inference \
-    --dtype float16 \
+    --dtype float16
 
 
 # 静态图模型推理
