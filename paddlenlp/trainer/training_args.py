@@ -790,6 +790,19 @@ class TrainingArguments:
                         # "delay_scale_loss": True, Fix ME
                     }
                     logger.info(f"PP configs:{strategy.pipeline_configs}, use master_grad: {self.amp_master_grad}")
+
+                    debug_hang = int(os.environ.get("PADDLE_DEBUG_HANG", 0))
+                    dygraph_pp_configs = {
+                        "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
+                        "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config
+                        and not debug_hang
+                        and self.data_parallel_degree > 1,
+                        "sharding_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config
+                        and not debug_hang
+                        and self.sharding_parallel_degree > 1,
+                        "enable_timer": "enable_timer" in pipeline_parallel_config,
+                    }
+
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
                         "dp_comm_overlap": "enable_dp_comm_overlap" in pipeline_parallel_config
