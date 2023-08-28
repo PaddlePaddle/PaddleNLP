@@ -201,8 +201,8 @@ class FasterTransformerExtension(CMakeExtension):
         # self.cmake_args += [f"-DSM={self.sm}"] if self.sm is not None else []
         self.cmake_args += ["-DWITH_GPT=ON"]
 
-        self.cmake_args += ["-D=PYTHON_LIBRARY={}".format(distutils.sysconfig.get_config_var("LIBDIR"))]
-        self.cmake_args += ["-D=PYTHON_INCLUDE_DIR={}".format(distutils.sysconfig.get_python_inc())]
+        self.cmake_args += ["-DPYTHON_LIBRARY={}".format(distutils.sysconfig.get_config_var("LIBDIR"))]
+        self.cmake_args += ["-DPYTHON_INCLUDE_DIR={}".format(distutils.sysconfig.get_python_inc())]
 
         if self.need_parallel:
             self.cmake_args += ["-DWITH_PARALLEL=ON"]
