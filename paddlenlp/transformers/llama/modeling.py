@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import math
+import warnings
 from functools import partial
 from typing import Optional, Tuple
 
@@ -30,20 +31,14 @@ try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
 except ImportError:
     fused_rotary_position_embedding = None
+
+
 from paddle.utils import try_import
 
 from paddlenlp.transformers.conversion_utils import (
     StateDictNameMapping,
     init_name_mappings,
 )
-
-try:
-    from paddle.nn.functional.flash_attention import flash_attention
-except:
-    flash_attention = None
-
-import warnings
-
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
@@ -187,21 +182,23 @@ def scaled_dot_product_attention(
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
 
-    if config.use_flash_attention and flash_attention:
-        if alibi is not None:
-            raise ValueError("Flash Attention does not support ALiBi yet")
-
+    if config.use_flash_attention:
         # Flash Attention now ignore attention mask
         # Current Flash Attention doesn't support attn maskt
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
-        attn_output, attn_weights = flash_attention(
+        if alibi is not None:
+            raise ValueError("Flash Attention does not support ALiBi yet")
+
+        attn_output = F.scaled_dot_product_attention(
             query_states,
             key_states,
             value_states,
-            causal=is_causal and query_states.shape[1] != 1,
-            return_softmax=output_attentions,
+            attn_mask=attention_mask,
+            is_causal=attention_mask is None,
         )
+
+        attn_weights = None
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
