@@ -144,11 +144,12 @@ class DistDataLoader(paddle.io.DataLoader):
             data = next(self._dataloader_iter)
             data_keys_size, data_keys = len(data.keys()), list(data.keys())
             data_list = [data[key] for key in data_keys]
+            # TODO(daisiming): add more type assertion.
             assert {item.dtype for item in data_list} == {
                 paddle.int64
             }, f"Distloader requires dtype == `int64`, got:{[item.dtype for item in data_list]}"
 
-        # broadcast data keys name
+        # broadcast data keys size
         data_keys_size = paddle.to_tensor(data_keys_size)
         if self._data_keys_size is None:
             if self.mp_group is not None and self.pp_rank == 0:
@@ -162,6 +163,7 @@ class DistDataLoader(paddle.io.DataLoader):
         if not self._need_data:
             data_keys = [None for i in range(self._data_keys_size)]
 
+        # broadcast data keys name
         if self._data_keys is None:
             if self.mp_group is not None and self.pp_rank == 0:
                 paddle.distributed.broadcast_object_list(data_keys, src=self.mp_src_rank, group=self.mp_group)
