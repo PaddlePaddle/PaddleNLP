@@ -31,7 +31,6 @@
 #include "paddle_inference_api.h"
 #include "paddle/phi/api/ext/exception.h"
 #else
-#include "paddle_api.h"
 #include "paddle/extension.h"
 #endif
 #endif
