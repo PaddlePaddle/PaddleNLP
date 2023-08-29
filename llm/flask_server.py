@@ -27,8 +27,9 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class ServerArgument:
-    port: int = field(default=8011, metadata={"help": "the port of ui service"})
-    flask_port: int = field(default=8010, metadata={"help": "the port of flask service"})
+    port: int = field(default=8011, metadata={"help": "The port of ui service"})
+    flask_port: int = field(default=8010, metadata={"help": "The port of flask service"})
+    title: str = field(default="LLM", metadata={"help": "The title of gradio"})
 
 
 def read_shared_memory(memory: SharedMemory):
@@ -182,6 +183,8 @@ def main(args, server: PredictorServer):
             server.predictor.config.max_length = generation_args["max_length"]
             server.predictor.config.top_p = generation_args["top_p"]
             server.predictor.config.temperature = generation_args["temperature"]
+            server.predictor.config.top_k = generation_args["top_k"]
+            server.predictor.config.repetition_penalty = generation_args["repetition_penalty"]
 
             for key, value in generation_args.items():
                 setattr(server.args, key, value)
