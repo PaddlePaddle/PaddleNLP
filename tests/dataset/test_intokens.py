@@ -70,7 +70,9 @@ class InTokensTestCommon:
         return_attention_mask=True,
     ):
         inputs = example["sentence"][:2]
-        model_inputs = self.tokenizer(inputs, max_length=max_src_length, truncation=True, return_attention_mask=False)
+        model_inputs = self.tokenizer(
+            inputs, max_length=max_src_length, truncation=True, return_attention_mask=False, return_position_ids=False
+        )
         labels_input_ids = model_inputs["input_ids"] + [self.tokenizer.eos_token_id]
         model_inputs["labels"] = [-100] * len(model_inputs["input_ids"]) + labels_input_ids
         model_inputs["input_ids"] = model_inputs["input_ids"] + labels_input_ids
@@ -137,7 +139,7 @@ class TestInTokensMapDataset(InTokensTestCommon, unittest.TestCase):
 
     def test_2d_position_id(self):
         inData_2d = InTokensMapDataset(self.dataset_position_2d, self.tokenizer, max_length=16)
-        self.assertTrue((inData_2d[0]["position_ids"] == self.expected_output["position_ids_2d"]).all())
+        self.assertTrue(inData_2d[0]["position_ids"] == self.expected_output["position_ids_2d"])
 
     def test_missing_data(self):
         orginal_input_ids = [item["input_ids"] for item in self.dataset]
@@ -167,56 +169,39 @@ class TestInTokensIterableDataset(InTokensTestCommon, unittest.TestCase):
 
     def test_long_max_length(self):
         inData = InTokensIterableDataset(self.dataset, self.tokenizer, max_length=128)
-        example = []
-        for item in inData:
-            example.append(item)
-            break
-        self.assertEqual(set(example[0].keys()), {"input_ids", "labels", "position_ids", "attention_mask"})
-        self.assertEqual(len(example), 1)
-        self.assertEqual(type(example[0]["input_ids"]), list)
-        self.assertEqual(np.array(example[0]["input_ids"]).shape, (70,))
+        example = next(iter(inData))
+        self.assertEqual(set(example.keys()), {"input_ids", "labels", "position_ids", "attention_mask"})
+        self.assertEqual(type(example["input_ids"]), list)
+        self.assertEqual(np.array(example["input_ids"]).shape, (70,))
 
         inData_input_labels_only = InTokensIterableDataset(
             self.dataset_input_labels_only, self.tokenizer, max_length=128
         )
-        example = []
-        for item in inData_input_labels_only:
-            example.append(item)
-            break
-        self.assertEqual(set(example[0].keys()), {"input_ids", "labels", "attention_mask"})
-        self.assertEqual(len(example), 1)
-        self.assertEqual(type(example[0]["input_ids"]), list)
-        self.assertEqual(np.array(example[0]["input_ids"]).shape, (70,))
+        example = next(iter(inData_input_labels_only))
+        self.assertEqual(set(example.keys()), {"input_ids", "labels", "attention_mask"})
+        self.assertEqual(type(example["input_ids"]), list)
+        self.assertEqual(np.array(example["input_ids"]).shape, (70,))
 
     def test_short_max_length(self):
         inData = InTokensIterableDataset(self.dataset, self.tokenizer, max_length=16)
-        example = []
-        for item in inData:
-            example.append(item)
-            break
-        self.assertEqual(example[0]["input_ids"], self.expected_output["input_ids"])
-        self.assertEqual(example[0]["labels"], self.expected_output["labels"])
-        self.assertTrue((example[0]["position_ids"] == self.expected_output["position_ids"]).all())
-        self.assertTrue((example[0]["attention_mask"] == self.expected_output["attention_mask"]).all())
+        example = next(iter(inData))
+        self.assertEqual(example["input_ids"], self.expected_output["input_ids"])
+        self.assertEqual(example["labels"], self.expected_output["labels"])
+        self.assertTrue((example["position_ids"] == self.expected_output["position_ids"]).all())
+        self.assertTrue((example["attention_mask"] == self.expected_output["attention_mask"]).all())
 
         inData_input_labels_only = InTokensIterableDataset(
             self.dataset_input_labels_only, self.tokenizer, max_length=16
         )
-        example = []
-        for item in inData_input_labels_only:
-            example.append(item)
-            break
-        self.assertEqual(example[0]["input_ids"], self.expected_output["input_ids"])
-        self.assertEqual(example[0]["labels"], self.expected_output["labels"])
-        self.assertTrue((example[0]["attention_mask"] == self.expected_output["attention_mask"]).all())
+        example = next(iter(inData_input_labels_only))
+        self.assertEqual(example["input_ids"], self.expected_output["input_ids"])
+        self.assertEqual(example["labels"], self.expected_output["labels"])
+        self.assertTrue((example["attention_mask"] == self.expected_output["attention_mask"]).all())
 
     def test_2d_position_id(self):
         inData_2d = InTokensIterableDataset(self.dataset_position_2d, self.tokenizer, max_length=16)
-        example = []
-        for item in inData_2d:
-            example.append(item)
-            break
-        self.assertTrue((example[0]["position_ids"] == self.expected_output["position_ids_2d"]).all())
+        example = next(iter(inData_2d))
+        self.assertTrue(example["position_ids"] == self.expected_output["position_ids_2d"])
 
     def test_missing_data(self):
         orginal_input_ids = [item["input_ids"] for item in self.dataset]
