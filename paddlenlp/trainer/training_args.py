@@ -316,6 +316,8 @@ class TrainingArguments:
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
         skip_profile_timer (`bool`, *optional*):
             Whether skip profile timer, timer will record time usage of forward/ backward/ step, etc.
+        distributed_dataloader (`bool`, *optional*):
+            Whether to use distributed dataloader. Default is `False`.
     """
 
     output_dir: str = field(
@@ -685,10 +687,11 @@ class TrainingArguments:
         metadata={"help": "Whether use lazy data processing."},
     )
     skip_profile_timer: Optional[bool] = field(
-      
-      
         default=True,
-        metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl"},
+        metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl."},
+    )
+    distributed_dataloader: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to use distributed dataloader."}
     )
 
     def __post_init__(self):
@@ -795,6 +798,10 @@ class TrainingArguments:
             len(self.sharding) > 0 or self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1
         ):
             self.use_hybrid_parallel = True
+
+        if self.distributed_dataloader and not (self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1):
+            warnings.warn("We set `distributed_dataloader` to False if tp_degree <= 1 and pp_degree <= 1")
+            self.distributed_dataloader = False
 
         if self.amp_master_grad:
             if self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1:
@@ -1230,6 +1237,16 @@ class TrainingArguments:
         return (
             ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.load_sharded_model
         )
+
+    @property
+    def should_load_dataset(self):
+        if not self.distributed_dataloader:
+            return True
+        else:
+            if self.tensor_parallel_rank == 0 and self.pipeline_parallel_rank == 0:
+                return True
+            else:
+                return False
 
     @contextlib.contextmanager
     def main_process_first(self, local=True, desc="work"):
