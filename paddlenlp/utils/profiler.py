@@ -107,7 +107,7 @@ def add_profiler_step(options_str=None):
         _timer_only = str(_profiler_options["timer_only"]) == str(True)
         _prof = profiler.Profiler(
             scheduler=(_profiler_options["batch_range"][0], _profiler_options["batch_range"][1]),
-            on_trace_ready=profiler.export_chrome_tracing("./profiler_log"),
+            on_trace_ready=profiler.export_chrome_tracing(_profiler_options["profile_path"]),
             timer_only=_timer_only,
         )
         _prof.start()

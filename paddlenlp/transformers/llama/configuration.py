@@ -151,7 +151,7 @@ class LlamaConfig(PretrainedConfig):
         use_cache=True,
         use_recompute=False,
         recompute_granularity="full",
-        pp_recompute_interval=0,
+        pp_recompute_interval=1,
         no_recompute_layers=None,
         fuse_attention_qkv=False,
         use_flash_attention=False,

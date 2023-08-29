@@ -75,6 +75,11 @@ class GenerationInferenceModel(GenerationMixin):
                 for i, shape in enumerate(cache_kvs_shapes)
             ],  # cache_kvs
         ]
+        if self.config["model_type"] and "chatglm" in self.config.model_type:
+            input_spec[2] = paddle.static.InputSpec(
+                shape=[None, None, None], dtype="int64", name="position_ids"
+            )  # position_ids
+            input_spec[16] = paddle.static.InputSpec(shape=[None, 2, 1], dtype="int64", name="tgt_pos")  # tgt_pos
         model = paddle.jit.to_static(self.generate, input_spec=input_spec)
         paddle.jit.save(model, output_path)
 
@@ -133,8 +138,7 @@ class GenerationInferenceModel(GenerationMixin):
         )
         return ret
 
-    @staticmethod
-    def update_model_kwargs_for_generation(cache, just_decoder, next_tokens, eos_token_id, model_kwargs):
+    def update_model_kwargs_for_generation(self, cache, just_decoder, next_tokens, eos_token_id, model_kwargs):
         if cache is None:
             model_kwargs["step_idx"] = paddle.where(
                 model_kwargs["seq_len_encoder"] == 0,
@@ -158,7 +162,19 @@ class GenerationInferenceModel(GenerationMixin):
         if cache is None:
             # encoder's generation
             model_kwargs["tgt_ids"] = paddle.where(just_decoder, model_kwargs["tgt_ids"], next_tokens)
-            model_kwargs["tgt_pos"] = paddle.where(just_decoder, model_kwargs["tgt_pos"], model_kwargs["tgt_pos"] + 1)
+            if self.model.config["position_encoding_2d"] and self.model.config.position_encoding_2d is True:
+                tgt_pos = model_kwargs["tgt_pos"]
+                new_position_id = tgt_pos[:, 0, :].clone()
+                new_block_id = tgt_pos[:, 1, :].clone()
+                new_block_id = new_block_id + 1
+
+                model_kwargs["tgt_pos"] = paddle.concat(
+                    [new_position_id.unsqueeze(1), new_block_id.unsqueeze(1)], axis=1
+                )
+            else:
+                model_kwargs["tgt_pos"] = paddle.where(
+                    just_decoder, model_kwargs["tgt_pos"], model_kwargs["tgt_pos"] + 1
+                )
             model_kwargs["seq_len_decoder"] = set_mask_value(
                 model_kwargs["tgt_generation_mask"],
                 model_kwargs["stop_flags"],
@@ -166,11 +182,21 @@ class GenerationInferenceModel(GenerationMixin):
             )
         else:
             model_kwargs["tgt_ids"] = next_tokens
-            model_kwargs["tgt_pos"] = paddle.where(
-                model_kwargs["stop_flags"],
-                model_kwargs["tgt_pos"],
-                model_kwargs["tgt_pos"] + 1,
-            )
+            if self.model.config["position_encoding_2d"] and self.model.config.position_encoding_2d is True:
+                tgt_pos = model_kwargs["tgt_pos"]
+                new_position_id = tgt_pos[:, 0, :].clone()
+                new_block_id = tgt_pos[:, 1, :].clone()
+                new_block_id = new_block_id + 1
+
+                model_kwargs["tgt_pos"] = paddle.concat(
+                    [new_position_id.unsqueeze(1), new_block_id.unsqueeze(1)], axis=1
+                )
+            else:
+                model_kwargs["tgt_pos"] = paddle.where(
+                    model_kwargs["stop_flags"],
+                    model_kwargs["tgt_pos"],
+                    model_kwargs["tgt_pos"] + 1,
+                )
             model_kwargs["seq_len_decoder"] = set_mask_value(
                 model_kwargs["tgt_generation_mask"],
                 model_kwargs["stop_flags"],

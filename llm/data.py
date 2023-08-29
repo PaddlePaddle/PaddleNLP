@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
-
 import numpy as np
 
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
@@ -32,12 +30,6 @@ def get_convert_example(model):
         raise ValueError(
             f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama."
         )
-
-
-def read_local_dataset(path):
-    with open(path, "r", encoding="utf-8") as fp:
-        for line in fp:
-            yield json.loads(line.strip())
 
 
 class DataFormatError(ValueError):

@@ -765,24 +765,6 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
         return loss
 
 
-class GPTHead(nn.Layer):
-    def __init__(self, config, embedding_weights=None):
-        super(GPTHead, self).__init__()
-        self.decoder_weight = (
-            self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype())
-            if embedding_weights is None
-            else embedding_weights
-        )
-        self.config = config
-
-    def forward(self, hidden_states):
-        if self.config.tensor_parallel_degree > 1:
-            logits = parallel_matmul(hidden_states, self.decoder_weight, self.config.tensor_parallel_output)
-        else:
-            logits = F.linear(hidden_states, self.decoder_weight.T)
-        return logits
-
-
 class GPTForCausalLM(GPTPretrainedModel):
     """
     The GPT Model with a `language modeling` head on top.
@@ -796,7 +778,6 @@ class GPTForCausalLM(GPTPretrainedModel):
         self.config = config
         self.gpt = GPTModel(config)
         self.criterion = GPTPretrainingCriterion(config)
-        self.lm_head = GPTHead(config, self.gpt.embeddings.word_embeddings.weight)
 
     def forward(
         self,
@@ -861,7 +842,10 @@ class GPTForCausalLM(GPTPretrainedModel):
         else:
             hidden_states = outputs[0]
 
-        logits = self.lm_head(hidden_states)
+        tensor_parallel_output = (
+            self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
+        )
+        logits = parallel_matmul(hidden_states, self.gpt.embeddings.word_embeddings.weight, tensor_parallel_output)
 
         loss = None
         if labels is not None:
