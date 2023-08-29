@@ -205,8 +205,8 @@ def create_pretrained_dataset(
     training_args,
     data_file,
     tokenizer,
+    need_data=True,
 ):
-
     train_val_test_num_samples = [
         training_args.per_device_train_batch_size
         * training_args.dataset_world_size
@@ -234,10 +234,11 @@ def create_pretrained_dataset(
         seed=training_args.seed,
         skip_warmup=data_args.skip_warmup,
         data_cache_path=data_args.data_cache,
+        need_data=need_data,
     )
 
     def print_dataset(data, mode="train"):
-        logger.info(f"Sample data for {mode} mode")
+        logger.info(f"Sample data for {mode} mode.")
         # input_ids, loss_mask, attention_mask, position_ids, labels = data
         input_ids = data["text"]
 
@@ -256,9 +257,10 @@ def create_pretrained_dataset(
             "labels": labels,
         }
 
-    print_dataset(train_dataset[0], "train")
-    print_dataset(valid_dataset[0], "valid")
-    print_dataset(test_dataset[0], "test")
+    if need_data:
+        print_dataset(train_dataset[0], "train")
+        print_dataset(valid_dataset[0], "valid")
+        print_dataset(test_dataset[0], "test")
 
     return train_dataset, valid_dataset, test_dataset, _collate_data
 
@@ -502,18 +504,20 @@ def main():
 
     data_file = get_train_data_file(data_args)
     train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(
-        data_args, training_args, data_file, tokenizer
+        data_args,
+        training_args,
+        data_file,
+        tokenizer,
+        need_data=training_args.should_load_dataset,
     )
 
-    if data_args.train_data_size > 0:
-        # GPTDataset is the type of `paddle.io.Dataset`, which dosen't contains `select` method
-        # modify the `__len__` function to change the length of dataset in current python process
-        GPTDataset.__len__ = lambda *_: data_args.train_data_size
-        total_effective_tokens = (
-            sum([len(train_dataset[i][0]) for i in range(data_args.train_data_size)]) * training_args.num_train_epochs
-        )
-    else:
-        total_effective_tokens = sum([len(i[0]) for i in train_dataset]) * training_args.num_train_epochs
+    total_effective_tokens = (
+        training_args.per_device_train_batch_size
+        * training_args.dataset_world_size
+        * training_args.max_steps
+        * training_args.gradient_accumulation_steps
+        * data_args.max_seq_length
+    )
 
     trainer = PretrainingTrainer(
         model=model,
@@ -544,9 +548,10 @@ def main():
         test_ret = trainer.predict(test_dataset)
         trainer.log_metrics("test", test_ret.metrics)
 
-    effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
-    print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
-    print(f"ips: {effective_tokens_per_second:.2f} tokens/s")
+    if training_args.should_load_dataset:
+        effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
+        print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
+        print(f"ips: {effective_tokens_per_second:.2f} tokens/s")
 
 
 if __name__ == "__main__":
