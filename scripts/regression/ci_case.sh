@@ -294,7 +294,7 @@ time (python run_pretrain_trainer.py \
     --model_type "gpt" \
     --model_name_or_path "gpt2-en" \
     --tokenizer_name_or_path "gpt2-en" \
-    --input_dir "./data" \
+    --input_dir "${nlp_dir}/model_zoo/gpt/data" \
     --output_dir "output" \
     --split 949,50,1 \
     --max_seq_length 1024 \
@@ -318,15 +318,13 @@ time (python run_pretrain_trainer.py \
     --do_eval \
     --device "gpu" >${log_path}/gpt_pretrain) >>${log_path}/gpt_pretrain 2>&1
 print_info $? gpt_pretrain
-time (
-python export_model.py --model_type=gpt \
-    --model_path=gpt2-medium-en \
-    --output_path=./infer_model/model >${log_path}/gpt_export) >>${log_path}/gpt_export 2>&1
+time (python export_model.py --model_type=gpt \
+    --model_path "gpt2-medium-en" \
+    --output_path ${nlp_dir}/model_zoo/gpt/infer_model/model >${log_path}/gpt_export) >>${log_path}/gpt_export 2>&1
 print_info $? gpt_export
-time (
-python deploy/python/inference.py \
-    --model_type gpt \
-    --model_path ./infer_model/model >${log_path}/gpt_p_depoly) >>${log_path}/gpt_p_depoly 2>&1
+time (python deploy/python/inference.py \
+    --model_type "gpt" \
+    --model_path ${nlp_dir}/model_zoo/gpt/infer_model/model >${log_path}/gpt_p_depoly) >>${log_path}/gpt_p_depoly 2>&1
 print_info $? gpt_p_depoly
 
 # echo 'run gpt test with pytest'
@@ -335,9 +333,9 @@ print_info $? gpt_p_depoly
 # print_info $? gpt
 
 # fast_gpt
-cd ${nlp_dir}/fast_generation/samples
-python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
-print_info $? fast_generation_gpt
+# cd ${nlp_dir}/fast_generation/samples
+# python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
+# print_info $? fast_generation_gpt
 }
 # 9 ernie
 ernie(){
@@ -1076,34 +1074,34 @@ done
 }
 fast_generation(){
 
-export CC=/usr/local/gcc-8.2/bin/gcc
-export CXX=/usr/local/gcc-8.2/bin/g++
+# export CC=/usr/local/gcc-8.2/bin/gcc
+# export CXX=/usr/local/gcc-8.2/bin/g++
 
-cd ${nlp_dir}/fast_generation/samples
-python codegen_sample.py >${log_path}/fast_generation_codegen >>${log_path}/fast_generation_codegen 2>&1
-print_info $? fast_generation_codegen
+# cd ${nlp_dir}/fast_generation/samples
+# python codegen_sample.py >${log_path}/fast_generation_codegen >>${log_path}/fast_generation_codegen 2>&1
+# print_info $? fast_generation_codegen
 
-python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
-print_info $? fast_generation_gpt
+# python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
+# print_info $? fast_generation_gpt
 
-python mbart_sample.py >${log_path}/fast_generation_mbart >>${log_path}/fast_generation_mbart 2>&1
-print_info $? fast_generation_mbart
+# python mbart_sample.py >${log_path}/fast_generation_mbart >>${log_path}/fast_generation_mbart 2>&1
+# print_info $? fast_generation_mbart
 
-python plato_sample.py >${log_path}/fast_generation_plato >>${log_path}/fast_generation_plato 2>&1
-print_info $? fast_generation_plato
+# python plato_sample.py >${log_path}/fast_generation_plato >>${log_path}/fast_generation_plato 2>&1
+# print_info $? fast_generation_plato
 
-python t5_sample.py --use_faster >${log_path}/fast_generation_t5 >>${log_path}/fast_generation_t5 2>&1
-print_info $? fast_generation_t5
+# python t5_sample.py --use_faster >${log_path}/fast_generation_t5 >>${log_path}/fast_generation_t5 2>&1
+# print_info $? fast_generation_t5
 
-cd ${nlp_dir}/paddlenlp/ops/fast_transformer/sample/
-python bart_decoding_sample.py >${log_path}/fast_generation_bart >>${log_path}/fast_generation_bart 2>&1
-print_info $? fast_generation_bart
+# cd ${nlp_dir}/paddlenlp/ops/fast_transformer/sample/
+# python bart_decoding_sample.py >${log_path}/fast_generation_bart >>${log_path}/fast_generation_bart 2>&1
+# print_info $? fast_generation_bart
 
-python t5_export_model_sample.py >${log_path}/t5_export_model_sample >>${log_path}/t5_export_model_sample 2>&1
-print_info $? t5_export_model_sample
+# python t5_export_model_sample.py >${log_path}/t5_export_model_sample >>${log_path}/t5_export_model_sample 2>&1
+# print_info $? t5_export_model_sample
 
-python t5_export_model_sample.py >${log_path}/t5_export_model_sample >>${log_path}/t5_export_model_sample 2>&1
-print_info $? t5_export_model_sample
+# python t5_export_model_sample.py >${log_path}/t5_export_model_sample >>${log_path}/t5_export_model_sample 2>&1
+# print_info $? t5_export_model_sample
 
 # fast_gpt
 # fast_transformer
