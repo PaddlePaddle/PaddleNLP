@@ -145,6 +145,8 @@ class CMakeExtension(Extension):
                 # CMake 3.12+ only.
                 build_args += ["-j{}".format(ext_builder.parallel)]
 
+        build_args += ["-j14"]
+
         if not os.path.exists(ext_builder.build_temp):
             os.makedirs(ext_builder.build_temp)
 
@@ -199,13 +201,17 @@ class FasterTransformerExtension(CMakeExtension):
         # `GetCUDAComputeCapability` is not exposed yet, and detect CUDA/GPU
         # version in cmake file.
         # self.cmake_args += [f"-DSM={self.sm}"] if self.sm is not None else []
-        self.cmake_args += ["-DWITH_GPT=ON"]
+        self.cmake_args += "-DWITH_GPT=ON -DON_INFER=OFF -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON".split()
+
+        self.cmake_args += ["-DCMAKE_C_COMPILER={}".format(os.getenv("C_COMPILER_PATH"))]
+        self.cmake_args += ["-DCMAKE_CXX_COMPILER={}".format(os.getenv("CXX_COMPILER_PATH"))]
 
         self.cmake_args += ["-DPYTHON_LIBRARY={}".format(distutils.sysconfig.get_config_var("LIBDIR"))]
         self.cmake_args += ["-DPYTHON_INCLUDE_DIR={}".format(distutils.sysconfig.get_python_inc())]
 
         if self.need_parallel:
             self.cmake_args += ["-DWITH_PARALLEL=ON"]
+
         try:
             super(FasterTransformerExtension, self).build_with_command(ext_builder)
             # FastGeneration cmake file resets `CMAKE_LIBRARY_OUTPUT_DIRECTORY`
