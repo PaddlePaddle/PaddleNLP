@@ -53,6 +53,7 @@ class ErnieEmbeddingEncoder(_BaseEmbeddingEncoder):
         payload = ""
         token_host = f"https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id={api_key}&client_secret={secret_key}"
         response = requests.request("POST", token_host, headers=headers, data=payload)
+
         if response:
             res = response.json()
         else:
@@ -94,12 +95,13 @@ class ErnieEmbeddingEncoder(_BaseEmbeddingEncoder):
             self.token
         )
         try:
-
             response = requests.request("POST", url, headers=headers, data=payload)
+            response_json = json.loads(response.text)
+            embedding_data = response_json["data"]
         except Exception as e:
             logger.error(e)
-        response_json = json.loads(response.text)
-        embedding_data = response_json["data"]
+            logger.error(response_json)
+
         generated_embeddings = [item["embedding"] for item in embedding_data]
 
         return generated_embeddings
