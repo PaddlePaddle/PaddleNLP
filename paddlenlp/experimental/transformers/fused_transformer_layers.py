@@ -155,6 +155,7 @@ class FusedMultiTransformer(Layer):
         ffn2_weight_attrs=None,
         ffn2_bias_attrs=None,
         epsilon=1e-5,
+        residual_alpha=1.0,
         num_layers=-1,
         nranks=1,
         trans_qkvw=True,
@@ -172,6 +173,7 @@ class FusedMultiTransformer(Layer):
         self.normalize_before = normalize_before
         self._dtype = self._helper.get_default_dtype()
         self._epsilon = epsilon
+        self._residual_alpha = residual_alpha
         self._trans_qkvw = trans_qkvw
         self._ring_id = ring_id
         self.nranks = nranks
@@ -388,7 +390,6 @@ class FusedMultiTransformer(Layer):
         padding_offset=None,
         attn_mask=None,
         caches=None,
-        # pre_caches=None,
         rotary_embs=None,
         rotary_emb_dims=0,
         seq_lens=None,
@@ -432,12 +433,17 @@ class FusedMultiTransformer(Layer):
         if caches is not None:
             assert len(caches) == len(self.qkv_weights)
         bias_residual_input = src
+        ln_out = src
         for i in range(len(caches)):
-            # layernorm
-            if i == 0:
-                ln_out = self.norm_func(src, self.ln_scales[i], self.ln_biases[i], self._epsilon, begin_norm_axis=1)
+            if self.normalize_before is True:
+                # layernorm
+                if i == 0:
+                    ln_out = self.norm_func(
+                        src, self.ln_scales[i], self.ln_biases[i], self._epsilon, begin_norm_axis=1
+                    )
+
             # qkv compute
-            qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], transpose_y=True)
+            qkv_out = self.linear(ln_out, self.qkv_weights[i], self.qkv_biases[i], transpose_weight=True)
 
             # fmha compute
             if time_step is None:  # context
@@ -468,6 +474,7 @@ class FusedMultiTransformer(Layer):
                 )
 
                 fmha_out = transpose_remove_padding(qktv_out, seq_lens, padding_offset)
+
             else:
                 fmha_out = masked_multihead_attention(
                     x=qkv_out,
@@ -478,6 +485,7 @@ class FusedMultiTransformer(Layer):
                     rotary_emb_dims=rotary_emb_dims,
                     use_neox_rotary_style=self.use_neox_rotary_style,
                 )[0]
+
             # out_linear
             out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i])
 
@@ -486,39 +494,65 @@ class FusedMultiTransformer(Layer):
                 dist.all_reduce(out_linear_out)
 
             # norm + residual_add_bias
-            norm_out = self.norm_func(
-                out_linear_out,
-                self.ffn_ln_scales[i],
-                self.ffn_ln_biases[i],
-                self._epsilon,
-                residual=bias_residual_input,
-                begin_norm_axis=1,
-            )
-            tmp_out, bias_residual_input = norm_out[0], norm_out[1]
-
-            # ffn1 matmul
-            ffn1_out = paddle.matmul(tmp_out, self.ffn1_weights[i])
-            ffn1_out = fused_act_bias_wrapper(ffn1_out, None, act_method=self.activation)
-            # ffn2 matmul
-            ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i])
-            # all_reduce
-            if self.nranks > 1:
-                dist.all_reduce(ffn2_out)
-
-            # norm + residual_add_bias
-            if i != len(caches) - 1:
+            if self.normalize_before is True:
                 norm_out = self.norm_func(
-                    ffn2_out,
-                    self.ln_scales[i + 1],
-                    self.ln_biases[i + 1],
+                    out_linear_out,
+                    self.ffn_ln_scales[i],
+                    self.ffn_ln_biases[i],
                     self._epsilon,
                     residual=bias_residual_input,
                     begin_norm_axis=1,
                 )
                 tmp_out, bias_residual_input = norm_out[0], norm_out[1]
             else:
-                tmp_out = fused_layer_norm(
-                    ffn2_out, None, None, self._epsilon, residual=bias_residual_input, begin_norm_axis=1
+                tmp_out = self.norm_func(
+                    out_linear_out,
+                    norm_weight=self.ln_scales[i],
+                    norm_bias=self.ln_biases[i],
+                    epsilon=self._epsilon,
+                    residual_alpha=self._residual_alpha,
+                    begin_norm_axis=1,
+                    bias=self.linear_biases[i],
+                    residual=ln_out,
+                )[0]
+
+            # ffn1 matmul
+            ffn1_out = paddle.matmul(tmp_out, self.ffn1_weights[i])
+            ffn1_out = fused_act_bias_wrapper(ffn1_out, self.ffn1_biases[i], act_method=self.activation)
+
+            # ffn2 matmul
+            ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i])
+
+            # all_reduce
+            if self.nranks > 1:
+                dist.all_reduce(ffn2_out)
+
+            # norm + residual_add_bias
+            if self.normalize_before is True:
+                if i != len(caches) - 1:
+                    norm_out = self.norm_func(
+                        ffn2_out,
+                        self.ln_scales[i + 1],
+                        self.ln_biases[i + 1],
+                        self._epsilon,
+                        residual=bias_residual_input,
+                        begin_norm_axis=1,
+                    )
+                    tmp_out, bias_residual_input = norm_out[0], norm_out[1]
+                else:
+                    tmp_out = fused_layer_norm(
+                        ffn2_out, None, None, self._epsilon, residual=bias_residual_input, begin_norm_axis=1
+                    )[0]
+            else:
+                tmp_out = self.norm_func(
+                    ffn2_out,
+                    norm_weight=self.ffn_ln_scales[i],
+                    norm_bias=self.ffn_ln_biases[i],
+                    epsilon=self._epsilon,
+                    residual_alpha=self._residual_alpha,
+                    begin_norm_axis=1,
+                    bias=self.ffn2_biases[i],
+                    residual=tmp_out,
                 )[0]
 
             ln_out = tmp_out
