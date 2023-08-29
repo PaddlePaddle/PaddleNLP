@@ -505,7 +505,21 @@ def _build_index_mappings(
             print("ensure you have write access to this directory or specify one that you do have")
             print("write access to.")
             # data_cache_success = False
-
+    else:
+        while True:
+            if (
+                (not os.path.isfile(idx_path["doc"]))
+                or (not os.path.isfile(idx_path["sample"]))
+                or (not os.path.isfile(idx_path["shuffle"]))
+            ):
+                time.sleep(3)
+            else:
+                try:
+                    np.load(idx_path["shuffle"], allow_pickle=True, mmap_mode="r")
+                    break
+                except Exception:
+                    print("%s file is still writing or damaged, please wait for a moment." % idx_path["shuffle"])
+                    time.sleep(3)
     # try:
     #     hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
     # except:
