@@ -62,7 +62,8 @@ python -u  -m paddle.distributed.launch \
     --recompute_granularity full \
     --do_train \
     --do_eval \
-    --device "gpu"
+    --device "gpu" \
+    --distributed_dataloader 1
     # --pipeline_parallel_config "disable_partial_send_recv"  # if set sequence_parallel True, please note off this line.
     # reompute settings:
     # --no_recompute_layers 0 1 2 3 4 5 6 7 8 9 10 ... int int

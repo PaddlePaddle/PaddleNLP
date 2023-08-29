@@ -18,6 +18,7 @@ import os
 import time
 import warnings
 from collections import namedtuple
+from itertools import islice
 
 import datasets
 from multiprocess import Pool, RLock
@@ -447,6 +448,12 @@ class IterDataset(IterableDataset):
                 ):
                     yield self._transform(example) if self._transform_pipline else example
                 num_samples += 1
+
+    def skip(self, n):
+        if inspect.isfunction(self.data):
+            raise NotImplementedError("Function-based IterDataset does not support `.skip()`")
+        self.data = islice(self.data, n, None)
+        return self
 
     def filter(self, fn):
         """

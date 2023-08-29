@@ -302,7 +302,7 @@ time (python run_pretrain_trainer.py \
     --model_type "gpt" \
     --model_name_or_path "gpt2-en" \
     --tokenizer_name_or_path "gpt2-en" \
-    --input_dir "./data" \
+    --input_dir "${nlp_dir}/model_zoo/gpt/data" \
     --output_dir "output" \
     --split 949,50,1 \
     --max_seq_length 1024 \
@@ -326,15 +326,13 @@ time (python run_pretrain_trainer.py \
     --do_eval \
     --device "gpu" >${log_path}/gpt_pretrain) >>${log_path}/gpt_pretrain 2>&1
 print_info $? gpt_pretrain
-time (
-python export_model.py --model_type=gpt \
-    --model_path=gpt2-medium-en \
-    --output_path=./infer_model/model >${log_path}/gpt_export) >>${log_path}/gpt_export 2>&1
+time (python export_model.py --model_type=gpt \
+    --model_path "gpt2-medium-en" \
+    --output_path ${nlp_dir}/model_zoo/gpt/infer_model/model >${log_path}/gpt_export) >>${log_path}/gpt_export 2>&1
 print_info $? gpt_export
-time (
-python deploy/python/inference.py \
-    --model_type gpt \
-    --model_path ./infer_model/model >${log_path}/gpt_p_depoly) >>${log_path}/gpt_p_depoly 2>&1
+time (python deploy/python/inference.py \
+    --model_type "gpt" \
+    --model_path ${nlp_dir}/model_zoo/gpt/infer_model/model >${log_path}/gpt_p_depoly) >>${log_path}/gpt_p_depoly 2>&1
 print_info $? gpt_p_depoly
 
 # echo 'run gpt test with pytest'
