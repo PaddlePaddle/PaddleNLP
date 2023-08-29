@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .blendable_dataset import *
-from .causal_dataset import *
-from .collate import *
-from .data_collator import *
-from .dist_dataloader import *
-from .sampler import *
-from .tokenizer import *
-from .vocab import *
+from .modeling import *

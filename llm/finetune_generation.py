@@ -18,7 +18,7 @@ from functools import partial
 
 import paddle
 from argument import DataArgument, GenerateArgument, ModelArgument, QuantArgument
-from data import get_convert_example, read_local_dataset
+from data import get_convert_example
 from utils import (
     CausalLMTrainer,
     compute_metrics,
@@ -31,6 +31,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
+from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -120,11 +121,23 @@ def main():
     elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) and os.path.exists(
         os.path.join(data_args.dataset_name_or_path, "dev.json")
     ):
-        train_ds = load_dataset(
-            read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "train.json"), lazy=data_args.lazy
+        train_ds, dev_ds = load_dataset(
+            "json",
+            data_files={
+                "train": os.path.join(data_args.dataset_name_or_path, "train.json"),
+                "dev": os.path.join(data_args.dataset_name_or_path, "dev.json"),
+            },
+            lazy=data_args.lazy,
         )
-        dev_ds = load_dataset(
-            read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "dev.json"), lazy=data_args.lazy
+    elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train")) and os.path.exists(
+        os.path.join(data_args.dataset_name_or_path, "dev")
+    ):
+        import glob
+
+        train_files = glob.glob(os.path.join(data_args.dataset_name_or_path, "train", "*.json"))
+        dev_files = glob.glob(os.path.join(data_args.dataset_name_or_path, "dev", "*.json"))
+        train_ds, dev_ds = load_dataset(
+            "json", data_files={"train": train_files, "dev": dev_files}, lazy=data_args.lazy
         )
     else:
         if data_args.task_name is not None:
@@ -133,6 +146,21 @@ def main():
             )
         else:
             train_ds, dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["train", "dev"])
+    # TODO(ZHUI & sijunhe): Temporary implementation. Generalize this logic and move to Trainer later.
+    if training_args.resume_from_checkpoint is not None and data_args.lazy:
+        logger.warning(
+            f"Loading from '{training_args.resume_from_checkpoint}', manually skipping dataset and setting `ignore_data_skip` to True."
+        )
+        training_args.ignore_data_skip = True
+        state = TrainerState.load_from_json(os.path.join(training_args.resume_from_checkpoint, "trainer_state.json"))
+        consumed_samples = (
+            state.global_step
+            * training_args.per_device_train_batch_size
+            * training_args.gradient_accumulation_steps
+            * training_args.dataset_world_size
+        )
+        train_ds = train_ds.skip(consumed_samples)
+
     if training_args.pipeline_parallel_degree > 1:
         from data import convert_example_common
 
@@ -294,8 +322,8 @@ def main():
         # Prepare ptq dataloader
         if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
             ptq_ds = load_dataset(
-                read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
-            )
+                "json", data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
+            )[0]
             ptq_ds = ptq_ds.map(partial(trans_func, is_test=False))
         else:
             ptq_ds = train_ds
@@ -324,8 +352,8 @@ def main():
         # Prepare ptq dataloader
         if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
             ptq_ds = load_dataset(
-                read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
-            )
+                "json", data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
+            )[0]
             ptq_ds = ptq_ds.map(partial(trans_func, is_test=False))
         else:
             ptq_ds = train_ds
@@ -344,8 +372,8 @@ def main():
     # Evaluation test set
     if training_args.do_predict:
         test_ds = load_dataset(
-            read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "test.json"), lazy=False
-        )
+            "json", data_files=os.path.join(data_args.dataset_name_or_path, "test.json"), lazy=False
+        )[0]
         test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
         eval_result = trainer.predict(test_ds).metrics
         trainer.log_metrics("test", eval_result)
