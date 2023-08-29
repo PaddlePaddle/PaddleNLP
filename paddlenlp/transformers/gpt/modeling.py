@@ -1130,7 +1130,7 @@ class GPTForPretraining(GPTPretrainedModel):
         self.tie_weights()
 
     def get_output_embeddings(self):
-        return self.lm_head.decoder
+        return self.lm_head
 
     def forward(
         self,
@@ -1332,7 +1332,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
 class GPTLMHead(nn.Layer):
     def __init__(self, config: GPTConfig, embedding_weights=None):
         super(GPTLMHead, self).__init__()
-        self.decoder_weight = (
+        self.weight = (
             self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype())
             if embedding_weights is None
             else embedding_weights
@@ -1342,12 +1342,12 @@ class GPTLMHead(nn.Layer):
         if self.config.tensor_parallel_degree > 1:
 
             def decoder(hidden_states):
-                return parallel_matmul(hidden_states, self.decoder_weight, self.config.tensor_parallel_output)
+                return parallel_matmul(hidden_states, self.weight, self.config.tensor_parallel_output)
 
         else:
 
             def decoder(hidden_states):
-                return F.linear(hidden_states, self.decoder_weight.T)
+                return F.linear(hidden_states, self.weight.T)
 
         self.decoder = decoder
 
@@ -1374,7 +1374,7 @@ class GPTForCausalLM(GPTPretrainedModel):
         self.criterion = GPTPretrainingCriterion(config)
 
     def get_output_embeddings(self):
-        return self.lm_head.decoder
+        return self.lm_head
 
     def forward(
         self,
