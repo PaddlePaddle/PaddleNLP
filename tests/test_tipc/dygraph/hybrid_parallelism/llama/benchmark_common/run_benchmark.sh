@@ -35,7 +35,7 @@ function _set_params(){
     device_num=${14:-"N2C32"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
     global_batch_size=${15:-"16"}
     model_item=${16:-"facebook-llama-13b"}
-    train_data_size=${17:-"1000"}
+    max_step=${17:-"20"}
     gradient_accumulation_steps=${18:-"4"}
     pp_recompute_interval=${19:-"1"}
 
@@ -133,7 +133,7 @@ function _train(){
             --disable_tqdm true \
             --continue_training 1\
             --recompute ${recompute} \
-            --train_data_size ${train_data_size} \
+            --max_step ${max_step} \
             --do_train \
             --device gpu"
     if [ ${PADDLE_TRAINER_ID} ]
