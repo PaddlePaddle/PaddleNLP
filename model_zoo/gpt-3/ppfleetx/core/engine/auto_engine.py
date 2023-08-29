@@ -269,7 +269,7 @@ class AutoEngine(BasicEngine):
         if train_dataset:
             train_data_loader = self._auto_engine.dataloader(
                 dataset=train_dataset,
-                batch_size=self._local_batch_size,
+                batch_size=self._global_batch_size,
                 steps_per_epoch=self._max_steps,
                 epochs=self._num_train_epochs,
                 collate_fn=train_dataset.collate_fn,
@@ -280,7 +280,7 @@ class AutoEngine(BasicEngine):
         if valid_dataset and self._eval_freq <= self._max_steps:
             valid_data_loader = self._auto_engine.dataloader(
                 dataset=valid_dataset,
-                batch_size=self._local_batch_size,
+                batch_size=self._global_batch_size,
                 steps_per_epoch=self._max_steps,
                 epochs=self._num_train_epochs,
                 collate_fn=valid_dataset.collate_fn,
@@ -330,7 +330,7 @@ class AutoEngine(BasicEngine):
         if valid_dataset:
             valid_data_loader = self._auto_engine.dataloader(
                 dataset=valid_dataset,
-                batch_size=self._local_batch_size,
+                batch_size=self._global_batch_size,
                 steps_per_epoch=self._max_steps,
                 epochs=self._num_train_epochs,
                 collate_fn=valid_dataset.collate_fn,
@@ -390,7 +390,7 @@ class AutoEngine(BasicEngine):
         if test_dataset:
             test_data_loader = self._auto_engine.dataloader(
                 dataset=test_dataset,
-                batch_size=self._local_batch_size,
+                batch_size=self._global_batch_size,
                 steps_per_epoch=self._max_steps,
                 epochs=self._num_train_epochs,
                 collate_fn=test_dataset.collate_fn,
