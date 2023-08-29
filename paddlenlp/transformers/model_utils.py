@@ -22,6 +22,7 @@ import re
 import tempfile
 import warnings
 from contextlib import contextmanager
+from functools import partial
 
 # from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
@@ -82,6 +83,16 @@ __all__ = [
     "PretrainedModel",
     "register_base_model",
 ]
+
+
+def unwrap_optimizer(optimizer, optimizer_instances=()):
+    if optimizer is None:
+        return None
+    while hasattr(optimizer, "_inner_opt") and not isinstance(optimizer, optimizer_instances):
+        optimizer = optimizer._inner_opt
+    if isinstance(optimizer, optimizer_instances):
+        return optimizer
+    return None
 
 
 if is_safetensors_available():
@@ -307,9 +318,7 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike], tensor_parallel_sp
             )
         if metadata["format"] == "pd":
             raise ValueError("Currently unsupport paddle weights file, use numpy instead.")
-            return safe_load_file(checkpoint_file)
         if metadata["format"] == "np":
-            logger.warning("loading safe.")
             state_dict = {}
             with safe_open(checkpoint_file, framework="np") as f:
                 for key in f.keys():
@@ -320,12 +329,10 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike], tensor_parallel_sp
                         weight = py_safe_slice_[:]
                     state_dict[key] = weight
 
-            logger.warning("loading done.")
             for k in list(state_dict.keys()):
                 with device_guard():
                     state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
 
-            logger.warning("copy paddle tensor done.")
             return state_dict
 
     state_dict = paddlenlp_load(checkpoint_file, map_location="cpu")
@@ -544,7 +551,7 @@ def shard_checkpoint(
     return shards, index
 
 
-def load_sharded_checkpoint(model, folder, strict=True):
+def load_sharded_checkpoint(model, folder, variant=None, strict=True, prefer_safe=False):
     """
     This is the same as [`paddle.nn.Layer.set_state_dict`]
     but for a sharded checkpoint.
@@ -555,8 +562,12 @@ def load_sharded_checkpoint(model, folder, strict=True):
     Args:
         model (`paddle.nn.Module`): The model in which to load the checkpoint.
         folder (`str` or `os.PathLike`): A path to a folder containing the sharded checkpoint.
+        variant (`str`): The model variant.
         strict (`bool`, *optional`, defaults to `True`):
             Whether to strictly enforce that the keys in the model state dict match the keys in the sharded checkpoint.
+        prefer_safe (`bool`, *optional*, defaults to `False`):
+            If both safetensors and Paddle save files are present in checkpoint and `prefer_safe` is True, the safetensors
+            files will be loaded. Otherwise, Paddle files are always loaded when possible.
 
     Returns:
         `NamedTuple`: A named tuple with `missing_keys` and `unexpected_keys` fields
@@ -564,11 +575,35 @@ def load_sharded_checkpoint(model, folder, strict=True):
             - `unexpected_keys` is a list of str containing the unexpected keys
     """
     # Load the index
-    index_file = os.path.join(folder, PADDLE_WEIGHTS_INDEX_NAME)
-    if not os.path.isfile(index_file):
-        raise ValueError(f"Can't find a checkpoint index ({PADDLE_WEIGHTS_INDEX_NAME}) in {folder}.")
+    index_file = os.path.join(folder, _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant))
+    safe_index_file = os.path.join(folder, _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant))
 
-    with open(index_file, "r", encoding="utf-8") as f:
+    index_present = os.path.isfile(index_file)
+    safe_index_present = os.path.isfile(safe_index_file)
+
+    if not index_present and not (safe_index_present and is_safetensors_available()):
+        filenames = (
+            (_add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant), _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant))
+            if is_safetensors_available()
+            else (_add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant),)
+        )
+        raise ValueError(f"Can't find a checkpoint index ({' or '.join(filenames)}) in {folder}.")
+
+    load_safe = False
+    if safe_index_present:
+        if prefer_safe:
+            if is_safetensors_available():
+                load_safe = True  # load safe due to preference
+            else:
+                logger.warning(
+                    f"Cannot load sharded checkpoint at {folder} safely since safetensors is not installed!"
+                )
+        elif not index_present:
+            load_safe = True
+
+    load_index = safe_index_file if load_safe else index_file
+
+    with open(load_index, "r", encoding="utf-8") as f:
         index = json.load(f)
 
     shard_files = list(set(index["weight_map"].values()))
@@ -588,12 +623,14 @@ def load_sharded_checkpoint(model, folder, strict=True):
             error_message += f"\nMissing key(s): {str_unexpected_keys}."
         raise RuntimeError(error_message)
 
+    loader = safe_load_file if load_safe else partial(paddlenlp_load, map_location="cpu")
+
     for shard_file in shard_files:
-        state_dict = paddlenlp_load(os.path.join(folder, shard_file), map_location="cpu")
+        state_dict = loader(os.path.join(folder, shard_file))
         with warnings.catch_warnings():
             warnings.resetwarnings()
             warnings.filterwarnings("ignore", message=r".*is not found in the provided dict.*")
-            model.set_state_dict(state_dict)
+            logger.info(f"set state-dict: {model.set_state_dict(state_dict)}")
 
         # Make sure memory is fred before we load the next state dict.
         del state_dict
@@ -699,7 +736,7 @@ def _load_state_dict_into_meta_model(
     `bert.pooler.dense.weight`
 
     """
-    from paddle.fluid.framework import convert_np_dtype_to_dtype_
+    from paddle.common_ops_import import convert_np_dtype_to_dtype_
 
     dtype = convert_np_dtype_to_dtype_(dtype)
     error_msgs = []
@@ -2000,6 +2037,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         os.makedirs(save_dir, exist_ok=True)
 
         merge_tensor_parallel = kwargs.get("merge_tensor_parallel", False)
+        config_to_save = kwargs.get("config_to_save", None)
         shard_format = kwargs.get("shard_format", "naive")  # support naive pipeline
         # variant = kwargs.get("variant", None)
         # is_main_process = kwargs.get("is_main_process", True)
@@ -2024,24 +2062,23 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         dtype = get_parameter_dtype(model_to_save)
         model_to_save.config.dtype = str(dtype).split(".")[1]
-
-        config_to_save = copy.deepcopy(model_to_save.config)
+        if config_to_save is None:
+            config_to_save = copy.deepcopy(model_to_save.config)
 
         # Save the model
-        if state_dict is None and config_to_save.tensor_parallel_degree > 1:
-            if merge_tensor_parallel:
-                state_dict = model_to_save.merge_tensor_parallel(model_to_save.state_dict(), config_to_save)
-                config_to_save.tensor_parallel_degree = 1
-                if config_to_save.tensor_parallel_rank != 0:
-                    logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
-                    return
-                if variant is not None and "tp" in variant:
-                    variant = "_".join([x for x in variant.split("_") if "tp" not in x])
-            else:
-                variant = weight_name_suffix() if variant is None else variant
-
         if state_dict is None:
-            state_dict = self.state_dict()
+            state_dict = model_to_save.state_dict()
+            if config_to_save.tensor_parallel_degree > 1:
+                if merge_tensor_parallel:
+                    state_dict = model_to_save.merge_tensor_parallel(state_dict, config_to_save)
+                    config_to_save.tensor_parallel_degree = 1
+                    if config_to_save.tensor_parallel_rank != 0:
+                        logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
+                        return
+                    if variant is not None and "tp" in variant:
+                        variant = "_".join([x for x in variant.split("_") if "tp" not in x])
+                else:
+                    variant = weight_name_suffix() if variant is None else variant
 
         # Attach architecture to the config
         config_to_save.architectures = [model_to_save.__class__.__name__]

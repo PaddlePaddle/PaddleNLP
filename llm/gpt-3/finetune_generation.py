@@ -142,7 +142,6 @@ def main():
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.use_flash_attn = model_args.use_flash_attn
     config.use_recompute = training_args.recompute
-    config.lm_shift_labels = True
 
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
@@ -156,16 +155,15 @@ def main():
     )
     if model_args.lora:
         if model_args.lora_path is None:
-            # Not yet support RowParallelLinear
-            if model_args.fuse_attention_qkv:
-                target_modules = [".*qkv_proj.*"]
-            else:
-                target_modules = [".*q_proj.*", ".*k_proj.*", ".*v_proj.*"]
-            if training_args.tensor_parallel_degree > 1:
-                target_modules += [".*linear1.*"]
-            else:
-                target_modules += [".*linear1.*", ".*linear2.*", ".*out_proj.*"]
-
+            target_modules = [
+                ".*qkv_proj.*",
+                ".*q_proj.*",
+                ".*k_proj.*",
+                ".*v_proj.*",
+                ".*linear1.*",
+                ".*linear2.*",
+                ".*out_proj.*",
+            ]
             lora_config = LoRAConfig(
                 target_modules=target_modules,
                 r=model_args.lora_rank,

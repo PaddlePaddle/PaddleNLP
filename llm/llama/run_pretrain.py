@@ -20,7 +20,7 @@ import random
 import sys
 import time
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import List, Optional
 
 import numpy as np
 import paddle
@@ -50,9 +50,14 @@ MODEL_CLASSES = {
     ),
 }
 
-from dataset import GPTDataset, get_train_valid_test_split_
 from fused_layers import mock_layers
 from modeling_pp import LlamaForCausalLMPipe
+
+from paddlenlp.data.causal_dataset import (
+    GPTDataset,
+    build_train_valid_test_datasets,
+    print_rank_0,
+)
 
 
 def add_start_docstrings(*docstr):
@@ -108,6 +113,14 @@ class DataArguments:
         default=False,
         metadata={"help": "Use share folder for data dir and output dir on multi machine."},
     )
+    train_data_size: int = field(default=-1, metadata={"help": "Number of dataset for training"})
+
+    data_impl: str = field(default="mmap", metadata={"help": "The format of the preprocessed data."})
+    skip_warmup: bool = field(
+        default=True,
+        metadata={"help": "Whether to skip the warmup process of mmap files."},
+    )
+    data_cache: str = field(default=None, metadata={"help": "The path of the cached dataset."})
 
 
 @dataclass
@@ -150,7 +163,7 @@ class ModelArguments:
     )
     recompute_granularity: str = field(
         default="full",
-        metadata={"help": "full core_attn"},
+        metadata={"help": "Choose among ['full', 'core_attn', 'full_attn']"},
     )
     virtual_pp_degree: int = field(
         default=1,
@@ -170,7 +183,6 @@ class ModelArguments:
         default=False,
         metadata={"help": "whether to use fuse sequence parallel allreduce"},
     )
-
     rope_fusion_level: Optional[str] = field(
         default=None,
         metadata={
@@ -180,6 +192,16 @@ class ModelArguments:
             "(3) None: don't fuse any part of the rope embedding"
         },
     )
+    no_recompute_layers: Optional[List[int]] = field(
+        default=None,
+        metadata={"help": "Specify the full transformer layers that should not be recomputed."},
+    )
+    pp_recompute_interval: int = field(
+        default=0,
+        metadata={
+            "help": "The interval for the number of layers at which recomputation occurs. A value of 0 indicates no recomputation. Default is 0."
+        },
+    )
 
 
 def create_pretrained_dataset(
@@ -187,9 +209,9 @@ def create_pretrained_dataset(
     training_args,
     data_file,
     tokenizer,
+    need_data=True,
 ):
-
-    train_valid_test_num_samples = [
+    train_val_test_num_samples = [
         training_args.per_device_train_batch_size
         * training_args.dataset_world_size
         * training_args.max_steps
@@ -201,74 +223,48 @@ def create_pretrained_dataset(
         training_args.per_device_eval_batch_size * training_args.dataset_world_size * training_args.test_iters,
     ]
 
-    input_prefix = data_file[0]
+    print_rank_0(" > datasets target sizes (minimum size):")
+    print_rank_0("    train:      {}".format(train_val_test_num_samples[0]))
+    print_rank_0("    validation: {}".format(train_val_test_num_samples[1]))
+    print_rank_0("    test:       {}".format(train_val_test_num_samples[2]))
 
-    for suffix in ["_ids.npy", "_idx.npz"]:
-        if not os.path.isfile(input_prefix + suffix):
-            raise ValueError("File Not found, %s" % (input_prefix + suffix))
-
-    sample_ids = np.load(input_prefix + "_ids.npy", mmap_mode="r", allow_pickle=True)
-    # All documment ids, extend as 1-D array.
-
-    process_data = np.load(input_prefix + "_idx.npz")
-    # The len(sample_lens) num of docs
-    # The sum(sample_lens) should equal len(sample_ids)
-    sample_lens = process_data["lens"]
-
-    splits = get_train_valid_test_split_(data_args.split, len(sample_lens))
-    assert len(sample_lens) >= splits[-1], "The document nums should larger than max of splits, but %s < %s" % (
-        len(sample_lens),
-        splits[-1],
+    # Build the datasets.
+    train_dataset, valid_dataset, test_dataset = build_train_valid_test_datasets(
+        data_prefix=data_file,
+        data_impl=data_args.data_impl,
+        splits_string=data_args.split,
+        train_val_test_num_samples=train_val_test_num_samples,
+        seq_length=data_args.max_seq_length,
+        seed=training_args.seed,
+        skip_warmup=data_args.skip_warmup,
+        data_cache_path=data_args.data_cache,
+        need_data=need_data,
     )
 
     def print_dataset(data, mode="train"):
-        logger.info(f"Sample data for {mode} mode")
-        input_ids, loss_mask, attention_mask, position_ids, labels = data
-        logger.info(tokenizer._decode(input_ids))
-        # logger.info(tokenizer._decode(labels))
-        # logger.info(tokenizer.convert_ids_to_tokens(input_ids))
+        logger.info(f"Sample data for {mode} mode.")
+        # input_ids, loss_mask, attention_mask, position_ids, labels = data
+        input_ids = data["text"]
 
-    def build_dataset(index, name):
-        dataset = GPTDataset(
-            file_prefix=input_prefix,
-            build_data_file=training_args.local_process_index == 0,
-            micro_batch_size=training_args.per_device_train_batch_size
-            if name == "train"
-            else training_args.per_device_eval_batch_size,
-            name="gpt_" + name,
-            max_seq_len=data_args.max_seq_length,
-            num_samples=train_valid_test_num_samples[index],
-            documents=np.arange(splits[index], splits[index + 1]),
-            sample_ids=sample_ids,
-            sample_lens=sample_lens,
-            eos_id=tokenizer.eos_token_id,
-            seed=training_args.seed,
-        )
-        print_dataset(dataset[0], name)
-        return dataset
+        logger.info(tokenizer._decode(input_ids))
 
     from paddlenlp.data import Stack
 
     def _collate_data(data, stack_fn=Stack()):
-        num_fields = len(data[0])
-        out = [None] * num_fields
-        # 0:input_ids, 1:loss_mask, 2:attention_mask, 3:position_ids, 4:labels
-        for i in (0, 1, 2, 3, 4):
-            out[i] = stack_fn([x[i] for x in data])
+        tokens_ = stack_fn(x["text"] for x in data)
+
+        labels = tokens_[:, 1:]
+        tokens = tokens_[:, :-1]
 
         return {
-            "input_ids": out[0],
-            # "token_type_ids": out[1],
-            # "attention_mask": out[2],
-            # "loss_mask": out[3],
-            "labels": out[4],
+            "input_ids": tokens,
+            "labels": labels,
         }
 
-    # Note, data should be broardcast to all devices.
-    # for train, valid, test, the distinct data num is data_world_size
-    train_dataset = build_dataset(0, "train")
-    valid_dataset = build_dataset(1, "valid")
-    test_dataset = build_dataset(2, "test")
+    if need_data:
+        print_dataset(train_dataset[0], "train")
+        print_dataset(valid_dataset[0], "valid")
+        print_dataset(test_dataset[0], "test")
 
     return train_dataset, valid_dataset, test_dataset, _collate_data
 
@@ -281,9 +277,10 @@ def get_train_data_file(args):
         files = [
             os.path.join(args.input_dir, f)
             for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz" in str(f))
+            if (os.path.isfile(os.path.join(args.input_dir, f)) and ("_idx.npz" in str(f) or ".idx" in str(f)))
         ]
         files = [x.replace("_idx.npz", "") for x in files]
+        files = [x.replace(".idx", "") for x in files]  # add
 
         if len(files) > 1:
             ret = []
@@ -385,6 +382,9 @@ def main():
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
 
+    if data_args.data_cache is not None:
+        os.makedirs(data_args.data_cache, exist_ok=True)
+
     set_seed(training_args)
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
@@ -424,6 +424,7 @@ def main():
 
     config = config_class.from_pretrained(model_args.model_name_or_path)
 
+    config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
     if not model_args.continue_training:
         config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
@@ -432,7 +433,9 @@ def main():
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
         logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
 
-    config.lm_shift_labels = False
+    if model_args.no_recompute_layers is not None:
+        model_args.no_recompute_layers.sort()
+
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
@@ -442,6 +445,8 @@ def main():
     config.sequence_parallel = model_args.sequence_parallel
     config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
     config.rope_fusion_level = model_args.rope_fusion_level
+    config.no_recompute_layers = model_args.no_recompute_layers
+    config.pp_recompute_interval = model_args.pp_recompute_interval
 
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
@@ -475,6 +480,9 @@ def main():
             model, training_args.gradient_accumulation_steps, model_args.fuse_sequence_parallel_allreduce
         )
 
+    if training_args.recompute:
+        model.recompute_enable()
+
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
@@ -500,8 +508,24 @@ def main():
 
     data_file = get_train_data_file(data_args)
     train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(
-        data_args, training_args, data_file, tokenizer
+        data_args,
+        training_args,
+        data_file,
+        tokenizer,
+        need_data=training_args.should_load_dataset,
     )
+
+    if training_args.should_load_dataset:
+        if data_args.train_data_size > 0:
+            # GPTDataset is the type of `paddle.io.Dataset`, which dosen't contains `select` method
+            # modify the `__len__` function to change the length of dataset in current python process
+            GPTDataset.__len__ = lambda *_: data_args.train_data_size
+            total_effective_tokens = (
+                sum([train_dataset[i]["text"].shape[0] for i in range(data_args.train_data_size)])
+                * training_args.num_train_epochs
+            )
+        else:
+            total_effective_tokens = sum([i["text"].shape[0] for i in train_dataset]) * training_args.num_train_epochs
 
     trainer = PretrainingTrainer(
         model=model,
@@ -531,6 +555,11 @@ def main():
     if training_args.do_predict:
         test_ret = trainer.predict(test_dataset)
         trainer.log_metrics("test", test_ret.metrics)
+
+    if training_args.should_load_dataset:
+        effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
+        print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
+        print(f"ips: {effective_tokens_per_second:.2f} tokens/s")
 
 
 if __name__ == "__main__":

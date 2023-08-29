@@ -25,12 +25,9 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.common_ops_import import convert_dtype
 
-try:
-    from paddle.utils import map_structure
-except ImportError:
-    from paddle.fluid.layers.utils import map_structure
-
-from paddle.fluid.dygraph.base import in_declarative_mode
+# TODO(guosheng): update this workaround import for in_declarative_mode
+from paddle.nn.layer.layers import in_declarative_mode
+from paddle.utils import map_structure
 
 try:
     from paddle import top_p_sampling
@@ -900,10 +897,20 @@ class GenerationMixin(object):
         model_kwargs["use_cache"] = use_cache
 
         if is_tracing and not paddle.is_tensor(max_length):
-            min_len = input_ids.shape[-1]
-            max_len = input_ids.shape[-1]
-            paddle.increment(min_len, min_length)
-            paddle.increment(max_len, max_length)
+            if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+                # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
+                # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+                # removed after static graphs support inplace and stride.
+                with paddle.framework._no_check_dy2st_diff():
+                    min_len = input_ids.shape[-1]
+                    max_len = input_ids.shape[-1]
+                    paddle.increment(min_len, min_length)
+                    paddle.increment(max_len, max_length)
+            else:
+                min_len = input_ids.shape[-1]
+                max_len = input_ids.shape[-1]
+                paddle.increment(min_len, min_length)
+                paddle.increment(max_len, max_length)
         else:
             input_len = input_ids.shape[-1]
             min_len = input_len + min_length
@@ -1171,6 +1178,12 @@ class GenerationMixin(object):
             )
         return input_ids[:, origin_len:], scores
 
+    def _get_model_inputs_spec(self, dtype: str):
+        return {
+            "input_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            "attention_mask": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+        }
+
     def to_static(self, path: str, config: dict):
         """export generation model to static
 
@@ -1189,18 +1202,21 @@ class GenerationMixin(object):
 
         top_p_spec = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
         temperature = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
+        dtype = config.get("dtype", paddle.get_default_dtype())
+
+        model_inputs_spec = self._get_model_inputs_spec(dtype)
 
         input_spec = [
-            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
-            None,  # position_ids
+            model_inputs_spec["input_ids"],
+            model_inputs_spec.get("attention_mask", None),
+            model_inputs_spec.get("position_ids", None),
             paddle.static.InputSpec(shape=[1], dtype="int64"),  # max_length
             0,  # min_length
             "sampling",  # decode_strategy
             temperature,  # temperature
             top_k_spec,  # top_k
             top_p_spec,  # top_p
-            1,  # repetition_penalty
+            config.get("repetition_penalty", 1.0),  # repetition_penalty
             # num_beams
             1,
             # num_beam_groups
@@ -1359,8 +1375,16 @@ class GenerationMixin(object):
             outputs, input_ids, cur_len_gpu, origin_len_gpu, scores, unfinished_flag, model_kwargs
         )
 
-        paddle.increment(cur_len)
-        paddle.increment(cur_len_gpu)
+        if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+            # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
+            # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+            # removed after static graphs support inplace and stride.
+            with paddle.framework._no_check_dy2st_diff():
+                paddle.increment(cur_len)
+                paddle.increment(cur_len_gpu)
+        else:
+            paddle.increment(cur_len)
+            paddle.increment(cur_len_gpu)
 
         attn_mask = model_kwargs["attention_mask"]
         # make the shape of attention_mask = (-1, -1, -1, -1) in dy2static.
@@ -1368,18 +1392,36 @@ class GenerationMixin(object):
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
         max_length = paddle.full([1], max_length, dtype="int64")
 
-        while cur_len < max_length and paddle.any(unfinished_flag):
-            input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
-                _forward_(**model_kwargs),
-                input_ids,
-                cur_len_gpu,
-                origin_len_gpu,
-                scores,
-                unfinished_flag,
-                model_kwargs,
-            )
-            paddle.increment(cur_len)
-            paddle.increment(cur_len_gpu)
+        if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+            # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
+            # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+            # removed after static graphs support inplace and stride.
+            with paddle.framework._no_check_dy2st_diff():
+                while cur_len < max_length and paddle.any(unfinished_flag):
+                    input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
+                        _forward_(**model_kwargs),
+                        input_ids,
+                        cur_len_gpu,
+                        origin_len_gpu,
+                        scores,
+                        unfinished_flag,
+                        model_kwargs,
+                    )
+                    paddle.increment(cur_len)
+                    paddle.increment(cur_len_gpu)
+        else:
+            while cur_len < max_length and paddle.any(unfinished_flag):
+                input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
+                    _forward_(**model_kwargs),
+                    input_ids,
+                    cur_len_gpu,
+                    origin_len_gpu,
+                    scores,
+                    unfinished_flag,
+                    model_kwargs,
+                )
+                paddle.increment(cur_len)
+                paddle.increment(cur_len_gpu)
 
         return input_ids[:, origin_len:], scores
 
@@ -1891,14 +1933,17 @@ def TopKProcess(probs, top_k, min_tokens_to_keep):
 
 
 def TopPProcess(probs, top_p, min_tokens_to_keep):
+    org_dtype = probs.dtype
+    if org_dtype == paddle.bfloat16:
+        probs = paddle.cast(probs, paddle.float32)
     sorted_indices = paddle.argsort(probs, descending=True)
+
     if isinstance(sorted_indices, tuple):
         sorted_probs, sorted_indices = sorted_indices
     else:
         sorted_probs = paddle.sort(probs, descending=True)
 
     cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)
-
     # Remove tokens with cumulative probs above the top_p, But keep at
     # least min_tokens_to_keep tokens
     sorted_indices_to_remove = cumulative_probs > top_p
@@ -1915,6 +1960,9 @@ def TopPProcess(probs, top_p, min_tokens_to_keep):
     condition = paddle.scatter(
         sorted_indices_to_remove.flatten(), sorted_indices.flatten(), sorted_indices_to_remove.flatten()
     )
+
     condition = paddle.cast(condition, "bool").reshape(probs.shape)
     probs = paddle.where(condition, paddle.full_like(probs, 0.0), probs)
+    if org_dtype == paddle.bfloat16:
+        probs = paddle.cast(probs, paddle.bfloat16)
     return probs

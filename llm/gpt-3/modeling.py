@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import collections
+import contextlib
 import math
 from functools import partial
 
@@ -30,8 +31,6 @@ from configuration import (
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
-from paddle.fluid import layers
-from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
 from paddlenlp.transformers.model_outputs import CausalLMOutputWithCrossAttentions
@@ -85,6 +84,13 @@ def parallel_matmul(x, y, tensor_parallel_output=True):
         return logits
 
 
+def seed_guard_context(name=None):
+    if name in get_rng_state_tracker().states_:
+        return get_rng_state_tracker().rng_state(name)
+    else:
+        return contextlib.nullcontext()
+
+
 class MultiHeadAttention(nn.Layer):
     """
     Attention mapps queries and a set of key-value pairs to outputs, and
@@ -96,7 +102,10 @@ class MultiHeadAttention(nn.Layer):
     Cache = collections.namedtuple("Cache", ["k", "v"])
     StaticCache = collections.namedtuple("StaticCache", ["k", "v"])
 
-    def __init__(self, config,):
+    def __init__(
+        self,
+        config,
+    ):
         super(MultiHeadAttention, self).__init__()
 
         self.config = config
@@ -107,7 +116,9 @@ class MultiHeadAttention(nn.Layer):
         self.use_flash_attention = config.use_flash_attention if flash_attention else None
 
         self.head_dim = config.hidden_size // config.num_attention_heads
-        assert self.head_dim * config.num_attention_heads == config.hidden_size, "hidden_size must be divisible by num_attention_heads"
+        assert (
+            self.head_dim * config.num_attention_heads == config.hidden_size
+        ), "hidden_size must be divisible by num_attention_heads"
 
         self.num_attention_heads = config.num_attention_heads  # default, without tensor parallel
         if config.tensor_parallel_degree > 1:
@@ -233,11 +244,11 @@ class MultiHeadAttention(nn.Layer):
             k, v = self.compute_kv(key, value)
             return self.StaticCache(k, v)
         elif value is None:  # incremental_state
-            k = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_attention_heads, 0, self.head_dim], dtype=key.dtype, value=0
+            k = paddle.full(
+                shape=[key.shape[0], self.num_attention_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0
             )
-            v = layers.fill_constant_batch_size_like(
-                input=key, shape=[-1, self.num_attention_heads, 0, self.head_dim], dtype=key.dtype, value=0
+            v = paddle.full(
+                shape=[key.shape[0], self.num_attention_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0
             )
             return self.Cache(k, v)
         else:
@@ -246,7 +257,13 @@ class MultiHeadAttention(nn.Layer):
 
     def _flash_attention(self, q, k, v, attn_mask=None, output_attentions=False):
         out, weights = flash_attention(
-            q, k, v, self.config.hidden_dropout_prob, causal=True, return_softmax=output_attentions, training=self.training
+            q,
+            k,
+            v,
+            self.config.hidden_dropout_prob,
+            causal=True,
+            return_softmax=output_attentions,
+            training=self.training,
         )
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
         return (out, weights) if output_attentions else out
@@ -276,11 +293,11 @@ class MultiHeadAttention(nn.Layer):
             weights = incubate.softmax_mask_fuse_upper_triangle(product)
 
         if self.config.hidden_dropout_prob:
-            if self.training:
-                with get_rng_state_tracker().rng_state("local_seed"):
-                    weights = F.dropout(weights, self.config.hidden_dropout_prob, training=self.training, mode="upscale_in_train")
-            else:
-                weights = F.dropout(weights, self.config.hidden_dropout_prob, training=self.training, mode="upscale_in_train")
+
+            with seed_guard_context("lcoal_seed"):
+                weights = F.dropout(
+                    weights, self.config.hidden_dropout_prob, training=self.training, mode="upscale_in_train"
+                )
 
         out = paddle.matmul(weights, v)
 
@@ -346,7 +363,9 @@ class TransformerDecoder(nn.Layer):
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
 
-    def forward(self, tgt, tgt_mask=None, memory=None, memory_mask=None, use_cache=False, cache=None, output_attentions=False):
+    def forward(
+        self, tgt, tgt_mask=None, memory=None, memory_mask=None, use_cache=False, cache=None, output_attentions=False
+    ):
         r"""
         Applies a stack of N Transformer decoder layers on inputs. If `norm` is
         provided, also applies layer normalization on the output of last decoder
@@ -359,17 +378,33 @@ class TransformerDecoder(nn.Layer):
         for i, mod in enumerate(self.layers):
             if cache is None:
                 if use_cache:
-                    output, new_cache = mod(output, tgt_mask=tgt_mask, memory=memory, use_cache=use_cache, cache=cache, output_attentions=output_attentions)
+                    output, new_cache = mod(
+                        output,
+                        tgt_mask=tgt_mask,
+                        memory=memory,
+                        use_cache=use_cache,
+                        cache=cache,
+                        output_attentions=output_attentions,
+                    )
                     new_caches.append(new_cache)
                 else:
                     has_gradient = not output.stop_gradient
                     if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
-                        output = recompute(mod, output, tgt_mask, memory, use_cache, cache, output_attentions, use_reentrant=False)
+                        output = recompute(
+                            mod, output, tgt_mask, memory, use_cache, cache, output_attentions, use_reentrant=False
+                        )
                     else:
                         output = mod(output, tgt_mask, memory, use_cache, cache, output_attentions)
 
             else:
-                output, new_cache = mod(output, tgt_mask=tgt_mask, memory=memory, use_cache=use_cache, cache=cache[i], output_attentions=output_attentions)
+                output, new_cache = mod(
+                    output,
+                    tgt_mask=tgt_mask,
+                    memory=memory,
+                    use_cache=use_cache,
+                    cache=cache[i],
+                    output_attentions=output_attentions,
+                )
                 new_caches.append(new_cache)
 
             if output_attentions:
@@ -410,12 +445,12 @@ class TransformerDecoderLayer(nn.Layer):
     def __init__(self, config: GPTConfig):
 
         super(TransformerDecoderLayer, self).__init__()
-        
+
         self.config = config
-        
+
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
-        
+
         if not FusedDropoutAdd:
             config.use_fused_dropout_add = False
 
@@ -442,7 +477,7 @@ class TransformerDecoderLayer(nn.Layer):
 
         self.norm1 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
         self.norm2 = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
-        
+
         if not config.use_fused_dropout_add:
             self.dropout1 = nn.Dropout(config.hidden_dropout_prob, mode="upscale_in_train")
             self.dropout2 = nn.Dropout(config.hidden_dropout_prob, mode="upscale_in_train")
@@ -461,7 +496,9 @@ class TransformerDecoderLayer(nn.Layer):
         if use_cache is False:
             has_gradient = not tgt.stop_gradient
             if self.enable_recompute and self.config.recompute_granularity == "full_attn" and has_gradient:
-                tgt = recompute(self.self_attn, tgt, None, None, tgt_mask, use_cache, cache, output_attentions, use_reentrant=False)
+                tgt = recompute(
+                    self.self_attn, tgt, None, None, tgt_mask, use_cache, cache, output_attentions, use_reentrant=False
+                )
             else:
                 tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache, output_attentions)
         else:
@@ -470,14 +507,7 @@ class TransformerDecoderLayer(nn.Layer):
         if output_attentions:
             tgt, weights = tgt
 
-        current_seed = "global_seed"
-        if self.training:
-            with get_rng_state_tracker().rng_state(current_seed):
-                if not self.config.use_fused_dropout_add:
-                    tgt = residual + self.dropout1(tgt)
-                else:
-                    tgt = self.fused_dropout_add1(tgt, residual)
-        else:
+        with seed_guard_context("global_seed"):
             if not self.config.use_fused_dropout_add:
                 tgt = residual + self.dropout1(tgt)
             else:
@@ -490,13 +520,7 @@ class TransformerDecoderLayer(nn.Layer):
         if self.config.normalize_before:
             tgt = self.norm2(tgt)
 
-        if self.training:
-            with get_rng_state_tracker().rng_state(current_seed):
-                if not self.config.use_fused_dropout_add:
-                    tgt = residual + self.linear2(F.gelu(self.linear1(tgt), approximate=True))
-                else:
-                    tgt = self.fused_dropout_add2(self.linear2(F.gelu(self.linear1(tgt), approximate=True)), residual)
-        else:
+        with seed_guard_context("global_seed"):
             if not self.config.use_fused_dropout_add:
                 tgt = residual + self.linear2(F.gelu(self.linear1(tgt), approximate=True))
             else:
@@ -519,7 +543,10 @@ class GPTEmbeddings(nn.Layer):
     Include embeddings from word, position and token_type embeddings
     """
 
-    def __init__(self, config,):
+    def __init__(
+        self,
+        config,
+    ):
         super(GPTEmbeddings, self).__init__()
 
         self.config = config
@@ -674,7 +701,9 @@ class GPTModel(GPTPretrainedModel):
             decoder_layers,
         )
 
-    def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None, output_attentions=False):
+    def forward(
+        self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None, output_attentions=False
+    ):
         if position_ids is None:
             past_length = 0
             if cache is not None:
@@ -728,18 +757,30 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=config.ignore_index)
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask=None):
-
-        if self.config.lm_shift_labels:
-            # Shift so that tokens < n predict n
-            prediction_scores = prediction_scores[..., :-1, :]
-            masked_lm_labels = masked_lm_labels[..., 1:]
-
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
             masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
             loss = paddle.mean(masked_lm_loss)
 
         return loss
+
+
+class GPTHead(nn.Layer):
+    def __init__(self, config, embedding_weights=None):
+        super(GPTHead, self).__init__()
+        self.decoder_weight = (
+            self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype())
+            if embedding_weights is None
+            else embedding_weights
+        )
+        self.config = config
+
+    def forward(self, hidden_states):
+        if self.config.tensor_parallel_degree > 1:
+            logits = parallel_matmul(hidden_states, self.decoder_weight, self.config.tensor_parallel_output)
+        else:
+            logits = F.linear(hidden_states, self.decoder_weight.T)
+        return logits
 
 
 class GPTForCausalLM(GPTPretrainedModel):
@@ -755,6 +796,7 @@ class GPTForCausalLM(GPTPretrainedModel):
         self.config = config
         self.gpt = GPTModel(config)
         self.criterion = GPTPretrainingCriterion(config)
+        self.lm_head = GPTHead(config, self.gpt.embeddings.word_embeddings.weight)
 
     def forward(
         self,
@@ -819,10 +861,7 @@ class GPTForCausalLM(GPTPretrainedModel):
         else:
             hidden_states = outputs[0]
 
-        tensor_parallel_output = (
-            self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
-        )
-        logits = parallel_matmul(hidden_states, self.gpt.embeddings.word_embeddings.weight, tensor_parallel_output)
+        logits = self.lm_head(hidden_states)
 
         loss = None
         if labels is not None:
@@ -865,9 +904,7 @@ class GPTForCausalLM(GPTPretrainedModel):
 
     @staticmethod
     def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
-        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
-            input_ids == pad_token_id
-        ).numpy().item()
+        is_pad_token_in_inputs_ids = (pad_token_id is not None) and float(paddle.any(input_ids == pad_token_id))
         is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
             (eos_token_id is not None) and (pad_token_id != eos_token_id)
         )

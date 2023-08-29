@@ -300,6 +300,13 @@ def naive_fuse_split_tp(
     """
     axis = -1 if is_column else 0
     splited = np.split(weight, fuse_tensor_parts * tensor_parallel_degree, axis=axis)
+
+    if tensor_parallel_rank is None:
+        ret = []
+        for tensor_parallel_rank in range(tensor_parallel_degree):
+            ret.append(np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis))
+        return ret
+
     return np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis)
 
 
@@ -1025,7 +1032,7 @@ class ConversionMixin:
         if state_dict is None:
             with device_guard("cpu"):
                 state_dict = paddle.load(weight_file, return_numpy=False)
-            logger.info("starting convert orignal state_dict to tensor parallel state_dict.")
+            logger.info("Starting to convert orignal state_dict to tensor parallel state_dict.")
 
         state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys(), ignore_error)
 
@@ -1035,7 +1042,7 @@ class ConversionMixin:
         for name, action in name_action_mappings.items():
             if name not in state_dict:
                 if not ignore_error:
-                    logger.warning(f"key<{name}> not in the model state weight file.")
+                    logger.warning(f"Key <{name}> not in the model state weight file.")
                 continue
             tensor = state_dict.pop(name)
             new_tensor = action(tensor)

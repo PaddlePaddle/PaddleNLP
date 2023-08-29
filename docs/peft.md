@@ -130,7 +130,7 @@ key function:
         --save_directory
                         保存目录的路径
         --merge_tensor_parallel
-                        是否合并多卡参数
+                        是否合并多卡参数,默认为True
 
         如果merge_tensor_parallel为真且模型的配置中的张量并行度大于1，则获取可训练的state_dict，并使用_merge_trainable_tensor_parallel方法合并张量并行训练的state_dict。如果merge_tensor_parallel为真且模型的张量并行度大于1，只有主进程会进行保存操作。
 
@@ -253,7 +253,7 @@ key function
         --save_directory
                         保存目录的路径
         --merge_tensor_parallel
-                        是否合并多卡参数
+                        是否合并多卡参数，默认为True
 
         如果merge_tensor_parallel为真且模型的配置中的张量并行度大于1，则获取可训练的state_dict，并使用_merge_trainable_tensor_parallel方法合并张量并行训练的state_dict。如果merge_tensor_parallel为真且模型的张量并行度大于1，只有主进程会进行保存操作。
 
