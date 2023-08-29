@@ -31,7 +31,6 @@ from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
-from ...layers import Linear as TransposedLinear
 from ...utils.converter import StateDictNameMapping
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
@@ -1331,9 +1330,26 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
 
 
 class GPTLMHead(nn.Layer):
-    def __init__(self, config: GPTConfig):
+    def __init__(self, config: GPTConfig, embedding_weights=None):
         super(GPTLMHead, self).__init__()
-        self.decoder = TransposedLinear(config.hidden_size, config.vocab_size, bias_attr=False)
+        self.decoder_weight = (
+            self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype())
+            if embedding_weights is None
+            else embedding_weights
+        )
+        self.config = config
+
+        if self.config.tensor_parallel_degree > 1:
+
+            def decoder(hidden_states):
+                return parallel_matmul(hidden_states, self.decoder_weight, self.config.tensor_parallel_output)
+
+        else:
+
+            def decoder(hidden_states):
+                return F.linear(hidden_states, self.decoder_weight.T)
+
+        self.decoder = decoder
 
     def forward(self, hidden_states):
         logits = self.decoder(hidden_states)
