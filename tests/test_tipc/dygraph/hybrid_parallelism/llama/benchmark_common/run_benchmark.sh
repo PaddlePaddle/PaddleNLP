@@ -107,7 +107,9 @@ function _train(){
             --gradient_accumulation_steps ${gradient_accumulation_steps} \
             --per_device_eval_batch_size ${per_device_train_batch_size} \
             --use_flash_attention ${use_flash_attention} \
-            --use_fused_rms_norm 0 \
+            --use_fused_rms_norm 1 \
+            --fuse_attention_qkv 1 \
+            --fuse_attention_ffn 1 \
             --fp16  \
             --fp16_opt_level O2  \
             --scale_loss 512 \
