@@ -49,12 +49,7 @@ from tqdm.auto import tqdm
 
 from ..data import DataCollator, DataCollatorWithPadding, default_data_collator
 from ..peft import LoRAModel, PrefixModelForCausalLM
-from ..transformers.model_utils import (
-    PretrainedModel,
-    _add_variant,
-    paddlenlp_load,
-    unwrap_model,
-)
+from ..transformers.model_utils import PretrainedModel, _add_variant, unwrap_model
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import LORA_WEIGHTS_NAME, PADDLE_WEIGHTS_NAME, PREFIX_WEIGHTS_NAME
@@ -1850,7 +1845,7 @@ class Trainer:
             os.path.join(checkpoint, SCHEDULER_NAME)
         ):
             # Load in optimizer and scheduler states
-            self.optimizer.set_state_dict(paddlenlp_load(os.path.join(checkpoint, optimizer_name), map_location="cpu"))
+            self.optimizer.set_state_dict(paddle.load(os.path.join(checkpoint, optimizer_name)))
 
             self.lr_scheduler.set_state_dict(paddle.load(os.path.join(checkpoint, SCHEDULER_NAME)))
             if self.do_grad_scaling and os.path.isfile(os.path.join(checkpoint, SCALER_NAME)):
