@@ -91,7 +91,7 @@ function _train(){
             --dataset_name_or_path ${dataset_name_or_path} \
             --output_dir output \
             --per_device_train_batch_size 1 \
-            --gradient_accumulation_steps 8 \
+            --gradient_accumulation_steps 1 \
             --num_train_epochs 1 \
             --learning_rate ${learning_rate} \
             --warmup_steps 30 \
