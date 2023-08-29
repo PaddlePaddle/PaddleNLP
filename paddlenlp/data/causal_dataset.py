@@ -141,6 +141,7 @@ def build_train_valid_test_datasets(
             skip_warmup,
             return_doc_ids,
             data_cache_path=data_cache_path,
+            need_data=need_data,
         )
         if train_ds:
             train_datasets.append(train_ds)

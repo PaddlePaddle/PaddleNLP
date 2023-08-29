@@ -25,7 +25,6 @@ from typing import List, Optional
 import numpy as np
 import paddle
 
-from paddlenlp.data.causal_dataset import GPTDataset
 from paddlenlp.trainer import (
     PdArgumentParser,
     Trainer,
@@ -54,11 +53,7 @@ MODEL_CLASSES = {
 from fused_layers import mock_layers
 from modeling_pp import LlamaForCausalLMPipe
 
-from paddlenlp.data.causal_dataset import (
-    GPTDataset,
-    build_train_valid_test_datasets,
-    print_rank_0,
-)
+from paddlenlp.data.causal_dataset import build_train_valid_test_datasets, print_rank_0
 
 
 def add_start_docstrings(*docstr):
@@ -516,17 +511,13 @@ def main():
         need_data=training_args.should_load_dataset,
     )
 
-    if training_args.should_load_dataset:
-        if data_args.train_data_size > 0:
-            # GPTDataset is the type of `paddle.io.Dataset`, which dosen't contains `select` method
-            # modify the `__len__` function to change the length of dataset in current python process
-            GPTDataset.__len__ = lambda *_: data_args.train_data_size
-            total_effective_tokens = (
-                sum([train_dataset[i]["text"].shape[0] for i in range(data_args.train_data_size)])
-                * training_args.num_train_epochs
-            )
-        else:
-            total_effective_tokens = sum([i["text"].shape[0] for i in train_dataset]) * training_args.num_train_epochs
+    total_effective_tokens = (
+        training_args.per_device_train_batch_size
+        * training_args.dataset_world_size
+        * training_args.max_steps
+        * training_args.gradient_accumulation_steps
+        * data_args.max_seq_length
+    )
 
     trainer = PretrainingTrainer(
         model=model,
