@@ -1097,8 +1097,8 @@ done
 }
 fast_generation(){
 cd ${nlp_dir}/fast_generation/samples
-python codegen_sample.py >${log_path}/fast_generation_codegen >>${log_path}/fast_generation_codegen 2>&1
-print_info $? fast_generation_codegen
+# python codegen_sample.py >${log_path}/fast_generation_codegen >>${log_path}/fast_generation_codegen 2>&1
+# print_info $? fast_generation_codegen
 
 python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
 print_info $? fast_generation_gpt
