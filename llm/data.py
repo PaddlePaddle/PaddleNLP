@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
-
 import numpy as np
 
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
@@ -26,18 +24,12 @@ def get_convert_example(model):
 
     if base_model_prefix == "chatglm":
         return convert_example_chatglm
-    elif base_model_prefix in ["chatglm_v2", "llama", "bloom", "opt"]:
+    elif base_model_prefix in ["chatglm_v2", "llama", "bloom", "opt", "qwen"]:
         return convert_example_common
     else:
         raise ValueError(
             f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama."
         )
-
-
-def read_local_dataset(path):
-    with open(path, "r", encoding="utf-8") as fp:
-        for line in fp:
-            yield json.loads(line.strip())
 
 
 class DataFormatError(ValueError):
@@ -59,9 +51,10 @@ def tokenize_example(tokenizer, example, data_args):
         truncation_side="left",
         add_special_tokens=True,
     )
+    tgt_max_length = data_args.max_length - len(tokenized_source["input_ids"])
     tokenized_target = tokenizer(
         target,
-        max_length=data_args.tgt_length,
+        max_length=tgt_max_length,
         truncation=True,
         truncation_side="right",
         add_special_tokens=False,
@@ -70,7 +63,7 @@ def tokenize_example(tokenizer, example, data_args):
     tokenized_target_input_ids = tokenized_target["input_ids"]
     # Add eos_token_id at the end of sequence if the sentence is not truncated.
     # Attention! In some cases(ex. ChatGLMv2), tokenized eos_token is not equal to eos_token_id.
-    if len(tokenized_target_input_ids) < data_args.tgt_length:
+    if len(tokenized_target_input_ids) < tgt_max_length:
         tokenized_target_input_ids += [tokenizer.eos_token_id]
 
     return tokenized_source, tokenized_target_input_ids

@@ -18,4 +18,5 @@ from .utils import (
     bloom_postprocess_past_key_value,
     chatglm_postprocess_past_key_value,
     llama_postprocess_past_key_value,
+    qwen_postprocess_past_key_value,
 )

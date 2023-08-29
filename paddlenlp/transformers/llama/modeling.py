@@ -346,10 +346,8 @@ class LlamaRotaryEmbedding(nn.Layer):
         self.dim = dim
         self.max_position_embeddings = max_position_embeddings
         self.base = base
-        self.dtype = paddle.get_default_dtype()
         # [dim / 2]
-        inv_freq = 1.0 / (self.base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype="float32") / self.dim))
-        self.register_buffer("inv_freq", inv_freq, persistable=False)
+        self.inv_freq = 1.0 / (self.base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype="float32") / self.dim))
         self._set_cos_sin_cache(seq_len=max_position_embeddings)
 
     def _set_cos_sin_cache(self, seq_len):
@@ -362,23 +360,21 @@ class LlamaRotaryEmbedding(nn.Layer):
         # [seq_len, dim]
         emb = paddle.concat([freqs, freqs], axis=-1)
         # [1, seqlen, 1, dim]
-        self.register_buffer("cos_cached", emb.cos()[None, :, None, :].cast(self.dtype), persistable=False)
-        self.register_buffer("sin_cached", emb.sin()[None, :, None, :].cast(self.dtype), persistable=False)
+        self.cos_cached = emb.cos()[None, :, None, :]
+        self.sin_cached = emb.sin()[None, :, None, :]
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
-        # if seq_len > self.max_seq_len_cached:
-        #     self._set_cos_sin_cache(seq_len)
         return (
             self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
             self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
         )
 
 
-class LlamaLinearScalingRotaryEmbedding(nn.Layer):
+class LlamaLinearScalingRotaryEmbedding(LlamaRotaryEmbedding):
     def __init__(self, dim, max_position_embeddings=2048, base=10000, scaling_factor=1.0):
         self.scaling_factor = scaling_factor
-        super().__init__(dim, max_position_embeddings, base)
+        super().__init__(dim, max_position_embeddings * scaling_factor, base)
 
     def _set_cos_sin_cache(self, seq_len):
         self.max_seq_len_cached = seq_len
@@ -391,17 +387,8 @@ class LlamaLinearScalingRotaryEmbedding(nn.Layer):
         # [seq_len, dim]
         emb = paddle.concat([freqs, freqs], axis=-1)
         # [1, seqlen, 1, dim]
-        self.register_buffer("cos_cached", emb.cos()[None, :, None, :].cast(self.dtype), persistable=False)
-        self.register_buffer("sin_cached", emb.sin()[None, :, None, :].cast(self.dtype), persistable=False)
-
-    def forward(self, x, seq_len=None):
-        # x: [bs, num_attention_heads, seq_len, head_size]
-        if seq_len > self.max_seq_len_cached:
-            self._set_cos_sin_cache(seq_len)
-        return (
-            self.cos_cached[:, :, :seq_len, ...].cast(x.dtype),
-            self.sin_cached[:, :, :seq_len, ...].cast(x.dtype),
-        )
+        self.cos_cached = emb.cos()[None, :, None, :]
+        self.sin_cached = emb.sin()[None, :, None, :]
 
 
 class LlamaNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
@@ -410,7 +397,7 @@ class LlamaNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
     def __init__(self, dim, max_position_embeddings=2048, base=10000, scaling_factor=1.0):
         base = base * scaling_factor ** (dim / (dim - 2))
         self.scaling_factor = scaling_factor
-        super().__init__(dim, max_position_embeddings, base)
+        super().__init__(dim, max_position_embeddings * scaling_factor, base)
 
 
 class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
@@ -432,8 +419,8 @@ class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
         # [seq_len, dim]
         emb = paddle.concat([freqs, freqs], axis=-1)
         # [1, seqlen, 1, dim]
-        scale_cos = emb.cos()[None, :, None, :].cast(self.dtype)
-        scale_sin = emb.sin()[None, :, None, :].cast(self.dtype)
+        scale_cos = emb.cos()[None, :, None, :]
+        scale_sin = emb.sin()[None, :, None, :]
         return scale_cos, scale_sin
 
     def forward(self, x, seq_len=None):
@@ -796,6 +783,7 @@ class LlamaAttention(nn.Layer):
                 output_attentions,
                 alibi,
                 self.sequence_parallel,
+                use_reentrant=False,
             )
         else:
             outputs = scaled_dot_product_attention(
@@ -820,10 +808,17 @@ class LlamaAttention(nn.Layer):
         if not output_attentions:
             attn_weights = None
 
-        outputs = dict()
-        outputs["attn_output"] = attn_output
-        outputs["attn_weights"] = attn_weights
-        outputs["past_key_value"] = past_key_value
+        outputs = (attn_output,)
+
+        if output_attentions:
+            outputs += (attn_weights,)
+
+        if use_cache:
+            outputs += (past_key_value,)
+
+        if type(outputs) is tuple and len(outputs) == 1:
+            outputs = outputs[0]
+
         return outputs
 
 
@@ -887,6 +882,7 @@ class LlamaDecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
+                use_reentrant=False,
             )
         else:
             outputs = self.self_attn(
@@ -899,9 +895,16 @@ class LlamaDecoderLayer(nn.Layer):
                 alibi,
             )
 
-        hidden_states = outputs.get("attn_output")
-        self_attn_weights = outputs.get("attn_weights", None)
-        present_key_value = outputs.get("past_key_value", None)
+        if type(outputs) is tuple:
+            hidden_states = outputs[0]
+        else:
+            hidden_states = outputs
+
+        if output_attentions:
+            self_attn_weights = outputs[1]
+
+        if use_cache:
+            present_key_value = outputs[2 if output_attentions else 1]
 
         hidden_states = residual + hidden_states
 
@@ -931,6 +934,7 @@ class LlamaPretrainedModel(PretrainedModel):
     base_model_prefix = "llama"
     pretrained_init_configuration = LLAMA_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = LLAMA_PRETRAINED_RESOURCE_FILES_MAP
+    _keys_to_ignore_on_load_unexpected = [r"self_attn.rotary_emb.inv_freq"]
 
     @classmethod
     def _get_name_mappings(cls, config: LlamaConfig) -> list[StateDictNameMapping]:
@@ -1150,6 +1154,7 @@ class LlamaModel(LlamaPretrainedModel):
             past_key_value,
             use_cache,
             alibi,
+            use_reentrant=False,
         )
 
         return hidden_states
@@ -1272,16 +1277,17 @@ class LlamaModel(LlamaPretrainedModel):
                     use_cache,
                     alibi=alibi,
                 )
+
             if type(layer_outputs) is tuple:
                 hidden_states = layer_outputs[0]
             else:
                 hidden_states = layer_outputs
 
-            if use_cache:
-                next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
-
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
+
+            if use_cache:
+                next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
 
         hidden_states = self.norm(hidden_states)
 

@@ -30,7 +30,7 @@ Engine:
 Model:
   module: "GPTModuleAuto"
   name: "GPT"
-  fuse_attn_qkv: False
+  fuse_attn_qkv: True
   scale_qk_by_layer_num: True
   fused_softmax_with_triangular: True
 

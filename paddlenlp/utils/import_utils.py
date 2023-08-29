@@ -52,6 +52,10 @@ def is_psutil_available():
     return importlib.util.find_spec("psutil") is not None
 
 
+def is_tiktoken_available():
+    return importlib.util.find_spec("tiktoken") is not None
+
+
 def is_torch_available() -> bool:
     """check if `torch` package is installed
     Returns:
@@ -82,7 +86,7 @@ def is_fast_tokenizer_available() -> bool:
 def is_paddlenlp_ops_available() -> bool:
     """check if `paddlenlp_ops` ia avaliable
     Returns:
-        bool: if `fast_tokenizer` is avaliable
+        bool: if `paddlenlp_ops` is avaliable
     """
     return is_package_available("paddlenlp_ops")
 

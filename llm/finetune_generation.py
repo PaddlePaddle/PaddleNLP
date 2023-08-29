@@ -18,7 +18,7 @@ from functools import partial
 
 import paddle
 from argument import DataArgument, GenerateArgument, ModelArgument, QuantArgument
-from data import get_convert_example, read_local_dataset
+from data import get_convert_example
 from utils import (
     CausalLMTrainer,
     compute_metrics,
@@ -101,9 +101,9 @@ def main():
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
         if hasattr(model_config, "max_position_embeddings"):
-            if model_config.max_position_embeddings < data_args.src_length + data_args.tgt_length:
+            if model_config.max_position_embeddings < data_args.max_length:
                 raise ValueError(
-                    f"The src_length + tgt_length ({data_args.src_length + data_args.tgt_length}) must be smaller than max_position_embeddings({model_config.max_position_embeddings})."
+                    f"The max_length ({data_args.max_length}) must be smaller than max_position_embeddings({model_config.max_position_embeddings})."
                 )
         model = AutoModelForCausalLM.from_pretrained(
             model_args.model_name_or_path,
@@ -113,18 +113,30 @@ def main():
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     if isinstance(tokenizer, LlamaTokenizer):
-        tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token else "<pad>"
+        tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if data_args.dataset_name_or_path is None:
         raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
     elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) and os.path.exists(
         os.path.join(data_args.dataset_name_or_path, "dev.json")
     ):
-        train_ds = load_dataset(
-            read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "train.json"), lazy=False
+        train_ds, dev_ds = load_dataset(
+            "json",
+            data_files={
+                "train": os.path.join(data_args.dataset_name_or_path, "train.json"),
+                "dev": os.path.join(data_args.dataset_name_or_path, "dev.json"),
+            },
+            lazy=data_args.lazy,
         )
-        dev_ds = load_dataset(
-            read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "dev.json"), lazy=False
+    elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train")) and os.path.exists(
+        os.path.join(data_args.dataset_name_or_path, "dev")
+    ):
+        import glob
+
+        train_files = glob.glob(os.path.join(data_args.dataset_name_or_path, "train", "*.json"))
+        dev_files = glob.glob(os.path.join(data_args.dataset_name_or_path, "dev", "*.json"))
+        train_ds, dev_ds = load_dataset(
+            "json", data_files={"train": train_files, "dev": dev_files}, lazy=data_args.lazy
         )
     else:
         if data_args.task_name is not None:
@@ -140,7 +152,7 @@ def main():
     else:
         trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
     if data_args.intokens:
-        if model.base_model_prefix not in ["llama", "bloom", "chatglm"]:
+        if model.base_model_prefix not in ["llama", "bloom", "chatglm"] and training_args.pipeline_parallel_degree < 1:
             raise NotImplementedError("InTokens data stream is only implemented for LLaMA, Bloom and ChatGLM so far.")
     train_ds = train_ds.map(partial(trans_func, is_test=False, intokens=data_args.intokens))
     eval_intokens = data_args.intokens
@@ -151,19 +163,27 @@ def main():
         eval_intokens = False
     dev_ds = dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, intokens=eval_intokens))
     if data_args.intokens:
+        if data_args.lazy:
+            from paddlenlp.datasets import InTokensIterableDataset
+
+            intoken_dataset = InTokensIterableDataset
+        else:
+            from paddlenlp.datasets import InTokensMapDataset
+
+            intoken_dataset = InTokensMapDataset
         from paddlenlp.datasets import InTokensMapDataset
 
         logger.info("Creating InTokens Data Stream. This may take a few minutes.")
-        train_ds = InTokensMapDataset(
+        train_ds = intoken_dataset(
             train_ds,
             tokenizer=tokenizer,
-            max_length=data_args.intokens_max_length,
+            max_length=data_args.max_length,
         )
         if eval_intokens:
-            dev_ds = InTokensMapDataset(
+            dev_ds = intoken_dataset(
                 dev_ds,
                 tokenizer=tokenizer,
-                max_length=data_args.intokens_max_length,
+                max_length=data_args.max_length,
             )
 
     if model_args.prefix_tuning:
@@ -232,6 +252,8 @@ def main():
         }
 
     # Create trainer
+    max_length = data_args.max_length if training_args.pipeline_parallel_degree > 1 else None
+    padding = "max_length" if training_args.pipeline_parallel_degree > 1 else True
     trainer = CausalLMTrainer(
         model=model,
         args=training_args,
@@ -241,13 +263,9 @@ def main():
         compute_metrics=compute_metrics_do_generation if data_args.eval_with_do_generation else compute_metrics,
         data_collator=DataCollatorForSeq2Seq(
             tokenizer=tokenizer,
-            max_length=data_args.src_length + data_args.tgt_length
-            if training_args.pipeline_parallel_degree > 1
-            else -1,
-            padding="max_length" if training_args.pipeline_parallel_degree > 1 else True,
-            max_label_length=data_args.src_length + data_args.tgt_length
-            if training_args.pipeline_parallel_degree > 1
-            else None,
+            max_length=max_length,
+            padding=padding,
+            max_label_length=max_length,
             return_tensors="np",
         ),
         do_generation=data_args.eval_with_do_generation,
@@ -288,8 +306,8 @@ def main():
         # Prepare ptq dataloader
         if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
             ptq_ds = load_dataset(
-                read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
-            )
+                "json", data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
+            )[0]
             ptq_ds = ptq_ds.map(partial(trans_func, is_test=False))
         else:
             ptq_ds = train_ds
@@ -318,8 +336,8 @@ def main():
         # Prepare ptq dataloader
         if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
             ptq_ds = load_dataset(
-                read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
-            )
+                "json", data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
+            )[0]
             ptq_ds = ptq_ds.map(partial(trans_func, is_test=False))
         else:
             ptq_ds = train_ds
@@ -338,8 +356,8 @@ def main():
     # Evaluation test set
     if training_args.do_predict:
         test_ds = load_dataset(
-            read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "test.json"), lazy=False
-        )
+            "json", data_files=os.path.join(data_args.dataset_name_or_path, "test.json"), lazy=False
+        )[0]
         test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
         eval_result = trainer.predict(test_ds).metrics
         trainer.log_metrics("test", eval_result)
