@@ -25,6 +25,7 @@ from typing import List, Optional
 import numpy as np
 import paddle
 
+from paddlenlp.data.causal_dataset import GPTDataset
 from paddlenlp.trainer import (
     PdArgumentParser,
     Trainer,
@@ -510,10 +511,11 @@ def main():
         # modify the `__len__` function to change the length of dataset in current python process
         GPTDataset.__len__ = lambda *_: data_args.train_data_size
         total_effective_tokens = (
-            sum([len(train_dataset[i][0]) for i in range(data_args.train_data_size)]) * training_args.num_train_epochs
+            sum([len(train_dataset[i]["text"]) for i in range(data_args.train_data_size)])
+            * training_args.num_train_epochs
         )
     else:
-        total_effective_tokens = sum([len(i[0]) for i in train_dataset]) * training_args.num_train_epochs
+        total_effective_tokens = sum([len(i["text"]) for i in train_dataset]) * training_args.num_train_epochs
 
     trainer = PretrainingTrainer(
         model=model,
