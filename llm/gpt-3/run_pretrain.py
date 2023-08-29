@@ -49,7 +49,11 @@ MODEL_CLASSES = {
     ),
 }
 
-from paddlenlp.data.causal_dataset import build_train_valid_test_datasets, print_rank_0
+from paddlenlp.data.causal_dataset import (
+    GPTDataset,
+    build_train_valid_test_datasets,
+    print_rank_0,
+)
 
 
 def add_start_docstrings(*docstr):
@@ -100,6 +104,7 @@ class DataArguments:
         metadata={"help": "Use share folder for data dir and output dir on multi machine."},
     )
 
+    train_data_size: int = field(default=-1, metadata={"help": "Number of dataset for training"})
     data_impl: str = field(default="mmap", metadata={"help": "The format of the preprocessed data."})
     skip_warmup: bool = field(
         default=True,
@@ -140,6 +145,12 @@ class ModelArguments:
     )
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
+    continue_training: bool = field(
+        default=False,
+        metadata={
+            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
+        },
+    )
 
 
 def create_pretrained_dataset(
@@ -379,12 +390,16 @@ def main():
     if training_args.pipeline_parallel_degree > 1:
         model_class = GPTForCausalLMPipe
 
-    model = model_class.from_pretrained(
-        model_args.model_name_or_path,
-        config=config,
-        dtype=dtype,
-        load_state_as_np=True,
-    )
+    if model_args.continue_training:
+        model = model_class.from_pretrained(
+            model_args.model_name_or_path,
+            config=config,
+            dtype=dtype,
+            load_state_as_np=True,
+        )
+    else:
+        model_config = config_class.from_pretrained(model_args.model_name_or_path)
+        model = model_class(model_config)
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
@@ -413,6 +428,17 @@ def main():
     train_dataset, eval_dataset, test_dataset, data_collator = create_pretrained_dataset(
         data_args, training_args, data_file, tokenizer
     )
+
+    if data_args.train_data_size > 0:
+        # GPTDataset is the type of `paddle.io.Dataset`, which dosen't contains `select` method
+        # modify the `__len__` function to change the length of dataset in current python process
+        GPTDataset.__len__ = lambda *_: data_args.train_data_size
+        total_effective_tokens = (
+            sum([train_dataset[i]["text"].shape[0] for i in range(data_args.train_data_size)])
+            * training_args.num_train_epochs
+        )
+    else:
+        total_effective_tokens = sum([len(i[0]) for i in train_dataset]) * training_args.num_train_epochs
 
     trainer = PretrainingTrainer(
         model=model,
@@ -443,6 +469,10 @@ def main():
     if training_args.do_predict:
         test_ret = trainer.predict(test_dataset)
         trainer.log_metrics("test", test_ret.metrics)
+
+    effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
+    print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
+    print(f"ips: {effective_tokens_per_second:.2f} tokens/s")
 
 
 if __name__ == "__main__":
