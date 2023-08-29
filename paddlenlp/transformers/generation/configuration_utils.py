@@ -128,31 +128,6 @@ class GenerationConfig:
                 Only works when fast entry is avalible. Default to False.
             model_kwargs (dict): It can be used to specify additional kwargs
                 passed to the model.
-
-        max_length=20,
-        min_length=0,
-        decode_strategy="greedy_search",
-        temperature=1.0,
-        top_k=0,
-        top_p=1.0,
-        repetition_penalty=1.0,
-        num_beams=1,
-        num_beam_groups=1,
-        length_penalty=0.0,
-        early_stopping=False,
-        bos_token_id=None,
-        eos_token_id=None,
-        pad_token_id=None,
-        decoder_start_token_id=None,
-        forced_bos_token_id=None,
-        forced_eos_token_id=None,
-        no_repeat_ngram_size=None,
-        num_return_sequences=1,
-        diversity_rate=0.0,
-        use_cache=True,
-        use_fast=False,
-        use_fp16_decoding=False,
-        **model_kwargs
     """
 
     def _get_generation_mode(self):

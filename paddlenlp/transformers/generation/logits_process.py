@@ -14,23 +14,11 @@
 
 import inspect
 from abc import ABC
+from collections import OrderedDict
 from typing import List
 
 import paddle
-
-
-class LogitsProcessorList(List):
-    def __call__(self, input_ids, logits, **kwargs):
-        for processor in self:
-            processor_args = inspect.signature(processor.__call__).parameters
-            if len(processor_args) > 2:
-                assert all(
-                    arg in kwargs for arg in list(processor_args.keys())[2:]
-                ), f"The parameters don't match for {processor.__class__}"
-                logits = processor(input_ids, logits, **kwargs)
-            else:
-                logits = processor(input_ids, logits)
-        return logits
+from paddle.nn.layer.layers import in_declarative_mode
 
 
 class LogitsProcessor(ABC):
@@ -45,6 +33,31 @@ class LogitsProcessor(ABC):
         )
 
 
+class LogitsProcessorList:
+    """use ordered dict to store processors"""
+
+    def __init__(self, processors: List[LogitsProcessor] = None) -> None:
+        self._processors = OrderedDict()
+        processors = processors or []
+        for processor in processors:
+            self.append(processor)
+
+    def __call__(self, input_ids, logits, **kwargs):
+        for processor in self._processors.values():
+            processor_args = inspect.signature(processor.__call__).parameters
+            if len(processor_args) > 2:
+                assert all(
+                    arg in kwargs for arg in list(processor_args.keys())[2:]
+                ), f"The parameters don't match for {processor.__class__}"
+                logits = processor(input_ids, logits, **kwargs)
+            else:
+                logits = processor(input_ids, logits)
+        return logits
+
+    def append(self, processor):
+        self._processors[len(self._processors)] = processor
+
+
 class MinLengthLogitsProcessor(LogitsProcessor):
     r"""
     Enforcing a min-length by setting EOS probability to 0.
@@ -55,7 +68,7 @@ class MinLengthLogitsProcessor(LogitsProcessor):
     """
 
     def __init__(self, min_length, eos_token_id):
-        if not isinstance(min_length, int) or min_length < 0:
+        if min_length < 0 and not in_declarative_mode():
             raise ValueError("`min_length` should be a positive integer, but get {}".format(min_length))
 
         if not isinstance(eos_token_id, int) or eos_token_id < 0:
@@ -82,7 +95,7 @@ class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
     """
 
     def __init__(self, penalty: float):
-        if not isinstance(penalty, float) or not (penalty > 0):
+        if not (penalty > 0) and not in_declarative_mode():
             raise ValueError(f"`penalty` has to be a strictly positive float, but is {penalty}")
 
         self.penalty = penalty
@@ -90,7 +103,7 @@ class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids, logits):
         score = paddle.index_sample(logits, input_ids)
         score = paddle.where(score < 0, score * self.penalty, score / self.penalty)
-        input_ids = input_ids + paddle.arange(logits.shape[0]).unsqueeze(-1) * logits.shape[-1]
+        input_ids = input_ids + paddle.arange(logits.shape[0], dtype="int64").unsqueeze(-1) * logits.shape[-1]
         outputs = paddle.scatter(logits.flatten(), input_ids.flatten(), score.flatten()).reshape(logits.shape)
         return outputs
 
@@ -127,14 +140,6 @@ def _calc_banned_ngram_tokens(ngram_size, prev_input_ids, num_hypos, cur_len):
     ]
     return banned_tokens
 
-    # # remove the unvalid banned_token
-    # valid_banned_tokens = []
-    # for banned_token in banned_tokens:
-    #     if len(banned_token) > 0:
-    #         valid_banned_tokens.append(banned_token)
-
-    # return valid_banned_tokens
-
 
 class NoRepeatNGramLogitsProcessor(LogitsProcessor):
     r"""
@@ -150,15 +155,13 @@ class NoRepeatNGramLogitsProcessor(LogitsProcessor):
             raise ValueError(f"`ngram_size` has to be a strictly positive integer, but is {ngram_size}")
         self.ngram_size = ngram_size
 
-    def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor):
+    def __call__(self, input_ids, scores):
         num_batch_hypotheses = scores.shape[0]
         cur_len = input_ids.shape[-1]
         banned_batch_tokens = _calc_banned_ngram_tokens(self.ngram_size, input_ids, num_batch_hypotheses, cur_len)
 
         for i, banned_tokens in enumerate(banned_batch_tokens):
-            if len(banned_tokens) == 0:
-                continue
-            scores[i, banned_tokens] = paddle.finfo(scores.dtype).min
+            scores[i, banned_tokens] = -float("inf")
 
         return scores
 
@@ -215,7 +218,7 @@ class ForcedBOSTokenLogitsProcessor(LogitsProcessor):
 
     Args:
         forced_bos_token_id (:obj:`int`):
-            The id of the token to to be generated as the first token.
+            The id of the token to be generated as the first token.
     """
 
     def __init__(self, forced_bos_token_id):
@@ -224,8 +227,7 @@ class ForcedBOSTokenLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids, scores):
         cur_len = input_ids.shape[-1]
         if cur_len == 1:
-            num_tokens = scores.shape[1]
-            scores[:, [i for i in range(num_tokens) if i != self.forced_bos_token_id]] = -float("inf")
+            scores[:] = -float("inf")
             scores[:, self.forced_bos_token_id] = 0
         return scores
 
@@ -236,7 +238,7 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
 
     Args:
         max_length (int): The maximum length of the sequence to be generated.
-        forced_eos_token_id (int): The id of the token to to be generated as the last token.
+        forced_eos_token_id (int): The id of the token to be generated as the last token.
     """
 
     def __init__(self, max_length, forced_eos_token_id):
@@ -246,10 +248,54 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids, scores):
         cur_len = input_ids.shape[-1]
         if cur_len == self.max_length - 1:
-            num_tokens = scores.shape[1]
-            scores[:, [i for i in range(num_tokens) if i != self.forced_eos_token_id]] = -float("inf")
+            scores[:] = -1e9  # TODO change back to -inf after paddle.topk is fixed
             scores[:, self.forced_eos_token_id] = 0
         return scores
+
+
+def TopKProcess(probs, top_k, min_tokens_to_keep):
+    top_k = min(max(top_k, min_tokens_to_keep), probs.shape[-1])
+    # Remove all tokens with a probability less than the last token of the top-k
+    # cast to float16 to support generation & d2s
+    if probs.dtype == paddle.bfloat16:
+        probs = paddle.cast(probs, paddle.float32)
+        topk_probs, _ = paddle.topk(probs, k=top_k)
+        topk_probs = paddle.cast(topk_probs, paddle.bfloat16)
+    else:
+        topk_probs, _ = paddle.topk(probs, k=top_k)
+
+    probs = paddle.where(probs >= topk_probs[:, -1:], probs, paddle.full_like(probs, 0.0))
+    return probs
+
+
+def TopPProcess(probs, top_p, min_tokens_to_keep):
+    sorted_indices = paddle.argsort(probs, descending=True)
+    if isinstance(sorted_indices, tuple):
+        sorted_probs, sorted_indices = sorted_indices
+    else:
+        sorted_probs = paddle.sort(probs, descending=True)
+
+    cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)
+
+    # Remove tokens with cumulative probs above the top_p, But keep at
+    # least min_tokens_to_keep tokens
+    sorted_indices_to_remove = cumulative_probs > top_p
+    if min_tokens_to_keep > 1:
+        # Set 'min_tokens_to_keep - 1' because the first token is kept
+        sorted_indices_to_remove[:, : min_tokens_to_keep - 1] = 0
+    # Keep the first token
+    sorted_indices_to_remove = paddle.cast(sorted_indices_to_remove, dtype="int64")
+    sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
+    sorted_indices_to_remove[:, 0] = 0
+
+    # Scatter sorted tensors to original indexing
+    sorted_indices = sorted_indices + paddle.arange(probs.shape[0], dtype="int64").unsqueeze(-1) * probs.shape[-1]
+    condition = paddle.scatter(
+        sorted_indices_to_remove.flatten(), sorted_indices.flatten(), sorted_indices_to_remove.flatten()
+    )
+    condition = paddle.cast(condition, "bool").reshape(probs.shape)
+    probs = paddle.where(condition, paddle.full_like(probs, 0.0), probs)
+    return probs
 
 
 class LogitsWarper:
@@ -264,7 +310,6 @@ class LogitsWarper:
 class TemperatureLogitsWarper(LogitsWarper):
     r"""
     [`LogitsWarper`] for temperature (exponential scaling output probability distribution).
-
     Args:
         temperature (`float`):
             The value used to module the logits distribution.
@@ -279,84 +324,3 @@ class TemperatureLogitsWarper(LogitsWarper):
     def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor):
         scores = scores / self.temperature
         return scores
-
-
-class TopKLogitsWarper(LogitsWarper):
-    r"""
-    [`LogitsWarper`] that performs top-k, i.e. restricting to the k highest probability elements.
-
-    Args:
-        top_k (`int`):
-            The number of highest probability vocabulary tokens to keep for top-k-filtering.
-        filter_value (`float`, *optional*, defaults to `-float("Inf")`):
-            All filtered values will be set to this float value.
-        min_tokens_to_keep (`int`, *optional*, defaults to 1):
-            Minimum number of tokens that cannot be filtered.
-    """
-
-    def __init__(self, top_k: int, filter_value: float = -float("inf"), min_tokens_to_keep: int = 1):
-        if not isinstance(top_k, int) or top_k <= 0:
-            raise ValueError(f"`top_k` has to be a strictly positive integer, but is {top_k}")
-
-        self.top_k = max(top_k, min_tokens_to_keep)
-        self.filter_value = filter_value
-
-    def __call__(self, input_ids, probs):
-        top_k = min(self.top_k, probs.shape[-1])  # Safety check
-        # Remove all tokens with a probability less than the last token of the top-k
-        topk_probs, _ = paddle.topk(probs, k=top_k)
-
-        # NOTE: probs need to be float32, otherwise, paddle.full_like will do truncation
-        probs = probs.astype("float32")
-        probs = paddle.where(
-            probs < topk_probs[:, -1:], paddle.full_like(probs, self.filter_value, dtype="float32"), probs
-        )
-        return probs
-
-
-class TopPLogitsWarper(LogitsWarper):
-    """
-    [`LogitsWarper`] that performs top-p, i.e. restricting to top tokens summing to prob_cut_off <= prob_cut_off.
-
-    Args:
-        top_p (`float`):
-            If set to < 1, only the smallest set of most probable tokens with probabilities that add up to `top_p` or
-            higher are kept for generation.
-        filter_value (`float`, *optional*, defaults to `-float("Inf")`):
-            All filtered values will be set to this float value.
-        min_tokens_to_keep (`int`, *optional*, defaults to 1):
-            Minimum number of tokens that cannot be filtered.
-    """
-
-    def __init__(self, top_p: float, filter_value: float = -float("inf"), min_tokens_to_keep: int = 1):
-        top_p = float(top_p)
-        if top_p < 0 or top_p > 1.0:
-            raise ValueError(f"`top_p` has to be a float > 0 and < 1, but is {top_p}")
-
-        self.top_p = top_p
-        self.filter_value = filter_value
-        self.min_tokens_to_keep = min_tokens_to_keep
-
-    def __call__(self, input_ids, probs):
-        sorted_logits = paddle.sort(probs, descending=False)
-        sorted_indices = paddle.argsort(probs, descending=False)
-        cumulative_probs = paddle.nn.functional.softmax(sorted_logits, axis=-1).cumsum(axis=-1)
-
-        # Remove tokens with cumulative top_p above the threshold (token with 0 are kept)
-        sorted_indices_to_remove = cumulative_probs <= (1 - self.top_p)
-
-        if self.min_tokens_to_keep > 1:
-            # Keep at least min_tokens_to_keep
-            sorted_indices_to_remove[..., -self.min_tokens_to_keep :] = 0
-
-        sorted_indices_to_remove = paddle.cast(sorted_indices_to_remove, dtype="int64")
-        sorted_indices = sorted_indices + paddle.arange(probs.shape[0]).unsqueeze(-1) * probs.shape[-1]
-        condition = paddle.scatter(
-            sorted_indices_to_remove.flatten(), sorted_indices.flatten(), sorted_indices_to_remove.flatten()
-        )
-        condition = paddle.cast(condition, "bool").reshape(probs.shape)
-
-        # NOTE: probs need to be float32, otherwise, paddle.full_like will do truncation
-        probs = probs.astype("float32")
-        probs = paddle.where(condition, paddle.full_like(probs, self.filter_value, dtype="float32"), probs)
-        return probs

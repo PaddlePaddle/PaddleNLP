@@ -1,5 +1,4 @@
-# coding=utf-8
-# Copyright 2023 The HuggingFace Inc. team.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,14 +31,6 @@ class BaseStreamer:
 
 class TextStreamer(BaseStreamer):
     """
-    Simple text streamer that prints the token(s) to stdout as soon as entire words are formed.
-
-    <Tip warning={true}>
-
-    The API for the streamer classes is still under development and may change in the future.
-
-    </Tip>
-
     Parameters:
         tokenizer (`AutoTokenizer`):
             The tokenized used to decode the tokens.
@@ -51,15 +42,16 @@ class TextStreamer(BaseStreamer):
     Examples:
 
         ```python
-        >>> from transformers import AutoModelForCausalLM, AutoTokenizer, TextStreamer
+        >>> from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+        >>> from paddlenlp.transformers.generation_utils import TextStreamer
 
         >>> tok = AutoTokenizer.from_pretrained("gpt2")
         >>> model = AutoModelForCausalLM.from_pretrained("gpt2")
-        >>> inputs = tok(["An increasing sequence: one,"], return_tensors="pt")
+        >>> inputs = tok(["An increasing sequence: one,"], return_tensors="pd")
         >>> streamer = TextStreamer(tok)
 
         >>> # Despite returning the usual output, the streamer will also print the generated text to stdout.
-        >>> _ = model.generate(**inputs, streamer=streamer, max_new_tokens=20)
+        >>> _ = model.generate(**inputs, streamer=streamer, max_tokens=20)
         An increasing sequence: one, two, three, four, five, six, seven, eight, nine, ten, eleven,
         ```
     """
@@ -157,12 +149,6 @@ class TextIteratorStreamer(TextStreamer):
     useful for applications that benefit from acessing the generated text in a non-blocking way (e.g. in an interactive
     Gradio demo).
 
-    <Tip warning={true}>
-
-    The API for the streamer classes is still under development and may change in the future.
-
-    </Tip>
-
     Parameters:
         tokenizer (`AutoTokenizer`):
             The tokenized used to decode the tokens.
@@ -177,16 +163,17 @@ class TextIteratorStreamer(TextStreamer):
     Examples:
 
         ```python
-        >>> from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
+        >>> from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+        >>> from paddlenlp.transformers.generation_utils import TextIteratorStreamer
         >>> from threading import Thread
 
         >>> tok = AutoTokenizer.from_pretrained("gpt2")
         >>> model = AutoModelForCausalLM.from_pretrained("gpt2")
-        >>> inputs = tok(["An increasing sequence: one,"], return_tensors="pt")
+        >>> inputs = tok(["An increasing sequence: one,"], return_tensors="pd")
         >>> streamer = TextIteratorStreamer(tok)
 
         >>> # Run the generation in a separate thread, so that we can fetch the generated text in a non-blocking way.
-        >>> generation_kwargs = dict(inputs, streamer=streamer, max_new_tokens=20)
+        >>> generation_kwargs = dict(inputs, streamer=streamer, max_tokens=20)
         >>> thread = Thread(target=model.generate, kwargs=generation_kwargs)
         >>> thread.start()
         >>> generated_text = ""

@@ -14,9 +14,6 @@
 # limitations under the License.
 from __future__ import annotations
 
-import inspect
-from abc import ABC
-from collections import OrderedDict
 from typing import Union
 
 import paddle
@@ -41,6 +38,18 @@ from paddlenlp.transformers.utils import get_scale_by_dtype
 from paddlenlp.utils.log import logger
 
 from .configuration_utils import GenerationConfig
+from .logits_process import (
+    ForcedBOSTokenLogitsProcessor,
+    ForcedEOSTokenLogitsProcessor,
+    HammingDiversityLogitsProcessor,
+    LogitsProcessor,
+    LogitsProcessorList,
+    MinLengthLogitsProcessor,
+    NoRepeatNGramLogitsProcessor,
+    RepetitionPenaltyLogitsProcessor,
+    TopKProcess,
+    TopPProcess,
+)
 
 __all__ = [
     "GenerationMixin",
@@ -597,33 +606,6 @@ class GenerationMixin(object):
         generation_config=None,
         streamer=None,
         **kwargs,
-        # input_ids=None,
-        # attention_mask=None,
-        # position_ids=None,
-        # max_length=20,
-        # min_length=0,
-        # decode_strategy="greedy_search",
-        # temperature=1.0,
-        # top_k=0,
-        # top_p=1.0,
-        # repetition_penalty=1.0,
-        # num_beams=1,
-        # num_beam_groups=1,
-        # length_penalty=0.0,
-        # early_stopping=False,
-        # bos_token_id=None,
-        # eos_token_id=None,
-        # pad_token_id=None,
-        # decoder_start_token_id=None,
-        # forced_bos_token_id=None,
-        # forced_eos_token_id=None,
-        # no_repeat_ngram_size=None,
-        # num_return_sequences=1,
-        # diversity_rate=0.0,
-        # use_cache=True,
-        # use_fast=False,
-        # use_fp16_decoding=False,
-        # **model_kwargs
     ):
         r"""
         The interface for generation task. This method can generate sequences
@@ -636,66 +618,17 @@ class GenerationMixin(object):
                 The data type should be int32 or int64. Default to None, which
                 we will initialize it as a Tensor with shape [1, 1], filled
                 with the value `bos_token_id`.
-            max_length (int, optional): The maximum length of the sequence to
-                be generated. Default to 20.
-            min_length (int, optional): The minimum length of the sequence to
-                be generated. Default to 0.
-            decode_strategy (str, optional): The decoding strategy in generation.
-                Currently, there are three decoding strategies supported:
-                "greedy_search", "sampling" and "beam_search". Default to
-                "greedy_search".
-            temperature (float, optional): The value used to module the next
-                token probabilities in the "sampling" strategy. Default to 1.0,
-                which means no effect.
-            top_k (int, optional): The number of highest probability tokens to
-                keep for top-k-filtering in the "sampling" strategy. Default to
-                0, which means no effect.
-            top_p (float, optional): The cumulative probability for
-                top-p-filtering in the "sampling" strategy. The value should
-                satisfy :math:`0 <= top\_p < 1`. Default to 1.0, which means no
-                effect.
-            repetition_penalty (float, optional):
-                The parameter for repetition penalty. 1.0 means no penalty. See `this paper
-                <https://arxiv.org/pdf/1909.05858.pdf>`__ for more details. Defaults to 1.0.
-            num_beams (int, optional): The number of beams in the "beam_search"
-                strategy. Default to 1.
-            num_beam_groups (int, optional):
-                Number of groups to divide `num_beams` into in order to use DIVERSE
-                BEAM SEARCH. See `this paper <https://arxiv.org/pdf/1610.02424.pdf>`__
-                for more details. Default to 1.
-            length_penalty (float, optional): The exponential penalty to the
-                sequence length in the "beam_search" strategy. The larger this
-                param is, the more that the model would generate shorter
-                sequences. Default to 0.0, which means no penalty.
-            early_stopping (bool, optional): Whether to stop searching in the
-                "beam_search" strategy when at least `num_beams` sentences are
-                finished per batch or not. Default to False.
-            bos_token_id (int, optional): The id of the `bos_token`. Default to
-                None.
-            eos_token_id (int, optional): The id of the `eos_token`. Default to
-                None.
-            pad_token_id (int, optional): The id of the `pad_token`. Default to
-                None.
-            decoder_start_token_id (int, optional): The start token id for
-                encoder-decoder models. Default to None.
-            forced_bos_token_id (int, optional): The id of the token to force as
-                the first generated token. Usually use for multilingual models.
-                Default to None.
-            forced_eos_token_id (int, optional): The id of the token to force as
-                the last generated token. Default to None.
-            num_return_sequences (int, optional): The number of returned
-                sequences for each sequence in the batch. Default to 1.
-            diversity_rate (float, optional): If num_beam_groups is 1, this is the
-                diversity_rate for Diverse Siblings Search. See
-                `this paper https://arxiv.org/abs/1611.08562`__ for more details.
-                If not, this is the diversity_rate for DIVERSE BEAM SEARCH.
-            use_cache: (bool, optional): Whether to use the model cache to
-                speed up decoding. Default to True.
-            use_fast: (bool, optional): Whether to use fast entry of model
-                for FastGeneration. Default to False.
-            use_fp16_decoding: (bool, optional): Whether to use fp16 for decoding.
-                Only works when fast entry is avalible. Default to False.
-            model_kwargs (dict): It can be used to specify additional kwargs
+            generation_config (`~generation.GenerationConfig`, *optional*):
+                The generation configuration to be used as base parametrization for the generation call. `**kwargs`
+                passed to generate matching the attributes of `generation_config` will override them. If
+                `generation_config` is not provided, the default will be used, which had the following loading
+                priority: 1) from the `generation_config.json` model file, if it exists; 2) from the model
+                configuration. Please note that unspecified parameters will inherit [`~generation.GenerationConfig`]'s
+                default values, whose documentation should be checked to parameterize generation.
+            streamer (`~streamer.BaseStreamer`, *optional*):
+                Streamer object that will be used to stream the generated sequences. Generated tokens are passed
+                through `streamer.put(token_ids)` and the streamer is responsible for any further processing.
+            kwargs (dict): It can be used to specify additional kwargs
                 passed to the model.
 
         Returns:
@@ -754,14 +687,18 @@ class GenerationMixin(object):
             .. code-block::
 
                 # Generate 2 sequences by using "sampling" strategy (top_k=5)
+                generation_config = GenerationConfig(
+                    decode_strategy="sampling",
+                    top_k=5,
+                    num_return_sequences=2
+                )
                 ids, scores = model.generate(
                     input_ids=inputs['input_ids'],
                     token_type_ids=inputs['token_type_ids'],
                     position_ids=inputs['position_ids'],
                     attention_mask=inputs['attention_mask'],
-                    decode_strategy="sampling",
-                    top_k=5,
-                    num_return_sequences=2)
+                    generation_config=generation_config)
+                    )
                 print(ids.shape, scores.shape)
                 # [2, 7] [2, 1]
                 response = []
@@ -775,14 +712,17 @@ class GenerationMixin(object):
             .. code-block::
 
                 # Generate 2 sequences by using "beam_search" strategy (num_beams=5)
+                generation_config = GenerationConfig(
+                    decode_strategy="beam_search",
+                    num_beams=5,
+                    num_return_sequences=2
+                )
                 ids, scores = model.generate(
                     input_ids=inputs['input_ids'],
                     token_type_ids=inputs['token_type_ids'],
                     position_ids=inputs['position_ids'],
                     attention_mask=inputs['attention_mask'],
-                    decode_strategy="beam_search",
-                    num_beams=5,
-                    num_return_sequences=2)
+                    )
                 print(ids.shape, scores.shape)
                 # [2, 3] [2, 1]
                 response = []
@@ -1744,280 +1684,3 @@ class GenerationMixin(object):
             eos_token_id=eos_token_id,
         )
         return pred_ids[:, origin_len:], scores
-
-
-class LogitsProcessorList:
-    """use ordered dict to store processors"""
-
-    def __init__(self, processors: list[LogitsProcessor] = None) -> None:
-        self._processors = OrderedDict()
-        processors = processors or []
-        for processor in processors:
-            self.append(processor)
-
-    def __call__(self, input_ids, logits, **kwargs):
-        for processor in self._processors.values():
-            processor_args = inspect.signature(processor.__call__).parameters
-            if len(processor_args) > 2:
-                assert all(
-                    arg in kwargs for arg in list(processor_args.keys())[2:]
-                ), f"The parameters don't match for {processor.__class__}"
-                logits = processor(input_ids, logits, **kwargs)
-            else:
-                logits = processor(input_ids, logits)
-        return logits
-
-    def append(self, processor):
-        self._processors[len(self._processors)] = processor
-
-
-class LogitsProcessor(ABC):
-    """
-    Abstract base class for all logit processors that can be applied during
-    generation.
-    """
-
-    def __call__(self, input_ids, logits):
-        raise NotImplementedError(
-            f"{self.__class__} is an abstract class. " "Only classes inheriting this class can be called."
-        )
-
-
-class MinLengthLogitsProcessor(LogitsProcessor):
-    r"""
-    Enforcing a min-length by setting EOS probability to 0.
-
-    Args:
-        min_length (int): The minimum length of generation sequence.
-        eos_token_id (int): The id of the `end-of-sequence` token.
-    """
-
-    def __init__(self, min_length, eos_token_id):
-        if min_length < 0 and not in_declarative_mode():
-            raise ValueError("`min_length` should be a positive integer, but get {}".format(min_length))
-
-        if not isinstance(eos_token_id, int) or eos_token_id < 0:
-            raise ValueError("`eos_token_id` should be a positive integer, but get {}".format(eos_token_id))
-
-        self.min_length = min_length
-        self.eos_token_id = eos_token_id
-
-    def __call__(self, input_ids, logits):
-        cur_len = input_ids.shape[-1]
-        if cur_len < self.min_length:
-            logits[:, self.eos_token_id] = -float("inf")
-        return logits
-
-
-class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
-    r"""
-    Enforcing an exponential penalty on repeated sequences.
-
-    Args:
-        repetition_penalty (float):
-            The parameter for repetition penalty. 1.0 means no penalty. See `this paper
-            <https://arxiv.org/pdf/1909.05858.pdf>`__ for more details.
-    """
-
-    def __init__(self, penalty: float):
-        if not (penalty > 0) and not in_declarative_mode():
-            raise ValueError(f"`penalty` has to be a strictly positive float, but is {penalty}")
-
-        self.penalty = penalty
-
-    def __call__(self, input_ids, logits):
-        score = paddle.index_sample(logits, input_ids)
-        score = paddle.where(score < 0, score * self.penalty, score / self.penalty)
-        input_ids = input_ids + paddle.arange(logits.shape[0], dtype="int64").unsqueeze(-1) * logits.shape[-1]
-        outputs = paddle.scatter(logits.flatten(), input_ids.flatten(), score.flatten()).reshape(logits.shape)
-        return outputs
-
-
-def _get_ngrams(ngram_size, prev_input_ids, num_hypos):
-    generated_ngrams = [{} for _ in range(num_hypos)]
-    for idx in range(num_hypos):
-        gen_tokens = prev_input_ids[idx].tolist()
-        generated_ngram = generated_ngrams[idx]
-        for ngram in zip(*[gen_tokens[i:] for i in range(ngram_size)]):
-            prev_ngram_tuple = tuple(ngram[:-1])
-            generated_ngram[prev_ngram_tuple] = generated_ngram.get(prev_ngram_tuple, []) + [ngram[-1]]
-    return generated_ngrams
-
-
-def _get_generated_ngrams(banned_ngrams, prev_input_ids, ngram_size, cur_len):
-    # Before decoding the next token, prevent decoding of ngrams that have already appeared
-    start_idx = cur_len + 1 - ngram_size
-    ngram_idx = tuple(prev_input_ids[start_idx:cur_len].tolist())
-    return banned_ngrams.get(ngram_idx, [])
-
-
-def _calc_banned_ngram_tokens(ngram_size, prev_input_ids, num_hypos, cur_len):
-    """Copied from fairseq for no_repeat_ngram in beam_search"""
-    if cur_len + 1 < ngram_size:
-        # return no banned tokens if we haven't generated no_repeat_ngram_size tokens yet
-        return [[] for _ in range(num_hypos)]
-
-    generated_ngrams = _get_ngrams(ngram_size, prev_input_ids, num_hypos)
-
-    banned_tokens = [
-        _get_generated_ngrams(generated_ngrams[hypo_idx], prev_input_ids[hypo_idx], ngram_size, cur_len)
-        for hypo_idx in range(num_hypos)
-    ]
-    return banned_tokens
-
-
-class NoRepeatNGramLogitsProcessor(LogitsProcessor):
-    r"""
-    [`LogitsProcessor`] that enforces no repetition of n-grams. See
-    [Fairseq](https://github.com/pytorch/fairseq/blob/a07cb6f40480928c9e0548b737aadd36ee66ac76/fairseq/sequence_generator.py#L345).
-    Args:
-        ngram_size (`int`):
-            All ngrams of size `ngram_size` can only occur once.
-    """
-
-    def __init__(self, ngram_size):
-        if not isinstance(ngram_size, int) or ngram_size <= 0:
-            raise ValueError(f"`ngram_size` has to be a strictly positive integer, but is {ngram_size}")
-        self.ngram_size = ngram_size
-
-    def __call__(self, input_ids, scores):
-        num_batch_hypotheses = scores.shape[0]
-        cur_len = input_ids.shape[-1]
-        banned_batch_tokens = _calc_banned_ngram_tokens(self.ngram_size, input_ids, num_batch_hypotheses, cur_len)
-
-        for i, banned_tokens in enumerate(banned_batch_tokens):
-            scores[i, banned_tokens] = -float("inf")
-
-        return scores
-
-
-class HammingDiversityLogitsProcessor(LogitsProcessor):
-    """
-    This `LogitsProcessor` enforces diverse beam search. Note that this logits
-    processor is only effective for `group_beam_search`. See
-    `this paper <https://arxiv.org/pdf/1610.02424.pdf>`__ for more details.
-
-    Args:
-        diversity_rate (float): This value is subtracted from a beam's score if
-            it generates a token same as any beam from other group at a particular
-            time.
-        num_beams (int): Number of beams used for group beam search.
-        num_beam_groups (int): Number of groups to divide `num_beams` into in order
-            to ensure diversity among different groups of beams.
-    """
-
-    def __init__(self, diversity_rate, num_beams, num_beam_groups):
-        if not isinstance(diversity_rate, float) or (not diversity_rate > 0.0):
-            raise ValueError("`diversity_rate` should be a float strictly larger than 0.")
-        self._diversity_rate = diversity_rate
-        if not isinstance(num_beams, int) or num_beams < 2:
-            raise ValueError("`num_beams` should be an integer strictly larger than 1.")
-        self._num_beams = num_beams
-        if not isinstance(num_beam_groups, int) or num_beam_groups < 2:
-            raise ValueError("`num_beam_groups` should be an integer strictly larger than 1.")
-        self._num_sub_beams = num_beams // num_beam_groups
-
-    def __call__(self, input_ids, scores, current_tokens, beam_group_idx):
-        batch_size = current_tokens.shape[0] // self._num_beams
-        group_start_idx = beam_group_idx * self._num_sub_beams
-        group_end_idx = min(group_start_idx + self._num_sub_beams, self._num_beams)
-        group_size = group_end_idx - group_start_idx
-        vocab_size = scores.shape[-1]
-
-        if group_start_idx == 0:
-            return scores
-
-        for batch_idx in range(batch_size):
-            previous_group_tokens = current_tokens[
-                batch_idx * self._num_beams : batch_idx * self._num_beams + group_start_idx
-            ]
-            token_frequency = paddle.bincount(previous_group_tokens, minlength=vocab_size)
-            scores[batch_idx * group_size : (batch_idx + 1) * group_size] -= self._diversity_rate * token_frequency
-
-        return scores
-
-
-class ForcedBOSTokenLogitsProcessor(LogitsProcessor):
-    """
-    This `LogitsProcessor` enforces the first generated token to be the selected `forced_bos_token`.
-
-    Args:
-        forced_bos_token_id (:obj:`int`):
-            The id of the token to be generated as the first token.
-    """
-
-    def __init__(self, forced_bos_token_id):
-        self.forced_bos_token_id = forced_bos_token_id
-
-    def __call__(self, input_ids, scores):
-        cur_len = input_ids.shape[-1]
-        if cur_len == 1:
-            scores[:] = -float("inf")
-            scores[:, self.forced_bos_token_id] = 0
-        return scores
-
-
-class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
-    """
-    This `LogitsProcessor` enforces the last generated token to be the selected `forced_eos_token`.
-
-    Args:
-        max_length (int): The maximum length of the sequence to be generated.
-        forced_eos_token_id (int): The id of the token to be generated as the last token.
-    """
-
-    def __init__(self, max_length, forced_eos_token_id):
-        self.max_length = max_length
-        self.forced_eos_token_id = forced_eos_token_id
-
-    def __call__(self, input_ids, scores):
-        cur_len = input_ids.shape[-1]
-        if cur_len == self.max_length - 1:
-            scores[:] = -1e9  # TODO change back to -inf after paddle.topk is fixed
-            scores[:, self.forced_eos_token_id] = 0
-        return scores
-
-
-def TopKProcess(probs, top_k, min_tokens_to_keep):
-    top_k = min(max(top_k, min_tokens_to_keep), probs.shape[-1])
-    # Remove all tokens with a probability less than the last token of the top-k
-    # cast to float16 to support generation & d2s
-    if probs.dtype == paddle.bfloat16:
-        probs = paddle.cast(probs, paddle.float32)
-        topk_probs, _ = paddle.topk(probs, k=top_k)
-        topk_probs = paddle.cast(topk_probs, paddle.bfloat16)
-    else:
-        topk_probs, _ = paddle.topk(probs, k=top_k)
-
-    probs = paddle.where(probs >= topk_probs[:, -1:], probs, paddle.full_like(probs, 0.0))
-    return probs
-
-
-def TopPProcess(probs, top_p, min_tokens_to_keep):
-    sorted_indices = paddle.argsort(probs, descending=True)
-    if isinstance(sorted_indices, tuple):
-        sorted_probs, sorted_indices = sorted_indices
-    else:
-        sorted_probs = paddle.sort(probs, descending=True)
-
-    cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)
-
-    # Remove tokens with cumulative probs above the top_p, But keep at
-    # least min_tokens_to_keep tokens
-    sorted_indices_to_remove = cumulative_probs > top_p
-    if min_tokens_to_keep > 1:
-        # Set 'min_tokens_to_keep - 1' because the first token is kept
-        sorted_indices_to_remove[:, : min_tokens_to_keep - 1] = 0
-    # Keep the first token
-    sorted_indices_to_remove = paddle.cast(sorted_indices_to_remove, dtype="int64")
-    sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
-    sorted_indices_to_remove[:, 0] = 0
-
-    # Scatter sorted tensors to original indexing
-    sorted_indices = sorted_indices + paddle.arange(probs.shape[0], dtype="int64").unsqueeze(-1) * probs.shape[-1]
-    condition = paddle.scatter(
-        sorted_indices_to_remove.flatten(), sorted_indices.flatten(), sorted_indices_to_remove.flatten()
-    )
-    condition = paddle.cast(condition, "bool").reshape(probs.shape)
-    probs = paddle.where(condition, paddle.full_like(probs, 0.0), probs)
-    return probs

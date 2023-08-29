@@ -44,8 +44,8 @@ from paddlenlp.transformers.generation.logits_process import (
     NoRepeatNGramLogitsProcessor,
     RepetitionPenaltyLogitsProcessor,
     TemperatureLogitsWarper,
-    TopKLogitsWarper,
-    TopPLogitsWarper,
+    TopKProcess,
+    TopPProcess,
 )
 
 
@@ -126,7 +126,6 @@ class LogitsProcessorTest(unittest.TestCase):
         self.assertAlmostEqual(scores[1, 5].item(), (4 / vocab_size) / 2)
 
     def test_top_k_dist_warper(self):
-        input_ids = None
         vocab_size = 10
         batch_size = 2
 
@@ -134,44 +133,38 @@ class LogitsProcessorTest(unittest.TestCase):
         ramp_logits = paddle.arange(vocab_size).unsqueeze(0).tile((batch_size, 1))
         ramp_logits[1:, : vocab_size // 2] = ramp_logits[1:, : vocab_size // 2] + vocab_size
         ramp_logits = ramp_logits.astype("float32")
-        top_k_warp = TopKLogitsWarper(3)
-
-        scores = top_k_warp(input_ids, ramp_logits)
+        scores = TopKProcess(ramp_logits, 3, 1)
 
         # check that correct tokens are filtered
-        self.assertListEqual(paddle.isinf(scores[0]).tolist(), 7 * [True] + 3 * [False])
-        self.assertListEqual(paddle.isinf(scores[1]).tolist(), 2 * [True] + 3 * [False] + 5 * [True])
+        self.assertListEqual((scores[0] == 0.0).tolist(), 7 * [True] + 3 * [False])
+        self.assertListEqual((scores[1] == 0.0).tolist(), 2 * [True] + 3 * [False] + 5 * [True])
 
         # check special cases
         length = 5
 
         logits = self._get_uniform_logits(batch_size=batch_size, length=length)
-        top_k_warp_safety_check = TopKLogitsWarper(top_k=1, filter_value=0.0, min_tokens_to_keep=3)
-        scores = top_k_warp_safety_check(input_ids, logits)
+        scores = TopKProcess(logits, top_k=1, min_tokens_to_keep=3)
         # uniform dist is not changed
         self.assertListEqual((scores == 0.0).sum(axis=-1).tolist(), [0, 0])
 
         ramp_logits = paddle.arange(length).unsqueeze(0).tile((batch_size, 1))
         ramp_logits = ramp_logits.astype("float32")
-        scores = top_k_warp_safety_check(input_ids, ramp_logits)
+        scores = TopKProcess(ramp_logits, top_k=1, min_tokens_to_keep=3)
 
         # min_tokens overwrites k: 3 tokens are kept => 2 tokens are nullified
         self.assertListEqual((scores == 0.0).sum(axis=-1).tolist(), [2, 2])
 
     def test_top_p_dist_warper(self):
-        input_ids = None
         vocab_size = 10
         batch_size = 2
 
-        # create distribution and take log (inverse to Softmax as taken in TopPLogitsWarper)
-        dist = paddle.log(paddle.to_tensor([[0.3, 0.1, 0.1, 0.5], [0.15, 0.3, 0.3, 0.25]]))
+        # create distribution and take log (inverse to Softmax as taken in TopPProcess)
+        # dist = paddle.log(paddle.to_tensor([[0.3, 0.1, 0.1, 0.5], [0.15, 0.3, 0.3, 0.25]]))
+        dist = paddle.to_tensor([[0.3, 0.1, 0.1, 0.5], [0.15, 0.3, 0.3, 0.25]])
 
-        # log and exp operation will cause difference of about 1e-7
-        top_p_warp = TopPLogitsWarper(0.79999)
-        filtered_dist = paddle.exp(top_p_warp(input_ids, dist))
+        # filtered_dist = paddle.exp(TopPProcess(dist, 0.80001, 1))
+        filtered_dist = TopPProcess(dist, 0.79999, 1)
 
-        # dist should be filtered to keep min num values so that sum is >= top_p
-        # exp (-inf) => 0
         EXPECTED_FILTERED_DIST = paddle.to_tensor([[0.3, 0.0, 0.0, 0.5], [0.0, 0.3, 0.3, 0.25]])
         self.assertTrue(paddle.allclose(filtered_dist, EXPECTED_FILTERED_DIST, atol=1e-3))
 
@@ -179,11 +172,10 @@ class LogitsProcessorTest(unittest.TestCase):
         ramp_logits = paddle.arange(vocab_size).unsqueeze(0).tile((batch_size, 1)) - (vocab_size // 2)
         ramp_logits = ramp_logits.astype("float32")
         # make ramp_logits more extreme
-        ramp_logits[1] = ramp_logits[1] * 100.0
-
+        ramp_logits[1] = ramp_logits[1] * 10.0
+        sft_ramp_logits = paddle.nn.functional.softmax(ramp_logits, axis=-1)
         # make sure at least 2 tokens are kept
-        top_p_warp = TopPLogitsWarper(0.9, min_tokens_to_keep=2, filter_value=0.0)
-        filtered_dist = top_p_warp(input_ids, ramp_logits)
+        filtered_dist = TopPProcess(sft_ramp_logits, 0.9, min_tokens_to_keep=2)
 
         # first batch should keep three tokens, second batch would keep only 1, but due to `min_tokens_to_keep=2` keeps 2.
         self.assertListEqual((filtered_dist != 0.0).sum(axis=-1).tolist(), [3, 2])
@@ -204,13 +196,13 @@ class LogitsProcessorTest(unittest.TestCase):
         # 2-gram would forbid 2nd and 3rd token (1,2) at 1st batch and 1st token (0) at 2nd batch
 
         self.assertListEqual(
-            (filtered_scores_2_gram == paddle.finfo(scores.dtype).min).tolist(),
+            (filtered_scores_2_gram == -float("inf")).tolist(),
             [[False, True, True], [True, False, False]],
         )
 
         # 3-gram would forbid no token at 1st batch and 1st token (0) at 2nd batch
         self.assertListEqual(
-            (filtered_scores_3_gram == paddle.finfo(scores.dtype).min).tolist(),
+            (filtered_scores_3_gram == -float("inf")).tolist(),
             [[False, False, False], [True, False, False]],
         )
 
@@ -231,16 +223,12 @@ class LogitsProcessorTest(unittest.TestCase):
         min_dist_proc = MinLengthLogitsProcessor(min_length=10, eos_token_id=eos_token_id)
         temp_dist_warp = TemperatureLogitsWarper(temperature=0.5)
         rep_penalty_proc = RepetitionPenaltyLogitsProcessor(penalty=2.0)
-        top_k_warp = TopKLogitsWarper(3)
-        top_p_warp = TopPLogitsWarper(0.8)
         no_repeat_proc = NoRepeatNGramLogitsProcessor(2)
 
         # no processor list
         scores = min_dist_proc(input_ids, scores)
         scores = temp_dist_warp(input_ids, scores)
         scores = rep_penalty_proc(input_ids, scores)
-        scores = top_k_warp(input_ids, scores)
-        scores = top_p_warp(input_ids, scores)
         scores = no_repeat_proc(input_ids, scores)
 
         # with processor list
@@ -249,8 +237,6 @@ class LogitsProcessorTest(unittest.TestCase):
                 min_dist_proc,
                 temp_dist_warp,
                 rep_penalty_proc,
-                top_k_warp,
-                top_p_warp,
                 no_repeat_proc,
             ]
         )
@@ -317,7 +303,7 @@ class LogitsProcessorTest(unittest.TestCase):
         input_ids = ids_tensor((batch_size, 4), vocab_size=20)
         scores = self._get_uniform_logits(batch_size, vocab_size)
         scores = logits_processor(input_ids, scores)
-        self.assertTrue(paddle.isinf(-scores[:, eos_token_id + 1 :]).all())
+        self.assertTrue((scores[:, eos_token_id + 1 :] == -1e9).all())
         self.assertListEqual(scores[:, eos_token_id].tolist(), 4 * [0])  # score for eos_token_id should be zero
 
         # check that eos_token_id is not forced if max_length-1 is not reached
