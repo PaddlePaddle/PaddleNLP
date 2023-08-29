@@ -25,6 +25,7 @@ from typing import List, Optional
 import numpy as np
 import paddle
 
+from paddlenlp.data.causal_dataset import GPTDataset
 from paddlenlp.trainer import (
     PdArgumentParser,
     Trainer,
