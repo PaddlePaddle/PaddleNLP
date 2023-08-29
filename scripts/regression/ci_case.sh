@@ -245,8 +245,7 @@ mkdir build_gpt_so
 cd build_gpt_so/
 cmake ..  -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=${C_COMPILER_PATH} -DCMAKE_CXX_COMPILER=${CXX_COMPILER_PATH} \
 -DPADDLE_LIB=${nlp_dir}/paddle_inference/ -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/gpt.cc \
--DPY_CMD=python -DWITH_GPT=ON -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON \
--DPYTHON_EXECUTABLE=/opt/_internal/cpython-3.8.0/bin/python
+-DPY_CMD=python -DWITH_GPT=ON -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
 make -j >${log_path}/GPT_python_FT >>${log_path}/gpt_python_FT 2>&1
 print_info $? gpt_python_FT
 cd ../
@@ -255,8 +254,7 @@ mkdir build_gpt_cc
 cd build_gpt_cc/
 cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=${C_COMPILER_PATH} -DCMAKE_CXX_COMPILER=${CXX_COMPILER_PATH} \
 -DPADDLE_LIB=${nlp_dir}/paddle_inference/ -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/gpt.cc \
--DWITH_GPT=ON -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON \
--DPYTHON_EXECUTABLE=/opt/_internal/cpython-3.8.0/bin/python
+-DWITH_GPT=ON -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
 make -j >${log_path}/GPT_C_FT >>${log_path}/gpt_C_FT 2>&1
 print_info $? gpt_C_FT
 #depoly python
@@ -709,10 +707,7 @@ cmake ..  -DCMAKE_BUILD_TYPE=Release \
 -DPY_CMD=python \
 -DPADDLE_LIB=${nlp_dir}/paddle_inference \
 -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/transformer_e2e.cc \
--DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON \
--DPYTHON_EXECUTABLE=/opt/_internal/cpython-3.8.0/bin/python \
--DPYTHON_INCLUDE_DIRS=/opt/_internal/cpython-3.8.0/include/python3.8 \
--DPYTHON_LIBRARIES=/opt/_internal/cpython-3.8.0/lib
+-DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
 make -j >${log_path}/transformer_python_FT >>${log_path}/transformer_python_FT 2>&1
 print_info $? transformer_python_FT
 cd ../
