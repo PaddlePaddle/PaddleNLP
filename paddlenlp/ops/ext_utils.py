@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import distutils
 import functools
 import hashlib
 import os
 import subprocess
 import sys
+import sysconfig
 import textwrap
 from pathlib import Path
 
@@ -206,8 +206,8 @@ class FasterTransformerExtension(CMakeExtension):
         self.cmake_args += ["-DCMAKE_C_COMPILER={}".format(os.getenv("C_COMPILER_PATH"))]
         self.cmake_args += ["-DCMAKE_CXX_COMPILER={}".format(os.getenv("CXX_COMPILER_PATH"))]
 
-        self.cmake_args += ["-DPYTHON_LIBRARY={}".format(distutils.sysconfig.get_config_var("LIBDIR"))]
-        self.cmake_args += ["-DPYTHON_INCLUDE_DIR={}".format(distutils.sysconfig.get_python_inc())]
+        self.cmake_args += ["-DPYTHON_LIBRARY={}".format(sysconfig.get_config_var("LIBDIR"))]
+        self.cmake_args += ["-DPYTHON_INCLUDE_DIR={}".format(sysconfig.get_config_var("INCLUDEDIR"))]
 
         if self.need_parallel:
             self.cmake_args += ["-DWITH_PARALLEL=ON"]
