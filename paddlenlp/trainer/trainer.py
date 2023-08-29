@@ -78,7 +78,6 @@ from ..transformers.model_utils import (
     PretrainedModel,
     _add_variant,
     load_sharded_checkpoint,
-    paddlenlp_load,
     unwrap_model,
 )
 from ..transformers.tokenizer_utils import PretrainedTokenizer
@@ -2042,7 +2041,7 @@ class Trainer:
             optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             path = os.path.join(checkpoint, optimizer_name)
             if os.path.isfile(path):
-                opt_state_dict = paddlenlp_load(path, map_location="cpu")
+                opt_state_dict = paddle.load(path)
 
         if opt_state_dict is not None and os.path.isfile(os.path.join(checkpoint, SCHEDULER_NAME)):
             # Load in optimizer and scheduler states
