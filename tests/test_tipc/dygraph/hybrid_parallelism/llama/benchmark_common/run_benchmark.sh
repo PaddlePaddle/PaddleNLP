@@ -129,6 +129,7 @@ function _train(){
             --dataloader_num_workers 1 \
             --eval_steps 100000000 \
             --report_to visualdl \
+            --data_cache ./data \
             --sharding ${sharding} \
             --disable_tqdm true \
             --continue_training 1\
