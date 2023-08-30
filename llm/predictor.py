@@ -71,7 +71,7 @@ class PredictorArgument:
 class ModelArgument:
     gpt: bool = field(default=False, metadata={"help": "GPTForCausalLM"})
     ernie: bool = field(default=False, metadata={"help": "Ernie35ForCausalLM"})
-    data_file: None = field(default=None, metadata={"help": "data file directory"})
+    data_file: str = field(default=None, metadata={"help": "data file directory"})
     output_file: str = field(default="output.json", metadata={"help": "predict result file directory"})
 
 
