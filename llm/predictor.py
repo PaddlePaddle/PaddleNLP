@@ -294,7 +294,7 @@ class StaticInferencePredictor(BasePredictor):
             )
 
         self.tgt_generation_mask = paddle.zeros(
-            shape=[config.batch_size, 1, 1, config.max_length + 1],
+            shape=[config.batch_size, 1, 1, config.max_length],
             dtype=dtype,
         )
         self.arange_tensor_encoder = paddle.zeros(shape=(config.batch_size, 1, config.max_length), dtype=dtype)
@@ -364,30 +364,30 @@ class StaticInferencePredictor(BasePredictor):
 
                 self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype="float16")
             # alibi encoder
-            alibi_slopes = get_alibi_slopes(self.model.config.n_head)
+            alibi_slopes = get_alibi_slopes(self.model_config.n_head)
             inputs["position_ids"] = paddle.to_tensor(alibi_slopes, dtype="float32")
 
             alibi = alibi_slopes[..., None] * self.arange_tensor_encoder
             alibi = alibi[:, :, None, :]
 
-            if self.model.config.tensor_parallel_degree > 1:
-                block_size = self.model.config.n_head // self.model.config.tensor_parallel_degree
+            if self.model_config.tensor_parallel_degree > 1:
+                block_size = self.model_config.n_head // self.model_config.tensor_parallel_degree
                 alibi = alibi[
                     :,
-                    self.model.config.tensor_parallel_rank
-                    * block_size : (self.model.config.tensor_parallel_rank + 1)
+                    self.model_config.tensor_parallel_rank
+                    * block_size : (self.model_config.tensor_parallel_rank + 1)
                     * block_size,
                 ]
                 alibi = alibi.reshape([inputs["input_ids"].shape[0], block_size, 1, self.config.max_length])
                 inputs["position_ids"] = inputs["position_ids"][
-                    self.model.config.tensor_parallel_rank
+                    self.model_config.tensor_parallel_rank
                     * block_size : (self.model.config.tensor_parallel_rank + 1)
                     * block_size
                 ]
             alibi_encoder = alibi.expand(
                 [
                     inputs["input_ids"].shape[0],
-                    self.model.config.n_head // self.model.config.tensor_parallel_degree,
+                    self.model_config.n_head // self.model_config.tensor_parallel_degree,
                     self.config.max_length,
                     self.config.max_length,
                 ]
@@ -419,7 +419,11 @@ class StaticInferencePredictor(BasePredictor):
             else:
                 input_tensor.copy_from_cpu(v)
 
-        for i in range(self.model_config.num_hidden_layers):
+        if "bloom" in self.architectures:
+            num_hidden_layers = self.model_config.n_layer
+        else:
+            num_hidden_layers = self.model_config.num_hidden_layers
+        for i in range(num_hidden_layers):
             input_tensor = self.predictor.get_input_handle("cache_kvs_" + str(i))
             input_tensor.share_external_data(self.cache_kvs[i])
         input_tensor = self.predictor.get_input_handle("pre_ids")
@@ -510,7 +514,6 @@ class DygraphInferencePredictor(BasePredictor):
                 self.attention_mask[i, 0, :length, :length] = paddle.tril(
                     paddle.ones(shape=(length, length), dtype="float16")
                 )
-                # import pdb;pdb.set_trace()
                 self.arange_tensor_encoder[i, 0, :length] = paddle.arange(length).astype("float16")
 
                 self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype="float16")
@@ -543,7 +546,6 @@ class DygraphInferencePredictor(BasePredictor):
                     self.config.max_length,
                 ]
             )
-            # import pdb;pdb.set_trace()
             self.attention_mask = alibi_encoder + (1 - self.attention_mask) * -60000.0
             self.tgt_generation_mask = alibi_encoder + (1 - self.tgt_generation_mask) * -60000.0
 
