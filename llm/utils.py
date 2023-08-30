@@ -493,7 +493,7 @@ def load_real_time_tokens():
     tokens = []
     files = glob.glob(os.path.join("./real_time_save.*"))
     for j in range(1, len(files)):
-        filename = "./real_time_save.temp_ids_rank_0_step_{}".format(j)
+        filename = "./real_time_save.temp_ids_rank_1_step_{}".format(j)
         if not os.path.exists(filename):
             break
         fp = open(filename, "rb+")

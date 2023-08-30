@@ -65,6 +65,18 @@ class PredictorArgument:
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     max_batch_size: int = field(default=None, metadata={"help": "The max batch size of data during serving."})
+    quant_type: str = field(default="", metadata={"help": "Quantization type. Supported values: A8W8, WINT4,WINT8"})
+    quant_round_type: int = field(
+        default=0,
+        metadata={
+            "help": "The quant round type, 0:-rounding to nearest ties to even， 1: -rounding to nearest ties away from zero"
+        },
+    )
+    quant_max_bound: float = field(default=127.0, metadata={"help": "The max bound of float type to int type"})
+    quant_min_bound: float = field(default=-127.0, metadata={"help": "The min bound of float type to int type"})
+    shift_smooth: int = field(
+        default=0, metadata={"help": "Whether to apply shift and smooth in ptq, valid when quant_type is A8W8"}
+    )
 
 
 @dataclass
@@ -383,14 +395,15 @@ class StaticInferencePredictor(BasePredictor):
         self.predictor.run()
 
     def _postprocess(self, predictions):
-        if paddle.distributed.get_rank() == 0:
-            tokens: np.ndarray = load_real_time_tokens()
-            decoded_predictions = self.tokenizer.batch_decode(
-                tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
-            )
-            return decoded_predictions
-        else:
-            return None
+        # if paddle.distributed.get_rank() == 0:
+        tokens: np.ndarray = load_real_time_tokens()
+        decoded_predictions = self.tokenizer.batch_decode(
+            tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
+        )
+        return decoded_predictions
+
+    # else:
+    #     return None
 
 
 class DygraphInferencePredictor(BasePredictor):
@@ -487,14 +500,15 @@ class DygraphInferencePredictor(BasePredictor):
         return None
 
     def _postprocess(self, predictions):
-        if paddle.distributed.get_rank() == 0:
-            tokens: np.ndarray = load_real_time_tokens()
-            decoded_predictions = self.tokenizer.batch_decode(
-                tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
-            )
-            return decoded_predictions
-        else:
-            return None
+        # if paddle.distributed.get_rank() == 0:
+        tokens: np.ndarray = load_real_time_tokens()
+        decoded_predictions = self.tokenizer.batch_decode(
+            tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
+        )
+        return decoded_predictions
+
+    # else:
+    #     return None
 
 
 def create_predictor(
@@ -559,6 +573,13 @@ def create_predictor(
 
                 config.tensor_parallel_degree = tensor_parallel_degree
                 config.tensor_parallel_rank = tensor_parallel_rank
+                config.quant_type = predictor_args.quant_type
+                config.model_name_or_path = predictor_args.model_name_or_path
+                config.quant_round_type = predictor_args.quant_round_type
+                config.quant_max_bound = predictor_args.quant_max_bound
+                config.quant_min_bound = predictor_args.quant_min_bound
+                config.shift_smooth = predictor_args.shift_smooth
+
                 model = LlamaForCausalLMInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
@@ -631,7 +652,8 @@ def predict():
                 source_texts.append(example["src"])
                 target_texts.append(example["tgt"])
     else:
-        source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
+        # source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
+        source_texts = ["类型#裙*裙款式#链条"]
         target_texts = ["", ""]
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
@@ -641,8 +663,8 @@ def predict():
         for bs, batch_source_text in enumerate(batch_source_texts):
             outputs = predictor.predict(batch_source_text)
 
-            if predictor.tensor_parallel_rank > 0:
-                continue
+            # if predictor.tensor_parallel_rank > 0:
+            #     continue
             for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
                 print("***********Source**********")
                 print(source)

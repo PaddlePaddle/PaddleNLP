@@ -268,6 +268,16 @@ python predictor.py \
     --max_length 1024 \
     --mode "dynamic" \
     --inference_model
+
+# A8W8 InferenceModel 动态图量化推理
+python predictor.py \
+    --model_name_or_path "/root/paddlejob/workspace/env_run/wfs/PaddleNLP/llm/quant_model_llama_smooth" \
+    --dtype float16 \
+    --max_length 1024 \
+    --mode "dynamic" \
+    --quant_type "A8W8" \
+    --inference_model \
+    --shift_smooth 1
 ```
 
 ### 4.4 InferenceModel 静态图推理
@@ -277,10 +287,11 @@ python predictor.py \
 # LoRA需要先合并参数，详见3.7LoRA参数合并
 # Prefix Tuning暂不支持
 python export_model.py \
-    --model_name_or_path meta-llama/Llama-2-7b-chat \
+    --model_name_or_path checkpoints/llama_sft_ckpts/checkpoint-7162 \
     --output_path ./inference \
     --dtype float16 \
-    --inference_model
+    --inference_model \
+    --max_batch_size 8
 
 # InferenceModel 静态图推理
 python predictor.py \

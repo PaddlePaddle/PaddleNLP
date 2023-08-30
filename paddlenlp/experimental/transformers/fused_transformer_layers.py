@@ -30,8 +30,10 @@ from paddlenlp.utils.log import logger
 
 if is_paddlenlp_ops_available():
     from paddlenlp_ops import (
+        dequant_int8,
         encode_rotary_qk,
         qkv_transpose_split,
+        quant_int8,
         rebuild_padding,
         transpose_remove_padding,
         write_cache_kv,
@@ -129,6 +131,25 @@ def fused_act_bias_wrapper(
         attrs=attrs,
     )
     return out
+
+
+def matmul_int8(x, y, transpose_x, transpose_y):
+    if in_dynamic_mode():
+        return paddle._C_ops.matmul_int8(x, y, transpose_x, transpose_y)
+    else:
+        helper = LayerHelper("matmul_int8")
+        out = helper.create_variable_for_type_inference(dtype="int32")
+
+        inputs = {"x": x, "y": y}
+        attrs = {"transpose_x": transpose_x, "transpose_y": transpose_y}
+
+        helper.append_op(
+            type="matmul_int8",
+            inputs=inputs,
+            outputs={"out": out},
+            attrs=attrs,
+        )
+        return out
 
 
 class FusedMultiTransformer(Layer):
@@ -553,6 +574,608 @@ class FusedMultiTransformer(Layer):
                     begin_norm_axis=1,
                     bias=self.ffn2_biases[i],
                     residual=tmp_out,
+                )[0]
+
+            ln_out = tmp_out
+
+        if time_step is None:
+            out = rebuild_padding(tmp_out, cum_offsets, seq_lens, input_ids)
+        else:
+            out = tmp_out
+        return out, caches
+
+
+class FusedMultiTransformerInt8(Layer):
+    def __init__(
+        self,
+        embed_dim,
+        num_heads,
+        dim_feedforward,
+        dropout_rate=0.0,
+        activation="gelu",
+        norm_type="layernorm",
+        use_neox_rotary_style=False,
+        normalize_before=True,
+        ln_scale_attrs=None,
+        ln_bias_attrs=None,
+        qkv_weight_attrs=None,
+        qkv_bias_attrs=None,
+        linear_weight_attrs=None,
+        linear_bias_attrs=None,
+        ffn_ln_scale_attrs=None,
+        ffn_ln_bias_attrs=None,
+        ffn1_weight_attrs=None,
+        ffn1_bias_attrs=None,
+        ffn2_weight_attrs=None,
+        ffn2_bias_attrs=None,
+        qkv_weight_out_scale_attrs=None,
+        linear_weight_out_scale_attrs=None,
+        ffn1_weight_out_scale_attrs=None,
+        ffn2_weight_out_scale_attrs=None,
+        linear_shift_attrs=None,
+        linear_smooth_attrs=None,
+        ffn2_shift_attrs=None,
+        ffn2_smooth_attrs=None,
+        quant_round_type=0,
+        quant_max_bound=127.0,
+        quant_min_bound=-127.0,
+        epsilon=1e-5,
+        num_layers=-1,
+        nranks=1,
+        trans_qkvw=True,
+        ring_id=-1,
+        name=None,
+    ):
+        super().__init__()
+
+        assert embed_dim > 0, "Expected embed_dim to be greater than 0, " "but received {}".format(embed_dim)
+        assert num_heads > 0, "Expected nhead to be greater than 0, " "but received {}".format(num_heads)
+        assert dim_feedforward > 0, "Expected dim_feedforward to be greater than 0, but received {}".format(
+            dim_feedforward
+        )
+
+        self.normalize_before = normalize_before
+        self._dtype = self._helper.get_default_dtype()
+        self._epsilon = epsilon
+        self._trans_qkvw = trans_qkvw
+        self._ring_id = ring_id
+        self.nranks = nranks
+        self.use_neox_rotary_style = use_neox_rotary_style
+        self.norm_type = norm_type
+        if norm_type == "layernorm":
+            self.norm_func = fused_layer_norm
+        else:
+            self.norm_func = fused_rms_norm
+
+        self._norm_weight_dtype = "float32" if self.norm_type == "layernorm" else self._dtype
+
+        if self._dtype == "bfloat16":
+            self._fuse_kernel_compute_dtype = "bf16"
+        elif self._dtype == "float16":
+            self._fuse_kernel_compute_dtype = "fp16"
+        elif self._dtype == "float32":
+            self._fuse_kernel_compute_dtype = "fp32"
+        else:
+            raise ValueError(
+                "FusedMultiTransformerInt8 just support float32, float16 and bfloat16 as default dtype, but received {}".format(
+                    self._dtype
+                )
+            )
+
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        assert self.head_dim * num_heads == embed_dim, "embed_dim must be divisible by num_heads"
+
+        # tensor model parallel
+        if nranks > 1:
+            assert ring_id != -1
+        assert num_heads % nranks == 0
+        assert dim_feedforward % nranks == 0
+        num_heads = num_heads // nranks
+        dim_feedforward = dim_feedforward // nranks
+        self._dim_feedforward = dim_feedforward
+
+        self.quant_round_type = quant_round_type
+        self.quant_max_bound = quant_max_bound
+        self.quant_min_bound = quant_min_bound
+
+        if isinstance(qkv_weight_attrs, (list, tuple)):
+            num_layers = len(qkv_weight_attrs)
+        assert num_layers > 0
+
+        self.ln_scales, self.ln_biases = [], []
+        self.qkv_weights, self.qkv_weight_out_scales, self.qkv_biases = [], [], []
+        self.linear_weights, self.linear_weight_out_scales, self.linear_biases = [], [], []
+        self.ffn_ln_scales, self.ffn_ln_biases = [], []
+        self.ffn1_weights, self.ffn1_weight_out_scales, self.ffn1_biases = [], [], []
+        self.ffn2_weights, self.ffn2_weight_out_scales, self.ffn2_biases = [], [], []
+
+        self.linear_shifts, self.linear_smooths, self.ffn2_shifts, self.ffn2_smooths = [], [], [], []
+
+        def get_attr(attrs, idx):
+            if isinstance(attrs, (list, tuple)):
+                assert len(attrs) == num_layers
+                return attrs[idx]
+            return attrs
+
+        def _add_parameter(param):
+            if param is None:
+                return
+            assert param.name not in self._parameters
+            self._parameters[param.name] = param
+
+        for i in range(num_layers):
+            ln_scale_attr = get_attr(ln_scale_attrs, i)
+            ln_bias_attr = get_attr(ln_bias_attrs, i)
+            qkv_weight_attr = get_attr(qkv_weight_attrs, i)
+            qkv_bias_attr = get_attr(qkv_bias_attrs, i)
+            linear_weight_attr = get_attr(linear_weight_attrs, i)
+            linear_bias_attr = get_attr(linear_bias_attrs, i)
+
+            ffn_ln_scale_attr = get_attr(ffn_ln_scale_attrs, i)
+            ffn_ln_bias_attr = get_attr(ffn_ln_bias_attrs, i)
+            ffn1_weight_attr = get_attr(ffn1_weight_attrs, i)
+            ffn1_bias_attr = get_attr(ffn1_bias_attrs, i)
+            ffn2_weight_attr = get_attr(ffn2_weight_attrs, i)
+            ffn2_bias_attr = get_attr(ffn2_bias_attrs, i)
+            qkv_weight_out_scale_attr = get_attr(qkv_weight_out_scale_attrs, i)
+            linear_weight_out_scale_attr = get_attr(linear_weight_out_scale_attrs, i)
+            ffn1_weight_out_scale_attr = get_attr(ffn1_weight_out_scale_attrs, i)
+            ffn2_weight_out_scale_attr = get_attr(ffn2_weight_out_scale_attrs, i)
+
+            linear_shift_attr = get_attr(linear_shift_attrs, i)
+            linear_smooth_attr = get_attr(linear_smooth_attrs, i)
+            ffn2_shift_attr = get_attr(ffn2_shift_attrs, i)
+            ffn2_smooth_attr = get_attr(ffn2_smooth_attrs, i)
+
+            ln_scale = self.create_parameter(
+                attr=ln_scale_attr,
+                shape=[embed_dim],
+                default_initializer=Constant(value=1.0),
+                dtype=self._norm_weight_dtype,
+            )
+            ln_bias = None
+            if ln_bias_attr:
+                ln_bias = self.create_parameter(
+                    attr=ln_bias_attr,
+                    shape=[embed_dim],
+                    is_bias=True,
+                    dtype=self._norm_weight_dtype,
+                )
+            qkv_weight = self.create_parameter(
+                shape=[3 * num_heads * self.head_dim, embed_dim]
+                if trans_qkvw
+                else [embed_dim, 3 * num_heads * self.head_dim],
+                attr=qkv_weight_attr,
+                dtype="int8",
+                is_bias=False,
+                default_initializer=paddle.nn.initializer.Constant(0),
+            )
+            qkv_weight_out_scale = self.create_parameter(
+                shape=[self.head_dim * 3 * num_heads],
+                attr=qkv_weight_out_scale_attr,
+                dtype="float32",
+                is_bias=False,
+                default_initializer=paddle.nn.initializer.Constant(0),
+            )
+            qkv_bias = None
+            if qkv_bias_attr:
+                qkv_bias = self.create_parameter(
+                    shape=[3 * num_heads * self.head_dim],
+                    attr=qkv_bias_attr,
+                    dtype=self._dtype,
+                    is_bias=True,
+                )
+            linear_weight = self.create_parameter(
+                shape=[embed_dim, num_heads * self.head_dim],
+                attr=linear_weight_attr,
+                dtype="int8",
+                is_bias=False,
+                default_initializer=paddle.nn.initializer.Constant(0),
+            )
+            linear_weight_out_scale = self.create_parameter(
+                shape=[embed_dim],
+                attr=linear_weight_out_scale_attr,
+                dtype="float32",
+                is_bias=False,
+                default_initializer=paddle.nn.initializer.Constant(0),
+            )
+            linear_bias = None
+            if linear_bias_attr:
+                linear_bias = self.create_parameter(
+                    shape=[embed_dim],
+                    attr=linear_bias_attr,
+                    dtype=self._dtype,
+                    is_bias=True,
+                )
+
+            ffn_ln_scale = self.create_parameter(
+                shape=[embed_dim],
+                attr=ffn_ln_scale_attr,
+                is_bias=False,
+                default_initializer=Constant(1.0),
+                dtype=self._norm_weight_dtype,
+            )
+            ffn_ln_bias = None
+            if ffn_ln_bias_attr:
+                ffn_ln_bias = self.create_parameter(
+                    shape=[embed_dim],
+                    attr=ffn_ln_bias_attr,
+                    is_bias=True,
+                    dtype=self._norm_weight_dtype,
+                )
+            ffn1_weight = self.create_parameter(
+                shape=[dim_feedforward * 2, embed_dim] if activation.endswith("glu") else [dim_feedforward, embed_dim],
+                attr=ffn1_weight_attr,
+                dtype="int8",
+                is_bias=False,
+                default_initializer=paddle.nn.initializer.Constant(0),
+            )
+
+            ffn1_weight_out_scale = self.create_parameter(
+                shape=[dim_feedforward * 2] if activation.endswith("glu") else [dim_feedforward],
+                attr=ffn1_weight_out_scale_attr,
+                dtype="float32",
+                is_bias=False,
+                default_initializer=paddle.nn.initializer.Constant(0),
+            )
+            ffn1_bias = None
+            if ffn1_bias_attr:
+                ffn1_bias = self.create_parameter(
+                    shape=[dim_feedforward * 2] if activation.endswith("glu") else [dim_feedforward],
+                    attr=ffn1_bias_attr,
+                    dtype=self._dtype,
+                    is_bias=True,
+                )
+            ffn2_weight = self.create_parameter(
+                shape=[embed_dim, dim_feedforward],
+                attr=ffn2_weight_attr,
+                dtype="int8",
+                is_bias=False,
+                default_initializer=paddle.nn.initializer.Constant(0),
+            )
+            ffn2_weight_out_scale = self.create_parameter(
+                shape=[embed_dim],
+                attr=ffn2_weight_out_scale_attr,
+                dtype="float32",
+                is_bias=False,
+                default_initializer=paddle.nn.initializer.Constant(0),
+            )
+            ffn2_bias = None
+            if ffn2_bias_attr:
+                ffn2_bias = self.create_parameter(
+                    shape=[embed_dim],
+                    attr=ffn2_bias_attr,
+                    dtype=self._dtype,
+                    is_bias=True,
+                )
+            linear_shift = None
+            if linear_shift_attr:
+                linear_shift = self.create_parameter(
+                    shape=[num_heads * self.head_dim], attr=linear_shift_attr, dtype=self._dtype, is_bias=False
+                )
+
+            linear_smooth = None
+            if linear_smooth_attr:
+                linear_smooth = self.create_parameter(
+                    shape=[num_heads * self.head_dim], attr=linear_smooth_attr, dtype=self._dtype, is_bias=False
+                )
+
+            ffn2_shift = None
+            if ffn2_shift_attr:
+                ffn2_shift = self.create_parameter(
+                    shape=[dim_feedforward], attr=ffn2_shift_attr, dtype=self._dtype, is_bias=False
+                )
+
+            ffn2_smooth = None
+            if ffn2_smooth_attr:
+                ffn2_smooth = self.create_parameter(
+                    shape=[dim_feedforward], attr=ffn2_smooth_attr, dtype=self._dtype, is_bias=False
+                )
+
+            # tensor model parallel
+            if nranks > 1:
+                # column parallel
+                _set_var_distributed(qkv_weight)
+                _set_var_distributed(qkv_bias)
+                _set_var_distributed(ffn1_weight)
+                _set_var_distributed(ffn1_bias)
+                # row parallel
+                _set_var_distributed(linear_weight)
+                _set_var_distributed(ffn2_weight)
+
+            self.ln_scales.append(ln_scale)
+            self.ln_biases.append(ln_bias)
+            self.qkv_weights.append(qkv_weight)
+            self.qkv_weight_out_scales.append(qkv_weight_out_scale)
+            self.qkv_biases.append(qkv_bias)
+            self.linear_weights.append(linear_weight)
+            self.linear_weight_out_scales.append(linear_weight_out_scale)
+            self.linear_biases.append(linear_bias)
+
+            self.ffn_ln_scales.append(ffn_ln_scale)
+            self.ffn_ln_biases.append(ffn_ln_bias)
+            self.ffn1_weights.append(ffn1_weight)
+            self.ffn1_weight_out_scales.append(ffn1_weight_out_scale)
+            self.ffn1_biases.append(ffn1_bias)
+            self.ffn2_weights.append(ffn2_weight)
+            self.ffn2_weight_out_scales.append(ffn2_weight_out_scale)
+            self.ffn2_biases.append(ffn2_bias)
+
+            self.linear_shifts.append(linear_shift)
+            self.linear_smooths.append(linear_smooth)
+            self.ffn2_shifts.append(ffn2_shift)
+            self.ffn2_smooths.append(ffn2_smooth)
+
+            _add_parameter(ln_scale)
+            _add_parameter(ln_bias)
+            _add_parameter(qkv_weight)
+            _add_parameter(qkv_weight_out_scale)
+            _add_parameter(qkv_bias)
+            _add_parameter(linear_weight)
+            _add_parameter(linear_weight_out_scale)
+            _add_parameter(linear_bias)
+
+            _add_parameter(ffn_ln_scale)
+            _add_parameter(ffn_ln_bias)
+            _add_parameter(ffn1_weight)
+            _add_parameter(ffn1_weight_out_scale)
+            _add_parameter(ffn1_bias)
+            _add_parameter(ffn2_weight)
+            _add_parameter(ffn2_weight_out_scale)
+            _add_parameter(ffn2_bias)
+
+            _add_parameter(linear_shift)
+            _add_parameter(linear_smooth)
+            _add_parameter(ffn2_shift)
+            _add_parameter(ffn2_smooth)
+
+        self.dropout_rate = dropout_rate
+        self.activation = activation
+        self.name = name
+
+    def forward(
+        self,
+        input_ids,
+        src,
+        cum_offsets=None,
+        padding_offset=None,
+        attn_mask=None,
+        caches=None,
+        rotary_embs=None,
+        rotary_emb_dims=0,
+        seq_lens=None,
+        time_step=None,
+    ):
+        r"""
+        Applies multi transformer layers on the input.
+
+        Parameters:
+            src (Tensor): The input of Transformer layers. It is
+                a tensor with shape `[batch_size, sequence_length, d_model]`.
+                The data type should be float16 or float32.
+            attn_mask (Tensor, optional): A tensor used in multi-head attention
+                to prevents attention to some unwanted positions, usually the
+                paddings or the subsequent positions. It is a tensor with shape
+                `[batch_size, 1, sequence_length, sequence_length]`. It can be
+                None when nothing wanted or needed to be prevented attention to.
+                Default None.
+            caches (list(Tensor)|tuple(Tensor), optional): The cache structure
+                tensors for the inference generation model. It is only used for
+                inference and should be None for training. The shape is
+                `[2, batch_size, num_head, max_seq_len, head_dim]`. Default None.
+            pre_caches (list(Tensor)|tuple(Tensor), optional): The prefix caches
+                for the generation model. The shape is `[2, bsz, num\_head, cache\_len, head\_dim]`. Default None.
+            rotary_embs (Tensor optional): The RoPE embs for the rotary computation. The shape is `[2, bsz, 1, seq\_len, head\_dim]`. Default None.
+            rotary_emb_dims (int, optional): The rotary_emb_dims of rotary computation, and it is 0 when rotary_embs is None,
+                1 when rotary_embs is not None and pos_extra_ids is None, 2 when rotary_embs and pos_extra_ids are both not None. Default 0.
+            seq_lens (Tensor optional): The sequence lengths of this batch. The shape is `[bsz]`. Default None.
+            time_step (Tensor, optional): The time step tensor for the generation
+                model. Which used in decode stage, to represent the time step,
+                that is, the real seq_len of CacheKV. The shape is `[1]`, must be
+                in CPUPlace. Default None.
+
+        Returns:
+            Tensor|tuple: If `caches` is None, return a tensor that has
+            the same shape and data type with `src`, representing the output
+            of Transformer layers. If `caches` is not None, return the
+            tuple (output, caches), which output is the output of
+            Transformer layers, caches is inplace with input `caches`.
+        """
+        if caches is not None:
+            assert len(caches) == len(self.qkv_weights)
+        bias_residual_input = src
+        ln_out = src
+        for i in range(len(caches)):
+            if self.normalize_before is True:
+                # layernorm
+                if i == 0:
+                    ln_out = self.norm_func(
+                        src,
+                        self.ln_scales[i],
+                        self.ln_biases[i],
+                        self._epsilon,
+                        begin_norm_axis=1,
+                        quant_scale=self.act_scales["qkv_in_scale"][i],  # quant_in_scale
+                        quant_round_type=self.quant_round_type,
+                        quant_max_bound=self.quant_max_bound,
+                        quant_min_bound=self.quant_min_bound,
+                    )
+
+            # qkv compute
+            qkv_out = matmul_int8(ln_out, self.qkv_weights[i], False, True)
+
+            # fmha compute
+            if time_step is None:  # context
+                """
+                qkv: bsz, seq_len, 3, numhead, headsize ->
+                q_out: bsz, numhead, seq_len, headsize
+                kv_out: 2, bsz, numhead, seq_len, headsize
+                """
+
+                # TODO(RichardWooSJTU): Fuse matmul+dequant+bias
+                qkv_out = dequant_int8(
+                    qkv_out,
+                    src,
+                    self.qkv_weight_out_scales[i],
+                )
+                if self.qkv_biases[i] is not None:
+                    qkv_out = paddle.add(qkv_out, self.qkv_biases[i])
+                q_out, k_out, v_out = qkv_transpose_split(
+                    qkv_out, padding_offset, seq_lens, input_ids, self.num_heads // self.nranks, self.head_dim
+                )
+
+                # rotary emb (inplace)
+                encode_rotary_qk(
+                    q_out,
+                    k_out,
+                    rotary_embs,
+                    seq_lens,
+                    rotary_emb_dims=rotary_emb_dims,
+                    use_neox=self.use_neox_rotary_style,
+                )
+                # write cache kv (inplace)
+                write_cache_kv(k_out, v_out, caches[i], seq_lens)
+
+                # cutlass fmha
+                qktv_out = variable_length_memory_efficient_attention(
+                    q_out, k_out, v_out, seq_lens, seq_lens, mask=attn_mask, scale=float(self.head_dim**-0.5)
+                )
+
+                fmha_out = transpose_remove_padding(qktv_out, seq_lens, padding_offset)
+                fmha_out = quant_int8(
+                    fmha_out,
+                    self.linear_shifts[i],
+                    self.linear_smooths[i],
+                    self.act_scales["out_linear_in_scale"][i],
+                    self.quant_round_type,
+                    self.quant_max_bound,
+                    self.quant_min_bound,
+                )
+
+            else:
+                fmha_out = masked_multihead_attention(
+                    x=qkv_out,
+                    bias=self.qkv_biases[i],
+                    cache_kv=caches[i],
+                    src_mask=attn_mask,
+                    sequence_lengths=seq_lens,
+                    rotary_tensor=rotary_embs,
+                    rotary_emb_dims=rotary_emb_dims,
+                    use_neox_rotary_style=self.use_neox_rotary_style,
+                    qkv_out_scale=self.qkv_weight_out_scales[i],
+                    out_shift=self.linear_shifts[i],
+                    out_smooth=self.linear_smooths[i],
+                    out_scale=self.act_scales["out_linear_in_scale"][i],
+                    quant_round_type=self.quant_round_type,
+                    quant_max_bound=self.quant_max_bound,
+                    quant_min_bound=self.quant_min_bound,
+                    compute_dtype=self._fuse_kernel_compute_dtype,
+                )[0]
+
+            # out_linear
+            out_linear_out = matmul_int8(fmha_out, self.linear_weights[i], False, True)
+            out_linear_out = dequant_int8(out_linear_out, src, self.linear_weight_out_scales[i])
+
+            # all_reduce
+            if self.nranks > 1:
+                dist.all_reduce(out_linear_out)
+
+            # norm + residual_add_bias
+            if self.normalize_before is True:
+                norm_out = self.norm_func(
+                    out_linear_out,
+                    self.ffn_ln_scales[i],
+                    self.ffn_ln_biases[i],
+                    self._epsilon,
+                    bias=self.linear_biases[i],
+                    residual=bias_residual_input,
+                    begin_norm_axis=1,
+                    quant_scale=self.act_scales["ffn1_in_scale"][i],  # quant_in_scale
+                    quant_round_type=self.quant_round_type,
+                    quant_max_bound=self.quant_max_bound,
+                    quant_min_bound=self.quant_min_bound,
+                )
+                tmp_out, bias_residual_input = norm_out[0], norm_out[1]
+            else:
+                tmp_out = self.norm_func(
+                    out_linear_out,
+                    norm_weight=self.ln_scales[i],
+                    norm_bias=self.ln_biases[i],
+                    epsilon=self._epsilon,
+                    residual_alpha=self._residual_alpha,
+                    begin_norm_axis=1,
+                    bias=self.linear_biases[i],
+                    residual=ln_out,
+                    quant_scale=self.act_scales["ffn1_in_scale"][i],  # quant_in_scale
+                    quant_round_type=self.quant_round_type,
+                    quant_max_bound=self.quant_max_bound,
+                    quant_min_bound=self.quant_min_bound,
+                )[0]
+
+            # ffn1 matmul
+            ffn1_out = matmul_int8(tmp_out, self.ffn1_weights[i], False, True)
+            ffn1_out = fused_act_bias_wrapper(
+                ffn1_out,
+                self.ffn1_biases[i],
+                act_method=self.activation,
+                compute_dtype=self._fuse_kernel_compute_dtype,
+                dequant_scales=self.ffn1_weight_out_scales[i],
+                shift=self.ffn2_shifts[i],
+                smooth=self.ffn2_smooths[i],
+                quant_scale=self.act_scales["ffn2_in_scale"][i],  # quant_in_scale
+                quant_round_type=self.quant_round_type,
+                quant_max_bound=self.quant_max_bound,
+                quant_min_bound=self.quant_min_bound,
+            )
+
+            # ffn2 matmul
+            ffn2_out = matmul_int8(ffn1_out, self.ffn2_weights[i], False, True)
+            ffn2_out = dequant_int8(
+                ffn2_out,
+                src,
+                self.ffn2_weight_out_scales[i],
+            )
+
+            # all_reduce
+            if self.nranks > 1:
+                dist.all_reduce(ffn2_out)
+
+            # norm + residual_add_bias
+            if self.normalize_before is True:
+                if i != len(caches) - 1:
+                    norm_out = self.norm_func(
+                        ffn2_out,
+                        self.ln_scales[i + 1],
+                        self.ln_biases[i + 1],
+                        self._epsilon,
+                        residual=bias_residual_input,
+                        begin_norm_axis=1,
+                        quant_scale=self.act_scales["qkv_in_scale"][i + 1],  # quant_in_scale
+                        quant_round_type=self.quant_round_type,
+                        quant_max_bound=self.quant_max_bound,
+                        quant_min_bound=self.quant_min_bound,
+                    )
+                    tmp_out, bias_residual_input = norm_out[0], norm_out[1]
+                else:
+                    tmp_out = fused_layer_norm(
+                        ffn2_out, None, None, self._epsilon, residual=bias_residual_input, begin_norm_axis=1
+                    )[0]
+            else:
+                tmp_out = self.norm_func(
+                    ffn2_out,
+                    norm_weight=self.ffn_ln_scales[i],
+                    norm_bias=self.ffn_ln_biases[i],
+                    epsilon=self._epsilon,
+                    residual_alpha=self._residual_alpha,
+                    begin_norm_axis=1,
+                    bias=self.ffn2_biases[i],
+                    residual=tmp_out,
+                    quant_scale=self.act_scales["qkv_in_scale"][i + 1],  # quant_in_scale
+                    quant_round_type=self.quant_round_type,
+                    quant_max_bound=self.quant_max_bound,
+                    quant_min_bound=self.quant_min_bound,
                 )[0]
 
             ln_out = tmp_out
