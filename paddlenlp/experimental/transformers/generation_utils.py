@@ -162,7 +162,7 @@ class GenerationInferenceModel(GenerationMixin):
         if cache is None:
             # encoder's generation
             model_kwargs["tgt_ids"] = paddle.where(just_decoder, model_kwargs["tgt_ids"], next_tokens)
-            if self.model.config["position_encoding_2d"] and self.model.config.position_encoding_2d is True:
+            if self.config["position_encoding_2d"] and self.config.position_encoding_2d is True:
                 tgt_pos = model_kwargs["tgt_pos"]
                 new_position_id = tgt_pos[:, 0, :].clone()
                 new_block_id = tgt_pos[:, 1, :].clone()
@@ -182,7 +182,7 @@ class GenerationInferenceModel(GenerationMixin):
             )
         else:
             model_kwargs["tgt_ids"] = next_tokens
-            if self.model.config["position_encoding_2d"] and self.model.config.position_encoding_2d is True:
+            if self.config["position_encoding_2d"] and self.config.position_encoding_2d is True:
                 tgt_pos = model_kwargs["tgt_pos"]
                 new_position_id = tgt_pos[:, 0, :].clone()
                 new_block_id = tgt_pos[:, 1, :].clone()
@@ -261,9 +261,9 @@ class GenerationInferenceModel(GenerationMixin):
             # compute next_tokens, use paddle.top_p_sampling
             logits = logits / temperature
 
-            _, next_tokens = top_p_sampling(probs, top_p)
+            _, next_tokens = top_p_sampling(probs, top_p, -1)
 
-            if self.model.config.tensor_parallel_degree > 1:
+            if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
 
             model_kwargs = self.update_model_kwargs_for_generation(
@@ -275,7 +275,7 @@ class GenerationInferenceModel(GenerationMixin):
                 batch_idx,
                 step_idx_ori,
                 "real_time_save.temp_ids",
-                self.model.config.tensor_parallel_rank,
+                self.config.tensor_parallel_rank,
             )
 
             return next_tokens, model_kwargs

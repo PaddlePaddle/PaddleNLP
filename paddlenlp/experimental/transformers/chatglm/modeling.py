@@ -294,18 +294,19 @@ class ChatGLMStackDyBatch(nn.Layer):
         new_cache = [None]
         hidden_states = self.input_layernorm(hidden_states)
 
-        hidden_states, new_cache = self.transformer_block(
-            input_ids,
-            hidden_states,
-            cum_offsets=cum_offsets,
-            padding_offset=padding_offset,
-            attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
-            caches=cache_kvs,
-            rotary_embs=paddle.cast(rotary_embeds, "float32"),
-            rotary_emb_dims=2 if self.config.position_encoding_2d else 1,
-            seq_lens=seq_lens,
-            time_step=time_step,
-        )
+        with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
+            hidden_states, new_cache = self.transformer_block(
+                input_ids,
+                hidden_states,
+                cum_offsets=cum_offsets,
+                padding_offset=padding_offset,
+                attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
+                caches=cache_kvs,
+                rotary_embs=paddle.cast(rotary_embeds, "float32"),
+                rotary_emb_dims=2 if self.config.position_encoding_2d else 1,
+                seq_lens=seq_lens,
+                time_step=time_step,
+            )
         return (hidden_states, new_cache)
 
     @paddle.no_grad()

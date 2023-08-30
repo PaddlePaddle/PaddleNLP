@@ -25,7 +25,7 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
-from paddlenlp.transformers import LlamaConfig, LlamaForCausalLM, LlamaPretrainedModel
+from paddlenlp.transformers import LlamaConfig, LlamaPretrainedModel
 from paddlenlp.transformers.llama.modeling import LlamaLMHead
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -200,18 +200,19 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
         new_rope = fused_get_rotary_embedding(input_ids, position_ids, self.head_dim_shape_tensor, 0, True)
 
-        hidden_states, _ = self.transformer_block(
-            input_ids,
-            hidden_states,
-            cum_offsets=cum_offsets,
-            padding_offset=padding_offset,
-            attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
-            caches=cache_kvs,
-            seq_lens=seq_lens,
-            rotary_embs=new_rope,
-            rotary_emb_dims=1,
-            time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
-        )
+        with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
+            hidden_states, _ = self.transformer_block(
+                input_ids,
+                hidden_states,
+                cum_offsets=cum_offsets,
+                padding_offset=padding_offset,
+                attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
+                caches=cache_kvs,
+                seq_lens=seq_lens,
+                rotary_embs=new_rope,
+                rotary_emb_dims=1,
+                time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
+            )
         hidden_states = self.norm(hidden_states)
 
         if output_hidden_states:
@@ -289,7 +290,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             )
 
 
-class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaForCausalLM):
+class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedModel):
     """
     Dynamic Batching for LLaMA Model with pretraining tasks on top.
     """
@@ -298,7 +299,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaForCausalLM)
 
     def __init__(self, config):
         super().__init__(config)
-        self.model = LlamaInferenceModel(config)
+        self.llama = LlamaInferenceModel(config)
         self.lm_head = LlamaLMHead(config)
 
     @classmethod
@@ -384,7 +385,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaForCausalLM)
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        outputs = self.model(
+        outputs = self.llama(
             input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
@@ -430,4 +431,4 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaForCausalLM)
     def set_state_dict(self, state_dict):
         if "lm_head.weight" in state_dict:
             self.lm_head.weight.set_value(state_dict["lm_head.weight"])
-        self.model.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
+        self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
