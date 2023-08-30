@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import glob
+import math
 import os
 import struct
 from typing import Dict, Optional
@@ -326,6 +327,21 @@ def deserialize_from_file(fp):
     return data_arr
 
 
+def get_alibi_slopes(num_heads):
+    closest_power_of_2 = 2 ** math.floor(math.log2(num_heads))
+    base = 2 ** (-(2 ** -(math.log2(closest_power_of_2) - 3)))
+    powers = np.arange(1, 1 + closest_power_of_2)
+    slopes = np.power(base, powers)
+
+    if closest_power_of_2 != num_heads:
+        extra_base = 2 ** (-(2 ** -(math.log2(2 * closest_power_of_2) - 3)))
+        num_remaining_heads = min(closest_power_of_2, num_heads - closest_power_of_2)
+        extra_powers = np.arange(1, 1 + 2 * num_remaining_heads, 2)
+        slopes = np.concatante([slopes, np.power(extra_base, extra_powers)], axis=0)
+
+    return slopes.astype("float32")
+
+
 def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
     """Pad sequences to the max sequence length in batch."""
     max_len = max(map(len, insts))
@@ -381,6 +397,7 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
 
         inputs = {}
         pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][-1]
+        pad_token_id = 0
         inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
         bs = inputs["input_ids"].shape[0]
         max_len = max(map(len, input_ids))

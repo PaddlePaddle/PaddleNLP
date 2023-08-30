@@ -24,6 +24,7 @@ import paddle
 from paddle.distributed import fleet
 from utils import (
     dybatch_preprocess,
+    get_alibi_slopes,
     get_infer_model_path,
     get_prefix_tuning_params,
     load_real_time_tokens,
@@ -63,7 +64,7 @@ class PredictorArgument:
         default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
-    batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
+    batch_size: int = field(default=3, metadata={"help": "The batch size of data."})
     max_batch_size: int = field(default=None, metadata={"help": "The max batch size of data during serving."})
 
 
@@ -296,6 +297,7 @@ class StaticInferencePredictor(BasePredictor):
             shape=[config.batch_size, 1, 1, config.max_length + 1],
             dtype=dtype,
         )
+        self.arange_tensor_encoder = paddle.zeros(shape=(config.batch_size, 1, config.max_length), dtype=dtype)
         self.predictor = self._create_predictor(config)
 
     def _create_predictor(self, predictor_args: PredictorArgument):
@@ -341,7 +343,6 @@ class StaticInferencePredictor(BasePredictor):
     def _preprocess(self, source):
         if "chatglm" in self.architectures:
             inputs = dybatch_preprocess(self.tokenizer, source, self.config.max_length, self.architectures)
-
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = 0
@@ -352,6 +353,50 @@ class StaticInferencePredictor(BasePredictor):
             inputs["attention_mask"] = self.attention_mask
             inputs["tgt_generation_mask"] = self.tgt_generation_mask
             inputs["tgt_pos"] = self.tgt_pos.numpy()
+        elif "bloom" in self.architectures:
+            inputs = dybatch_preprocess(self.tokenizer, source, self.config.max_length, self.architectures)
+            for i in range(inputs["input_ids"].shape[0]):
+                length = inputs["seq_len_encoder"][i][0]
+                self.attention_mask[i, 0, :length, :length] = paddle.tril(
+                    paddle.ones(shape=(length, length), dtype="float16")
+                )
+                self.arange_tensor_encoder[i, 0, :length] = paddle.arange(length).astype("float16")
+
+                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype="float16")
+            # alibi encoder
+            alibi_slopes = get_alibi_slopes(self.model.config.n_head)
+            inputs["position_ids"] = paddle.to_tensor(alibi_slopes, dtype="float32")
+
+            alibi = alibi_slopes[..., None] * self.arange_tensor_encoder
+            alibi = alibi[:, :, None, :]
+
+            if self.model.config.tensor_parallel_degree > 1:
+                block_size = self.model.config.n_head // self.model.config.tensor_parallel_degree
+                alibi = alibi[
+                    :,
+                    self.model.config.tensor_parallel_rank
+                    * block_size : (self.model.config.tensor_parallel_rank + 1)
+                    * block_size,
+                ]
+                alibi = alibi.reshape([inputs["input_ids"].shape[0], block_size, 1, self.config.max_length])
+                inputs["position_ids"] = inputs["position_ids"][
+                    self.model.config.tensor_parallel_rank
+                    * block_size : (self.model.config.tensor_parallel_rank + 1)
+                    * block_size
+                ]
+            alibi_encoder = alibi.expand(
+                [
+                    inputs["input_ids"].shape[0],
+                    self.model.config.n_head // self.model.config.tensor_parallel_degree,
+                    self.config.max_length,
+                    self.config.max_length,
+                ]
+            )
+            self.attention_mask = alibi_encoder + (1 - self.attention_mask) * -60000.0
+            self.tgt_generation_mask = alibi_encoder + (1 - self.tgt_generation_mask) * -60000.0
+
+            inputs["attention_mask"] = self.attention_mask
+            inputs["tgt_generation_mask"] = self.tgt_generation_mask
         else:
             inputs = dybatch_preprocess(self.tokenizer, source, self.config.max_length, self.architectures)
             for i in range(inputs["input_ids"].shape[0]):
@@ -439,6 +484,7 @@ class DygraphInferencePredictor(BasePredictor):
             shape=[config.max_batch_size, 1, 1, config.max_length],
             dtype=dtype,
         )
+        self.arange_tensor_encoder = paddle.zeros(shape=(config.batch_size, 1, config.max_length), dtype=dtype)
 
     def _preprocess(self, source):
         if "chatglm" in self.architectures:
@@ -456,6 +502,55 @@ class DygraphInferencePredictor(BasePredictor):
             inputs["cache_kvs"] = self.cache_kvs
             inputs["pre_ids"] = self.pre_ids
             inputs["tgt_pos"] = self.tgt_pos
+        elif "bloom" in self.architectures:
+            inputs = dybatch_preprocess(self.tokenizer, source, self.config.max_length, self.architectures)
+            for i in range(inputs["input_ids"].shape[0]):
+                length = inputs["seq_len_encoder"][i][0]
+                print("length", length)
+                self.attention_mask[i, 0, :length, :length] = paddle.tril(
+                    paddle.ones(shape=(length, length), dtype="float16")
+                )
+                # import pdb;pdb.set_trace()
+                self.arange_tensor_encoder[i, 0, :length] = paddle.arange(length).astype("float16")
+
+                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype="float16")
+            # alibi encoder
+            alibi_slopes = get_alibi_slopes(self.model.config.n_head)
+            inputs["position_ids"] = paddle.to_tensor(alibi_slopes, dtype="float32")
+
+            alibi = alibi_slopes[..., None] * self.arange_tensor_encoder
+            alibi = alibi[:, :, None, :]
+
+            if self.model.config.tensor_parallel_degree > 1:
+                block_size = self.model.config.n_head // self.model.config.tensor_parallel_degree
+                alibi = alibi[
+                    :,
+                    self.model.config.tensor_parallel_rank
+                    * block_size : (self.model.config.tensor_parallel_rank + 1)
+                    * block_size,
+                ]
+                alibi = alibi.reshape([inputs["input_ids"].shape[0], block_size, 1, self.config.max_length])
+                inputs["position_ids"] = inputs["position_ids"][
+                    self.model.config.tensor_parallel_rank
+                    * block_size : (self.model.config.tensor_parallel_rank + 1)
+                    * block_size
+                ]
+            alibi_encoder = alibi.expand(
+                [
+                    inputs["input_ids"].shape[0],
+                    self.model.config.n_head // self.model.config.tensor_parallel_degree,
+                    self.config.max_length,
+                    self.config.max_length,
+                ]
+            )
+            # import pdb;pdb.set_trace()
+            self.attention_mask = alibi_encoder + (1 - self.attention_mask) * -60000.0
+            self.tgt_generation_mask = alibi_encoder + (1 - self.tgt_generation_mask) * -60000.0
+
+            inputs["attention_mask"] = self.attention_mask
+            inputs["tgt_generation_mask"] = self.tgt_generation_mask
+            inputs["cache_kvs"] = self.cache_kvs
+            inputs["pre_ids"] = self.pre_ids
         else:
             inputs = dybatch_preprocess(self.tokenizer, source, self.config.max_length, self.architectures)
             for i in range(inputs["input_ids"].shape[0]):
@@ -475,6 +570,7 @@ class DygraphInferencePredictor(BasePredictor):
                 inputs_tensor[key] = paddle.to_tensor(value)
             else:
                 inputs_tensor[key] = value
+
         return inputs_tensor
 
     @paddle.no_grad()
@@ -577,6 +673,20 @@ def create_predictor(
                     dtype=predictor_args.dtype,
                 )
                 model.eval()
+            elif "bloom" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    BloomForCausalLMInferenceModel,
+                )
+
+                config.tensor_parallel_degree = tensor_parallel_degree
+                config.tensor_parallel_rank = tensor_parallel_rank
+
+                model = BloomForCausalLMInferenceModel.from_pretrained(
+                    predictor_args.model_name_or_path,
+                    config=config,
+                    dtype=predictor_args.dtype,
+                )
+                model.eval()
             predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
         elif predictor_args.mode == "static":
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
@@ -595,6 +705,13 @@ def create_predictor(
                 cache_kvs_shape = ChatGLMForCausalLMInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size
                 )
+                predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
+            elif "bloom" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    BloomForCausalLMInferenceModel,
+                )
+
+                cache_kvs_shape = BloomForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
                 predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
         else:
             raise ValueError("the `mode` should be one of [dynamic, static]")
@@ -631,8 +748,12 @@ def predict():
                 source_texts.append(example["src"])
                 target_texts.append(example["tgt"])
     else:
-        source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
-        target_texts = ["", ""]
+        source_texts = [
+            "My name is",
+            "Today is",
+            "中国的首都在哪里",
+        ]
+        target_texts = ["", "", ""]
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
