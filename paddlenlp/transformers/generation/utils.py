@@ -50,6 +50,7 @@ from .logits_process import (
     TopKProcess,
     TopPProcess,
 )
+from .stopping_criteria import StoppingCriteriaList, validate_stopping_criteria
 
 __all__ = [
     "GenerationMixin",
@@ -604,6 +605,7 @@ class GenerationMixin(object):
         self,
         input_ids=None,
         generation_config=None,
+        stopping_criteria=None,
         streamer=None,
         **kwargs,
     ):
@@ -625,6 +627,10 @@ class GenerationMixin(object):
                 priority: 1) from the `generation_config.json` model file, if it exists; 2) from the model
                 configuration. Please note that unspecified parameters will inherit [`~generation.GenerationConfig`]'s
                 default values, whose documentation should be checked to parameterize generation.
+            stopping_criteria (`StoppingCriteriaList`, *optional*):
+                Custom stopping criteria that complement the default stopping criteria built from arguments and a
+                generation config. If a stopping criteria is passed that is already created with the arguments or a
+                generation config an error is thrown. This feature is intended for advanced users.
             streamer (`~streamer.BaseStreamer`, *optional*):
                 Streamer object that will be used to stream the generated sequences. Generated tokens are passed
                 through `streamer.put(token_ids)` and the streamer is responsible for any further processing.
@@ -697,7 +703,7 @@ class GenerationMixin(object):
                     token_type_ids=inputs['token_type_ids'],
                     position_ids=inputs['position_ids'],
                     attention_mask=inputs['attention_mask'],
-                    generation_config=generation_config)
+                    generation_config=generation_config,
                     )
                 print(ids.shape, scores.shape)
                 # [2, 7] [2, 1]
@@ -722,6 +728,7 @@ class GenerationMixin(object):
                     token_type_ids=inputs['token_type_ids'],
                     position_ids=inputs['position_ids'],
                     attention_mask=inputs['attention_mask'],
+                    generation_config=generation_config,
                     )
                 print(ids.shape, scores.shape)
                 # [2, 3] [2, 1]
@@ -930,6 +937,8 @@ class GenerationMixin(object):
         if "logits_processors" in model_kwargs:
             model_kwargs.pop("logits_processors")
 
+        stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
+
         if generation_config.decode_strategy == "greedy_search":
             if generation_config.num_return_sequences > 1:
                 raise ValueError(
@@ -937,7 +946,14 @@ class GenerationMixin(object):
                     "when doing greedy search.".format(generation_config.num_return_sequences)
                 )
             return self.greedy_search(
-                input_ids, logits_processors, max_len, pad_token_id, eos_token_id, streamer=streamer, **model_kwargs
+                input_ids,
+                logits_processors,
+                max_len,
+                pad_token_id,
+                eos_token_id,
+                stopping_criteria=stopping_criteria,
+                streamer=streamer,
+                **model_kwargs,
             )
 
         elif generation_config.decode_strategy == "sampling":
@@ -968,6 +984,7 @@ class GenerationMixin(object):
                     generation_config.top_k,
                     generation_config.top_p,
                     generation_config.temperature,
+                    stopping_criteria=stopping_criteria,
                     streamer=streamer,
                     **model_kwargs,
                 )
@@ -1009,6 +1026,7 @@ class GenerationMixin(object):
                     max_len,
                     pad_token_id,
                     eos_token_id,
+                    stopping_criteria=stopping_criteria,
                     **model_kwargs,
                 )
             else:
@@ -1033,19 +1051,39 @@ class GenerationMixin(object):
                     generation_config.diversity_rate,
                     pad_token_id,
                     eos_token_id,
+                    stopping_criteria=stopping_criteria,
                     **model_kwargs,
                 )
 
     def greedy_search(
-        self, input_ids, logits_processors, max_length, pad_token_id, eos_token_id, streamer=None, **model_kwargs
+        self,
+        input_ids,
+        logits_processors,
+        max_length,
+        pad_token_id,
+        eos_token_id,
+        stopping_criteria=None,
+        streamer=None,
+        **model_kwargs
     ):
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
+
+        # max_length will be convert to MaxLengthCriteria
+        stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
+        if max_length is not None:
+            logger.warning(
+                "`max_length` is deprecated in this function, use"
+                " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead."
+            )
+            stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
+
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
-        while cur_len < max_length:
+        generate_end = False
+        while True:
 
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
@@ -1075,18 +1113,20 @@ class GenerationMixin(object):
                 next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
 
             scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
-
             cur_len += 1
 
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
             if streamer is not None:
                 streamer.put(next_tokens.cpu())
 
+            if stopping_criteria(input_ids, scores):
+                generate_end = True
+
             if eos_token_id is not None:
                 unfinished_flag = get_unfinished_flag(input_ids, unfinished_flag, eos_token_id)
 
             # Stop when there is a </s> in all sentences
-            if not paddle.any(unfinished_flag):
+            if not paddle.any(unfinished_flag) or generate_end:
                 break
 
             model_kwargs = self.update_model_kwargs_for_generation(
@@ -1109,6 +1149,7 @@ class GenerationMixin(object):
         top_p=None,
         temperature=None,
         min_tokens_to_keep=1,
+        stopping_criteria=None,
         streamer=None,
         **model_kwargs
     ):
@@ -1116,12 +1157,22 @@ class GenerationMixin(object):
 
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
+        # max_length will be convert to MaxLengthCriteria
+        stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
+        if max_length is not None:
+            logger.warning(
+                "`max_length` is deprecated in this function, use"
+                " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead."
+            )
+            stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
+
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
-        while cur_len < max_length:
+        generate_end = False
+        while True:
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
             outputs = self(**model_inputs)
@@ -1173,12 +1224,16 @@ class GenerationMixin(object):
             if streamer is not None:
                 streamer.put(next_tokens.cpu())
 
+            if stopping_criteria(input_ids, scores):
+                generate_end = True
+
             if eos_token_id is not None:
                 unfinished_flag = get_unfinished_flag(input_ids, unfinished_flag, eos_token_id)
 
             # Stop when there is a </s> in all sentences
-            if not paddle.any(unfinished_flag):
+            if not paddle.any(unfinished_flag) or generate_end:
                 break
+
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
@@ -1435,11 +1490,21 @@ class GenerationMixin(object):
         diversity_rate,
         pad_token_id,
         eos_token_id,
+        stopping_criteria=None,
         **model_kwargs
     ):
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
 
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
+
+        # max_length will be convert to MaxLengthCriteria
+        stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
+        if max_length is not None:
+            logger.warning(
+                "`max_length` is deprecated in this function, use"
+                " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead."
+            )
+            stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
 
         batch_size = len(beam_scorer._beam_hyps)
         num_beams = beam_scorer.num_beams
@@ -1457,7 +1522,7 @@ class GenerationMixin(object):
         beam_scores[:, 1:] = get_scale_by_dtype(return_positive=False)
         beam_scores = paddle.reshape(beam_scores, [-1])
 
-        while cur_len < max_length:
+        while True:
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
@@ -1535,8 +1600,9 @@ class GenerationMixin(object):
                 [paddle.index_select(input_ids, beam_idx), beam_next_tokens.unsqueeze(-1)], axis=-1
             )
 
-            if beam_scorer.is_done:
+            if beam_scorer.is_done or stopping_criteria(input_ids, beam_scores):
                 break
+
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
@@ -1558,9 +1624,26 @@ class GenerationMixin(object):
         return pred_ids[:, origin_len:], scores
 
     def group_beam_search(
-        self, input_ids, beam_scorer, logits_processors, max_length, pad_token_id, eos_token_id, **model_kwargs
+        self,
+        input_ids,
+        beam_scorer,
+        logits_processors,
+        max_length,
+        pad_token_id,
+        eos_token_id,
+        stopping_criteria=None,
+        **model_kwargs
     ):
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
+
+        # max_length will be convert to MaxLengthCriteria
+        stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
+        if max_length is not None:
+            logger.warning(
+                "`max_length` is deprecated in this function, use"
+                " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead."
+            )
+            stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
 
         batch_size = len(beam_scorer._beam_hyps)
         num_beams = beam_scorer.num_beams
@@ -1663,8 +1746,10 @@ class GenerationMixin(object):
             input_ids = paddle.concat([input_ids, current_tokens.unsqueeze(-1)], axis=-1)
 
             cur_len += 1
-            if beam_scorer.is_done:
+
+            if beam_scorer.is_done or stopping_criteria(input_ids, beam_scores):
                 break
+
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
