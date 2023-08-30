@@ -12,7 +12,7 @@ Engine:
   num_train_epochs: 1
   accumulate_steps:
   logging_freq: 1
-  eval_freq: 1
+  eval_freq: 500
   eval_iters: 10
   test_iters:
   mix_precision:
