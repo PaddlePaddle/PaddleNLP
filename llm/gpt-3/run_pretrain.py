@@ -48,7 +48,7 @@ MODEL_CLASSES = {
     ),
 }
 
-from paddlenlp.data.causal_dataset import _build_train_valid_test_datasets, print_rank_0
+from paddlenlp.data.causal_dataset import build_train_valid_test_datasets, print_rank_0
 
 
 def add_start_docstrings(*docstr):
@@ -166,7 +166,7 @@ def create_pretrained_dataset(
     print_rank_0("    test:       {}".format(train_val_test_num_samples[2]))
 
     # Build the datasets.
-    train_dataset, valid_dataset, test_dataset = _build_train_valid_test_datasets(
+    train_dataset, valid_dataset, test_dataset = build_train_valid_test_datasets(
         data_prefix=data_file,
         data_impl=data_args.data_impl,
         splits_string=data_args.split,
