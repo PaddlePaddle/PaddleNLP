@@ -34,11 +34,12 @@ function _set_params(){
     run_mode=${10:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP1-MP4-PP1
     device_num=${11:-"N1C1"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
     profiling="false"      # (必选) Profiling  开关，默认关闭，通过全局变量传递
- 
+    num_train_epochs=${12:-"1"}
+
     model_repo="PaddleNLP"          # (必选) 模型套件的名字
     speed_unit="tokens/s"         # (必选)速度指标单位
     skip_steps=0                  # (必选)解析日志，跳过模型前几个性能不稳定的step
-    keyword="All_Tokens_per_second:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
+    keyword="Effective_Tokens_per_second:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
     convergence_key="train_loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
     is_large_model=True           # (可选)普通模型默认为False，如果添加大模型且只取一条ips设置为True
 
@@ -92,7 +93,7 @@ function _train(){
             --output_dir output \
             --per_device_train_batch_size 1 \
             --gradient_accumulation_steps 1 \
-            --num_train_epochs 1 \
+            --num_train_epochs ${num_train_epochs} \
             --learning_rate ${learning_rate} \
             --warmup_steps 30 \
             --evaluation_strategy no \

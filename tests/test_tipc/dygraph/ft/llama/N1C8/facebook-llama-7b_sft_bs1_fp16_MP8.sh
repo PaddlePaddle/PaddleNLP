@@ -23,7 +23,8 @@ prefix_tuning="0"
 model_item="facebook-llama-7b_sft"
 run_mode="MP8"
 device_num="N1C8"
-
+num_train_epochs=5
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 cd ./tests
-bash ./test_tipc/llm/benchmark/benchmark_common/prepare.sh
-bash ./test_tipc/llm/benchmark/benchmark_common/run_benchmark.sh ${model_name_or_path} ${dataset_name_or_path} ${max_length} ${learning_rate} ${recompute} ${tensor_parallel_degree} ${lora} ${prefix_tuning} ${model_item} ${run_mode} ${device_num} 
+bash ./test_tipc/dygraph/ft/benchmark_common/prepare.sh
+bash ./test_tipc/dygraph/ft/benchmark_common/run_benchmark.sh ${model_name_or_path} ${dataset_name_or_path} ${max_length} ${learning_rate} ${recompute} ${tensor_parallel_degree} ${lora} ${prefix_tuning} ${model_item} ${run_mode} ${device_num} ${num_train_epochs}

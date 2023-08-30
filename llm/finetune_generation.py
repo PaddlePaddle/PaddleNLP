@@ -294,9 +294,10 @@ def main():
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
         if training_args.benchmark:
-            tokens_per_second = trainer.total_observed_tokens / train_result.metrics["train_runtime"]
-            effective_tokens_per_second = trainer.total_effective_tokens / train_result.metrics["train_runtime"]
-            logger.info(f"All_Tokens_per_second: {tokens_per_second} ")
+            total_effective_tokens = (
+                sum([len(i["input_ids"]) for i in trainer.train_dataset]) * training_args.num_train_epochs
+            )
+            effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
             logger.info(f"Effective_Tokens_per_second: {effective_tokens_per_second} ")
             logger.info("Benchmark done.")
         else:
