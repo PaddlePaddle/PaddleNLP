@@ -50,7 +50,12 @@ from .logits_process import (
     TopKProcess,
     TopPProcess,
 )
-from .stopping_criteria import StoppingCriteriaList, validate_stopping_criteria
+from .stopping_criteria import (
+    StoppingCriteria,
+    StoppingCriteriaList,
+    validate_stopping_criteria,
+)
+from .streamers import BaseStreamer
 
 __all__ = [
     "GenerationMixin",
@@ -603,10 +608,10 @@ class GenerationMixin(object):
     @paddle.no_grad()
     def generate(
         self,
-        input_ids=None,
-        generation_config=None,
-        stopping_criteria=None,
-        streamer=None,
+        input_ids: paddle.Tensor = None,
+        generation_config: GenerationConfig = None,
+        stopping_criteria: StoppingCriteria = None,
+        streamer: BaseStreamer = None,
         **kwargs,
     ):
         r"""
@@ -677,10 +682,7 @@ class GenerationMixin(object):
 
                 # Generate the sequence by using "greedy_search" strategy
                 ids, scores = model.generate(
-                    input_ids=inputs['input_ids'],
-                    token_type_ids=inputs['token_type_ids'],
-                    position_ids=inputs['position_ids'],
-                    attention_mask=inputs['attention_mask'],
+                    **inputs,
                     decode_strategy="greedy_search")
                 print(ids.shape, scores.shape)
                 # [1, 3] [1, 1]
@@ -699,10 +701,7 @@ class GenerationMixin(object):
                     num_return_sequences=2
                 )
                 ids, scores = model.generate(
-                    input_ids=inputs['input_ids'],
-                    token_type_ids=inputs['token_type_ids'],
-                    position_ids=inputs['position_ids'],
-                    attention_mask=inputs['attention_mask'],
+                    **inputs,
                     generation_config=generation_config,
                     )
                 print(ids.shape, scores.shape)
@@ -724,10 +723,7 @@ class GenerationMixin(object):
                     num_return_sequences=2
                 )
                 ids, scores = model.generate(
-                    input_ids=inputs['input_ids'],
-                    token_type_ids=inputs['token_type_ids'],
-                    position_ids=inputs['position_ids'],
-                    attention_mask=inputs['attention_mask'],
+                    **inputs,
                     generation_config=generation_config,
                     )
                 print(ids.shape, scores.shape)
@@ -741,7 +737,7 @@ class GenerationMixin(object):
                 # ['是的', '嗯嗯']
         """
         if generation_config is None:
-            generation_config = GenerationConfig()
+            generation_config = GenerationConfig.from_model_config(self.config)
 
         model_kwargs = generation_config.update(**kwargs)
 

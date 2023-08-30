@@ -13,6 +13,9 @@
 # limitations under the License.
 
 from queue import Queue
+from typing import Optional
+
+from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 
 
 class BaseStreamer:
@@ -51,12 +54,12 @@ class TextStreamer(BaseStreamer):
         >>> streamer = TextStreamer(tok)
 
         >>> # Despite returning the usual output, the streamer will also print the generated text to stdout.
-        >>> _ = model.generate(**inputs, streamer=streamer, max_tokens=20)
+        >>> _ = model.generate(**inputs, streamer=streamer, max_length=20)
         An increasing sequence: one, two, three, four, five, six, seven, eight, nine, ten, eleven,
         ```
     """
 
-    def __init__(self, tokenizer, skip_prompt=False, **decode_kwargs):
+    def __init__(self, tokenizer: PretrainedTokenizer, skip_prompt: bool = False, **decode_kwargs):
         self.tokenizer = tokenizer
         self.skip_prompt = skip_prompt
         self.decode_kwargs = decode_kwargs
@@ -114,7 +117,7 @@ class TextStreamer(BaseStreamer):
         self.next_tokens_are_prompt = True
         self.on_finalized_text(printable_text, stream_end=True)
 
-    def on_finalized_text(self, text, stream_end=False):
+    def on_finalized_text(self, text: str, stream_end: bool = False):
         """Prints the new text to stdout. If the stream is ending, also prints a newline."""
         print(text, flush=True, end="" if not stream_end else None)
 
@@ -173,7 +176,7 @@ class TextIteratorStreamer(TextStreamer):
         >>> streamer = TextIteratorStreamer(tok)
 
         >>> # Run the generation in a separate thread, so that we can fetch the generated text in a non-blocking way.
-        >>> generation_kwargs = dict(inputs, streamer=streamer, max_tokens=20)
+        >>> generation_kwargs = dict(inputs, streamer=streamer, max_length=20)
         >>> thread = Thread(target=model.generate, kwargs=generation_kwargs)
         >>> thread.start()
         >>> generated_text = ""
@@ -184,13 +187,19 @@ class TextIteratorStreamer(TextStreamer):
         ```
     """
 
-    def __init__(self, tokenizer, skip_prompt=False, timeout=None, **decode_kwargs):
+    def __init__(
+        self,
+        tokenizer: PretrainedTokenizer,
+        skip_prompt: bool = False,
+        timeout: Optional[float] = None,
+        **decode_kwargs
+    ):
         super().__init__(tokenizer, skip_prompt, **decode_kwargs)
         self.text_queue = Queue()
         self.stop_signal = None
         self.timeout = timeout
 
-    def on_finalized_text(self, text, stream_end=False):
+    def on_finalized_text(self, text: str, stream_end: bool = False):
         """Put the new text in the queue. If the stream is ending, also put a stop signal in the queue."""
         self.text_queue.put(text, timeout=self.timeout)
         if stream_end:

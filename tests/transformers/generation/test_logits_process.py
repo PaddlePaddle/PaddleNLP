@@ -65,13 +65,13 @@ class LogitsProcessorTest(unittest.TestCase):
         input_ids = ids_tensor((batch_size, 5), vocab_size=20)
         scores = self._get_uniform_logits(batch_size, vocab_size)
         scores_before_min_length = min_dist_processor(input_ids, scores)
-        self.assertListEqual(scores_before_min_length[:, eos_token_id].tolist(), 4 * [-float("inf")])
+        self.assertListEqual(scores_before_min_length[:, eos_token_id].tolist(), 4 * [paddle.finfo(scores.dtype).min])
 
         # check that min length is not applied anymore at length 15
         input_ids = ids_tensor((batch_size, 15), vocab_size=20)
         scores = self._get_uniform_logits(batch_size, vocab_size)
         scores_before_min_length = min_dist_processor(input_ids, scores)
-        self.assertFalse(paddle.isinf(scores_before_min_length).any())
+        self.assertFalse((scores_before_min_length == paddle.finfo(scores.dtype).min).any())
 
     def test_temperature_dist_warper(self):
         input_ids = None
@@ -196,13 +196,13 @@ class LogitsProcessorTest(unittest.TestCase):
         # 2-gram would forbid 2nd and 3rd token (1,2) at 1st batch and 1st token (0) at 2nd batch
 
         self.assertListEqual(
-            (filtered_scores_2_gram == -float("inf")).tolist(),
+            (filtered_scores_2_gram == paddle.finfo(scores.dtype).min).tolist(),
             [[False, True, True], [True, False, False]],
         )
 
         # 3-gram would forbid no token at 1st batch and 1st token (0) at 2nd batch
         self.assertListEqual(
-            (filtered_scores_3_gram == -float("inf")).tolist(),
+            (filtered_scores_3_gram == paddle.finfo(scores.dtype).min).tolist(),
             [[False, False, False], [True, False, False]],
         )
 
@@ -282,14 +282,14 @@ class LogitsProcessorTest(unittest.TestCase):
         input_ids = ids_tensor((batch_size, 1), vocab_size=20)
         scores = self._get_uniform_logits(batch_size, vocab_size)
         scores = logits_processor(input_ids, scores)
-        self.assertTrue(paddle.isinf(-scores[:, bos_token_id + 1 :]).all())
+        self.assertTrue((scores[:, bos_token_id + 1 :] == paddle.finfo(scores.dtype).min).all())
         self.assertListEqual(scores[:, bos_token_id].tolist(), 4 * [0])  # score for bos_token_id shold be zero
 
         # check that bos_token_id is not forced if current length is greater than 1
         input_ids = ids_tensor((batch_size, 4), vocab_size=20)
         scores = self._get_uniform_logits(batch_size, vocab_size)
         scores = logits_processor(input_ids, scores)
-        self.assertFalse(paddle.isinf(scores).any())
+        self.assertFalse((scores == paddle.finfo(scores.dtype).min).any())
 
     def test_forced_eos_token_logits_processor(self):
         vocab_size = 20
@@ -310,4 +310,4 @@ class LogitsProcessorTest(unittest.TestCase):
         input_ids = ids_tensor((batch_size, 3), vocab_size=20)
         scores = self._get_uniform_logits(batch_size, vocab_size)
         scores = logits_processor(input_ids, scores)
-        self.assertFalse(paddle.isinf(scores).any())
+        self.assertFalse((scores == paddle.finfo(scores.dtype).min).any())

@@ -416,8 +416,7 @@ class GenerationConfig:
             )
         # 3. get the configuration file from local dir with default name, eg: /local/path
         elif os.path.isdir(pretrained_model_name_or_path):
-            configuration_file = GENERATION_CONFIG_NAME
-            configuration_file = os.path.join(pretrained_model_name_or_path, configuration_file)
+            configuration_file = os.path.join(pretrained_model_name_or_path, GENERATION_CONFIG_NAME)
             if os.path.exists(configuration_file):
                 resolved_config_file = configuration_file
             else:

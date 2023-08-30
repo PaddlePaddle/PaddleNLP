@@ -15,5 +15,5 @@
 from paddlenlp.transformers.generation.configuration_utils import *  # noqa: F401, F403
 from paddlenlp.transformers.generation.logits_process import *  # noqa: F401, F403
 from paddlenlp.transformers.generation.stopping_criteria import *  # noqa: F401, F403
-from paddlenlp.transformers.generation.streamer import *  # noqa: F401, F403
+from paddlenlp.transformers.generation.streamers import *  # noqa: F401, F403
 from paddlenlp.transformers.generation.utils import *  # noqa: F401, F403
