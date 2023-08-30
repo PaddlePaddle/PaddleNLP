@@ -28,7 +28,7 @@ run_mode="DP1-MP2-PP2-SD4"
 device_num="N2C16"
 global_batch_size=32
 model_item="facebook-llama-13b_pretrain"
-max_step=150
+max_step=80
 gradient_accumulation_steps=16
 pp_recompute_interval=1
 
