@@ -11,51 +11,42 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import argparse
-from collections import defaultdict
 
 import gradio as gr
-from utils import chat_table
+from chat_table import parsing_QA
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--api_key", default="", type=str, help="The API Key.")
 parser.add_argument("--secret_key", default="", type=str, help="The secret key.")
 args = parser.parse_args()
-history_index = defaultdict(list)
 
 
 def reset_state():
-    global history_index
-    history_index = defaultdict(list)
     return "", []
 
 
-def predict(query, history=[], api_key=args.api_key, secret_key=args.secret_key, index=None):
-    if index is None:
-        index = "document"
-    try:
-        message = chat_table(query, history_index[index], api_key, secret_key, index)
-        history.append(["user: {}".format(query), "assistant: {}".format(message["result"])])
-    except:
-        history_index[index] = []
-        message = chat_table(query, history_index[index], api_key, secret_key, index)
-        history.append(["user: {}".format(query), "assistant: {}".format(message["result"])])
+def predict(query, history=[]):
+    result = parsing_QA(args.api_key, args.secret_key, query)
+    history.append(["user: {}".format(query), "assistant: {}".format(result)])
     return "", history, history
 
 
-with gr.Blocks() as demo:
-    gr.HTML("""<h1 align="center">🤖ChatTable</h1>""")
-
-    chatbot = gr.Chatbot()
-    with gr.Row():
-        with gr.Column(scale=4):
-            with gr.Column(scale=12):
-                user_input = gr.Textbox(show_label=False, placeholder="Input...", lines=10).style(container=False)
-            with gr.Column(min_width=32, scale=1):
-                submitBtn = gr.Button("Submit", variant="primary")
-                state = gr.State([])
-        with gr.Column(scale=1):
-            emptyBtn = gr.Button("Clear History")
-    submitBtn.click(predict, [user_input, state], [user_input, chatbot, state])
-    emptyBtn.click(reset_state, outputs=[chatbot, state], show_progress=True)
-demo.queue().launch(server_name="0.0.0.0", server_port=8084, share=False)
+if __name__ == "__main__":
+    with gr.Blocks() as demo:
+        gr.HTML("""<h1 align="center">🤖ChatTable</h1>""")
+        with gr.Accordion("输出区", open=True, elem_id="input-panel") as area_input_primary:
+            chatbot = gr.Chatbot(scale=30, height=600)
+        with gr.Accordion("输入区", open=True, elem_id="output-panel") as area_output_primary:
+            with gr.Row():
+                user_input = gr.Textbox(show_label=False, placeholder="Input...", lines=5, scale=10).style(
+                    container=False
+                )
+                with gr.Column(scale=1):
+                    submitBtn = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
+                    state = gr.State([])
+                    emptyBtn = gr.Button("Clear History")
+        submitBtn.click(predict, [user_input, state], [user_input, chatbot, state])
+        emptyBtn.click(reset_state, outputs=[chatbot, state], show_progress=True)
+    demo.queue().launch(server_name="0.0.0.0", server_port=8084, share=False)
