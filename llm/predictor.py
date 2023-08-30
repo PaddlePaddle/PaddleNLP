@@ -417,7 +417,7 @@ class DygraphInferencePredictor(BasePredictor):
 
         self.cache_kvs = [
             paddle.zeros(shape, dtype=dtype)
-            for shape in self.model.get_cache_kvs_shape(self.model.config, config.max_batch_size)
+            for shape in self.model.get_cache_kvs_shape(self.model.config, config.max_batch_size, config.max_length)
         ]
         self.pre_ids = paddle.full([config.max_batch_size, config.max_length], -1, dtype="int64")
         if "chatglm" in self.architectures:
