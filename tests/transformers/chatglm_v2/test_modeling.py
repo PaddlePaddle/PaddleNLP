@@ -221,9 +221,11 @@ class ChatGLMv2Test(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_model_attention_mask(*config_and_inputs)
 
+    # chatglm_v2 cannot use beam search temporarily
     def test_beam_search_generate(self):
         pass
 
+    # chatglm_v2 cannot use group beam search temporarily
     def test_group_beam_search_generate(self):
         pass
 
