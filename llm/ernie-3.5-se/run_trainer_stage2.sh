@@ -16,7 +16,7 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-task_name="ernie35_hybid"
+task_name="ernie35_hybrid"
 # rm -rf output/$task_name/
 # rm -rf "output/$task_name""_log"
 
