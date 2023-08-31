@@ -1630,6 +1630,7 @@ class GenerationMixin(object):
         stopping_criteria=None,
         **model_kwargs
     ):
+        model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
         # max_length will be convert to MaxLengthCriteria
@@ -1661,7 +1662,7 @@ class GenerationMixin(object):
         beam_scores[:, ::num_sub_beams] = 0
         beam_scores = paddle.reshape(beam_scores, [-1])
 
-        while cur_len < max_length:
+        while True:
             # predicted tokens in cur_len step
             current_tokens = paddle.zeros(shape=[batch_size * num_beams], dtype=input_ids.dtype)
 
