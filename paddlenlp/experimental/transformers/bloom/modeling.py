@@ -73,7 +73,6 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
         self.n_head = config.n_head
 
         # Embedding + LN Embedding
-        # self.word_embeddings = nn.Embedding(config.vocab_size, self.embed_dim)
         if config.tensor_parallel_degree > 1:
             self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
                 config.vocab_size,
@@ -96,7 +95,6 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
         except:
             pass
 
-        # config.tensor_parallel_degree = 8
         # Transformer blocks
         ln_scale_attrs = [paddle.ParamAttr(name="fusemt.{}.ln_scale".format(i)) for i in range(config.n_layer)]
         ln_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ln_bias".format(i)) for i in range(config.n_layer)]
@@ -438,7 +436,6 @@ class BloomForCausalLMInferenceModel(GenerationInferenceModel, BloomPreTrainedMo
         if hidden_states.stop_gradient:
             pass
         lm_logits = parallel_matmul(hidden_states, self.bloom.word_embeddings.weight, parallel_output=False)
-        # lm_logits = self.lm_head(hidden_states)
 
         loss = None
         if labels is not None:
