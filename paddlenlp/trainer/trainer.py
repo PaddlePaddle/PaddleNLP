@@ -2065,7 +2065,7 @@ class Trainer:
                     with open(saved_signal_path, mode="w+") as f:
                         f.write("1")
 
-        if self.args.use_moe and self.dp_group.rank > 0:
+        if self.args.use_moe and self.args.data_parallel_rank > 0:
             self._save_moe_weights(output_dir)
 
         # Maybe delete some older checkpoints.
