@@ -501,7 +501,7 @@ class ChatGLMStack(nn.Layer):
             use_cache,
             cache,
             rotary_embeds,
-            use_reentrant=False,
+            use_reentrant=self.config.recompute_use_reentrant,
         )
         return hidden_states
 
