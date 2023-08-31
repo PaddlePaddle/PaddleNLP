@@ -18,6 +18,8 @@ from typing import Optional
 import numpy as np
 import paddle.profiler as profiler
 from datasets import load_dataset
+from modeling import GPTForCausalLM
+from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from utils import CustomTrainer, ProfilerCallback
 
 from paddlenlp.data import DataCollatorForSeq2Seq
@@ -64,6 +66,7 @@ class ModelArguments:
     train_data_size: int = field(default=1000, metadata={"help": "Number of dataset for training"})
     intokens_length: int = field(default=2048, metadata={"help": "Intokens length"})
     intokens: Optional[bool] = field(default=False, metadata={"help": "whether to use intokens"})
+    use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
 
 
 def main():
@@ -79,23 +82,49 @@ def main():
             dtype = "bfloat16"
     else:
         dtype = "float32"
-
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    if model_args.model_name_or_path in ["gpt3-6.7B-en", "gpt3-13B-en"]:
+        tokenizer = AutoTokenizer.from_pretrained("gpt3-13B-en")
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     if "llama" in model_args.model_name_or_path:
         tokenizer.pad_token = tokenizer.unk_token
-    model = AutoModelForCausalLM.from_pretrained(
-        model_args.model_name_or_path,
-        low_cpu_mem_usage=True,
-        # use_flash_attention=True,
-        dtype=dtype,
-        tensor_parallel_degree=training_args.tensor_parallel_degree,
-        tensor_parallel_rank=training_args.tensor_parallel_rank,
-    )
+
+    if model_args.model_name_or_path in ["gpt3-6.7B-en", "gpt3-13B-en"]:
+        model = GPTForCausalLM.from_pretrained(
+            model_args.model_name_or_path,
+            low_cpu_mem_usage=True,
+            use_flash_attention=model_args.use_flash_attention,
+            dtype=dtype,
+            tensor_parallel_degree=training_args.tensor_parallel_degree,
+            tensor_parallel_rank=training_args.tensor_parallel_rank,
+        )
+        tracker = get_rng_state_tracker()
+        tracker.add("global_seed", 111)
+        tracker.add("local_seed", 222)
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            model_args.model_name_or_path,
+            low_cpu_mem_usage=True,
+            use_flash_attention=model_args.use_flash_attention,
+            dtype=dtype,
+            tensor_parallel_degree=training_args.tensor_parallel_degree,
+            tensor_parallel_rank=training_args.tensor_parallel_rank,
+        )
 
     if model_args.lora:
         if "llama" in model_args.model_name_or_path:
             target_modules = [".*q_proj.*", ".*k_proj.*", ".*v_proj.*"]
+        elif model_args.model_name_or_path in ["gpt3-6.7B-en", "gpt3-13B-en"]:
+            target_modules = [
+                ".*qkv_proj.*",
+                ".*q_proj.*",
+                ".*k_proj.*",
+                ".*v_proj.*",
+                ".*linear1.*",
+                ".*linear2.*",
+                ".*out_proj.*",
+            ]
         else:
             target_modules = [".*query_key_value.*"]
 
@@ -172,11 +201,57 @@ def main():
         # shift input and labels
         model_inputs["input_ids"] = model_inputs["input_ids"][:-1]
         model_inputs["labels"] = model_inputs["labels"][1:]
+
         if intokens:
             model_inputs["attention_mask"] = np.tril(
                 np.ones([len(model_inputs["input_ids"]), len(model_inputs["input_ids"])], dtype=bool)
             )
         return model_inputs
+
+    def preprocess_function_gpt(example, max_source_length=256, max_target_length=384, intokens=False):
+        """
+        Convert an example into necessary features.
+        """
+        # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
+        # in one example possible giving several features when a context is long, each of those features having a
+        # context that overlaps a bit the context of the previous feature.
+        # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
+        # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
+        inputs = example["instruction"]
+        targets = example["output"]
+        if "input" in example:
+            inputs += example["input"]
+
+        input_seq = inputs
+        output_seq = targets
+
+        outputs = tokenizer(
+            output_seq,
+            max_length=max_target_length,
+            # pad_to_max_seq_len=True,
+            truncation_strategy="longest_first",
+            return_attention_mask=False,
+            return_token_type_ids=False,
+        )
+        inputs = tokenizer(
+            input_seq,
+            max_length=max_source_length,
+            # pad_to_max_seq_len=True,
+            truncation_strategy="longest_first",
+            return_attention_mask=False,
+            return_length=False,
+        )
+
+        final = {}
+        for k in outputs.keys():
+            final[k] = inputs[k] + outputs[k]
+            if k == "input_ids":
+                final["labels"] = [tokenizer.pad_token_id] * len(inputs["input_ids"]) + outputs[k]
+
+        # shift inputs and labels
+        final["input_ids"] = final["input_ids"][:-1]
+        final["labels"] = final["labels"][1:]
+        return final
 
     if model_args.english:
         dataset = load_dataset("tatsu-lab/alpaca")
@@ -198,12 +273,13 @@ def main():
         dataset = dataset.map(
             lambda example: preprocess_function_bloom(example, intokens=model_args.intokens),
         )
-    else:
+    elif model_args.model_name_or_path in ["gpt3-6.7B-en", "gpt3-13B-en"]:
         dataset = dataset.map(
-            lambda example: preprocess_function(example, intokens=model_args.intokens),
+            lambda example: preprocess_function_gpt(example, intokens=model_args.intokens),
         )
+    else:
+        dataset = dataset.map(lambda example: preprocess_function(example, intokens=model_args.intokens))
     total_effective_tokens = sum([len(i["input_ids"]) for i in dataset]) * training_args.num_train_epochs
-
     if model_args.intokens:
         dataset = InTokensMapDataset(
             dataset,
@@ -218,8 +294,12 @@ def main():
             scheduler=profiler.make_scheduler(closed=1, ready=2, record=1, repeat=1),
             on_trace_ready=profiler.export_chrome_tracing("./log"),
         )
-
-    data_collator = DataCollatorForSeq2Seq(return_tensors="pd", tokenizer=tokenizer)
+    if model_args.model_name_or_path in ["gpt3-6.7B-en", "gpt3-13B-en"]:
+        data_collator = DataCollatorForSeq2Seq(
+            return_tensors="pd", tokenizer=tokenizer, label_pad_token_id=tokenizer.pad_token_id
+        )
+    else:
+        data_collator = DataCollatorForSeq2Seq(return_tensors="pd", tokenizer=tokenizer)
 
     trainer = CustomTrainer(
         model=model,

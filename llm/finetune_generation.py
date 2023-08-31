@@ -17,7 +17,13 @@ import sys
 from functools import partial
 
 import paddle
-from argument import DataArgument, GenerateArgument, ModelArgument, QuantArgument
+from argument import (
+    DataArgument,
+    GenerateArgument,
+    ModelArgument,
+    QuantArgument,
+    TrainingArguments,
+)
 from data import get_convert_example
 from utils import (
     CausalLMTrainer,
@@ -30,7 +36,8 @@ from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.trainer import PdArgumentParser, TrainingArguments
+from paddlenlp.trainer import PdArgumentParser
+from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -100,11 +107,6 @@ def main():
         )
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
-        if hasattr(model_config, "max_position_embeddings"):
-            if model_config.max_position_embeddings < data_args.max_length:
-                raise ValueError(
-                    f"The max_length ({data_args.max_length}) must be smaller than max_position_embeddings({model_config.max_position_embeddings})."
-                )
         model = AutoModelForCausalLM.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
@@ -145,6 +147,21 @@ def main():
             )
         else:
             train_ds, dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["train", "dev"])
+    # TODO(ZHUI & sijunhe): Temporary implementation. Generalize this logic and move to Trainer later.
+    if training_args.resume_from_checkpoint is not None and data_args.lazy:
+        logger.warning(
+            f"Loading from '{training_args.resume_from_checkpoint}', manually skipping dataset and setting `ignore_data_skip` to True."
+        )
+        training_args.ignore_data_skip = True
+        state = TrainerState.load_from_json(os.path.join(training_args.resume_from_checkpoint, "trainer_state.json"))
+        consumed_samples = (
+            state.global_step
+            * training_args.per_device_train_batch_size
+            * training_args.gradient_accumulation_steps
+            * training_args.dataset_world_size
+        )
+        train_ds = train_ds.skip(consumed_samples)
+
     if training_args.pipeline_parallel_degree > 1:
         from data import convert_example_common
 
@@ -276,10 +293,18 @@ def main():
     # Train
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
-        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
-        trainer.log_metrics("train", train_result.metrics)
-        trainer.save_metrics("train", train_result.metrics)
-        trainer.save_state()
+        if training_args.benchmark:
+            total_effective_tokens = (
+                sum([len(i["input_ids"]) for i in trainer.train_dataset]) * training_args.num_train_epochs
+            )
+            effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
+            logger.info(f"Effective_Tokens_per_second: {effective_tokens_per_second} ")
+            logger.info("Benchmark done.")
+        else:
+            trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
+            trainer.log_metrics("train", train_result.metrics)
+            trainer.save_metrics("train", train_result.metrics)
+            trainer.save_state()
 
     # QAT
     if quant_args.do_qat:

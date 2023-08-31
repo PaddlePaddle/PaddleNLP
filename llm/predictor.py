@@ -59,6 +59,13 @@ class PredictorArgument:
     prefix_path: str = field(
         default=None, metadata={"help": "The directory of Prefix Tuning parameters. Default to None"}
     )
+    decode_strategy: str = field(
+        default="sampling",
+        metadata={
+            "help": "the decoding strategy of generation, which should be one of ['sampling', 'greedy_search', 'beam_search']. Default to sampling"
+        },
+    )
+
     mode: str = field(
         default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
     )
@@ -71,7 +78,7 @@ class PredictorArgument:
 class ModelArgument:
     gpt: bool = field(default=False, metadata={"help": "GPTForCausalLM"})
     ernie: bool = field(default=False, metadata={"help": "Ernie35ForCausalLM"})
-    data_file: None = field(default=None, metadata={"help": "data file directory"})
+    data_file: str = field(default=None, metadata={"help": "data file directory"})
     output_file: str = field(default="output.json", metadata={"help": "predict result file directory"})
 
 
@@ -191,7 +198,7 @@ class DygraphPredictor(BasePredictor):
             bos_token_id=self.tokenizer.bos_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
             pad_token_id=self.tokenizer.pad_token_id,
-            decode_strategy="sampling",
+            decode_strategy=self.config.decode_strategy,
             temperature=self.config.temperature,
             top_k=self.config.top_k,
             top_p=self.config.top_p,
@@ -417,7 +424,7 @@ class DygraphInferencePredictor(BasePredictor):
 
         self.cache_kvs = [
             paddle.zeros(shape, dtype=dtype)
-            for shape in self.model.get_cache_kvs_shape(self.model.config, config.max_batch_size)
+            for shape in self.model.get_cache_kvs_shape(self.model.config, config.max_batch_size, config.max_length)
         ]
         self.pre_ids = paddle.full([config.max_batch_size, config.max_length], -1, dtype="int64")
         if "chatglm" in self.architectures:
