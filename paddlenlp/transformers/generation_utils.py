@@ -1675,7 +1675,7 @@ class GenerationMixin(object):
             if model_kwargs[cache_name] is not None:
                 # reorder the cache
                 model_kwargs[cache_name] = map_structure(
-                    lambda x: paddle.index_select(x, beam_idx), model_kwargs[cache_name]
+                    lambda x: paddle.index_select(x, reordering_indices), model_kwargs[cache_name]
                 )
 
         pred_ids, scores = beam_scorer.finalize(
