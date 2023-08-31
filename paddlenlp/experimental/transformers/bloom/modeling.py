@@ -195,7 +195,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
         hidden_states = self.word_embeddings_layernorm(inputs_embeds)
 
         with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
-            hidden_states = self.transformer_block(
+            hidden_states, _ = self.transformer_block(
                 src=hidden_states,
                 input_ids=input_ids,
                 cum_offsets=cum_offsets,

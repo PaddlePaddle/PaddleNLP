@@ -564,4 +564,4 @@ class FusedMultiTransformer(Layer):
             out = rebuild_padding(tmp_out, cum_offsets, seq_lens, input_ids)
         else:
             out = tmp_out
-        return out
+        return out, caches
