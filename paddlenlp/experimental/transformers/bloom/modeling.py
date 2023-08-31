@@ -211,6 +211,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict, use_structured_name=True):
+
         for k, v in state_dict.items():
             if k.find("word_embeddings.weight") >= 0:
                 self.word_embeddings.weight.set_value(paddle.to_tensor(v))
@@ -224,7 +225,9 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                 self.ln_f.bias.set_value(paddle.to_tensor(v))
             else:
                 # transformer block weights
-                idx = int(k.split(".")[1])
+                splits = k.split(".")
+                idx = int(splits[1]) if splits[1].isdigit() else int(splits[2])
+
                 if k.endswith("input_layernorm.weight"):
                     self.transformer_block.ln_scales[idx].set_value(paddle.to_tensor(v).astype("float32"))
                 elif k.endswith("input_layernorm.bias"):
@@ -432,10 +435,7 @@ class BloomForCausalLMInferenceModel(GenerationInferenceModel, BloomPreTrainedMo
             return_dict=return_dict,
         )
         hidden_states = transformer_outputs[0]
-        # TODO(wj-Mcat): to enable lm_head
-        if hidden_states.stop_gradient:
-            pass
-        lm_logits = parallel_matmul(hidden_states, self.bloom.word_embeddings.weight, parallel_output=False)
+        lm_logits = self.lm_head(hidden_states)
 
         loss = None
         if labels is not None:
