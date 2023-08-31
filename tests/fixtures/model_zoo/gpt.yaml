@@ -83,11 +83,10 @@ glue:
     device: gpu
     do_train: true
   
-
 generation:
   default:
     model_type: gpt2
-    model_name_or_path: hf-internal-testing/tiny-random-GPT2Model
+    model_name_or_path: hf-internal-testing/tiny-random-gpt2
     from_hf_hub: true
 
   slow:

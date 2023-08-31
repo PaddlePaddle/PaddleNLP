@@ -15,14 +15,6 @@
 # pass
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
-from configuration import GPTConfig
-from modeling import (
-    GPTEmbeddings,
-    GPTPretrainedModel,
-    GPTPretrainingCriterion,
-    TransformerDecoderLayer,
-    parallel_matmul,
-)
 from paddle.distributed.fleet.meta_parallel import (
     LayerDesc,
     PipelineLayer,
@@ -30,7 +22,15 @@ from paddle.distributed.fleet.meta_parallel import (
 )
 from paddle.distributed.fleet.utils import recompute
 
-from paddlenlp.transformers import PretrainedModel
+from paddlenlp.transformers import (
+    GPTConfig,
+    GPTDecoderLayer,
+    GPTEmbeddings,
+    GPTPretrainedModel,
+    GPTPretrainingCriterion,
+    PretrainedModel,
+)
+from paddlenlp.transformers.gpt.modeling import parallel_matmul
 
 
 def get_hcg():
@@ -91,7 +91,7 @@ class GPTEmbeddingPipe(GPTEmbeddings):
         return embeddings
 
 
-class GPTDecoderLayerPipe(TransformerDecoderLayer):
+class GPTDecoderLayerPipe(GPTDecoderLayer):
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
         # hidden_states = super().forward(hidden_states, tgt_mask=attention_mask)
