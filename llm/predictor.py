@@ -362,11 +362,19 @@ class InferencePredictorMixin:
                     self.config.max_length,
                 ]
             )
+            alibi_decoder = alibi.expand(
+                [
+                    inputs["input_ids"].shape[0],
+                    self.model_config.n_head // self.model_config.tensor_parallel_degree,
+                    1,
+                    self.config.max_length,
+                ]
+            )
             self.attention_mask = (
                 alibi_encoder + (1 - self.attention_mask) * paddle.finfo(self.attention_mask.dtype).min
             )
             self.tgt_generation_mask = (
-                alibi_encoder + (1 - self.tgt_generation_mask) * paddle.finfo(self.tgt_generation_mask.dtype).min
+                alibi_decoder + (1 - self.tgt_generation_mask) * paddle.finfo(self.tgt_generation_mask.dtype).min
             )
 
         else:

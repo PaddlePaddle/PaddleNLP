@@ -544,7 +544,13 @@ class FusedMultiTransformer(Layer):
                     tmp_out, bias_residual_input = norm_out[0], norm_out[1]
                 else:
                     tmp_out = fused_layer_norm(
-                        ffn2_out, None, None, self._epsilon, residual=bias_residual_input, begin_norm_axis=1
+                        ffn2_out,
+                        norm_weight=None,
+                        norm_bias=None,
+                        epsilon=self._epsilon,
+                        begin_norm_axis=1,
+                        bias=self.ffn2_biases[i],
+                        residual=bias_residual_input,
                     )[0]
             else:
                 tmp_out = self.norm_func(
