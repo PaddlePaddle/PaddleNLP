@@ -109,7 +109,6 @@ class DataArguments:
         default=False,
         metadata={"help": "Use share folder for data dir and output dir on multi machine."},
     )
-    train_data_size: int = field(default=-1, metadata={"help": "Number of dataset for training"})
 
     data_impl: str = field(default="mmap", metadata={"help": "The format of the preprocessed data."})
     skip_warmup: bool = field(

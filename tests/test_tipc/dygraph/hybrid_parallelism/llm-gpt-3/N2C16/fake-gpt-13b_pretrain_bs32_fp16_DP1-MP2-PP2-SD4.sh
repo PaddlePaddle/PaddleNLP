@@ -28,7 +28,7 @@
 # limitations under the License.
 
 model_name_or_path="__internal_testing__/fake-gpt-13b"
-model_item="fake-gpt-13b"
+model_item="fake-gpt-13b_pretrain"
 tokenizer_name_or_path="__internal_testing__/fake-gpt-13b"
 max_seq_length=1024
 per_device_train_batch_size=1
@@ -41,7 +41,7 @@ fp16_opt_level="O2"
 max_steps=200
 dataloader_num_workers=1
 sharding="stage1"
-sharding_degree=4
+sharding_degree=2
 recompute=1
 gradient_accumulation_steps=16
 run_mode="DP1-MP2-PP2-SD2"

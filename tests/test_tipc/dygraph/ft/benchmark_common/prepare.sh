@@ -14,17 +14,8 @@
 
 python -m pip install -r ../requirements.txt
 
-# install fused_ln custom ops
-cd ../model_zoo/gpt-3/external_ops/
-python setup.py install
+cd ../llm
 
-# install tool_helpers
-cd ../../../llm/llama
-python -m pip install tool_helpers
+wget https://bj.bcebos.com/paddlenlp/datasets/examples/llm_benchmark_en.tar.gz
+tar -zxvf llm_benchmark_en.tar.gz
 
-wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
-wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
-
-mkdir data
-mv llama_openwebtext_100k_ids.npy ./data
-mv llama_openwebtext_100k_idx.npz ./data
