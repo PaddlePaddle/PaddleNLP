@@ -48,11 +48,7 @@ MODEL_CLASSES = {
     ),
 }
 
-from paddlenlp.data.causal_dataset import (
-    GPTDataset,
-    build_train_valid_test_datasets,
-    print_rank_0,
-)
+from paddlenlp.data.causal_dataset import build_train_valid_test_datasets, print_rank_0
 
 
 def add_start_docstrings(*docstr):
@@ -103,7 +99,6 @@ class DataArguments:
         metadata={"help": "Use share folder for data dir and output dir on multi machine."},
     )
 
-    train_data_size: int = field(default=-1, metadata={"help": "Number of dataset for training"})
     data_impl: str = field(default="mmap", metadata={"help": "The format of the preprocessed data."})
     skip_warmup: bool = field(
         default=True,
@@ -145,7 +140,7 @@ class ModelArguments:
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
     continue_training: bool = field(
-        default=False,
+        default=True,
         metadata={
             "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
         },
@@ -418,16 +413,13 @@ def main():
         data_args, training_args, data_file, tokenizer
     )
 
-    if data_args.train_data_size > 0:
-        # GPTDataset is the type of `paddle.io.Dataset`, which dosen't contains `select` method
-        # modify the `__len__` function to change the length of dataset in current python process
-        GPTDataset.__len__ = lambda *_: data_args.train_data_size
-        total_effective_tokens = (
-            sum([train_dataset[i]["text"].shape[0] for i in range(data_args.train_data_size)])
-            * training_args.num_train_epochs
-        )
-    else:
-        total_effective_tokens = sum([len(i[0]) for i in train_dataset]) * training_args.num_train_epochs
+    total_effective_tokens = (
+        training_args.per_device_train_batch_size
+        * training_args.dataset_world_size
+        * training_args.max_steps
+        * training_args.gradient_accumulation_steps
+        * data_args.max_seq_length
+    )
 
     trainer = PretrainingTrainer(
         model=model,

@@ -17,28 +17,27 @@
 # Test training benchmark for a model.
 # Usage：bash benchmark/run_benchmark.sh ${model_name_or_path} ${per_device_train_batch_size} ${use_flash_attention} ${tensor_parallel_degree} ${pipeline_parallel_degree} ${virtual_pp_degree} ${sequence_parallel} ${sharding_degree} ${num_train_epochs} ${save_steps} ${sharding} ${recompute} ${run_mode} ${device_num}
 function _set_params(){
-    model_name_or_path=${1:-"gpt2-medium-en"}
+    run_mode=${run_mode:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP2-MP8-PP2|DP1-MP8-PP4|DP4-MP8-PP1
+    device_num=${device_num:-"N1C8"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
+    global_batch_size=${global_batch_size:-32}
+    model_item=${model_item:-"gpt2-medium-en"}
 
-    per_device_train_batch_size=${2:-""}
-    use_flash_attention=${3:-"1"}
-    tensor_parallel_degree=${4:-"2"}
-    pipeline_parallel_degree=${5:-"2"}
+    model_name_or_path=${model_name_or_path:-"gpt2-medium-en"}
+    tokenizer_name_or_path=${tokenizer_name_or_path:-"gpt2-medium-en"}
+    max_seq_length=${max_seq_length:-1024}
+    per_device_train_batch_size=${per_device_train_batch_size:-1}
+    tensor_parallel_degree=${tensor_parallel_degree:-1}
+    pipeline_parallel_degree=${pipeline_parallel_degree:-1}
+    fuse_attention_qkv=${fuse_attention_qkv:-1}
+    use_flash_attention=${use_flash_attention:-0}
+    fp16_opt_level=${fp16_opt_level:-"O2" }
 
-    virtual_pp_degree=${6:-"1"}
-    sequence_parallel=${7:-"0"}
-    sharding_degree=${8:-"1"}      # (可选)
-    num_train_epochs=${9:-"200"}
-    save_steps=${10:-"200"}
-    sharding=${11:-"stage1"}
-    recompute=${12:-"1"}
-    run_mode=${13:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP2-MP8-PP2|DP1-MP8-PP4|DP4-MP8-PP1
-    device_num=${14:-"N2C32"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
-    global_batch_size=${15:-"16"}
-    model_item=${16:-"gpt2-medium-en"}
-    train_data_size=${17:-"1000"}
-    gradient_accumulation_steps=${18:-"4"}
-    pp_recompute_interval=${19:-"1"}
-
+    max_steps=${max_steps:-10000}
+    dataloader_num_workers=${dataloader_num_workers:-1}
+    sharding=${sharding:-"stage2"}
+    sharding_degree=${sharding_degree:-2}
+    recompute=${recompute:-1}
+    gradient_accumulation_steps=${gradient_accumulation_steps:-2}
 
     base_batch_size=${global_batch_size}
 
@@ -97,43 +96,41 @@ function _train(){
     use_pure_fp16=False
 
     train_cmd="    --model_type gpt \
-            --model_name_or_path ${model_name_or_path} \
-            --tokenizer_name_or_path ${model_name_or_path} \
-            --input_dir ./data \
-            --output_dir output \
-            --split 949,50,1 \
-            --max_seq_length 2048 \
-            --per_device_train_batch_size ${per_device_train_batch_size} \
-            --gradient_accumulation_steps ${gradient_accumulation_steps} \
-            --per_device_eval_batch_size ${per_device_train_batch_size} \
-            --use_flash_attention ${use_flash_attention} \
-            --use_fused_rms_norm 0 \
-            --fp16  \
-            --fp16_opt_level O2  \
-            --scale_loss 512 \
-            --tensor_parallel_degree ${tensor_parallel_degree} \
-            --pipeline_parallel_degree ${pipeline_parallel_degree} \
-            --virtual_pp_degree ${virtual_pp_degree} \
-            --sequence_parallel ${sequence_parallel} \
-            --learning_rate 0.00001 \
-            --min_learning_rate 0.000001 \
-            --save_steps ${save_steps} \
-            --weight_decay 0.01 \
-            --pp_recompute_interval ${pp_recompute_interval}\
-            --warmup_ratio 0.01 \
-            --num_train_epochs ${num_train_epochs} \
-            --max_grad_norm 1.0 \
-            --logging_steps 10 \
-            --dataloader_num_workers 1 \
-            --eval_steps 100000000 \
-            --report_to visualdl \
-            --sharding ${sharding} \
-            --disable_tqdm true \
-            --continue_training 1\
-            --recompute ${recompute} \
-            --train_data_size ${train_data_size} \
-            --do_train \
-            --device gpu"
+        --model_name_or_path ${model_name_or_path} \
+        --tokenizer_name_or_path ${tokenizer_name_or_path} \
+        --input_dir ./data \
+        --output_dir output \
+        --split 949,50,1 \
+        --max_seq_length ${max_seq_length} \
+        --per_device_train_batch_size ${per_device_train_batch_size} \
+        --per_device_eval_batch_size 1 \
+        --tensor_parallel_degree ${tensor_parallel_degree} \
+        --pipeline_parallel_degree ${pipeline_parallel_degree} \
+        --fuse_attention_qkv ${fuse_attention_qkv} \
+        --use_flash_attention ${use_flash_attention} \
+        --fp16  \
+        --fp16_opt_level ${fp16_opt_level} \
+        --scale_loss 1024 \
+        --learning_rate 0.00001 \
+        --min_learning_rate 0.000005 \
+        --max_steps ${max_steps} \
+        --save_steps 5000 \
+        --weight_decay 0.01 \
+        --warmup_ratio 0.01 \
+        --max_grad_norm 1.0 \
+        --logging_steps 1\
+        --dataloader_num_workers ${dataloader_num_workers} \
+        --sharding ${sharding} \
+        --sharding_degree ${sharding_degree} \
+        --eval_steps 1000 \
+        --report_to visualdl \
+        --disable_tqdm true \
+        --recompute ${recompute} \
+        --gradient_accumulation_steps ${gradient_accumulation_steps} \
+        --do_train \
+        --do_eval \
+        --continue_training 0 \
+        --device gpu"
     if [ ${PADDLE_TRAINER_ID} ]
     then
         PADDLE_RANK_OPTION=" --rank ${PADDLE_TRAINER_ID}"
@@ -168,7 +165,7 @@ function _train(){
         *) echo "choose run_mode "; exit 1;
         esac
     fi
-    cd ../llm/llama
+    cd ../llm/gpt-3
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     python -c "import paddlenlp"
     if [[ ${model_name_or_path} =~ "CE" ]];then # CE精度-不限制执行时间
