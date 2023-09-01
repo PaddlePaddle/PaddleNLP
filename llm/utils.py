@@ -27,7 +27,7 @@ from sklearn.metrics import accuracy_score
 
 from paddlenlp.datasets import InTokensIterableDataset
 from paddlenlp.trainer import Trainer, TrainerCallback
-from paddlenlp.trainer.trainer_utils import has_length
+from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
 from paddlenlp.utils.log import logger
 
 
@@ -153,11 +153,19 @@ class InTokensIterDatasetCallback(TrainerCallback):
 
     def on_step_end(self, args, state, control, **kwargs):
         train_dataloader = kwargs["train_dataloader"]
-        if not isinstance(train_dataloader.dataset, InTokensIterableDataset):
-            raise ValueError("InTokensIterDatasetCallback expectes `paddlenlp.datasets.InTokensIterableDataset`")
+        if isinstance(train_dataloader.dataset, InTokensIterableDataset):
+            dataset = train_dataloader.dataset
+        elif isinstance(train_dataloader.dataset, IterableDatasetShard) and isinstance(
+            train_dataloader.dataset.dataset, InTokensIterableDataset
+        ):
+            dataset = train_dataloader.dataset.dataset
+        else:
+            raise ValueError(
+                "Unexpected dataset format: InTokensIterDatasetCallback expectes `paddlenlp.datasets.InTokensIterableDataset`"
+            )
         if state.trial_params is None:
             state.trial_params = {}
-        state.trial_params["intokens_global_step"] = train_dataloader.dataset.intokens_global_step
+        state.trial_params["intokens_global_step"] = dataset.intokens_global_step
 
 
 class CausalLMTrainer(Trainer):
