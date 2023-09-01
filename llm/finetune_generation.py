@@ -27,6 +27,7 @@ from argument import (
 from data import get_convert_example
 from utils import (
     CausalLMTrainer,
+    InTokensIterDatasetCallback,
     compute_metrics,
     get_lora_target_modules,
     get_prefix_tuning_params,
@@ -45,6 +46,12 @@ from paddlenlp.transformers import (
     LlamaTokenizer,
 )
 from paddlenlp.utils.log import logger
+
+
+def read_local_dataset(path):
+    with open(path, "r", encoding="utf-8") as fp:
+        for line in fp:
+            yield json.loads(line.strip())
 
 
 def main():
@@ -122,14 +129,21 @@ def main():
     elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) and os.path.exists(
         os.path.join(data_args.dataset_name_or_path, "dev.json")
     ):
-        train_ds, dev_ds = load_dataset(
-            "json",
-            data_files={
-                "train": os.path.join(data_args.dataset_name_or_path, "train.json"),
-                "dev": os.path.join(data_args.dataset_name_or_path, "dev.json"),
-            },
-            lazy=data_args.lazy,
+        # train_ds, dev_ds = load_dataset(
+        #     "json",
+        #     data_files={
+        #         "train": os.path.join(data_args.dataset_name_or_path, "train.json"),
+        #         "dev": os.path.join(data_args.dataset_name_or_path, "dev.json"),
+        #     },
+        #     lazy=data_args.lazy,
+        # )
+        train_ds = load_dataset(
+            read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "train.json"), lazy=False
         )
+        dev_ds = load_dataset(
+            read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "dev.json"), lazy=False
+        )
+
     elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train")) and os.path.exists(
         os.path.join(data_args.dataset_name_or_path, "dev")
     ):
@@ -149,16 +163,22 @@ def main():
             train_ds, dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["train", "dev"])
     # TODO(ZHUI & sijunhe): Temporary implementation. Generalize this logic and move to Trainer later.
     if training_args.resume_from_checkpoint is not None and data_args.lazy:
-        logger.warning(
-            f"Loading from '{training_args.resume_from_checkpoint}', manually skipping dataset and setting `ignore_data_skip` to True."
+        logger.info(
+            f"Loading from '{training_args.resume_from_checkpoint}' with `lazy=True`, manually skipping dataset and setting `ignore_data_skip` to True."
         )
         training_args.ignore_data_skip = True
         state = TrainerState.load_from_json(os.path.join(training_args.resume_from_checkpoint, "trainer_state.json"))
-        consumed_samples = (
-            state.global_step
-            * training_args.per_device_train_batch_size
-            * training_args.gradient_accumulation_steps
-            * training_args.dataset_world_size
+        if state.trial_params is not None and "intokens_global_step" in state.trial_params:
+            consumed_samples = state.trial_params["intokens_global_step"]
+        else:
+            consumed_samples = (
+                state.global_step
+                * training_args.per_device_train_batch_size
+                * training_args.gradient_accumulation_steps
+                * training_args.dataset_world_size
+            )
+        logger.info(
+            f"Skipping the first {consumed_samples} samples to warmup the dataset from checkpoint '{training_args.resume_from_checkpoint}'."
         )
         train_ds = train_ds.skip(consumed_samples)
 
@@ -286,6 +306,7 @@ def main():
             return_tensors="np",
         ),
         do_generation=data_args.eval_with_do_generation,
+        callbacks=[InTokensIterDatasetCallback()] if isinstance(train_ds, InTokensIterableDataset) else None,
         gen_args=gen_args,
         data_args=data_args,
     )
@@ -330,9 +351,12 @@ def main():
         trainer.model.eval()
         # Prepare ptq dataloader
         if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
+            # ptq_ds = load_dataset(
+            #     "json", data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
+            # )[0]
             ptq_ds = load_dataset(
-                "json", data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
-            )[0]
+                read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
+            )
             ptq_ds = ptq_ds.map(partial(trans_func, is_test=False))
         else:
             ptq_ds = train_ds
@@ -360,9 +384,12 @@ def main():
 
         # Prepare ptq dataloader
         if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
+            # ptq_ds = load_dataset(
+            #     "json", data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
+            # )[0]
             ptq_ds = load_dataset(
-                "json", data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
-            )[0]
+                read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
+            )
             ptq_ds = ptq_ds.map(partial(trans_func, is_test=False))
         else:
             ptq_ds = train_ds
@@ -380,9 +407,12 @@ def main():
 
     # Evaluation test set
     if training_args.do_predict:
+        # test_ds = load_dataset(
+        #     "json", data_files=os.path.join(data_args.dataset_name_or_path, "test.json"), lazy=False
+        # )[0]
         test_ds = load_dataset(
-            "json", data_files=os.path.join(data_args.dataset_name_or_path, "test.json"), lazy=False
-        )[0]
+            read_local_dataset, path=os.path.join(data_args.dataset_name_or_path, "test.json"), lazy=False
+        )
         test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
         eval_result = trainer.predict(test_ds).metrics
         trainer.log_metrics("test", eval_result)
