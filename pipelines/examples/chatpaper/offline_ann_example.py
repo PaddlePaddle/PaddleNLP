@@ -22,16 +22,13 @@ from pipelines.document_stores import (
     ElasticsearchDocumentStore,
     MilvusDocumentStore,
 )
-from pipelines.nodes import (
-    CharacterTextSplitter,
-    DensePassageRetriever,
-    EmbeddingRetriever,
-)
+from pipelines.nodes import DensePassageRetriever, EmbeddingRetriever, SpacyTextSplitter
 from pipelines.utils import launch_es
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--index_name", default="baike_cities", type=str, help="The index name of the ANN search engine")
+parser.add_argument("--root_index_name", default="weipu_abstract", type=str, help="The index name of the ANN search engine")
+parser.add_argument("--child_index_name", default="weipu_full_text", type=str, help="The index name of the ANN search engine")
 parser.add_argument("--file_name", default="data/baike/", type=str, help="The doc path of the corpus")
 parser.add_argument('--username', type=str, default="", help='Username of ANN search engine')
 parser.add_argument('--password', type=str, default="", help='Password of ANN search engine')
@@ -192,8 +189,7 @@ def read_data(file_path):
 
 def indexing_abstract(csv_name):
     dataset = read_data(csv_name)
-
-    text_splitter = CharacterTextSplitter(separator="\n", chunk_size=300, chunk_overlap=0, filters=["\n"])
+    text_splitter = SpacyTextSplitter(separator="\n", chunk_size=320, chunk_overlap=10, filters=["\n"])
     datasets = []
     for document in dataset:
         text = document["abstracts"]
@@ -205,33 +201,41 @@ def indexing_abstract(csv_name):
             meta_data.pop("abstracts")
             datasets.append({"content": txt, "meta": meta_data})
     # Add abstract into one index
-    offline_ann(index_name=args.index_name, docs=datasets)
+    offline_ann(index_name=args.root_index_name, docs=datasets)
 
 
 def run_thread_index(data):
-    index_name = data["index_name"]
     docs = data["content"]
-    offline_ann(index_name, docs)
+    offline_ann(args.child_index_name, docs)
+
+
+def run_multi_process_splitter(document):
+    file_log = open("log_process.txt", "a")
+    text_splitter = SpacyTextSplitter(separator="\n", chunk_size=320, chunk_overlap=10, filters=["\n"])
+    text = document["content"]
+    text_splits = text_splitter.split_text(text)
+
+    datasets = []
+    for txt in text_splits:
+        meta_data = {
+            "name": document["title"],
+            "id": document["id"],
+            "title": document["title"],
+            "key_words": document["key_words"],
+        }
+        datasets.append({"content": txt, "meta": meta_data})
+    file_log.write(document["id"] + "\tsuccess" + "\n")
+    return {"index_name": document["id"], "content": datasets}
+
+
+from multiprocessing import Pool
 
 
 def indexing_main_body(csv_name):
     dataset = read_data(csv_name)
-    text_splitter = CharacterTextSplitter(separator="\n", chunk_size=300, chunk_overlap=0, filters=["\n"])
-    all_data = []
-
-    for document in dataset:
-        text = document["content"]
-        text_splits = text_splitter.split_text(text)
-        datasets = []
-        for txt in text_splits:
-            meta_data = {
-                "name": document["title"],
-                "id": document["id"],
-                "title": document["title"],
-                "key_words": document["key_words"],
-            }
-            datasets.append({"content": txt, "meta": meta_data})
-        all_data.append({"index_name": document["id"], "content": datasets})
+    # Multiprocessing for splitting text
+    pool = Pool(processes=10)
+    all_data = pool.map(run_multi_process_splitter, dataset)
 
     # Add body into separate index
     thread_count = 10
@@ -241,7 +245,8 @@ def indexing_main_body(csv_name):
 
 if __name__ == "__main__":
     if args.delete_index:
-        delete_data(args.index_name)
+        delete_data(args.root_index_name)
+        delete_data(args.child_index_name)
     # hierarchical index abstract, keywords
     indexing_abstract(args.file_name)
     # hierarchical index main body

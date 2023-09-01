@@ -31,7 +31,8 @@ from pipelines.utils import print_documents
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to run dense_qa system, defaults to gpu.")
-parser.add_argument("--index_name", default='dureader_nano_query_encoder', type=str, help="The ann index name of ANN.")
+parser.add_argument("--root_index_name", default="weipu_abstract", type=str, help="The index name of the ANN search engine")
+parser.add_argument("--child_index_name", default="weipu_full_text", type=str, help="The index name of the ANN search engine")
 parser.add_argument('--username', type=str, default="", help='Username of ANN search engine')
 parser.add_argument('--password', type=str, default="", help='Password of ANN search engine')
 parser.add_argument("--search_engine", choices=['elastic', 'bes'], default="elastic", help="The type of ANN search engine.")
@@ -67,7 +68,7 @@ def get_retrievers(use_gpu):
             embedding_dim=args.embedding_dim,
             vector_type="dense_vector",
             search_fields=["content", "meta"],
-            index=args.index_name,
+            index=args.root_index_name,
         )
     else:
         document_store_with_docs = BaiduElasticsearchDocumentStore(
@@ -79,7 +80,7 @@ def get_retrievers(use_gpu):
             similarity="dot_prod",
             vector_type="bpack_vector",
             search_fields=["content", "meta"],
-            index=args.index_name,
+            index=args.root_index_name,
         )
 
     # 语义索引模型
@@ -117,7 +118,7 @@ def hierarchical_search_tutorial():
     dpr_retriever, bm_retriever = get_retrievers(use_gpu)
 
     # Ranker
-    ranker = ErnieRanker(model_name_or_path="rocketqa-nano-cross-encoder", use_gpu=use_gpu)
+    ranker = ErnieRanker(model_name_or_path="rocketqa-base-cross-encoder", use_gpu=use_gpu)
 
     # Pipeline
     pipeline = Pipeline()
@@ -127,12 +128,16 @@ def hierarchical_search_tutorial():
         component=JoinDocuments(join_mode="concatenate"), name="JoinResults", inputs=["BMRetriever", "DenseRetriever"]
     )
     pipeline.add_node(component=ranker, name="Ranker", inputs=["JoinResults"])
+
     # Abstract search
     prediction = pipeline.run(
-        query="P2P网络借贷的风险有哪些？",
+        query="商誉私法保护研究",
         params={
-            "BMRetriever": {"top_k": args.bm_topk, "index": args.index_name},
-            "DenseRetriever": {"top_k": args.dense_topk, "index": args.index_name},
+            "BMRetriever": {"top_k": args.bm_topk, "index": args.root_index_name},
+            "DenseRetriever": {
+                "top_k": args.dense_topk,
+                "index": args.root_index_name,
+            },
             "Ranker": {"top_k": args.rank_topk},
         },
     )
@@ -140,18 +145,29 @@ def hierarchical_search_tutorial():
 
     # Main body Search
     documents = prediction["documents"]
-    sub_index_name = documents[0].meta["name"]
+    file_id = documents[0].meta["id"]
+
+    # filters = {
+    #         "$and": {
+    #             "id": {"$eq": "6bc0c021ef4ec96a81fbc5707e1c7016"},
+    #         }
+    # }
     pipe = Pipeline()
     pipe.add_node(component=dpr_retriever, name="DenseRetriever", inputs=["Query"])
     pipe.add_node(component=ranker, name="Ranker", inputs=["DenseRetriever"])
+
+    filters = {
+        "$and": {
+            "id": {"$eq": file_id},
+        }
+    }
     results = pipe.run(
-        query="P2P网络借贷的研究背景是什么？",
+        query="商誉私法保护的目的是什么？",
         params={
-            "DenseRetriever": {"top_k": args.dense_topk, "index": sub_index_name.lower()},
+            "DenseRetriever": {"top_k": args.dense_topk, "index": args.child_index_name, "filters": filters},
         },
     )
-
-    print_documents(results)
+    print_documents(results, print_meta=True)
 
 
 if __name__ == "__main__":
