@@ -55,7 +55,8 @@ def launch(args):
         context = state.setdefault("context", [])
 
         if not utterance:
-            gr.Warning("请输入有效问题")
+            gr.Warning("invalid inputs")
+            # gr.Warning("请输入有效问题")
             shown_context = get_shown_context(context)
             return None, shown_context, context, state
 
@@ -186,7 +187,7 @@ def launch(args):
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
             )
 
-    block.launch(server_name="0.0.0.0", server_port=args.port, debug=True)
+    block.queue(default_enabled=True).launch(server_name="0.0.0.0", server_port=args.port, debug=True)
 
 
 def main(args):
