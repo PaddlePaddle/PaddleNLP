@@ -13,7 +13,6 @@
 # limitations under the License.
 from typing import Optional
 
-import erniebot as eb
 import fitz
 import requests
 
@@ -142,7 +141,3 @@ def retrieval(
             params={"Retriever": {"top_k": retriever_topk, "filters": filters}, "Ranker": {"top_k": rank_topk}},
         )
         return prediction
-
-
-def chat_content(content, api_key, secret_key):
-    eb.ChatCompletion.create()

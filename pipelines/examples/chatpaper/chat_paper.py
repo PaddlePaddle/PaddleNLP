@@ -221,7 +221,7 @@ def infer(query, state):
         context_new[-2]["content"] = query
         shown_context = get_shown_context(context_new)
     else:
-        context.append({"system": args.system_prompt, "role": "user", "content": content})
+        context.append({"system": args.system_prompt, "role": "user", "content": query})
         response = eb.ChatFile.create(messages=context, stream=False)
         bot_response = response.result
         context.append({"role": "assistant", "content": bot_response})
@@ -243,9 +243,15 @@ def upload_file(file_name, file_url, file_upload, state={}):
             with open(json_file_path, mode="r") as json_file:
                 json_content = json.load(json_file)
             content = json_content["content"]
-            return None, gr.File.update(visible=False), None, state, gr.Markdown.update(content, visible=True)
+            return (
+                gr.Gallery.update(visible=False),
+                gr.File.update(visible=False),
+                None,
+                state,
+                gr.Markdown.update(content, visible=True),
+            )
         else:
-            return None, gr.File.update(visible=False), None, state, None
+            return gr.Gallery.update(visible=False), gr.File.update(visible=False), None, state, None
     elif file_url:
         single_paper_id = ""
         root_path = "./"
@@ -276,7 +282,13 @@ def upload_file(file_name, file_url, file_upload, state={}):
     bot_response = response.result
     context.append({"role": "assistant", "content": bot_response})
     shown_context = get_shown_context(context)
-    return imgs, file_name, shown_context, state, gr.Markdown.update(visible=False)
+    return (
+        gr.Gallery.update(imgs, visible=True),
+        gr.File.update(file_name, label="原文下载链接", visible=True),
+        shown_context,
+        state,
+        gr.Markdown.update(visible=False),
+    )
 
 
 with gr.Blocks(title="维普小助手", theme=gr.themes.Base()) as demo:
@@ -372,4 +384,4 @@ with gr.Blocks(title="维普小助手", theme=gr.themes.Base()) as demo:
                     show_progress=False,
                 )
 demo.queue(concurrency_count=40, max_size=40)
-demo.launch(server_name="10.9.189.4", server_port=8084)
+demo.launch(server_name="0.0.0.0", server_port=8084)
