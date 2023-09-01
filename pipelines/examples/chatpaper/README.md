@@ -23,21 +23,22 @@ pip install -r requirements.txt
 =======
 ## 2. 快速开始
 >>>>>>> 886218498232006ef738a937d5fe963355c29d35
-如果要实现学术检索功能，首先需要建立本地知识库
-建立本地知识库（中文pdf）
-```
-python create_index.py \
---api_key ... \
---secret_key ... \
---dirname ...
-```
-开始chatpaper
 ```
 python chat_paper.py \
---api_key ... \
---secret_key ...
+--api_key  \
+--secret_key \
+--bos_ak \
+--bos_sk \
+--json_dir \
+--retriever_api_key \
+--retriever_secret_key \
+--es_host \
+--es_port \
+--es_username \
+--es_password \
+--es_index_abstract \
+--es_index_full_text
 ```
-【注意】如果要进行英文论文的翻译和精读，请在前端页面 切换输入论文类别为English
 <<<<<<< HEAD
 
 ## 4. 效果展示
