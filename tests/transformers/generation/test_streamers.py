@@ -28,7 +28,7 @@ from ..test_modeling_common import ids_tensor
 
 class StreamerTester(unittest.TestCase):
     def get_inputs(self, model):
-        input_ids = ids_tensor([1, 5], vocab_size=model.config.vocab_size)
+        input_ids = ids_tensor([1, 5], vocab_size=model.config.vocab_size, dtype="int64")
         attention_mask = paddle.ones_like(input_ids, dtype="bool")
         return {
             "input_ids": input_ids,
