@@ -358,7 +358,13 @@ def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
 
 
 def dybatch_preprocess(
-    tokenizer, texts: list[str], max_length: int, architectures: str, top_p: float, temperature: float
+    tokenizer,
+    texts: list[str],
+    max_length: int,
+    architectures: str,
+    top_p: float,
+    temperature: float,
+    pre_caches_length: int = 0,
 ):
     """Pre-process generation inputs."""
     if "chatglm" in architectures:
@@ -372,7 +378,6 @@ def dybatch_preprocess(
 
         inputs = {}
         pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][0]
-
         inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
         bs = inputs["input_ids"].shape[0]
         max_len = max(map(len, input_ids))
@@ -399,13 +404,16 @@ def dybatch_preprocess(
 
         inputs = {}
         pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][-1]
+        pad_token_id = 0
         inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
         bs = inputs["input_ids"].shape[0]
         max_len = max(map(len, input_ids))
 
-        position_ids = paddle.zeros(shape=[bs, max_len], dtype="int64")
+        position_ids = paddle.zeros(shape=[bs, max_length], dtype="int64")
+
+        # import pdb; pdb.set_trace()
         for i in range(bs):
-            position_ids[i, : seq_len[i]] = paddle.arange(seq_len[i])
+            position_ids[i, pre_caches_length : pre_caches_length + seq_len[i]] = paddle.arange(seq_len[i])
         inputs["position_ids"] = position_ids
 
     tgt_ids = [input[-1:] for input in input_ids]
@@ -448,11 +456,11 @@ def dybatch_preprocess(
         .astype("float32")
     )
     inputs["seq_len_encoder"] = seq_len.astype("int32").reshape(-1, 1)
-    inputs["seq_len_decoder"] = seq_len.astype("int32").reshape(-1, 1)
+    inputs["seq_len_decoder"] = (seq_len + pre_caches_length).astype("int32").reshape(-1, 1)
     inputs["step_idx"] = np.array(step_idx).astype("int64").reshape(-1, 1)
     inputs["tgt_ids"] = np.array(tgt_ids).astype("int64").reshape(-1, 1)
     inputs["tgt_pos"] = tgt_pos.reshape(-1, 1)
-    inputs["max_length"] = np.array(max_length - seq_len).astype("int64").reshape((-1, 1))
+    inputs["max_length"] = np.array(max_length - seq_len - pre_caches_length).astype("int64").reshape((-1, 1))
     inputs["min_length"] = (
         np.array(
             [

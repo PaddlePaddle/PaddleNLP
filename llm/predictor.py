@@ -64,7 +64,7 @@ class PredictorArgument:
         default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
-    batch_size: int = field(default=3, metadata={"help": "The batch size of data."})
+    batch_size: int = field(default=2, metadata={"help": "The batch size of data."})
     max_batch_size: int = field(default=None, metadata={"help": "The max batch size of data during serving."})
     output_ops: str = field(
         default="none", metadata={"help": "the type of output ops, which should be one of [none, save_with_output]"}
@@ -98,6 +98,7 @@ class BasePredictor:
         self.model_config.tensor_parallel_degree = max(1, self.model_config.tensor_parallel_degree)
 
         self.tokenizer = tokenizer
+        self.tokenizer.pad_token = 2
         self.return_tensors = "pd"
         self._init_dist_env()
 
@@ -287,6 +288,21 @@ class InferencePredictorMixin:
         )
         self.arange_tensor_encoder = paddle.zeros(shape=(config.batch_size, 1, config.max_length), dtype=self.dtype)
 
+        if config.prefix_path:
+            prefix_cache = paddle.to_tensor(np.load(f"{config.prefix_path}/pre_caches.npy")).unsqueeze(2)
+            num_layers = self.model_config.num_hidden_layers
+            num_attention_heads = self.model_config.num_attention_heads
+            head_dim = self.model_config.hidden_size // num_attention_heads
+            prefix_cache = paddle.expand(
+                prefix_cache, [num_layers, 2, config.batch_size, num_attention_heads, prefix_cache.shape[-2], head_dim]
+            )
+            # prefix_cache = paddle.rand(shape=[32, 3, 32, 4, 128])
+            print("prefix_cache", prefix_cache[0])
+            # TODO(wj-Mcat): support more model of fetching `num_hidden_layers`
+
+            self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, num_layers, axis=0)]
+            # import pdb;pdb.set_trace()
+
     def _postprocess(self, predictions):
         if paddle.distributed.get_rank() == 0:
             tokens: np.ndarray = load_real_time_tokens()
@@ -378,6 +394,9 @@ class InferencePredictorMixin:
             )
 
         else:
+            pre_caches_length = 0 if self.config.prefix_path is None else self.pre_caches[0].shape[-2]
+            print("pre_caches_length", pre_caches_length)
+
             inputs = dybatch_preprocess(
                 self.tokenizer,
                 source,
@@ -385,17 +404,35 @@ class InferencePredictorMixin:
                 self.architectures,
                 top_p=self.config.top_p,
                 temperature=self.config.temperature,
+                pre_caches_length=pre_caches_length,
             )
+
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = paddle.tril(
                     paddle.ones(shape=(length, length), dtype="float16")
                 )
-                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype="float16")
+
+                if pre_caches_length > 0:
+                    prefix_attention_mask = paddle.ones(
+                        [1, length, pre_caches_length], dtype=self.attention_mask.dtype
+                    )
+                    post_attention_mask = paddle.tril(
+                        paddle.ones(shape=(length, length), dtype=self.attention_mask.dtype)
+                    ).unsqueeze_(axis=0)
+                    self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
+                        [prefix_attention_mask, post_attention_mask], axis=2
+                    )
+
+                self.tgt_generation_mask[i, 0, 0, : length + pre_caches_length] = paddle.ones(
+                    shape=[1, length + pre_caches_length], dtype="float16"
+                )
 
         inputs["pre_ids"] = self.pre_ids
         inputs["attention_mask"] = self.attention_mask
         inputs["tgt_generation_mask"] = self.tgt_generation_mask
+        if self.config.prefix_path:
+            inputs["pre_caches"] = self.pre_caches
         return inputs
 
 
@@ -612,6 +649,7 @@ def create_predictor(
                 model = LlamaForCausalLMInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
+                cache_kvs_shape = LlamaForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
                 model.eval()
             elif "chatglm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
@@ -625,6 +663,9 @@ def create_predictor(
                     predictor_args.model_name_or_path,
                     config=config,
                     dtype=predictor_args.dtype,
+                )
+                cache_kvs_shape = ChatGLMForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size
                 )
                 model.eval()
             elif "bloom" in config.architectures[0].lower():
@@ -709,11 +750,11 @@ def predict():
                 target_texts.append(example["tgt"])
     else:
         source_texts = [
-            "My name is",
-            "Today is",
-            "中国的首都在哪里",
+            # "类型#裙*材质#针织*颜色#纯色*风格#复古*风格#文艺*风格#简约*图案#格子*图案#纯色*图案#复古*裙型#背带裙*裙长#连衣裙*裙领型",
+            "类型#上衣*材质#牛仔布*颜色#白色*风格#简约*图案#刺绣*衣样式#外套*衣款式#破洞",
+            "类型#上衣*风格#嘻哈*图案#卡通*图案#印花*图案#撞色*衣样式#卫衣*衣款式#连帽",
         ]
-        target_texts = ["", "", ""]
+        target_texts = ["", ""]
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)

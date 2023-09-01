@@ -390,6 +390,8 @@ class FusedMultiTransformer(Layer):
         padding_offset=None,
         attn_mask=None,
         caches=None,
+        pre_caches=None,
+        pre_caches_length=0,
         rotary_embs=None,
         rotary_emb_dims=0,
         seq_lens=None,
@@ -434,13 +436,14 @@ class FusedMultiTransformer(Layer):
             assert len(caches) == len(self.qkv_weights)
         bias_residual_input = src
         ln_out = src
+
         for i in range(len(caches)):
             if self.normalize_before is True:
                 # layernorm
                 if i == 0:
                     ln_out = self.norm_func(
                         src, self.ln_scales[i], self.ln_biases[i], self._epsilon, begin_norm_axis=1
-                    )
+                    )[0]
 
             # qkv compute
             qkv_out = self.linear(ln_out, self.qkv_weights[i], self.qkv_biases[i], transpose_weight=True)
@@ -455,6 +458,7 @@ class FusedMultiTransformer(Layer):
                 q_out, k_out, v_out = qkv_transpose_split(
                     qkv_out, padding_offset, seq_lens, input_ids, self.num_heads // self.nranks, self.head_dim
                 )
+                # import pdb; pdb.set_trace()
 
                 if rotary_embs is not None:
                     # rotary emb (inplace)
@@ -467,11 +471,22 @@ class FusedMultiTransformer(Layer):
                         use_neox=self.use_neox_rotary_style,
                     )
                 # write cache kv (inplace)
-                write_cache_kv(k_out, v_out, caches[i], seq_lens)
+                if pre_caches is not None:
+                    k_out = paddle.concat([pre_caches[i][0], k_out], axis=2)
+                    v_out = paddle.concat([pre_caches[i][1], v_out], axis=2)
+
+                write_cache_kv(k_out, v_out, caches[i], seq_lens + pre_caches_length)
 
                 # cutlass fmha
+                # import pdb; pdb.set_trace()
                 qktv_out = variable_length_memory_efficient_attention(
-                    q_out, k_out, v_out, seq_lens, seq_lens, mask=attn_mask, scale=float(self.head_dim**-0.5)
+                    q_out,
+                    k_out,
+                    v_out,
+                    seq_lens,
+                    seq_lens + pre_caches_length,
+                    mask=attn_mask,
+                    scale=float(self.head_dim**-0.5),
                 )
 
                 fmha_out = transpose_remove_padding(qktv_out, seq_lens, padding_offset)

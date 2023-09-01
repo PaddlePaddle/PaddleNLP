@@ -103,6 +103,7 @@ class GenerationInferenceModel(GenerationMixin):
         tgt_generation_mask=None,
         pre_ids=None,
         stop_nums=None,
+        pre_caches=None,
         cache_kvs=[],
         **model_kwargs,
     ):
@@ -124,6 +125,7 @@ class GenerationInferenceModel(GenerationMixin):
         model_kwargs["penalty_score"] = penalty_score
         model_kwargs["frequency_score"] = frequency_score
         model_kwargs["presence_score"] = presence_score
+        model_kwargs["pre_caches"] = pre_caches
 
         ret = self.sample(
             input_ids,
