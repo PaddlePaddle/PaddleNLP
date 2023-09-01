@@ -233,10 +233,10 @@ class GenerationTesterMixin:
         with paddle.no_grad():
             output_generate = model.generate(
                 input_ids,
+                attention_mask=attention_mask,
                 generation_config=GenerationConfig(
                     max_length=max_length,
                     decode_strategy="greedy_search",
-                    attention_mask=attention_mask,
                     **logits_process_kwargs,
                 ),
             )
@@ -275,11 +275,11 @@ class GenerationTesterMixin:
         with paddle.no_grad():
             output_generate = model.generate(
                 input_ids,
+                attention_mask=attention_mask,
                 generation_config=GenerationConfig(
                     max_length=max_length,
                     decode_strategy="sampling",
                     num_return_sequences=num_return_sequences,
-                    attention_mask=attention_mask,
                     top_k=1,
                     **process_kwargs,
                 ),
@@ -329,9 +329,9 @@ class GenerationTesterMixin:
         with paddle.no_grad():
             output_generate = model.generate(
                 input_ids,
+                attention_mask=attention_mask,
                 generation_config=GenerationConfig(
                     decode_strategy="beam_search",
-                    attention_mask=attention_mask,
                     max_length=max_length,
                     **beam_kwargs,
                     **logits_process_kwargs,
@@ -387,9 +387,9 @@ class GenerationTesterMixin:
         with paddle.no_grad():
             output_generate = model.generate(
                 input_ids,
+                attention_mask=attention_mask,
                 generation_config=GenerationConfig(
                     decode_strategy="beam_search",
-                    attention_mask=attention_mask,
                     max_length=max_length,
                     **beam_kwargs,
                     **logits_process_kwargs,
