@@ -184,7 +184,7 @@ class AutoEngine(BasicEngine):
                 fetch_list = []
 
             final_loss = None
-            if use_new_executor:
+            if use_new_executor():
                 batches = self._validate_batch(batch)
                 for micro_batch in batches:
                     with paddle.profiler.utils._nvprof_range(iter_id=step, start=self.nvprof_start, end=self.nvprof_end):
@@ -371,7 +371,7 @@ class AutoEngine(BasicEngine):
                 convert_timestamp_to_data(get_timestamp() - train_start)
             )
         )
-        if valid_data_loader and not use_new_executor:
+        if valid_data_loader and not use_new_executor():
             valid_data_loader._inner_dataloader.reset()
 
         if self.profiler:
@@ -381,7 +381,7 @@ class AutoEngine(BasicEngine):
 
         valid_data_loader = None
         if valid_dataset:
-            if use_new_executor:
+            if use_new_executor():
                 valid_data_loader = self._auto_engine.dataloader(
                     dataset=valid_dataset,
                     batch_size=self._global_batch_size,
@@ -452,7 +452,7 @@ class AutoEngine(BasicEngine):
 
         test_data_loader = None
         if test_dataset:
-            if use_new_executor:
+            if use_new_executor():
                 test_data_loader = self._auto_engine.dataloader(
                     dataset=test_dataset,
                     batch_size=self._global_batch_size,
