@@ -546,7 +546,7 @@ class Ernie35Attention(nn.Layer):
                 attention_mask,
                 position_ids,
                 output_attentions,
-                use_reentrant=False,
+                use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
             attn_output, attn_weights, past_key_value = _rope_attn(

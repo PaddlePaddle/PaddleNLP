@@ -778,7 +778,7 @@ class LlamaAttention(nn.Layer):
                 output_attentions,
                 alibi,
                 self.sequence_parallel,
-                use_reentrant=False,
+                use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
             outputs = scaled_dot_product_attention(
@@ -820,6 +820,7 @@ class LlamaAttention(nn.Layer):
 class LlamaDecoderLayer(nn.Layer):
     def __init__(self, config, layerwise_recompute: bool = False):
         super().__init__()
+        self.config = config
         self.hidden_size = config.hidden_size
         self.self_attn = LlamaAttention(config, layerwise_recompute)
         self.mlp = LlamaMLP(config)
@@ -877,7 +878,7 @@ class LlamaDecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
-                use_reentrant=False,
+                use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
             outputs = self.self_attn(
@@ -1150,7 +1151,7 @@ class LlamaModel(LlamaPretrainedModel):
             past_key_value,
             use_cache,
             alibi,
-            use_reentrant=False,
+            use_reentrant=self.config.recompute_use_reentrant,
         )
 
         return hidden_states

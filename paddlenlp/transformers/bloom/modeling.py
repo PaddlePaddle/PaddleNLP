@@ -764,6 +764,7 @@ class BloomModel(BloomPreTrainedModel):
 
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
+        self.config = config
         self.embed_dim = config.hidden_size
         self.n_head = config.n_head
 
@@ -846,7 +847,7 @@ class BloomModel(BloomPreTrainedModel):
             use_cache,
             output_attentions,
             alibi,
-            use_reentrant=False,
+            use_reentrant=self.config.recompute_use_reentrant,
         )
         return hidden_states
 
