@@ -32,6 +32,18 @@ from ppfleetx.utils.log import convert_timestamp_to_data, get_timestamp, logger
 from ppfleetx.utils.version import version_check
 
 
+def use_new_executor():
+    new_executor_micro_batching = os.environ.get(
+        'FLAGS_new_executor_micro_batching', None)
+    return new_executor_micro_batching in [
+        1,
+        '1',
+        True,
+        'True',
+        'true',
+    ]
+
+
 class AutoEngine(BasicEngine):
     def __init__(self, configs, module=None, mode="train"):
         super().__init__()
@@ -41,17 +53,22 @@ class AutoEngine(BasicEngine):
         loss_fn = None
 
         if module and not isinstance(module, BasicModule):
-            raise TypeError("'module' must be sub classes of `BasicModule`, but got: {model.__class__.__name__}.")
+            raise TypeError(
+                "'module' must be sub classes of `BasicModule`, but got: {model.__class__.__name__}."
+            )
 
         if module:
-            if module.model and not isinstance(module.model, nn.Layer) and not callable(module.model):
+            if module.model and not isinstance(
+                    module.model, nn.Layer) and not callable(module.model):
                 raise TypeError(
                     "'model' must be sub classes of `paddle.nn.Layer` or any callable function, but got: {module.model.__class__.__name__}."
                 )
             model = module.model
 
             if mode == "train":
-                if module.loss_fn and not isinstance(module.loss_fn, nn.Layer) and not callable(module.loss_fn):
+                if module.loss_fn and not isinstance(
+                        module.loss_fn,
+                        nn.Layer) and not callable(module.loss_fn):
                     raise TypeError(
                         "'loss_fn' must be sub classes of `paddle.nn.Layer` or any callable function, but got: {module.loss_fn.__class__.__name__}."
                     )
@@ -73,7 +90,8 @@ class AutoEngine(BasicEngine):
         self._configs = configs["Engine"]
 
         self._run_mode = self._configs.get("run_mode", "step")
-        assert self._run_mode in ["epoch", "step"], "run_mode must be epoch or step"
+        assert self._run_mode in ["epoch", "step"
+                                  ], "run_mode must be epoch or step"
 
         self._max_steps = self._configs["max_steps"]
         self._eval_freq = self._configs["eval_freq"]
@@ -92,42 +110,57 @@ class AutoEngine(BasicEngine):
 
         # lr_scheduler and optimizer
         if mode == "train":
-            self._use_increments = configs.Optimizer.lr.pop("use_increments", False)
-            self._lr_scheduler_mode = configs.Optimizer.lr.pop("run_mode", "step")
-            assert self._lr_scheduler_mode in ["epoch", "step"], "lr.run_mode must be epoch or step"
-        self._lr_scheduler = build_lr_scheduler(configs.Optimizer.lr) if mode == "train" else None
+            self._use_increments = configs.Optimizer.lr.pop("use_increments",
+                                                            False)
+            self._lr_scheduler_mode = configs.Optimizer.lr.pop("run_mode",
+                                                               "step")
+            assert self._lr_scheduler_mode in [
+                "epoch", "step"
+            ], "lr.run_mode must be epoch or step"
+        self._lr_scheduler = build_lr_scheduler(
+            configs.Optimizer.lr) if mode == "train" else None
         self._optimizer = (
-            build_optimizer(configs.Optimizer, model, self._lr_scheduler) if mode == "train" else None
-        )
+            build_optimizer(configs.Optimizer, model, self._lr_scheduler)
+            if mode == "train" else None)
 
         # init engine
-        self._auto_engine = auto.Engine(model, loss_fn, self._optimizer, strategy=self._strategy)
+        self._auto_engine = auto.Engine(
+            model, loss_fn, self._optimizer, strategy=self._strategy)
 
         # using for save/load
         self._load_recovery = {"step": 0, "epoch": 0}
 
         self.profiler = None
-        if "Profiler" in configs and configs.get("Profiler", {}).get("enable", False):
+        if "Profiler" in configs and configs.get("Profiler", {}).get("enable",
+                                                                     False):
             self.profiler_config = configs["Profiler"]
 
             scheduler = self.profiler_config.get("scheduler", None)
-            profiler_log = self.profiler_config.get("profiler_log", "./profiler_log")
+            profiler_log = self.profiler_config.get("profiler_log",
+                                                    "./profiler_log")
             record_shapes = self.profiler_config.get("record_shapes", True)
             profile_memory = self.profiler_config.get("profile_memory", True)
             self.profiler = paddle.profiler.Profiler(
-                targets=[paddle.profiler.ProfilerTarget.CPU, paddle.profiler.ProfilerTarget.GPU],
+                targets=[
+                    paddle.profiler.ProfilerTarget.CPU,
+                    paddle.profiler.ProfilerTarget.GPU
+                ],
                 scheduler=scheduler,
-                on_trace_ready=paddle.profiler.export_chrome_tracing(profiler_log),
+                on_trace_ready=paddle.profiler.export_chrome_tracing(
+                    profiler_log),
                 record_shapes=record_shapes,
-                profile_memory=profile_memory,
-            )
+                profile_memory=profile_memory, )
             self.profiler.start()
-            logger.warning("Profiler is enabled, do not enable it in production.")
+            logger.warning(
+                "Profiler is enabled, do not enable it in production.")
 
         # Profiler_auto configs
-        self.memory_stats = configs.get("Profiler_auto", {}).get("memory_stats", False)
-        self.nvprof_start = configs.get("Profiler_auto", {}).get("nvprof_start", -1)
-        self.nvprof_end = configs.get("Profiler_auto", {}).get("nvprof_end", -1)
+        self.memory_stats = configs.get("Profiler_auto", {}).get(
+            "memory_stats", False)
+        self.nvprof_start = configs.get("Profiler_auto", {}).get(
+            "nvprof_start", -1)
+        self.nvprof_end = configs.get("Profiler_auto", {}).get("nvprof_end",
+                                                               -1)
 
     def _validate_batch(self, batch):
         if self._pp_degree > 1 or self._accumulate_steps == 1:
@@ -137,22 +170,31 @@ class AutoEngine(BasicEngine):
             split_batches = []
             for n, b in batch[0].items():
                 feed_names.append(n)
-                split_batches.append(np.split(np.array(b), self._accumulate_steps, 0))
+                split_batches.append(
+                    np.split(np.array(b), self._accumulate_steps, 0))
             batches = []
             for i in range(len(split_batches[0])):
                 micro_batch = [split_batch[i] for split_batch in split_batches]
                 batches.append(dict(zip(feed_names, micro_batch)))
         return batches
 
-    def _train_one_epoch(self, epoch_index, train_data_loader=None, valid_data_loader=None):
+    def _train_one_epoch(self,
+                         epoch_index,
+                         train_data_loader=None,
+                         valid_data_loader=None):
 
         train_losses = []
         train_step_start = get_timestamp()
         skip_first = True
 
-        total_train_batch = self._max_steps if self._run_mode == "step" else len(train_data_loader)
+        total_train_batch = self._max_steps if self._run_mode == "step" else len(
+            train_data_loader)
         total_train_step = self._max_steps if self._run_mode == "step" else total_train_batch * self._num_train_epochs
-        total_eval_batch = len(valid_data_loader) if valid_data_loader is not None else 0
+        if use_new_executor():
+            total_eval_batch = len(
+                valid_data_loader) if valid_data_loader is not None else 0
+        else:
+            total_eval_batch = valid_data_loader._steps if valid_data_loader is not None else 0
         valid_data_loader = valid_data_loader if valid_data_loader is not None else None
         eval_finished_step = 0
 
@@ -163,23 +205,47 @@ class AutoEngine(BasicEngine):
                 if step < self._load_recovery["step"]:
                     continue
 
-            batches = self._validate_batch(batch)
-
             fetch_list = None
             if self._strategy.amp.enable:
                 # fetch_list = ["find_infinite_scale.tmp_0", "loss_scaling_0"]
                 fetch_list = []
 
             final_loss = None
-            for micro_batch in batches:
-                with paddle.profiler.utils._nvprof_range(iter_id=step, start=self.nvprof_start, end=self.nvprof_end):
-                    outs = self._auto_engine.run(micro_batch, fetch_list=fetch_list, mode="train")
-                # pp: some devices don't have loss in outs
-                if "loss" in outs:
-                    if final_loss is None:
-                        final_loss = np.sum(outs["loss"])
-                    else:
-                        final_loss += np.sum(outs["loss"])
+            if use_new_executor:
+                batches = self._validate_batch(batch)
+                for micro_batch in batches:
+                    with paddle.profiler.utils._nvprof_range(
+                            iter_id=step,
+                            start=self.nvprof_start,
+                            end=self.nvprof_end):
+                        outs = self._auto_engine.run(micro_batch,
+                                                     fetch_list=fetch_list,
+                                                     mode="train")
+                    # pp: some devices don't have loss in outs
+                    if "loss" in outs:
+                        if final_loss is None:
+                            final_loss = np.sum(outs["loss"])
+                        else:
+                            final_loss += np.sum(outs["loss"])
+            else:
+                if self._pp_degree == 1 and self._accumulate_steps > 1:  # gradient merge
+                    local_steps = self._accumulate_steps
+                else:
+                    local_steps = 1
+                for _ in range(local_steps):
+                    with paddle.profiler.utils._nvprof_range(
+                            iter_id=step,
+                            start=self.nvprof_start,
+                            end=self.nvprof_end):
+                        outs = self._auto_engine.run(batch,
+                                                     fetch_list=fetch_list,
+                                                     mode="train")
+                    # pp: some devices don't have loss in outs
+                    if "loss" in outs:
+                        if final_loss is None:
+                            final_loss = np.sum(outs["loss"])
+                        else:
+                            final_loss += np.sum(outs["loss"])
 
             if final_loss is not None and self._accumulate_steps > 1:
                 final_loss /= self._accumulate_steps
@@ -188,7 +254,9 @@ class AutoEngine(BasicEngine):
                 train_losses.append(final_loss)
 
             if self._lr_scheduler is not None and self._lr_scheduler_mode == "step":
-                self._auto_engine.optimizer._learning_rate.step(epoch=self._global_batch_size if self._use_increments else None)
+                self._auto_engine.optimizer._learning_rate.step(
+                    epoch=self._global_batch_size
+                    if self._use_increments else None)
 
             if (step + 1) % self._logging_freq == 0:
                 train_step_cost = get_timestamp() - train_step_start
@@ -199,21 +267,32 @@ class AutoEngine(BasicEngine):
                     "batch": step,
                     "total_batch": total_train_batch,
                     "total_step": total_train_step,
-                    "train_cost": train_step_cost if step == 0 else train_step_cost / self._logging_freq,
+                    "train_cost": train_step_cost
+                    if step == 0 else train_step_cost / self._logging_freq,
                     "lr": self._auto_engine.optimizer.get_lr(),
-                    "found_inf": 0, # if self._strategy.amp.enable outs["fetches"]["find_infinite_scale.tmp_0"]
+                    "found_inf":
+                    0,  # if self._strategy.amp.enable outs["fetches"]["find_infinite_scale.tmp_0"]
                     "dp_world_size": self._auto_engine._dp_world_sizes[0]
                 }
                 if len(train_losses) > 0:
                     log_dict["loss"] = sum(numpy_losses) / len(numpy_losses)
                 if self._strategy.amp.enable:
-                    log_dict["loss_scale"] = self._strategy.amp.init_loss_scaling  # outs["fetches"]["loss_scaling_0"]
+                    log_dict[
+                        "loss_scale"] = self._strategy.amp.init_loss_scaling  # outs["fetches"]["loss_scaling_0"]
                 if self.memory_stats:
                     # convert from Byte to MB
-                    log_dict["max_memory_allocated"] = paddle.device.cuda.max_memory_allocated() / (1024**2)
-                    log_dict["max_memory_reserved"] = paddle.device.cuda.max_memory_reserved() / (1024**2)
-                    log_dict["memory_allocated"] = paddle.device.cuda.memory_allocated() / (1024**2)
-                    log_dict["memory_reserved"] = paddle.device.cuda.memory_reserved() / (1024**2)
+                    log_dict[
+                        "max_memory_allocated"] = paddle.device.cuda.max_memory_allocated(
+                        ) / (1024**2)
+                    log_dict[
+                        "max_memory_reserved"] = paddle.device.cuda.max_memory_reserved(
+                        ) / (1024**2)
+                    log_dict[
+                        "memory_allocated"] = paddle.device.cuda.memory_allocated(
+                        ) / (1024**2)
+                    log_dict[
+                        "memory_reserved"] = paddle.device.cuda.memory_reserved(
+                        ) / (1024**2)
                 self._module.training_step_end(log_dict)
 
                 train_step_start = get_timestamp()
@@ -244,7 +323,8 @@ class AutoEngine(BasicEngine):
                         "eval_cost": eval_step_cost / self._logging_freq,
                     }
                     if len(eval_losses) > 0:
-                        log_dict["loss"] = sum(numpy_losses) / len(numpy_losses)
+                        log_dict["loss"] = sum(numpy_losses) / len(
+                            numpy_losses)
                     self._module.validation_step_end(log_dict)
 
                 if self._save_steps > 0 and step % self._save_steps == 0:
@@ -267,31 +347,50 @@ class AutoEngine(BasicEngine):
 
         train_data_loader, valid_data_loader = None, None
         if train_dataset:
-            train_data_loader = self._auto_engine.dataloader(
-                dataset=train_dataset,
-                batch_size=self._global_batch_size,
-                steps_per_epoch=self._max_steps,
-                epochs=self._num_train_epochs,
-                collate_fn=train_dataset.collate_fn,
-                num_workers=1,
-                sample_split=train_dataset.sample_split,
-                mode="train",
-            )
+            if use_new_executor():
+                train_data_loader = self._auto_engine.dataloader(
+                    dataset=train_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=train_dataset.collate_fn,
+                    num_workers=1,
+                    sample_split=train_dataset.sample_split,
+                    mode="train", )
+            else:
+                train_data_loader = self._auto_engine.dataloader_from_generator(
+                    dataset=train_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=train_dataset.collate_fn,
+                    sample_split=train_dataset.sample_split,
+                    mode="train", )
         if valid_dataset and self._eval_freq <= self._max_steps:
-            valid_data_loader = self._auto_engine.dataloader(
-                dataset=valid_dataset,
-                batch_size=self._global_batch_size,
-                steps_per_epoch=self._max_steps,
-                epochs=self._num_train_epochs,
-                collate_fn=valid_dataset.collate_fn,
-                num_workers=1,
-                sample_split=valid_dataset.sample_split,
-                mode="eval",
-            )
+            if use_new_executor():
+                valid_data_loader = self._auto_engine.dataloader(
+                    dataset=valid_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=valid_dataset.collate_fn,
+                    num_workers=1,
+                    sample_split=valid_dataset.sample_split,
+                    mode="eval", )
+            else:
+                valid_data_loader = self._auto_engine.dataloader_from_generator(
+                    dataset=valid_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=valid_dataset.collate_fn,
+                    sample_split=valid_dataset.sample_split,
+                    mode="eval", )
 
         for epoch_index in range(start_epoch, epoch):
             train_epoch_start = get_timestamp()
-            self._train_one_epoch(epoch_index, train_data_loader, valid_data_loader)
+            self._train_one_epoch(epoch_index, train_data_loader,
+                                  valid_data_loader)
             train_epoch_cost = get_timestamp() - train_epoch_start
             log_dict = {
                 "epoch": epoch_index,
@@ -316,10 +415,10 @@ class AutoEngine(BasicEngine):
                 self.save(epoch=epoch_index, step=len(train_data_loader))
 
         logger.info(
-            "The training process is complete and total cost of time for training is : {}".format(
-                convert_timestamp_to_data(get_timestamp() - train_start)
-            )
-        )
+            "The training process is complete and total cost of time for training is : {}".
+            format(convert_timestamp_to_data(get_timestamp() - train_start)))
+        if valid_data_loader and not use_new_executor:
+            valid_data_loader._inner_dataloader.reset()
 
         if self.profiler:
             self._profiler_done()
@@ -328,16 +427,25 @@ class AutoEngine(BasicEngine):
 
         valid_data_loader = None
         if valid_dataset:
-            valid_data_loader = self._auto_engine.dataloader(
-                dataset=valid_dataset,
-                batch_size=self._global_batch_size,
-                steps_per_epoch=self._max_steps,
-                epochs=self._num_train_epochs,
-                collate_fn=valid_dataset.collate_fn,
-                num_workers=1,
-                sample_split=valid_dataset.sample_split,
-                mode="eval",
-            )
+            if use_new_executor:
+                valid_data_loader = self._auto_engine.dataloader(
+                    dataset=valid_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=valid_dataset.collate_fn,
+                    num_workers=1,
+                    sample_split=valid_dataset.sample_split,
+                    mode="eval", )
+            else:
+                valid_data_loader = self._auto_engine.dataloader_from_generator(
+                    dataset=valid_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=valid_dataset.collate_fn,
+                    sample_split=valid_dataset.sample_split,
+                    mode="eval", )
 
         for epoch_index in range(epoch):
             eval_epoch_start = get_timestamp()
@@ -359,9 +467,13 @@ class AutoEngine(BasicEngine):
         eval_step_start = get_timestamp()
         eval_losses = []
         total_eval_batch = len(valid_data_loader)
-        valid_data_loader = valid_data_loader() if valid_data_loader is not None else None
+        valid_data_loader = valid_data_loader(
+        ) if valid_data_loader is not None else None
         for eval_step, batch in enumerate(valid_data_loader):
-            with paddle.profiler.utils._nvprof_range(iter_id=eval_step, start=self.nvprof_start, end=self.nvprof_end):
+            with paddle.profiler.utils._nvprof_range(
+                    iter_id=eval_step,
+                    start=self.nvprof_start,
+                    end=self.nvprof_end):
                 outs = self._auto_engine.run(batch, mode="eval")
             eval_losses.append(outs["loss"])
 
@@ -373,7 +485,8 @@ class AutoEngine(BasicEngine):
                     "epoch": epoch,
                     "batch": eval_step,
                     "total_batch": total_eval_batch,
-                    "eval_cost": eval_step_cost if eval_step == 0 else eval_step_cost / self._logging_freq,
+                    "eval_cost": eval_step_cost
+                    if eval_step == 0 else eval_step_cost / self._logging_freq,
                 }
                 self._module.validation_step_end(log_dict)
                 eval_step_start = get_timestamp()
@@ -388,21 +501,33 @@ class AutoEngine(BasicEngine):
 
         test_data_loader = None
         if test_dataset:
-            test_data_loader = self._auto_engine.dataloader(
-                dataset=test_dataset,
-                batch_size=self._global_batch_size,
-                steps_per_epoch=self._max_steps,
-                epochs=self._num_train_epochs,
-                collate_fn=test_dataset.collate_fn,
-                num_workers=1,
-                sample_split=test_dataset.sample_split,
-                mode="predict",
-            )
+            if use_new_executor:
+                test_data_loader = self._auto_engine.dataloader(
+                    dataset=test_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=test_dataset.collate_fn,
+                    num_workers=1,
+                    sample_split=test_dataset.sample_split,
+                    mode="predict", )
+            else:
+                test_data_loader = self._auto_engine.dataloader_from_generator(
+                    dataset=test_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=test_dataset.collate_fn,
+                    sample_split=test_dataset.sample_split,
+                    mode="predict", )
 
         test_start = get_timestamp()
         test_losses = []
         for test_step, batch in enumerate(test_data_loader):
-            with paddle.profiler.utils._nvprof_range(iter_id=test_step, start=self.nvprof_start, end=self.nvprof_end):
+            with paddle.profiler.utils._nvprof_range(
+                    iter_id=test_step,
+                    start=self.nvprof_start,
+                    end=self.nvprof_end):
                 outs = self._auto_engine.run(batch, mode="predict")
             test_losses.append(outs["loss"])
 
@@ -413,7 +538,8 @@ class AutoEngine(BasicEngine):
                     "loss": sum(test_losses) / len(test_losses),
                     "epoch": epoch,
                     "batch": test_step,
-                    "test_cost": test_cost if test_step == 0 else test_cost / self._logging_freq,
+                    "test_cost": test_cost
+                    if test_step == 0 else test_cost / self._logging_freq,
                 }
                 self._module.test_step_end(log_dict)
                 test_start = get_timestamp()
@@ -429,7 +555,10 @@ class AutoEngine(BasicEngine):
         self.save(training=False)
 
     def tune(self, tune_dataset=None):
-        self._auto_engine._tune(tune_dataset, tune_sample_split=tune_dataset.sample_split, batch_size=self.batch_size)
+        self._auto_engine._tune(
+            tune_dataset,
+            tune_sample_split=tune_dataset.sample_split,
+            batch_size=self.batch_size)
 
     def save(self, training=True):
         if self._output_dir and isinstance(self._output_dir, str):
@@ -452,24 +581,32 @@ class AutoEngine(BasicEngine):
 
         exe = paddle.static.Executor()
 
-        [inference_program, feed_target_names, fetch_targets] = paddle.static.load_inference_model(
-            path_prefix=self._ckpt_dir, executor=exe
-        )
-        feed_targets = [inference_program.global_block().var(name) for name in feed_target_names]
+        [inference_program, feed_target_names,
+         fetch_targets] = paddle.static.load_inference_model(
+             path_prefix=self._ckpt_dir, executor=exe)
+        feed_targets = [
+            inference_program.global_block().var(name)
+            for name in feed_target_names
+        ]
 
         self._auto_engine.prepare(
             inputs=feed_targets,
             main_program=inference_program,
             startup_program=paddle.static.Program(),
-            mode="predict",
-        )
+            mode="predict", )
 
         model_dict = self._auto_engine.main_program.state_dict()
-        for param in list(filter(lambda var: var.persistable, self._auto_engine.main_program.list_vars())):
-            if param.type in [core.VarDesc.VarType.FEED_MINIBATCH, core.VarDesc.VarType.FETCH_LIST]:
+        for param in list(
+                filter(lambda var: var.persistable,
+                       self._auto_engine.main_program.list_vars())):
+            if param.type in [
+                    core.VarDesc.VarType.FEED_MINIBATCH,
+                    core.VarDesc.VarType.FETCH_LIST
+            ]:
                 continue
             if param.dtype != model_dict[param.name]._dtype():
-                model_dict[param.name] = model_dict[param.name]._as_type(param.dtype)
+                model_dict[param.name] = model_dict[param.name]._as_type(
+                    param.dtype)
         self._auto_engine.main_program.set_state_dict(model_dict)
 
         path = os.path.join(self._output_dir, "auto_dist0")
@@ -478,8 +615,7 @@ class AutoEngine(BasicEngine):
             feed_targets,
             fetch_targets,
             exe,
-            program=self._auto_engine.main_program,
-        )
+            program=self._auto_engine.main_program, )
 
         paddle.disable_static()
 
