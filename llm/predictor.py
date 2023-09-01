@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import paddle
+import paddle.distributed.fleet.base.topology as tp
 from paddle.distributed import fleet
 from utils import (
     dybatch_preprocess,
@@ -91,6 +92,28 @@ def batchfy_text(texts, batch_size):
     return batch_texts
 
 
+def init_dist_env():
+    tensor_parallel_degree = paddle.distributed.get_world_size()
+    tensor_parallel_rank = paddle.distributed.get_rank()
+
+    if tensor_parallel_degree > 1:
+        # refer to: https://github.com/PaddlePaddle/Paddle/blob/4abea956ee852ce52791a1e08fa92ed4d3be150d/python/paddle/distributed/fleet/fleet.py#L298C23-L298C45
+        hcg = tp._HYBRID_PARALLEL_GROUP
+        if hcg is None:
+            strategy = fleet.DistributedStrategy()
+            strategy.hybrid_configs = {
+                "dp_degree": 1,
+                "mp_degree": tensor_parallel_degree,
+                "pp_degree": 1,
+                "sharding_degree": 1,
+            }
+            fleet.init(is_collective=True, strategy=strategy)
+            hcg = fleet.get_hybrid_communicate_group()
+
+        tensor_parallel_rank = hcg.get_model_parallel_rank()
+    return tensor_parallel_rank, tensor_parallel_degree
+
+
 class BasePredictor:
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
         self.config: PredictorArgument = config
@@ -99,7 +122,7 @@ class BasePredictor:
 
         self.tokenizer = tokenizer
         self.return_tensors = "pd"
-        self._init_dist_env()
+        self.tensor_parallel_rank, self.tensor_parallel_degree = init_dist_env()
 
     def _preprocess(self, source):
         tokenized_source = self.tokenizer(
@@ -112,24 +135,6 @@ class BasePredictor:
             add_special_tokens=True,
         )
         return tokenized_source
-
-    def _init_dist_env(self):
-        tensor_parallel_degree = paddle.distributed.get_world_size()
-        tensor_parallel_rank = paddle.distributed.get_rank()
-        if tensor_parallel_degree > 1:
-            strategy = fleet.DistributedStrategy()
-            strategy.hybrid_configs = {
-                "dp_degree": 1,
-                "mp_degree": tensor_parallel_degree,
-                "pp_degree": 1,
-                "sharding_degree": 1,
-            }
-            fleet.init(is_collective=True, strategy=strategy)
-            hcg = fleet.get_hybrid_communicate_group()
-            tensor_parallel_rank = hcg.get_model_parallel_rank()
-
-        self.tensor_parallel_rank = tensor_parallel_rank
-        self.tensor_parallel_degree = tensor_parallel_degree
 
     @abstractmethod
     def _infer(self, inputs):
@@ -515,8 +520,7 @@ def create_predictor(
     if isinstance(tokenizer, LlamaTokenizer):
         tokenizer.pad_token = tokenizer.eos_token
 
-    tensor_parallel_degree = paddle.distributed.get_world_size()
-    tensor_parallel_rank = paddle.distributed.get_rank()
+    tensor_parallel_rank, tensor_parallel_degree = init_dist_env()
     if not predictor_args.inference_model:
         if predictor_args.mode == "dynamic":
             if model_args.gpt:

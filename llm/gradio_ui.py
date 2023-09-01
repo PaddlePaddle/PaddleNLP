@@ -53,6 +53,12 @@ def launch(args):
         """Model inference."""
         utterance = utterance.strip().replace("<br>", "\n")
         context = state.setdefault("context", [])
+
+        if not utterance:
+            gr.Warning("请输入有效问题")
+            shown_context = get_shown_context(context)
+            return None, shown_context, context, state
+
         context.append({"role": "user", "utterance": utterance})
         data = {
             "context": utterance,
