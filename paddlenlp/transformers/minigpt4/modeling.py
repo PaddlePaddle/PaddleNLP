@@ -202,8 +202,11 @@ class MiniGPT4VisionEmbeddings(nn.Layer):
         self.num_positions = self.num_patches + 1
 
         self.position_embedding = Parameter(paddle.randn([1, self.num_positions, self.embed_dim]))
+        self.ln_pre = nn.LayerNorm(1280, epsilon=config.layer_norm_eps)
 
     def forward(self, pixel_values: paddle.Tensor) -> paddle.Tensor:
+
+        
         batch_size = pixel_values.shape[0]
         target_dtype = self.patch_embedding.weight.dtype
         patch_embeds = self.patch_embedding(pixel_values)  # shape = [*, width, grid, grid]
@@ -215,6 +218,10 @@ class MiniGPT4VisionEmbeddings(nn.Layer):
         class_embeds = self.class_embedding.expand([batch_size, 1, -1]).cast(target_dtype)
         embeddings = paddle.concat([class_embeds, patch_embeds], axis=1)
         embeddings = embeddings + self.position_embedding[:, : embeddings.shape[1], :].cast(target_dtype)
+
+        
+        embeddings = self.ln_pre(embeddings)
+
         return embeddings
 
 
@@ -305,6 +312,7 @@ class MiniGPT4Attention(nn.Layer):
         return outputs
 
 
+
 class MiniGPT4MLP(nn.Layer):
     def __init__(self, config):
         super().__init__()
@@ -314,8 +322,9 @@ class MiniGPT4MLP(nn.Layer):
         self.fc2 = nn.Linear(config.intermediate_size, config.hidden_size)
 
     def forward(self, hidden_states: paddle.Tensor) -> paddle.Tensor:
+        
         hidden_states = self.fc1(hidden_states)
-        hidden_states = self.activation_fn(hidden_states)
+        hidden_states = hidden_states * paddle.nn.functional.sigmoid(1.702 * hidden_states)
         hidden_states = self.fc2(hidden_states)
         return hidden_states
 
@@ -347,6 +356,7 @@ class MiniGPT4EncoderLayer(nn.Layer):
         """
         residual = hidden_states
 
+        # import pdb;pdb.set_trace()
         hidden_states = self.layer_norm1(hidden_states)
         hidden_states, attn_weights = self.self_attn(
             hidden_states=hidden_states,
@@ -356,6 +366,7 @@ class MiniGPT4EncoderLayer(nn.Layer):
         hidden_states = hidden_states + residual
         residual = hidden_states
         hidden_states = self.layer_norm2(hidden_states)
+        
         hidden_states = self.mlp(hidden_states)
 
         hidden_states = hidden_states + residual
@@ -443,7 +454,7 @@ class MiniGPT4Encoder(nn.Layer):
                     attention_mask,
                     output_attentions=output_attentions,
                 )
-
+            import pdb;pdb.set_trace()
             hidden_states = layer_outputs[0]
 
             if output_attentions:
@@ -1388,6 +1399,7 @@ class MiniGPT4Model(MiniGPT4PretrainedModel):
         # step 1: forward the images through the vision encoder,
         # to get image embeddings of shape (batch_size, seq_len, hidden_size)
         pixel_values = paddle.cast(pixel_values, self.vision_model.embeddings.patch_embedding.weight.dtype)
+        
         vision_outputs = self.vision_model(pixel_values, return_dict=True)
         image_embeds = vision_outputs.last_hidden_state
         image_attention_mask = paddle.ones(image_embeds.shape[:-1], dtype="int64")

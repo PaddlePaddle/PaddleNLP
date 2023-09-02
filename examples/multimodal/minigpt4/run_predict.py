@@ -14,6 +14,8 @@
 
 import argparse
 import os
+import numpy as np
+import paddle
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["FLAGS_use_cuda_managed_memory"] = "true"
@@ -37,6 +39,17 @@ def predict(args):
     text = "describe this image"
     prompt = "Give the following image: <Img>ImageContent</Img>. You will be able to see the image once I provide it to you. Please answer my questions.###Human: <Img><ImageHere></Img> <TextHere>###Assistant:"
     inputs = processor([image], text, prompt)
+
+
+    path_data = "/root/paddlejob/workspace/env_run/zhengshifeng/vitllm/LAVIS_to_onnx/models_bk/test_data/input_and_output_xiaohongshu.npz"
+    vit_data = np.load(path_data, allow_pickle=True)
+    vit_inputs = vit_data["input"]
+    vit_outputs = vit_data["output"]
+    vit_image = vit_inputs[0]["image"].detach().numpy()
+    inputs["pixel_values"] = paddle.to_tensor(vit_image)
+    print("inputs", inputs)
+
+    # import pdb;pdb.set_trace()
 
     # generate with MiniGPT4
     # breakpoint
