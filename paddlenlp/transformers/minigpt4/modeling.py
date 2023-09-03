@@ -1474,7 +1474,76 @@ class MiniGPT4Model(MiniGPT4PretrainedModel):
             language_model_outputs=outputs,
         )
 
-class PerceiverResampler(MiniGPT4PretrainedModel):
+def FeedForward(dim, mult = 4):
+    inner_dim = int(dim * mult)
+    return nn.Sequential(
+        nn.LayerNorm(dim),
+        nn.Linear(dim, inner_dim, bias_attr = False),
+        nn.GELU(),
+        nn.Linear(inner_dim, dim, bias_attr = False)
+    )
+
+class PerceiverAttention(nn.Layer):
+    def __init__(
+        self,
+        dim,
+        dim_head = 64,
+        heads = 8,
+    ):
+        super().__init__()
+        self.scale = dim_head ** -0.5
+        self.heads = heads
+        inner_dim = dim_head * heads
+
+        self.norm_media = nn.LayerNorm(dim)
+        self.norm_latents = nn.LayerNorm(dim)
+        self.to_q = nn.Linear(dim, inner_dim, bias_attr = False)
+        self.to_kv = nn.Linear(dim, inner_dim * 2, bias_attr = False)
+        self.to_out = nn.Linear(inner_dim, dim, bias_attr = False)
+
+        
+
+    def forward(self, x, latents):
+        
+        x = self.norm_media(x)
+        latents = self.norm_latents(latents)
+        b = 1
+        m = 1
+        h = 8
+        # torch.Size([7, 1, 64, 1280])
+        q = self.to_q(latents)
+        # latents size1: torch.Size([7, 1, 64, 1280])
+        # x size: torch.Size([7, 1, 1226, 1280])
+        
+        # kv_input = torch.cat((x, latents), dim = -2)
+        kv_input = paddle.concat([x, latents], axis=-2)
+        
+        # kv_input size: torch.Size([7, 1, 1290, 1280])
+
+        k, v = self.to_kv(kv_input).chunk(2, axis=-1)
+        # k,v size: torch.Size([7, 1, 1290, 512]) torch.Size([7, 1, 1290, 512])
+
+        import pdb;pdb.set_trace()
+        q = q.reshape([b, 1, 64, 8, 64]).transpose([0, 3, 1, 2, 4])
+        k = k.reshape([b, 1, 321, 8, 64]).transpose([0, 3, 1, 2, 4])
+        v = v.reshape([b, 1, 321, 8, 64]).transpose([0, 3, 1, 2, 4])
+
+        # q, k, v = rearrange_many((q, k, v), 'b t n (h d) -> b h t n d', h = h)
+        # torch.Size([7, 8, 1, 64, 64]) torch.Size([7, 8, 1, 1290, 64]) torch.Size([7, 8, 1, 1290, 64])
+        
+        q = q * self.scale
+
+        # attention
+        sim = paddle.matmul(q, k, transpose_y=True)
+
+        sim = sim - sim.amax(axis = -1, keepdim = True)
+        attn = F.softmax(sim)
+
+        out = paddle.matmul(attn, v)
+        out = out.transpose([0, 2, 3, 1, 4]).reshape([1, 1, 64, 512])
+        return self.to_out(out)
+
+class PerceiverResampler(nn.Layer):
     def __init__(
         self,
         dim,
@@ -1484,32 +1553,27 @@ class PerceiverResampler(MiniGPT4PretrainedModel):
         num_latents = 64,
         num_media_embeds = 4,
         ff_mult = 4,
-        is_train = True
     ):
         super().__init__()
         self.latents = Parameter(paddle.randn([num_latents, dim]))
         self.media_pos_emb = Parameter(paddle.randn([num_media_embeds, 1, dim]))
 
-        self.layers = nn.ModuleList([])
+        self.layers = nn.LayerList()
         for _ in range(depth):
-            self.layers.append(nn.ModuleList([
-                PerceiverAttention(dim = dim, dim_head = dim_head, heads = heads, is_train=is_train),
-                FeedForward(dim = dim, mult = ff_mult, is_train=is_train)
+            self.layers.append(nn.LayerList([
+                PerceiverAttention(dim = dim, dim_head = dim_head, heads = heads),
+                FeedForward(dim = dim, mult = ff_mult)
             ]))
-        if is_train:
-            self.norm = LayerNorm(dim)
-        else:
-            self.norm = nn.LayerNorm(dim)
+        self.norm = nn.LayerNorm(dim)
 
     def forward(self, x):
-        import pdb;pdb.set_trace()
-        if x.ndim == 3:
-            x = rearrange(x, 'b n d -> b 1 n d')
+        
+        # if x.ndim == 3:
+        x = x.unsqueeze(0)
 
         times = x.shape[1]
         x = x + self.media_pos_emb[:times]
-
-        latents = repeat(self.latents, 'n d -> b m n d', b = x.shape[0], m = x.shape[1])
+        latents = self.latents.reshape([1, 1, 64, 1280])
 
         for attn, ff in self.layers:
             latents = attn(x, latents) + latents
@@ -1528,6 +1592,14 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
 
         self.query_tokens = Parameter(paddle.zeros([1, config.num_query_tokens, config.qformer_config.hidden_size]))
         self.qformer = MiniGPT4QFormerModel(config.qformer_config)
+        self.resampler = PerceiverResampler(
+            dim = 1280,
+            depth = 6,
+            dim_head = 64,
+            heads = 8,
+            num_latents = 64,
+            num_media_embeds = 1226, 
+        )
         self.language_projection = nn.Linear(config.qformer_config.hidden_size, config.text_config.hidden_size)
         self.language_model = LlamaForCausalLM(config.text_config)
 
@@ -1684,7 +1756,7 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
         image_embeds = vision_outputs.last_hidden_state
         image_attention_mask = paddle.ones(image_embeds.shape[:-1], dtype="int64")
 
-
+        query_outputs = self.resampler(image_embeds.cast("float32"))
 
         import pdb;pdb.set_trace()
         # step 2: forward the query tokens through the QFormer, using the image embeddings for cross-attention

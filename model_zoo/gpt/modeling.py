@@ -692,7 +692,7 @@ class GPTModel(GPTPretrainedModel):
 
         self.embeddings = GPTEmbeddings(config)
 
-        decoder_layers = nn.LayerList()
+        decoder_layers = ()
         for i in range(config.num_hidden_layers):
             decoder_layers.append(TransformerDecoderLayer(config))
 
