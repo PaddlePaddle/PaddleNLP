@@ -356,20 +356,24 @@ class MiniGPT4EncoderLayer(nn.Layer):
         """
         residual = hidden_states
 
-        # import pdb;pdb.set_trace()
+        print("hidden_states input", hidden_states)
         hidden_states = self.layer_norm1(hidden_states)
         hidden_states, attn_weights = self.self_attn(
             hidden_states=hidden_states,
             head_mask=attention_mask,
             output_attentions=output_attentions,
         )
+
+        print("hidden_states self_attn", hidden_states)
         hidden_states = hidden_states + residual
         residual = hidden_states
         hidden_states = self.layer_norm2(hidden_states)
         
         hidden_states = self.mlp(hidden_states)
+        
 
         hidden_states = hidden_states + residual
+        print("hidden_states out", hidden_states)
 
         outputs = (hidden_states,)
 
@@ -454,15 +458,16 @@ class MiniGPT4Encoder(nn.Layer):
                     attention_mask,
                     output_attentions=output_attentions,
                 )
-            import pdb;pdb.set_trace()
+            
             hidden_states = layer_outputs[0]
 
             if output_attentions:
                 all_attentions = all_attentions + (layer_outputs[1],)
 
+
+        
         if output_hidden_states:
             encoder_states = encoder_states + (hidden_states,)
-
         if not return_dict:
             return tuple(v for v in [hidden_states, encoder_states, all_attentions] if v is not None)
         return BaseModelOutput(
@@ -512,9 +517,12 @@ class MiniGPT4VisionModel(MiniGPT4PretrainedModel):
         )
 
         last_hidden_state = encoder_outputs[0]
+        # import pdb;pdb.set_trace()
         last_hidden_state = self.post_layernorm(last_hidden_state)
 
         pooled_output = last_hidden_state[:, 0, :]
+
+
         pooled_output = self.post_layernorm(pooled_output)
 
         if not return_dict:
@@ -1466,6 +1474,48 @@ class MiniGPT4Model(MiniGPT4PretrainedModel):
             language_model_outputs=outputs,
         )
 
+class PerceiverResampler(MiniGPT4PretrainedModel):
+    def __init__(
+        self,
+        dim,
+        depth,
+        dim_head = 64,
+        heads = 8,
+        num_latents = 64,
+        num_media_embeds = 4,
+        ff_mult = 4,
+        is_train = True
+    ):
+        super().__init__()
+        self.latents = Parameter(paddle.randn([num_latents, dim]))
+        self.media_pos_emb = Parameter(paddle.randn([num_media_embeds, 1, dim]))
+
+        self.layers = nn.ModuleList([])
+        for _ in range(depth):
+            self.layers.append(nn.ModuleList([
+                PerceiverAttention(dim = dim, dim_head = dim_head, heads = heads, is_train=is_train),
+                FeedForward(dim = dim, mult = ff_mult, is_train=is_train)
+            ]))
+        if is_train:
+            self.norm = LayerNorm(dim)
+        else:
+            self.norm = nn.LayerNorm(dim)
+
+    def forward(self, x):
+        import pdb;pdb.set_trace()
+        if x.ndim == 3:
+            x = rearrange(x, 'b n d -> b 1 n d')
+
+        times = x.shape[1]
+        x = x + self.media_pos_emb[:times]
+
+        latents = repeat(self.latents, 'n d -> b m n d', b = x.shape[0], m = x.shape[1])
+
+        for attn, ff in self.layers:
+            latents = attn(x, latents) + latents
+            latents = ff(latents) + latents
+
+        return self.norm(latents)
 
 class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
     config_class = MiniGPT4Config
@@ -1519,6 +1569,7 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
         pixel_values = paddle.cast(pixel_values, self.vision_model.embeddings.patch_embedding.weight.dtype)
         vision_outputs = self.vision_model(pixel_values, return_dict=True)
         image_embeds = vision_outputs.last_hidden_state
+        import pdb;pdb.set_trace()
         image_attention_mask = paddle.ones(image_embeds.shape[:-1], dtype="int64")
 
         # step 2: forward the query tokens through the QFormer, using the image embeddings for cross-attention
@@ -1633,6 +1684,9 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
         image_embeds = vision_outputs.last_hidden_state
         image_attention_mask = paddle.ones(image_embeds.shape[:-1], dtype="int64")
 
+
+
+        import pdb;pdb.set_trace()
         # step 2: forward the query tokens through the QFormer, using the image embeddings for cross-attention
         query_tokens = self.query_tokens.expand([image_embeds.shape[0], -1, -1])
         query_tokens = paddle.cast(query_tokens, self.qformer.layernorm.weight.dtype)
