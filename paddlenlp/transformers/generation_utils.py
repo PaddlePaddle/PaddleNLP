@@ -319,7 +319,7 @@ class GenerationMixin(object):
             raise ValueError("`bos_token_id` should be defined when no " "`input_ids` are provided.")
         if encoder_output is not None:
             batch_size = encoder_output.shape[0]
-        return paddle.ones([batch_size, 1], dtype="int64") * bos_token_id
+        return paddle.ones([1, 1], dtype="int64") * bos_token_id
 
     @staticmethod
     def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
@@ -485,6 +485,7 @@ class GenerationMixin(object):
                     [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype="int64")], axis=-1
                 )
             model_kwargs["attention_mask"] = attention_mask
+        model_kwargs["inputs_embeds"] = None
 
         # update role_ids
         if "role_ids" in model_kwargs and model_kwargs["role_ids"] is not None:
@@ -587,12 +588,12 @@ class GenerationMixin(object):
         position_ids=None,
         max_length=20,
         min_length=0,
-        decode_strategy="greedy_search",
+        decode_strategy="beam_search",
         temperature=1.0,
         top_k=0,
         top_p=1.0,
         repetition_penalty=1.0,
-        num_beams=1,
+        num_beams=5,
         num_beam_groups=1,
         length_penalty=0.0,
         early_stopping=False,
@@ -778,6 +779,8 @@ class GenerationMixin(object):
                 print(response)
                 # ['是的', '嗯嗯']
         """
+
+        
         assert decode_strategy in [
             "greedy_search",
             "sampling",
@@ -792,10 +795,10 @@ class GenerationMixin(object):
         if in_declarative_mode():
             is_tracing = True
 
-        if is_tracing:
-            assert decode_strategy in [
-                "sampling",
-            ], "`generate()` only supports 'sampling' temporarily but received {}.".format(decode_strategy)
+        # if is_tracing:
+        #     assert decode_strategy in [
+        #         "sampling",
+        #     ], "`generate()` only supports 'sampling' temporarily but received {}.".format(decode_strategy)
 
         if getattr(self, "deprecated_warnings", None) is None:
             self.deprecated_warnings = {}
@@ -824,7 +827,7 @@ class GenerationMixin(object):
 
         if is_tracing:
             self._fast_entry = None
-
+        eos_token_id = 199
         if getattr(self, "_fast_entry", None) is not False and use_fast:
             args = locals()
             args.pop("self")
@@ -860,14 +863,14 @@ class GenerationMixin(object):
                 logger.warning("FastGeneration is not available, " "and the original version would be used instead.")
 
         # params check
-        if input_ids is None and "inputs_embeds" not in model_kwargs:
-            # Init `input_ids` with bos_token_id
-            input_ids = self.prepare_input_ids_for_generation(bos_token_id)
-        elif "inputs_embeds" in model_kwargs and model_kwargs["inputs_embeds"] is not None:
-            # Add input embeds support
-            input_ids = self.prepare_input_ids_for_generation(
-                bos_token_id, encoder_output=model_kwargs["inputs_embeds"]
-            )
+        # if input_ids is None and "inputs_embeds" not in model_kwargs:
+        #     # Init `input_ids` with bos_token_id
+        #     input_ids = self.prepare_input_ids_for_generation(bos_token_id)
+        # elif "inputs_embeds" in model_kwargs and model_kwargs["inputs_embeds"] is not None:
+        #     # Add input embeds support
+        #     input_ids = self.prepare_input_ids_for_generation(
+        #         bos_token_id, encoder_output=model_kwargs["inputs_embeds"]
+        # )
 
         # Add to model_kwargs
         model_kwargs["attention_mask"] = attention_mask
@@ -917,7 +920,8 @@ class GenerationMixin(object):
             input_len = input_ids.shape[-1]
             min_len = input_len + min_length
             max_len = input_len + max_length
-
+        
+        # import pdb;pdb.set_trace()
         logits_processors = self.get_logits_processor(
             min_length=min_len if min_length > 0 else None,
             max_length=max_len,
@@ -1453,11 +1457,12 @@ class GenerationMixin(object):
             num_beams * batch_size, batch_beam_size
         )
 
-        beam_scores = paddle.zeros((batch_size, num_beams), dtype=paddle.get_default_dtype())
+        beam_scores = paddle.zeros((1, 5), dtype=paddle.get_default_dtype())
 
         beam_scores[:, 1:] = get_scale_by_dtype(return_positive=False)
         beam_scores = paddle.reshape(beam_scores, [-1])
 
+        
         while cur_len < max_length:
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
@@ -1478,8 +1483,7 @@ class GenerationMixin(object):
             logits = self.adjust_logits_during_generation(logits)
             # beam search
             # [batch_size * num_beams, vocab_size]
-            next_scores = F.softmax(logits)
-            next_scores = paddle.log(next_scores)
+            next_scores = F.log_softmax(logits)
             next_scores = logits_processors(input_ids, next_scores)
             next_scores = next_scores + beam_scores.unsqueeze(-1)
 
@@ -1531,10 +1535,15 @@ class GenerationMixin(object):
             beam_next_tokens = beam_outputs["next_beam_tokens"]
             beam_idx = beam_outputs["next_beam_indices"]
 
+            print("beam_next_tokens---", beam_next_tokens)
+
             cur_len += 1
             input_ids = paddle.concat(
                 [paddle.index_select(input_ids, beam_idx), beam_next_tokens.unsqueeze(-1)], axis=-1
             )
+
+            print("input_ids---", input_ids)
+            
 
             if beam_scorer.is_done:
                 break
@@ -1546,6 +1555,7 @@ class GenerationMixin(object):
                 model_kwargs["cache"] = map_structure(
                     lambda x: paddle.index_select(x, beam_idx), model_kwargs["cache"]
                 )
+            # import pdb;pdb.set_trace()
 
         pred_ids, scores = beam_scorer.finalize(
             input_ids,

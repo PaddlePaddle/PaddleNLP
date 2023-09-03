@@ -58,15 +58,17 @@ def predict(args):
     # breakpoint
     generate_kwargs = {
         "max_length": 300,
-        "num_beams": 1,
-        "top_p": 1.0,
+        "num_beams": 5,
+        "top_p": 0.9,
         "repetition_penalty": 1.0,
         "length_penalty": 0,
         "temperature": 1,
-        "decode_strategy": "greedy_search",
-        "eos_token_id": [[835], [2277, 29937]],
+        "decode_strategy": "beam_search",
+        "eos_token_id": [[199]],
     }
     outputs = model.generate(**inputs, **generate_kwargs)
+
+    print("outputs", outputs)
     msg = processor.batch_decode(outputs[0])
     print("Inference result: ", msg)
 

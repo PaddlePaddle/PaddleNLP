@@ -1781,27 +1781,8 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
 
 
         outputs = self.language_model.generate(
-            inputs_embeds=inputs_embeds, attention_mask=attention_mask, **generate_kwargs
+            input_ids=first_input_ids, inputs_embeds=inputs_embeds, attention_mask=attention_mask, **generate_kwargs
         )
-
-
-        first_embeds = self.language_model.llama.embed_tokens(first_input_ids)
-        second_embeds = self.language_model.llama.embed_tokens(second_input_ids)
-        language_model_inputs = paddle.cast(language_model_inputs, dtype=first_embeds.dtype)
-        inputs_embeds = paddle.concat([first_embeds, language_model_inputs, second_embeds], axis=1)
-
-        if first_attention_mask is None:
-            first_attention_mask = paddle.ones(first_embeds.shape[:-1], dtype="int64")
-        if second_attention_mask is None:
-            second_attention_mask = paddle.ones(second_embeds.shape[:-1], dtype="int64")
-        attention_mask = paddle.concat(
-            [first_attention_mask, language_model_attention_mask, second_attention_mask], axis=1
-        )
-
-        outputs = self.language_model.generate(
-            inputs_embeds=inputs_embeds, attention_mask=attention_mask, **generate_kwargs
-        )
-
         return outputs
 
     @paddle.no_grad()

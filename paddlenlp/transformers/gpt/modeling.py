@@ -204,15 +204,23 @@ class MultiHeadAttention(nn.Layer):
             self.out_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
 
     def _fuse_prepare_qkv(self, query, use_cache=False, cache=None):
-        mix_layer = self.qkv_proj(query)
-        # bs, seqlen, nhead, headdim
-        mix_layer = paddle.reshape_(mix_layer, [0, 0, self.num_attention_heads, 3 * self.head_dim])
-        # bs, nhead, seqlen, headdim
-        if not self.config.use_flash_attention:
-            # falsh attn need: [ bz, seqlen, nhead, head_dim]
-            mix_layer = paddle.transpose(mix_layer, [0, 2, 1, 3])
+        # import pdb;pdb.set_trace()
+        q, k, v = self.qkv_proj(query).split(3, axis=2)
+        print("query--",query.shape)
+        print("q--",q.shape)
 
-        q, k, v = paddle.split(mix_layer, num_or_sections=3, axis=-1)
+        q = q.reshape([5, query.shape[1], 32, 128]).transpose([0, 2, 1, 3])
+        k = k.reshape([5, query.shape[1], 32, 128]).transpose([0, 2, 1, 3])
+        v = v.reshape([5, query.shape[1], 32, 128]).transpose([0, 2, 1, 3])
+
+        # # bs, seqlen, nhead, headdim
+        # mix_layer = paddle.reshape_(mix_layer, [0, 0, self.num_attention_heads, 3 * self.head_dim])
+        # # bs, nhead, seqlen, headdim
+        # if not self.config.use_flash_attention:
+        #     # falsh attn need: [ bz, seqlen, nhead, head_dim]
+        #     mix_layer = paddle.transpose(mix_layer, [0, 2, 1, 3])
+
+        # q, k, v = paddle.split(mix_layer, num_or_sections=3, axis=-1)
 
         assert not isinstance(cache, self.StaticCache), "cache currently does not support the StaticCache type"
 
@@ -349,6 +357,8 @@ class MultiHeadAttention(nn.Layer):
         Applies multi-head attention to map queries and a set of key-value pairs
         to outputs.
         """
+
+        
         key = query if key is None else key
         value = query if value is None else value
         # compute q ,k ,v
@@ -357,38 +367,23 @@ class MultiHeadAttention(nn.Layer):
         else:
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
 
-        if self.config.use_flash_attention:
-            # Flash Attention now ignore attention mask
-            # Current Flash Attention doesn't support attn maskt
-            # Paddle Flash Attention input [batch_size, seq_len, num_heads, head_dim]
-            # Torch Flash Attention input (batch_size, seqlen, nheads, headdim)
-            bsz, q_len, num_heads, head_dim = q.shape
-            # Q Shape:  [1, 16, 2048, 64]
-            # bs, nhead, seqlen, head_dim
-            attn_output, weights = flash_attention(
-                q,
-                k,
-                v,
-                causal=q.shape[1] != 1,
-                return_softmax=self.need_weights,
-            )
-            out = attn_output.reshape([bsz, q_len, head_dim * num_heads])
-        else:
-            # scale dot product attention
-            product = paddle.matmul(x=q * (self.head_dim**-0.5), y=k, transpose_y=True)
+        # import pdb;pdb.set_trace()
+        product = paddle.matmul(x=q * (self.head_dim**-0.5), y=k, transpose_y=True)
+        # paddle.matmul(x=q , y=k, transpose_y=True)
 
-            if attn_mask is not None:
-                product = product + attn_mask
+        if attn_mask is not None:
+            product = product + attn_mask
 
-            weights = F.softmax(product)
-            if self.dropout:
-                weights = F.dropout(weights, self.dropout, training=self.training, mode="upscale_in_train")
+        weights = F.softmax(product)
+        if self.dropout:
+            weights = F.dropout(weights, self.dropout, training=self.training, mode="upscale_in_train")
+        
 
-            out = tensor.matmul(weights, v)
+        out = tensor.matmul(weights, v)
 
-            # combine heads
-            out = tensor.transpose(out, perm=[0, 2, 1, 3])
-            out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
+        # combine heads
+        out = tensor.transpose(out, perm=[0, 2, 1, 3])
+        out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
 
         # project to output
         out = self.out_proj(out)
@@ -505,6 +500,8 @@ class TransformerDecoder(nn.Layer):
                 all_hidden_states = all_hidden_states + (output,)
             self.checkpoints.append(output.name)
 
+            print("outputs -- ", output[0])
+        # import pdb; pdb.set_trace()
         if self.norm is not None:
             output = self.norm(output)
 
@@ -597,21 +594,13 @@ class GPTDecoderLayer(nn.Layer):
 
     def forward(self, tgt, memory, tgt_mask=None, use_cache=False, cache=None, output_attentions=False):
         residual = tgt
-
+        # import pdb;pdb.set_trace()
         if self.config.normalize_before:
             tgt = self.norm1(tgt)
 
         # self.self_attn(...) --> hidden_states, weights, (cache)
-        if use_cache is False:
-            has_gradient = not tgt.stop_gradient
-            if self.enable_recompute and has_gradient and self.config.recompute_granularity == "full_attn":
-                tgt = recompute(
-                    self.self_attn, tgt, None, None, tgt_mask, use_cache, cache, output_attentions, use_reentrant=False
-                )
-            else:
-                tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache, output_attentions)
-        else:
-            tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache, output_attentions)
+        tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache, output_attentions)
+        
         if output_attentions:
             tgt, attention_weights = tgt
 
@@ -1054,6 +1043,8 @@ class GPTModel(GPTPretrainedModel):
         self.checkpoints = []
         cache = kwargs.get("cache", cache)
         is_decoder = cache is not None
+        # if is_decoder:
+        #     import pdb;pdb.set_trace()
 
         if inputs_embeds is not None:
             input_ids = None
@@ -1063,7 +1054,7 @@ class GPTModel(GPTPretrainedModel):
             input_ids = input_ids.reshape((-1, input_shape[-1])) 
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
-        import pdb;pdb.set_trace()
+        
         if position_ids is None:
             past_length = 0
             if cache is not None:
@@ -1074,7 +1065,8 @@ class GPTModel(GPTPretrainedModel):
         
         if inputs_embeds is not None:
             embedding_output = inputs_embeds
-            
+            position_embeddings = self.embeddings.position_embeddings(position_ids)
+            embedding_output = inputs_embeds + position_embeddings
         else:
             embedding_output = self.embeddings(
                 input_ids=input_ids, position_ids=position_ids, inputs_embeddings=inputs_embeds
@@ -1468,6 +1460,7 @@ class GPTForCausalLM(GPTPretrainedModel):
             hidden_states = outputs
         else:
             hidden_states = outputs[0]
+
 
         logits = self.lm_head(hidden_states)
 
