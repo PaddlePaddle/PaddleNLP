@@ -142,6 +142,8 @@ class MultiHeadAttention(nn.Layer):
         self.dropout = config.attention_probs_dropout_prob
 
         self.head_dim = config.hidden_size // config.num_attention_heads
+
+        # import pdb;pdb.set_trace()
         assert (
             self.head_dim * config.num_attention_heads == config.hidden_size
         ), "hidden_size must be divisible by num_attention_heads"
@@ -407,7 +409,9 @@ class TransformerDecoder(nn.Layer):
     def __init__(self, config, decoder_layers, norm=None, hidden_size=None):
         super(TransformerDecoder, self).__init__()
 
+        config.fuse_attention_qkv = True
         self.config = config
+        
         self.layers = decoder_layers
         self.norm = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
 
@@ -942,7 +946,7 @@ class GPTModel(GPTPretrainedModel):
         self.vocab_size = config.vocab_size
 
         self.bias = paddle.tril(
-            paddle.ones([1, 1, config.max_position_embeddings, config.max_position_embeddings], dtype="int64")
+            paddle.ones([5, 1, config.max_position_embeddings, config.max_position_embeddings], dtype="int64")
         )
 
         self.embeddings = GPTEmbeddings(config)
@@ -975,6 +979,7 @@ class GPTModel(GPTPretrainedModel):
         output_attentions=False,
         output_hidden_states=False,
         return_dict=False,
+        **kwargs,
     ):
         r"""
         The GPTModel forward method, overrides the `__call__()` special method.
@@ -1047,16 +1052,18 @@ class GPTModel(GPTPretrainedModel):
         """
 
         self.checkpoints = []
-        if input_ids is not None and inputs_embeds is not None:
-            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        cache = kwargs.get("cache", cache)
+        is_decoder = cache is not None
+
+        if inputs_embeds is not None:
+            input_ids = None
+            input_shape = paddle.shape(inputs_embeds)[:-1]
         elif input_ids is not None:
             input_shape = paddle.shape(input_ids)
-            input_ids = input_ids.reshape((-1, input_shape[-1]))
-        elif inputs_embeds is not None:
-            input_shape = paddle.shape(inputs_embeds)[:-1]
+            input_ids = input_ids.reshape((-1, input_shape[-1])) 
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
-
+        import pdb;pdb.set_trace()
         if position_ids is None:
             past_length = 0
             if cache is not None:
@@ -1064,27 +1071,43 @@ class GPTModel(GPTPretrainedModel):
             position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype="int64")
             position_ids = position_ids.unsqueeze(0)
             position_ids = paddle.expand(position_ids, input_shape)
-        embedding_output = self.embeddings(
-            input_ids=input_ids, position_ids=position_ids, inputs_embeddings=inputs_embeds
-        )
+        
+        if inputs_embeds is not None:
+            embedding_output = inputs_embeds
+            
+        else:
+            embedding_output = self.embeddings(
+                input_ids=input_ids, position_ids=position_ids, inputs_embeddings=inputs_embeds
+            )
 
         # TODO, use registered buffer
+        # length = input_shape[-1]
+        # if cache is not None:
+        #     cache_length = paddle.shape(cache[0].k)[2]
+        #     length = length + cache_length
+        # else:
+        #     cache_length = 0
+        # causal_mask = self.bias[:, :, cache_length:length, :length]
+
+        # if attention_mask is not None:
+        #     if attention_mask.dtype != paddle.int64:
+        #         attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
+        #     if len(attention_mask.shape) == 2:
+        #         attention_mask = attention_mask[:, None, None, :]
+        #     attention_mask = (1.0 - (attention_mask & causal_mask)) * -1e4
+        # else:
+        #     attention_mask = (1.0 - causal_mask) * -1e4
+
         length = input_shape[-1]
-        if cache is not None:
-            cache_length = paddle.shape(cache[0].k)[2]
+        if is_decoder:
+            cache_length = paddle.shape(attention_mask)[-1] - 1
             length = length + cache_length
         else:
             cache_length = 0
         causal_mask = self.bias[:, :, cache_length:length, :length]
 
-        if attention_mask is not None:
-            if attention_mask.dtype != paddle.int64:
-                attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
-            if len(attention_mask.shape) == 2:
-                attention_mask = attention_mask[:, None, None, :]
-            attention_mask = (1.0 - (attention_mask & causal_mask)) * -1e4
-        else:
-            attention_mask = (1.0 - causal_mask) * -1e4
+        attention_mask = (1.0 - causal_mask) * -1e4
+
 
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
@@ -1135,6 +1158,7 @@ class GPTForPretraining(GPTPretrainedModel):
     def forward(
         self,
         input_ids,
+        inputs_embeds=None,
         position_ids=None,
         attention_mask=None,
         masked_positions=None,
@@ -1182,7 +1206,7 @@ class GPTForPretraining(GPTPretrainedModel):
         """
 
         outputs = self.gpt(
-            input_ids, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
+            input_ids, inputs_embeds=inputs_embeds, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
         )
         if use_cache:
             encoder_outputs, cached_kvs = outputs[:2]
@@ -1428,6 +1452,7 @@ class GPTForCausalLM(GPTPretrainedModel):
         """
         input_type = type(input_ids) if input_ids is not None else type(inputs_embeds)
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        print("elf.gpt inputs_embeds", inputs_embeds)
         outputs = self.gpt(
             input_ids,
             position_ids=position_ids,
@@ -1499,6 +1524,7 @@ class GPTForCausalLM(GPTPretrainedModel):
         # only last token for inputs_ids if cache is defined in kwargs
         position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
+        inputs_embeds = kwargs.get("inputs_embeds", None)
         if attention_mask is not None and attention_mask.ndim == 4:
             attention_mask = attention_mask[:, -1:, -1:, :]
         if cache is not None:
@@ -1507,6 +1533,7 @@ class GPTForCausalLM(GPTPretrainedModel):
                 position_ids = position_ids[:, -1].unsqueeze(-1)
         return {
             "input_ids": input_ids,
+            "inputs_embeds": inputs_embeds,
             "position_ids": position_ids,
             "attention_mask": attention_mask,
             "use_cache": use_cache,

@@ -28,6 +28,7 @@ from paddlenlp.utils.log import logger
 from ...utils.initializer import normal_, ones_, zeros_
 from ..activations import ACT2FN
 from ..llama.modeling import LlamaForCausalLM
+from ..gpt.modeling import GPTForCausalLM
 from ..model_outputs import (
     BaseModelOutput,
     BaseModelOutputWithPastAndCrossAttentions,
@@ -79,6 +80,8 @@ def convert_weights_to_dtype(model, dtype: str):
     if isinstance(model, MiniGPT4VisionModel):
         model.apply(convert_for_vit)
     elif isinstance(model, (MiniGPT4QFormerModel, LlamaForCausalLM)):
+        model.to(dtype=dtype)
+    elif isinstance(model, (MiniGPT4QFormerModel, GPTForCausalLM)):
         model.to(dtype=dtype)
     else:
         raise TypeError("Not support model type: {}.".format(type(model)))
@@ -1523,7 +1526,7 @@ class PerceiverAttention(nn.Layer):
         k, v = self.to_kv(kv_input).chunk(2, axis=-1)
         # k,v size: torch.Size([7, 1, 1290, 512]) torch.Size([7, 1, 1290, 512])
 
-        import pdb;pdb.set_trace()
+        
         q = q.reshape([b, 1, 64, 8, 64]).transpose([0, 3, 1, 2, 4])
         k = k.reshape([b, 1, 321, 8, 64]).transpose([0, 3, 1, 2, 4])
         v = v.reshape([b, 1, 321, 8, 64]).transpose([0, 3, 1, 2, 4])
@@ -1600,8 +1603,10 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
             num_latents = 64,
             num_media_embeds = 1226, 
         )
+        self.opt_proj = nn.Linear(1280, 4096)
+
         self.language_projection = nn.Linear(config.qformer_config.hidden_size, config.text_config.hidden_size)
-        self.language_model = LlamaForCausalLM(config.text_config)
+        self.language_model = GPTForCausalLM(config.text_config)
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.embeddings.patch_embedding
@@ -1641,7 +1646,7 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
         pixel_values = paddle.cast(pixel_values, self.vision_model.embeddings.patch_embedding.weight.dtype)
         vision_outputs = self.vision_model(pixel_values, return_dict=True)
         image_embeds = vision_outputs.last_hidden_state
-        import pdb;pdb.set_trace()
+
         image_attention_mask = paddle.ones(image_embeds.shape[:-1], dtype="int64")
 
         # step 2: forward the query tokens through the QFormer, using the image embeddings for cross-attention
@@ -1754,26 +1759,31 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
         pixel_values = paddle.cast(pixel_values, self.vision_model.embeddings.patch_embedding.weight.dtype)
         vision_outputs = self.vision_model(pixel_values, return_dict=True)
         image_embeds = vision_outputs.last_hidden_state
-        image_attention_mask = paddle.ones(image_embeds.shape[:-1], dtype="int64")
 
         query_outputs = self.resampler(image_embeds.cast("float32"))
+        inputs_opt = self.opt_proj(query_outputs.squeeze(1))
 
-        import pdb;pdb.set_trace()
+        
         # step 2: forward the query tokens through the QFormer, using the image embeddings for cross-attention
-        query_tokens = self.query_tokens.expand([image_embeds.shape[0], -1, -1])
-        query_tokens = paddle.cast(query_tokens, self.qformer.layernorm.weight.dtype)
-        image_embeds = paddle.cast(image_embeds, self.qformer.layernorm.weight.dtype)
-        query_outputs = self.qformer(
-            query_embeds=query_tokens,
-            encoder_hidden_states=image_embeds,
-            encoder_attention_mask=image_attention_mask,
-            return_dict=True,
-        )
-        query_output = query_outputs.last_hidden_state
+        atts_opt = paddle.ones([first_input_ids.shape[0], inputs_opt.shape[1]], dtype="int64")
+        attention_mask = paddle.concat([atts_opt, first_attention_mask], axis=1)
+        batch_size = first_input_ids.shape[0]
 
-        # step 3: use the language model, conditioned on the text and image
-        language_model_inputs = self.language_projection(query_output)
-        language_model_attention_mask = paddle.ones(language_model_inputs.shape[:-1], dtype="int64")
+        
+
+        # import pdb;pdb.set_trace()
+        first_embeds = self.language_model.gpt.embeddings.word_embeddings(first_input_ids)
+        first_embeds = paddle.concat([inputs_opt, first_embeds.cast("float32")], axis=1)
+        
+        inputs_embeds = first_embeds.repeat_interleave(5, 0).cast("float16")
+        attention_mask = attention_mask.repeat_interleave(5, 0)
+
+
+
+        outputs = self.language_model.generate(
+            inputs_embeds=inputs_embeds, attention_mask=attention_mask, **generate_kwargs
+        )
+
 
         first_embeds = self.language_model.llama.embed_tokens(first_input_ids)
         second_embeds = self.language_model.llama.embed_tokens(second_input_ids)

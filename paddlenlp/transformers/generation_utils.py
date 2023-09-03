@@ -582,6 +582,7 @@ class GenerationMixin(object):
     def generate(
         self,
         input_ids=None,
+        inputs_embeds=None,
         attention_mask=None,
         position_ids=None,
         max_length=20,
@@ -785,6 +786,7 @@ class GenerationMixin(object):
             decode_strategy
         )
 
+        model_kwargs["inputs_embeds"] = inputs_embeds
         # Whether to dynamic to static
         is_tracing = False
         if in_declarative_mode():
@@ -861,7 +863,7 @@ class GenerationMixin(object):
         if input_ids is None and "inputs_embeds" not in model_kwargs:
             # Init `input_ids` with bos_token_id
             input_ids = self.prepare_input_ids_for_generation(bos_token_id)
-        elif "inputs_embeds" in model_kwargs:
+        elif "inputs_embeds" in model_kwargs and model_kwargs["inputs_embeds"] is not None:
             # Add input embeds support
             input_ids = self.prepare_input_ids_for_generation(
                 bos_token_id, encoder_output=model_kwargs["inputs_embeds"]

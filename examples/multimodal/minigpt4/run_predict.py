@@ -47,6 +47,9 @@ def predict(args):
     vit_outputs = vit_data["output"]
     vit_image = vit_inputs[0]["image"].detach().numpy()
     inputs["pixel_values"] = paddle.to_tensor(vit_image)
+    inputs["first_input_ids"] = paddle.to_tensor([[50258]])
+    inputs["first_attention_mask"] = paddle.to_tensor([[1]])
+    
     print("inputs", inputs)
 
     # import pdb;pdb.set_trace()

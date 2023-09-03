@@ -21,6 +21,7 @@ from ...utils.log import logger
 from ..auto.modeling import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
 from ..configuration_utils import PretrainedConfig
 from ..llama.configuration import LlamaConfig
+from ..gpt.configuration import GPTConfig
 
 __all__ = ["MiniGPT4VisionConfig", "MiniGPT4QFormerConfig", "MiniGPT4Config"]
 
@@ -298,10 +299,10 @@ class MiniGPT4Config(PretrainedConfig):
             logger.info("text_config is None. Initializing the text config with default values (`LlamaConfig`).")
         self.vision_config = MiniGPT4VisionConfig(**vision_config)
         self.qformer_config = MiniGPT4QFormerConfig(**qformer_config)
-        text_model_type = text_config["model_type"] if "model_type" in text_config else "llama"
+        text_model_type = text_config["model_type"] if "model_type" in text_config else "gpt2"
 
-        if text_model_type == "llama":
-            self.text_config = LlamaConfig(**text_config)
+        if text_model_type == "gpt2":
+            self.text_config = GPTConfig(**text_config)
         else:
             raise ValueError("Only llama accepted for model_type, but accepted {}.".format(text_model_type))
 
