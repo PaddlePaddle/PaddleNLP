@@ -652,24 +652,24 @@ def predict():
         source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
         target_texts = ["", ""]
 
-    # batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
-    # batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
+    batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
+    batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
 
-    # with open(model_args.output_file, "w", encoding="utf-8") as f:
-    #     for bs, batch_source_text in enumerate(batch_source_texts):
-    #         outputs = predictor.predict(batch_source_text)
+    with open(model_args.output_file, "w", encoding="utf-8") as f:
+        for bs, batch_source_text in enumerate(batch_source_texts):
+            outputs = predictor.predict(batch_source_text)
 
-    #         if predictor.tensor_parallel_rank > 0:
-    #             continue
-    #         for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
-    #             print("***********Source**********")
-    #             print(source)
-    #             print("***********Target**********")
-    #             print(target)
-    #             print("***********Output**********")
-    #             print(output)
-    #             out = {"src": source, "tgt": target, "output": output}
-    #             f.write(json.dumps(out, ensure_ascii=False) + "\n")
+            if predictor.tensor_parallel_rank > 0:
+                continue
+            for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
+                print("***********Source**********")
+                print(source)
+                print("***********Target**********")
+                print(target)
+                print("***********Output**********")
+                print(output)
+                out = {"src": source, "tgt": target, "output": output}
+                f.write(json.dumps(out, ensure_ascii=False) + "\n")
 
     if predictor_args.benchmark:
         benchmark(predictor, predictor_args, model_args)
