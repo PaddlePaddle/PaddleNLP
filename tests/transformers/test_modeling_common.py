@@ -916,6 +916,12 @@ class GenerationD2STestMixin:
     CausalLMClass = AutoModelForCausalLM
     max_length = 20
 
+    def setUp(self):
+        paddle.disable_static()
+
+    def tearDown(self):
+        paddle.disable_static()
+
     def test_to_static_use_top_k(self):
         tokenizer = self.TokenizerClass.from_pretrained(self.internal_testing_model)
         if tokenizer.__class__.__name__ == "LlamaTokenizer":
