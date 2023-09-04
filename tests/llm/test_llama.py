@@ -18,11 +18,7 @@ import sys
 from unittest import TestCase
 
 from paddlenlp.utils.downloader import get_path_from_url
-from tests.testing_utils import (
-    argv_context_guard,
-    load_test_config,
-    update_params,
-)
+from tests.testing_utils import argv_context_guard, load_test_config, update_params
 
 
 class LLaMATest(TestCase):
