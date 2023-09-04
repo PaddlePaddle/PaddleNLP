@@ -34,7 +34,7 @@ from utils import (
 )
 
 from paddlenlp.data import DataCollatorForSeq2Seq
-from paddlenlp.datasets import load_dataset
+from paddlenlp.datasets import InTokensIterableDataset, InTokensMapDataset, load_dataset
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.trainer import PdArgumentParser
@@ -205,14 +205,9 @@ def main():
     dev_ds = dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, intokens=eval_intokens))
     if data_args.intokens:
         if data_args.lazy:
-            from paddlenlp.datasets import InTokensIterableDataset
-
             intoken_dataset = InTokensIterableDataset
         else:
-            from paddlenlp.datasets import InTokensMapDataset
-
             intoken_dataset = InTokensMapDataset
-        from paddlenlp.datasets import InTokensMapDataset
 
         logger.info("Creating InTokens Data Stream. This may take a few minutes.")
         train_ds = intoken_dataset(
