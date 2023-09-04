@@ -1068,10 +1068,10 @@ class GenerationMixin(object):
         # max_length will be convert to MaxLengthCriteria
         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
         if max_length is not None:
-            logger.warning(
-                "`max_length` is deprecated in this function, use"
-                " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead."
-            )
+            # logger.warning(
+            #    "`max_length` is deprecated in this function, use"
+            #    " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead."
+            # )
             stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
 
         batch_size, cur_len = input_ids.shape
@@ -1156,10 +1156,10 @@ class GenerationMixin(object):
         # max_length will be convert to MaxLengthCriteria
         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
         if max_length is not None:
-            logger.warning(
-                "`max_length` is deprecated in this function, use"
-                " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead."
-            )
+            # logger.warning(
+            #    "`max_length` is deprecated in this function, use"
+            #    " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead."
+            # )
             stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
 
         batch_size, cur_len = input_ids.shape
@@ -1496,10 +1496,10 @@ class GenerationMixin(object):
         # max_length will be convert to MaxLengthCriteria
         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
         if max_length is not None:
-            logger.warning(
-                "`max_length` is deprecated in this function, use"
-                " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead."
-            )
+            # logger.warning(
+            #    "`max_length` is deprecated in this function, use"
+            #    " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead."
+            # )
             stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
 
         batch_size = len(beam_scorer._beam_hyps)
@@ -1637,10 +1637,10 @@ class GenerationMixin(object):
         # max_length will be convert to MaxLengthCriteria
         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
         if max_length is not None:
-            logger.warning(
-                "`max_length` is deprecated in this function, use"
-                " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead."
-            )
+            # logger.warning(
+            #    "`max_length` is deprecated in this function, use"
+            #    " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead."
+            # )
             stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
 
         batch_size = len(beam_scorer._beam_hyps)
