@@ -17,10 +17,17 @@ import sys
 from functools import partial
 
 import paddle
-from argument import DataArgument, GenerateArgument, ModelArgument, QuantArgument
+from argument import (
+    DataArgument,
+    GenerateArgument,
+    ModelArgument,
+    QuantArgument,
+    TrainingArguments,
+)
 from data import get_convert_example
 from utils import (
     CausalLMTrainer,
+    InTokensIterDatasetCallback,
     compute_metrics,
     get_lora_target_modules,
     get_prefix_tuning_params,
@@ -30,7 +37,7 @@ from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.trainer import PdArgumentParser, TrainingArguments
+from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
     AutoConfig,
@@ -39,6 +46,12 @@ from paddlenlp.transformers import (
     LlamaTokenizer,
 )
 from paddlenlp.utils.log import logger
+
+
+def read_local_dataset(path):
+    with open(path, "r", encoding="utf-8") as fp:
+        for line in fp:
+            yield json.loads(line.strip())
 
 
 def main():
@@ -101,11 +114,6 @@ def main():
         )
         if hasattr(model_config, "use_flash_attention"):
             model_config.use_flash_attention = model_args.use_flash_attention
-        if hasattr(model_config, "max_position_embeddings"):
-            if model_config.max_position_embeddings < data_args.max_length:
-                raise ValueError(
-                    f"The max_length ({data_args.max_length}) must be smaller than max_position_embeddings({model_config.max_position_embeddings})."
-                )
         model = AutoModelForCausalLM.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
@@ -121,14 +129,25 @@ def main():
     elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) and os.path.exists(
         os.path.join(data_args.dataset_name_or_path, "dev.json")
     ):
-        train_ds, dev_ds = load_dataset(
-            "json",
-            data_files={
-                "train": os.path.join(data_args.dataset_name_or_path, "train.json"),
-                "dev": os.path.join(data_args.dataset_name_or_path, "dev.json"),
-            },
+        # train_ds, dev_ds = load_dataset(
+        #     "json",
+        #     data_files={
+        #         "train": os.path.join(data_args.dataset_name_or_path, "train.json"),
+        #         "dev": os.path.join(data_args.dataset_name_or_path, "dev.json"),
+        #     },
+        #     lazy=data_args.lazy,
+        # )
+        train_ds = load_dataset(
+            read_local_dataset,
+            path=os.path.join(data_args.dataset_name_or_path, "train.json"),
             lazy=data_args.lazy,
         )
+        dev_ds = load_dataset(
+            read_local_dataset,
+            path=os.path.join(data_args.dataset_name_or_path, "dev.json"),
+            lazy=data_args.lazy,
+        )
+
     elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train")) and os.path.exists(
         os.path.join(data_args.dataset_name_or_path, "dev")
     ):
@@ -148,16 +167,22 @@ def main():
             train_ds, dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["train", "dev"])
     # TODO(ZHUI & sijunhe): Temporary implementation. Generalize this logic and move to Trainer later.
     if training_args.resume_from_checkpoint is not None and data_args.lazy:
-        logger.warning(
-            f"Loading from '{training_args.resume_from_checkpoint}', manually skipping dataset and setting `ignore_data_skip` to True."
+        logger.info(
+            f"Loading from '{training_args.resume_from_checkpoint}' with `lazy=True`, manually skipping dataset and setting `ignore_data_skip` to True."
         )
         training_args.ignore_data_skip = True
         state = TrainerState.load_from_json(os.path.join(training_args.resume_from_checkpoint, "trainer_state.json"))
-        consumed_samples = (
-            state.global_step
-            * training_args.per_device_train_batch_size
-            * training_args.gradient_accumulation_steps
-            * training_args.dataset_world_size
+        if state.trial_params is not None and "intokens_global_step" in state.trial_params:
+            consumed_samples = state.trial_params["intokens_global_step"]
+        else:
+            consumed_samples = (
+                state.global_step
+                * training_args.per_device_train_batch_size
+                * training_args.gradient_accumulation_steps
+                * training_args.dataset_world_size
+            )
+        logger.info(
+            f"Skipping the first {consumed_samples} samples to warmup the dataset from checkpoint '{training_args.resume_from_checkpoint}'."
         )
         train_ds = train_ds.skip(consumed_samples)
 
@@ -285,6 +310,7 @@ def main():
             return_tensors="np",
         ),
         do_generation=data_args.eval_with_do_generation,
+        callbacks=[InTokensIterDatasetCallback()] if isinstance(train_ds, InTokensIterableDataset) else None,
         gen_args=gen_args,
         data_args=data_args,
     )
@@ -292,10 +318,18 @@ def main():
     # Train
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
-        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
-        trainer.log_metrics("train", train_result.metrics)
-        trainer.save_metrics("train", train_result.metrics)
-        trainer.save_state()
+        if training_args.benchmark:
+            total_effective_tokens = (
+                sum([len(i["input_ids"]) for i in trainer.train_dataset]) * training_args.num_train_epochs
+            )
+            effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
+            logger.info(f"Effective_Tokens_per_second: {effective_tokens_per_second} ")
+            logger.info("Benchmark done.")
+        else:
+            trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
+            trainer.log_metrics("train", train_result.metrics)
+            trainer.save_metrics("train", train_result.metrics)
+            trainer.save_state()
 
     # QAT
     if quant_args.do_qat:
@@ -321,9 +355,14 @@ def main():
         trainer.model.eval()
         # Prepare ptq dataloader
         if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
+            # ptq_ds = load_dataset(
+            #     "json", data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=data_args.lazy,
+            # )[0]
             ptq_ds = load_dataset(
-                "json", data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
-            )[0]
+                read_local_dataset,
+                path=os.path.join(data_args.dataset_name_or_path, "quant.json"),
+                lazy=data_args.lazy,
+            )
             ptq_ds = ptq_ds.map(partial(trans_func, is_test=False))
         else:
             ptq_ds = train_ds
@@ -351,9 +390,14 @@ def main():
 
         # Prepare ptq dataloader
         if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
+            # ptq_ds = load_dataset(
+            #     "json", data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=data_args.lazy,
+            # )[0]
             ptq_ds = load_dataset(
-                "json", data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"), lazy=False
-            )[0]
+                read_local_dataset,
+                path=os.path.join(data_args.dataset_name_or_path, "quant.json"),
+                lazy=data_args.lazy,
+            )
             ptq_ds = ptq_ds.map(partial(trans_func, is_test=False))
         else:
             ptq_ds = train_ds
@@ -371,9 +415,14 @@ def main():
 
     # Evaluation test set
     if training_args.do_predict:
+        # test_ds = load_dataset(
+        #     "json", data_files=os.path.join(data_args.dataset_name_or_path, "test.json"), lazy=data_args.lazy,
+        # )[0]
         test_ds = load_dataset(
-            "json", data_files=os.path.join(data_args.dataset_name_or_path, "test.json"), lazy=False
-        )[0]
+            read_local_dataset,
+            path=os.path.join(data_args.dataset_name_or_path, "test.json"),
+            lazy=data_args.lazy,
+        )
         test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
         eval_result = trainer.predict(test_ds).metrics
         trainer.log_metrics("test", eval_result)
