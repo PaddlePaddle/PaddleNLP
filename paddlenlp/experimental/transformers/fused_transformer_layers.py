@@ -458,7 +458,6 @@ class FusedMultiTransformer(Layer):
                 q_out, k_out, v_out = qkv_transpose_split(
                     qkv_out, padding_offset, seq_lens, input_ids, self.num_heads // self.nranks, self.head_dim
                 )
-                # import pdb; pdb.set_trace()
 
                 if rotary_embs is not None:
                     # rotary emb (inplace)
@@ -478,7 +477,6 @@ class FusedMultiTransformer(Layer):
                 write_cache_kv(k_out, v_out, caches[i], seq_lens + pre_caches_length)
 
                 # cutlass fmha
-                # import pdb; pdb.set_trace()
                 qktv_out = variable_length_memory_efficient_attention(
                     q_out,
                     k_out,

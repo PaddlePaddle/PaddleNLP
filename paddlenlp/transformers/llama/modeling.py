@@ -702,7 +702,6 @@ class LlamaAttention(nn.Layer):
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
-        # import pdb;pdb.set_trace()
         if self.fuse_attention_qkv:
             if self.sequence_parallel:
                 target_shape = [-1, self.seq_length, self.num_heads, 3 * self.head_dim]
@@ -1188,7 +1187,6 @@ class LlamaModel(LlamaPretrainedModel):
             batch_size, seq_length, _ = inputs_embeds.shape
         else:
             raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
-        # import pdb;pdb.set_trace()
         if past_key_values is None:
             past_key_values = tuple([None] * len(self.layers))
 
@@ -1235,9 +1233,7 @@ class LlamaModel(LlamaPretrainedModel):
             attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
         )  # [bs, 1, seq_len, seq_len]
         hidden_states = inputs_embeds
-        import pdb
 
-        pdb.set_trace()
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
@@ -1286,9 +1282,7 @@ class LlamaModel(LlamaPretrainedModel):
 
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
-        import pdb
 
-        pdb.set_trace()
         hidden_states = self.norm(hidden_states)
 
         # add hidden states from the last decoder layer

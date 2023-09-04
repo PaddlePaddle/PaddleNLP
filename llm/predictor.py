@@ -296,12 +296,8 @@ class InferencePredictorMixin:
             prefix_cache = paddle.expand(
                 prefix_cache, [num_layers, 2, config.batch_size, num_attention_heads, prefix_cache.shape[-2], head_dim]
             )
-            # prefix_cache = paddle.rand(shape=[32, 3, 32, 4, 128])
-            print("prefix_cache", prefix_cache[0])
-            # TODO(wj-Mcat): support more model of fetching `num_hidden_layers`
 
             self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, num_layers, axis=0)]
-            # import pdb;pdb.set_trace()
 
     def _postprocess(self, predictions):
         if paddle.distributed.get_rank() == 0:
@@ -395,7 +391,6 @@ class InferencePredictorMixin:
 
         else:
             pre_caches_length = 0 if self.config.prefix_path is None else self.pre_caches[0].shape[-2]
-            print("pre_caches_length", pre_caches_length)
 
             inputs = dybatch_preprocess(
                 self.tokenizer,

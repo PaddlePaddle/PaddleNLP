@@ -206,12 +206,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             input_ids, position_ids, self.head_dim_shape_tensor, position_offset, True
         )
 
-        print("cum_offsets", cum_offsets)
-        print("padding_offset", padding_offset)
-
-        # if is_decoder:
-        #  import pdb; pdb.set_trace()
-
         with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
             hidden_states, _ = self.transformer_block(
                 input_ids,
