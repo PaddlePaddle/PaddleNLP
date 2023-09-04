@@ -519,7 +519,6 @@ def cached_file(
 
     try:
         # Load from URL or cache if already cached
-        # import pdb;pdb.set_trace()
         resolved_file = paddlenlp_hub_download(
             path_or_repo_id,
             filename,

@@ -390,6 +390,8 @@ class FusedMultiTransformer(Layer):
         padding_offset=None,
         attn_mask=None,
         caches=None,
+        pre_caches=None,
+        pre_caches_length=0,
         rotary_embs=None,
         rotary_emb_dims=0,
         seq_lens=None,
@@ -434,13 +436,14 @@ class FusedMultiTransformer(Layer):
             assert len(caches) == len(self.qkv_weights)
         bias_residual_input = src
         ln_out = src
+
         for i in range(len(caches)):
             if self.normalize_before is True:
                 # layernorm
                 if i == 0:
                     ln_out = self.norm_func(
                         src, self.ln_scales[i], self.ln_biases[i], self._epsilon, begin_norm_axis=1
-                    )
+                    )[0]
 
             # qkv compute
             qkv_out = self.linear(ln_out, self.qkv_weights[i], self.qkv_biases[i], transpose_weight=True)
@@ -456,21 +459,32 @@ class FusedMultiTransformer(Layer):
                     qkv_out, padding_offset, seq_lens, input_ids, self.num_heads // self.nranks, self.head_dim
                 )
 
-                # rotary emb (inplace)
-                encode_rotary_qk(
-                    q_out,
-                    k_out,
-                    rotary_embs,
-                    seq_lens,
-                    rotary_emb_dims=rotary_emb_dims,
-                    use_neox=self.use_neox_rotary_style,
-                )
+                if rotary_embs is not None:
+                    # rotary emb (inplace)
+                    encode_rotary_qk(
+                        q_out,
+                        k_out,
+                        rotary_embs,
+                        seq_lens,
+                        rotary_emb_dims=rotary_emb_dims,
+                        use_neox=self.use_neox_rotary_style,
+                    )
                 # write cache kv (inplace)
-                write_cache_kv(k_out, v_out, caches[i], seq_lens)
+                if pre_caches is not None:
+                    k_out = paddle.concat([pre_caches[i][0], k_out], axis=2)
+                    v_out = paddle.concat([pre_caches[i][1], v_out], axis=2)
+
+                write_cache_kv(k_out, v_out, caches[i], seq_lens + pre_caches_length)
 
                 # cutlass fmha
                 qktv_out = variable_length_memory_efficient_attention(
-                    q_out, k_out, v_out, seq_lens, seq_lens, mask=attn_mask, scale=float(self.head_dim**-0.5)
+                    q_out,
+                    k_out,
+                    v_out,
+                    seq_lens,
+                    seq_lens + pre_caches_length,
+                    mask=attn_mask,
+                    scale=float(self.head_dim**-0.5),
                 )
 
                 fmha_out = transpose_remove_padding(qktv_out, seq_lens, padding_offset)
@@ -497,11 +511,12 @@ class FusedMultiTransformer(Layer):
             if self.normalize_before is True:
                 norm_out = self.norm_func(
                     out_linear_out,
-                    self.ffn_ln_scales[i],
-                    self.ffn_ln_biases[i],
-                    self._epsilon,
-                    residual=bias_residual_input,
+                    norm_weight=self.ffn_ln_scales[i],
+                    norm_bias=self.ffn_ln_biases[i],
+                    epsilon=self._epsilon,
                     begin_norm_axis=1,
+                    bias=self.linear_biases[i],
+                    residual=bias_residual_input,
                 )
                 tmp_out, bias_residual_input = norm_out[0], norm_out[1]
             else:
@@ -532,16 +547,23 @@ class FusedMultiTransformer(Layer):
                 if i != len(caches) - 1:
                     norm_out = self.norm_func(
                         ffn2_out,
-                        self.ln_scales[i + 1],
-                        self.ln_biases[i + 1],
-                        self._epsilon,
-                        residual=bias_residual_input,
+                        norm_weight=self.ln_scales[i + 1],
+                        norm_bias=self.ln_biases[i + 1],
+                        epsilon=self._epsilon,
                         begin_norm_axis=1,
+                        bias=self.ffn2_biases[i],
+                        residual=bias_residual_input,
                     )
                     tmp_out, bias_residual_input = norm_out[0], norm_out[1]
                 else:
                     tmp_out = fused_layer_norm(
-                        ffn2_out, None, None, self._epsilon, residual=bias_residual_input, begin_norm_axis=1
+                        ffn2_out,
+                        norm_weight=None,
+                        norm_bias=None,
+                        epsilon=self._epsilon,
+                        begin_norm_axis=1,
+                        bias=self.ffn2_biases[i],
+                        residual=bias_residual_input,
                     )[0]
             else:
                 tmp_out = self.norm_func(

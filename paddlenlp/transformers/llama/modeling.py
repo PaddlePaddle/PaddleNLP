@@ -708,7 +708,6 @@ class LlamaAttention(nn.Layer):
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
-
         if self.fuse_attention_qkv:
             if self.sequence_parallel:
                 target_shape = [-1, self.seq_length, self.num_heads, 3 * self.head_dim]
@@ -1195,7 +1194,6 @@ class LlamaModel(LlamaPretrainedModel):
             batch_size, seq_length, _ = inputs_embeds.shape
         else:
             raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
-
         if past_key_values is None:
             past_key_values = tuple([None] * len(self.layers))
 
