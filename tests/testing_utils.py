@@ -16,9 +16,9 @@ from __future__ import annotations
 import copy
 import gc
 import inspect
+import json
 import os
 import sys
-import json
 import unittest
 from collections.abc import Mapping
 from contextlib import contextmanager
@@ -359,15 +359,15 @@ def argv_context_guard(config: dict):
     sys.argv = old_argv
 
 
-def update_params(json_file: str,params: dict):
+def update_params(json_file: str, params: dict):
     """update params in json file
 
     Args:
         json_file (str): the path of json file
         params (dict): the parameters need to update
     """
-    with open(json_file, 'r') as f:
+    with open(json_file, "r") as f:
         data = json.load(f)
         data.update(params)
-    with open(json_file, 'w') as f:
-        json.dump(data, f,indent=2, ensure_ascii=False)
+    with open(json_file, "w") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)

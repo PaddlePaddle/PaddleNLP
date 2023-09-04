@@ -44,7 +44,7 @@ class LLaMATest(TestCase):
             URL2 = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz"
             get_path_from_url(URL, root_dir="./llm/llama/data")
             get_path_from_url(URL2, root_dir="./llm/llama/data")
-        
+
         # fix fused_layers import error
         sys.path.insert(0, self.path + "/llama")
 
