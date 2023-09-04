@@ -462,7 +462,7 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
     inputs["min_length"] = (
         np.array(
             [
-                2 if not benchmark else max_length - seq_len, # Note(Zhengzekang): When in benchmark mode, we need to set a fixed decode length. 
+                1 if not benchmark else max_length - seq_len, # Note(Zhengzekang): When in benchmark mode, we need to set a fixed decode length. 
             ]
             * bs
         )
