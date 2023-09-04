@@ -26,5 +26,5 @@ device_num="N1C1"
 num_train_epochs=2
 export CUDA_VISIBLE_DEVICES=0
 cd ./tests
-# bash ./test_tipc/dygraph/ft/benchmark_common/prepare.sh
+bash ./test_tipc/dygraph/ft/benchmark_common/prepare.sh
 bash ./test_tipc/dygraph/ft/benchmark_common/run_benchmark.sh ${model_name_or_path} ${dataset_name_or_path} ${max_length} ${learning_rate} ${recompute} ${tensor_parallel_degree} ${lora} ${prefix_tuning} ${model_item} ${run_mode} ${device_num} ${num_train_epochs}
