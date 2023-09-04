@@ -41,6 +41,7 @@ from pipelines.nodes.preprocessor import (
     CharacterTextSplitter,
     PreProcessor,
     RecursiveCharacterTextSplitter,
+    SpacyTextSplitter,
 )
 from pipelines.nodes.prompt import PromptModel, PromptNode, Shaper
 from pipelines.nodes.question_generator import QuestionGenerator

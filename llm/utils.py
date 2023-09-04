@@ -25,8 +25,9 @@ from paddle.distributed import fleet
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from sklearn.metrics import accuracy_score
 
-from paddlenlp.trainer import Trainer
-from paddlenlp.trainer.trainer_utils import has_length
+from paddlenlp.datasets import InTokensIterableDataset
+from paddlenlp.trainer import Trainer, TrainerCallback
+from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
 from paddlenlp.utils.log import logger
 
 
@@ -142,6 +143,29 @@ def get_lora_target_modules(model):
     else:
         raise ValueError(f"Unknown base_model_prefix: {model.base_model_prefix}.")
     return target_modules
+
+
+class InTokensIterDatasetCallback(TrainerCallback):
+    """
+    A [`TrainerCallback`] that handles early stopping.
+
+    """
+
+    def on_step_end(self, args, state, control, **kwargs):
+        train_dataloader = kwargs["train_dataloader"]
+        if isinstance(train_dataloader.dataset, InTokensIterableDataset):
+            dataset = train_dataloader.dataset
+        elif isinstance(train_dataloader.dataset, IterableDatasetShard) and isinstance(
+            train_dataloader.dataset.dataset, InTokensIterableDataset
+        ):
+            dataset = train_dataloader.dataset.dataset
+        else:
+            raise ValueError(
+                "Unexpected dataset format: InTokensIterDatasetCallback expectes `paddlenlp.datasets.InTokensIterableDataset`"
+            )
+        if state.trial_params is None:
+            state.trial_params = {}
+        state.trial_params["intokens_global_step"] = dataset.intokens_global_step
 
 
 class CausalLMTrainer(Trainer):

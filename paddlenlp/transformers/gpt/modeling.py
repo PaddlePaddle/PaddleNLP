@@ -440,7 +440,7 @@ class TransformerDecoder(nn.Layer):
             attention_mask,
             use_cache,
             cache,
-            use_reentrant=False,
+            use_reentrant=self.config.recompute_use_reentrant,
         )
         return hidden_states
 

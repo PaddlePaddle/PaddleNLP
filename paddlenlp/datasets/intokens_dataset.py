@@ -105,6 +105,7 @@ class InTokensIterableDataset(InTokens, IterableDataset):
         self.data = data
         self.tokenizer = tokenizer
         self.max_length = max_length
+        self.intokens_global_step = 0
 
     def __iter__(self):
         batch_records, max_len = [], 0
@@ -114,6 +115,7 @@ class InTokensIterableDataset(InTokens, IterableDataset):
             to_append = (cur_len_so_far + len(record["input_ids"])) <= self.max_length
             if to_append:
                 batch_records.append(record)
+                self.intokens_global_step += 1
                 cur_len_so_far += len(record["input_ids"])
             else:
                 # exceed max length
@@ -124,6 +126,7 @@ class InTokensIterableDataset(InTokens, IterableDataset):
                 cur_len_so_far = 0
                 # append current data
                 batch_records.append(record)
+                self.intokens_global_step += 1
                 cur_len_so_far += len(record["input_ids"])
         if batch_records:
             padded_list = self._pad_batch_records(batch_records)
