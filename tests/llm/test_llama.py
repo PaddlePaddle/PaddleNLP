@@ -15,14 +15,12 @@ from __future__ import annotations
 
 import os
 import sys
-import unittest
 from unittest import TestCase
 
 from paddlenlp.utils.downloader import get_path_from_url
 from tests.testing_utils import (
     argv_context_guard,
     load_test_config,
-    slow,
     update_params,
 )
 
