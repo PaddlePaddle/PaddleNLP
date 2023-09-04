@@ -231,7 +231,7 @@ python -u  -m paddle.distributed.launch \
 - `tokenizer_name_or_path` 模型词表文件所在的文件夹，或者PaddleNLP内置tokenizer的名字。
 - `continue_training` 默认false，模型从随机初始化，开始训练。如果为True，从已有的预训练权重加载，开始训练。如果为True， 训练初始loss 为2.x 是正常loss，如果未False，随机初始化，初始loss一般为10+。
 - `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
-- `data_impl` 指定输入文件数据制作类型，默认为mmap，可指定mmap或lazy。
+- `data_impl` 指定输入文件数据制作类型，默认为`mmap`，可指定`mmap`或`lazy`，`mmap`格式在读入数据时会建立内存映射，`lazy`格式在读入数据时直接从文件读取。
 - `output_dir` 指定输出文件。
 - `split` 划分数据集为train、valid、test的比例。整个数据集会按照这个比例划分数据。默认1/1000的数据为test，当样本数太少时，请修改此比例。
 - `max_seq_len` 输入文本序列的长度。
