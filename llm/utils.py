@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import glob
+import math
 import os
 import struct
 from typing import Dict, Optional
@@ -351,6 +352,21 @@ def deserialize_from_file(fp):
     return data_arr
 
 
+def get_alibi_slopes(num_heads):
+    closest_power_of_2 = 2 ** math.floor(math.log2(num_heads))
+    base = 2 ** (-(2 ** -(math.log2(closest_power_of_2) - 3)))
+    powers = np.arange(1, 1 + closest_power_of_2)
+    slopes = np.power(base, powers)
+
+    if closest_power_of_2 != num_heads:
+        extra_base = 2 ** (-(2 ** -(math.log2(2 * closest_power_of_2) - 3)))
+        num_remaining_heads = min(closest_power_of_2, num_heads - closest_power_of_2)
+        extra_powers = np.arange(1, 1 + 2 * num_remaining_heads, 2)
+        slopes = np.concatante([slopes, np.power(extra_base, extra_powers)], axis=0)
+
+    return slopes.astype("float32")
+
+
 def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
     """Pad sequences to the max sequence length in batch."""
     max_len = max(map(len, insts))
@@ -366,7 +382,9 @@ def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
         return inst_data.astype("int64").reshape([-1, max_len])
 
 
-def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectures: str):
+def dybatch_preprocess(
+    tokenizer, texts: list[str], max_length: int, architectures: str, top_p: float, temperature: float
+):
     """Pre-process generation inputs."""
     if "chatglm" in architectures:
         input_ids = []

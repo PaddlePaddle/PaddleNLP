@@ -31,6 +31,7 @@ setup(
             "./generation/write_cache_kv.cu",
             "./generation/encode_rotary_qk.cu",
             "./generation/top_p_sampling.cu",
+            "./generation/set_alibi_mask_value.cu",
         ]
     ),
 )
