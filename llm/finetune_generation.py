@@ -37,7 +37,7 @@ from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import InTokensIterableDataset, InTokensMapDataset, load_dataset
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
-from paddlenlp.trainer import PdArgumentParser
+from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
     AutoConfig,
@@ -79,6 +79,21 @@ def main():
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: {training_args.world_size}, "
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
+
+    # Detecting last checkpoint.
+    last_checkpoint = None
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
+        last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 1:
+            raise ValueError(
+                f"Output directory ({training_args.output_dir}) already exists and is not empty. "
+                "Use --overwrite_output_dir to overcome."
+            )
+        if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
+            logger.info(
+                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+            )
 
     # Load model
     if training_args.fp16_opt_level == "O2":
@@ -312,7 +327,12 @@ def main():
 
     # Train
     if training_args.do_train:
-        train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
+        checkpoint = None
+        if training_args.resume_from_checkpoint is not None:
+            checkpoint = training_args.resume_from_checkpoint
+        elif last_checkpoint is not None:
+            checkpoint = last_checkpoint
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
         if training_args.benchmark:
             total_effective_tokens = (
                 sum([len(i["input_ids"]) for i in trainer.train_dataset]) * training_args.num_train_epochs
