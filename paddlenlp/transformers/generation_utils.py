@@ -12,8 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from paddlenlp.transformers.generation.configuration_utils import *  # noqa: F401, F403
-from paddlenlp.transformers.generation.logits_process import *  # noqa: F401, F403
-from paddlenlp.transformers.generation.stopping_criteria import *  # noqa: F401, F403
-from paddlenlp.transformers.generation.streamers import *  # noqa: F401, F403
-from paddlenlp.transformers.generation.utils import *  # noqa: F401, F403
+from paddlenlp.generation.configuration_utils import *  # noqa: F401, F403
+from paddlenlp.generation.logits_process import *  # noqa: F401, F403
+from paddlenlp.generation.stopping_criteria import *  # noqa: F401, F403
+from paddlenlp.generation.streamers import *  # noqa: F401, F403
+from paddlenlp.generation.utils import *  # noqa: F401, F403

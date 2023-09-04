@@ -14,6 +14,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import copy
 from typing import Union
 
 import paddle
@@ -737,8 +738,17 @@ class GenerationMixin(object):
                 # ['是的', '嗯嗯']
         """
         if generation_config is None:
-            generation_config = GenerationConfig.from_model_config(self.config)
+            if self.generation_config._from_model_config:
+                new_generation_config = GenerationConfig.from_model_config(self.config)
+                if new_generation_config != self.generation_config:
+                    logger.warning(
+                        "model.generation_config is in conflict with model.config, " "model.config is used."
+                    )
+                    self.generation_config = new_generation_config
+            generation_config = self.generation_config
 
+        # without update model.generation_config
+        generation_config = copy.deepcopy(generation_config)
         model_kwargs = generation_config.update(**kwargs)
 
         assert generation_config.decode_strategy in [

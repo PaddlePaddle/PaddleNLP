@@ -23,18 +23,18 @@ from huggingface_hub import hf_hub_download
 from paddle.common_ops_import import convert_dtype
 
 from paddlenlp import __version__
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
+from paddlenlp.transformers.utils import resolve_cache_dir
 from paddlenlp.utils.log import logger
 
-from ...utils import GENERATION_CONFIG_NAME
-from ...utils.downloader import (
+from ..utils import GENERATION_CONFIG_NAME
+from ..utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     get_path_from_url_with_filelock,
     hf_file_exists,
     is_url,
     url_file_exists,
 )
-from ..configuration_utils import PretrainedConfig
-from ..utils import resolve_cache_dir
 
 
 def resolve_hf_generation_config_path(repo_id: str, cache_dir: str, subfolder=None) -> str:
@@ -202,7 +202,7 @@ class GenerationConfig:
         self_dict = self.__dict__.copy()
         other_dict = other.__dict__.copy()
         # ignore metadata
-        for metadata_field in "paddlenlp_version":
+        for metadata_field in ["_from_model_config", "paddlenlp_version"]:
             self_dict.pop(metadata_field, None)
             other_dict.pop(metadata_field, None)
         return self_dict == other_dict

@@ -22,8 +22,7 @@ from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.transformers.generation_utils import TextIteratorStreamer, TextStreamer
 from paddlenlp.transformers.utils import CaptureStd
 from tests.testing_utils import slow
-
-from ..test_modeling_common import ids_tensor
+from tests.transformers.test_modeling_common import ids_tensor
 
 
 class StreamerTester(unittest.TestCase):
