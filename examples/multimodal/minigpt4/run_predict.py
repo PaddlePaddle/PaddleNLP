@@ -30,16 +30,16 @@ def predict(args):
     # load MiniGPT4 moel and processor
     model = MiniGPT4ForConditionalGeneration.from_pretrained(args.pretrained_name_or_path)
     model.eval()
-    processor = MiniGPT4Processor.from_pretrained(args.pretrained_name_or_path)
+    # processor = MiniGPT4Processor.from_pretrained(args.pretrained_name_or_path)
     print("load processor and model done!")
 
     # prepare model inputs for MiniGPT4
-    url = "https://paddlenlp.bj.bcebos.com/data/images/mugs.png"
-    image = Image.open(requests.get(url, stream=True).raw)
+    # url = "https://paddlenlp.bj.bcebos.com/data/images/mugs.png"
+    # image = Image.open(requests.get(url, stream=True).raw)
 
-    text = "describe this image"
-    prompt = "Give the following image: <Img>ImageContent</Img>. You will be able to see the image once I provide it to you. Please answer my questions.###Human: <Img><ImageHere></Img> <TextHere>###Assistant:"
-    inputs = processor([image], text, prompt)
+    # text = "describe this image"
+    # prompt = "Give the following image: <Img>ImageContent</Img>. You will be able to see the image once I provide it to you. Please answer my questions.###Human: <Img><ImageHere></Img> <TextHere>###Assistant:"
+    # inputs = processor([image], text, prompt)
 
 
     import numpy as np
@@ -49,9 +49,11 @@ def predict(args):
     # vit_inputs = vit_data["input"]
     # vit_outputs = vit_data["output"]
     vit_image = vit_data[0]
+    inputs={}
     inputs["pixel_values"] = paddle.to_tensor(vit_image)
     inputs["first_input_ids"] = paddle.to_tensor([[50258]])
     inputs["first_attention_mask"] = paddle.to_tensor([[1]])
+    inputs["max_len"] = paddle.to_tensor([20])
     
     print("inputs", inputs)
 
@@ -69,7 +71,7 @@ def predict(args):
         "decode_strategy": "beam_search",
         "eos_token_id": [[199]],
     }
-    outputs = model.generate(**inputs, **generate_kwargs)
+    outputs = model.generate_gpt(**inputs, **generate_kwargs)
 
     print("outputs", outputs)
     tokenizer = GPTTokenizer.from_pretrained("/root/paddlejob/workspace/env_run/zhengshifeng/vitllm/vit_model")

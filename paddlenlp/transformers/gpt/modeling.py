@@ -206,8 +206,8 @@ class MultiHeadAttention(nn.Layer):
     def _fuse_prepare_qkv(self, query, use_cache=False, cache=None):
         # import pdb;pdb.set_trace()
         q, k, v = self.qkv_proj(query).split(3, axis=2)
-        print("query--",query.shape)
-        print("q--",q.shape)
+        # # print("query--",query.shape)
+        # # print("q--",q.shape)
 
         q = q.reshape([5, query.shape[1], 32, 128]).transpose([0, 2, 1, 3])
         k = k.reshape([5, query.shape[1], 32, 128]).transpose([0, 2, 1, 3])
@@ -500,7 +500,7 @@ class TransformerDecoder(nn.Layer):
                 all_hidden_states = all_hidden_states + (output,)
             self.checkpoints.append(output.name)
 
-            print("outputs -- ", output[0])
+            # # print("outputs -- ", output[0])
         # import pdb; pdb.set_trace()
         if self.norm is not None:
             output = self.norm(output)
@@ -1046,10 +1046,13 @@ class GPTModel(GPTPretrainedModel):
         # if is_decoder:
         #     import pdb;pdb.set_trace()
 
-        if inputs_embeds is not None:
+        # if inputs_embeds is not None:
+        if not is_decoder:
+            # print("inputs_embeds----", inputs_embeds.cast("float32"))
             input_ids = None
             input_shape = paddle.shape(inputs_embeds)[:-1]
         elif input_ids is not None:
+            # print("input_ids----", input_ids)
             input_shape = paddle.shape(input_ids)
             input_ids = input_ids.reshape((-1, input_shape[-1])) 
         else:
@@ -1061,9 +1064,12 @@ class GPTModel(GPTPretrainedModel):
                 past_length = paddle.shape(cache[0].k)[-2]
             position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype="int64")
             position_ids = position_ids.unsqueeze(0)
+            # import pdb;pdb.set_trace()
+            # print(" input_shape---", input_shape)
+            # print(" position_ids---", position_ids)
             position_ids = paddle.expand(position_ids, input_shape)
         
-        if inputs_embeds is not None:
+        if not is_decoder:
             embedding_output = inputs_embeds
             position_embeddings = self.embeddings.position_embeddings(position_ids)
             embedding_output = inputs_embeds + position_embeddings
@@ -1444,7 +1450,7 @@ class GPTForCausalLM(GPTPretrainedModel):
         """
         input_type = type(input_ids) if input_ids is not None else type(inputs_embeds)
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        print("elf.gpt inputs_embeds", inputs_embeds)
+        # # print("elf.gpt inputs_embeds", inputs_embeds)
         outputs = self.gpt(
             input_ids,
             position_ids=position_ids,

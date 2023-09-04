@@ -24,7 +24,7 @@ from paddle.nn import CrossEntropyLoss
 
 from paddlenlp.ops import transfer_param
 from paddlenlp.utils.log import logger
-
+from paddlenlp.transformers.model_utils import dtype_guard
 from ...utils.initializer import normal_, ones_, zeros_
 from ..activations import ACT2FN
 from ..llama.modeling import LlamaForCausalLM
@@ -359,7 +359,7 @@ class MiniGPT4EncoderLayer(nn.Layer):
         """
         residual = hidden_states
 
-        print("hidden_states input", hidden_states)
+        # print("hidden_states input", hidden_states)
         hidden_states = self.layer_norm1(hidden_states)
         hidden_states, attn_weights = self.self_attn(
             hidden_states=hidden_states,
@@ -367,7 +367,7 @@ class MiniGPT4EncoderLayer(nn.Layer):
             output_attentions=output_attentions,
         )
 
-        print("hidden_states self_attn", hidden_states)
+        # print("hidden_states self_attn", hidden_states)
         hidden_states = hidden_states + residual
         residual = hidden_states
         hidden_states = self.layer_norm2(hidden_states)
@@ -376,7 +376,7 @@ class MiniGPT4EncoderLayer(nn.Layer):
         
 
         hidden_states = hidden_states + residual
-        print("hidden_states out", hidden_states)
+        # print("hidden_states out", hidden_states)
 
         outputs = (hidden_states,)
 
@@ -1606,7 +1606,8 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
         self.opt_proj = nn.Linear(1280, 4096)
 
         self.language_projection = nn.Linear(config.qformer_config.hidden_size, config.text_config.hidden_size)
-        self.language_model = GPTForCausalLM(config.text_config)
+        with dtype_guard("float16"):
+            self.language_model = GPTForCausalLM(config.text_config)
 
     def get_input_embeddings(self) -> nn.Layer:
         return self.vision_model.embeddings.patch_embedding
@@ -1713,13 +1714,12 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
         )
 
     @paddle.no_grad()
-    def generate(
+    def generate_gpt(
         self,
         pixel_values: paddle.Tensor,  # processed image
         first_input_ids: paddle.Tensor,
-        second_input_ids: paddle.Tensor,
         first_attention_mask: Optional[paddle.Tensor] = None,
-        second_attention_mask: Optional[paddle.Tensor] = None,
+        # max_length: Optional[paddle.Tensor] = None,
         **generate_kwargs,
     ) -> paddle.Tensor:
         """
@@ -1756,6 +1756,8 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
         """
         # step 1: forward the images through the vision encoder,
         # to get image embeddings of shape (batch_size, seq_len, hidden_size)
+
+        print("88888888888888888")
         pixel_values = paddle.cast(pixel_values, self.vision_model.embeddings.patch_embedding.weight.dtype)
         vision_outputs = self.vision_model(pixel_values, return_dict=True)
         image_embeds = vision_outputs.last_hidden_state
@@ -1774,131 +1776,135 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
         # import pdb;pdb.set_trace()
         first_embeds = self.language_model.gpt.embeddings.word_embeddings(first_input_ids)
         first_embeds = paddle.concat([inputs_opt, first_embeds.cast("float32")], axis=1)
+        print("first_embeds0---", first_embeds.shape)
         
         inputs_embeds = first_embeds.repeat_interleave(5, 0).cast("float16")
         attention_mask = attention_mask.repeat_interleave(5, 0)
 
+        print("inputs_embeds---", inputs_embeds.shape)
 
 
-        outputs = self.language_model.generate(
+
+        outputs, beam_scores = self.language_model.generate(
             input_ids=first_input_ids, inputs_embeds=inputs_embeds, attention_mask=attention_mask, **generate_kwargs
         )
-        return outputs
+        output = paddle.clone(outputs) + paddle.to_tensor([0])
+        return output, beam_scores
 
-    @paddle.no_grad()
-    def encode_images(
-        self,
-        pixel_values: paddle.Tensor,  # processed image
-    ) -> paddle.Tensor:
-        """
-        Overrides `generate` function to be able to use the model as a conditional generator.
-        Args:
-            pixel_values (`paddle.Tensor` of shape (batch_size, num_channels, height, width)):
-                Input images to be processed.
-        Returns:
-            captions (list): A list of strings of length batch_size * num_captions.
+    # @paddle.no_grad()
+    # def encode_images(
+    #     self,
+    #     pixel_values: paddle.Tensor,  # processed image
+    # ) -> paddle.Tensor:
+    #     """
+    #     Overrides `generate` function to be able to use the model as a conditional generator.
+    #     Args:
+    #         pixel_values (`paddle.Tensor` of shape (batch_size, num_channels, height, width)):
+    #             Input images to be processed.
+    #     Returns:
+    #         captions (list): A list of strings of length batch_size * num_captions.
 
-        Examples:
-        ```python
-        >>> from PIL import Image
-        >>> import requests
-        >>> import paddle
-        >>> from paddlenlp.transformers import MiniGPT4Processor, MiniGPT4ForConditionalGeneration
-        >>> processor = MiniGPT4Processor.from_pretrained("model_name")
-        >>> model = MiniGPT4ForConditionalGeneration.from_pretrained("model_name")
-        >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
-        >>> image = Image.open(requests.get(url, stream=True).raw)
-        >>> image = processor.process_images(images=image, return_tensors="pd")
-        >>> image_features, image_attention_mask = model.encode_images(**image)
-        """
-        # step 1: forward the images through the vision encoder,
-        # to get image embeddings of shape (batch_size, seq_len, hidden_size)
-        pixel_values = paddle.cast(pixel_values, self.vision_model.embeddings.patch_embedding.weight.dtype)
-        vision_outputs = self.vision_model(pixel_values, return_dict=True)
-        image_embeds = vision_outputs.last_hidden_state
-        image_attention_mask = paddle.ones(image_embeds.shape[:-1], dtype="int64")
+    #     Examples:
+    #     ```python
+    #     >>> from PIL import Image
+    #     >>> import requests
+    #     >>> import paddle
+    #     >>> from paddlenlp.transformers import MiniGPT4Processor, MiniGPT4ForConditionalGeneration
+    #     >>> processor = MiniGPT4Processor.from_pretrained("model_name")
+    #     >>> model = MiniGPT4ForConditionalGeneration.from_pretrained("model_name")
+    #     >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+    #     >>> image = Image.open(requests.get(url, stream=True).raw)
+        # >>> image = processor.process_images(images=image, return_tensors="pd")
+        # >>> image_features, image_attention_mask = model.encode_images(**image)
+        # """
+        # # step 1: forward the images through the vision encoder,
+        # # to get image embeddings of shape (batch_size, seq_len, hidden_size)
+        # pixel_values = paddle.cast(pixel_values, self.vision_model.embeddings.patch_embedding.weight.dtype)
+        # vision_outputs = self.vision_model(pixel_values, return_dict=True)
+        # image_embeds = vision_outputs.last_hidden_state
+        # image_attention_mask = paddle.ones(image_embeds.shape[:-1], dtype="int64")
 
-        # step 2: forward the query tokens through the QFormer, using the image embeddings for cross-attention
-        query_tokens = self.query_tokens.expand([image_embeds.shape[0], -1, -1])
-        query_tokens = paddle.cast(query_tokens, self.qformer.layernorm.weight.dtype)
-        image_embeds = paddle.cast(image_embeds, self.qformer.layernorm.weight.dtype)
-        query_outputs = self.qformer(
-            query_embeds=query_tokens,
-            encoder_hidden_states=image_embeds,
-            encoder_attention_mask=image_attention_mask,
-            return_dict=True,
-        )
-        query_output = query_outputs.last_hidden_state
+        # # step 2: forward the query tokens through the QFormer, using the image embeddings for cross-attention
+        # query_tokens = self.query_tokens.expand([image_embeds.shape[0], -1, -1])
+        # query_tokens = paddle.cast(query_tokens, self.qformer.layernorm.weight.dtype)
+        # image_embeds = paddle.cast(image_embeds, self.qformer.layernorm.weight.dtype)
+        # query_outputs = self.qformer(
+        #     query_embeds=query_tokens,
+        #     encoder_hidden_states=image_embeds,
+        #     encoder_attention_mask=image_attention_mask,
+        #     return_dict=True,
+        # )
+        # query_output = query_outputs.last_hidden_state
 
-        # step 3: use the language model, conditioned on the text and image
-        language_model_inputs = self.language_projection(query_output)
-        language_model_attention_mask = paddle.ones(language_model_inputs.shape[:-1], dtype="int64")
+        # # step 3: use the language model, conditioned on the text and image
+        # language_model_inputs = self.language_projection(query_output)
+        # language_model_attention_mask = paddle.ones(language_model_inputs.shape[:-1], dtype="int64")
 
-        return language_model_inputs, language_model_attention_mask
+        # return language_model_inputs, language_model_attention_mask
 
-    @paddle.no_grad()
-    def generate_with_image_features(
-        self,
-        image_features: paddle.Tensor,
-        first_input_ids: paddle.Tensor,
-        second_input_ids: paddle.Tensor,
-        image_attention_mask: Optional[paddle.Tensor] = None,
-        first_attention_mask: Optional[paddle.Tensor] = None,
-        second_attention_mask: Optional[paddle.Tensor] = None,
-        **generate_kwargs,
-    ) -> paddle.Tensor:
-        """
-        Overrides `generate` function to be able to use the model as a conditional generator.
-        Args:
-            image_features (`paddle.Tensor` of shape (batch_size, num_channels, height, width)):
-                Image features extracted with vit and qformer, specifically, the features extracted with the method `encoded_images`.
-            first_input_ids (`paddle.Tensor` of shape (batch_size, sequence_length), *optional*):
-                The first input prompt before the tag `<ImageHere>`, it's embeddings will concat with image embeddings and the embeddings of the second_input_ids for the generation.
-            second_input_ids (`paddle.Tensor` of shape (batch_size, sequence_length), *optional*):
-                The second input prompt after the tag `<ImageHere>`, it's embeddings will concat with image embeddings and the embeddings of the first_input_ids for the generation.
-            image_attention_mask (`paddle.Tensor` of shape (batch_size, image_sequence_length), *optional*):
-                The attention mask to the image_features.
-            first_attention_mask (`paddle.Tensor` of shape (batch_size, sequence_length), *optional*):
-                The attention mask corresponding to the first_input_ids.
-            second_attention_mask (`paddle.Tensor` of shape (batch_size, sequence_length), *optional*):
-                The attention mask corresponding to the second_input_ids.
-        Returns:
-            captions (list): A list of strings of length batch_size * num_captions.
+    # @paddle.no_grad()
+    # def generate_with_image_features(
+    #     self,
+    #     image_features: paddle.Tensor,
+    #     first_input_ids: paddle.Tensor,
+    #     second_input_ids: paddle.Tensor,
+    #     image_attention_mask: Optional[paddle.Tensor] = None,
+    #     first_attention_mask: Optional[paddle.Tensor] = None,
+    #     second_attention_mask: Optional[paddle.Tensor] = None,
+    #     **generate_kwargs,
+    # ) -> paddle.Tensor:
+    #     """
+    #     Overrides `generate` function to be able to use the model as a conditional generator.
+    #     Args:
+    #         image_features (`paddle.Tensor` of shape (batch_size, num_channels, height, width)):
+    #             Image features extracted with vit and qformer, specifically, the features extracted with the method `encoded_images`.
+    #         first_input_ids (`paddle.Tensor` of shape (batch_size, sequence_length), *optional*):
+    #             The first input prompt before the tag `<ImageHere>`, it's embeddings will concat with image embeddings and the embeddings of the second_input_ids for the generation.
+    #         second_input_ids (`paddle.Tensor` of shape (batch_size, sequence_length), *optional*):
+    #             The second input prompt after the tag `<ImageHere>`, it's embeddings will concat with image embeddings and the embeddings of the first_input_ids for the generation.
+    #         image_attention_mask (`paddle.Tensor` of shape (batch_size, image_sequence_length), *optional*):
+    #             The attention mask to the image_features.
+    #         first_attention_mask (`paddle.Tensor` of shape (batch_size, sequence_length), *optional*):
+    #             The attention mask corresponding to the first_input_ids.
+    #         second_attention_mask (`paddle.Tensor` of shape (batch_size, sequence_length), *optional*):
+    #             The attention mask corresponding to the second_input_ids.
+    #     Returns:
+    #         captions (list): A list of strings of length batch_size * num_captions.
 
-        Examples:
-        ```python
-        >>> from PIL import Image
-        >>> import requests
-        >>> import paddle
-        >>> from paddlenlp.transformers import MiniGPT4Processor, MiniGPT4ForConditionalGeneration
-        >>> processor = MiniGPT4Processor.from_pretrained("model_name")
-        >>> model = MiniGPT4ForConditionalGeneration.from_pretrained("model_name")
-        >>>  url = "https://paddlenlp.bj.bcebos.com/data/images/dog.png"
-        >>> image = Image.open(requests.get(url, stream=True).raw)
-        >>> processed_image = processor.process_images(images=image, return_tensors="pd")
-        >>> image_features, image_attention_mask = model.encode_images(**processed_image)
-        >>> text = "describe this image"
-        >>> prompt = "###Human: <Img><ImageHere></Img> <TextHere>###Assistant:"
-        >>> inputs = processor(text=text, prompt=prompt, return_tensors="pd")
-        >>> generated_ids, scores= model.generate_with_image_features(image_features, image_attention_mask=image_attention_mask, **inputs)
-        >>> generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
-        """
-        first_embeds = self.language_model.llama.embed_tokens(first_input_ids)
-        second_embeds = self.language_model.llama.embed_tokens(second_input_ids)
-        image_features = paddle.cast(image_features, dtype=first_embeds.dtype)
-        inputs_embeds = paddle.concat([first_embeds, image_features, second_embeds], axis=1)
+    #     Examples:
+    #     ```python
+    #     >>> from PIL import Image
+    #     >>> import requests
+    #     >>> import paddle
+    #     >>> from paddlenlp.transformers import MiniGPT4Processor, MiniGPT4ForConditionalGeneration
+    #     >>> processor = MiniGPT4Processor.from_pretrained("model_name")
+    #     >>> model = MiniGPT4ForConditionalGeneration.from_pretrained("model_name")
+    #     >>>  url = "https://paddlenlp.bj.bcebos.com/data/images/dog.png"
+    #     >>> image = Image.open(requests.get(url, stream=True).raw)
+    #     >>> processed_image = processor.process_images(images=image, return_tensors="pd")
+    #     >>> image_features, image_attention_mask = model.encode_images(**processed_image)
+    #     >>> text = "describe this image"
+    #     >>> prompt = "###Human: <Img><ImageHere></Img> <TextHere>###Assistant:"
+    #     >>> inputs = processor(text=text, prompt=prompt, return_tensors="pd")
+    #     >>> generated_ids, scores= model.generate_with_image_features(image_features, image_attention_mask=image_attention_mask, **inputs)
+    #     >>> generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+    #     """
+    #     first_embeds = self.language_model.llama.embed_tokens(first_input_ids)
+    #     second_embeds = self.language_model.llama.embed_tokens(second_input_ids)
+    #     image_features = paddle.cast(image_features, dtype=first_embeds.dtype)
+    #     inputs_embeds = paddle.concat([first_embeds, image_features, second_embeds], axis=1)
 
-        if first_attention_mask is None:
-            first_attention_mask = paddle.ones(first_embeds.shape[:-1], dtype="int64")
-        if second_attention_mask is None:
-            second_attention_mask = paddle.ones(second_embeds.shape[:-1], dtype="int64")
-        if image_attention_mask is None:
-            image_attention_mask = paddle.ones(image_features.shape[:-1], dtype="int64")
+    #     if first_attention_mask is None:
+    #         first_attention_mask = paddle.ones(first_embeds.shape[:-1], dtype="int64")
+    #     if second_attention_mask is None:
+    #         second_attention_mask = paddle.ones(second_embeds.shape[:-1], dtype="int64")
+    #     if image_attention_mask is None:
+    #         image_attention_mask = paddle.ones(image_features.shape[:-1], dtype="int64")
 
-        attention_mask = paddle.concat([first_attention_mask, image_attention_mask, second_attention_mask], axis=1)
+    #     attention_mask = paddle.concat([first_attention_mask, image_attention_mask, second_attention_mask], axis=1)
 
-        outputs = self.language_model.generate(
-            inputs_embeds=inputs_embeds, attention_mask=attention_mask, **generate_kwargs
-        )
+    #     outputs = self.language_model.generate(
+    #         inputs_embeds=inputs_embeds, attention_mask=attention_mask, **generate_kwargs
+    #     )
 
-        return outputs
+    #     return outputs
