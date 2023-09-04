@@ -40,7 +40,6 @@ class GenerationInferenceModel(GenerationMixin):
 
     def to_static(self, output_path: str, config: dict):
         dtype = config.get("dtype", paddle.get_default_dtype())
-
         cache_kvs_shapes = self.get_cache_kvs_shape(self.config, max_length=config.get("max_length", None))
 
         input_spec = [
@@ -83,6 +82,7 @@ class GenerationInferenceModel(GenerationMixin):
         model = paddle.jit.to_static(self.generate, input_spec=input_spec)
         paddle.jit.save(model, output_path)
 
+    # this function make generate_with_image_features to static inference model.
     def generate_with_image_features_to_static(self, output_path: str, config: dict):
         dtype = config.get("dtype", paddle.get_default_dtype())
         cache_kvs_shapes = self.get_cache_kvs_shape(self.config, max_length=config.get("max_length", None))
@@ -93,9 +93,6 @@ class GenerationInferenceModel(GenerationMixin):
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="first_input_ids"),  # first_input_ids
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="second_input_ids"),  # second_input_ids
             paddle.static.InputSpec(shape=[None, None], dtype=dtype, name="attention_mask"),  # attention_mask
-            # paddle.static.InputSpec(shape=[None, None], dtype="int64", name = "image_attention_mask"),  # image_attention_mask
-            # paddle.static.InputSpec(shape=[None, None], dtype="int64", name = "first_attention_mask"),  # first_attention_mask
-            # paddle.static.InputSpec(shape=[None, None], dtype="int64", name = "second_attention_mask"),  # second_attention_mask
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),  # position_ids
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="penalty_score"),  # penalty_score
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="frequency_score"),  # frequency_score
@@ -137,9 +134,6 @@ class GenerationInferenceModel(GenerationMixin):
         first_input_ids: paddle.Tensor,
         second_input_ids: paddle.Tensor,
         attention_mask: paddle.Tensor,
-        # image_attention_mask: Optional[paddle.Tensor] = None,
-        # first_attention_mask: Optional[paddle.Tensor] = None,
-        # second_attention_mask: Optional[paddle.Tensor] = None,
         position_ids=None,
         penalty_score=None,
         frequency_score=None,
@@ -167,20 +161,6 @@ class GenerationInferenceModel(GenerationMixin):
         second_embeds = self.llama.embed_tokens(second_input_ids)
         image_features = paddle.cast(image_features, dtype=first_embeds.dtype)
         inputs_embeds = paddle.concat([first_embeds, image_features, second_embeds], axis=1)
-
-        # if first_attention_mask is None:
-        #     first_attention_mask = paddle.ones(first_embeds.shape[:-1], dtype="int64")
-        # if second_attention_mask is None:
-        #     second_attention_mask = paddle.ones(second_embeds.shape[:-1], dtype="int64")
-        # if image_attention_mask is None:
-        #     image_attention_mask = paddle.ones(image_features.shape[:-1], dtype="int64")
-        # attention_mask = paddle.concat([first_attention_mask, image_attention_mask, second_attention_mask], axis=1)
-
-        # batch, seq = attention_mask.shape
-        # attention_mask = paddle.full([batch, 1, seq, seq], 0, dtype="float32")
-        # attention_mask[:,0,:seq,:seq] = paddle.tril(
-        #             paddle.ones(shape=(seq, seq), dtype="float32")
-        #         )
 
         outputs = self.generate(
             inputs_embeds=inputs_embeds,
