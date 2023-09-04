@@ -283,10 +283,11 @@ class CausalLMTrainer(Trainer):
         logger.info(f"  Pre device batch size = {batch_size}")
         logger.info(f"  Total Batch size = {batch_size * self.args.dataset_world_size}")
         self.model.eval()
-        for step, inputs in enumerate(dataloader):
-            self.prediction_step(model=self.model, inputs=inputs, prediction_loss_only=True, ignore_keys=None)
-            if max_eval_iters > 0 and step >= max_eval_iters - 1:
-                break
+        with paddle.no_grad():
+            for step, inputs in enumerate(dataloader):
+                self.prediction_step(model=self.model, inputs=inputs, prediction_loss_only=True, ignore_keys=None)
+                if max_eval_iters > 0 and step >= max_eval_iters - 1:
+                    break
 
 
 def get_infer_model_path(input_dir, model_prefix):
