@@ -1545,6 +1545,8 @@ class GenerationMixin(object):
         batch_size = 1
         num_beams = 5
         batch_beam_size, cur_len = paddle.shape(input_ids)
+        slice_ = batch_beam_size // num_beams
+        # print("slice----", slice_)
         origin_len = 65
 
         beam_scores = paddle.zeros((1, 5), dtype=paddle.get_default_dtype())
@@ -1684,11 +1686,11 @@ class GenerationMixin(object):
             output = paddle.clone(input_ids)
             
             if paddle.all(stop_flags):
-                output
                 break
             paddle.increment(cur_len)
+        # print("slice_--", slice_)
 
-        return output, beam_scores
+        return output[0, slice_:], beam_scores
 
     def group_beam_search(
         self, input_ids, beam_scorer, logits_processors, max_length, pad_token_id, eos_token_id, **model_kwargs

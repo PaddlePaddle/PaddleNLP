@@ -16,9 +16,9 @@ model.eval()
 model = paddle.jit.to_static(
     model.generate_gpt,
     input_spec=[
-    paddle.static.InputSpec(shape=[1, 3, 224, 224], dtype="float32"),  # image_features
-    paddle.static.InputSpec(shape=[1, 1], dtype="int64"),  # first_input_ids
-    paddle.static.InputSpec(shape=[1, 1], dtype="int64"),  # first_attention_mask
+    paddle.static.InputSpec(shape=[1, 3, None, None], dtype="float32"),  # image_features
+    paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # first_input_ids
+    paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # first_attention_mask
     # paddle.static.InputSpec(shape=[1], dtype="int64"),  # max_length
     ],
     )

@@ -53,7 +53,7 @@ def predict(args):
     inputs["pixel_values"] = paddle.to_tensor(vit_image)
     inputs["first_input_ids"] = paddle.to_tensor([[50258]])
     inputs["first_attention_mask"] = paddle.to_tensor([[1]])
-    inputs["max_len"] = paddle.to_tensor([20])
+    # inputs["max_len"] = paddle.to_tensor([20])
     
     print("inputs", inputs)
 
@@ -75,7 +75,7 @@ def predict(args):
 
     print("outputs", outputs)
     tokenizer = GPTTokenizer.from_pretrained("/root/paddlejob/workspace/env_run/zhengshifeng/vitllm/vit_model")
-    msg = tokenizer.convert_ids_to_string(outputs[0][0].numpy().tolist())
+    msg = tokenizer.convert_ids_to_string(outputs[0].numpy().tolist())
 
     print("Inference result: ", msg)
 

@@ -1789,6 +1789,7 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
             input_ids=first_input_ids, inputs_embeds=inputs_embeds, attention_mask=attention_mask, **generate_kwargs
         )
         output = paddle.clone(outputs) + paddle.to_tensor([0])
+        
         return output, beam_scores
 
     # @paddle.no_grad()
