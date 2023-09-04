@@ -43,6 +43,7 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.utils.import_utils import import_module, is_paddlenlp_ops_available
 
+import time
 
 @dataclass
 class PredictorArgument:
@@ -73,6 +74,7 @@ class PredictorArgument:
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     max_batch_size: int = field(default=None, metadata={"help": "The max batch size of data during serving."})
+    benchmark: bool = field(default=False, metadata={"help": "If benchmark set as `True`, we will force model decode to max_length, which is helpful to compute throughput. "})
 
 
 @dataclass
@@ -663,6 +665,31 @@ def predict():
                 print(output)
                 out = {"src": source, "tgt": target, "output": output}
                 f.write(json.dumps(out, ensure_ascii=False) + "\n")
+
+    if predictor_args.benchmark: 
+        # Just construct a simple benchmark input. We pad input to the src_length. 
+        benchmark_texts = ["<pad>" * (predictor_args.src_length // 2 - 3) + "My name is " for _ in range(predictor_args.batch_size)]
+        batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
+        print("***********Start Benchmark**********")
+
+        warmup_time = 5 
+        test_time = 10
+
+        print("***********Start Warmup**********")
+        for _ in range(warmup_time): 
+            for bs, batch_source_text in enumerate(batch_benchmark_texts):
+                outputs = predictor.predict(batch_source_text)
+
+        print("***********Start Speed Test**********")
+        start = time.perf_counter()
+        for _ in range(test_time): 
+            for bs, batch_source_text in enumerate(batch_benchmark_texts):
+                outputs = predictor.predict(batch_source_text)
+        print("Input length is: {}, Output length is: {}, bs is: {}, Avg time is: {}s. ".format(predictor_args.src_length, 
+                                                                                                predictor_args.max_length - predictor_args.src_length, 
+                                                                                                predictor_args.batch_size, 
+                                                                                                (time.perf_counter() - start) / test_time))
+
 
 
 if __name__ == "__main__":

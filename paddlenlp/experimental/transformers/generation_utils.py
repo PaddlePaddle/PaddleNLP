@@ -81,7 +81,7 @@ class GenerationInferenceModel(GenerationMixin):
             )  # position_ids
             input_spec[16] = paddle.static.InputSpec(shape=[None, 2, 1], dtype="int64", name="tgt_pos")  # tgt_pos
         model = paddle.jit.to_static(self.generate, input_spec=input_spec)
-        paddle.jit.save(model, output_path)
+        paddle.jit.save(model, output_path, skip_prune_program=True) # Note(Zhengzekang): If we prune program it may cause some inference error. 
 
     @paddle.no_grad()
     def generate(
