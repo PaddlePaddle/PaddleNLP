@@ -25,6 +25,5 @@
     "recompute": true,
     "save_total_limit": 1,
     "sharding_parallel_degree": 4,
-    "sharding": "stage3",
-    "overwrite_output_dir": true
+    "sharding": "stage3"
   }
