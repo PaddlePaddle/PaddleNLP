@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # Test training benchmark for a model.
-# Usage：bash benchmark/run_benchmark.sh ${model_name_or_path} ${per_device_train_batch_size} ${use_flash_attention} ${tensor_parallel_degree} ${pipeline_parallel_degree} ${virtual_pp_degree} ${sequence_parallel} ${sharding_degree} ${num_train_epochs} ${save_steps} ${sharding} ${recompute} ${run_mode} ${device_num}
+# Usage：bash benchmark/run_benchmark.sh ${model_name_or_path} ${per_device_train_batch_size} ${use_flash_attention} ${tensor_parallel_degree} ${pipeline_parallel_degree} ${virtual_pp_degree} ${sequence_parallel} ${sharding_parallel_degree} ${num_train_epochs} ${save_steps} ${sharding} ${recompute} ${run_mode} ${device_num}
 function _set_params(){
     model_name_or_path=${1:-"facebook/llama-7b"}
 
@@ -26,7 +26,7 @@ function _set_params(){
 
     virtual_pp_degree=${6:-"1"}
     sequence_parallel=${7:-"0"}
-    sharding_degree=${8:-"1"}      # (可选)
+    sharding_parallel_degree=${8:-"1"}      # (可选)
     num_train_epochs=${9:-"200"}
     save_steps=${10:-"200"}
     sharding=${11:-"stage1"}
@@ -131,6 +131,7 @@ function _train(){
             --report_to visualdl \
             --data_cache ./data \
             --sharding ${sharding} \
+            --sharding_parallel_degree ${sharding_parallel_degree} \
             --disable_tqdm true \
             --continue_training 1\
             --recompute ${recompute} \

@@ -19,7 +19,7 @@ tensor_parallel_degree="2"
 pipeline_parallel_degree="2"
 virtual_pp_degree="1"
 sequence_parallel="0"
-sharding_degree="4"
+sharding_parallel_degree="4"
 num_train_epochs="1"
 save_steps="200"
 sharding="stage1"
@@ -35,4 +35,4 @@ pp_recompute_interval=1
 cd ./tests
 bash ./test_tipc/dygraph/hybrid_parallelism/llama/benchmark_common/prepare.sh
 
-bash ./test_tipc/dygraph/hybrid_parallelism/llama/benchmark_common/run_benchmark.sh ${model_name_or_path} ${per_device_train_batch_size} ${use_flash_attention} ${tensor_parallel_degree} ${pipeline_parallel_degree} ${virtual_pp_degree} ${sequence_parallel} ${sharding_degree} ${num_train_epochs} ${save_steps} ${sharding} ${recompute} ${run_mode} ${device_num} ${global_batch_size} ${model_item} ${max_step} ${gradient_accumulation_steps} ${pp_recompute_interval}
+bash ./test_tipc/dygraph/hybrid_parallelism/llama/benchmark_common/run_benchmark.sh ${model_name_or_path} ${per_device_train_batch_size} ${use_flash_attention} ${tensor_parallel_degree} ${pipeline_parallel_degree} ${virtual_pp_degree} ${sequence_parallel} ${sharding_parallel_degree} ${num_train_epochs} ${save_steps} ${sharding} ${recompute} ${run_mode} ${device_num} ${global_batch_size} ${model_item} ${max_step} ${gradient_accumulation_steps} ${pp_recompute_interval}
