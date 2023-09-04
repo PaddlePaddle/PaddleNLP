@@ -21,6 +21,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["FLAGS_use_cuda_managed_memory"] = "true"
 import requests
 from PIL import Image
+from paddlenlp.transformers import GPTTokenizer
 
 from paddlenlp.transformers import MiniGPT4ForConditionalGeneration, MiniGPT4Processor
 
@@ -41,11 +42,13 @@ def predict(args):
     inputs = processor([image], text, prompt)
 
 
-    path_data = "/root/paddlejob/workspace/env_run/zhengshifeng/vitllm/LAVIS_to_onnx/models_bk/test_data/input_and_output_xiaohongshu.npz"
-    vit_data = np.load(path_data, allow_pickle=True)
-    vit_inputs = vit_data["input"]
-    vit_outputs = vit_data["output"]
-    vit_image = vit_inputs[0]["image"].detach().numpy()
+    import numpy as np
+    path_data = "/root/paddlejob/workspace/env_run/zhengshifeng/vitllm/LAVIS_to_onnx/models_bk/test_data/vit_numpy.npy"
+    vit_data = np.load(path_data, allow_pickle=True).item()
+    
+    # vit_inputs = vit_data["input"]
+    # vit_outputs = vit_data["output"]
+    vit_image = vit_data[0]
     inputs["pixel_values"] = paddle.to_tensor(vit_image)
     inputs["first_input_ids"] = paddle.to_tensor([[50258]])
     inputs["first_attention_mask"] = paddle.to_tensor([[1]])
@@ -69,7 +72,9 @@ def predict(args):
     outputs = model.generate(**inputs, **generate_kwargs)
 
     print("outputs", outputs)
-    msg = processor.batch_decode(outputs[0])
+    tokenizer = GPTTokenizer.from_pretrained("/root/paddlejob/workspace/env_run/zhengshifeng/vitllm/vit_model")
+    msg = tokenizer.convert_ids_to_string(outputs[0][0].numpy().tolist())
+
     print("Inference result: ", msg)
 
 
