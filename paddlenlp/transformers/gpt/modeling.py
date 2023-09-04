@@ -440,7 +440,7 @@ class TransformerDecoder(nn.Layer):
             attention_mask,
             use_cache,
             cache,
-            use_reentrant=False,
+            use_reentrant=self.config.recompute_use_reentrant,
         )
         return hidden_states
 
@@ -1444,10 +1444,7 @@ class GPTForCausalLM(GPTPretrainedModel):
         else:
             hidden_states = outputs[0]
 
-        tensor_parallel_output = (
-            self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
-        )
-        logits = parallel_matmul(hidden_states, self.gpt.embeddings.word_embeddings.weight, tensor_parallel_output)
+        logits = self.lm_head(hidden_states)
 
         loss = None
         if labels is not None:

@@ -471,6 +471,7 @@ class QWenPreTrainedModel(PretrainedModel):
 class QWenModel(QWenPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
+        self.config = config
         self.vocab_size = config.vocab_size
         self.num_hidden_layers = config.num_hidden_layers
         self.embed_dim = config.hidden_size
@@ -531,7 +532,7 @@ class QWenModel(QWenPreTrainedModel):
             encoder_attention_mask,
             use_cache,
             output_attentions,
-            use_reentrant=False,
+            use_reentrant=self.config.recompute_use_reentrant,
         )
         return hidden_states
 

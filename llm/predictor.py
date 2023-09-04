@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import paddle
+import paddle.distributed.fleet.base.topology as tp
 from paddle.distributed import fleet
 from utils import (
     dybatch_preprocess,
@@ -59,6 +60,13 @@ class PredictorArgument:
     prefix_path: str = field(
         default=None, metadata={"help": "The directory of Prefix Tuning parameters. Default to None"}
     )
+    decode_strategy: str = field(
+        default="sampling",
+        metadata={
+            "help": "the decoding strategy of generation, which should be one of ['sampling', 'greedy_search', 'beam_search']. Default to sampling"
+        },
+    )
+
     mode: str = field(
         default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
     )
@@ -71,7 +79,7 @@ class PredictorArgument:
 class ModelArgument:
     gpt: bool = field(default=False, metadata={"help": "GPTForCausalLM"})
     ernie: bool = field(default=False, metadata={"help": "Ernie35ForCausalLM"})
-    data_file: None = field(default=None, metadata={"help": "data file directory"})
+    data_file: str = field(default=None, metadata={"help": "data file directory"})
     output_file: str = field(default="output.json", metadata={"help": "predict result file directory"})
 
 
@@ -84,6 +92,28 @@ def batchfy_text(texts, batch_size):
     return batch_texts
 
 
+def init_dist_env():
+    tensor_parallel_degree = paddle.distributed.get_world_size()
+    tensor_parallel_rank = paddle.distributed.get_rank()
+
+    if tensor_parallel_degree > 1:
+        # refer to: https://github.com/PaddlePaddle/Paddle/blob/4abea956ee852ce52791a1e08fa92ed4d3be150d/python/paddle/distributed/fleet/fleet.py#L298C23-L298C45
+        hcg = tp._HYBRID_PARALLEL_GROUP
+        if hcg is None:
+            strategy = fleet.DistributedStrategy()
+            strategy.hybrid_configs = {
+                "dp_degree": 1,
+                "mp_degree": tensor_parallel_degree,
+                "pp_degree": 1,
+                "sharding_degree": 1,
+            }
+            fleet.init(is_collective=True, strategy=strategy)
+            hcg = fleet.get_hybrid_communicate_group()
+
+        tensor_parallel_rank = hcg.get_model_parallel_rank()
+    return tensor_parallel_rank, tensor_parallel_degree
+
+
 class BasePredictor:
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
         self.config: PredictorArgument = config
@@ -92,7 +122,7 @@ class BasePredictor:
 
         self.tokenizer = tokenizer
         self.return_tensors = "pd"
-        self._init_dist_env()
+        self.tensor_parallel_rank, self.tensor_parallel_degree = init_dist_env()
 
     def _preprocess(self, source):
         tokenized_source = self.tokenizer(
@@ -105,24 +135,6 @@ class BasePredictor:
             add_special_tokens=True,
         )
         return tokenized_source
-
-    def _init_dist_env(self):
-        tensor_parallel_degree = paddle.distributed.get_world_size()
-        tensor_parallel_rank = paddle.distributed.get_rank()
-        if tensor_parallel_degree > 1:
-            strategy = fleet.DistributedStrategy()
-            strategy.hybrid_configs = {
-                "dp_degree": 1,
-                "mp_degree": tensor_parallel_degree,
-                "pp_degree": 1,
-                "sharding_degree": 1,
-            }
-            fleet.init(is_collective=True, strategy=strategy)
-            hcg = fleet.get_hybrid_communicate_group()
-            tensor_parallel_rank = hcg.get_model_parallel_rank()
-
-        self.tensor_parallel_rank = tensor_parallel_rank
-        self.tensor_parallel_degree = tensor_parallel_degree
 
     @abstractmethod
     def _infer(self, inputs):
@@ -191,7 +203,7 @@ class DygraphPredictor(BasePredictor):
             bos_token_id=self.tokenizer.bos_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
             pad_token_id=self.tokenizer.pad_token_id,
-            decode_strategy="sampling",
+            decode_strategy=self.config.decode_strategy,
             temperature=self.config.temperature,
             top_k=self.config.top_k,
             top_p=self.config.top_p,
@@ -417,7 +429,7 @@ class DygraphInferencePredictor(BasePredictor):
 
         self.cache_kvs = [
             paddle.zeros(shape, dtype=dtype)
-            for shape in self.model.get_cache_kvs_shape(self.model.config, config.max_batch_size)
+            for shape in self.model.get_cache_kvs_shape(self.model.config, config.max_batch_size, config.max_length)
         ]
         self.pre_ids = paddle.full([config.max_batch_size, config.max_length], -1, dtype="int64")
         if "chatglm" in self.architectures:
@@ -508,8 +520,7 @@ def create_predictor(
     if isinstance(tokenizer, LlamaTokenizer):
         tokenizer.pad_token = tokenizer.eos_token
 
-    tensor_parallel_degree = paddle.distributed.get_world_size()
-    tensor_parallel_rank = paddle.distributed.get_rank()
+    tensor_parallel_rank, tensor_parallel_degree = init_dist_env()
     if not predictor_args.inference_model:
         if predictor_args.mode == "dynamic":
             if model_args.gpt:
