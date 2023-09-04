@@ -159,12 +159,14 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         cache_kvs=None,
         seq_len_encoder=None,
         seq_len_decoder=None,
+        # past_key_values is useless,as it is replaced by kwargs["cache"], so confusion.
         past_key_values=None,
         output_attentions=False,
         output_hidden_states=None,
         return_dict=False,
         **kwargs,
     ):
+        # kwargs["cache"] is used used to distinguish between encoder and decoder phase.
         past_key_values = kwargs.get("cache", None)
         is_decoder = past_key_values is not None
 
@@ -345,14 +347,19 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
         cache = kwargs.get("cache", None)
+        inputs_embeds = kwargs.get("inputs_embeds", None)
         if cache is not None:
             input_ids = tgt_ids
             position_ids = tgt_pos
             attention_mask = (tgt_generation_mask - 1) * 1e4
+            # make inputs_embeds be none in decoder phase.
+            # in forward function, it will be assigned according to input_ids.
+            inputs_embeds = None
         else:
             attention_mask = (attention_mask - 1) * 1e4
         model_inputs = {
             "input_ids": input_ids,
+            "inputs_embeds": inputs_embeds,
             "position_ids": position_ids,
             "attention_mask": attention_mask,
             "cache_kvs": cache_kvs,

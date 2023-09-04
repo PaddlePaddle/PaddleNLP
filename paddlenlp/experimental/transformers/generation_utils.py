@@ -83,6 +83,141 @@ class GenerationInferenceModel(GenerationMixin):
         model = paddle.jit.to_static(self.generate, input_spec=input_spec)
         paddle.jit.save(model, output_path)
 
+    def generate_with_image_features_to_static(self, output_path: str, config: dict):
+        dtype = config.get("dtype", paddle.get_default_dtype())
+        cache_kvs_shapes = self.get_cache_kvs_shape(self.config, max_length=config.get("max_length", None))
+        input_spec = [
+            paddle.static.InputSpec(
+                shape=[None, None, None], dtype="float32", name="image_features"
+            ),  # image_features
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="first_input_ids"),  # first_input_ids
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="second_input_ids"),  # second_input_ids
+            paddle.static.InputSpec(shape=[None, None], dtype=dtype, name="attention_mask"),  # attention_mask
+            # paddle.static.InputSpec(shape=[None, None], dtype="int64", name = "image_attention_mask"),  # image_attention_mask
+            # paddle.static.InputSpec(shape=[None, None], dtype="int64", name = "first_attention_mask"),  # first_attention_mask
+            # paddle.static.InputSpec(shape=[None, None], dtype="int64", name = "second_attention_mask"),  # second_attention_mask
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),  # position_ids
+            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="penalty_score"),  # penalty_score
+            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="frequency_score"),  # frequency_score
+            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="presence_score"),  # presence_score
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="min_length"),  # min_decode_length
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="max_length"),  # max_decode_length
+            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="temperature"),  # temperature
+            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="top_p"),  # top_p
+            paddle.static.InputSpec(shape=[None], dtype="int64", name="eos_token_id"),  # eos_token_id
+            paddle.static.InputSpec(shape=[None, 1], dtype="int32", name="seq_len_encoder"),  # seq_len_encoder
+            paddle.static.InputSpec(shape=[None, 1], dtype="int32", name="seq_len_decoder"),  # seq_len_decoder
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="step_idx"),  # step_idx
+            paddle.static.InputSpec(shape=[None, 1], dtype="bool", name="stop_flags"),  # stop_flags
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="tgt_ids"),  # tgt_ids
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="tgt_pos"),  # tgt_pos
+            paddle.static.InputSpec(
+                shape=[None, 1, 1, None], dtype=dtype, name="tgt_generation_mask"
+            ),  # tgt_generation_mask
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="pre_ids"),  # pre_ids
+            paddle.static.InputSpec(shape=[1], dtype="int64", name="stop_nums"),  # stop_nums
+            [
+                paddle.static.InputSpec(
+                    shape=shape,
+                    dtype=dtype,
+                    name="cache_kvs_{}".format(i),
+                )
+                for i, shape in enumerate(cache_kvs_shapes)
+            ],  # cache_kvs
+        ]
+
+        model = paddle.jit.to_static(self.generate_with_image_features, input_spec=input_spec)
+        paddle.jit.save(model, output_path)
+
+    # This function is called by miniGPT4's second part.
+    @paddle.no_grad()
+    def generate_with_image_features(
+        self,
+        image_features: paddle.Tensor,
+        first_input_ids: paddle.Tensor,
+        second_input_ids: paddle.Tensor,
+        attention_mask: paddle.Tensor,
+        # image_attention_mask: Optional[paddle.Tensor] = None,
+        # first_attention_mask: Optional[paddle.Tensor] = None,
+        # second_attention_mask: Optional[paddle.Tensor] = None,
+        position_ids=None,
+        penalty_score=None,
+        frequency_score=None,
+        presence_score=None,
+        min_length=None,
+        max_length=None,
+        temperature=None,
+        top_p=None,
+        eos_token_id=None,
+        seq_len_encoder=None,
+        seq_len_decoder=None,
+        step_idx=None,
+        stop_flags=None,
+        tgt_ids=None,
+        tgt_pos=None,
+        tgt_generation_mask=None,
+        pre_ids=None,
+        stop_nums=None,
+        cache_kvs=[],
+        inputs_embeds=None,
+        **generate_kwargs
+    ) -> paddle.Tensor:
+
+        first_embeds = self.llama.embed_tokens(first_input_ids)
+        second_embeds = self.llama.embed_tokens(second_input_ids)
+        image_features = paddle.cast(image_features, dtype=first_embeds.dtype)
+        inputs_embeds = paddle.concat([first_embeds, image_features, second_embeds], axis=1)
+
+        # if first_attention_mask is None:
+        #     first_attention_mask = paddle.ones(first_embeds.shape[:-1], dtype="int64")
+        # if second_attention_mask is None:
+        #     second_attention_mask = paddle.ones(second_embeds.shape[:-1], dtype="int64")
+        # if image_attention_mask is None:
+        #     image_attention_mask = paddle.ones(image_features.shape[:-1], dtype="int64")
+        # attention_mask = paddle.concat([first_attention_mask, image_attention_mask, second_attention_mask], axis=1)
+
+        # batch, seq = attention_mask.shape
+        # attention_mask = paddle.full([batch, 1, seq, seq], 0, dtype="float32")
+        # attention_mask[:,0,:seq,:seq] = paddle.tril(
+        #             paddle.ones(shape=(seq, seq), dtype="float32")
+        #         )
+
+        outputs = self.generate(
+            inputs_embeds=inputs_embeds,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            penalty_score=penalty_score,
+            frequency_score=frequency_score,
+            presence_score=presence_score,
+            min_length=min_length,
+            max_length=max_length,
+            temperature=temperature,
+            top_p=top_p,
+            eos_token_id=eos_token_id,
+            seq_len_encoder=seq_len_encoder,
+            seq_len_decoder=seq_len_decoder,
+            step_idx=step_idx,
+            stop_flags=stop_flags,
+            tgt_ids=tgt_ids,
+            tgt_pos=tgt_pos,
+            tgt_generation_mask=tgt_generation_mask,
+            pre_ids=pre_ids,
+            stop_nums=stop_nums,
+            cache_kvs=cache_kvs,
+        )
+        return outputs
+
+    @staticmethod
+    def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
+        batch_size = 1
+        seq_len = 1
+        if bos_token_id is None:
+            raise ValueError("`bos_token_id` should be defined when no " "`input_ids` are provided.")
+        if encoder_output is not None:
+            batch_size = encoder_output.shape[0]
+            seq_len = encoder_output.shape[1]
+        return paddle.ones([batch_size, seq_len], dtype="int64") * bos_token_id
+
     @paddle.no_grad()
     def generate(
         self,
@@ -107,6 +242,7 @@ class GenerationInferenceModel(GenerationMixin):
         pre_ids=None,
         stop_nums=None,
         cache_kvs=[],
+        inputs_embeds=None,
         **model_kwargs,
     ):
 
@@ -130,6 +266,7 @@ class GenerationInferenceModel(GenerationMixin):
 
         ret = self.sample(
             input_ids,
+            inputs_embeds,
             eos_token_id,
             top_p=top_p,
             cache_kvs=cache_kvs,
@@ -211,8 +348,9 @@ class GenerationInferenceModel(GenerationMixin):
 
     def sample(
         self,
-        input_ids,
-        eos_token_id,
+        input_ids=None,
+        inputs_embeds=None,
+        eos_token_id=None,
         cache_kvs=[],
         top_p=None,
         temperature=None,
@@ -221,7 +359,21 @@ class GenerationInferenceModel(GenerationMixin):
         step_idx_ori = paddle.full(shape=[1], dtype="int64", fill_value=1)
         batch_idx = paddle.full(shape=[1], dtype="int32", fill_value=-1)
 
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        elif input_ids is None and inputs_embeds is None:
+            raise ValueError("You have to specify either input_ids or inputs_embeds")
+
+        # genereate a fake input_ids according to inputs_embeds.
+        if input_ids is None and inputs_embeds is not None:
+            input_ids = self.prepare_input_ids_for_generation(1, inputs_embeds)
+        if inputs_embeds is not None:
+            batch, seq_len, hidden_dim = inputs_embeds.shape
+            inputs_embeds = inputs_embeds.reshape([batch * seq_len, hidden_dim])
+            model_kwargs["inputs_embeds"] = inputs_embeds
+
         def _forward_(**args):
+            # cache_kvs is never empty because it is passed as a parameter in def sample.
             model_inputs = self.prepare_inputs_for_generation(input_ids, cache_kvs, **args)
             return self(**model_inputs)
 
@@ -292,6 +444,7 @@ class GenerationInferenceModel(GenerationMixin):
         )
         step_idx_ori += 1
         encoder_output = outputs
+        # gives it a value, means we will entered into decoder phase.
         model_kwargs["cache"] = 0
 
         # decoder
