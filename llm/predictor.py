@@ -260,45 +260,99 @@ class StaticGraphPredictor(BasePredictor):
 
 class InferencePredictorMixin:
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer):
+        self.config = config
 
         self.architectures = self.model_config.architectures[0].lower()
 
         self.dtype = config.dtype or self.model_config
         self.cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.cache_kvs_shape]
-        self.pre_ids = paddle.full([config.max_batch_size, config.max_length], -1, dtype="int64")
+        self.pre_ids, self.attention_mask, self.tgt_pos, self.tgt_generation_mask, self.arange_tensor_encoder = (
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        self.init_base_inputs()
+
+    def init_base_inputs(self):
+        def _init_tensor(variable, func, value):
+            if variable is None:
+                return func()
+
+            if len(variable.shape) == 1:
+                variable[:] = value
+            if len(variable.shape) == 2:
+                variable[:, :] = value
+            if len(variable.shape) == 3:
+                variable[:, :, :] = value
+            if len(variable.shape) == 4:
+                variable[:, :, :, :] = value
+
+            return variable
+
+        self.pre_ids = _init_tensor(
+            self.pre_ids,
+            lambda: paddle.full([self.config.max_batch_size, self.config.max_length], -1, dtype="int64"),
+            -1,
+        )
+
         if "chatglm" in self.architectures:
-            self.attention_mask = paddle.ones(
-                shape=(config.batch_size, 1, config.max_length, config.max_length),
-                dtype=self.dtype,
-            )
-            self.tgt_pos = paddle.ones(
-                shape=[config.batch_size, 2, 1],
-                dtype="int64",
-            )
-        else:
-            self.attention_mask = paddle.zeros(
-                shape=(config.batch_size, 1, config.max_length, config.max_length),
-                dtype=self.dtype,
+            self.attention_mask = _init_tensor(
+                self.attention_mask,
+                lambda: paddle.ones(
+                    shape=(self.config.batch_size, 1, self.config.max_length, self.config.max_length),
+                    dtype=self.dtype,
+                ),
+                1,
             )
 
-        self.tgt_generation_mask = paddle.zeros(
-            shape=[config.max_batch_size, 1, 1, config.max_length],
-            dtype=self.dtype,
+            self.tgt_pos = _init_tensor(
+                self.tgt_pos,
+                lambda: paddle.ones(
+                    shape=[self.config.batch_size, 2, 1],
+                    dtype="int64",
+                ),
+                1,
+            )
+        else:
+            self.attention_mask = _init_tensor(
+                self.attention_mask,
+                lambda: paddle.zeros(
+                    shape=(self.config.batch_size, 1, self.config.max_length, self.config.max_length),
+                    dtype=self.dtype,
+                ),
+                0,
+            )
+
+        self.tgt_generation_mask = _init_tensor(
+            self.tgt_generation_mask,
+            lambda: paddle.zeros(
+                shape=[self.config.max_batch_size, 1, 1, self.config.max_length],
+                dtype=self.dtype,
+            ),
+            0,
         )
-        self.arange_tensor_encoder = paddle.zeros(shape=(config.batch_size, 1, config.max_length), dtype=self.dtype)
+        self.arange_tensor_encoder = _init_tensor(
+            self.arange_tensor_encoder,
+            lambda: paddle.zeros(shape=(self.config.batch_size, 1, self.config.max_length), dtype=self.dtype),
+            0,
+        )
 
     def _postprocess(self, predictions):
         if paddle.distributed.get_rank() == 0:
             tokens: np.ndarray = load_real_time_tokens()
             decoded_predictions = self.tokenizer.batch_decode(
-                tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
+                tokens.tolist(), skip_special_tokens=False, clean_up_tokenization_spaces=False
             )
             return decoded_predictions
         else:
             return None
 
     def _preprocess(self, source):
+        self.init_base_inputs()
         if "chatglm" in self.architectures:
+
             inputs = dybatch_preprocess(
                 self.tokenizer,
                 source,
@@ -530,6 +584,7 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
     def _infer(self, inputs: dict[str, paddle.Tensor]):
         # the `max_length` of generate is: max_new_length, it will occur error when `max_length` + sequence_length > max_position_embeddings.
         # so change max_length to control the length of decoding.
+
         for key in inputs.keys():
             if paddle.is_tensor(inputs[key]):
                 continue
@@ -640,7 +695,6 @@ def create_predictor(
                     config=config,
                     dtype=predictor_args.dtype,
                 )
-
                 cache_kvs_shape = BloomForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
                 model.eval()
             predictor = DygraphInferencePredictor(
