@@ -192,9 +192,15 @@ class AutoEngine(BasicEngine):
                     # pp: some devices don't have loss in outs
                     if "loss" in outs:
                         if final_loss is None:
-                            final_loss = outs["loss"][-1]
+                            if outs["loss"].shape ==  ():
+                                final_loss = outs["loss"]
+                            else:
+                                final_loss = outs["loss"][-1]
                         else:
-                            final_loss += outs["loss"][-1]
+                            if outs["loss"].shape == ():
+                                final_loss += outs["loss"]
+                            else:
+                                final_loss += outs["loss"][-1]
             else:
                 if self._pp_degree == 1 and self._accumulate_steps > 1:  # gradient merge
                     local_steps = self._accumulate_steps
