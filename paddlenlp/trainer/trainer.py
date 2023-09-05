@@ -971,7 +971,7 @@ class Trainer:
                     enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
 
-                    assert not availiable_no_sync, availiable_no_sync
+                    assert not args.use_moe or not availiable_no_sync
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
                         parameters_list = obtain_optimizer_parameters_list(self.optimizer._inner_opt)
 
