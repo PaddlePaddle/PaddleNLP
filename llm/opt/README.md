@@ -1,6 +1,6 @@
 # OPT
 
-## 1.模型介绍
+## 1. 模型介绍
 
 [OPT: Open Pre-trained Transformer Language Models](https://arxiv.org/abs/2205.01068) 是以自回归填空作为训练目标的通用语言模型，可用于各类理解和生成任务。
 
@@ -17,3 +17,6 @@
 |facebook/opt-66b |
 |facebook/opt-iml-1.3b |
 |opt-iml-max-1.3b |
+
+## 2. 模型精调
+请参考[LLM全流程工具介绍](../README.md)

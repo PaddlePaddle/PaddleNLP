@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
 
@@ -73,6 +74,12 @@ class PredictorArgument:
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     max_batch_size: int = field(default=None, metadata={"help": "The max batch size of data during serving."})
+    benchmark: bool = field(
+        default=False,
+        metadata={
+            "help": "If benchmark set as `True`, we will force model decode to max_length, which is helpful to compute throughput. "
+        },
+    )
 
 
 @dataclass
@@ -663,6 +670,47 @@ def predict():
                 print(output)
                 out = {"src": source, "tgt": target, "output": output}
                 f.write(json.dumps(out, ensure_ascii=False) + "\n")
+
+    if predictor_args.benchmark:
+        benchmark(predictor, predictor_args, model_args)
+
+
+def benchmark(predictor, predictor_args, model_args):
+    # Just construct a simple benchmark input. We pad input to the src_length.
+    test_texts = "hello world, how are you?"
+    benchmark_texts = [test_texts + "<pad>" * predictor_args.src_length for _ in range(predictor_args.batch_size)]
+
+    benchmark_texts = [
+        "<pad>" * (predictor_args.src_length // 2 - 3) + "My name is " for _ in range(predictor_args.batch_size)
+    ]
+    batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
+    print("***********Start Benchmark**********")
+
+    warmup_time = 1
+    test_time = 1
+
+    print("***********Start Warmup**********")
+    for _ in range(warmup_time):
+        for bs, batch_source_text in enumerate(batch_benchmark_texts):
+            outputs = predictor.predict(batch_source_text)
+
+    print("***********Start Speed Test**********")
+    start = time.perf_counter()
+    for _ in range(test_time):
+        for bs, batch_source_text in enumerate(batch_benchmark_texts):
+            outputs = predictor.predict(batch_source_text)
+    end = time.perf_counter()
+
+    output_tokens = sum([len(output) for output in outputs])
+    print(
+        "Input length is: {}, Output length is: {}, bs is: {}, Generate speed is: {:.3f} tokens/s(ips), QPS: {:.3f} requests/s. ".format(
+            predictor_args.src_length,
+            predictor_args.max_length - predictor_args.src_length,
+            predictor_args.batch_size,
+            (output_tokens / (end - start) / test_time),
+            (predictor_args.batch_size / (end - start) / test_time),
+        )
+    )
 
 
 if __name__ == "__main__":
