@@ -14,7 +14,12 @@
 
 python -m pip install -r ../requirements.txt
 
-cd ../llm/llama
+# install fused_ln custom ops
+cd ../model_zoo/gpt-3/external_ops/
+python setup.py install
+
+# install tool_helpers
+cd ../../../llm/llama
 python -m pip install tool_helpers
 
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy

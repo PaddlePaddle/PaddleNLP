@@ -25,8 +25,9 @@ from paddle.distributed import fleet
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from sklearn.metrics import accuracy_score
 
-from paddlenlp.trainer import Trainer
-from paddlenlp.trainer.trainer_utils import has_length
+from paddlenlp.datasets import InTokensIterableDataset
+from paddlenlp.trainer import Trainer, TrainerCallback
+from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
 from paddlenlp.utils.log import logger
 
 
@@ -144,6 +145,29 @@ def get_lora_target_modules(model):
     return target_modules
 
 
+class InTokensIterDatasetCallback(TrainerCallback):
+    """
+    A [`TrainerCallback`] that handles early stopping.
+
+    """
+
+    def on_step_end(self, args, state, control, **kwargs):
+        train_dataloader = kwargs["train_dataloader"]
+        if isinstance(train_dataloader.dataset, InTokensIterableDataset):
+            dataset = train_dataloader.dataset
+        elif isinstance(train_dataloader.dataset, IterableDatasetShard) and isinstance(
+            train_dataloader.dataset.dataset, InTokensIterableDataset
+        ):
+            dataset = train_dataloader.dataset.dataset
+        else:
+            raise ValueError(
+                "Unexpected dataset format: InTokensIterDatasetCallback expectes `paddlenlp.datasets.InTokensIterableDataset`"
+            )
+        if state.trial_params is None:
+            state.trial_params = {}
+        state.trial_params["intokens_global_step"] = dataset.intokens_global_step
+
+
 class CausalLMTrainer(Trainer):
     def __init__(self, do_generation: bool, gen_args, data_args, **kwargs):
         super().__init__(**kwargs)
@@ -259,10 +283,11 @@ class CausalLMTrainer(Trainer):
         logger.info(f"  Pre device batch size = {batch_size}")
         logger.info(f"  Total Batch size = {batch_size * self.args.dataset_world_size}")
         self.model.eval()
-        for step, inputs in enumerate(dataloader):
-            self.prediction_step(model=self.model, inputs=inputs, prediction_loss_only=True, ignore_keys=None)
-            if max_eval_iters > 0 and step >= max_eval_iters - 1:
-                break
+        with paddle.no_grad():
+            for step, inputs in enumerate(dataloader):
+                self.prediction_step(model=self.model, inputs=inputs, prediction_loss_only=True, ignore_keys=None)
+                if max_eval_iters > 0 and step >= max_eval_iters - 1:
+                    break
 
 
 def get_infer_model_path(input_dir, model_prefix):
@@ -341,7 +366,7 @@ def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
         return inst_data.astype("int64").reshape([-1, max_len])
 
 
-def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectures: str):
+def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectures: str, benchmark=False):
     """Pre-process generation inputs."""
     if "chatglm" in architectures:
         input_ids = []
@@ -438,7 +463,7 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
     inputs["min_length"] = (
         np.array(
             [
-                2,
+                1 if not benchmark else max_length - seq_len, # Note(Zhengzekang): When in benchmark mode, we need to set a fixed decode length. 
             ]
             * bs
         )

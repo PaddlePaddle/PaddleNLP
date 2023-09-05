@@ -59,6 +59,11 @@ from .configuration import (
     LlamaConfig,
 )
 
+try:
+    from paddle.nn.functional.flash_attention import flash_attention
+except:
+    flash_attention = None
+
 __all__ = [
     "LlamaModel",
     "LlamaPretrainedModel",
@@ -182,7 +187,7 @@ def scaled_dot_product_attention(
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
 
-    if config.use_flash_attention:
+    if config.use_flash_attention and flash_attention:
         # Flash Attention now ignore attention mask
         # Current Flash Attention doesn't support attn maskt
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
@@ -190,15 +195,13 @@ def scaled_dot_product_attention(
         if alibi is not None:
             raise ValueError("Flash Attention does not support ALiBi yet")
 
-        attn_output = F.scaled_dot_product_attention(
+        attn_output, attn_weights = flash_attention(
             query_states,
             key_states,
             value_states,
-            attn_mask=attention_mask,
-            is_causal=attention_mask is None,
+            causal=is_causal and query_states.shape[1] != 1,
+            return_softmax=output_attentions,
         )
-
-        attn_weights = None
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
@@ -442,10 +445,16 @@ def rotate_half(x):
 
 
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
-    cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
-    sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
-    cos = cos[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
-    sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
+
+    if position_ids is None:
+        # Note: Only for LlamaForCausalLMPipe model pretraining
+        cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+        sin = sin[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+    else:
+        cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
+        sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
+        cos = cos[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
+        sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
@@ -775,7 +784,7 @@ class LlamaAttention(nn.Layer):
                 output_attentions,
                 alibi,
                 self.sequence_parallel,
-                use_reentrant=False,
+                use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
             outputs = scaled_dot_product_attention(
@@ -817,6 +826,7 @@ class LlamaAttention(nn.Layer):
 class LlamaDecoderLayer(nn.Layer):
     def __init__(self, config, layerwise_recompute: bool = False):
         super().__init__()
+        self.config = config
         self.hidden_size = config.hidden_size
         self.self_attn = LlamaAttention(config, layerwise_recompute)
         self.mlp = LlamaMLP(config)
@@ -874,7 +884,7 @@ class LlamaDecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
-                use_reentrant=False,
+                use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
             outputs = self.self_attn(
@@ -1147,7 +1157,7 @@ class LlamaModel(LlamaPretrainedModel):
             past_key_value,
             use_cache,
             alibi,
-            use_reentrant=False,
+            use_reentrant=self.config.recompute_use_reentrant,
         )
 
         return hidden_states
