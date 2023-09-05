@@ -136,8 +136,9 @@ class Predictor(object):
         results = output_handle.copy_to_cpu()
         # import pdb;pdb.set_trace()
         print("outputs", results)
+        print("results", results.shape)
         tokenizer = GPTTokenizer.from_pretrained("/root/paddlejob/workspace/env_run/zhengshifeng/vitllm/vit_model")
-        msg = tokenizer.convert_ids_to_string(results)
+        msg = tokenizer.convert_ids_to_string(results[0])
         print(msg)
         return results
 

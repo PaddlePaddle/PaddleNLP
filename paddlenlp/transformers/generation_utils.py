@@ -1690,7 +1690,7 @@ class GenerationMixin(object):
             paddle.increment(cur_len)
         # print("slice_--", slice_)
 
-        return output[0, slice_:], beam_scores
+        return output[0, slice_:].unsqueeze(0), beam_scores
 
     def group_beam_search(
         self, input_ids, beam_scorer, logits_processors, max_length, pad_token_id, eos_token_id, **model_kwargs
