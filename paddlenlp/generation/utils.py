@@ -903,11 +903,11 @@ class GenerationMixin(object):
             pad_token_id = eos_token_id
 
         if generation_config.max_length != 0 and generation_config.max_new_token == DEFAULT_MAX_NEW_TOKEN:
-            logger.warning("`max_length` will be deprecated in future, use" " `max_new_token` instead.")
+            logger.warning("`max_length` will be deprecated in future releases, use `max_new_token` instead.")
             generation_config.max_new_token = generation_config.max_length
 
         if generation_config.min_length != 0 and generation_config.min_new_token == 0:
-            logger.warning("`min_length` will be deprecated in future, use" " `min_new_token` instead.")
+            logger.warning("`min_length` will be deprecated in future releases, use `min_new_token` instead.")
             generation_config.min_new_token = generation_config.min_length
 
         max_length = generation_config.max_new_token

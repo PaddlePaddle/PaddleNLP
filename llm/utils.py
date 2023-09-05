@@ -26,7 +26,6 @@ from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from sklearn.metrics import accuracy_score
 
 from paddlenlp.datasets import InTokensIterableDataset
-from paddlenlp.generation import GenerationConfig
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
 from paddlenlp.utils.log import logger
@@ -201,16 +200,14 @@ class CausalLMTrainer(Trainer):
                 input_ids=inputs["input_ids"],
                 attention_mask=inputs["attention_mask"] if "attention_mask" in inputs else None,
                 position_ids=inputs["position_ids"] if "position_ids" in inputs else None,
-                generation_config=GenerationConfig(
-                    max_new_token=self.data_args.tgt_length,
-                    decode_strategy="sampling",
-                    top_k=self.gen_args.top_k,
-                    top_p=self.gen_args.top_p,
-                    bos_token_id=self.tokenizer.bos_token_id,
-                    eos_token_id=self.tokenizer.eos_token_id,
-                    pad_token_id=self.tokenizer.pad_token_id,
-                    use_cache=True,
-                ),
+                max_new_token=self.data_args.tgt_length,
+                decode_strategy="sampling",
+                top_k=self.gen_args.top_k,
+                top_p=self.gen_args.top_p,
+                bos_token_id=self.tokenizer.bos_token_id,
+                eos_token_id=self.tokenizer.eos_token_id,
+                pad_token_id=self.tokenizer.pad_token_id,
+                use_cache=True,
             )[0]
             all_preds = []
             for pred_tokens in generated_tokens:

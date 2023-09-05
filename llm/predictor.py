@@ -30,7 +30,6 @@ from utils import (
     load_real_time_tokens,
 )
 
-from paddlenlp.generation import GenerationConfig
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.trainer import PdArgumentParser
@@ -200,17 +199,15 @@ class DygraphPredictor(BasePredictor):
         max_length = max(self.config.max_length - inputs["input_ids"].shape[-1], 1)
         result = self.model.generate(
             **inputs,
-            generation_config=GenerationConfig(
-                max_new_token=max_length,
-                bos_token_id=self.tokenizer.bos_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
-                pad_token_id=self.tokenizer.pad_token_id,
-                decode_strategy=self.config.decode_strategy,
-                temperature=self.config.temperature,
-                top_k=self.config.top_k,
-                top_p=self.config.top_p,
-                repetition_penalty=self.config.repetition_penalty,
-            ),
+            max_new_token=max_length,
+            bos_token_id=self.tokenizer.bos_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
+            pad_token_id=self.tokenizer.pad_token_id,
+            decode_strategy=self.config.decode_strategy,
+            temperature=self.config.temperature,
+            top_k=self.config.top_k,
+            top_p=self.config.top_p,
+            repetition_penalty=self.config.repetition_penalty,
         )
         result = result[0]
         return result
