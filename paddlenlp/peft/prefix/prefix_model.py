@@ -252,10 +252,16 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         return past_key_values
 
     def train(self):
+        self.training = True
+        self.model.training = True
+        self.prefix_encoder.training = True
         self.model.train()
         self.prefix_encoder.train()
 
     def eval(self):
+        self.training = False
+        self.model.training = False
+        self.prefix_encoder.training = False
         self.model.eval()
         self.prefix_encoder.eval()
 

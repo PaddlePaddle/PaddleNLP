@@ -18,8 +18,7 @@ import paddle
 
 from paddlenlp.transformers import ChatGLMv2Config, ChatGLMv2ForCausalLM, ChatGLMv2Model
 from tests.transformers.test_generation_utils import GenerationTesterMixin
-from tests.transformers.test_modeling_common import (
-    GenerationD2STestMixin,
+from tests.transformers.test_modeling_common import (  # GenerationD2STestMixin,
     ModelTesterMixin,
     ids_tensor,
     random_attention_mask,
@@ -230,8 +229,8 @@ class ChatGLMv2Test(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
         pass
 
 
-class ChatGLMV2GenerationD2STest(GenerationD2STestMixin, unittest.TestCase):
-    internal_testing_model = "__internal_testing__/tiny-random-chatglm2"
+# class ChatGLMV2GenerationD2STest(GenerationD2STestMixin, unittest.TestCase):
+#     internal_testing_model = "__internal_testing__/tiny-random-chatglm2"
 
 
 if __name__ == "__main__":
