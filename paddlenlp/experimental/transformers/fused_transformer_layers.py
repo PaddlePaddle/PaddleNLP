@@ -581,13 +581,13 @@ class FusedMultiTransformer(Layer):
 
             # out_linear
             if self.use_weight_only: 
-                weight_only_linear(fmha_out, 
-                                   weight=self.linear_weights[i], 
-                                   weight_scale=self.linear_weights_scale[i], 
-                                   weight_dtype=self.weight_dtype)
+                out_linear_out = weight_only_linear(fmha_out, 
+                                                    weight=self.linear_weights[i], 
+                                                    weight_scale=self.linear_weights_scale[i], 
+                                                    weight_dtype=self.weight_dtype)
             else: 
                 out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i])
-                
+
             # all_reduce
             if self.nranks > 1:
                 dist.all_reduce(out_linear_out)

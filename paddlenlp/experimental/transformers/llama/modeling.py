@@ -112,18 +112,18 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             pass
 
         ln_scale_attrs = [paddle.ParamAttr(name="fusellama.{}.ln_scale".format(i)) for i in range(self.num_layers)]
-        qkv_weight_attrs = [paddle.ParamAttr(name="fusellama.{}.qkv_weight".format(i)) for i in range(self.num_layers)]
+        qkv_weight_attrs = [paddle.ParamAttr(name="fusellama.{}.qkv_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)) for i in range(self.num_layers)]
         out_proj_weight_attrs = [
-            paddle.ParamAttr(name="fusellama.{}.out_proj_weight".format(i)) for i in range(self.num_layers)
+            paddle.ParamAttr(name="fusellama.{}.out_proj_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)) for i in range(self.num_layers)
         ]
         ffn_ln_scale_attrs = [
             paddle.ParamAttr(name="fusellama.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
         ]
         ffn1_weight_attrs = [
-            paddle.ParamAttr(name="fusellama.{}.ffn1_weight".format(i)) for i in range(self.num_layers)
+            paddle.ParamAttr(name="fusellama.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)) for i in range(self.num_layers)
         ]
         ffn2_weight_attrs = [
-            paddle.ParamAttr(name="fusellama.{}.ffn2_weight".format(i)) for i in range(self.num_layers)
+            paddle.ParamAttr(name="fusellama.{}.ffn2_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)) for i in range(self.num_layers)
         ]
 
         qkv_weight_scale_attrs = None 
