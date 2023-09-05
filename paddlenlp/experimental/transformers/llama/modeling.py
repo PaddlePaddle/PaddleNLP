@@ -79,14 +79,16 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
         self.quant_bits = config.quant_bits 
         self.quant_algo = 'weight_only_int' + str(self.quant_bits)
-
-        assert (
-            self.quant_algo == 'weight_only_int8' or self.quant_algo == 'weight_only_int4'
-        ), "Expected quant_algo equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
-            self.quant_algo
-        )
         if self.quant_bits != -1: 
-            self.use_weight_only = True 
+            self.use_weight_only = True
+        
+        if self.use_weight_only: 
+            assert (
+                self.quant_algo == 'weight_only_int8' or self.quant_algo == 'weight_only_int4'
+            ), "Expected quant_algo equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
+                self.quant_algo
+            )
+         
 
         if config.tensor_parallel_degree > 1:
             self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
