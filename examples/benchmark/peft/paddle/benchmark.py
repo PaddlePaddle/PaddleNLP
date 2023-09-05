@@ -18,7 +18,6 @@ from typing import Optional
 import numpy as np
 import paddle.profiler as profiler
 from datasets import load_dataset
-from modeling import GPTForCausalLM
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from utils import CustomTrainer, ProfilerCallback
 
@@ -26,7 +25,7 @@ from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import InTokensMapDataset
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
-from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, GPTForCausalLM
 
 """
 单卡
@@ -87,7 +86,7 @@ def main():
     else:
         tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
-    if "llama" in model_args.model_name_or_path:
+    if "llama" in model_args.model_name_or_path or "Baichuan" in model_args.model_name_or_path:
         tokenizer.pad_token = tokenizer.unk_token
 
     if model_args.model_name_or_path in ["gpt3-6.7B-en", "gpt3-13B-en"]:
@@ -113,7 +112,7 @@ def main():
         )
 
     if model_args.lora:
-        if "llama" in model_args.model_name_or_path:
+        if "llama" in model_args.model_name_or_path or "Baichuan" in model_args.model_name_or_path:
             target_modules = [".*q_proj.*", ".*k_proj.*", ".*v_proj.*"]
         elif model_args.model_name_or_path in ["gpt3-6.7B-en", "gpt3-13B-en"]:
             target_modules = [
