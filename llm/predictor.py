@@ -64,7 +64,10 @@ class PredictorArgument:
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
-    max_batch_size: int = field(default=None, metadata={"help": "The max batch size of data during serving."})
+    max_batch_size: int = field(default=1, metadata={"help": "The max batch size of data during serving."})
+    llm_for_img2txt: bool = field(
+        default=False, metadata={"help": "whether this llm model is used for img2txt, such as miniGPT4, blip2."}
+    )
 
 
 @dataclass
@@ -553,13 +556,19 @@ def create_predictor(
             # TODO(wj-Mcat): complete AutoInferenceModel & AutoPredictor
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
             if "llama" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    LlamaForCausalLMInferenceModel,
-                )
+                if predictor_args.llm_for_img2txt:
+                    # we use llama for img2txt.
+                    from paddlenlp.experimental.transformers import (
+                        LlamaForminiGPT4InferenceModel as LlamaInferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        LlamaForCausalLMInferenceModel as LlamaInferenceModel,
+                    )
 
                 config.tensor_parallel_degree = tensor_parallel_degree
                 config.tensor_parallel_rank = tensor_parallel_rank
-                model = LlamaForCausalLMInferenceModel.from_pretrained(
+                model = LlamaInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
                 model.eval()
