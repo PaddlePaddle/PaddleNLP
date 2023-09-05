@@ -86,7 +86,7 @@ def main():
     else:
         tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
-    if "llama" in model_args.model_name_or_path:
+    if "llama" in model_args.model_name_or_path or "Baichuan" in model_args.model_name_or_path:
         tokenizer.pad_token = tokenizer.unk_token
 
     if model_args.model_name_or_path in ["gpt3-6.7B-en", "gpt3-13B-en"]:
@@ -112,7 +112,7 @@ def main():
         )
 
     if model_args.lora:
-        if "llama" in model_args.model_name_or_path:
+        if "llama" in model_args.model_name_or_path or "Baichuan" in model_args.model_name_or_path:
             target_modules = [".*q_proj.*", ".*k_proj.*", ".*v_proj.*"]
         elif model_args.model_name_or_path in ["gpt3-6.7B-en", "gpt3-13B-en"]:
             target_modules = [
