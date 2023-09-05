@@ -148,7 +148,7 @@ class BloomTokenizer(PretrainedTokenizer):
         "bigscience/bloom-560m": 102400,
     }
     padding_side = "left"
-    model_input_names = ["input_ids", "attention_mask"]
+    model_input_names = ["input_ids", "attention_mask", "position_ids"]
 
     def __init__(
         self,
