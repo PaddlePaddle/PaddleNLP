@@ -26,7 +26,6 @@ from paddle.nn import Layer
 from paddle.nn.initializer import Constant
 from paddle.nn.quant import weight_only_linear
 
-
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
@@ -139,7 +138,7 @@ class FusedMultiTransformer(Layer):
         embed_dim,
         num_heads,
         dim_feedforward,
-        quant_bits=-1, # -1 means use Half precision.  
+        quant_bits=-1,  # -1 means use Half precision.
         dropout_rate=0.0,
         activation="gelu",
         norm_type="layernorm",
@@ -148,18 +147,18 @@ class FusedMultiTransformer(Layer):
         ln_scale_attrs=None,
         ln_bias_attrs=None,
         qkv_weight_attrs=None,
-        qkv_weight_scale_attrs=None, 
+        qkv_weight_scale_attrs=None,
         qkv_bias_attrs=None,
         linear_weight_attrs=None,
-        linear_weight_scale_attrs=None, 
+        linear_weight_scale_attrs=None,
         linear_bias_attrs=None,
         ffn_ln_scale_attrs=None,
         ffn_ln_bias_attrs=None,
         ffn1_weight_attrs=None,
-        ffn1_weight_scale_attrs=None, 
+        ffn1_weight_scale_attrs=None,
         ffn1_bias_attrs=None,
         ffn2_weight_attrs=None,
-        ffn2_weight_scale_attrs=None, 
+        ffn2_weight_scale_attrs=None,
         ffn2_bias_attrs=None,
         epsilon=1e-5,
         residual_alpha=1.0,
@@ -211,12 +210,12 @@ class FusedMultiTransformer(Layer):
         assert num_layers > 0
 
         self.quant_bits = quant_bits
-        self.use_weight_only = False 
+        self.use_weight_only = False
         self.weight_dtype = self._dtype
 
-        if self.quant_bits != -1: 
+        if self.quant_bits != -1:
             self.use_weight_only = True
-            self.weight_dtype = 'int'+str(self.quant_bits)
+            self.weight_dtype = "int" + str(self.quant_bits)
 
         self.ln_scales, self.ln_biases = [], []
         self.qkv_weights, self.qkv_weights_scale, self.qkv_biases = [], [], []
@@ -272,13 +271,17 @@ class FusedMultiTransformer(Layer):
                     dtype=self._norm_weight_dtype,
                 )
 
-            # Note(Zhengzekang): Weightonly need weight is ColMajor layout. 
-            qkv_weight_shape = [3 * num_heads * self.head_dim, embed_dim] if trans_qkvw else [embed_dim * 3 * num_heads, self.head_dim]
-            qkv_weight_scale = None 
-            if self.use_weight_only: 
-                if self.quant_bits == 4: 
+            # Note(Zhengzekang): Weightonly need weight is ColMajor layout.
+            qkv_weight_shape = (
+                [3 * num_heads * self.head_dim, embed_dim]
+                if trans_qkvw
+                else [embed_dim * 3 * num_heads, self.head_dim]
+            )
+            qkv_weight_scale = None
+            if self.use_weight_only:
+                if self.quant_bits == 4:
                     qkv_weight_shape[0] //= 2
-                
+
                 qkv_weight_scale = self.create_parameter(
                     shape=[3 * num_heads * self.head_dim],
                     attr=qkv_weight_scale_attr,
@@ -303,10 +306,10 @@ class FusedMultiTransformer(Layer):
                 )
 
             linear_weight_shape = [num_heads * self.head_dim, embed_dim]
-            linear_weight_scale = None 
-            if self.use_weight_only: 
+            linear_weight_scale = None
+            if self.use_weight_only:
                 linear_weight_shape = [embed_dim, num_heads * self.head_dim]
-                if self.quant_bits == 4: 
+                if self.quant_bits == 4:
                     linear_weight_shape[0] //= 2
 
                 linear_weight_scale = self.create_parameter(
@@ -316,7 +319,7 @@ class FusedMultiTransformer(Layer):
                     is_bias=False,
                 )
             linear_weight = self.create_parameter(
-                shape=linear_weight_shape, 
+                shape=linear_weight_shape,
                 attr=linear_weight_attr,
                 dtype=self.weight_dtype,
                 is_bias=False,
@@ -348,11 +351,15 @@ class FusedMultiTransformer(Layer):
                     dtype=self._norm_weight_dtype,
                 )
 
-            ffn1_weight_shape = [embed_dim, dim_feedforward * 2] if activation.endswith("glu") else [embed_dim, dim_feedforward]
-            ffn1_weight_scale = None 
-            if self.use_weight_only: 
-                ffn1_weight_shape = [dim_feedforward * 2, embed_dim] if activation.endswith("glu") else [dim_feedforward, embed_dim]
-                if self.quant_bits == 4: 
+            ffn1_weight_shape = (
+                [embed_dim, dim_feedforward * 2] if activation.endswith("glu") else [embed_dim, dim_feedforward]
+            )
+            ffn1_weight_scale = None
+            if self.use_weight_only:
+                ffn1_weight_shape = (
+                    [dim_feedforward * 2, embed_dim] if activation.endswith("glu") else [dim_feedforward, embed_dim]
+                )
+                if self.quant_bits == 4:
                     ffn1_weight_shape[0] //= 2
 
                 ffn1_weight_scale = self.create_parameter(
@@ -362,7 +369,7 @@ class FusedMultiTransformer(Layer):
                     is_bias=False,
                 )
             ffn1_weight = self.create_parameter(
-                shape=ffn1_weight_shape, 
+                shape=ffn1_weight_shape,
                 attr=ffn1_weight_attr,
                 dtype=self.weight_dtype,
                 is_bias=False,
@@ -378,12 +385,12 @@ class FusedMultiTransformer(Layer):
                 )
 
             ffn2_weight_shape = [dim_feedforward, embed_dim]
-            ffn2_weight_scale = None 
-            if self.use_weight_only: 
+            ffn2_weight_scale = None
+            if self.use_weight_only:
                 ffn2_weight_shape = [embed_dim, dim_feedforward]
-                if self.quant_bits == 4: 
+                if self.quant_bits == 4:
                     ffn2_weight_shape[0] //= 2
-                
+
                 ffn2_weight_scale = self.create_parameter(
                     shape=[embed_dim],
                     attr=ffn2_weight_scale_attr,
@@ -432,12 +439,11 @@ class FusedMultiTransformer(Layer):
             self.ffn2_weights.append(ffn2_weight)
             self.ffn2_biases.append(ffn2_bias)
 
-            if self.use_weight_only: 
+            if self.use_weight_only:
                 self.qkv_weights_scale.append(qkv_weight_scale)
                 self.linear_weights_scale.append(linear_weight_scale)
                 self.ffn1_weights_scale.append(ffn1_weight_scale)
                 self.ffn2_weights_scale.append(ffn2_weight_scale)
-
 
             _add_parameter(ln_scale)
             _add_parameter(ln_bias)
@@ -453,12 +459,11 @@ class FusedMultiTransformer(Layer):
             _add_parameter(ffn2_weight)
             _add_parameter(ffn2_bias)
 
-            if self.use_weight_only: 
+            if self.use_weight_only:
                 _add_parameter(qkv_weight_scale)
                 _add_parameter(linear_weight_scale)
                 _add_parameter(ffn1_weight_scale)
                 _add_parameter(ffn2_weight_scale)
-
 
         self.dropout_rate = dropout_rate
         self.activation = activation
@@ -529,14 +534,16 @@ class FusedMultiTransformer(Layer):
                     )
 
             # qkv compute
-            if self.use_weight_only: 
-                qkv_out = weight_only_linear(ln_out, 
-                                             weight=self.qkv_weights[i], 
-                                             bias=self.qkv_biases[i], 
-                                             weight_scale=self.qkv_weights_scale[i], 
-                                             weight_dtype=self.weight_dtype)
-            else: 
-                qkv_out = self.linear(ln_out, self.qkv_weights[i], self.qkv_biases[i], transpose_weight=True)                
+            if self.use_weight_only:
+                qkv_out = weight_only_linear(
+                    ln_out,
+                    weight=self.qkv_weights[i],
+                    bias=self.qkv_biases[i],
+                    weight_scale=self.qkv_weights_scale[i],
+                    weight_dtype=self.weight_dtype,
+                )
+            else:
+                qkv_out = self.linear(ln_out, self.qkv_weights[i], self.qkv_biases[i], transpose_weight=True)
 
             # fmha compute
             if time_step is None:  # context
@@ -580,12 +587,14 @@ class FusedMultiTransformer(Layer):
                 )[0]
 
             # out_linear
-            if self.use_weight_only: 
-                out_linear_out = weight_only_linear(fmha_out, 
-                                                    weight=self.linear_weights[i], 
-                                                    weight_scale=self.linear_weights_scale[i], 
-                                                    weight_dtype=self.weight_dtype)
-            else: 
+            if self.use_weight_only:
+                out_linear_out = weight_only_linear(
+                    fmha_out,
+                    weight=self.linear_weights[i],
+                    weight_scale=self.linear_weights_scale[i],
+                    weight_dtype=self.weight_dtype,
+                )
+            else:
                 out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i])
 
             # all_reduce
@@ -616,22 +625,26 @@ class FusedMultiTransformer(Layer):
                 )[0]
 
             # ffn1 matmul
-            if self.use_weight_only: 
-                ffn1_out = weight_only_linear(tmp_out, 
-                                              weight=self.ffn1_weights[i], 
-                                              weight_scale=self.ffn1_weights_scale[i], 
-                                              weight_dtype=self.weight_dtype)
-            else:  
+            if self.use_weight_only:
+                ffn1_out = weight_only_linear(
+                    tmp_out,
+                    weight=self.ffn1_weights[i],
+                    weight_scale=self.ffn1_weights_scale[i],
+                    weight_dtype=self.weight_dtype,
+                )
+            else:
                 ffn1_out = paddle.matmul(tmp_out, self.ffn1_weights[i])
             ffn1_out = fused_act_bias_wrapper(ffn1_out, self.ffn1_biases[i], act_method=self.activation)
 
             # ffn2 matmul
-            if self.use_weight_only: 
-                ffn2_out = weight_only_linear(ffn1_out, 
-                                              weight=self.ffn2_weights[i], 
-                                              weight_scale=self.ffn2_weights_scale[i], 
-                                              weight_dtype=self.weight_dtype)
-            else: 
+            if self.use_weight_only:
+                ffn2_out = weight_only_linear(
+                    ffn1_out,
+                    weight=self.ffn2_weights[i],
+                    weight_scale=self.ffn2_weights_scale[i],
+                    weight_dtype=self.weight_dtype,
+                )
+            else:
                 ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i])
 
             # all_reduce
