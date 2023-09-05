@@ -82,9 +82,6 @@ class PredictorArgument:
             },
         ),
     )
-    llm_for_img2txt: bool = field(
-        default=False, metadata={"help": "whether this llm model is used for img2txt, such as miniGPT4, blip2."}
-    )
 
 
 @dataclass
@@ -578,7 +575,7 @@ def create_predictor(
             # TODO(wj-Mcat): complete AutoInferenceModel & AutoPredictor
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
             if "llama" in config.architectures[0].lower():
-                if predictor_args.llm_for_img2txt:
+                if model_args.model_type == "llama-img2txt":
                     # we use llama for img2txt.
                     from paddlenlp.experimental.transformers import (
                         LlamaForMiniGPT4InferenceModel as LlamaInferenceModel,
