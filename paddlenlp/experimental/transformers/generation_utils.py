@@ -244,7 +244,7 @@ class GenerationInferenceModel(GenerationMixin):
 
         # genereate a fake input_ids according to inputs_embeds.
         if input_ids is None and inputs_embeds is not None:
-            input_ids = self.prepare_input_ids_for_generation(1, inputs_embeds)
+            input_ids = self.prepare_input_ids_for_generation(self.config.bos_token_id, inputs_embeds)
         if inputs_embeds is not None:
             batch, seq_len, hidden_dim = inputs_embeds.shape
             inputs_embeds = inputs_embeds.reshape([batch * seq_len, hidden_dim])
