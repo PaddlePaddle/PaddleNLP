@@ -192,7 +192,7 @@ class ModelArguments:
         metadata={"help": "Specify the full transformer layers that should not be recomputed."},
     )
     pp_recompute_interval: int = field(
-        default=0,
+        default=1,
         metadata={
             "help": "The interval for the number of layers at which recomputation occurs. A value of 0 indicates no recomputation. Default is 0."
         },
