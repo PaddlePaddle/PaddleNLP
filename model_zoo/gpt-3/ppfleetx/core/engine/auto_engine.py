@@ -315,14 +315,14 @@ class AutoEngine(BasicEngine):
                 )
             else:
                 train_data_loader = self._auto_engine.dataloader_from_generator(
-                dataset=train_dataset,
-                batch_size=self._global_batch_size,
-                steps_per_epoch=self._max_steps,
-                epochs=self._num_train_epochs,
-                collate_fn=train_dataset.collate_fn,
-                sample_split=train_dataset.sample_split,
-                mode="train",
-            )
+                    dataset=train_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=train_dataset.collate_fn,
+                    sample_split=train_dataset.sample_split,
+                    mode="train",
+                )
         if valid_dataset and self._eval_freq <= self._max_steps:
             if use_new_executor():
                 valid_data_loader = self._auto_engine.dataloader(
@@ -337,14 +337,14 @@ class AutoEngine(BasicEngine):
                 )
             else:
                 valid_data_loader = self._auto_engine.dataloader_from_generator(
-                dataset=valid_dataset,
-                batch_size=self._global_batch_size,
-                steps_per_epoch=self._max_steps,
-                epochs=self._num_train_epochs,
-                collate_fn=valid_dataset.collate_fn,
-                sample_split=valid_dataset.sample_split,
-                mode="eval",
-            )
+                    dataset=valid_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=valid_dataset.collate_fn,
+                    sample_split=valid_dataset.sample_split,
+                    mode="eval",
+                )
 
         for epoch_index in range(start_epoch, epoch):
             train_epoch_start = get_timestamp()
