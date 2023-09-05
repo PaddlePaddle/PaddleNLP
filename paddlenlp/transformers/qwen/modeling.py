@@ -471,6 +471,7 @@ class QWenPreTrainedModel(PretrainedModel):
 class QWenModel(QWenPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
+        self.config = config
         self.vocab_size = config.vocab_size
         self.num_hidden_layers = config.num_hidden_layers
         self.embed_dim = config.hidden_size
@@ -531,7 +532,7 @@ class QWenModel(QWenPreTrainedModel):
             encoder_attention_mask,
             use_cache,
             output_attentions,
-            use_reentrant=False,
+            use_reentrant=self.config.recompute_use_reentrant,
         )
         return hidden_states
 
@@ -625,11 +626,11 @@ class QWenModel(QWenPreTrainedModel):
         all_self_attentions = () if output_attentions else None
         all_hidden_states = () if output_hidden_states else None
         for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
-
+            has_gradient = not hidden_states.stop_gradient
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
-            if self.enable_recompute and self.training:
+            if self.enable_recompute and self.training and has_gradient:
                 outputs = self.recompute_training(
                     block,
                     hidden_states,

@@ -1539,10 +1539,13 @@ class GenerationMixin(object):
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
-            if "cache" in model_kwargs and model_kwargs["cache"] is not None:
+
+            cache_name = "cache" if "cache" in model_kwargs else "past_key_values"
+
+            if model_kwargs[cache_name] is not None:
                 # reorder the cache
-                model_kwargs["cache"] = map_structure(
-                    lambda x: paddle.index_select(x, beam_idx), model_kwargs["cache"]
+                model_kwargs[cache_name] = map_structure(
+                    lambda x: paddle.index_select(x, beam_idx), model_kwargs[cache_name]
                 )
 
         pred_ids, scores = beam_scorer.finalize(
@@ -1667,10 +1670,12 @@ class GenerationMixin(object):
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
-            if "cache" in model_kwargs and model_kwargs["cache"] is not None:
+            cache_name = "cache" if "cache" in model_kwargs else "past_key_values"
+
+            if model_kwargs[cache_name] is not None:
                 # reorder the cache
-                model_kwargs["cache"] = map_structure(
-                    lambda x: paddle.index_select(x, reordering_indices), model_kwargs["cache"]
+                model_kwargs[cache_name] = map_structure(
+                    lambda x: paddle.index_select(x, reordering_indices), model_kwargs[cache_name]
                 )
 
         pred_ids, scores = beam_scorer.finalize(

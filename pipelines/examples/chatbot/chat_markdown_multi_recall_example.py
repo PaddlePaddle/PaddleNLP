@@ -25,6 +25,7 @@ from pipelines.nodes import (
     CharacterTextSplitter,
     ChatGLMBot,
     DensePassageRetriever,
+    EmbeddingRetriever,
     ErnieBot,
     ErnieRanker,
     JoinDocuments,
@@ -57,9 +58,11 @@ parser.add_argument("--data_chunk_size", default=300, type=int, help="The length
 parser.add_argument('--host', type=str, default="localhost", help='host ip of ANN search engine')
 parser.add_argument('--embed_title', default=False, type=bool, help="The title to be  embedded into embedding")
 parser.add_argument('--chatbot', choices=['ernie_bot', 'chatglm'], default="chatglm", help="The chatbot models ")
-parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search'], default="ernie", help="the ernie model types")
+parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search', 'ernie-embedding-v1'], default="ernie", help="the ernie model types")
 parser.add_argument("--api_key", default=None, type=str, help="The API Key.")
 parser.add_argument("--secret_key", default=None, type=str, help="The secret key.")
+parser.add_argument("--embedding_api_key", default=None, type=str, help="The Embedding API Key.")
+parser.add_argument("--embedding_secret_key", default=None, type=str, help="The Embedding secret key.")
 parser.add_argument("--port", type=str, default="9200", help="port of ANN search engine")
 parser.add_argument("--es_chunk_size", default=500, type=int, help="Number of docs in one chunk sent to es")
 parser.add_argument("--es_thread_count", default=32, type=int, help="Size of the threadpool to use for the bulk requests")
@@ -100,19 +103,29 @@ def chat_markdown_tutorial():
             queue_size=args.es_queue_size,
         )
     use_gpu = True if args.device == "gpu" else False
-    retriever = DensePassageRetriever(
-        document_store=document_store,
-        query_embedding_model=args.query_embedding_model,
-        passage_embedding_model=args.passage_embedding_model,
-        params_path=args.params_path,
-        output_emb_size=args.embedding_dim if args.model_type in ["ernie_search", "neural_search"] else None,
-        max_seq_len_query=args.max_seq_len_query,
-        max_seq_len_passage=args.max_seq_len_passage,
-        batch_size=args.retriever_batch_size,
-        use_gpu=use_gpu,
-        embed_title=args.embed_title,
-        precision="fp16",
-    )
+
+    if args.model_type == "ernie-embedding-v1":
+        retriever = EmbeddingRetriever(
+            document_store=document_store,
+            retriever_batch_size=args.retriever_batch_size,
+            api_key=args.embedding_api_key,
+            embed_title=args.embed_title,
+            secret_key=args.embedding_secret_key,
+        )
+    else:
+        retriever = DensePassageRetriever(
+            document_store=document_store,
+            query_embedding_model=args.query_embedding_model,
+            passage_embedding_model=args.passage_embedding_model,
+            params_path=args.params_path,
+            output_emb_size=args.embedding_dim if args.model_type in ["ernie_search", "neural_search"] else None,
+            max_seq_len_query=args.max_seq_len_query,
+            max_seq_len_passage=args.max_seq_len_passage,
+            batch_size=args.retriever_batch_size,
+            use_gpu=use_gpu,
+            embed_title=args.embed_title,
+            precision="fp16",
+        )
     bm_retriever = BM25Retriever(document_store=document_store)
 
     # Indexing Markdowns

@@ -10,6 +10,7 @@
 | [GPT-3](./gpt-3) |   ✅  |  ✅  |  ✅  |  WIP  | ✅    | WIP |
 | [OPT](./opt) | WIP | ✅ | ✅ | WIP|  ✅ | WIP |
 | [GLM](./glm) |N/A | ✅ | ✅ | WIP|  ✅ | WIP |
+| [Qwen](./qwen) |N/A | ✅ | ✅ | ✅ |  ✅ | WIP |
 
 
 # LLM全流程工具介绍
@@ -29,12 +30,13 @@
 
 - PaddlePaddle >= 2.5.1
 - PaddleNLP >= 2.6.0
+- tiktoken (仅 Qwen 需要)
 
 ## 2. 预训练
 [LLaMA v1/v2](./llama)、[GPT-3](./gpt-3) 目录中提供了模型预训练的数据准备和训练细节，后续我们将支持更多的模型预训练。
 
 ## 3. 精调
-目前精调统一脚本只支持[LLaMA v1/v2](./llama)、[ChatGLM-6B](./chatglm)、[ChatGLM2-6B](./chatglm2)、[Bloom](./bloom)、[OPT](./opt)，其他模型精调使用详见对应模型目录。接下来我们将以**Llama 2**为例介绍如何使用统一脚本进行SFT、LoRA、Prefix Tuning。更多LoRA、Prefix Tuning请参见[PEFT文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/peft.md)。
+目前精调统一脚本只支持[LLaMA v1/v2](./llama)、[ChatGLM-6B](./chatglm)、[ChatGLM2-6B](./chatglm2)、[Bloom](./bloom)、[OPT](./opt)、[Qwen](./qwen)，其他模型精调使用详见对应模型目录。接下来我们将以**Llama 2**为例介绍如何使用统一脚本进行SFT、LoRA、Prefix Tuning。更多LoRA、Prefix Tuning请参见[PEFT文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/peft.md)。
 
 ### 3.1 精调训练数据格式
 
@@ -48,6 +50,8 @@
 {"src": "类型#裙*颜色#蓝色*风格#清新*图案#蝴蝶结", "tgt": "裙身处采用立体蝴蝶结装饰辅以蓝色条带点缀，令衣身造型饱满富有层次的同时为其注入一丝甜美气息。将女孩清新娇俏的一面衬托而出。"}
 ...
 ```
+
+
 
 ### 3.2 SFT
 SFT(Supervised Fine-Tuning)依托飞桨提出的[4D混合分布式并行](https://ai.baidu.com/forum/topic/show/987996)能力，支持使用Trainer API轻松切换数据并行(DP)、[张量并行（TP, Tensor Parallelism）](https://arxiv.org/abs/1909.08053)、[流水线并行（PP, Pipeline Parallelism）](https://arxiv.org/abs/1811.06965)（目前仅支持Llama）等多种分布式训练策略。
@@ -122,15 +126,15 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 
 <details><summary>&emsp; 数据参数(DataArgument) </summary><div>
 
-
-- `dataset_name_or_path`: 本地数据集目录或内置数据集名称，默认为None。
+- `dataset_name_or_path`: 本地数据集目录或内置数据集名称，默认为None。脚本已适配单文件和多文件，会自己寻找`dataset_name_or_path/train.json` 或者 `dataset_name_or_path/train/*.json`作为训练集文件, 以及`dataset_name_or_path/dev.json` 或者 `dataset_name_or_path/dev/*.json`作为验证集文件。
 - `task_name`: 用于选择内置数据集中的具体任务，默认为None。
-- `src_length`: 模型输入上下文最大长度，默认为1024。
-- `tgt_length`:模型生成文本最大长度，默认为1024。
 - `eval_with_do_generation`: 在模型效果评估的时候是否调用model.generate,默认为False。设置为True时，指标为ppl, accuracy；设置为False时，指标为BLEU4/Rouge，建议将`metric_for_best_model`设为bleu4。
 - `save_generation_output`: 当`eval_with_do_generation`设为True，是否将生成结果保存在`generated_output.json`文件中，默认为False。
-- `intokens`:是否使用InToken数据流（减少Padding冗余计算，大幅提升有效Token计算效率），默认为False。当`eval_with_do_generation`设为True,评估过程不支持InToken数据流。
-- `intokens_max_length`: InToken数据流模型训练最大长度，默认为2048。
+- `intokens`:是否使用InToken数据流（减少Padding冗余计算，大幅提升有效Token计算效率），默认为False。当`eval_with_do_generation`设为True,评估过程不支持InToken数据流。。
+- `src_length`: 模型输入上下文最大token长度，默认为1024。
+- `max_length`:模型输入（上下文+生成内容）的最大token长度, 默认为2048。当`intokens`设为True的时候，同时也为InToken数据流模型训练输入最大长度，通常建议设为模型允许输入最大长度，同时`per_device_train_batch_size`设为1，使用`gradient_accumulation_steps`控制batch size。
+- `lazy`:设置为False则使用`MapDataset`，设置为True则使用`IterDataset`，默认为False。对于数据量较大的时候建议设为True，`IterDataset`可以避免一次性将所有数据读入内存，注意需要设置`max_steps`并且`evaluation_strategy`和`save_strategy`设为`steps`
+
 </div></details>
 
 
@@ -240,7 +244,7 @@ python predictor.py \
 python export_model.py \
     --model_name_or_path meta-llama/Llama-2-7b-chat \
     --output_path ./inference \
-    --dtype float16 \
+    --dtype float16
 
 
 # 静态图模型推理
@@ -295,8 +299,8 @@ python predictor.py \
 
 - `model_name_or_path`: 必须，预训练模型名称或者本地的模型路径，用于热启模型和分词器，默认为None。
 - `batch_size`: 批处理大小，默认为8。该参数越大，占用显存越高；该参数越小，占用显存越低。
-- `src_length`: 模型输入上下文最大长度，默认为1024。
-- `max_length`:推理过程中模型输入最大长度，也即文本生成的最长长度为`max_length-len(input_ids)`, 默认为2048。
+- `src_length`: 模型输入上下文最大token长度，默认为1024。
+- `max_length`:模型输入（上下文+生成内容）的最大token长度, 默认为2048。
 - `lora_path`: LoRA参数和配置路径，对LoRA参数进行初始化，默认为None。
 - `prefix_path`: Prefix Tuning参数和配置路径，对Prefix Tuning参数进行初始化，默认为None。
 - `top_k`: “采样”策略中为 top-k 过滤保留的最高概率标记的数量。默认为1，等价于贪心策略。

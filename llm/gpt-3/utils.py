@@ -172,6 +172,7 @@ def convert_example(
     tokenizer,
     max_source_length,
     max_target_length,
+    is_test=False,
 ):
     """
     Convert an example into necessary features.
@@ -217,6 +218,8 @@ def convert_example(
         final[k] = inputs[k] + outputs[k]
         if k == "input_ids":
             final["labels"] = [tokenizer.pad_token_id] * len(inputs["input_ids"]) + outputs[k]
+    if is_test:
+        return dict(input_ids=inputs["input_ids"], labels=outputs["input_ids"])
 
     # shift inputs and labels
     final["input_ids"] = final["input_ids"][:-1]
@@ -328,7 +331,7 @@ class GPTTrainer(Trainer):
 
         preds = model.generate(
             input_ids=inputs["input_ids"],
-            attention_mask=inputs["attention_mask"],
+            attention_mask=inputs["attention_mask"] if "attention_mask" in inputs else None,
             max_length=self.args.tgt_length,
             min_length=0,
             use_cache=True,

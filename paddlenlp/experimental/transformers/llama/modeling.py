@@ -25,7 +25,7 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
-from paddlenlp.transformers import LlamaConfig, LlamaForCausalLM, LlamaPretrainedModel
+from paddlenlp.transformers import LlamaConfig, LlamaPretrainedModel
 from paddlenlp.transformers.llama.modeling import LlamaLMHead
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -290,7 +290,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             )
 
 
-class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaForCausalLM):
+class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedModel):
     """
     Dynamic Batching for LLaMA Model with pretraining tasks on top.
     """
@@ -299,7 +299,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaForCausalLM)
 
     def __init__(self, config):
         super().__init__(config)
-        self.model = LlamaInferenceModel(config)
+        self.llama = LlamaInferenceModel(config)
         self.lm_head = LlamaLMHead(config)
 
     @classmethod
@@ -385,7 +385,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaForCausalLM)
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        outputs = self.model(
+        outputs = self.llama(
             input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
@@ -429,5 +429,6 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaForCausalLM)
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
-        self.lm_head.weight.set_value(state_dict["lm_head.weight"])
-        self.model.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
+        if "lm_head.weight" in state_dict:
+            self.lm_head.weight.set_value(state_dict["lm_head.weight"])
+        self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
