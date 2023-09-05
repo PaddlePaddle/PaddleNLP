@@ -366,7 +366,9 @@ def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
         return inst_data.astype("int64").reshape([-1, max_len])
 
 
-def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectures: str, benchmark=False, pre_caches_length: int = 0):
+def dybatch_preprocess(
+    tokenizer, texts: list[str], max_length: int, architectures: str, benchmark=False, pre_caches_length: int = 0
+):
     """Pre-process generation inputs."""
     if "chatglm" in architectures:
         input_ids = []
@@ -376,7 +378,6 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
             tokens = tokenizer(text, return_tensors="np", padding=True)
             input_ids.append(tokens["input_ids"][0])
             position_ids.append(tokens["position_ids"][0])
-
         inputs = {}
         pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][0]
 
@@ -463,7 +464,10 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
     inputs["min_length"] = (
         np.array(
             [
-                1 if not benchmark else max_length - seq_len, # Note(Zhengzekang): When in benchmark mode, we need to set a fixed decode length. 
+                1
+                if not benchmark
+                else max_length
+                - seq_len,  # Note(Zhengzekang): When in benchmark mode, we need to set a fixed decode length.
             ]
             * bs
         )

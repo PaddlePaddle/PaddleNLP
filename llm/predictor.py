@@ -315,6 +315,7 @@ class StaticInferencePredictor(BasePredictor):
             shape=[config.batch_size, 1, 1, config.max_length + 1],
             dtype=dtype,
         )
+
         if config.prefix_path:
             prefix_cache = paddle.to_tensor(np.load(f"{config.prefix_path}/pre_caches.npy")).unsqueeze(2)
             num_layers = self.model_config.num_hidden_layers
@@ -383,7 +384,9 @@ class StaticInferencePredictor(BasePredictor):
         else:
             pre_caches_length = 0 if self.config.prefix_path is None else self.pre_caches[0].shape[-2]
 
-            inputs = dybatch_preprocess(self.tokenizer, source, self.config.max_length, self.architectures, pre_caches_length=pre_caches_length)
+            inputs = dybatch_preprocess(
+                self.tokenizer, source, self.config.max_length, self.architectures, pre_caches_length=pre_caches_length
+            )
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = paddle.tril(
@@ -491,7 +494,6 @@ class DygraphInferencePredictor(BasePredictor):
             num_layers = self.model.config.num_hidden_layers
             num_attention_heads = self.model.config.num_attention_heads
             head_dim = self.model.config.hidden_size // num_attention_heads
-
             prefix_cache = paddle.expand(
                 prefix_cache, [num_layers, 2, config.batch_size, num_attention_heads, prefix_cache.shape[-2], head_dim]
             )
@@ -515,13 +517,19 @@ class DygraphInferencePredictor(BasePredictor):
             inputs["tgt_pos"] = self.tgt_pos
         else:
             pre_caches_length = 0 if self.config.prefix_path is None else self.pre_caches[0].shape[-2]
-            inputs = dybatch_preprocess(self.tokenizer, source, self.config.max_length, self.architectures, pre_caches_length=pre_caches_length,)
+            inputs = dybatch_preprocess(
+                self.tokenizer,
+                source,
+                self.config.max_length,
+                self.architectures,
+                pre_caches_length=pre_caches_length,
+            )
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = paddle.tril(
                     paddle.ones(shape=(length, length), dtype="float16")
                 )
-                
+
                 if pre_caches_length > 0:
                     prefix_attention_mask = paddle.ones(
                         [1, length, pre_caches_length], dtype=self.attention_mask.dtype
@@ -537,7 +545,7 @@ class DygraphInferencePredictor(BasePredictor):
                     shape=[1, length + pre_caches_length], dtype="float16"
                 )
             inputs["attention_mask"] = self.attention_mask
-            inputs["tgt_generation_mask"] = self.tgt_generation_mask    
+            inputs["tgt_generation_mask"] = self.tgt_generation_mask
             inputs["cache_kvs"] = self.cache_kvs
             inputs["pre_ids"] = self.pre_ids
             if self.config.prefix_path:

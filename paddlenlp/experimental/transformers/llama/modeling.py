@@ -359,6 +359,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
             attention_mask = (tgt_generation_mask - 1) * 1e4
         else:
             attention_mask = (attention_mask - 1) * 1e4
+
         model_inputs = {
             "input_ids": input_ids,
             "position_ids": position_ids,
