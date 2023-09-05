@@ -43,7 +43,7 @@ if(BUILD_GPT)
   set(CMAKE_MODULE_PATH "") # prevent the bugs for pytorch building
 endif()
 
-set(CXX_STD "14" CACHE STRING "C++ standard")
+set(CXX_STD "17" CACHE STRING "C++ standard")
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
 
@@ -142,8 +142,8 @@ set(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG}  -Wall -O0")
 # set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G -Xcompiler -Wall  --ptxas-options=-v --resource-usage")
 set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -O0 -G -Xcompiler -Wall")
 
-set(CMAKE_CXX_STANDARD "${CXX_STD}")
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX17_STANDARD_COMPILE_OPTION "-std=c++{CXX_STD}")
+set(CMAKE_CXX17_EXTENSION_COMPILE_OPTION "-std=gnu++{CXX_STD}")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-extended-lambda")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --std=c++${CXX_STD}")
@@ -203,7 +203,7 @@ if(BUILD_PD)
       message(FATAL_ERROR "please set PADDLE_LIB with -DPADDLE_LIB=/path/paddle/lib")
     endif()
 
-    include_directories("${PADDLE_LIB}/")
+    include_directories("${PADDLE_LIB}/paddle/include/")
     set(PADDLE_LIB_THIRD_PARTY_PATH "${PADDLE_LIB}/third_party/install/")
     include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}protobuf/include")
     include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}glog/include")
@@ -227,7 +227,7 @@ if(BUILD_PD)
     if(WITH_MKL)
       set(FLAG_OPENMP "-fopenmp")
     endif()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 ${FLAG_OPENMP}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FLAG_OPENMP}")
 
     if (USE_TENSORRT AND WITH_GPU)
       set(TENSORRT_ROOT "" CACHE STRING "The root directory of TensorRT library")

@@ -28,7 +28,7 @@ try:
 except:
     from paddlenlp_ops import top_p_sampling
 
-from paddlenlp.transformers.generation_utils import GenerationMixin
+from ...generation import GenerationMixin
 
 __all__ = ["GenerationInferenceModel"]
 
@@ -222,6 +222,8 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs["seq_len_decoder"],
                 model_kwargs["seq_len_decoder"] + 1,
             )
+
+        model_kwargs["next_tokens"] = next_tokens
         return model_kwargs
 
     def sample(
@@ -290,6 +292,7 @@ class GenerationInferenceModel(GenerationMixin):
             model_kwargs = self.update_model_kwargs_for_generation(
                 cache, just_decoder, next_tokens, eos_token_id, model_kwargs
             )
+            next_tokens = model_kwargs["next_tokens"]
 
             save_with_output(
                 next_tokens,

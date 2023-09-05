@@ -310,7 +310,7 @@ python predictor.py \
 - `output_file`:保存推理结果文件名，默认为output.json。
 - `device`: 运行环境，默认为gpu。
 - `dtype`: 模型参数dtype，默认为None。如果没有传入`lora_path`、`prefix_path`则必须传入
-- `gpt`: 是否使用GPTForCausalLM模型，默认为False。
+- `model_type`: 初始化不同类型模型，gpt-3: GPTForCausalLM; ernie-3.5-se: Ernie35ForCausalLM; 默认为 None。
 - `mode`: 使用动态图或者静态图推理，值为：[dynamic, static]，默认为 dynamic。
 - `inference_model`: 是否使用InferenceModel 推理，默认值为 False。
 
