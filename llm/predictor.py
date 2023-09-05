@@ -199,7 +199,7 @@ class DygraphPredictor(BasePredictor):
         max_length = max(self.config.max_length - inputs["input_ids"].shape[-1], 1)
         result = self.model.generate(
             **inputs,
-            max_new_token=max_length,
+            max_length=max_length,
             bos_token_id=self.tokenizer.bos_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
             pad_token_id=self.tokenizer.pad_token_id,
