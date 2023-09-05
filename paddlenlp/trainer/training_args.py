@@ -807,7 +807,7 @@ class TrainingArguments:
             if (
                 self.pipeline_parallel_degree <= 1
                 and self.tensor_parallel_degree <= 1
-                and self.sharding_parallel_degree <= 1
+                and not (self.sharding and ShardingOption.SHARD_OP in self.sharding)
             ):
                 raise ValueError(
                     "Temporarily amp master grad only support for tensor/pipeline/sharding parallel. "
