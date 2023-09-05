@@ -30,6 +30,7 @@ from utils import (
     load_real_time_tokens,
 )
 
+from paddlenlp.generation import GenerationConfig
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.trainer import PdArgumentParser
@@ -41,7 +42,6 @@ from paddlenlp.transformers import (
     PretrainedModel,
     PretrainedTokenizer,
 )
-from paddlenlp.transformers.generation_utils import GenerationConfig
 from paddlenlp.utils.import_utils import import_module, is_paddlenlp_ops_available
 
 

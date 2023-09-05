@@ -19,16 +19,7 @@ import unittest
 import numpy as np
 import paddle
 
-from paddlenlp.transformers import (  # import gpt model
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    BartForConditionalGeneration,
-    BartTokenizer,
-    GPTLMHeadModel,
-    PretrainedConfig,
-    PretrainedTokenizer,
-)
-from paddlenlp.transformers.generation_utils import (
+from paddlenlp.generation import (
     BeamSearchScorer,
     ForcedBOSTokenLogitsProcessor,
     ForcedEOSTokenLogitsProcessor,
@@ -40,6 +31,15 @@ from paddlenlp.transformers.generation_utils import (
     TopKProcess,
     TopPProcess,
     get_unfinished_flag,
+)
+from paddlenlp.transformers import (  # import gpt model
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BartForConditionalGeneration,
+    BartTokenizer,
+    GPTLMHeadModel,
+    PretrainedConfig,
+    PretrainedTokenizer,
 )
 from tests.testing_utils import slow
 

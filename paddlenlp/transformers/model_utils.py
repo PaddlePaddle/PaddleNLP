@@ -46,6 +46,7 @@ from paddle.nn import Embedding, Layer
 from paddle.utils.download import is_url as is_remote_url
 from tqdm.auto import tqdm
 
+from paddlenlp.generation import GenerationConfig, GenerationMixin
 from paddlenlp.utils.downloader import get_path_from_url_with_filelock, hf_file_exists
 from paddlenlp.utils.env import (
     CONFIG_NAME,
@@ -61,7 +62,6 @@ from paddlenlp.utils.log import logger
 from ..utils import device_guard
 from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
-from .generation_utils import GenerationConfig, GenerationMixin
 from .utils import (  # convert_ndarray_dtype,
     ContextManagers,
     InitTrackerMeta,

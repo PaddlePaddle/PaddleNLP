@@ -26,9 +26,9 @@ from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from sklearn.metrics import accuracy_score
 
 from paddlenlp.datasets import InTokensIterableDataset
+from paddlenlp.generation import GenerationConfig
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
-from paddlenlp.transformers.generation_utils import GenerationConfig
 from paddlenlp.utils.log import logger
 
 
