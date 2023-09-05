@@ -86,7 +86,7 @@ def convert_example_common(example, tokenizer, data_args, is_test=True, intokens
         seq_length = len(input_ids)
         features = {"input_ids": input_ids, "labels": labels}
         if "position_ids" in tokenized_source:
-            features["position_ids"]: list(range(seq_length))
+            features["position_ids"] = list(range(seq_length))
         if intokens:
             features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
 
