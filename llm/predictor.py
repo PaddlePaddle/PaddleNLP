@@ -84,8 +84,10 @@ class PredictorArgument:
 
 @dataclass
 class ModelArgument:
-    gpt: bool = field(default=False, metadata={"help": "GPTForCausalLM"})
-    ernie: bool = field(default=False, metadata={"help": "Ernie35ForCausalLM"})
+    model_type: str = field(
+        default=None,
+        metadata={"help": "the type of the model, which can be one of ['gpt-3', 'ernie-3.5-se', 'llama-img2txt']"},
+    )
     data_file: str = field(default=None, metadata={"help": "data file directory"})
     output_file: str = field(default="output.json", metadata={"help": "predict result file directory"})
 
@@ -530,7 +532,7 @@ def create_predictor(
     tensor_parallel_rank, tensor_parallel_degree = init_dist_env()
     if not predictor_args.inference_model:
         if predictor_args.mode == "dynamic":
-            if model_args.gpt:
+            if model_args.model_type == "gpt-3":
                 sys.path.append("./gpt-3")
                 from modeling import GPTForCausalLM
 
@@ -540,7 +542,7 @@ def create_predictor(
                     tensor_parallel_degree=tensor_parallel_degree,
                     tensor_parallel_rank=tensor_parallel_rank,
                 )
-            elif model_args.ernie:
+            elif model_args.model_type == "ernie-3.5-se":
                 sys.path.append("./ernie-3.5-se")
                 from modeling import Ernie35ForCausalLM
 
