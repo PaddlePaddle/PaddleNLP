@@ -27,6 +27,7 @@ testpaths = [
     # "tests/taskflow",  TODO (paddle 2.5.1 breaks this test suite, debug later)
     "tests/utils",
     "model_zoo",
+    "tests/generation",
 ]
 python_files = [
     "test.py",

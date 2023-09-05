@@ -192,6 +192,8 @@ class NoRepeatNGramLogitsProcessor(LogitsProcessor):
         banned_batch_tokens = _calc_banned_ngram_tokens(self.ngram_size, input_ids, num_batch_hypotheses, cur_len)
 
         for i, banned_tokens in enumerate(banned_batch_tokens):
+            if len(banned_tokens) == 0:
+                continue
             scores[i, banned_tokens] = paddle.finfo(scores.dtype).min
 
         return scores
