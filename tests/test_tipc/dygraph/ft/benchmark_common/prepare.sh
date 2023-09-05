@@ -13,6 +13,7 @@
 # limitations under the License.
 
 python -m pip install -r ../requirements.txt
+pip install regex -i https://pypi.tuna.tsinghua.edu.cn/simple 
 
 cd ../llm
 
