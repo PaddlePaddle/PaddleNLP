@@ -192,9 +192,9 @@ class AutoEngine(BasicEngine):
                     # pp: some devices don't have loss in outs
                     if "loss" in outs:
                         if final_loss is None:
-                            final_loss = np.sum(outs["loss"])
+                            final_loss = outs["loss"][-1]
                         else:
-                            final_loss += np.sum(outs["loss"])
+                            final_loss += outs["loss"][-1]
             else:
                 if self._pp_degree == 1 and self._accumulate_steps > 1:  # gradient merge
                     local_steps = self._accumulate_steps
@@ -206,12 +206,12 @@ class AutoEngine(BasicEngine):
                     # pp: some devices don't have loss in outs
                     if "loss" in outs:
                         if final_loss is None:
-                            final_loss = np.sum(outs["loss"])
+                            final_loss = outs["loss"]
                         else:
-                            final_loss += np.sum(outs["loss"])
+                            final_loss += outs["loss"]
 
-            if final_loss is not None and self._accumulate_steps > 1:
-                final_loss /= self._accumulate_steps
+            # if final_loss is not None and self._accumulate_steps > 1:
+            #     final_loss /= self._accumulate_steps
 
             if final_loss is not None:
                 train_losses.append(final_loss)
