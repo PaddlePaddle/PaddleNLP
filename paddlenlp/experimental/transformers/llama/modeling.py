@@ -159,7 +159,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         cache_kvs=None,
         seq_len_encoder=None,
         seq_len_decoder=None,
-        # past_key_values is useless,as it is replaced by kwargs["cache"], so confusion.
         past_key_values=None,
         output_attentions=False,
         output_hidden_states=None,
