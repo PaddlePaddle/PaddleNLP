@@ -18,8 +18,6 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
-from configuration import GPTConfig
-from modeling import GPTForCausalLM
 from modeling_pp import GPTForCausalLMPipe
 from utils import (
     DataCollatorForSupervisedDataset,
@@ -36,7 +34,7 @@ from paddlenlp.trainer import (
     get_last_checkpoint,
     set_seed,
 )
-from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.transformers import AutoTokenizer, GPTConfig, GPTForCausalLM
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
@@ -142,7 +140,6 @@ def main():
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.use_flash_attn = model_args.use_flash_attn
     config.use_recompute = training_args.recompute
-    config.lm_shift_labels = True
 
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
@@ -156,16 +153,15 @@ def main():
     )
     if model_args.lora:
         if model_args.lora_path is None:
-            # Not yet support RowParallelLinear
-            if model_args.fuse_attention_qkv:
-                target_modules = [".*qkv_proj.*"]
-            else:
-                target_modules = [".*q_proj.*", ".*k_proj.*", ".*v_proj.*"]
-            if training_args.tensor_parallel_degree > 1:
-                target_modules += [".*linear1.*"]
-            else:
-                target_modules += [".*linear1.*", ".*linear2.*", ".*out_proj.*"]
-
+            target_modules = [
+                ".*qkv_proj.*",
+                ".*q_proj.*",
+                ".*k_proj.*",
+                ".*v_proj.*",
+                ".*linear1.*",
+                ".*linear2.*",
+                ".*out_proj.*",
+            ]
             lora_config = LoRAConfig(
                 target_modules=target_modules,
                 r=model_args.lora_rank,
@@ -193,9 +189,8 @@ def main():
     if training_args.do_train:
         train_ds = train_ds.map(partial(trans_func))
     if training_args.do_eval:
-        # is_test = model_args.eval_with_do_generation
-        # dev_ds = dev_ds.map(partial(trans_func, is_test=is_test))
-        dev_ds = dev_ds.map(partial(trans_func))
+        is_test = model_args.eval_with_do_generation
+        dev_ds = dev_ds.map(partial(trans_func, is_test=is_test))
 
     collate_fn = DataCollatorForSupervisedDataset(
         tokenizer, max_length=1024 if data_args.always_pad_to_max_length else 0

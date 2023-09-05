@@ -20,9 +20,9 @@ except ImportError:
     from typing_extensions import Literal
 
 import multiprocessing
-import socket
 import time
 from copy import deepcopy
+from functools import partial
 from multiprocessing import Pool
 from typing import Dict, List, Optional, Union
 
@@ -103,8 +103,8 @@ class TritonRunner:
                 inputs=infer_inputs,
                 outputs=self._outputs_req,
             )
-        except socket.timeout as e:
-            print(e)
+        except Exception as e:
+            logger.error("InferenceServerClient infer error {}".format(e))
         results = {name: results.as_numpy(name) for name in self._output_names}
         for doc, emb in zip(documents, results["embedding"]):
             doc["embedding"] = emb
@@ -130,8 +130,8 @@ class TritonRunner:
                 inputs=infer_inputs,
                 outputs=self._outputs_req,
             )
-        except socket.timeout as e:
-            print(e)
+        except Exception as e:
+            logger.error("InferenceServerClient infer error {}".format(e))
         results = {name: results.as_numpy(name) for name in self._output_names}
         return results["embedding"]
 
@@ -155,17 +155,15 @@ def run_main_query(query, url="0.0.0.0:8082", model_name="m3e", model_version="1
     return runner.Run_query(query)
 
 
-def embeddings_multi_doc(data, batch_size=32, p_m=10, url="0.0.0.0:8082"):
+def embeddings_multi_doc(data, batch_size=32, num_process=10, url="0.0.0.0:8082"):
     workers = len(data) // batch_size + 1
     offset = [i * batch_size for i in range(workers)]
     if offset[-1] != len(data):
         offset += [len(data)]
     data_index = zip(offset, offset[1:])
     data_list = [data[start:end] for start, end in data_index]
-    from functools import partial
-
     func = partial(run_main_doc, url=url)
-    pool = Pool(processes=min(p_m, multiprocessing.cpu_count()))
+    pool = Pool(processes=min(num_process, multiprocessing.cpu_count()))
     result = pool.map(func, data_list)
     pool.close()  # close the process pool and no longer accept new processes
     pool.join()
@@ -190,12 +188,12 @@ class ParallelRetriever(BaseRetriever):
         progress_bar: bool = True,
         mode: Literal["snippets", "raw_documents", "preprocessed_documents"] = "preprocessed_documents",
         url="0.0.0.0:8082",
-        p_m=10,
+        num_process=10,
         **kwargs
     ):
         """
         :param url: the port of the HTTP service
-        :param p_m: the number of processes
+        :param num_process: the number of processes
         """
         self.set_config(
             document_store=document_store,
@@ -224,7 +222,7 @@ class ParallelRetriever(BaseRetriever):
         self.embed_title = embed_title
         self.mode = mode
         self.url = url
-        self.p_m = p_m
+        self.num_process = num_process
 
         if document_store is None:
             logger.warning("DensePassageRetriever initialized without a document store. ")
@@ -326,13 +324,15 @@ class ParallelRetriever(BaseRetriever):
 
     def run_indexing(self, documents: List[dict], **kwargs):
         time1 = time.time()
-        documents_list = embeddings_multi_doc(documents, batch_size=self.batch_size, p_m=self.p_m, url=self.url)
+        documents_list = embeddings_multi_doc(
+            documents, batch_size=self.batch_size, num_process=self.num_process, url=self.url
+        )
         documents = []
         for i in documents_list:
             documents.extend(i)
         output = {"documents": documents}
         time2 = time.time()
-        logger.info(f"the time of create docs: {time2-time1:.3f} s")
+        logger.info(f"The time cost of create docs: {time2-time1:.3f} s")
         return output, "output_1"
 
     def embed_queries(self, texts: List[str], **kwargs) -> List[np.ndarray]:

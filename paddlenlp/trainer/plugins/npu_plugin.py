@@ -17,7 +17,7 @@ import types
 
 import numpy as np
 import paddle
-from paddle.fluid.layer_helper import LayerHelper
+from paddle.common_ops_import import LayerHelper
 
 from ...utils.log import logger
 
