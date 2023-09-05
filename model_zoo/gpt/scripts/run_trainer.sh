@@ -15,7 +15,7 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-task_name="gpt_hybid"
+task_name="gpt_hybrid"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
