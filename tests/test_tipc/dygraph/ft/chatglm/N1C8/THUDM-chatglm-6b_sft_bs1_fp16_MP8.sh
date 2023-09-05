@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-model_name_or_path="THUDM/chatglm-6b-v1.1"
+model_name_or_path="THUDM/chatglm-6b"
 dataset_name_or_path="llm_benchmark_zh"
 max_length=3072
 learning_rate="3e-05"
