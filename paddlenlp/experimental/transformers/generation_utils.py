@@ -28,7 +28,7 @@ try:
 except:
     from paddlenlp_ops import top_p_sampling
 
-from paddlenlp.transformers.generation_utils import GenerationMixin
+from ...generation import GenerationMixin
 
 __all__ = ["GenerationInferenceModel"]
 
