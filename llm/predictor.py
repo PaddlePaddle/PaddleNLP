@@ -315,6 +315,15 @@ class StaticInferencePredictor(BasePredictor):
             shape=[config.batch_size, 1, 1, config.max_length + 1],
             dtype=dtype,
         )
+        if config.prefix_path:
+            prefix_cache = paddle.to_tensor(np.load(f"{config.prefix_path}/pre_caches.npy")).unsqueeze(2)
+            num_layers = self.model_config.num_hidden_layers
+            num_attention_heads = self.model_config.num_attention_heads
+            head_dim = self.model_config.hidden_size // num_attention_heads
+            prefix_cache = paddle.expand(
+                prefix_cache, [num_layers, 2, config.batch_size, num_attention_heads, prefix_cache.shape[-2], head_dim]
+            )
+            self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, num_layers, axis=0)]
         self.predictor = self._create_predictor(config)
 
     def _create_predictor(self, predictor_args: PredictorArgument):
@@ -372,16 +381,34 @@ class StaticInferencePredictor(BasePredictor):
             inputs["tgt_generation_mask"] = self.tgt_generation_mask
             inputs["tgt_pos"] = self.tgt_pos.numpy()
         else:
-            inputs = dybatch_preprocess(self.tokenizer, source, self.config.max_length, self.architectures)
+            pre_caches_length = 0 if self.config.prefix_path is None else self.pre_caches[0].shape[-2]
+
+            inputs = dybatch_preprocess(self.tokenizer, source, self.config.max_length, self.architectures, pre_caches_length=pre_caches_length)
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = paddle.tril(
                     paddle.ones(shape=(length, length), dtype="float16")
                 )
-                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype="float16")
+                if pre_caches_length > 0:
+                    prefix_attention_mask = paddle.ones(
+                        [1, length, pre_caches_length], dtype=self.attention_mask.dtype
+                    )
+                    post_attention_mask = paddle.tril(
+                        paddle.ones(shape=(length, length), dtype=self.attention_mask.dtype)
+                    ).unsqueeze_(axis=0)
+                    self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
+                        [prefix_attention_mask, post_attention_mask], axis=2
+                    )
+
+                self.tgt_generation_mask[i, 0, 0, : length + pre_caches_length] = paddle.ones(
+                    shape=[1, length + pre_caches_length], dtype="float16"
+                )
 
             inputs["attention_mask"] = self.attention_mask
             inputs["tgt_generation_mask"] = self.tgt_generation_mask
+            if self.config.prefix_path:
+                for i in range(len(self.pre_caches)):
+                    inputs["pre_caches_{}".format(i)] = self.pre_caches[i].numpy()
         return inputs
 
     @paddle.no_grad()
@@ -459,6 +486,17 @@ class DygraphInferencePredictor(BasePredictor):
             dtype=dtype,
         )
 
+        if config.prefix_path:
+            prefix_cache = paddle.to_tensor(np.load(f"{config.prefix_path}/pre_caches.npy")).unsqueeze(2)
+            num_layers = self.model.config.num_hidden_layers
+            num_attention_heads = self.model.config.num_attention_heads
+            head_dim = self.model.config.hidden_size // num_attention_heads
+
+            prefix_cache = paddle.expand(
+                prefix_cache, [num_layers, 2, config.batch_size, num_attention_heads, prefix_cache.shape[-2], head_dim]
+            )
+            self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, num_layers, axis=0)]
+
     def _preprocess(self, source):
         if "chatglm" in self.architectures:
             inputs = dybatch_preprocess(self.tokenizer, source, self.config.max_length, self.architectures)
@@ -476,17 +514,34 @@ class DygraphInferencePredictor(BasePredictor):
             inputs["pre_ids"] = self.pre_ids
             inputs["tgt_pos"] = self.tgt_pos
         else:
-            inputs = dybatch_preprocess(self.tokenizer, source, self.config.max_length, self.architectures)
+            pre_caches_length = 0 if self.config.prefix_path is None else self.pre_caches[0].shape[-2]
+            inputs = dybatch_preprocess(self.tokenizer, source, self.config.max_length, self.architectures, pre_caches_length=pre_caches_length,)
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = paddle.tril(
                     paddle.ones(shape=(length, length), dtype="float16")
                 )
-                inputs["attention_mask"] = self.attention_mask
-                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype="float16")
-                inputs["tgt_generation_mask"] = self.tgt_generation_mask
+                
+                if pre_caches_length > 0:
+                    prefix_attention_mask = paddle.ones(
+                        [1, length, pre_caches_length], dtype=self.attention_mask.dtype
+                    )
+                    post_attention_mask = paddle.tril(
+                        paddle.ones(shape=(length, length), dtype=self.attention_mask.dtype)
+                    ).unsqueeze_(axis=0)
+                    self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
+                        [prefix_attention_mask, post_attention_mask], axis=2
+                    )
+
+                self.tgt_generation_mask[i, 0, 0, : length + pre_caches_length] = paddle.ones(
+                    shape=[1, length + pre_caches_length], dtype="float16"
+                )
+            inputs["attention_mask"] = self.attention_mask
+            inputs["tgt_generation_mask"] = self.tgt_generation_mask    
             inputs["cache_kvs"] = self.cache_kvs
             inputs["pre_ids"] = self.pre_ids
+            if self.config.prefix_path:
+                inputs["pre_caches"] = self.pre_caches
 
         inputs_tensor = {}
         for key, value in inputs.items():

@@ -390,6 +390,8 @@ class FusedMultiTransformer(Layer):
         padding_offset=None,
         attn_mask=None,
         caches=None,
+        pre_caches=None,
+        pre_caches_length=0,
         rotary_embs=None,
         rotary_emb_dims=0,
         seq_lens=None,
@@ -442,9 +444,9 @@ class FusedMultiTransformer(Layer):
                         src, self.ln_scales[i], self.ln_biases[i], self._epsilon, begin_norm_axis=1
                     )
 
-            # qkv compute
+            # qkv compute   
             qkv_out = self.linear(ln_out, self.qkv_weights[i], self.qkv_biases[i], transpose_weight=True)
-
+            
             # fmha compute
             if time_step is None:  # context
                 """
@@ -452,6 +454,7 @@ class FusedMultiTransformer(Layer):
                 q_out: bsz, numhead, seq_len, headsize
                 kv_out: 2, bsz, numhead, seq_len, headsize
                 """
+
                 q_out, k_out, v_out = qkv_transpose_split(
                     qkv_out, padding_offset, seq_lens, input_ids, self.num_heads // self.nranks, self.head_dim
                 )
@@ -463,14 +466,20 @@ class FusedMultiTransformer(Layer):
                     rotary_embs,
                     seq_lens,
                     rotary_emb_dims=rotary_emb_dims,
-                    use_neox=self.use_neox_rotary_style,
+                    use_neox=self.
+                    use_neox_rotary_style,
                 )
+
+                if pre_caches is not None:
+                    k_out = paddle.concat([pre_caches[i][0], k_out], axis=2)
+                    v_out = paddle.concat([pre_caches[i][1], v_out], axis=2)
+
                 # write cache kv (inplace)
-                write_cache_kv(k_out, v_out, caches[i], seq_lens)
+                write_cache_kv(k_out, v_out, caches[i], seq_lens + pre_caches_length)
 
                 # cutlass fmha
                 qktv_out = variable_length_memory_efficient_attention(
-                    q_out, k_out, v_out, seq_lens, seq_lens, mask=attn_mask, scale=float(self.head_dim**-0.5)
+                    q_out, k_out, v_out, seq_lens, seq_lens + pre_caches_length, mask=attn_mask, scale=float(self.head_dim**-0.5)
                 )
 
                 fmha_out = transpose_remove_padding(qktv_out, seq_lens, padding_offset)
@@ -541,7 +550,13 @@ class FusedMultiTransformer(Layer):
                     tmp_out, bias_residual_input = norm_out[0], norm_out[1]
                 else:
                     tmp_out = fused_layer_norm(
-                        ffn2_out, None, None, self._epsilon, residual=bias_residual_input, begin_norm_axis=1
+                        ffn2_out,
+                        norm_weight=None,
+                        norm_bias=None,
+                        epsilon=self._epsilon,
+                        begin_norm_axis=1,
+                        bias=self.ffn2_biases[i],
+                        residual=bias_residual_input,
                     )[0]
             else:
                 tmp_out = self.norm_func(

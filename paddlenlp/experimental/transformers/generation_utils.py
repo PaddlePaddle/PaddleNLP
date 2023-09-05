@@ -74,6 +74,10 @@ class GenerationInferenceModel(GenerationMixin):
                 )
                 for i, shape in enumerate(cache_kvs_shapes)
             ],  # cache_kvs
+            [
+                paddle.static.InputSpec(shape=[2, None, None, None, None], dtype=dtype, name=f"pre_caches_{i}")
+                for i in range(len(cache_kvs_shapes))
+            ],  # pre_caches
         ]
         if self.config["model_type"] and "chatglm" in self.config.model_type:
             input_spec[2] = paddle.static.InputSpec(
@@ -109,6 +113,7 @@ class GenerationInferenceModel(GenerationMixin):
         pre_ids=None,
         stop_nums=None,
         cache_kvs=[],
+        pre_caches=None,
         **model_kwargs,
     ):
 
@@ -129,6 +134,7 @@ class GenerationInferenceModel(GenerationMixin):
         model_kwargs["penalty_score"] = penalty_score
         model_kwargs["frequency_score"] = frequency_score
         model_kwargs["presence_score"] = presence_score
+        model_kwargs["pre_caches"] = pre_caches
 
         ret = self.sample(
             input_ids,

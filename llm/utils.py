@@ -366,7 +366,7 @@ def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
         return inst_data.astype("int64").reshape([-1, max_len])
 
 
-def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectures: str, benchmark=False):
+def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectures: str, benchmark=False, pre_caches_length: int = 0):
     """Pre-process generation inputs."""
     if "chatglm" in architectures:
         input_ids = []
@@ -410,9 +410,9 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
         bs = inputs["input_ids"].shape[0]
         max_len = max(map(len, input_ids))
 
-        position_ids = paddle.zeros(shape=[bs, max_len], dtype="int64")
+        position_ids = paddle.zeros(shape=[bs, max_length], dtype="int64")
         for i in range(bs):
-            position_ids[i, : seq_len[i]] = paddle.arange(seq_len[i])
+            position_ids[i, pre_caches_length : pre_caches_length + seq_len[i]] = paddle.arange(seq_len[i])
         inputs["position_ids"] = position_ids
 
     tgt_ids = [input[-1:] for input in input_ids]
@@ -455,11 +455,11 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
         .astype("float32")
     )
     inputs["seq_len_encoder"] = seq_len.astype("int32").reshape(-1, 1)
-    inputs["seq_len_decoder"] = seq_len.astype("int32").reshape(-1, 1)
+    inputs["seq_len_decoder"] = (seq_len + pre_caches_length).astype("int32").reshape(-1, 1)
     inputs["step_idx"] = np.array(step_idx).astype("int64").reshape(-1, 1)
     inputs["tgt_ids"] = np.array(tgt_ids).astype("int64").reshape(-1, 1)
     inputs["tgt_pos"] = tgt_pos.reshape(-1, 1)
-    inputs["max_length"] = np.array(max_length - seq_len).astype("int64").reshape((-1, 1))
+    inputs["max_length"] = np.array(max_length - seq_len - pre_caches_length).astype("int64").reshape((-1, 1))
     inputs["min_length"] = (
         np.array(
             [
