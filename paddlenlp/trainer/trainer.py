@@ -772,9 +772,11 @@ class Trainer:
                 # stage2 and stage3 should not no_sync, because the is no DDP wrapper and  no_sync API
                 if self.sharding and (ShardingOption.SHARD_OP not in self.args.sharding):
                     forbidden_no_sync = True
-                # hybrid_parallel (tp or pp) should not no_sync
+                # hybrid_parallel (tp or pp or sharding stage 1) should not no_sync
                 if self.args.use_hybrid_parallel and (
-                    self.args.tensor_parallel_degree > 1 or self.args.pipeline_parallel_degree > 1
+                    self.args.tensor_parallel_degree > 1
+                    or self.args.pipeline_parallel_degree > 1
+                    or (self.sharding and ShardingOption.SHARD_OP in self.args.sharding)
                 ):
                     forbidden_no_sync = True
 
