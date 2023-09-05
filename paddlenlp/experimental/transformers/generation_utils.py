@@ -81,7 +81,9 @@ class GenerationInferenceModel(GenerationMixin):
             )  # position_ids
             input_spec[16] = paddle.static.InputSpec(shape=[None, 2, 1], dtype="int64", name="tgt_pos")  # tgt_pos
         model = paddle.jit.to_static(self.generate, input_spec=input_spec)
-        paddle.jit.save(model, output_path)
+        paddle.jit.save(
+            model, output_path, skip_prune_program=True
+        )  # Note(Zhengzekang): If we prune program it may cause some inference error.
 
     @paddle.no_grad()
     def generate(
@@ -151,7 +153,7 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs["step_idx"],
                 model_kwargs["step_idx"] + 1,
             )
-        length_cond = paddle.greater_equal(model_kwargs["step_idx"], model_kwargs["max_dec_len"])
+        length_cond = paddle.greater_than(model_kwargs["step_idx"], model_kwargs["max_dec_len"])
         model_kwargs["stop_flags"] = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
         if cache is None:
             next_tokens = paddle.where(just_decoder, paddle.full_like(next_tokens, -1), next_tokens)
