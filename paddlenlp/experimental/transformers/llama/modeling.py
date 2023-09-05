@@ -149,6 +149,18 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         )
         return ids_remove_padding, padding_offset, cum_offsets
 
+    # This function is a little different from prepare_input_ids_for_generation in paddlenlp/transformers/generation/utils.py
+    @staticmethod
+    def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
+        batch_size = 1
+        seq_len = 1
+        if bos_token_id is None:
+            raise ValueError("`bos_token_id` should be defined when no " "`input_ids` are provided.")
+        if encoder_output is not None:
+            batch_size = encoder_output.shape[0]
+            seq_len = encoder_output.shape[1]
+        return paddle.ones([batch_size, seq_len], dtype="int64") * bos_token_id
+
     def forward(
         self,
         input_ids=None,
@@ -168,6 +180,20 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         # kwargs["cache"] is used used to distinguish between encoder and decoder phase.
         past_key_values = kwargs.get("cache", None)
         is_decoder = past_key_values is not None
+
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        elif input_ids is None and inputs_embeds is None:
+            raise ValueError("You have to specify either input_ids or inputs_embeds")
+
+        # genereate a fake input_ids according to inputs_embeds
+        # this is usually occurred in img2txt multimodal model when first enter into this forward function.
+        if input_ids is None and inputs_embeds is not None:
+            input_ids = self.prepare_input_ids_for_generation(self.config.bos_token_id, inputs_embeds)
+        if inputs_embeds is not None:
+            batch, seq_len, hidden_dim = inputs_embeds.shape
+            # merge batch and seq_len dimension.
+            inputs_embeds = inputs_embeds.reshape([batch * seq_len, hidden_dim])
 
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (

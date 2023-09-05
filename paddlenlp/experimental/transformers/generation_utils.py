@@ -237,18 +237,9 @@ class GenerationInferenceModel(GenerationMixin):
         step_idx_ori = paddle.full(shape=[1], dtype="int64", fill_value=1)
         batch_idx = paddle.full(shape=[1], dtype="int32", fill_value=-1)
 
-        if input_ids is not None and inputs_embeds is not None:
-            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
-        elif input_ids is None and inputs_embeds is None:
-            raise ValueError("You have to specify either input_ids or inputs_embeds")
-
-        # genereate a fake input_ids according to inputs_embeds.
-        if input_ids is None and inputs_embeds is not None:
-            input_ids = self.prepare_input_ids_for_generation(self.config.bos_token_id, inputs_embeds)
-        if inputs_embeds is not None:
-            batch, seq_len, hidden_dim = inputs_embeds.shape
-            inputs_embeds = inputs_embeds.reshape([batch * seq_len, hidden_dim])
-            model_kwargs["inputs_embeds"] = inputs_embeds
+        # let inputs_embeds enter into model_kwargs.
+        # because the code below directly use the model_kwargs as a parameter without using inputs_embeds.
+        model_kwargs["inputs_embeds"] = inputs_embeds
 
         def _forward_(**args):
             # cache_kvs is never empty because it is passed as a parameter in def sample.
