@@ -33,7 +33,7 @@ from paddlenlp.transformers.model_outputs import (
 )
 from paddlenlp.transformers.model_utils import register_base_model
 
-__all__ = ["LlamaInferenceModel", "LlamaForCausalLMInferenceModel", "LlamaForminiGPT4InferenceModel"]
+__all__ = ["LlamaInferenceModel", "LlamaForCausalLMInferenceModel", "LlamaForMiniGPT4InferenceModel"]
 
 
 class FusedLlamaRMSNorm(nn.Layer):
@@ -466,7 +466,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
 
 
-class LlamaForminiGPT4InferenceModel(LlamaForCausalLMInferenceModel):
+class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
     """
     This class is 99% like LlamaForCausalLMInferenceModel.
     Used only for miniGPT4's second part.

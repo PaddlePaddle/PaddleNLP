@@ -579,7 +579,7 @@ def create_predictor(
                 if predictor_args.llm_for_img2txt:
                     # we use llama for img2txt.
                     from paddlenlp.experimental.transformers import (
-                        LlamaForminiGPT4InferenceModel as LlamaInferenceModel,
+                        LlamaForMiniGPT4InferenceModel as LlamaInferenceModel,
                     )
                 else:
                     from paddlenlp.experimental.transformers import (
