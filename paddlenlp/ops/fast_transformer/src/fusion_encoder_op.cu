@@ -91,7 +91,7 @@ std::vector<paddle::Tensor> encoder_kernel(
 
   if (normalize_before == false) {
     typedef BertEncoderTransformerTraits<traits_::OpType,
-                                        cuda::OpenMultiHeadAttention>
+                                        fastertransformer::cuda::OpenMultiHeadAttention>
         EncoderTraits_;
 
     // Post-Normalization
@@ -202,7 +202,7 @@ std::vector<paddle::Tensor> encoder_kernel(
     delete allocator_;
     delete encoder;
   } else {
-    typedef OpenEncoderTraits<traits_::OpType, cuda::OpenMultiHeadAttention>
+    typedef OpenEncoderTraits<traits_::OpType, fastertransformer::cuda::OpenMultiHeadAttention>
         OpenEncoderTraits_;
 
     // Pre-Normalization
