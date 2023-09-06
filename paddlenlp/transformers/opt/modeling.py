@@ -320,7 +320,7 @@ class TransformerDecoderLayer(nn.Layer):
                 d_model,
                 dim_feedforward,
                 gather_output=False,
-                has_bias=False,
+                has_bias=True,
             )
         else:
             self.linear1 = nn.Linear(d_model, dim_feedforward, weight_attrs[2], bias_attr=bias_attrs[2])
@@ -330,7 +330,7 @@ class TransformerDecoderLayer(nn.Layer):
                 dim_feedforward,
                 d_model,
                 input_is_parallel=True,
-                has_bias=False,
+                has_bias=True,
             )
         else:
             self.linear2 = nn.Linear(dim_feedforward, d_model, weight_attrs[2], bias_attr=bias_attrs[2])
@@ -615,16 +615,20 @@ class OPTPretrainedModel(PretrainedModel):
             num_attention_heads=config.num_attention_heads,
         )
         actions = {
-            "word_embeddings.weight": partial(fn, is_column=False),
+            "embeddings.word_embeddings.weight": partial(fn, is_column=False),
         }
         for layer_index in range(config.num_hidden_layers):
             actions.update(
                 {
                     # Column Linear
                     f"decoder.layers.{layer_index}.self_attn.q_proj.weight": partial(fn, is_column=True),
+                    f"decoder.layers.{layer_index}.self_attn.q_proj.bias": partial(fn, is_column=True),
                     f"decoder.layers.{layer_index}.self_attn.k_proj.weight": partial(fn, is_column=True),
+                    f"decoder.layers.{layer_index}.self_attn.k_proj.bias": partial(fn, is_column=True),
                     f"decoder.layers.{layer_index}.self_attn.v_proj.weight": partial(fn, is_column=True),
+                    f"decoder.layers.{layer_index}.self_attn.v_proj.bias": partial(fn, is_column=True),
                     f"decoder.layers.{layer_index}.linear1.weight": partial(fn, is_column=True),
+                    f"decoder.layers.{layer_index}.linear1.bias": partial(fn, is_column=True),
                     # Row Linear
                     f"decoder.layers.{layer_index}.linear2.weight": partial(fn, is_column=False),
                     f"decoder.layers.{layer_index}.self_attn.out_proj.weight": partial(fn, is_column=False),
@@ -980,7 +984,6 @@ class OPTForCausalLM(OPTPretrainedModel):
         self.opt = OPTModel(config)
         self.lm_head = OPTLMHead(
             config,
-            embedding_weights=self.opt.embeddings.word_embeddings.weight,
         )
 
     def _get_model_inputs_spec(self, dtype: str):

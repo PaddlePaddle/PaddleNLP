@@ -122,6 +122,7 @@ class OPTConfig(PretrainedConfig):
         "num_classes": "num_labels",
         "ffn_dim": "intermediate_size",
         "activation_function": "hidden_act",
+        "tensor_parallel_degree": "mp_degree",
     }
     pretrained_init_configuration = OPT_PRETRAINED_INIT_CONFIGURATION
     model_type = "opt"
