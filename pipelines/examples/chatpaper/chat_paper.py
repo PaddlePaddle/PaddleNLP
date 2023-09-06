@@ -284,7 +284,6 @@ def upload_file(file_name, file_url, file_upload, state={}):
     context = state.setdefault("context", [])
     context.append({"system": "你是一位AI小助手", "role": "user", "content": content})
     access_token = _apply_token(args.api_key, args.secret_key)
-    print(access_token)
     eb.api_type = args.api_type
     eb.access_token = access_token
     response = eb.ChatFile.create(messages=context, stream=False)
@@ -365,7 +364,6 @@ with gr.Blocks(title="维普小助手", theme=gr.themes.Base()) as demo:
                             columns=[1], rows=[1], object_fit="contain", height="700px"
                         )
                         ori_json = gr.Chatbot(label="论文原文", visible=False)
-                        # ori_json = gr.Markdown(label="论文原文", visible=False)
                         ori_pdf = gr.File(label="原文下载链接")
                     with gr.Accordion("   "):
                         gr.Dropdown(choices=[""], max_choices=1, label="文章摘要等总结-PDF插件-支持下载；此处为PDF占位符")
