@@ -15,8 +15,9 @@
 import inspect
 from abc import ABC
 from collections import OrderedDict
-from typing import List, Union
+from typing import Dict, List, Tuple, Union
 
+import numpy as np
 import paddle
 from paddle.nn.layer.layers import in_declarative_mode
 
@@ -359,3 +360,251 @@ class TemperatureLogitsWarper(LogitsWarper):
     def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor):
         scores = scores / self.temperature
         return scores
+
+
+class SequenceBiasLogitsProcessor(LogitsProcessor):
+    """
+    [`LogitsProcessor`] that applies an additive bias on sequences. The bias is applied to the last token of a sequence
+    when the next generated token can complete it. Consequently, to take the most of biasing sequences with more than
+    one token, consider using beam methods (to gracefully work around partially completed sequences that have a
+    negative bias) and applying the bias to their prefixes (to ensure the bias is applied earlier).
+
+    <Tip>
+
+    In order to get the token ids of the sequences that you want to bias, make sure to set `add_prefix_space=True` when
+    initializing the tokenizer, and use `tokenizer(bad_words, add_special_tokens=False).input_ids`. The
+    `add_prefix_space` argument is only supported for some slow tokenizers, as fast tokenizers' prefixing behaviours
+    come from `pre tokenizers`.
+
+    </Tip>
+
+    Args:
+        sequence_bias (`Dict[Tuple[int], float]`):
+            Dictionary that maps a sequence of tokens to its bias term. Positive biases increase the odds of the
+            sequence being selected, while negative biases do the opposite. If a sequence has a length of 1, its bias
+            will always be applied. Otherwise, the bias will only be applied if the sequence in question is about to be
+            completed (in the token selection step after this processor is applied).
+
+    Examples:
+
+    ```python
+    >>> from paddlenlp.transformers import AutoTokenizer, AutoModelForCausalLM
+
+    >>> model = AutoModelForCausalLM.from_pretrained("gpt2-en")
+    >>> tokenizer = AutoTokenizer.from_pretrained("gpt2-en")
+    >>> inputs = tokenizer(["The full name of Donald is Donald"], return_tensors="pt")
+
+    >>> summary_ids = model.generate(inputs["input_ids"], max_new_tokens=4)
+    >>> print(tokenizer.batch_decode(summary_ids, skip_special_tokens=True)[0])
+    The full name of Donald is Donald J. Trump Jr
+
+    >>> # Now let's control generation through a bias. Please note that the tokenizer is initialized differently!
+    >>> tokenizer_with_prefix_space = AutoTokenizer.from_pretrained("gpt2-en")
+
+
+    >>> def get_tokens_as_tuple(word):
+    ...     return tuple(tokenizer_with_prefix_space([word], add_special_tokens=False).input_ids[0])
+
+
+    >>> # If we add a negative bias without beam search, it may become "stuck" in a prefix without good continuations
+    >>> sequence_bias = {get_tokens_as_tuple("Trump"): -10.0}
+    >>> biased_ids = model.generate(inputs["input_ids"], max_new_tokens=4, sequence_bias=sequence_bias)
+    >>> print(tokenizer.batch_decode(biased_ids, skip_special_tokens=True)[0])
+    The full name of Donald is Donald J. Donald,
+
+    >>> biased_ids = model.generate(inputs["input_ids"], max_new_tokens=4, num_beams=4, sequence_bias=sequence_bias)
+    >>> print(tokenizer.batch_decode(biased_ids, skip_special_tokens=True)[0])
+    The full name of Donald is Donald Rumsfeld,
+
+    >>> # We can also add a positive bias to nudge the model towards specific tokens or continuations
+    >>> sequence_bias = {get_tokens_as_tuple("Donald Duck"): 10.0}
+    >>> biased_ids = model.generate(inputs["input_ids"], max_new_tokens=4, num_beams=4, sequence_bias=sequence_bias)
+    >>> print(tokenizer.batch_decode(biased_ids, skip_special_tokens=True)[0])
+    The full name of Donald is Donald Duck.
+    ```
+    """
+
+    def __init__(self, sequence_bias: Dict[Tuple[int], float]):
+        self.sequence_bias = sequence_bias
+        self._validate_arguments()
+
+        # Bias variables that will be populated on the first call (for retrocompatibility purposes, the vocabulary size
+        # is infered in the first usage, which inhibits initializing here)
+        self.length_1_bias = None
+        self.prepared_bias_variables = False
+
+    def __call__(self, input_ids, scores):
+        # 1 - Prepares the bias tensors. This is only needed the first time the logit processor is called.
+        if not self.prepared_bias_variables:
+            self._prepare_bias_variables(scores)
+
+        # 2 - prepares an empty bias to add
+        bias = paddle.zeros_like(scores)
+
+        # 3 - include the bias from length = 1
+        if self.length_1_bias is not None:
+            bias += self.length_1_bias
+
+        # 4 - include the bias from length > 1, after determining which biased sequences may be completed.
+        for sequence_ids, sequence_bias in self.sequence_bias.items():
+            if len(sequence_ids) == 1:  # the sequence is of length 1, already applied
+                continue
+            if len(sequence_ids) > input_ids.shape[1]:  # the sequence is longer than the context, ignore
+                continue
+            prefix_length = len(sequence_ids) - 1
+            last_token = sequence_ids[-1]
+            matching_rows = (
+                paddle.equal(
+                    input_ids[:, -prefix_length:],
+                    paddle.to_tensor(sequence_ids[:-1], dtype=input_ids.dtype),
+                )
+                .astype(paddle.int64)
+                .prod(axis=1)
+            )
+            bias[:, last_token] += paddle.where(
+                matching_rows == 1,
+                paddle.to_tensor(sequence_bias),
+                paddle.to_tensor(0.0),
+            )
+
+        # 5 - apply the bias to the scores
+        scores = scores + bias
+        return scores
+
+    def _prepare_bias_variables(self, scores):
+        vocabulary_size = scores.shape[-1]
+
+        # Check biased tokens out of bounds
+        invalid_biases = []
+        for sequence_ids in self.sequence_bias:
+            for token_id in sequence_ids:
+                if token_id >= vocabulary_size:
+                    invalid_biases.append(token_id)
+        if len(invalid_biases) > 0:
+            raise ValueError(
+                f"The model vocabulary size is {vocabulary_size}, but the following tokens were being biased: "
+                f"{invalid_biases}"
+            )
+
+        # Precompute the bias tensors to be applied. Sequences of length 1 are kept separately, as they can be applied
+        # with simpler logic.
+        self.length_1_bias = paddle.zeros((vocabulary_size,))
+        for sequence_ids, bias in self.sequence_bias.items():
+            if len(sequence_ids) == 1:
+                self.length_1_bias[sequence_ids[-1]] = bias
+
+        self.prepared_bias_variables = True
+
+    def _validate_arguments(self):
+        sequence_bias = self.sequence_bias
+        if not isinstance(sequence_bias, dict) or len(sequence_bias) == 0:
+            raise ValueError(f"`sequence_bias` has to be a non-empty dictionary, but is {sequence_bias}.")
+        if any(not isinstance(sequence_ids, tuple) for sequence_ids in sequence_bias.keys()):
+            raise ValueError(f"`sequence_bias` has to be a dict with tuples as keys, but is {sequence_bias}.")
+        if any(
+            any((not isinstance(token_id, (int, np.integer)) or token_id < 0) for token_id in sequence_ids)
+            or len(sequence_ids) == 0
+            for sequence_ids in sequence_bias.keys()
+        ):
+            raise ValueError(
+                f"Each key in `sequence_bias` has to be a non-empty tuple of positive integers, but is "
+                f"{sequence_bias}."
+            )
+        if any(not isinstance(bias, float) for bias in sequence_bias.values()):
+            raise ValueError(f"`sequence_bias` has to be a dict with floats as values, but is {sequence_bias}.")
+
+
+class NoBadWordsLogitsProcessor(SequenceBiasLogitsProcessor):
+    """
+    [`LogitsProcessor`] that enforces that specified sequences will never be selected.
+
+    <Tip>
+
+    In order to get the token ids of the words that should not appear in the generated text, make sure to set
+    `add_prefix_space=True` when initializing the tokenizer, and use `tokenizer(bad_words,
+    add_special_tokens=False).input_ids`. The `add_prefix_space` argument is only supported for some slow tokenizers,
+    as fast tokenizers' prefixing behaviours come from `pre tokenizers`. Read more
+    [here](https://huggingface.co/docs/tokenizers/api/pre-tokenizers).
+
+    </Tip>
+
+    Args:
+        bad_words_ids (`List[List[int]]`):
+            List of list of token ids that are not allowed to be generated.
+        eos_token_id (`Union[int, List[int]]`):
+            The id of the *end-of-sequence* token. Optionally, use a list to set multiple *end-of-sequence* tokens.
+
+    Examples:
+
+    ```python
+    >>> from paddlenlp.transformers import AutoTokenizer, AutoModelForCausalLM
+
+    >>> model = AutoModelForCausalLM.from_pretrained("gpt2-en")
+    >>> tokenizer = AutoTokenizer.from_pretrained("gpt2-en")
+    >>> inputs = tokenizer(["In a word, the cake is a"], return_tensors="pt")
+
+    >>> output_ids = model.generate(inputs["input_ids"], max_new_tokens=5, pad_token_id=tokenizer.eos_token_id)
+    >>> print(tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0])
+    In a word, the cake is a bit of a mess.
+
+    >>> # Now let's take the bad words out. Please note that the tokenizer is initialized differently
+    >>> tokenizer_with_prefix_space = AutoTokenizer.from_pretrained("gpt2-en", add_prefix_space=True)
+
+
+    >>> def get_tokens_as_list(word_list):
+    ...     "Converts a sequence of words into a list of tokens"
+    ...     tokens_list = []
+    ...     for word in word_list:
+    ...         tokenized_word = tokenizer_with_prefix_space([word], add_special_tokens=False).input_ids[0]
+    ...         tokens_list.append(tokenized_word)
+    ...     return tokens_list
+
+
+    >>> bad_words_ids = get_tokens_as_list(word_list=["mess"])
+    >>> output_ids = model.generate(
+    ...     inputs["input_ids"], max_new_tokens=5, bad_words_ids=bad_words_ids, pad_token_id=tokenizer.eos_token_id
+    ... )
+    >>> print(tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0])
+    In a word, the cake is a bit of a surprise.
+    ```
+
+    >>> from paddlenlp.transformers.generation import NoBadWordsLogitsProcessor, LogitsProcessorList
+    >>> logits_processors = LogitsProcessorList([NoBadWordsLogitsProcessor([[5,6]], eos_token_id=tokenizer.eos_token_id)])
+    >>> output_ids = model.generate(
+    ...     inputs["input_ids"], max_new_tokens=5, logits_processors=logits_processors, pad_token_id=tokenizer.eos_token_id
+    ... )
+    >>> print(tokenizer.batch_decode(output_ids, skip_special_tokens=True)[0])
+    In a word, the cake is a bit of a surprise.
+    ```
+    """
+
+    def __init__(self, bad_words_ids: List[List[int]], eos_token_id: Union[int, List[int]]):
+        self.bad_word_ids = bad_words_ids
+        self._validate_arguments()
+
+        # Filter EOS token from bad_words_ids
+        if eos_token_id is None:
+            eos_token_id = []
+        if isinstance(eos_token_id, int):
+            eos_token_id = [eos_token_id]
+        bad_words_ids = list(
+            filter(lambda bad_token_seq: all(bad_token_seq != [i] for i in eos_token_id), bad_words_ids)
+        )
+
+        # Forbidding a sequence is equivalent to setting its bias to -inf
+        sequence_bias = {tuple(sequence): float("-inf") for sequence in bad_words_ids}
+        super().__init__(sequence_bias=sequence_bias)
+
+    def _validate_arguments(self):
+        bad_words_ids = self.bad_word_ids
+        if not isinstance(bad_words_ids, list) or len(bad_words_ids) == 0:
+            raise ValueError(f"`bad_words_ids` has to be a non-empty list, but is {bad_words_ids}.")
+        if any(not isinstance(bad_word_ids, list) for bad_word_ids in bad_words_ids):
+            raise ValueError(f"`bad_words_ids` has to be a list of lists, but is {bad_words_ids}.")
+        if any(
+            any((not isinstance(token_id, (int, np.integer)) or token_id < 0) for token_id in bad_word_ids)
+            for bad_word_ids in bad_words_ids
+        ):
+            raise ValueError(
+                f"Each list in `bad_words_ids` has to be a list of positive integers, but is {bad_words_ids}."
+            )
