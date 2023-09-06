@@ -19,6 +19,7 @@ import sys
 import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
+from distutils.command.config import config
 
 import numpy as np
 import paddle
@@ -369,7 +370,7 @@ class StaticInferencePredictor(BasePredictor):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = 0
                 self.attention_mask[i, 0, : length - 1, length - 1] = 1
-                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype="float16")
+                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype=self.dtype)
                 self.tgt_pos[i, 0, 0] = paddle.to_tensor([length], dtype="int64")
 
             inputs["attention_mask"] = self.attention_mask
@@ -380,9 +381,9 @@ class StaticInferencePredictor(BasePredictor):
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = paddle.tril(
-                    paddle.ones(shape=(length, length), dtype="float16")
+                    paddle.ones(shape=(length, length), dtype=self.dtype)
                 )
-                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype="float16")
+                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype=self.dtype)
 
             inputs["attention_mask"] = self.attention_mask
             inputs["tgt_generation_mask"] = self.tgt_generation_mask
@@ -471,7 +472,7 @@ class DygraphInferencePredictor(BasePredictor):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = 0
                 self.attention_mask[i, 0, : length - 1, length - 1] = 1
-                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype="float16")
+                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype=self.dtype)
                 self.tgt_pos[i, 0, 0] = paddle.to_tensor([length], dtype="int64")
 
             inputs["attention_mask"] = self.attention_mask
@@ -484,10 +485,10 @@ class DygraphInferencePredictor(BasePredictor):
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
                 self.attention_mask[i, 0, :length, :length] = paddle.tril(
-                    paddle.ones(shape=(length, length), dtype="float16")
+                    paddle.ones(shape=(length, length), dtype=self.dtype)
                 )
                 inputs["attention_mask"] = self.attention_mask
-                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype="float16")
+                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype=self.dtype)
                 inputs["tgt_generation_mask"] = self.tgt_generation_mask
             inputs["cache_kvs"] = self.cache_kvs
             inputs["pre_ids"] = self.pre_ids
