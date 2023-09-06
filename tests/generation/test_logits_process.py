@@ -41,8 +41,10 @@ from paddlenlp.generation.logits_process import (
     HammingDiversityLogitsProcessor,
     LogitsProcessorList,
     MinLengthLogitsProcessor,
+    NoBadWordsLogitsProcessor,
     NoRepeatNGramLogitsProcessor,
     RepetitionPenaltyLogitsProcessor,
+    SequenceBiasLogitsProcessor,
     TemperatureLogitsWarper,
     TopKProcess,
     TopPProcess,
@@ -311,3 +313,53 @@ class LogitsProcessorTest(unittest.TestCase):
         scores = self._get_uniform_logits(batch_size, vocab_size)
         scores = logits_processor(input_ids, scores)
         self.assertFalse((scores == paddle.finfo(scores.dtype).min).any())
+
+    def test_bias_dist_processor(self):
+        vocab_size = 5
+        batch_size = 2
+
+        input_ids = paddle.to_tensor([[0, 1, 3, 1], [0, 1, 0, 1]])
+        positive_bias = {(1,): 100.0, (4,): 100.0}
+        negative_bias = {(1, 0): -100.0, (0, 1, 2): -100.0, (1, 3, 1, 3): -100.0}
+        # biases the same termination twice, to ensure we can handle overlapping terminations (it won't have an effect
+        # on the test cases, though)
+        negative_bias.update({(1, 3, 1, 3, 1, 3): -100.0})
+        sequence_bias = {**positive_bias, **negative_bias}
+
+        # scores = 0 to facilitate checks
+        scores = paddle.zeros((batch_size, vocab_size))
+
+        bias_dist_proc = SequenceBiasLogitsProcessor(sequence_bias=sequence_bias)
+        filtered_scores = bias_dist_proc(input_ids, scores.clone())
+
+        # batch 1: positive bias: tokens (1, 4); negative bias: tokens (0, 3); neutral: tokens (2)
+        # batch 2: positive bias: tokens (1, 4); negative bias: tokens (0, 2); neutral: tokens (3)
+        self.assertListEqual(
+            filtered_scores.tolist(), [[-100.0, 100.0, 0.0, -100.0, 100.0], [-100.0, 100.0, -100.0, 0.0, 100.0]]
+        )
+
+    def test_no_bad_words_dist_processor(self):
+        vocab_size = 5
+        batch_size = 2
+        eos_token_id = 4
+
+        input_ids = paddle.to_tensor([[0, 1, 3, 1], [0, 1, 0, 1]])
+        bad_word_tokens = [[1], [4], [1, 0], [0, 1, 2], [1, 3, 1, 3]]
+        scores = self._get_uniform_logits(batch_size, vocab_size)
+
+        no_bad_words_dist_proc = NoBadWordsLogitsProcessor(bad_words_ids=bad_word_tokens, eos_token_id=eos_token_id)
+
+        filtered_scores = no_bad_words_dist_proc(input_ids, scores.clone())
+
+        # batch 1: 1st, 2nd, and 4th (0, 1, 3) token are forbidden
+        # batch 2: 1st, 2nd, and 3rd (0, 1, 2) token are forbidden
+        # Note that 5th element cannot be forbidden as it is EOS token
+        self.assertListEqual(
+            paddle.isinf(filtered_scores).tolist(),
+            [[True, True, False, True, False], [True, True, True, False, False]],
+        )
+
+        # check edge case
+        no_bad_words_dist_proc = NoBadWordsLogitsProcessor(bad_words_ids=[[4]], eos_token_id=eos_token_id)
+        filtered_scores = no_bad_words_dist_proc(input_ids, scores.clone())
+        self.assertTrue(paddle.allclose(scores, filtered_scores, atol=1e-3).numpy())
