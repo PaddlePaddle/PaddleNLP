@@ -17,7 +17,7 @@ import fitz
 import requests
 
 from pipelines.document_stores import BaiduElasticsearchDocumentStore
-from pipelines.nodes import ErnieRanker, ErnieRetriever
+from pipelines.nodes import EmbeddingRetriever, ErnieRanker
 from pipelines.pipelines import Pipeline
 
 
@@ -112,7 +112,7 @@ def retrieval(
         thread_count=es_thread_count,
         queue_size=es_queue_size,
     )
-    retriever = ErnieRetriever(
+    retriever = EmbeddingRetriever(
         document_store=document_store,
         retriever_batch_size=retriever_batch_size,
         api_key=retriever_api_key,
