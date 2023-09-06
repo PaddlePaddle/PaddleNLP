@@ -208,7 +208,10 @@ def main():
     else:
         trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
     if data_args.intokens:
-        if model.base_model_prefix not in ["llama", "bloom", "chatglm"] and training_args.pipeline_parallel_degree < 1:
+        if (
+            model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2"]
+            and training_args.pipeline_parallel_degree < 1
+        ):
             raise NotImplementedError("InTokens data stream is only implemented for LLaMA, Bloom and ChatGLM so far.")
     train_ds = train_ds.map(partial(trans_func, is_test=False, intokens=data_args.intokens))
     eval_intokens = data_args.intokens
