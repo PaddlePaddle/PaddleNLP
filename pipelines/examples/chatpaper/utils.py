@@ -21,6 +21,18 @@ from pipelines.nodes import EmbeddingRetriever, ErnieRanker
 from pipelines.pipelines import Pipeline
 
 
+def load_all_json_path(path):
+    json_path = {}
+    with open(path, encoding="utf-8", mode="r") as f:
+        for line in f:
+            try:
+                json_id, json_name = line.strip().split()
+                json_path[json_id] = json_name
+            except:
+                continue
+    return json_path
+
+
 def pdf2image(pdfPath, imgPath, zoom_x=10, zoom_y=10, rotation_angle=0):
     """
     Convert PDF to Image
@@ -58,6 +70,17 @@ def get_shown_context(context):
     for turn_idx in range(0, len(context), 2):
         shown_context.append([context[turn_idx]["content"], context[turn_idx + 1]["content"]])
     return shown_context
+
+
+def tackle_history(history=[]):
+    messages = []
+    if len(history) < 3:
+        return messages
+    for turn_idx in range(2, len(history)):
+        messages.extend(
+            [{"role": "user", "content": history[turn_idx][0]}, {"role": "assistant", "content": history[turn_idx][1]}]
+        )
+    return messages
 
 
 def retrieval(
