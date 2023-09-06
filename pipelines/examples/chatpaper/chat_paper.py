@@ -237,6 +237,7 @@ def upload_file(file_name, file_url, file_upload, state={}):
     Upload the file to bos or retrieve the json_file of the paper
     """
     global single_paper_id
+    single_paper_id = ""
     if file_name:
         json_file_path, file_id = retrieval_title(file_name)
         json_file_path = json_file_path.replace("/", "_").replace(".pdf", "")
@@ -262,7 +263,6 @@ def upload_file(file_name, file_url, file_upload, state={}):
         else:
             return gr.Gallery.update(visible=False), gr.File.update(visible=False), None, state, None
     elif file_url:
-        single_paper_id = ""
         root_path = "./"
         paper = next(arxiv.Search(id_list=[file_url.split("/")[-1]]).results())
         real_filename = "{}.pdf".format(file_url.split("/")[-1])
@@ -270,7 +270,6 @@ def upload_file(file_name, file_url, file_upload, state={}):
         file_name = os.path.join(root_path, real_filename)
         imgs = pdf2image(pdfPath=file_name, imgPath=root_path)
     elif file_upload:
-        single_paper_id = ""
         file_name = file_upload.name
         real_filename = os.path.split(file_name)[-1]
         root_path = os.path.dirname(file_name)
@@ -290,7 +289,6 @@ def upload_file(file_name, file_url, file_upload, state={}):
     eb.access_token = access_token
     response = eb.ChatFile.create(messages=context, stream=False)
     bot_response = response.result
-    print(bot_response)
     context.append({"role": "assistant", "content": bot_response})
     shown_context = get_shown_context(context)
     return (
