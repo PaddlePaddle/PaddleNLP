@@ -1078,7 +1078,7 @@ class ConversionMixin:
                 action = name_action_mappings.pop(key)
                 tensor = action(ret) if is_dst else None
             else:
-                tensor = tensor.numpy() if is_dst else None
+                tensor = tensor.cpu().numpy() if is_dst else None
 
             # keep state dict use paddle.tensor
             if isinstance(tensor, np.ndarray):
