@@ -73,10 +73,10 @@ def convert_example_common(example, tokenizer, data_args, is_test=True, intokens
     tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
 
     if is_test:
-        return dict(
-            input_ids=tokenized_source["input_ids"],
-            labels=tokenized_target_input_ids,
-        )
+        return {
+            **tokenized_source,
+            "labels": tokenized_target_input_ids,
+        }
     else:
         input_ids = tokenized_source["input_ids"] + tokenized_target_input_ids
         source_length = len(tokenized_source["input_ids"])
@@ -84,7 +84,9 @@ def convert_example_common(example, tokenizer, data_args, is_test=True, intokens
         # shift input_ids and labels
         input_ids, labels = input_ids[:-1], labels[1:]
         seq_length = len(input_ids)
-        features = {"input_ids": input_ids, "labels": labels, "position_ids": list(range(seq_length))}
+        features = {"input_ids": input_ids, "labels": labels}
+        if "position_ids" in tokenized_source:
+            features["position_ids"] = list(range(seq_length))
         if intokens:
             features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
 
@@ -95,12 +97,10 @@ def convert_example_chatglm(example, tokenizer, data_args, is_test=True, intoken
 
     tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
     if is_test:
-        return dict(
-            input_ids=tokenized_source["input_ids"],
-            position_ids=tokenized_source["position_ids"],
-            attention_mask=tokenized_source["attention_mask"],
-            labels=tokenized_target_input_ids,
-        )
+        return {
+            **tokenized_source,
+            "labels": tokenized_target_input_ids,
+        }
     else:
         input_ids = tokenized_source["input_ids"] + tokenized_target_input_ids
         bos_position = len(tokenized_source["input_ids"]) - 1
