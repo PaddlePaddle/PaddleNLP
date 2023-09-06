@@ -58,6 +58,8 @@ class PredictorArgument:
     device: str = field(default="gpu", metadata={"help": "Device"})
     dtype: str = field(default=None, metadata={"help": "Model dtype"})
     lora_path: str = field(default=None, metadata={"help": "The directory of LoRA parameters. Default to None"})
+    use_pre_caches: bool = field(default=False, metadata={"help": "whether use prefix weight to do infer"})
+    pre_caches_length: int = field(default=None, metadata={"help": "the length of prefix weights"})
     prefix_path: str = field(
         default=None, metadata={"help": "The directory of Prefix Tuning parameters. Default to None"}
     )
@@ -278,20 +280,10 @@ class StaticInferencePredictor(BasePredictor):
         tokenizer: PretrainedTokenizer = None,
     ):
         super().__init__(config, tokenizer)
-        if config.lora_path is not None:
-            lora_config = LoRAConfig.from_pretrained(config.lora_path)
-            dtype = lora_config.dtype
-            lora_config.merge_weights = True
-        elif config.prefix_path is not None:
-            prefix_config = PrefixConfig.from_pretrained(config.prefix_path)
-            dtype = prefix_config.dtype
-        elif config.dtype is not None:
-            dtype = config.dtype
-        else:
-            raise ValueError("Please specific the model dtype.")
 
         self.model_config = AutoConfig.from_pretrained(config.model_name_or_path)
-        self.dtype = dtype
+        dtype = config.dtype or self.model_config.dtype
+
         self.architectures = self.model_config.architectures[0].lower()
         self.cache_kvs = [paddle.zeros(shape, dtype=dtype) for shape in cache_kv_shapes]
         self.pre_ids = paddle.full([config.batch_size, config.max_length + 1], -1, dtype="int64")
@@ -316,15 +308,29 @@ class StaticInferencePredictor(BasePredictor):
             dtype=dtype,
         )
 
-        if config.prefix_path:
-            prefix_cache = paddle.to_tensor(np.load(f"{config.prefix_path}/pre_caches.npy")).unsqueeze(2)
-            num_layers = self.model_config.num_hidden_layers
-            num_attention_heads = self.model_config.num_attention_heads
-            head_dim = self.model_config.hidden_size // num_attention_heads
-            prefix_cache = paddle.expand(
-                prefix_cache, [num_layers, 2, config.batch_size, num_attention_heads, prefix_cache.shape[-2], head_dim]
-            )
-            self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, num_layers, axis=0)]
+        if config.use_pre_caches:
+            if config.prefix_path:
+                prefix_cache = (
+                    paddle.to_tensor(np.load(f"{config.prefix_path}/pre_caches.npy")).astype(dtype).unsqueeze(2)
+                )
+                num_layers = self.model_config.num_hidden_layers
+                num_attention_heads = self.model_config.num_attention_heads
+                head_dim = self.model_config.hidden_size // num_attention_heads
+                prefix_cache = paddle.expand(
+                    prefix_cache,
+                    [num_layers, 2, config.batch_size, num_attention_heads, prefix_cache.shape[-2], head_dim],
+                )
+                self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, num_layers, axis=0)]
+            else:
+                # prefix_cache = paddle.to_tensor(np.load(f"{config.prefix_path}/pre_caches.npy")).astype(dtype).unsqueeze(2)
+                num_layers = self.model_config.num_hidden_layers
+                num_attention_heads = self.model_config.num_attention_heads
+                head_dim = self.model_config.hidden_size // num_attention_heads
+                prefix_cache = paddle.zeros(
+                    [num_layers, 2, config.batch_size, num_attention_heads, 128, head_dim], dtype=dtype
+                )
+                self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, num_layers, axis=0)]
+
         self.predictor = self._create_predictor(config)
 
     def _create_predictor(self, predictor_args: PredictorArgument):
@@ -382,7 +388,9 @@ class StaticInferencePredictor(BasePredictor):
             inputs["tgt_generation_mask"] = self.tgt_generation_mask
             inputs["tgt_pos"] = self.tgt_pos.numpy()
         else:
-            pre_caches_length = 0 if self.config.prefix_path is None else self.pre_caches[0].shape[-2]
+            pre_caches_length = (
+                self.config.pre_caches_length if self.config.prefix_path is None else self.pre_caches[0].shape[-2]
+            )
 
             inputs = dybatch_preprocess(
                 self.tokenizer, source, self.config.max_length, self.architectures, pre_caches_length=pre_caches_length
@@ -394,6 +402,16 @@ class StaticInferencePredictor(BasePredictor):
                 )
                 if pre_caches_length > 0:
                     prefix_attention_mask = paddle.ones(
+                        [1, length, pre_caches_length], dtype=self.attention_mask.dtype
+                    )
+                    post_attention_mask = paddle.tril(
+                        paddle.ones(shape=(length, length), dtype=self.attention_mask.dtype)
+                    ).unsqueeze_(axis=0)
+                    self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
+                        [prefix_attention_mask, post_attention_mask], axis=2
+                    )
+                else:
+                    prefix_attention_mask = paddle.zeros(
                         [1, length, pre_caches_length], dtype=self.attention_mask.dtype
                     )
                     post_attention_mask = paddle.tril(
@@ -435,7 +453,7 @@ class StaticInferencePredictor(BasePredictor):
         if paddle.distributed.get_rank() == 0:
             tokens: np.ndarray = load_real_time_tokens()
             decoded_predictions = self.tokenizer.batch_decode(
-                tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
+                tokens.tolist(), skip_special_tokens=False, clean_up_tokenization_spaces=False
             )
             return decoded_predictions
         else:
@@ -449,19 +467,8 @@ class DygraphInferencePredictor(BasePredictor):
         super().__init__(config, tokenizer)
         self.model = model
 
-        if config.lora_path is not None:
-            lora_config = LoRAConfig.from_pretrained(config.lora_path)
-            dtype = lora_config.dtype
-            lora_config.merge_weights = True
-        elif config.prefix_path is not None:
-            prefix_config = PrefixConfig.from_pretrained(config.prefix_path)
-            dtype = prefix_config.dtype
-        elif config.dtype is not None:
-            dtype = config.dtype
-        else:
-            raise ValueError("Please specific the model dtype.")
+        dtype = config.dtype or self.model.config.dtype
 
-        self.dtype = dtype
         self.architectures = self.model.config.architectures[0].lower()
 
         self.cache_kvs = [
@@ -579,12 +586,26 @@ class DygraphInferencePredictor(BasePredictor):
             return None
 
 
+def validate_args(predictor_args: PredictorArgument):
+    predictor_args.max_batch_size = predictor_args.max_batch_size or predictor_args.batch_size
+
+    if predictor_args.use_pre_caches:
+        if predictor_args.pre_caches_length is None and predictor_args.prefix_path is None:
+            raise ValueError(
+                "when `use_pre_caches` set to True, one of [`pre_caches_length`, `prefix_path`] should be set"
+            )
+
+    return predictor_args
+
+
 def create_predictor(
     predictor_args: PredictorArgument,
     model_args: ModelArgument,
     tensor_parallel_degree: int = 1,
     tensor_parallel_rank: int = 0,
 ):
+
+    predictor_args = validate_args(predictor_args)
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer):
@@ -685,9 +706,7 @@ def create_predictor(
 def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
-    # init `max_batch_size`
 
-    predictor_args.max_batch_size = predictor_args.max_batch_size or predictor_args.batch_size
     paddle.set_device(predictor_args.device)
     paddle.set_default_dtype(predictor_args.dtype)
 
