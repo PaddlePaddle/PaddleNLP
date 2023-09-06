@@ -116,7 +116,7 @@ def nested_numpify(tensors):
     t = tensors.cpu()
     if t.dtype == paddle.float16:
         t = t.cast(paddle.float32)
-    return t.numpy()
+    return t.cpu().numpy()
 
 
 def nested_truncate(tensors, limit):
