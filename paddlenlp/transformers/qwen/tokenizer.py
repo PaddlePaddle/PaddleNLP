@@ -22,8 +22,6 @@ from typing import Collection, Dict, List, Optional, Set, Tuple, Union
 import numpy as np
 
 from ...utils.import_utils import is_tiktoken_available
-
-# from ..tokenizer_utils_base import BatchEncoding, EncodedInput, PaddingStrategy
 from .. import PretrainedTokenizer
 from ..tokenizer_utils_base import (
     AddedToken,
