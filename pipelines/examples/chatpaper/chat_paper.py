@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-import copy
 import json
 import os
 
@@ -41,7 +40,7 @@ parser.add_argument(
 )
 parser.add_argument("--max_length", type=int, default=1024, help="Maximum number of generated tokens")
 parser.add_argument("--ernie_model", type=str, default="ernie-bot-3.5", help="Model type")
-parser.add_argument("--system_prompt", type=str, default="你是我的AI助理", help="System settings for dialogue models")
+parser.add_argument("--system_prompt", type=str, default="你是我的AI助理。", help="System settings for dialogue models")
 parser.add_argument("--es_host", type=str, default="", help="the host of es")
 parser.add_argument("--es_port", type=int, default=8309, help="the port of es")
 parser.add_argument("--es_username", type=str, default="", help="the username of es")
@@ -61,6 +60,10 @@ parser.add_argument("--retriever_threshold", type=float, default=0.95, help="the
 parser.add_argument("--json_dir", type=str, default="", help="the directory of json files created by papers")
 parser.add_argument("--max_token", type=int, default=11200, help=" the max number of tokens of LLM")
 args = parser.parse_args()
+PROMPT_RETRIVER = """<指令>根据已知信息，简洁和专业的来回答问题。如果无法从中得到答案，
+请说 “根据已知信息无法回答该问题”，不允许在答案中添加编造成分，答案请使用中文。 </指令>
+<已知信息>{documents}</已知信息>
+<问题>{query}</问题>"""
 
 
 def clear_input():
@@ -90,7 +93,6 @@ def retrieval_papers(query, state={}):
     global paper_id_list
     if not paper_id_list:
         context.append({"system": args.system_prompt, "role": "user", "content": query})
-        abstract = ""
         prediction = retrieval(
             query=query,
             es_host=args.es_host,
@@ -109,15 +111,18 @@ def retrieval_papers(query, state={}):
             rank_topk=5,
         )
         documents = prediction["documents"]
+        all_content = ""
         for i in range(len(documents)):
             if documents[i].meta["id"] not in paper_id_list:
                 paper_id_list.append(documents[i].meta["id"])
                 key_words = documents[i].meta.get("key_words", "")
                 title = documents[i].meta.get("title", "")
-                content = documents[i].content
-                paper_content = "**" + str(len(paper_id_list)) + "." + title + "**" + "\n" + key_words + "\n" + content
-                abstract += paper_content + "\n\n"
-        context.append({"role": "assistant", "content": abstract})
+                abstract = documents[i].meta.get("abstracts", "")
+                paper_content = (
+                    "**" + str(len(paper_id_list)) + "." + title + "**" + "\n" + key_words + "\n" + abstract
+                )
+                all_content += paper_content + "\n\n"
+        context.append({"role": "assistant", "content": all_content})
         shown_context = get_shown_context(context)
     else:
         content = ""
@@ -141,7 +146,7 @@ def retrieval_papers(query, state={}):
                 rank_topk=2,
             )
             content += "\n".join([item.content for item in prediction["documents"]])
-        content = "请根据以下背景资料回答问题：\n 背景资料：{documents} \n问题：{query}".format(documents=content, query=query)
+        content = PROMPT_RETRIVER.format(documents=content, query=query)
         content = content[: args.max_token]
         context.append({"system": args.system_prompt, "role": "user", "content": content})
         eb.api_type = args.api_type
@@ -151,9 +156,8 @@ def retrieval_papers(query, state={}):
         response = eb.ChatCompletion.create(model=model, messages=context, stream=False)
         bot_response = response.result
         context.append({"role": "assistant", "content": bot_response})
-        context_new = copy.deepcopy(context)
-        context_new[-2]["content"] = query
-        shown_context = get_shown_context(context_new)
+        context[-2]["content"] = query
+        shown_context = get_shown_context(context)
     return None, shown_context, state
 
 
@@ -210,16 +214,15 @@ def infer(query, state):
             rank_topk=2,
         )
         content = "\n".join([item.content for item in prediction["documents"]])
-        content = "请根据以下背景资料回答问题：\n 背景资料：{documents} \n问题：{query}".format(documents=content, query=query)
+        content = PROMPT_RETRIVER.format(documents=content, query=query)
         content = content[: args.max_token]
         context.append({"system": args.system_prompt, "role": "user", "content": content})
         model = "ernie-bot-3.5" if args.ernie_model is None or args.ernie_model.strip() == "" else args.ernie_model
         response = eb.ChatCompletion.create(model=model, messages=context, stream=False)
         bot_response = response.result
         context.append({"role": "assistant", "content": bot_response})
-        context_new = copy.deepcopy(context)
-        context_new[-2]["content"] = query
-        shown_context = get_shown_context(context_new)
+        context[-2]["content"] = query
+        shown_context = get_shown_context(context)
     else:
         context.append({"system": args.system_prompt, "role": "user", "content": query})
         response = eb.ChatFile.create(messages=context, stream=False)
@@ -234,12 +237,14 @@ def upload_file(file_name, file_url, file_upload, state={}):
     Upload the file to bos or retrieve the json_file of the paper
     """
     global single_paper_id
+    single_paper_id = ""
     if file_name:
         json_file_path, file_id = retrieval_title(file_name)
         json_file_path = json_file_path.replace("/", "_").replace(".pdf", "")
         json_file_path = os.path.join(args.json_dir, json_file_path)
         single_paper_id = file_id
         if os.path.isfile(json_file_path):
+
             with open(json_file_path, mode="r") as json_file:
                 json_content = json.load(json_file)
             content = json_content["content"]
@@ -248,12 +253,16 @@ def upload_file(file_name, file_url, file_upload, state={}):
                 gr.File.update(visible=False),
                 None,
                 state,
-                gr.Markdown.update(content, visible=True),
+                gr.Chatbot.update(
+                    [["", content]],
+                    visible=True,
+                    scale=30,
+                    height=600,
+                ),
             )
         else:
             return gr.Gallery.update(visible=False), gr.File.update(visible=False), None, state, None
     elif file_url:
-        single_paper_id = ""
         root_path = "./"
         paper = next(arxiv.Search(id_list=[file_url.split("/")[-1]]).results())
         real_filename = "{}.pdf".format(file_url.split("/")[-1])
@@ -261,7 +270,6 @@ def upload_file(file_name, file_url, file_upload, state={}):
         file_name = os.path.join(root_path, real_filename)
         imgs = pdf2image(pdfPath=file_name, imgPath=root_path)
     elif file_upload:
-        single_paper_id = ""
         file_name = file_upload.name
         real_filename = os.path.split(file_name)[-1]
         root_path = os.path.dirname(file_name)
@@ -287,7 +295,7 @@ def upload_file(file_name, file_url, file_upload, state={}):
         gr.File.update(file_name, label="原文下载链接", visible=True),
         shown_context,
         state,
-        gr.Markdown.update(visible=False),
+        gr.Chatbot.update(visible=False),
     )
 
 
@@ -355,7 +363,7 @@ with gr.Blocks(title="维普小助手", theme=gr.themes.Base()) as demo:
                         ori_paper = gr.Gallery(label="论文原文", show_label=False, elem_id="gallery").style(
                             columns=[1], rows=[1], object_fit="contain", height="700px"
                         )
-                        ori_json = gr.Markdown(label="论文原文", visible=False)
+                        ori_json = gr.Chatbot(label="论文原文", visible=False)
                         ori_pdf = gr.File(label="原文下载链接")
                     with gr.Accordion("   "):
                         gr.Dropdown(choices=[""], max_choices=1, label="文章摘要等总结-PDF插件-支持下载；此处为PDF占位符")
