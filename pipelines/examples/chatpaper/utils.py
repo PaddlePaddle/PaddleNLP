@@ -37,6 +37,18 @@ def pdf2image(pdfPath, imgPath, zoom_x=10, zoom_y=10, rotation_angle=0):
     return image_path
 
 
+def load_all_json_path(path):
+    json_path = {}
+    with open(path, encoding="utf-8", mode="r") as f:
+        for line in f:
+            try:
+                json_id, json_name = line.strip().split()
+                json_path[json_id] = json_name
+            except:
+                continue
+    return json_path
+
+
 def _apply_token(api_key, secret_key):
     """
     Gererate an access token.
