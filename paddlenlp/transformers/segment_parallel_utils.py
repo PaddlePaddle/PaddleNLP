@@ -57,7 +57,8 @@ class ReshardAxis:
 
 @paddle.no_grad()
 def _reshard_qkv(x, group, split_axis=2, concat_axis=0):
-    # [s / sep, b, h] -> [s, b, h / sep]
+    # [s/sep, b, h] -> [s, b, h/sep]
+    # [s, b, h/sep] -> [s/sep, b, h]
     group = _get_global_group() if group is None else group
     nranks = dist.get_world_size(group=group)
     shape = x.shape
@@ -69,7 +70,6 @@ def _reshard_qkv(x, group, split_axis=2, concat_axis=0):
     output_list = [paddle.empty_like(comm_tensor_list[0]) for _ in comm_tensor_list]
     dist.alltoall(comm_tensor_list, output_list, group=group)
     reshard_tensor = paddle.concat(output_list, axis=concat_axis)
-    # print(f"comm_tensor_list{comm_tensor_list}, output_list:{output_list}, reshard_tensor:{reshard_tensor}")
 
     return reshard_tensor
 
@@ -82,7 +82,7 @@ class ReshardQKV(PyLayer):
         ctx.group = _get_global_group() if group is None else group
         ctx.split_axis = split_axis
         ctx.concat_axis = concat_axis
-        res = _reshard_qkv(x.clone(), group, split_axis=ctx.split_axis, concat_axis=ctx.concat_axis)
+        res = _reshard_qkv(x, group, split_axis=ctx.split_axis, concat_axis=ctx.concat_axis)
         _timer("reshard qkv fwd").stop()
 
         return res
@@ -115,9 +115,9 @@ class ReshardLayer(paddle.nn.Layer):
         ReshardAxis.check([split_axis, concat_axis])
         shape = x.shape
         assert len(shape) == 3 or len(shape) == 4, "Only support 3D or 4D tensor"
+        input_data = x
         group = _get_global_group() if group is None else group
         nranks = dist.get_world_size(group=group)
-        input_data = x
         perm = [1, 0, 2] if len(shape) == 3 else [1, 0, 2, 3]
         batch_dim_idx = 0 if batch_major_in else 1
         seq_dim_idx = 1 if batch_major_in else 0
@@ -130,6 +130,8 @@ class ReshardLayer(paddle.nn.Layer):
                 input_data = paddle.transpose(input_data, perm)
             else:
                 new_shape = [seq_size, batch_size, 0] if len(shape) == 3 else [seq_size, batch_size, 0, 0]
+                input_data = input_data.clone() if input_data.is_leaf else input_data
+                input_data.reshape_(new_shape)
                 input_data = paddle.reshape(input_data, new_shape)
 
         if split_axis == ReshardAxis.SEQUENCE:
@@ -142,11 +144,12 @@ class ReshardLayer(paddle.nn.Layer):
         if len(shape) == 3:
             reshard_tensor = ReshardQKV.apply(input_data, group, split_axis=split_axis, concat_axis=concat_axis)
         else:
-            input_data = paddle.reshape(input_data, [0, 0, -1])
+            input_data = input_data.clone() if input_data.is_leaf else input_data
+            input_data.reshape_([0, 0, -1])
             reshard_tensor = ReshardQKV.apply(input_data, group, split_axis=split_axis, concat_axis=concat_axis)
 
-            reshard_tensor = paddle.reshape(
-                reshard_tensor, [resharded_seq_size, batch_size, resharded_num_head_size, shape[3]]
+            reshard_tensor.reshape_(
+                [resharded_seq_size, batch_size, resharded_num_head_size, shape[3]]
             )
 
         if batch_major_out:
@@ -158,7 +161,7 @@ class ReshardLayer(paddle.nn.Layer):
                     if len(shape) == 3
                     else [batch_size, resharded_seq_size, resharded_num_head_size, shape[3]]
                 )
-                reshard_tensor = paddle.reshape(reshard_tensor, new_shape)
+                reshard_tensor.reshape_(new_shape)
         return reshard_tensor
 
 
@@ -463,6 +466,7 @@ def main():
         split_axis=2,
         concat_axis=0,
     )
+
     check_equal(
         input_data,
         bin_sout_expected_output_data,
@@ -536,6 +540,7 @@ def main():
     )
     check_equal(input_data, bin_bout_expected_output_data, batch_major_in=True, batch_major_out=True)
     check_equal(input_data, bin_sout_expected_output_data, batch_major_in=True, batch_major_out=False)
+
     input_data, sin_sout_expected_output_data, sin_bout_expected_output_data = prepare_data(
         batch_major=False, batch_size=1, seq_len=4, num_head=4, h=8
     )
