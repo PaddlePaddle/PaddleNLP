@@ -13,6 +13,8 @@
 # limitations under the License.
 from __future__ import annotations
 
+from typing import List, Union
+
 import paddle
 import paddle.nn.functional as F
 from paddlenlp_ops import (
@@ -23,16 +25,35 @@ from paddlenlp_ops import (
     set_value_by_flags_and_idx,
 )
 
-from paddlenlp.generation import LogitsProcessorList
+from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList
 
 try:
     from paddle import top_p_sampling
 except:
     from paddlenlp_ops import top_p_sampling
 
-from ...generation import GenerationMixin
 
 __all__ = ["GenerationInferenceModel"]
+
+
+class ForcedDecodingEOSTokenLogitsProcessor(LogitsProcessor):
+    """
+    This `LogitsProcessor` enforces the last generated token to be the selected `forced_eos_token`.
+
+    Args:
+        max_length (int): The maximum length of the sequence to be generated.
+        forced_eos_token_id (int): The id of the token to be generated as the last token.
+    """
+
+    def __init__(self, max_decoding_step: int, forced_eos_token_id: Union[int, List[int]]):
+        self.max_decoding_step = max_decoding_step
+        self.forced_eos_token_id = forced_eos_token_id
+
+    def __call__(self, input_ids, scores, decoding_step):
+        if decoding_step == self.max_decoding_step - 1:
+            scores[:] = paddle.finfo(scores.dtype).min
+            scores[:, self.forced_eos_token_id] = 0
+        return scores
 
 
 class GenerationInferenceModel(GenerationMixin):
@@ -76,6 +97,8 @@ class GenerationInferenceModel(GenerationMixin):
                 )
                 for i, shape in enumerate(cache_kvs_shapes)
             ],  # cache_kvs
+            None,  # inputs_embeds
+            config.get("logits_processors", None),
         ]
         if self.config["model_type"] and "chatglm" in self.config.model_type:
             input_spec[2] = paddle.static.InputSpec(
@@ -274,7 +297,7 @@ class GenerationInferenceModel(GenerationMixin):
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
 
             logits = paddle.cast(logits, paddle.float32)
-            logits = logits_processors(model_kwargs["all_input_ids"], logits, decoding_length=step_idx_ori)
+            logits = logits_processors(model_kwargs["all_input_ids"], logits, decoding_step=step_idx_ori)
 
             logits = get_token_penalty_multi_scores(
                 model_kwargs["pre_ids"],

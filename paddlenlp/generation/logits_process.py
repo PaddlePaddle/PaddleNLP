@@ -289,26 +289,6 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
         return scores
 
 
-class ForcedDecodingEOSTokenLogitsProcessor(LogitsProcessor):
-    """
-    This `LogitsProcessor` enforces the last generated token to be the selected `forced_eos_token`.
-
-    Args:
-        max_length (int): The maximum length of the sequence to be generated.
-        forced_eos_token_id (int): The id of the token to be generated as the last token.
-    """
-
-    def __init__(self, max_decoding_length: int, forced_eos_token_id: Union[int, List[int]]):
-        self.max_decoding_length = max_decoding_length
-        self.forced_eos_token_id = forced_eos_token_id
-
-    def __call__(self, input_ids, scores, decoding_length):
-        if decoding_length == self.max_decoding_length - 1:
-            scores[:] = paddle.finfo(scores.dtype).min
-            scores[:, self.forced_eos_token_id] = 0
-        return scores
-
-
 def TopKProcess(probs: paddle.Tensor, top_k: int, min_tokens_to_keep: int):
     top_k = min(max(top_k, min_tokens_to_keep), probs.shape[-1])
     # Remove all tokens with a probability less than the last token of the top-k
