@@ -122,7 +122,7 @@ def distributed_gather(tensor: Any, dst: int = 0, group=None, offload=False) -> 
 
                 if is_dst:
                     for i in range(len(output_tensors)):
-                        output_tensors[i].append(slice_output_tensors[i].numpy())
+                        output_tensors[i].append(slice_output_tensors[i].cpu().numpy())
 
             tensor.reshape_(origin_shape)
             if is_dst:

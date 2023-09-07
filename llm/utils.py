@@ -200,7 +200,7 @@ class CausalLMTrainer(Trainer):
                 input_ids=inputs["input_ids"],
                 attention_mask=inputs["attention_mask"] if "attention_mask" in inputs else None,
                 position_ids=inputs["position_ids"] if "position_ids" in inputs else None,
-                max_length=self.data_args.tgt_length,
+                max_length=max(self.data_args.max_length - inputs["input_ids"].shape[-1], 1),
                 decode_strategy="sampling",
                 top_k=self.gen_args.top_k,
                 top_p=self.gen_args.top_p,

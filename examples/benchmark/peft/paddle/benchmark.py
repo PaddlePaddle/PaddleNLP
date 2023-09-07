@@ -124,6 +124,15 @@ def main():
                 ".*linear2.*",
                 ".*out_proj.*",
             ]
+        elif "chatglm2" in model_args.model_name_or_path:
+            target_modules = [
+                ".*query.*",
+                ".*key.*",
+                ".*value.*",
+                ".*dense.*",
+                ".*dense_h_to_4h.*",
+                ".*dense_4h_to_h.*",
+            ]
         else:
             target_modules = [".*query_key_value.*"]
 
@@ -285,7 +294,6 @@ def main():
             tokenizer=tokenizer,
             max_length=model_args.intokens_length,
         )
-
     if model_args.profiler:
         prof = profiler.Profiler(
             targets=[profiler.ProfilerTarget.CPU, profiler.ProfilerTarget.GPU],

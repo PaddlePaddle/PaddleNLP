@@ -74,18 +74,22 @@ class PredictorArgument:
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     max_batch_size: int = field(default=None, metadata={"help": "The max batch size of data during serving."})
-    benchmark: bool = field(
-        default=False,
-        metadata={
-            "help": "If benchmark set as `True`, we will force model decode to max_length, which is helpful to compute throughput. "
-        },
+    benchmark: bool = (
+        field(
+            default=False,
+            metadata={
+                "help": "If benchmark set as `True`, we will force model decode to max_length, which is helpful to compute throughput. "
+            },
+        ),
     )
 
 
 @dataclass
 class ModelArgument:
-    gpt: bool = field(default=False, metadata={"help": "GPTForCausalLM"})
-    ernie: bool = field(default=False, metadata={"help": "Ernie35ForCausalLM"})
+    model_type: str = field(
+        default=None,
+        metadata={"help": "the type of the model, which can be one of ['gpt-3', 'ernie-3.5-se', 'llama-img2txt']"},
+    )
     data_file: str = field(default=None, metadata={"help": "data file directory"})
     output_file: str = field(default="output.json", metadata={"help": "predict result file directory"})
 
@@ -530,7 +534,7 @@ def create_predictor(
     tensor_parallel_rank, tensor_parallel_degree = init_dist_env()
     if not predictor_args.inference_model:
         if predictor_args.mode == "dynamic":
-            if model_args.gpt:
+            if model_args.model_type == "gpt-3":
                 sys.path.append("./gpt-3")
                 from modeling import GPTForCausalLM
 
@@ -540,7 +544,7 @@ def create_predictor(
                     tensor_parallel_degree=tensor_parallel_degree,
                     tensor_parallel_rank=tensor_parallel_rank,
                 )
-            elif model_args.ernie:
+            elif model_args.model_type == "ernie-3.5-se":
                 sys.path.append("./ernie-3.5-se")
                 from modeling import Ernie35ForCausalLM
 
@@ -556,7 +560,6 @@ def create_predictor(
                 model = AutoModelForCausalLM.from_pretrained(
                     predictor_args.model_name_or_path,
                     dtype=predictor_args.dtype,
-                    low_cpu_mem_usage=True,
                     tensor_parallel_degree=tensor_parallel_degree,
                     tensor_parallel_rank=tensor_parallel_rank,
                 )
@@ -571,13 +574,19 @@ def create_predictor(
             # TODO(wj-Mcat): complete AutoInferenceModel & AutoPredictor
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
             if "llama" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    LlamaForCausalLMInferenceModel,
-                )
+                if model_args.model_type == "llama-img2txt":
+                    # we use llama for img2txt.
+                    from paddlenlp.experimental.transformers import (
+                        LlamaForMiniGPT4InferenceModel as LlamaInferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        LlamaForCausalLMInferenceModel as LlamaInferenceModel,
+                    )
 
                 config.tensor_parallel_degree = tensor_parallel_degree
                 config.tensor_parallel_rank = tensor_parallel_rank
-                model = LlamaForCausalLMInferenceModel.from_pretrained(
+                model = LlamaInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
                 model.eval()
