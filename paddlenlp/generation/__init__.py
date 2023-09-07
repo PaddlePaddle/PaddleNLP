@@ -16,6 +16,7 @@ from .logits_process import (
     ForcedBOSTokenLogitsProcessor,
     ForcedEOSTokenLogitsProcessor,
     HammingDiversityLogitsProcessor,
+    LogitsProcessor,
     LogitsProcessorList,
     MinLengthLogitsProcessor,
     RepetitionPenaltyLogitsProcessor,
