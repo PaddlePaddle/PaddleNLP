@@ -1,5 +1,5 @@
-fitz
 scipdf
 PyMuPDF==1.20.2
 arxiv
 erniebot
+gradio==3.41.2

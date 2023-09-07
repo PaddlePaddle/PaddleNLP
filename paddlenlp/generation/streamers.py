@@ -46,7 +46,7 @@ class TextStreamer(BaseStreamer):
 
         ```python
         >>> from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
-        >>> from paddlenlp.transformers.generation_utils import TextStreamer
+        >>> from paddlenlp.generation import TextStreamer
 
         >>> tok = AutoTokenizer.from_pretrained("gpt2")
         >>> model = AutoModelForCausalLM.from_pretrained("gpt2")
@@ -167,7 +167,7 @@ class TextIteratorStreamer(TextStreamer):
 
         ```python
         >>> from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
-        >>> from paddlenlp.transformers.generation_utils import TextIteratorStreamer
+        >>> from paddlenlp.generation import TextIteratorStreamer
         >>> from threading import Thread
 
         >>> tok = AutoTokenizer.from_pretrained("gpt2")
