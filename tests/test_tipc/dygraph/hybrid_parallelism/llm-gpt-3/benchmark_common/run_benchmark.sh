@@ -26,6 +26,7 @@ function _set_params(){
     tokenizer_name_or_path=${tokenizer_name_or_path:-"gpt2-medium-en"}
     max_seq_length=${max_seq_length:-1024}
     per_device_train_batch_size=${per_device_train_batch_size:-1}
+    per_device_eval_batch_size=${per_device_eval_batch_size:-1}
     tensor_parallel_degree=${tensor_parallel_degree:-1}
     pipeline_parallel_degree=${pipeline_parallel_degree:-1}
     fuse_attention_qkv=${fuse_attention_qkv:-1}
@@ -35,7 +36,7 @@ function _set_params(){
     max_steps=${max_steps:-10000}
     dataloader_num_workers=${dataloader_num_workers:-1}
     sharding=${sharding:-"stage2"}
-    sharding_degree=${sharding_degree:-2}
+    sharding_parallel_degree=${sharding_parallel_degree:-2}
     recompute=${recompute:-1}
     gradient_accumulation_steps=${gradient_accumulation_steps:-2}
 
@@ -103,7 +104,7 @@ function _train(){
         --split 949,50,1 \
         --max_seq_length ${max_seq_length} \
         --per_device_train_batch_size ${per_device_train_batch_size} \
-        --per_device_eval_batch_size 1 \
+        --per_device_eval_batch_size ${per_device_eval_batch_size} \
         --tensor_parallel_degree ${tensor_parallel_degree} \
         --pipeline_parallel_degree ${pipeline_parallel_degree} \
         --fuse_attention_qkv ${fuse_attention_qkv} \
@@ -121,7 +122,7 @@ function _train(){
         --logging_steps 1\
         --dataloader_num_workers ${dataloader_num_workers} \
         --sharding ${sharding} \
-        --sharding_degree ${sharding_degree} \
+        --sharding_parallel_degree ${sharding_parallel_degree} \
         --eval_steps 1000 \
         --report_to visualdl \
         --disable_tqdm true \
@@ -157,7 +158,7 @@ function _train(){
                 run_pretrain.py ${train_cmd}"
             workerlog_id=0
             ;;
-        DP1-MP2-PP2-SD4|DP1-MP2-PP2-SD2) echo "run run_mode: ${run_mode}"
+        DP1-MP2-PP2-SD4-stage1-mbs4-acc4-recompute|DP1-MP2-PP2-SD2) echo "run run_mode: ${run_mode}"
             train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
                 run_pretrain.py ${train_cmd}"
             workerlog_id=0
