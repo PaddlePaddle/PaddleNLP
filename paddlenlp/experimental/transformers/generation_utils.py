@@ -85,6 +85,17 @@ class GenerationInferenceModel(GenerationMixin):
             model, output_path, skip_prune_program=True
         )  # Note(Zhengzekang): If we prune program it may cause some inference error.
 
+    @staticmethod
+    def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
+        batch_size = 1
+        seq_len = 1
+        if bos_token_id is None:
+            raise ValueError("`bos_token_id` should be defined when no " "`input_ids` are provided.")
+        if encoder_output is not None:
+            batch_size = encoder_output.shape[0]
+            seq_len = encoder_output.shape[1]
+        return paddle.ones([batch_size, seq_len], dtype="int64") * bos_token_id
+
     @paddle.no_grad()
     def generate(
         self,
@@ -109,6 +120,7 @@ class GenerationInferenceModel(GenerationMixin):
         pre_ids=None,
         stop_nums=None,
         cache_kvs=[],
+        inputs_embeds=None,
         **model_kwargs,
     ):
 
@@ -136,6 +148,7 @@ class GenerationInferenceModel(GenerationMixin):
             top_p=top_p,
             cache_kvs=cache_kvs,
             temperature=temperature,
+            inputs_embeds=inputs_embeds,
             **model_kwargs,
         )
         return ret
@@ -215,17 +228,23 @@ class GenerationInferenceModel(GenerationMixin):
 
     def sample(
         self,
-        input_ids,
-        eos_token_id,
+        input_ids=None,
+        eos_token_id=None,
         cache_kvs=[],
         top_p=None,
         temperature=None,
+        inputs_embeds=None,
         **model_kwargs,
     ):
         step_idx_ori = paddle.full(shape=[1], dtype="int64", fill_value=1)
         batch_idx = paddle.full(shape=[1], dtype="int32", fill_value=-1)
 
+        # let inputs_embeds enter into model_kwargs.
+        # because the code below directly use the model_kwargs as a parameter without using inputs_embeds.
+        model_kwargs["inputs_embeds"] = inputs_embeds
+
         def _forward_(**args):
+            # cache_kvs is never empty because it is passed as a parameter in def sample.
             model_inputs = self.prepare_inputs_for_generation(input_ids, cache_kvs, **args)
             return self(**model_inputs)
 
@@ -297,6 +316,7 @@ class GenerationInferenceModel(GenerationMixin):
         )
         step_idx_ori += 1
         encoder_output = outputs
+        # gives it a value, means we will entered into decoder phase.
         model_kwargs["cache"] = 0
 
         # decoder
