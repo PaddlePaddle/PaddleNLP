@@ -310,6 +310,14 @@ python predictor.py \
     --output_file "infer.json" \
     --mode "static" \
     --inference_model
+
+python predictor.py \
+    --model_name_or_path ./inference_ptq \
+    --dtype float16 \
+    --max_length 1024 \
+    --output_file "infer.json" \
+    --mode "static" \
+    --inference_model
 ```
 
 

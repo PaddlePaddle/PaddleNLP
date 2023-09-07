@@ -86,13 +86,11 @@ class PredictorArgument:
     shift_smooth: int = field(
         default=0, metadata={"help": "Whether to apply shift and smooth in ptq, valid when quant_type is A8W8"}
     )
-    benchmark: bool = (
-        field(
-            default=False,
-            metadata={
-                "help": "If benchmark set as `True`, we will force model decode to max_length, which is helpful to compute throughput. "
-            },
-        ),
+    benchmark: bool = field(
+        default=False,
+        metadata={
+            "help": "If benchmark set as `True`, we will force model decode to max_length, which is helpful to compute throughput. "
+        },
     )
 
 

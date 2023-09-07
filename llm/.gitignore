@@ -1,5 +1,5 @@
 output.json
 checkpoints/
 quant_model*
-inference/
+inference*
 infer.json
