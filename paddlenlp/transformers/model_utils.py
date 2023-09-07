@@ -2148,7 +2148,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 # joyfulness), but for now this enough.
                 for k in list(shard.keys()):
                     if isinstance(shard[k], paddle.Tensor):
-                        shard[k] = shard.pop(k).numpy()
+                        shard[k] = shard.pop(k).cpu().numpy()
                 safe_save_file(shard, os.path.join(save_directory, shard_file), metadata={"format": "np"})
             else:
                 save_function(shard, os.path.join(save_directory, shard_file))
