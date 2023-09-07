@@ -223,7 +223,6 @@ def main():
             intoken_dataset = InTokensIterableDataset
         else:
             intoken_dataset = InTokensMapDataset
-
         logger.info("Creating InTokens Data Stream. This may take a few minutes.")
         train_ds = intoken_dataset(
             train_ds,
