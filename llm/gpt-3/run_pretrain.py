@@ -187,7 +187,7 @@ def create_pretrained_dataset(
     from paddlenlp.data import Stack
 
     def _collate_data(data, stack_fn=Stack()):
-        tokens_ = stack_fn(x["text"] for x in data)
+        tokens_ = stack_fn([x["text"] for x in data])
 
         labels = tokens_[:, 1:]
         tokens = tokens_[:, :-1]

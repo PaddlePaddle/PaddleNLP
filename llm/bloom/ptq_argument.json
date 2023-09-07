@@ -8,7 +8,7 @@
     "fp16": true,
     "fp16_opt_level": "O2",
     "dataset_name_or_path": "./data",
-    "output_dir": "./checkpoints/bloom_gptq_ckpts",
+    "output_dir": "./checkpoints/bloom_ptq_ckpts",
     "do_eval": true,
     "eval_with_do_generation": false,
     "do_ptq": true,

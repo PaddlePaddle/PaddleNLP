@@ -14,9 +14,7 @@
 # limitations under the License.
 from __future__ import annotations
 
-import inspect
-from abc import ABC
-from collections import OrderedDict
+import copy
 from typing import Union
 
 import paddle
@@ -36,12 +34,42 @@ try:
 except:
     is_top_p_sampling_avaliable = False
 
+from paddlenlp.transformers.model_outputs import ModelOutput
+from paddlenlp.transformers.utils import get_scale_by_dtype
 from paddlenlp.utils.log import logger
 
-from .model_outputs import ModelOutput
-from .utils import get_scale_by_dtype
+from .configuration_utils import DEFAULT_MAX_NEW_TOKEN, GenerationConfig
+from .logits_process import (
+    ForcedBOSTokenLogitsProcessor,
+    ForcedEOSTokenLogitsProcessor,
+    HammingDiversityLogitsProcessor,
+    LogitsProcessor,
+    LogitsProcessorList,
+    MinLengthLogitsProcessor,
+    NoRepeatNGramLogitsProcessor,
+    RepetitionPenaltyLogitsProcessor,
+    TopKProcess,
+    TopPProcess,
+)
+from .stopping_criteria import (
+    StoppingCriteria,
+    StoppingCriteriaList,
+    validate_stopping_criteria,
+)
+from .streamers import BaseStreamer
 
-__all__ = ["GenerationMixin"]
+__all__ = [
+    "GenerationMixin",
+    "BeamSearchScorer",
+    "BeamHypotheses",
+    "LogitsProcessorList",
+    "LogitsProcessor",
+    "MinLengthLogitsProcessor",
+    "RepetitionPenaltyLogitsProcessor",
+    "TopKProcess",
+    "TopPProcess",
+    "get_unfinished_flag",
+]
 
 
 def get_unfinished_flag(
@@ -295,7 +323,7 @@ class BeamSearchScorer(object):
 
         # fill with hypotheses and eos_token_id if the latter fits in
         for i, (hypo, score) in enumerate(best):
-            decoded[i, : sent_lengths[i].item()] = hypo.numpy()
+            decoded[i, : sent_lengths[i].item()] = hypo.cpu().numpy()
             decoded_score[i] = score
             if sent_lengths[i] < self.max_length:
                 decoded[i, sent_lengths[i].item()] = eos_token_id
@@ -581,33 +609,11 @@ class GenerationMixin(object):
     @paddle.no_grad()
     def generate(
         self,
-        input_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        max_length=20,
-        min_length=0,
-        decode_strategy="greedy_search",
-        temperature=1.0,
-        top_k=0,
-        top_p=1.0,
-        repetition_penalty=1.0,
-        num_beams=1,
-        num_beam_groups=1,
-        length_penalty=0.0,
-        early_stopping=False,
-        bos_token_id=None,
-        eos_token_id=None,
-        pad_token_id=None,
-        decoder_start_token_id=None,
-        forced_bos_token_id=None,
-        forced_eos_token_id=None,
-        no_repeat_ngram_size=None,
-        num_return_sequences=1,
-        diversity_rate=0.0,
-        use_cache=True,
-        use_fast=False,
-        use_fp16_decoding=False,
-        **model_kwargs
+        input_ids: paddle.Tensor = None,
+        generation_config: GenerationConfig = None,
+        stopping_criteria: StoppingCriteria = None,
+        streamer: BaseStreamer = None,
+        **kwargs,
     ):
         r"""
         The interface for generation task. This method can generate sequences
@@ -620,66 +626,21 @@ class GenerationMixin(object):
                 The data type should be int32 or int64. Default to None, which
                 we will initialize it as a Tensor with shape [1, 1], filled
                 with the value `bos_token_id`.
-            max_length (int, optional): The maximum length of the sequence to
-                be generated. Default to 20.
-            min_length (int, optional): The minimum length of the sequence to
-                be generated. Default to 0.
-            decode_strategy (str, optional): The decoding strategy in generation.
-                Currently, there are three decoding strategies supported:
-                "greedy_search", "sampling" and "beam_search". Default to
-                "greedy_search".
-            temperature (float, optional): The value used to module the next
-                token probabilities in the "sampling" strategy. Default to 1.0,
-                which means no effect.
-            top_k (int, optional): The number of highest probability tokens to
-                keep for top-k-filtering in the "sampling" strategy. Default to
-                0, which means no effect.
-            top_p (float, optional): The cumulative probability for
-                top-p-filtering in the "sampling" strategy. The value should
-                satisfy :math:`0 <= top\_p < 1`. Default to 1.0, which means no
-                effect.
-            repetition_penalty (float, optional):
-                The parameter for repetition penalty. 1.0 means no penalty. See `this paper
-                <https://arxiv.org/pdf/1909.05858.pdf>`__ for more details. Defaults to 1.0.
-            num_beams (int, optional): The number of beams in the "beam_search"
-                strategy. Default to 1.
-            num_beam_groups (int, optional):
-                Number of groups to divide `num_beams` into in order to use DIVERSE
-                BEAM SEARCH. See `this paper <https://arxiv.org/pdf/1610.02424.pdf>`__
-                for more details. Default to 1.
-            length_penalty (float, optional): The exponential penalty to the
-                sequence length in the "beam_search" strategy. The larger this
-                param is, the more that the model would generate shorter
-                sequences. Default to 0.0, which means no penalty.
-            early_stopping (bool, optional): Whether to stop searching in the
-                "beam_search" strategy when at least `num_beams` sentences are
-                finished per batch or not. Default to False.
-            bos_token_id (int, optional): The id of the `bos_token`. Default to
-                None.
-            eos_token_id (int, optional): The id of the `eos_token`. Default to
-                None.
-            pad_token_id (int, optional): The id of the `pad_token`. Default to
-                None.
-            decoder_start_token_id (int, optional): The start token id for
-                encoder-decoder models. Default to None.
-            forced_bos_token_id (int, optional): The id of the token to force as
-                the first generated token. Usually use for multilingual models.
-                Default to None.
-            forced_eos_token_id (int, optional): The id of the token to force as
-                the last generated token. Default to None.
-            num_return_sequences (int, optional): The number of returned
-                sequences for each sequence in the batch. Default to 1.
-            diversity_rate (float, optional): If num_beam_groups is 1, this is the
-                diversity_rate for Diverse Siblings Search. See
-                `this paper https://arxiv.org/abs/1611.08562`__ for more details.
-                If not, this is the diversity_rate for DIVERSE BEAM SEARCH.
-            use_cache: (bool, optional): Whether to use the model cache to
-                speed up decoding. Default to True.
-            use_fast: (bool, optional): Whether to use fast entry of model
-                for FastGeneration. Default to False.
-            use_fp16_decoding: (bool, optional): Whether to use fp16 for decoding.
-                Only works when fast entry is avalible. Default to False.
-            model_kwargs (dict): It can be used to specify additional kwargs
+            generation_config (`~generation.GenerationConfig`, *optional*):
+                The generation configuration to be used as base parametrization for the generation call. `**kwargs`
+                passed to generate matching the attributes of `generation_config` will override them. If
+                `generation_config` is not provided, the default will be used, which had the following loading
+                priority: 1) from the `generation_config.json` model file, if it exists; 2) from the model
+                configuration. Please note that unspecified parameters will inherit [`~generation.GenerationConfig`]'s
+                default values, whose documentation should be checked to parameterize generation.
+            stopping_criteria (`StoppingCriteriaList`, *optional*):
+                Custom stopping criteria that complement the default stopping criteria built from arguments and a
+                generation config. If a stopping criteria is passed that is already created with the arguments or a
+                generation config an error is thrown. This feature is intended for advanced users.
+            streamer (`~streamer.BaseStreamer`, *optional*):
+                Streamer object that will be used to stream the generated sequences. Generated tokens are passed
+                through `streamer.put(token_ids)` and the streamer is responsible for any further processing.
+            kwargs (dict): It can be used to specify additional kwargs
                 passed to the model.
 
         Returns:
@@ -722,14 +683,11 @@ class GenerationMixin(object):
 
                 # Generate the sequence by using "greedy_search" strategy
                 ids, scores = model.generate(
-                    input_ids=inputs['input_ids'],
-                    token_type_ids=inputs['token_type_ids'],
-                    position_ids=inputs['position_ids'],
-                    attention_mask=inputs['attention_mask'],
+                    **inputs,
                     decode_strategy="greedy_search")
                 print(ids.shape, scores.shape)
                 # [1, 3] [1, 1]
-                sequence_ids = ids.numpy().tolist()[0]
+                sequence_ids = ids.cpu().numpy().tolist()[0]
                 sequence_ids = sequence_ids[:sequence_ids.index(tokenizer.sep_token_id)]
                 response = tokenizer.convert_ids_to_string(sequence_ids, keep_space=False)
                 print(response)
@@ -738,18 +696,19 @@ class GenerationMixin(object):
             .. code-block::
 
                 # Generate 2 sequences by using "sampling" strategy (top_k=5)
-                ids, scores = model.generate(
-                    input_ids=inputs['input_ids'],
-                    token_type_ids=inputs['token_type_ids'],
-                    position_ids=inputs['position_ids'],
-                    attention_mask=inputs['attention_mask'],
+                generation_config = GenerationConfig(
                     decode_strategy="sampling",
                     top_k=5,
-                    num_return_sequences=2)
+                    num_return_sequences=2
+                )
+                ids, scores = model.generate(
+                    **inputs,
+                    generation_config=generation_config,
+                    )
                 print(ids.shape, scores.shape)
                 # [2, 7] [2, 1]
                 response = []
-                for sequence_ids in ids.numpy().tolist():
+                for sequence_ids in ids.cpu().numpy().tolist():
                     sequence_ids = sequence_ids[:sequence_ids.index(tokenizer.sep_token_id)]
                     text = tokenizer.convert_ids_to_string(sequence_ids, keep_space=False)
                     response.append(text)
@@ -759,30 +718,45 @@ class GenerationMixin(object):
             .. code-block::
 
                 # Generate 2 sequences by using "beam_search" strategy (num_beams=5)
-                ids, scores = model.generate(
-                    input_ids=inputs['input_ids'],
-                    token_type_ids=inputs['token_type_ids'],
-                    position_ids=inputs['position_ids'],
-                    attention_mask=inputs['attention_mask'],
+                generation_config = GenerationConfig(
                     decode_strategy="beam_search",
                     num_beams=5,
-                    num_return_sequences=2)
+                    num_return_sequences=2
+                )
+                ids, scores = model.generate(
+                    **inputs,
+                    generation_config=generation_config,
+                    )
                 print(ids.shape, scores.shape)
                 # [2, 3] [2, 1]
                 response = []
-                for sequence_ids in ids.numpy().tolist():
+                for sequence_ids in ids.cpu().numpy().tolist():
                     sequence_ids = sequence_ids[:sequence_ids.index(tokenizer.sep_token_id)]
                     text = tokenizer.convert_ids_to_string(sequence_ids, keep_space=False)
                     response.append(text)
                 print(response)
                 # ['是的', '嗯嗯']
         """
-        assert decode_strategy in [
+        if generation_config is None:
+            if self.generation_config._from_model_config:
+                new_generation_config = GenerationConfig.from_model_config(self.config)
+                if new_generation_config != self.generation_config:
+                    logger.warning(
+                        "model.generation_config is in conflict with model.config, " "model.config is used."
+                    )
+                    self.generation_config = new_generation_config
+            generation_config = self.generation_config
+
+        # without update model.generation_config
+        generation_config = copy.deepcopy(generation_config)
+        model_kwargs = generation_config.update(**kwargs)
+
+        assert generation_config.decode_strategy in [
             "greedy_search",
             "sampling",
             "beam_search",
         ], "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
-            decode_strategy
+            generation_config.decode_strategy
         )
 
         # Whether to dynamic to static
@@ -791,71 +765,99 @@ class GenerationMixin(object):
             is_tracing = True
 
         if is_tracing:
-            assert decode_strategy in [
+            assert generation_config.decode_strategy in [
                 "sampling",
-            ], "`generate()` only supports 'sampling' temporarily but received {}.".format(decode_strategy)
+            ], "`generate()` only supports 'sampling' temporarily but received {}.".format(
+                generation_config.decode_strategy
+            )
 
         if getattr(self, "deprecated_warnings", None) is None:
             self.deprecated_warnings = {}
 
+        use_fast = False
         if "use_faster" in model_kwargs:
             use_fast = model_kwargs.pop("use_faster")
             if not self.deprecated_warnings.get("use_faster", False):
                 logger.warning("`use_faster` will be deprecated in near future. Please use `use_fast` instead. ")
                 self.deprecated_warnings["use_faster"] = True
 
-        bos_token_id = bos_token_id if bos_token_id is not None else self.config.bos_token_id
-        eos_token_id = eos_token_id if eos_token_id is not None else self.config.eos_token_id
-        pad_token_id = pad_token_id if pad_token_id is not None else self.config.pad_token_id
+        if "use_fast" in model_kwargs:
+            use_fast = model_kwargs.pop("use_fast")
+
+        bos_token_id = (
+            generation_config.bos_token_id if generation_config.bos_token_id is not None else self.config.bos_token_id
+        )
+        eos_token_id = (
+            generation_config.eos_token_id if generation_config.eos_token_id is not None else self.config.eos_token_id
+        )
+        pad_token_id = (
+            generation_config.pad_token_id if generation_config.pad_token_id is not None else self.config.pad_token_id
+        )
         forced_bos_token_id = (
-            forced_bos_token_id if forced_bos_token_id is not None else self.config.forced_bos_token_id
+            generation_config.forced_bos_token_id
+            if generation_config.forced_bos_token_id is not None
+            else self.config.forced_bos_token_id
         )
         forced_eos_token_id = (
-            forced_eos_token_id if forced_eos_token_id is not None else self.config.forced_eos_token_id
+            generation_config.forced_eos_token_id
+            if generation_config.forced_eos_token_id is not None
+            else self.config.forced_eos_token_id
         )
         decoder_start_token_id = (
-            decoder_start_token_id if decoder_start_token_id is not None else self.config.decoder_start_token_id
+            generation_config.decoder_start_token_id
+            if generation_config.decoder_start_token_id is not None
+            else self.config.decoder_start_token_id
         )
         no_repeat_ngram_size = (
-            no_repeat_ngram_size if no_repeat_ngram_size is not None else self.config.no_repeat_ngram_size
+            generation_config.no_repeat_ngram_size
+            if generation_config.no_repeat_ngram_size is not None
+            else self.config.no_repeat_ngram_size
         )
 
         if is_tracing:
             self._fast_entry = None
 
         if getattr(self, "_fast_entry", None) is not False and use_fast:
-            args = locals()
-            args.pop("self")
-            args.pop("__class__", None)
-            model_kwargs = args.pop("model_kwargs")
-            args.update(model_kwargs)
+            fg_args = locals()
+            fg_args.pop("self")
+            fg_args.pop("__class__", None)
+            model_kwargs = fg_args.pop("model_kwargs")
+            fg_args.update(model_kwargs)
             try:
                 if getattr(self, "_fast_entry", None) is None:
-                    self._build_fast(args)
+                    self._build_fast(fg_args)
                 if self._fast_entry:
-                    output = self._fast_entry(**args)
+                    output = self._fast_entry(**fg_args)
                     if isinstance(output, tuple):
                         output_ids, dummy_srore = output
                     else:
                         output_ids = output
                         # make result and fast result oneconsistent
                         dummy_srore = None
-                    if decode_strategy == "beam_search":
+                    if generation_config.decode_strategy == "beam_search":
                         output_ids = output_ids.transpose([1, 2, 0])
-                        output_ids = output_ids[:, :num_return_sequences, :].reshape([-1, output_ids.shape[-1]])
+                        output_ids = output_ids[:, : generation_config.num_return_sequences, :].reshape(
+                            [-1, output_ids.shape[-1]]
+                        )
                         if dummy_srore is not None:
-                            dummy_srore = dummy_srore[:, :num_return_sequences].flatten()
+                            dummy_srore = dummy_srore[:, : generation_config.num_return_sequences].flatten()
                     else:
                         output_ids = output_ids.transpose([1, 0])
                     return output_ids, dummy_srore
 
             except Exception as e:
-                args["model_kwargs"] = model_kwargs
+                fg_args["model_kwargs"] = model_kwargs
                 # TODO
                 # Prevent self._convert_to_fast to throw Exception
-                self._convert_to_fast(args)
+                self._convert_to_fast(fg_args)
                 logger.warning(e)
                 logger.warning("FastGeneration is not available, " "and the original version would be used instead.")
+
+        # input_ids in model_kwargs is supported
+        if "input_ids" in model_kwargs:
+            _input_ids = model_kwargs.pop("input_ids")
+            if input_ids is None:
+                input_ids = _input_ids
 
         # params check
         if input_ids is None and "inputs_embeds" not in model_kwargs:
@@ -867,11 +869,6 @@ class GenerationMixin(object):
                 bos_token_id, encoder_output=model_kwargs["inputs_embeds"]
             )
 
-        # Add to model_kwargs
-        model_kwargs["attention_mask"] = attention_mask
-        if position_ids is not None:
-            model_kwargs["position_ids"] = position_ids
-
         if model_kwargs.get("attention_mask", None) is None:
             # TODO
             # Init `attention_mask` depending on `pad_token_id`
@@ -881,6 +878,7 @@ class GenerationMixin(object):
         self.is_encoder_decoder = (
             getattr(self, "encoder", None) is not None and getattr(self, "decoder", None) is not None
         )
+
         if self.is_encoder_decoder:
             model_kwargs = self.prepare_encoder_decoder_kwargs_for_generation(input_ids, model_kwargs)
             # set input_ids as decoder_input_ids
@@ -890,12 +888,30 @@ class GenerationMixin(object):
                 input_ids = self.prepare_decoder_input_ids_for_generation(
                     input_ids, decoder_start_token_id, bos_token_id
                 )
+
+        # streamer
+        if streamer is not None:
+            # streamer couldn't support beam_search strategy
+            if generation_config.decode_strategy == "beam_search" or generation_config.num_beams > 1:
+                raise ValueError(
+                    "`streamer` cannot be used with beam search (yet!). Make sure that `num_beams` is set to 1."
+                )
+            streamer.put(input_ids)
+
         if pad_token_id is None and eos_token_id is not None:
             print("Setting `pad_token_id` to `eos_token_id`:{} for " "open-end generation.".format(eos_token_id))
             pad_token_id = eos_token_id
 
-        model_kwargs["use_cache"] = use_cache
+        if generation_config.max_length != 0 and generation_config.max_new_token == DEFAULT_MAX_NEW_TOKEN:
+            logger.warning("`max_length` will be deprecated in future releases, use `max_new_token` instead.")
+            generation_config.max_new_token = generation_config.max_length
 
+        if generation_config.min_length != 0 and generation_config.min_new_token == 0:
+            logger.warning("`min_length` will be deprecated in future releases, use `min_new_token` instead.")
+            generation_config.min_new_token = generation_config.min_length
+
+        max_length = generation_config.max_new_token
+        min_length = generation_config.min_new_token
         if is_tracing and not paddle.is_tensor(max_length):
             if hasattr(paddle.framework, "_no_check_dy2st_diff"):
                 # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
@@ -922,11 +938,11 @@ class GenerationMixin(object):
             eos_token_id=eos_token_id,
             forced_bos_token_id=forced_bos_token_id,
             forced_eos_token_id=forced_eos_token_id,
-            num_beams=num_beams,
-            num_beam_groups=num_beam_groups,
-            diversity_rate=diversity_rate,
-            repetition_penalty=repetition_penalty,
-            no_repeat_ngram_size=no_repeat_ngram_size,
+            num_beams=generation_config.num_beams,
+            num_beam_groups=generation_config.num_beam_groups,
+            diversity_rate=generation_config.diversity_rate,
+            repetition_penalty=generation_config.repetition_penalty,
+            no_repeat_ngram_size=generation_config.no_repeat_ngram_size,
             logits_processors=model_kwargs["logits_processors"]
             if "logits_processors" in model_kwargs
             and isinstance(model_kwargs["logits_processors"], LogitsProcessorList)
@@ -935,20 +951,29 @@ class GenerationMixin(object):
         if "logits_processors" in model_kwargs:
             model_kwargs.pop("logits_processors")
 
-        if decode_strategy == "greedy_search":
-            if num_return_sequences > 1:
+        stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
+
+        if generation_config.decode_strategy == "greedy_search":
+            if generation_config.num_return_sequences > 1:
                 raise ValueError(
                     "`num_return_sequences` has to be 1, but is {} "
-                    "when doing greedy search.".format(num_return_sequences)
+                    "when doing greedy search.".format(generation_config.num_return_sequences)
                 )
             return self.greedy_search(
-                input_ids, logits_processors, max_len, pad_token_id, eos_token_id, **model_kwargs
+                input_ids,
+                logits_processors,
+                max_len,
+                pad_token_id,
+                eos_token_id,
+                stopping_criteria=stopping_criteria,
+                streamer=streamer,
+                **model_kwargs,
             )
 
-        elif decode_strategy == "sampling":
-            if num_return_sequences > 1:
+        elif generation_config.decode_strategy == "sampling":
+            if generation_config.num_return_sequences > 1:
                 input_ids, model_kwargs = self.expand_inputs_for_generation(
-                    input_ids, expand_size=num_return_sequences, **model_kwargs
+                    input_ids, expand_size=generation_config.num_return_sequences, **model_kwargs
                 )
 
             if is_tracing:
@@ -958,9 +983,9 @@ class GenerationMixin(object):
                     max_len,
                     pad_token_id,
                     eos_token_id,
-                    top_k,
-                    top_p,
-                    temperature,
+                    generation_config.top_k,
+                    generation_config.top_p,
+                    generation_config.temperature,
                     **model_kwargs,
                 )
             else:
@@ -970,40 +995,42 @@ class GenerationMixin(object):
                     max_len,
                     pad_token_id,
                     eos_token_id,
-                    top_k,
-                    top_p,
-                    temperature,
+                    generation_config.top_k,
+                    generation_config.top_p,
+                    generation_config.temperature,
+                    stopping_criteria=stopping_criteria,
+                    streamer=streamer,
                     **model_kwargs,
                 )
 
-        elif decode_strategy == "beam_search":
+        elif generation_config.decode_strategy == "beam_search":
             batch_size = input_ids.shape[0]
-            if num_return_sequences > num_beams:
+            if generation_config.num_return_sequences > generation_config.num_beams:
                 raise ValueError(
                     "`num_return_sequences` has to be smaller or equal to "
                     "`num_beams`. But received `num_return_sequences` is {}, "
-                    "`num_beams` is {}".format(num_return_sequences, num_beams)
+                    "`num_beams` is {}".format(generation_config.num_return_sequences, generation_config.num_beams)
                 )
-            if num_beams <= 1:
+            if generation_config.num_beams <= 1:
                 raise ValueError(
                     "`num_beams` has to be bigger than 1. But received "
                     "`num_beams` is {}. If `num_beams` is 1, `decode_strategy` "
-                    "should be 'greedy_search'".format(num_beams)
+                    "should be 'greedy_search'".format(generation_config.num_beams)
                 )
-            if num_beam_groups > 1:
+            if generation_config.num_beam_groups > 1:
                 diverse_beam_scorer = BeamSearchScorer(
                     batch_size=batch_size,
                     max_length=max_len,
-                    num_beams=num_beams,
-                    length_penalty=length_penalty,
-                    do_early_stopping=early_stopping,
-                    num_beam_hyps_to_keep=num_return_sequences,
-                    num_beam_groups=num_beam_groups,
+                    num_beams=generation_config.num_beams,
+                    length_penalty=generation_config.length_penalty,
+                    do_early_stopping=generation_config.early_stopping,
+                    num_beam_hyps_to_keep=generation_config.num_return_sequences,
+                    num_beam_groups=generation_config.num_beam_groups,
                 )
 
                 # interleave with `num_beams`
                 input_ids, model_kwargs = self.expand_inputs_for_generation(
-                    input_ids, expand_size=num_beams, **model_kwargs
+                    input_ids, expand_size=generation_config.num_beams, **model_kwargs
                 )
 
                 return self.group_beam_search(
@@ -1013,20 +1040,21 @@ class GenerationMixin(object):
                     max_len,
                     pad_token_id,
                     eos_token_id,
+                    stopping_criteria=stopping_criteria,
                     **model_kwargs,
                 )
             else:
                 beam_scorer = BeamSearchScorer(
                     batch_size=batch_size,
                     max_length=max_len,
-                    num_beams=num_beams,
-                    length_penalty=length_penalty,
-                    do_early_stopping=early_stopping,
-                    num_beam_hyps_to_keep=num_return_sequences,
+                    num_beams=generation_config.num_beams,
+                    length_penalty=generation_config.length_penalty,
+                    do_early_stopping=generation_config.early_stopping,
+                    num_beam_hyps_to_keep=generation_config.num_return_sequences,
                 )
 
                 input_ids, model_kwargs = self.expand_inputs_for_generation(
-                    input_ids, expand_size=num_beams, **model_kwargs
+                    input_ids, expand_size=generation_config.num_beams, **model_kwargs
                 )
 
                 return self.beam_search(
@@ -1034,20 +1062,42 @@ class GenerationMixin(object):
                     beam_scorer,
                     logits_processors,
                     max_len,
-                    diversity_rate,
+                    generation_config.diversity_rate,
                     pad_token_id,
                     eos_token_id,
+                    stopping_criteria=stopping_criteria,
                     **model_kwargs,
                 )
 
-    def greedy_search(self, input_ids, logits_processors, max_length, pad_token_id, eos_token_id, **model_kwargs):
+    def greedy_search(
+        self,
+        input_ids,
+        logits_processors,
+        max_length,
+        pad_token_id,
+        eos_token_id,
+        stopping_criteria=None,
+        streamer=None,
+        **model_kwargs
+    ):
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
+
+        # max_length will be convert to MaxLengthCriteria
+        stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
+        if max_length is not None:
+            # logger.warning(
+            #    "`max_length` is deprecated in this function, use"
+            #    " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead."
+            # )
+            stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
+
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
-        while cur_len < max_length:
+        generate_end = False
+        while True:
 
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
@@ -1077,21 +1127,28 @@ class GenerationMixin(object):
                 next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
 
             scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
-
             cur_len += 1
 
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
+            if streamer is not None:
+                streamer.put(next_tokens.cpu())
+
+            if stopping_criteria(input_ids, scores):
+                generate_end = True
 
             if eos_token_id is not None:
                 unfinished_flag = get_unfinished_flag(input_ids, unfinished_flag, eos_token_id)
 
             # Stop when there is a </s> in all sentences
-            if not paddle.any(unfinished_flag):
+            if not paddle.any(unfinished_flag) or generate_end:
                 break
 
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
+
+        if streamer is not None:
+            streamer.end()
 
         return input_ids[:, origin_len:], scores
 
@@ -1106,18 +1163,30 @@ class GenerationMixin(object):
         top_p=None,
         temperature=None,
         min_tokens_to_keep=1,
+        stopping_criteria=None,
+        streamer=None,
         **model_kwargs
     ):
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
 
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
+        # max_length will be convert to MaxLengthCriteria
+        stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
+        if max_length is not None:
+            # logger.warning(
+            #    "`max_length` is deprecated in this function, use"
+            #    " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead."
+            # )
+            stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
+
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
         unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
         scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
-        while cur_len < max_length:
+        generate_end = False
+        while True:
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
             outputs = self(**model_inputs)
@@ -1166,23 +1235,27 @@ class GenerationMixin(object):
 
             cur_len += 1
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
+            if streamer is not None:
+                streamer.put(next_tokens.cpu())
+
+            if stopping_criteria(input_ids, scores):
+                generate_end = True
 
             if eos_token_id is not None:
                 unfinished_flag = get_unfinished_flag(input_ids, unfinished_flag, eos_token_id)
 
             # Stop when there is a </s> in all sentences
-            if not paddle.any(unfinished_flag):
+            if not paddle.any(unfinished_flag) or generate_end:
                 break
+
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
-        return input_ids[:, origin_len:], scores
 
-    def _get_model_inputs_spec(self, dtype: str):
-        return {
-            "input_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
-            "attention_mask": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
-        }
+        if streamer is not None:
+            streamer.end()
+
+        return input_ids[:, origin_len:], scores
 
     def to_static(self, path: str, config: dict):
         """export generation model to static
@@ -1202,21 +1275,18 @@ class GenerationMixin(object):
 
         top_p_spec = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
         temperature = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
-        dtype = config.get("dtype", paddle.get_default_dtype())
-
-        model_inputs_spec = self._get_model_inputs_spec(dtype)
 
         input_spec = [
-            model_inputs_spec["input_ids"],
-            model_inputs_spec.get("attention_mask", None),
-            model_inputs_spec.get("position_ids", None),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # attention_mask
+            None,  # position_ids
             paddle.static.InputSpec(shape=[1], dtype="int64"),  # max_length
             0,  # min_length
             "sampling",  # decode_strategy
             temperature,  # temperature
             top_k_spec,  # top_k
             top_p_spec,  # top_p
-            config.get("repetition_penalty", 1.0),  # repetition_penalty
+            1,  # repetition_penalty
             # num_beams
             1,
             # num_beam_groups
@@ -1434,11 +1504,21 @@ class GenerationMixin(object):
         diversity_rate,
         pad_token_id,
         eos_token_id,
+        stopping_criteria=None,
         **model_kwargs
     ):
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
 
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
+
+        # max_length will be convert to MaxLengthCriteria
+        stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
+        if max_length is not None:
+            # logger.warning(
+            #    "`max_length` is deprecated in this function, use"
+            #    " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead."
+            # )
+            stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
 
         batch_size = len(beam_scorer._beam_hyps)
         num_beams = beam_scorer.num_beams
@@ -1456,7 +1536,7 @@ class GenerationMixin(object):
         beam_scores[:, 1:] = get_scale_by_dtype(return_positive=False)
         beam_scores = paddle.reshape(beam_scores, [-1])
 
-        while cur_len < max_length:
+        while True:
             # prepare model inputs & get model output
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
@@ -1534,14 +1614,13 @@ class GenerationMixin(object):
                 [paddle.index_select(input_ids, beam_idx), beam_next_tokens.unsqueeze(-1)], axis=-1
             )
 
-            if beam_scorer.is_done:
+            if beam_scorer.is_done or stopping_criteria(input_ids, beam_scores):
                 break
+
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
-
             cache_name = "cache" if "cache" in model_kwargs else "past_key_values"
-
             if model_kwargs[cache_name] is not None:
                 # reorder the cache
                 model_kwargs[cache_name] = map_structure(
@@ -1560,9 +1639,27 @@ class GenerationMixin(object):
         return pred_ids[:, origin_len:], scores
 
     def group_beam_search(
-        self, input_ids, beam_scorer, logits_processors, max_length, pad_token_id, eos_token_id, **model_kwargs
+        self,
+        input_ids,
+        beam_scorer,
+        logits_processors,
+        max_length,
+        pad_token_id,
+        eos_token_id,
+        stopping_criteria=None,
+        **model_kwargs
     ):
+        model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
+
+        # max_length will be convert to MaxLengthCriteria
+        stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
+        if max_length is not None:
+            # logger.warning(
+            #    "`max_length` is deprecated in this function, use"
+            #    " `stopping_criteria=StoppingCriteriaList([MaxLengthCriteria(max_length=max_length)])` instead."
+            # )
+            stopping_criteria = validate_stopping_criteria(stopping_criteria, max_length)
 
         batch_size = len(beam_scorer._beam_hyps)
         num_beams = beam_scorer.num_beams
@@ -1584,7 +1681,7 @@ class GenerationMixin(object):
         beam_scores[:, ::num_sub_beams] = 0
         beam_scores = paddle.reshape(beam_scores, [-1])
 
-        while cur_len < max_length:
+        while True:
             # predicted tokens in cur_len step
             current_tokens = paddle.zeros(shape=[batch_size * num_beams], dtype=input_ids.dtype)
 
@@ -1665,13 +1762,15 @@ class GenerationMixin(object):
             input_ids = paddle.concat([input_ids, current_tokens.unsqueeze(-1)], axis=-1)
 
             cur_len += 1
-            if beam_scorer.is_done:
+
+            if beam_scorer.is_done or stopping_criteria(input_ids, beam_scores):
                 break
+
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
-            cache_name = "cache" if "cache" in model_kwargs else "past_key_values"
 
+            cache_name = "cache" if "cache" in model_kwargs else "past_key_values"
             if model_kwargs[cache_name] is not None:
                 # reorder the cache
                 model_kwargs[cache_name] = map_structure(
@@ -1688,286 +1787,3 @@ class GenerationMixin(object):
             eos_token_id=eos_token_id,
         )
         return pred_ids[:, origin_len:], scores
-
-
-class LogitsProcessorList:
-    """use ordered dict to store processors"""
-
-    def __init__(self, processors: list[LogitsProcessor] = None) -> None:
-        self._processors = OrderedDict()
-        processors = processors or []
-        for processor in processors:
-            self.append(processor)
-
-    def __call__(self, input_ids, logits, **kwargs):
-        for processor in self._processors.values():
-            processor_args = inspect.signature(processor.__call__).parameters
-            if len(processor_args) > 2:
-                assert all(
-                    arg in kwargs for arg in list(processor_args.keys())[2:]
-                ), f"The parameters don't match for {processor.__class__}"
-                logits = processor(input_ids, logits, **kwargs)
-            else:
-                logits = processor(input_ids, logits)
-        return logits
-
-    def append(self, processor):
-        self._processors[len(self._processors)] = processor
-
-
-class LogitsProcessor(ABC):
-    """
-    Abstract base class for all logit processors that can be applied during
-    generation.
-    """
-
-    def __call__(self, input_ids, logits):
-        raise NotImplementedError(
-            f"{self.__class__} is an abstract class. " "Only classes inheriting this class can be called."
-        )
-
-
-class MinLengthLogitsProcessor(LogitsProcessor):
-    r"""
-    Enforcing a min-length by setting EOS probability to 0.
-
-    Args:
-        min_length (int): The minimum length of generation sequence.
-        eos_token_id (int): The id of the `end-of-sequence` token.
-    """
-
-    def __init__(self, min_length, eos_token_id):
-        if min_length < 0 and not in_declarative_mode():
-            raise ValueError("`min_length` should be a positive integer, but get {}".format(min_length))
-
-        if not isinstance(eos_token_id, int) or eos_token_id < 0:
-            raise ValueError("`eos_token_id` should be a positive integer, but get {}".format(eos_token_id))
-
-        self.min_length = min_length
-        self.eos_token_id = eos_token_id
-
-    def __call__(self, input_ids, logits):
-        cur_len = input_ids.shape[-1]
-        if cur_len < self.min_length:
-            logits[:, self.eos_token_id] = -float("inf")
-        return logits
-
-
-class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
-    r"""
-    Enforcing an exponential penalty on repeated sequences.
-
-    Args:
-        repetition_penalty (float):
-            The parameter for repetition penalty. 1.0 means no penalty. See `this paper
-            <https://arxiv.org/pdf/1909.05858.pdf>`__ for more details.
-    """
-
-    def __init__(self, penalty: float):
-        if not (penalty > 0) and not in_declarative_mode():
-            raise ValueError(f"`penalty` has to be a strictly positive float, but is {penalty}")
-
-        self.penalty = penalty
-
-    def __call__(self, input_ids, logits):
-        score = paddle.index_sample(logits, input_ids)
-        score = paddle.where(score < 0, score * self.penalty, score / self.penalty)
-        input_ids = input_ids + paddle.arange(logits.shape[0], dtype="int64").unsqueeze(-1) * logits.shape[-1]
-        outputs = paddle.scatter(logits.flatten(), input_ids.flatten(), score.flatten()).reshape(logits.shape)
-        return outputs
-
-
-def _get_ngrams(ngram_size, prev_input_ids, num_hypos):
-    generated_ngrams = [{} for _ in range(num_hypos)]
-    for idx in range(num_hypos):
-        gen_tokens = prev_input_ids[idx].tolist()
-        generated_ngram = generated_ngrams[idx]
-        for ngram in zip(*[gen_tokens[i:] for i in range(ngram_size)]):
-            prev_ngram_tuple = tuple(ngram[:-1])
-            generated_ngram[prev_ngram_tuple] = generated_ngram.get(prev_ngram_tuple, []) + [ngram[-1]]
-    return generated_ngrams
-
-
-def _get_generated_ngrams(banned_ngrams, prev_input_ids, ngram_size, cur_len):
-    # Before decoding the next token, prevent decoding of ngrams that have already appeared
-    start_idx = cur_len + 1 - ngram_size
-    ngram_idx = tuple(prev_input_ids[start_idx:cur_len].tolist())
-    return banned_ngrams.get(ngram_idx, [])
-
-
-def _calc_banned_ngram_tokens(ngram_size, prev_input_ids, num_hypos, cur_len):
-    """Copied from fairseq for no_repeat_ngram in beam_search"""
-    if cur_len + 1 < ngram_size:
-        # return no banned tokens if we haven't generated no_repeat_ngram_size tokens yet
-        return [[] for _ in range(num_hypos)]
-
-    generated_ngrams = _get_ngrams(ngram_size, prev_input_ids, num_hypos)
-
-    banned_tokens = [
-        _get_generated_ngrams(generated_ngrams[hypo_idx], prev_input_ids[hypo_idx], ngram_size, cur_len)
-        for hypo_idx in range(num_hypos)
-    ]
-    return banned_tokens
-
-
-class NoRepeatNGramLogitsProcessor(LogitsProcessor):
-    r"""
-    [`LogitsProcessor`] that enforces no repetition of n-grams. See
-    [Fairseq](https://github.com/pytorch/fairseq/blob/a07cb6f40480928c9e0548b737aadd36ee66ac76/fairseq/sequence_generator.py#L345).
-    Args:
-        ngram_size (`int`):
-            All ngrams of size `ngram_size` can only occur once.
-    """
-
-    def __init__(self, ngram_size):
-        if not isinstance(ngram_size, int) or ngram_size <= 0:
-            raise ValueError(f"`ngram_size` has to be a strictly positive integer, but is {ngram_size}")
-        self.ngram_size = ngram_size
-
-    def __call__(self, input_ids, scores):
-        num_batch_hypotheses = scores.shape[0]
-        cur_len = input_ids.shape[-1]
-        banned_batch_tokens = _calc_banned_ngram_tokens(self.ngram_size, input_ids, num_batch_hypotheses, cur_len)
-
-        for i, banned_tokens in enumerate(banned_batch_tokens):
-            scores[i, banned_tokens] = -float("inf")
-
-        return scores
-
-
-class HammingDiversityLogitsProcessor(LogitsProcessor):
-    """
-    This `LogitsProcessor` enforces diverse beam search. Note that this logits
-    processor is only effective for `group_beam_search`. See
-    `this paper <https://arxiv.org/pdf/1610.02424.pdf>`__ for more details.
-
-    Args:
-        diversity_rate (float): This value is subtracted from a beam's score if
-            it generates a token same as any beam from other group at a particular
-            time.
-        num_beams (int): Number of beams used for group beam search.
-        num_beam_groups (int): Number of groups to divide `num_beams` into in order
-            to ensure diversity among different groups of beams.
-    """
-
-    def __init__(self, diversity_rate, num_beams, num_beam_groups):
-        if not isinstance(diversity_rate, float) or (not diversity_rate > 0.0):
-            raise ValueError("`diversity_rate` should be a float strictly larger than 0.")
-        self._diversity_rate = diversity_rate
-        if not isinstance(num_beams, int) or num_beams < 2:
-            raise ValueError("`num_beams` should be an integer strictly larger than 1.")
-        self._num_beams = num_beams
-        if not isinstance(num_beam_groups, int) or num_beam_groups < 2:
-            raise ValueError("`num_beam_groups` should be an integer strictly larger than 1.")
-        self._num_sub_beams = num_beams // num_beam_groups
-
-    def __call__(self, input_ids, scores, current_tokens, beam_group_idx):
-        batch_size = current_tokens.shape[0] // self._num_beams
-        group_start_idx = beam_group_idx * self._num_sub_beams
-        group_end_idx = min(group_start_idx + self._num_sub_beams, self._num_beams)
-        group_size = group_end_idx - group_start_idx
-        vocab_size = scores.shape[-1]
-
-        if group_start_idx == 0:
-            return scores
-
-        for batch_idx in range(batch_size):
-            previous_group_tokens = current_tokens[
-                batch_idx * self._num_beams : batch_idx * self._num_beams + group_start_idx
-            ]
-            token_frequency = paddle.bincount(previous_group_tokens, minlength=vocab_size)
-            scores[batch_idx * group_size : (batch_idx + 1) * group_size] -= self._diversity_rate * token_frequency
-
-        return scores
-
-
-class ForcedBOSTokenLogitsProcessor(LogitsProcessor):
-    """
-    This `LogitsProcessor` enforces the first generated token to be the selected `forced_bos_token`.
-
-    Args:
-        forced_bos_token_id (:obj:`int`):
-            The id of the token to be generated as the first token.
-    """
-
-    def __init__(self, forced_bos_token_id):
-        self.forced_bos_token_id = forced_bos_token_id
-
-    def __call__(self, input_ids, scores):
-        cur_len = input_ids.shape[-1]
-        if cur_len == 1:
-            scores[:] = -float("inf")
-            scores[:, self.forced_bos_token_id] = 0
-        return scores
-
-
-class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
-    """
-    This `LogitsProcessor` enforces the last generated token to be the selected `forced_eos_token`.
-
-    Args:
-        max_length (int): The maximum length of the sequence to be generated.
-        forced_eos_token_id (int): The id of the token to be generated as the last token.
-    """
-
-    def __init__(self, max_length, forced_eos_token_id):
-        self.max_length = max_length
-        self.forced_eos_token_id = forced_eos_token_id
-
-    def __call__(self, input_ids, scores):
-        cur_len = input_ids.shape[-1]
-        if cur_len == self.max_length - 1:
-            scores[:] = -1e9  # TODO change back to -inf after paddle.topk is fixed
-            scores[:, self.forced_eos_token_id] = 0
-        return scores
-
-
-def TopKProcess(probs, top_k, min_tokens_to_keep):
-    top_k = min(max(top_k, min_tokens_to_keep), probs.shape[-1])
-    # Remove all tokens with a probability less than the last token of the top-k
-    # cast to float16 to support generation & d2s
-    if probs.dtype == paddle.bfloat16:
-        probs = paddle.cast(probs, paddle.float32)
-        topk_probs, _ = paddle.topk(probs, k=top_k)
-        topk_probs = paddle.cast(topk_probs, paddle.bfloat16)
-    else:
-        topk_probs, _ = paddle.topk(probs, k=top_k)
-
-    probs = paddle.where(probs >= topk_probs[:, -1:], probs, paddle.full_like(probs, 0.0))
-    return probs
-
-
-def TopPProcess(probs, top_p, min_tokens_to_keep):
-    org_dtype = probs.dtype
-    if org_dtype == paddle.bfloat16:
-        probs = paddle.cast(probs, paddle.float32)
-    sorted_indices = paddle.argsort(probs, descending=True)
-
-    if isinstance(sorted_indices, tuple):
-        sorted_probs, sorted_indices = sorted_indices
-    else:
-        sorted_probs = paddle.sort(probs, descending=True)
-
-    cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)
-    # Remove tokens with cumulative probs above the top_p, But keep at
-    # least min_tokens_to_keep tokens
-    sorted_indices_to_remove = cumulative_probs > top_p
-    if min_tokens_to_keep > 1:
-        # Set 'min_tokens_to_keep - 1' because the first token is kept
-        sorted_indices_to_remove[:, : min_tokens_to_keep - 1] = 0
-    # Keep the first token
-    sorted_indices_to_remove = paddle.cast(sorted_indices_to_remove, dtype="int64")
-    sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
-    sorted_indices_to_remove[:, 0] = 0
-
-    # Scatter sorted tensors to original indexing
-    sorted_indices = sorted_indices + paddle.arange(probs.shape[0], dtype="int64").unsqueeze(-1) * probs.shape[-1]
-    condition = paddle.scatter(
-        sorted_indices_to_remove.flatten(), sorted_indices.flatten(), sorted_indices_to_remove.flatten()
-    )
-
-    condition = paddle.cast(condition, "bool").reshape(probs.shape)
-    probs = paddle.where(condition, paddle.full_like(probs, 0.0), probs)
-    if org_dtype == paddle.bfloat16:
-        probs = paddle.cast(probs, paddle.bfloat16)
-    return probs
