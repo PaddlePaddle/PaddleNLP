@@ -235,8 +235,9 @@ def infer(history=[]):
                     bot_response["关键句抽取任务的结果"] = "\n".join(bot_response["关键句抽取任务的结果"])
                 bot_response = str(bot_response["关键句抽取任务的结果"]) + "\n\n" + str(bot_response["问答任务的结果"])
             except:
-                bot_response = str(bot_response).replace("关键句抽取任务的结果", "").replace("问答任务的结果", "")
+                bot_response = str(bot_response).replace("'关键句抽取任务的结果':", "").replace("'问答任务的结果':", "\n")
             bot_response = re.sub(r"\[|\]|{|}", "", bot_response)
+            bot_response = bot_response.replace("\\n", "\n")
             history.append([query, bot_response])
         else:
             context.append({"role": "user", "content": query})
