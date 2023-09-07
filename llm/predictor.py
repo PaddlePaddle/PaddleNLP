@@ -560,7 +560,6 @@ def create_predictor(
                 model = AutoModelForCausalLM.from_pretrained(
                     predictor_args.model_name_or_path,
                     dtype=predictor_args.dtype,
-                    low_cpu_mem_usage=True,
                     tensor_parallel_degree=tensor_parallel_degree,
                     tensor_parallel_rank=tensor_parallel_rank,
                 )
