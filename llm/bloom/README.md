@@ -10,10 +10,10 @@ BLOOM是一种自回归大型语言模型(LLM)，在大量文本数据上训练�
 |----------------------------------|
 | bigscience/bloom-560m            |
 | bigscience/bloom-560m-bf16          |
-| bigscience/bloom-1b1/          |
+| bigscience/bloom-1b1          |
 | bigscience/bloom-3b          |
 | bigscience/bloom-7b1          |
-| bigscience/bloomz-560m/         |
+| bigscience/bloomz-560m        |
 | bigscience/bloomz-1b1          |
 | bigscience/bloomz-3b          |
 | bigscience/bloomz-7b1-mt          |

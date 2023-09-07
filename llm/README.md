@@ -38,6 +38,20 @@
 ## 3. 精调
 目前精调统一脚本只支持[LLaMA v1/v2](./llama)、[ChatGLM-6B](./chatglm)、[ChatGLM2-6B](./chatglm2)、[Bloom](./bloom)、[OPT](./opt)、[Qwen](./qwen)，其他模型精调使用详见对应模型目录。接下来我们将以**Llama 2**为例介绍如何使用统一脚本进行SFT、LoRA、Prefix Tuning。更多LoRA、Prefix Tuning请参见[PEFT文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/peft.md)。
 
+
+<details><summary>&emsp; 统一脚本精调支持模型列表: </summary><div>
+
+| 模型结构 | 模型名称 |
+| --- | --- |
+| [LLaMA v1/v2](./llama) | facebook/llama-7b <br> facebook/llama-13b <br> facebook/llama-30b<br>facebook/llama-65b<br>meta-llama/Llama-2-7b<br>meta-llama/Llama-2-7b-chat<br>meta-llama/Llama-2-13b<br>meta-llama/Llama-2-13b-chat<br>meta-llama/Llama-2-70b<br>meta-llama/Llama-2-70b-chat<br>baichuan-inc/Baichuan-7B<br> baichuan-inc/Baichuan-13B-Base<br>baichuan-inc/Baichuan-13B-Chat<br>idea-ccnl/ziya-llama-13b-v1<br>linly-ai/chinese-llama-2-7b<br>ziqingyang/chinese-llama-7b<br>ziqingyang/chinese-llama-13b<br>ziqingyang/chinese-alpaca-7b <br>ziqingyang/chinese-alpaca-13b   |
+| [ChatGLM-6B](./chatglm) |THUDM/chatglm-6b<br>THUDM/chatglm-6b-v1.1|
+| [ChatGLM2-6B](./chatglm2) |THUDM/chatglm2-6b|
+| [Qwen](./qwen) |qwen/qwen-7b|
+| [Bloom](./bloom) |bellegroup/belle-7b-2m<br>bigscience/bloom-560m <br>bigscience/bloom-560m-bf16<br>bigscience/bloom-1b1 <br>bigscience/bloom-3b <br>bigscience/bloom-7b1 <br>bigscience/bloomz-560m<br>bigscience/bloomz-1b1 <br>bigscience/bloomz-3b <br>bigscience/bloomz-7b1-mt <br> bigscience/bloomz-7b1-p3 <br>bigscience/bloomz-7b1 <br>bellegroup/belle-7b-2m|
+| [OPT](./opt) |facebook/opt-125m<br>facebook/opt-350m<br>facebook/opt-1.3b<br>facebook/opt-2.7b <br>facebook/opt-6.7b<br>facebook/opt-13b<br>facebook/opt-30b<br>facebook/opt-66b<br>facebook/opt-iml-1.3b<br>opt-iml-max-1.3b|
+
+</div></details>
+
 ### 3.1 精调训练数据格式
 
 为了方便用户测试，我们也提供示例数据集[广告生成数据集](https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz)，用户也可以仿照数据集的格式制作自己的数据集进行精调。我们支持的数据格式是每行包含一个字典，每个字典包含以下字段：
@@ -50,7 +64,6 @@
 {"src": "类型#裙*颜色#蓝色*风格#清新*图案#蝴蝶结", "tgt": "裙身处采用立体蝴蝶结装饰辅以蓝色条带点缀，令衣身造型饱满富有层次的同时为其注入一丝甜美气息。将女孩清新娇俏的一面衬托而出。"}
 ...
 ```
-
 
 
 ### 3.2 SFT
