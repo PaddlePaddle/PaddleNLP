@@ -111,15 +111,15 @@ class MultiHeadAttention(nn.Layer):
 
         # get the `num_heads`
         assert self.num_heads % config.tensor_parallel_degree == 0
-        self.num_heads = self.num_heads // config.tensor_parallel_degree
+        if config.tensor_parallel_degree > 0:
+            self.num_heads = self.num_heads // config.tensor_parallel_degree
+            assert (
+                self.head_dim * self.num_heads * config.tensor_parallel_degree == config.hidden_size
+            ), "hidden_size must be divisible by num_heads"
 
         self.dropout = config.attention_probs_dropout_prob
         self.need_weights = need_weights
         self.fuse_attention_qkv = config.fuse_attention_qkv
-
-        assert (
-            self.head_dim * self.num_heads * config.tensor_parallel_degree == config.hidden_size
-        ), "hidden_size must be divisible by num_heads"
 
         if config.tensor_parallel_degree > 1:
             if self.fuse_attention_qkv:
@@ -957,7 +957,12 @@ class OPTLMHead(Layer):
         super(OPTLMHead, self).__init__()
         self.config = config
         self.decoder_weight = (
-            self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=config.dtype, is_bias=True)
+            self.create_parameter(
+                default_initializer=paddle.nn.initializer.Uniform(low=-0.1, high=0.1),
+                shape=[config.vocab_size, config.hidden_size],
+                dtype=config.dtype,
+                is_bias=True,
+            )
             if embedding_weights is None
             else embedding_weights
         )
