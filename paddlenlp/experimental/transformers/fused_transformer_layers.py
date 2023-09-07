@@ -107,7 +107,7 @@ def fused_act_bias_wrapper(
     if bias is not None:
         inputs["bias"] = bias
     if dequant_scales is not None:
-        inputs["bias"] = dequant_scales
+        inputs["dequant_scales"] = dequant_scales
 
     if shift is not None:
         inputs["shift"] = shift
@@ -133,23 +133,23 @@ def fused_act_bias_wrapper(
     return out
 
 
-def matmul_int8(x, y, transpose_x, transpose_y):
-    if in_dynamic_mode():
-        return paddle._C_ops.matmul_int8(x, y, transpose_x, transpose_y)
-    else:
-        helper = LayerHelper("matmul_int8")
-        out = helper.create_variable_for_type_inference(dtype="int32")
+# def matmul_int8(x, y, transpose_x, transpose_y):
+#     if in_dynamic_mode():
+#         return paddle._C_ops.matmul_int8(x, y, transpose_x, transpose_y)
+#     else:
+#         helper = LayerHelper("matmul_int8")
+#         out = helper.create_variable_for_type_inference(dtype="int32")
 
-        inputs = {"x": x, "y": y}
-        attrs = {"transpose_x": transpose_x, "transpose_y": transpose_y}
+#         inputs = {"x": x, "y": y}
+#         attrs = {"transpose_x": transpose_x, "transpose_y": transpose_y}
 
-        helper.append_op(
-            type="matmul_int8",
-            inputs=inputs,
-            outputs={"out": out},
-            attrs=attrs,
-        )
-        return out
+#         helper.append_op(
+#             type="matmul_int8",
+#             inputs=inputs,
+#             outputs={"out": out},
+#             attrs=attrs,
+#         )
+#         return out
 
 
 class FusedMultiTransformer(Layer):
@@ -1004,7 +1004,7 @@ class FusedMultiTransformerInt8(Layer):
                     )
 
             # qkv compute
-            qkv_out = matmul_int8(ln_out, self.qkv_weights[i], False, True)
+            qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
 
             # fmha compute
             if time_step is None:  # context
@@ -1075,7 +1075,7 @@ class FusedMultiTransformerInt8(Layer):
                 )[0]
 
             # out_linear
-            out_linear_out = matmul_int8(fmha_out, self.linear_weights[i], False, True)
+            out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i], False, True)
             out_linear_out = dequant_int8(out_linear_out, src, self.linear_weight_out_scales[i])
 
             # all_reduce
@@ -1115,7 +1115,7 @@ class FusedMultiTransformerInt8(Layer):
                 )[0]
 
             # ffn1 matmul
-            ffn1_out = matmul_int8(tmp_out, self.ffn1_weights[i], False, True)
+            ffn1_out = paddle.matmul(tmp_out, self.ffn1_weights[i], False, True)
             ffn1_out = fused_act_bias_wrapper(
                 ffn1_out,
                 self.ffn1_biases[i],
@@ -1131,7 +1131,7 @@ class FusedMultiTransformerInt8(Layer):
             )
 
             # ffn2 matmul
-            ffn2_out = matmul_int8(ffn1_out, self.ffn2_weights[i], False, True)
+            ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i], False, True)
             ffn2_out = dequant_int8(
                 ffn2_out,
                 src,

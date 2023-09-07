@@ -293,6 +293,15 @@ python export_model.py \
     --inference_model \
     --max_batch_size 8
 
+python export_model.py \
+    --model_name_or_path "/root/paddlejob/workspace/env_run/wfs/PaddleNLP/llm/quant_model_llama_smooth" \
+    --output_path ./inference_ptq \
+    --dtype float16 \
+    --inference_model \
+    --max_batch_size 8 \
+    --quant_type "A8W8" \
+    --shift_smooth 1
+
 # InferenceModel 静态图推理
 python predictor.py \
     --model_name_or_path ./inference \
