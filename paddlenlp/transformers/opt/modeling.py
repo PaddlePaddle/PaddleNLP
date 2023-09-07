@@ -110,18 +110,18 @@ class MultiHeadAttention(nn.Layer):
         self.head_dim = config.hidden_size // self.num_heads
 
         # get the `num_heads`
-        assert self.num_heads % config.mp_degree == 0
-        self.num_heads = self.num_heads // config.mp_degree
+        assert self.num_heads % config.tensor_parallel_degree == 0
+        self.num_heads = self.num_heads // config.tensor_parallel_degree
 
         self.dropout = config.attention_probs_dropout_prob
         self.need_weights = need_weights
         self.fuse_attention_qkv = config.fuse_attention_qkv
 
         assert (
-            self.head_dim * self.num_heads * config.mp_degree == config.hidden_size
+            self.head_dim * self.num_heads * config.tensor_parallel_degree == config.hidden_size
         ), "hidden_size must be divisible by num_heads"
 
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             if self.fuse_attention_qkv:
                 self.qkv_proj = fleet.meta_parallel.ColumnParallelLinear(
                     config.hidden_size,
@@ -315,7 +315,7 @@ class TransformerDecoderLayer(nn.Layer):
         bias_attrs = _convert_param_attr_to_list(bias_attr, 3)
 
         self.self_attn = MultiHeadAttention(config, need_weights=True)
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.linear1 = fleet.meta_parallel.ColumnParallelLinear(
                 d_model,
                 dim_feedforward,
@@ -325,7 +325,7 @@ class TransformerDecoderLayer(nn.Layer):
         else:
             self.linear1 = nn.Linear(d_model, dim_feedforward, weight_attrs[2], bias_attr=bias_attrs[2])
 
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.linear2 = fleet.meta_parallel.RowParallelLinear(
                 dim_feedforward,
                 d_model,
@@ -390,7 +390,7 @@ class TransformerDecoder(Layer):
         super(TransformerDecoder, self).__init__()
 
         if config.word_embed_proj_dim != config.hidden_size:
-            if config.mp_degree > 1:
+            if config.tensor_parallel_degree > 1:
                 self.project_out = fleet.meta_parallel.ColumnParallelLinear(
                     config.hidden_size,
                     config.word_embed_proj_dim,
@@ -535,7 +535,7 @@ class OPTEmbeddings(Layer):
 
     def __init__(self, config: OPTConfig):
         super(OPTEmbeddings, self).__init__()
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
                 config.vocab_size,
                 config.word_embed_proj_dim,
@@ -554,7 +554,7 @@ class OPTEmbeddings(Layer):
             )
 
         if config.word_embed_proj_dim != config.hidden_size:
-            if config.mp_degree > 1:
+            if config.tensor_parallel_degree > 1:
                 self.project_in = fleet.meta_parallel.ColumnParallelLinear(
                     config.word_embed_proj_dim,
                     config.hidden_size,
