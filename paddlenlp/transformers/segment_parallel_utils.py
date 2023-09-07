@@ -44,7 +44,7 @@ from paddlenlp.trainer.plugins import timer
 class ReshardAxis:
     # Corresponding to shape [b, s, h] or [b, s, num_head, h/num_head]
     SEQUENCE = 0  # s
-    HIDDEN = 2    # h
+    HIDDEN = 2  # h
     NUM_HEAD = 2  # num_head
 
     @classmethod
@@ -73,6 +73,7 @@ def _reshard_qkv(x, group, split_axis=2, concat_axis=0):
 
     return reshard_tensor
 
+
 class ReshardQKV(PyLayer):
     @staticmethod
     def forward(ctx, x, group=None, split_axis=2, concat_axis=0):
@@ -100,7 +101,15 @@ class ReshardLayer(paddle.nn.Layer):
     def __init__(self) -> None:
         super(ReshardLayer, self).__init__()
 
-    def forward(self, x, group=None, split_axis=ReshardAxis.SEQUENCE, concat_axis=ReshardAxis.HIDDEN, batch_major_in=False, batch_major_out=False):
+    def forward(
+        self,
+        x,
+        group=None,
+        split_axis=ReshardAxis.SEQUENCE,
+        concat_axis=ReshardAxis.HIDDEN,
+        batch_major_in=False,
+        batch_major_out=False,
+    ):
         # if x dims==3, its shape can be [s/sep, b, h] or [b, s/sep, h], the output shape can be [s, b, h/sep] or [b, s, h/sep]
         # if x dims==4, its shape can be [s, b, num_head/sep, head_dim] or [b, s, num_head/sep, head_dim], the output shape can be [s/sep, b, num_head, head_dim] or [b, s/sep, num_head, head_dim]
         ReshardAxis.check([split_axis, concat_axis])
