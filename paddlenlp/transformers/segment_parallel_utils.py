@@ -148,9 +148,7 @@ class ReshardLayer(paddle.nn.Layer):
             input_data.reshape_([0, 0, -1])
             reshard_tensor = ReshardQKV.apply(input_data, group, split_axis=split_axis, concat_axis=concat_axis)
 
-            reshard_tensor.reshape_(
-                [resharded_seq_size, batch_size, resharded_num_head_size, shape[3]]
-            )
+            reshard_tensor.reshape_([resharded_seq_size, batch_size, resharded_num_head_size, shape[3]])
 
         if batch_major_out:
             if not (batch_size == 1):
