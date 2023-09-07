@@ -1078,16 +1078,8 @@ print_info $? taskflow
 transformers(){
 echo ' RUN all LLMs unittest'
 export RUN_SLOW_TEST=True
-cd ${nlp_dir}/tests/llm/
-for apicase in `ls`;do
-    if [[ ${apicase##*.} == "py" ]];then
-            continue
-    else
-        cd ${nlp_dir}
-        python -m pytest tests/llm/${apicase}/test_*.py  >${nlp_dir}/unittest_logs/${apicase}_unittest.log 2>&1
-        print_info $? tests ${apicase}_unittest
-    fi
-done
+python -m pytest tests/llm/test_*.py >${nlp_dir}/unittest_logs/llm_unittest.log 2>&1
+print_info $? llm_unittest
 }
 fast_generation(){
 cd ${nlp_dir}/fast_generation/samples
