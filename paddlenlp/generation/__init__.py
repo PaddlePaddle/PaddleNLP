@@ -14,6 +14,7 @@
 from .configuration_utils import GenerationConfig
 from .logits_process import (
     ForcedBOSTokenLogitsProcessor,
+    ForcedDecodingEOSTokenLogitsProcessor,
     ForcedEOSTokenLogitsProcessor,
     HammingDiversityLogitsProcessor,
     LogitsProcessorList,

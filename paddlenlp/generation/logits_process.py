@@ -284,7 +284,27 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids, scores):
         cur_len = input_ids.shape[-1]
         if cur_len == self.max_length - 1:
-            scores[:] = -1e9  # TODO change back to -inf after paddle.topk is fixed
+            scores[:] = paddle.finfo(scores.dtype).min
+            scores[:, self.forced_eos_token_id] = 0
+        return scores
+
+
+class ForcedDecodingEOSTokenLogitsProcessor(LogitsProcessor):
+    """
+    This `LogitsProcessor` enforces the last generated token to be the selected `forced_eos_token`.
+
+    Args:
+        max_length (int): The maximum length of the sequence to be generated.
+        forced_eos_token_id (int): The id of the token to be generated as the last token.
+    """
+
+    def __init__(self, max_decoding_length: int, forced_eos_token_id: Union[int, List[int]]):
+        self.max_decoding_length = max_decoding_length
+        self.forced_eos_token_id = forced_eos_token_id
+
+    def __call__(self, input_ids, scores, decoding_length):
+        if decoding_length == self.max_decoding_length - 1:
+            scores[:] = paddle.finfo(scores.dtype).min
             scores[:, self.forced_eos_token_id] = 0
         return scores
 
