@@ -24,10 +24,10 @@ num_train_epochs="1"
 save_steps="200"
 sharding="stage1"
 recompute="1"
-run_mode="DP1-MP2-PP2-SD2"
+run_mode="DP1-MP2-PP2-SD2-stage1-mbs1-acc16-recompute"
 device_num="N1C8"
 global_batch_size=32
-model_item="facebook-llama-13b_pretrain"
+model_item="facebook-llama-13b_seqlen2048_pretrain"
 max_step=150
 gradient_accumulation_steps=16
 pp_recompute_interval=1
@@ -36,3 +36,4 @@ cd ./tests
 bash ./test_tipc/dygraph/hybrid_parallelism/llama/benchmark_common/prepare.sh
 
 bash ./test_tipc/dygraph/hybrid_parallelism/llama/benchmark_common/run_benchmark.sh ${model_name_or_path} ${per_device_train_batch_size} ${use_flash_attention} ${tensor_parallel_degree} ${pipeline_parallel_degree} ${virtual_pp_degree} ${sequence_parallel} ${sharding_parallel_degree} ${num_train_epochs} ${save_steps} ${sharding} ${recompute} ${run_mode} ${device_num} ${global_batch_size} ${model_item} ${max_step} ${gradient_accumulation_steps} ${pp_recompute_interval}
+

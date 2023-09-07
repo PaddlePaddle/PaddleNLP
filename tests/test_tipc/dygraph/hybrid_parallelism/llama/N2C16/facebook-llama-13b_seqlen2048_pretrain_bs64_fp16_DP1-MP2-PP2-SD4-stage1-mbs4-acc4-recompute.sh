@@ -24,11 +24,11 @@ num_train_epochs="1"
 save_steps="200"
 sharding="stage1"
 recompute="1"
-run_mode="DP1-MP2-PP2-SD4"
+run_mode="DP1-MP2-PP2-SD4-stage1-mbs4-acc4-recompute"
 device_num="N2C16"
 global_batch_size=64
-model_item="facebook-llama-13b_pretrain"
-max_step=80
+model_item="facebook-llama-13b_seqlen2048_pretrain_gbs64_fp16"
+max_step=150
 gradient_accumulation_steps=4
 pp_recompute_interval=1
 
