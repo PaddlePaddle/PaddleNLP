@@ -1077,6 +1077,7 @@ print_info $? taskflow
 }
 transformers(){
 echo ' RUN all LLMs unittest'
+export RUN_SLOW_TEST=True
 cd ${nlp_dir}/tests/llm/
 for apicase in `ls`;do
     if [[ ${apicase##*.} == "py" ]];then
