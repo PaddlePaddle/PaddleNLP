@@ -15,21 +15,23 @@ from __future__ import annotations
 
 import os
 import sys
+import subprocess
 from unittest import TestCase
 
 from paddlenlp.utils.downloader import get_path_from_url
-from tests.testing_utils import argv_context_guard, load_test_config, update_params
+from tests.testing_utils import argv_context_guard, load_test_config, update_params,slow
 
 
 class LLaMATest(TestCase):
     def setUp(self) -> None:
-        self.path = "./llm/"
+        self.path = "./llm"
         self.config_path = "./tests/fixtures/llm/llama.yaml"
         sys.path.insert(0, self.path)
 
     def tearDown(self) -> None:
         sys.path.remove(self.path)
 
+    @slow
     def test_pretrain(self):
 
         # 1. run pretrain
@@ -38,115 +40,146 @@ class LLaMATest(TestCase):
             URL2 = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz"
             get_path_from_url(URL, root_dir="./llm/llama/data")
             get_path_from_url(URL2, root_dir="./llm/llama/data")
-
-        # fix fused_layers import error
+    
         sys.path.insert(0, self.path + "/llama")
-
+        print(self.path + "/llama")
         pretrain_config = load_test_config(self.config_path, "pretrain")
         with argv_context_guard(pretrain_config):
             from run_pretrain import main
 
             main()
 
+    @slow
     def test_finetune(self):
 
-        run_finetune_format = "python -u  -m paddle.distributed.launch --gpus 0,1 llm/finetune_generation.py "
-
-        # 1. run sft
-        sft_json_file = os.path.join(self.path + "llama/sft_argument.json")
-        sft_params = {
-            "dataset_name_or_path": "./fixtures/llm/data",
-            "save_steps": 5,
-            "max_steps": 5,
-            "tensor_parallel_degree": 2,
+        finetune_params = {
+            "model_name_or_path": "__internal_testing__/micro-random-llama",
+            "dataset_name_or_path": "./tests/fixtures/llm/data",
+            "output_dir": "./llm/checkpoints/llama_sft_ckpts",
+            "save_steps": 2,
+            "max_steps": 2,
+            "per_device_train_batch_size": 1,
+            "per_device_eval_batch_size": 1,
+            "tensor_parallel_degree": 1,
+            "pipeline_parallel_degree": 1
         }
-        update_params(sft_json_file, sft_params)
-        os.system(f"{run_finetune_format + sft_json_file}")
-
-        # 2. run lora
-        lora_json_file = os.path.join(self.path + "llama/lora_argument.json")
-        lora_params = {
-            "dataset_name_or_path": "./fixtures/llm/data",
-            "save_steps": 5,
-            "max_steps": 5,
-            "tensor_parallel_degree": 2,
+        quant_params ={
+            "dataset_name_or_path": "./tests/fixtures/llm/data",
+            "per_device_train_batch_size": 2,
+            "per_device_eval_batch_size": 2,
+            "model_name_or_path": "./llm/checkpoints/llama_sft_ckpts/checkpoint-2",
+            "output_dir": "./llm/checkpoints/llama_ptq_ckpts",
         }
-        update_params(lora_json_file, lora_params)
-        os.system(f"{run_finetune_format + lora_json_file}")
 
-        # 3. run prefix tuning
-        pt_json_file = os.path.join(self.path + "llama/pt_argument.json")
-        pt_params = {
-            "dataset_name_or_path": "./fixtures/llm/data",
-            "save_steps": 5,
-            "max_steps": 5,
-            "tensor_parallel_degree": 2,
-        }
-        update_params(pt_json_file, pt_params)
-        os.system(f"{run_finetune_format + pt_json_file}")
+        # run sft
+        run_fintune = "llm/finetune_generation.py"
+        sft_json_file = "./llm/llama/sft_argument.json"
+        update_params(sft_json_file, finetune_params)
+        subprocess.check_output("python %s %s " % (run_fintune,sft_json_file),shell = True)
 
-        # 4. run  ptq quantization
-        ptq_json_file = os.path.join(self.path + "llama/ptq_argument.json")
-        os.system(f"python finetune_generation.py {ptq_json_file}")
+        # run sft_pp
+        sft_pp_json_file = "./llm/llama/sft_pp_argument.json"
+        finetune_params.update({"output_dir": "./llm/checkpoints/llama_sft_pp_ckpts"})
+        update_params(sft_pp_json_file, finetune_params)
+        subprocess.check_output("python %s %s " % (run_fintune,sft_pp_json_file),shell = True)
 
-        # 5. run gptq quantization
-        gptq_json_file = os.path.join(self.path + "llama/gptq_argument.json")
-        os.system(f"python finetune_generation.py {gptq_json_file}")
+        # run lora
+        lora_json_file = "./llm/llama/lora_argument.json"
+        finetune_params.update({"output_dir": "./llm/checkpoints/llama_lora_ckpts"})
+        update_params(lora_json_file, finetune_params)
+        subprocess.check_output("python %s %s " % (run_fintune,lora_json_file),shell = True)
 
+        # run prefix tuning
+        pt_json_file = "./llm/llama/pt_argument.json"
+        finetune_params.update({"output_dir": "./llm/checkpoints/llama_pt_ckpts"})
+        update_params(pt_json_file, finetune_params)
+        subprocess.check_output("python %s %s " % (run_fintune,pt_json_file),shell = True)
+
+        # run  ptq quant
+        ptq_json_file = "./llm/llama/ptq_argument.json"
+        update_params(ptq_json_file, quant_params)
+        subprocess.check_output("python %s %s " % (run_fintune,ptq_json_file),shell = True)
+
+        # run gptq quant
+        gptq_json_file = "./llm/llama/gptq_argument.json"
+        quant_params.update({"output_dir": "./llm/checkpoints/llama_gptq_ckpts"})
+        update_params(gptq_json_file, quant_params)
+        subprocess.check_output("python %s %s " % (run_fintune,gptq_json_file),shell = True)
+
+    @slow
     def test_merge_params(self):
 
-        # 1. Merge Tensor Parallelism
-        merge_config = load_test_config(self.config_path, "merge")
-        with argv_context_guard(merge_config):
+        # 1. Merge Tensor Parallelism Params
+        merge_tp_config = load_test_config(self.config_path, "merge_tp_params")
+        with argv_context_guard(merge_tp_config):
             from merge_tp_params import main
 
             main()
 
-        # 2. Merge Lora
-        lora_config = {
-            "model_name_or_path": merge_config["meta-llama/Llama-2-7b-chat"],
-            "lora_path": merge_config["./checkpoints/llama_lora_ckpts/checkpoint-5"],
-        }
-        with argv_context_guard(lora_config):
-            from merge_tp_params import merge
+        # 2. Merge Lora Params
+        merge_lora_config = load_test_config(self.config_path, "merge_lora_params")
+        with argv_context_guard(merge_lora_config):
+            from merge_lora_params import merge
 
             merge()
 
+    @slow
     def test_predict(self):
-        pretrain_config = load_test_config(self.config_path, "pretrain")
-        # 1. dynamic predict
-        dy_config = {
-            "model_name_or_path": pretrain_config["facebook/llama-7b"],
-            "batch_size": pretrain_config["1"],
-            "data_file": pretrain_config["./data/dev.json"],
-            "dtype": pretrain_config["float16"],
-            "mode": pretrain_config["dynamic"],
-        }
-        with argv_context_guard(dy_config):
+        # SFT dynamic predict
+        predict_config = load_test_config(self.config_path, "predict")
+        with argv_context_guard(predict_config):
             from predictor import predict
 
             predict()
 
-        # 2. export model
+        # LoRA dynamic predict
+        lora_predict_config = {
+            "model_name_or_path": predict_config["model_name_or_path"],
+            "batch_size": predict_config["batch_size"],
+            "data_file": predict_config["data_file"],
+            "dtype": predict_config["dtype"],
+            "mode": predict_config["mode"],
+            "lora_path": "./llm/checkpoints/llama_lora_ckpts/checkpoint-2/"
+        }
+        with argv_context_guard(lora_predict_config):
+            from predictor import predict
+
+            predict()
+
+         # Prefix Tuning dynamic predict
+        pt_predict_config = {
+            "model_name_or_path": predict_config["model_name_or_path"],
+            "batch_size": predict_config["batch_size"],
+            "data_file": predict_config["data_file"],
+            "dtype": predict_config["dtype"],
+            "mode": predict_config["mode"],
+            "prefix_path": "./llm/checkpoints/llama_pt_ckpts/checkpoint-2/"
+        }
+        with argv_context_guard(pt_predict_config):
+            from predictor import predict
+
+            predict()
+
+        # export model
         export_config = {
-            "model_name_or_path": pretrain_config["meta-llama/Llama-2-7b-chat"],
-            "output_path": pretrain_config["1"],
-            "dtype": pretrain_config["./inference"],
+            "model_name_or_path": predict_config["model_name_or_path"],
+            "output_path": "./llm/inference",
+            "dtype": predict_config["dtype"],
         }
         with argv_context_guard(export_config):
             from export_model import main
 
             main()
 
-        # 3. static predict
-        st_config = {
-            "model_name_or_path": pretrain_config["./inference "],
-            "batch_size": pretrain_config["1"],
-            "data_file": pretrain_config["./data/dev.json"],
-            "dtype": pretrain_config["float16"],
-            "mode": pretrain_config["static"],
+        # static predict
+        st_predict_config = {
+            "model_name_or_path": "./llm/inference",
+            "batch_size": predict_config["batch_size"],
+            "data_file": predict_config["data_file"],
+            "dtype": predict_config["dtype"],
+            "mode": "static"
         }
-        with argv_context_guard(st_config):
+        with argv_context_guard(st_predict_config):
             from predictor import predict
 
             predict()
