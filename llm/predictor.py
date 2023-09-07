@@ -16,11 +16,13 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
 import paddle
+import paddle.distributed.fleet.base.topology as tp
 from paddle.distributed import fleet
 from utils import (
     dybatch_preprocess,
@@ -72,12 +74,22 @@ class PredictorArgument:
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     max_batch_size: int = field(default=None, metadata={"help": "The max batch size of data during serving."})
+    benchmark: bool = (
+        field(
+            default=False,
+            metadata={
+                "help": "If benchmark set as `True`, we will force model decode to max_length, which is helpful to compute throughput. "
+            },
+        ),
+    )
 
 
 @dataclass
 class ModelArgument:
-    gpt: bool = field(default=False, metadata={"help": "GPTForCausalLM"})
-    ernie: bool = field(default=False, metadata={"help": "Ernie35ForCausalLM"})
+    model_type: str = field(
+        default=None,
+        metadata={"help": "the type of the model, which can be one of ['gpt-3', 'ernie-3.5-se', 'llama-img2txt']"},
+    )
     data_file: str = field(default=None, metadata={"help": "data file directory"})
     output_file: str = field(default="output.json", metadata={"help": "predict result file directory"})
 
@@ -91,6 +103,28 @@ def batchfy_text(texts, batch_size):
     return batch_texts
 
 
+def init_dist_env():
+    tensor_parallel_degree = paddle.distributed.get_world_size()
+    tensor_parallel_rank = paddle.distributed.get_rank()
+
+    if tensor_parallel_degree > 1:
+        # refer to: https://github.com/PaddlePaddle/Paddle/blob/4abea956ee852ce52791a1e08fa92ed4d3be150d/python/paddle/distributed/fleet/fleet.py#L298C23-L298C45
+        hcg = tp._HYBRID_PARALLEL_GROUP
+        if hcg is None:
+            strategy = fleet.DistributedStrategy()
+            strategy.hybrid_configs = {
+                "dp_degree": 1,
+                "mp_degree": tensor_parallel_degree,
+                "pp_degree": 1,
+                "sharding_degree": 1,
+            }
+            fleet.init(is_collective=True, strategy=strategy)
+            hcg = fleet.get_hybrid_communicate_group()
+
+        tensor_parallel_rank = hcg.get_model_parallel_rank()
+    return tensor_parallel_rank, tensor_parallel_degree
+
+
 class BasePredictor:
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
         self.config: PredictorArgument = config
@@ -99,7 +133,7 @@ class BasePredictor:
 
         self.tokenizer = tokenizer
         self.return_tensors = "pd"
-        self._init_dist_env()
+        self.tensor_parallel_rank, self.tensor_parallel_degree = init_dist_env()
 
     def _preprocess(self, source):
         tokenized_source = self.tokenizer(
@@ -112,24 +146,6 @@ class BasePredictor:
             add_special_tokens=True,
         )
         return tokenized_source
-
-    def _init_dist_env(self):
-        tensor_parallel_degree = paddle.distributed.get_world_size()
-        tensor_parallel_rank = paddle.distributed.get_rank()
-        if tensor_parallel_degree > 1:
-            strategy = fleet.DistributedStrategy()
-            strategy.hybrid_configs = {
-                "dp_degree": 1,
-                "mp_degree": tensor_parallel_degree,
-                "pp_degree": 1,
-                "sharding_degree": 1,
-            }
-            fleet.init(is_collective=True, strategy=strategy)
-            hcg = fleet.get_hybrid_communicate_group()
-            tensor_parallel_rank = hcg.get_model_parallel_rank()
-
-        self.tensor_parallel_rank = tensor_parallel_rank
-        self.tensor_parallel_degree = tensor_parallel_degree
 
     @abstractmethod
     def _infer(self, inputs):
@@ -515,11 +531,10 @@ def create_predictor(
     if isinstance(tokenizer, LlamaTokenizer):
         tokenizer.pad_token = tokenizer.eos_token
 
-    tensor_parallel_degree = paddle.distributed.get_world_size()
-    tensor_parallel_rank = paddle.distributed.get_rank()
+    tensor_parallel_rank, tensor_parallel_degree = init_dist_env()
     if not predictor_args.inference_model:
         if predictor_args.mode == "dynamic":
-            if model_args.gpt:
+            if model_args.model_type == "gpt-3":
                 sys.path.append("./gpt-3")
                 from modeling import GPTForCausalLM
 
@@ -529,7 +544,7 @@ def create_predictor(
                     tensor_parallel_degree=tensor_parallel_degree,
                     tensor_parallel_rank=tensor_parallel_rank,
                 )
-            elif model_args.ernie:
+            elif model_args.model_type == "ernie-3.5-se":
                 sys.path.append("./ernie-3.5-se")
                 from modeling import Ernie35ForCausalLM
 
@@ -560,13 +575,19 @@ def create_predictor(
             # TODO(wj-Mcat): complete AutoInferenceModel & AutoPredictor
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
             if "llama" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    LlamaForCausalLMInferenceModel,
-                )
+                if model_args.model_type == "llama-img2txt":
+                    # we use llama for img2txt.
+                    from paddlenlp.experimental.transformers import (
+                        LlamaForMiniGPT4InferenceModel as LlamaInferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        LlamaForCausalLMInferenceModel as LlamaInferenceModel,
+                    )
 
                 config.tensor_parallel_degree = tensor_parallel_degree
                 config.tensor_parallel_rank = tensor_parallel_rank
-                model = LlamaForCausalLMInferenceModel.from_pretrained(
+                model = LlamaInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
                 model.eval()
@@ -659,6 +680,47 @@ def predict():
                 print(output)
                 out = {"src": source, "tgt": target, "output": output}
                 f.write(json.dumps(out, ensure_ascii=False) + "\n")
+
+    if predictor_args.benchmark:
+        benchmark(predictor, predictor_args, model_args)
+
+
+def benchmark(predictor, predictor_args, model_args):
+    # Just construct a simple benchmark input. We pad input to the src_length.
+    test_texts = "hello world, how are you?"
+    benchmark_texts = [test_texts + "<pad>" * predictor_args.src_length for _ in range(predictor_args.batch_size)]
+
+    benchmark_texts = [
+        "<pad>" * (predictor_args.src_length // 2 - 3) + "My name is " for _ in range(predictor_args.batch_size)
+    ]
+    batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
+    print("***********Start Benchmark**********")
+
+    warmup_time = 1
+    test_time = 1
+
+    print("***********Start Warmup**********")
+    for _ in range(warmup_time):
+        for bs, batch_source_text in enumerate(batch_benchmark_texts):
+            outputs = predictor.predict(batch_source_text)
+
+    print("***********Start Speed Test**********")
+    start = time.perf_counter()
+    for _ in range(test_time):
+        for bs, batch_source_text in enumerate(batch_benchmark_texts):
+            outputs = predictor.predict(batch_source_text)
+    end = time.perf_counter()
+
+    output_tokens = sum([len(output) for output in outputs])
+    print(
+        "Input length is: {}, Output length is: {}, bs is: {}, Generate speed is: {:.3f} tokens/s(ips), QPS: {:.3f} requests/s. ".format(
+            predictor_args.src_length,
+            predictor_args.max_length - predictor_args.src_length,
+            predictor_args.batch_size,
+            (output_tokens / (end - start) / test_time),
+            (predictor_args.batch_size / (end - start) / test_time),
+        )
+    )
 
 
 if __name__ == "__main__":

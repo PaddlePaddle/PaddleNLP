@@ -92,7 +92,7 @@ def build_alibi_tensor(
     bool_attention_mask: Tensor, num_heads: int, dtype: paddle.dtype, tensor_parallel_degree=1
 ) -> Tensor:
     attention_mask = bool_attention_mask.astype("float32")
-    batch_size, seq_length = attention_mask.shape
+    batch_size, seq_length = attention_mask.shape[0], attention_mask.shape[-1]
     slopes = paddle.to_tensor(_get_interleave(num_heads), dtype="float32")
     alibi = slopes.unsqueeze(axis=[1, 2]) * paddle.arange(seq_length, dtype="float32").unsqueeze(axis=[0, 1]).expand(
         [num_heads, -1, -1]
@@ -445,10 +445,16 @@ def rotate_half(x):
 
 
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
-    cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
-    sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
-    cos = cos[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
-    sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
+
+    if position_ids is None:
+        # Note: Only for LlamaForCausalLMPipe model pretraining
+        cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+        sin = sin[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+    else:
+        cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
+        sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
+        cos = cos[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
+        sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed

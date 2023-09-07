@@ -20,3 +20,6 @@ BLOOM是一种自回归大型语言模型(LLM)，在大量文本数据上训练�
 | bigscience/bloomz-7b1-p3          |
 | bigscience/bloomz-7b1          |
 | bellegroup/belle-7b-2m |
+
+## 2. 模型精调
+请参考[LLM全流程工具介绍](../README.md)

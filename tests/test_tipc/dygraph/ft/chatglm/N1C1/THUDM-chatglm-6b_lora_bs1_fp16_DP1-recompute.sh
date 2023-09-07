@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-model_name_or_path="facebook/llama-13b"
-dataset_name_or_path="llm_benchmark_en"
-max_length=1024
+model_name_or_path="THUDM/chatglm-6b"
+dataset_name_or_path="llm_benchmark_zh"
+max_length=3072
 learning_rate="3e-04"
 recompute="1"
 tensor_parallel_degree="1"
 lora="1"
 prefix_tuning="0"
-model_item="facebook-llama-13b_lora"
+model_item="THUDM-chatglm-6b_lora"
 run_mode="DP1"
 device_num="N1C1"
 num_train_epochs=2

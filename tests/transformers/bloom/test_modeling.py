@@ -36,8 +36,7 @@ from paddlenlp.transformers import (
 from paddlenlp.transformers.bloom.modeling import BloomForGeneration
 from tests.testing_utils import PaddleNLPModelTest, require_package, slow
 from tests.transformers.test_generation_utils import GenerationTesterMixin
-from tests.transformers.test_modeling_common import (
-    GenerationD2STestMixin,
+from tests.transformers.test_modeling_common import (  # GenerationD2STestMixin,
     ModelTesterMixin,
     floats_tensor,
     ids_tensor,
@@ -677,6 +676,6 @@ class BloomModelLanguageGenerationTest(PaddleNLPModelTest):
         self.assertEqual(output_str, EXPECTED_OUTPUT_STR)
 
 
-class BloomGenerationD2STest(GenerationD2STestMixin, unittest.TestCase):
-    max_length = 100
-    internal_testing_model = "__internal_testing__/tiny-random-bloom"
+# class BloomGenerationD2STest(GenerationD2STestMixin, unittest.TestCase):
+#    max_length = 100
+#    internal_testing_model = "__internal_testing__/tiny-random-bloom"

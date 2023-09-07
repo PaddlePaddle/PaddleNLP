@@ -327,7 +327,7 @@ class SentenceBackTranslate:
                 use_faster=self.use_faster,
             )[0]
             for output in outputs:
-                eos = np.where(output.numpy() == eos_id)[0]
+                eos = np.where(output.cpu().numpy() == eos_id)[0]
                 if len(eos) == 0:
                     eos_pos = len(output) - 1
                 else:
@@ -535,7 +535,7 @@ class SentenceContinue:
                 top_p=self.top_p,
             )[0]
             for i in range(outputs.shape[0]):
-                output = outputs[i].numpy()
+                output = outputs[i].cpu().numpy()
                 eos = np.where(output == model.eos_token_id)[0]
                 if len(eos) == 0:
                     eos_pos = len(output) - 1
