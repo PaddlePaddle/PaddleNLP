@@ -137,7 +137,6 @@ def adapt_stale_fwd_patch(self, name, value):
     model compression, we make these patches compatible with the latest forward
     method.
     """
-
     if name == "forward":
         # NOTE(guosheng): In dygraph to static, `layer.forward` would be patched
         # by an instance of `StaticFunction`. And use string compare to avoid to
