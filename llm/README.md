@@ -39,7 +39,7 @@
 目前精调统一脚本只支持[LLaMA v1/v2](./llama)、[ChatGLM-6B](./chatglm)、[ChatGLM2-6B](./chatglm2)、[Bloom](./bloom)、[OPT](./opt)、[Qwen](./qwen)，其他模型精调使用详见对应模型目录。接下来我们将以**Llama 2**为例介绍如何使用统一脚本进行SFT、LoRA、Prefix Tuning。更多LoRA、Prefix Tuning请参见[PEFT文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/peft.md)。
 
 
-<details><summary>&emsp; 统一脚本精调支持模型列表: </summary><div>
+**统一脚本精调支持模型列表**:
 
 | 模型结构 | 模型名称 |
 | --- | --- |
@@ -50,7 +50,6 @@
 | [Bloom](./bloom) |bellegroup/belle-7b-2m<br>bigscience/bloom-560m <br>bigscience/bloom-560m-bf16<br>bigscience/bloom-1b1 <br>bigscience/bloom-3b <br>bigscience/bloom-7b1 <br>bigscience/bloomz-560m<br>bigscience/bloomz-1b1 <br>bigscience/bloomz-3b <br>bigscience/bloomz-7b1-mt <br> bigscience/bloomz-7b1-p3 <br>bigscience/bloomz-7b1 <br>bellegroup/belle-7b-2m|
 | [OPT](./opt) |facebook/opt-125m<br>facebook/opt-350m<br>facebook/opt-1.3b<br>facebook/opt-2.7b <br>facebook/opt-6.7b<br>facebook/opt-13b<br>facebook/opt-30b<br>facebook/opt-66b<br>facebook/opt-iml-1.3b<br>opt-iml-max-1.3b|
 
-</div></details>
 
 ### 3.1 精调训练数据格式
 
