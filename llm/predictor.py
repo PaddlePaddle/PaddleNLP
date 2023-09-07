@@ -450,15 +450,16 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         BasePredictor.__init__(self, config, tokenizer)
         InferencePredictorMixin.__init__(self, config, tokenizer)
 
-        self.dtype = config.dtype or self.model_config.dtype
+        dtype = config.dtype or self.model_config.dtype
         self.architectures = self.model_config.architectures[0].lower()
-        self.cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in cache_kvs_shape]
-        self.pre_ids = paddle.full([config.batch_size, config.max_length + 1], -1, dtype="int64")
+        self.cache_kvs = [paddle.zeros(shape, dtype=dtype) for shape in cache_kvs_shape]
+        total_max_length = config.src_length + config.max_length
+        self.pre_ids = paddle.full([config.batch_size, total_max_length + 1], -1, dtype="int64")
 
         if "chatglm" in self.architectures:
             self.attention_mask = paddle.ones(
-                shape=(config.batch_size, 1, config.max_length, config.max_length),
-                dtype=self.dtype,
+                shape=(config.batch_size, 1, total_max_length, total_max_length),
+                dtype=dtype,
             )
             self.tgt_pos = paddle.ones(
                 shape=[config.batch_size, 2, 1],
@@ -466,13 +467,13 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
             )
         else:
             self.attention_mask = paddle.zeros(
-                shape=(config.batch_size, 1, config.max_length, config.max_length),
-                dtype=self.dtype,
+                shape=(config.batch_size, 1, total_max_length, total_max_length),
+                dtype=dtype,
             )
 
         self.tgt_generation_mask = paddle.zeros(
-            shape=[config.batch_size, 1, 1, config.max_length],
-            dtype=self.dtype,
+            shape=[config.batch_size, 1, 1, total_max_length + 1],
+            dtype=dtype,
         )
         self.arange_tensor_encoder = paddle.zeros(shape=(config.batch_size, 1, config.max_length), dtype=self.dtype)
         self.predictor = self._create_predictor(config)
@@ -564,6 +565,88 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
         BasePredictor.__init__(self, config, tokenizer)
         InferencePredictorMixin.__init__(self, config, tokenizer)
         self.model = model
+
+        dtype = config.dtype or model.config.dtype
+        self.architectures = self.model.config.architectures[0].lower()
+
+        self.cache_kvs = [
+            paddle.zeros(shape, dtype=dtype)
+            for shape in self.model.get_cache_kvs_shape(self.model.config, config.batch_size)
+        ]
+        total_max_length = config.src_length + config.max_length
+        self.pre_ids = paddle.full([config.batch_size, total_max_length], -1, dtype="int64")
+        if "chatglm" in self.architectures:
+            self.attention_mask = paddle.ones(
+                shape=(config.batch_size, 1, total_max_length, total_max_length),
+                dtype=dtype,
+            )
+            self.tgt_pos = paddle.ones(
+                shape=[config.batch_size, 2, 1],
+                dtype="int64",
+            )
+        else:
+            self.attention_mask = paddle.zeros(
+                shape=(config.batch_size, 1, total_max_length, total_max_length),
+                dtype=dtype,
+            )
+
+        self.tgt_generation_mask = paddle.zeros(
+            shape=[config.batch_size, 1, 1, total_max_length],
+            dtype=dtype,
+        )
+
+    def _preprocess(self, source):
+        if "chatglm" in self.architectures:
+            inputs = dybatch_preprocess(
+                self.tokenizer,
+                source,
+                self.config.max_length,
+                self.architectures,
+                top_p=self.config.top_p,
+                temperature=self.config.temperature,
+                benchmark=self.config.benchmark,
+            )
+
+            for i in range(inputs["input_ids"].shape[0]):
+                length = inputs["seq_len_encoder"][i][0]
+                self.attention_mask[i, 0, :length, :length] = 0
+                self.attention_mask[i, 0, : length - 1, length - 1] = 1
+                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype="float16")
+                self.tgt_pos[i, 0, 0] = paddle.to_tensor([length], dtype="int64")
+
+            inputs["attention_mask"] = self.attention_mask
+            inputs["tgt_generation_mask"] = self.tgt_generation_mask
+            inputs["cache_kvs"] = self.cache_kvs
+            inputs["pre_ids"] = self.pre_ids
+            inputs["tgt_pos"] = self.tgt_pos
+        else:
+            inputs = dybatch_preprocess(
+                self.tokenizer,
+                source,
+                self.config.max_length,
+                self.architectures,
+                top_p=self.config.top_p,
+                temperature=self.config.temperature,
+                benchmark=self.config.benchmark,
+            )
+            for i in range(inputs["input_ids"].shape[0]):
+                length = inputs["seq_len_encoder"][i][0]
+                self.attention_mask[i, 0, :length, :length] = paddle.tril(
+                    paddle.ones(shape=(length, length), dtype="float16")
+                )
+                inputs["attention_mask"] = self.attention_mask
+                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype="float16")
+                inputs["tgt_generation_mask"] = self.tgt_generation_mask
+            inputs["cache_kvs"] = self.cache_kvs
+            inputs["pre_ids"] = self.pre_ids
+
+        inputs_tensor = {}
+        for key, value in inputs.items():
+            if key != "cache_kvs":
+                inputs_tensor[key] = paddle.to_tensor(value)
+            else:
+                inputs_tensor[key] = value
+        return inputs_tensor
 
     @paddle.no_grad()
     def _infer(self, inputs: dict[str, paddle.Tensor]):

@@ -390,6 +390,7 @@ def dybatch_preprocess(
     top_p: float,
     temperature: float,
     pre_caches_length: int = 0,
+    benchmark: bool = False,
 ):
     """Pre-process generation inputs."""
     if "chatglm" in architectures:
@@ -462,7 +463,7 @@ def dybatch_preprocess(
     inputs["top_p"] = (
         np.array(
             [
-                0.0,
+                top_p,
             ]
             * bs
         )
@@ -472,7 +473,7 @@ def dybatch_preprocess(
     inputs["temperature"] = (
         np.array(
             [
-                1.0,
+                temperature,
             ]
             * bs
         )
@@ -484,11 +485,13 @@ def dybatch_preprocess(
     inputs["step_idx"] = np.array(step_idx).astype("int64").reshape(-1, 1)
     inputs["tgt_ids"] = np.array(tgt_ids).astype("int64").reshape(-1, 1)
     inputs["tgt_pos"] = tgt_pos.reshape(-1, 1)
-    inputs["max_length"] = np.array(max_length - seq_len - pre_caches_length).astype("int64").reshape((-1, 1))
+    inputs["max_length"] = np.array(max_length).astype("int64").reshape((-1, 1))
     inputs["min_length"] = (
         np.array(
             [
-                2,
+                1
+                if not benchmark
+                else max_length,  # Note(Zhengzekang): When in benchmark mode, we need to set a fixed decode length.
             ]
             * bs
         )
@@ -542,7 +545,7 @@ def dybatch_preprocess(
 def load_real_time_tokens():
     tokens = []
     files = glob.glob(os.path.join("./real_time_save.*"))
-    for j in range(1, len(files)):
+    for j in range(1, len(files) + 1):
         filename = "./real_time_save.temp_ids_rank_0_step_{}".format(j)
         if not os.path.exists(filename):
             break
