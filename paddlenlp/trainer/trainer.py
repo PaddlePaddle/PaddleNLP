@@ -355,6 +355,8 @@ class Trainer:
                 if self.amp_dtype == "float16" or self.amp_dtype == "bfloat16":
                     if ShardingOption.SHARD_OP in self.args.sharding:
                         self.scaler = fleet.distributed_scaler(self.scaler)
+                        if self.args.amp_master_grad:
+                            mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
                     else:
                         # scaler for stage2 and stage3
                         from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
