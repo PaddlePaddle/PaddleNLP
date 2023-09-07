@@ -482,7 +482,7 @@ class Trainer:
                 if os.path.isfile(weights_file):
                     # We load the model state dict on the CPU to avoid an OOM error.
                     state_dict = paddle.load(weights_file, return_numpy=True)
-                    if (isinstance(self.model, LoRAModel) and self.lmodel.lora_config.tensor_parallel_degree > 1) or (
+                    if (isinstance(self.model, LoRAModel) and self.model.lora_config.tensor_parallel_degree > 1) or (
                         isinstance(self.model, PrefixModelForCausalLM)
                         and self.model.prefix_config.tensor_parallel_degree > 1
                     ):
@@ -859,10 +859,10 @@ class Trainer:
                     )
                     optimizer_was_run = True
                     if self.do_grad_scaling:
-                        scale_before = self.scaler._scale.numpy()
+                        scale_before = self.scaler._scale.cpu().numpy()
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
-                        scale_after = self.scaler._scale.numpy()
+                        scale_after = self.scaler._scale.cpu().numpy()
                         optimizer_was_run = not self.scaler._cache_founf_inf
                         if not optimizer_was_run:
                             logger.warning(

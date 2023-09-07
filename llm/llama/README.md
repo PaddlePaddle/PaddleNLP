@@ -4,27 +4,27 @@
 
 **支持模型权重:**
 
-| Model                            |
-|----------------------------------|
-| facebook/llama-7b                |
-| facebook/llama-13b               |
-| facebook/llama-30b               |
-| facebook/llama-65b               |
-| meta-llama/Llama-2-7b            |
-| meta-llama/Llama-2-7b-chat       |
-| meta-llama/Llama-2-13b           |
-| meta-llama/Llama-2-13b-chat      |
-| meta-llama/Llama-2-70b           |
-| meta-llama/Llama-2-70b-chat      |
-| ziqingyang/chinese-llama-7b      |
-| ziqingyang/chinese-llama-13b     |
-| ziqingyang/chinese-alpaca-7b     |
-| ziqingyang/chinese-alpaca-13b    |
-| idea-ccnl/ziya-llama-13b-v1      |
-| linly-ai/chinese-llama-2-7b      |
-| baichuan-inc/Baichuan-7B         |
-| baichuan-inc/Baichuan-13B-Base   |
-| baichuan-inc/Baichuan-13B-Chat   |
+| Model                          |
+| ------------------------------ |
+| facebook/llama-7b              |
+| facebook/llama-13b             |
+| facebook/llama-30b             |
+| facebook/llama-65b             |
+| meta-llama/Llama-2-7b          |
+| meta-llama/Llama-2-7b-chat     |
+| meta-llama/Llama-2-13b         |
+| meta-llama/Llama-2-13b-chat    |
+| meta-llama/Llama-2-70b         |
+| meta-llama/Llama-2-70b-chat    |
+| ziqingyang/chinese-llama-7b    |
+| ziqingyang/chinese-llama-13b   |
+| ziqingyang/chinese-alpaca-7b   |
+| ziqingyang/chinese-alpaca-13b  |
+| idea-ccnl/ziya-llama-13b-v1    |
+| linly-ai/chinese-llama-2-7b    |
+| baichuan-inc/Baichuan-7B       |
+| baichuan-inc/Baichuan-13B-Base |
+| baichuan-inc/Baichuan-13B-Chat |
 
 
 使用方法：
@@ -62,7 +62,7 @@ mv llama_openwebtext_100k_idx.npz ./data
 
 使用下面脚本,即可在llama-7b的基础上,继续训练.
 ```shell
-task_name_or_path="llama_hybid"
+task_name_or_path="llama_hybrid"
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "output/$task_name_or_path""_log" \
@@ -107,3 +107,6 @@ python -u  -m paddle.distributed.launch \
 3. `continue_training` 表示从现有的预训练模型加载训练。7b模型初始loss大概为1.99x, 随机初始化模型loss从11.x左右下降。
 4. `use_fused_rms_norm` 需要安装[此目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt-3/external_ops)下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置PYTHONPATH
 5. 当前脚本为sharding版本，需要4D并行训练（数据、sharding、张量、流水线并行）的用户，请参考 `run_trainer_tp4pp2.sh`脚本。
+
+## 4. 模型精调
+请参考[LLM全流程工具介绍](../README.md)

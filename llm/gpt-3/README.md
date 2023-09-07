@@ -28,7 +28,7 @@ mv gpt_en_dataset_300m_idx.npz ./data
 
 使用下面脚本,即可在gpt2-medium-en的基础上,继续训练.
 ```shell
-task_name="gpt3_hybid"
+task_name="gpt3_hybrid"
 export PYTHONPATH="../../PaddleNLP/"
 export FLAGS_cudnn_deterministic=True
 log_dir="log"
@@ -107,7 +107,7 @@ python -u  -m paddle.distributed.launch \
 ### SFT
 
 ```shell
-task_name="gpt3_hybid"
+task_name="gpt3_hybrid"
 export PYTHONPATH="../../PaddleNLP/"
 export FLAGS_cudnn_deterministic=True
 log_dir="log"

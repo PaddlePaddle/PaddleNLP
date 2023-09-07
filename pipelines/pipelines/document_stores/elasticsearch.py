@@ -451,6 +451,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                     mapping["mappings"]["properties"].update({field: {"type": "text"}})
 
             if self.embedding_field:
+                mapping["settings"]["number_of_shards"] = 1
+                mapping["settings"]["number_of_replicas"] = 2
                 mapping["mappings"]["properties"][self.embedding_field] = {
                     "type": self.vector_type,
                     "dims": self.embedding_dim,
@@ -485,7 +487,8 @@ class ElasticsearchDocumentStore(KeywordDocumentStore):
                     "updated_at": {"type": "date", "format": "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis"}
                     # TODO add pipeline_hash and pipeline_name once we migrated the REST API to pipelines
                 }
-            }
+            },
+            "settings": {"number_of_shards": 1, "number_of_replicas": 2},
         }
         try:
             self.client.indices.create(index=index_name, body=mapping, headers=headers)
