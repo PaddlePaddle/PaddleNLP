@@ -939,19 +939,19 @@ class TrainingArguments:
                     self.hybrid_parallel_topo_order = "pp_first"
                 assert self.hybrid_parallel_topo_order in ["pp_first", "sharding_first"]
 
-                def sep_supported():
+                def is_segment_parallel_supported():
                     import inspect
 
                     members = [name for (name, date) in inspect.getmembers(fleet.HybridCommunicateGroup)]
                     return "get_sep_parallel_world_size" in members
 
                 if self.hybrid_parallel_topo_order == "pp_first":
-                    if sep_supported():
+                    if is_segment_parallel_supported():
                         order = ["dp", "pp", "sharding", "sep", "mp"]
                     else:
                         order = ["dp", "pp", "sharding", "mp"]
                 if self.hybrid_parallel_topo_order == "sharding_first":
-                    if sep_supported():
+                    if is_segment_parallel_supported():
                         order = ["dp", "sharding", "pp", "sep", "mp"]
                     else:
                         order = ["dp", "sharding", "pp", "mp"]
