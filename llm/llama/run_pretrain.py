@@ -182,9 +182,8 @@ class ModelArguments:
         default="core",
         metadata={
             "help": "The level of fusion of rope embedding. Can be chosen from:\n"
-            "(1) 'full': fuse sin cos compute and rope embedding\n"
-            "(2) 'core': only fuse rope embedding, will compute the sin and cos\n"
-            "(3) None: don't fuse any part of the rope embedding"
+            "(1) 'core': only fuse rope embedding, will compute the sin and cos\n"
+            "(2) None: don't fuse any part of the rope embedding"
         },
     )
     no_recompute_layers: Optional[List[int]] = field(

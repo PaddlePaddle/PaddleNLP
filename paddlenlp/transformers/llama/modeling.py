@@ -664,7 +664,7 @@ class LlamaAttention(nn.Layer):
                 bias_attr=False,
             )
 
-        if config.rope and self.rope_fusion_level != "full":
+        if config.rope:
             self._init_rope()
 
         self.config = config
@@ -739,9 +739,7 @@ class LlamaAttention(nn.Layer):
             if self.rope_fusion_level is not None:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
 
-            if self.rope_fusion_level == "full":
-                query_states, key_states, _ = fused_rotary_position_embedding(query_states, key_states, v=None)
-            elif self.rope_fusion_level == "core":
+            if self.rope_fusion_level == "core":
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states, _ = fused_rotary_position_embedding(
                     query_states,
