@@ -163,8 +163,8 @@ python -u  ./preprocess/create_pretraining_data.py \
 
 转化后的数据如下，使用这份数据，即可开始ERNIE预训练：
 ```
--rw-rw-r-- 1 500 501 6.4G Jul  4 03:39 wudao_corpus_200g.bin
--rw-rw-r-- 1 500 501 129G Jul  4 03:39 wudao_corpus_200g.idx
+-rw-rw-r-- 1 500 501 129G Jul  4 03:39 wudao_corpus_200g.bin
+-rw-rw-r-- 1 500 501 6.4G Jul  4 03:39 wudao_corpus_200g.idx
 ```
 同样，对于 WuDaoCorpus2.0_base_200G_sample.tar.gz 数据，使用`ernie-3.0-bash-zh`的tokenizer，可以得到数据。
 ```
