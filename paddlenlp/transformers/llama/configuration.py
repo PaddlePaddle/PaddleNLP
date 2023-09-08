@@ -103,9 +103,8 @@ class LlamaConfig(PretrainedConfig):
             Whether to tie weight embeddings
         rope_fusion_level(`str`, *optional*, defaults to ``):
             The level of fusion of rope embedding. Can be chosen from:
-            (1) 'full': fuse sin cos compute and rope embedding
-            (2) 'core': only fuse rope embedding, will compute the sin and cos
-            (3) None: don't fuse any part of the rope embedding
+            (1) 'core': only fuse rope embedding, will compute the sin and cos
+            (2) None: don't fuse any part of the rope embedding
         num_key_value_heads (`int`, *optional*):
             This is the number of key_value heads that should be used to implement Grouped Query Attention. If
             `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
