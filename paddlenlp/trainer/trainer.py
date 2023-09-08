@@ -355,6 +355,8 @@ class Trainer:
                 if self.amp_dtype == "float16" or self.amp_dtype == "bfloat16":
                     if ShardingOption.SHARD_OP in self.args.sharding:
                         self.scaler = fleet.distributed_scaler(self.scaler)
+                        if self.args.amp_master_grad:
+                            mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
                     else:
                         # scaler for stage2 and stage3
                         from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
@@ -769,13 +771,9 @@ class Trainer:
                     self.args.data_parallel_degree > 1 if self.args.use_hybrid_parallel else args.local_rank != -1
                 )
                 forbidden_no_sync = False
-                # stage2 and stage3 should not no_sync, because the is no DDP wrapper and  no_sync API
-                if self.sharding and (ShardingOption.SHARD_OP not in self.args.sharding):
-                    forbidden_no_sync = True
-                # hybrid_parallel (tp or pp) should not no_sync
-                if self.args.use_hybrid_parallel and (
-                    self.args.tensor_parallel_degree > 1 or self.args.pipeline_parallel_degree > 1
-                ):
+                # stage2 and stage3 should not no_sync, because the is no DDP wrapper and no_sync API
+                # hybrid_parallel (tp or pp or sharding stage 1) should not no_sync
+                if self.args.use_hybrid_parallel:
                     forbidden_no_sync = True
 
                 availiable_no_sync = dp_enabled and not forbidden_no_sync
@@ -1536,7 +1534,11 @@ class Trainer:
                 model = paddle.distributed.fleet.meta_parallel.TensorParallel(model, hcg, strategy=None)
 
             if ShardingOption.SHARD_OP in self.args.sharding:
+                if self.args.amp_master_grad:
+                    mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
                 model = fleet.distributed_model(model)
+                if self.args.amp_master_grad:
+                    self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
                 self.optimizer = fleet.distributed_optimizer(self.optimizer)
             else:
                 # sync params (broadcast) buffers in dp group
