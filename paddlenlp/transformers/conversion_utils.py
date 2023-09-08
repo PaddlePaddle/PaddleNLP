@@ -1045,6 +1045,44 @@ class ConversionMixin:
         return state_dict
 
     @classmethod
+    def merge_tensor_parallel_with_shard(cls, state_dict, config, all_filter_keys) -> None:
+        name_action_mappings = cls._get_tensor_parallel_mappings(config, is_split=False)
+        state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys())
+
+        for k, v in state_keys_map.items():
+            name_action_mappings[v] = name_action_mappings.pop(k)
+
+        state_dict_to_save = {}
+
+        hcg = paddle.distributed.fleet.get_hybrid_communicate_group()
+        mp_group = hcg.get_model_parallel_group()
+
+        for i, filter_keys in enumerate(all_filter_keys):
+            is_dst = paddle.distributed.get_rank(mp_group) == i
+            for key in filter_keys:
+                tensor = state_dict[key]
+                if key in name_action_mappings:
+                    ret = distributed_gather(tensor, dst=i, group=mp_group, offload=True)
+                    action = name_action_mappings.pop(key)
+                    tensor = action(ret) if is_dst else None
+                else:
+                    tensor = tensor.numpy() if is_dst else None
+
+                # keep state_dict using paddle.tensor
+                if isinstance(tensor, np.ndarray):
+                    with device_guard("cpu"):
+                        tensor = paddle.Tensor(tensor, zero_copy=True)
+
+                if is_dst:
+                    state_dict_to_save[key] = tensor
+
+        if len(name_action_mappings) > 0:
+            for x in name_action_mappings.keys():
+                logger.warning(f"key <{x}> need to merge tensor parallel but we can't find in model state.")
+
+        return state_dict_to_save
+
+    @classmethod
     def merge_tensor_parallel(cls, state_dict, config) -> None:
         """the entry of converting config and converting model file
 

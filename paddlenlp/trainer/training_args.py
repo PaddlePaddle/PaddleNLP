@@ -665,6 +665,10 @@ class TrainingArguments:
         default=True,
         metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl"},
     )
+    old_save_load: Optional[bool] = field(
+        default=True,
+        metadata={"help": "whether use old save load method or new sharded ckpt method."},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -744,7 +748,6 @@ class TrainingArguments:
         self.optim = OptimizerNames(self.optim)
 
         self.use_hybrid_parallel = False
-        self.old_save_load = True
 
         if isinstance(self.sharding, bool):
             self.sharding = "stage1" if self.sharding else ""
@@ -1076,7 +1079,7 @@ class TrainingArguments:
             else:
                 # model_00001-of-00072.safetensors
                 name.append(
-                    f"{self.data_parallel_rank:0>5d}-of-{paddle.distributed.get_world_size()//self.data_parallel_degree:0>5d}"
+                    f"{self.process_index:0>5d}-of-{paddle.distributed.get_world_size()//self.data_parallel_degree:0>5d}"
                 )
                 return "_".join(name)
         else:
