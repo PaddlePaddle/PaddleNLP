@@ -180,7 +180,7 @@ def retrieval(
         return prediction
 
 
-# 单篇摘要精读
+# Summary of a paper
 def summarize_collapse(text_list, api_key, secret_key):
     document_prompt = "这是一篇论文摘要的第{index}部分的内容：{content}"
     llm_prompt = """
@@ -238,7 +238,7 @@ def summarize_abstract(abstract, api_key, secret_key, chunk_size=300, max_token=
     return summary.replace("\n\n", "\n")
 
 
-# 多篇文档总结
+# Summary of multiple papers
 def merge_summary(text_list, api_key, secret_key):
     document_prompt = "输入的第{index}论文的内容：{content}"
     llm_prompt = """你需要完成多篇论文总结任务，不要分别进行单篇论文总结。
@@ -258,7 +258,7 @@ def merge_summary(text_list, api_key, secret_key):
     return summary[0]["result"]
 
 
-# 翻译
+# translation
 dict_l = {"中文": "英文", "英文": "中文"}
 
 
