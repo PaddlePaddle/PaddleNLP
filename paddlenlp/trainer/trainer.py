@@ -473,7 +473,7 @@ class Trainer:
             return
 
         state_dict = None
-        if self.args.load_sharding_stage1_model:
+        if self.args.load_sharded_model:
             state_dict = self.load_state_dict_from_checkpoint_with_reshard(resume_from_checkpoint)
             if self.args.bf16:
                 state_dict = self.recover_params_from_master_weights(state_dict)
@@ -492,24 +492,25 @@ class Trainer:
         del state_dict
 
     def recover_params_from_master_weights(self, state_dict):
-        assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
-        param2rank = self.optimizer._inner_opt._param2rank
         opt_state_dict = self.optimizer.state_dict()
         assert "master_weights" in opt_state_dict
         master_weigths = opt_state_dict["master_weights"]
-        param_names_in_master_weights = list(master_weigths.keys())
-        tmp = []
-        logger.info("param_names_in_master_weights:{}".format(param_names_in_master_weights))
-        paddle.distributed.all_gather_object(tmp, param_names_in_master_weights, group=self.sharding_group)
-        sharding_group_param_names = [v for item in tmp for v in item]
-        logger.info("sharding_group_param_names:{}".format(sharding_group_param_names))
+        if self.args.load_sharding_stage1_model:
+            assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
+            param2rank = self.optimizer._inner_opt._param2rank
+            param_names_in_master_weights = list(master_weigths.keys())
+            tmp = []
+            logger.info("param_names_in_master_weights:{}".format(param_names_in_master_weights))
+            paddle.distributed.all_gather_object(tmp, param_names_in_master_weights, group=self.sharding_group)
+            sharding_group_param_names = [v for item in tmp for v in item]
+            logger.info("sharding_group_param_names:{}".format(sharding_group_param_names))
         model_state_dict = self.model.state_dict()
         logger.info("before recover, model_state_dict number: {}".format(len(model_state_dict)))
         for key, param in model_state_dict.items():
             if param.name in master_weigths:
                 assert param.shape == master_weigths[param.name].shape
                 paddle.assign(paddle.cast(master_weigths[param.name].cuda(), paddle.bfloat16), model_state_dict[key])
-            if param.name in sharding_group_param_names:
+            if self.args.load_sharding_stage1_model and param.name in sharding_group_param_names:
                 paddle.distributed.broadcast(
                     model_state_dict[key],
                     src=self.sharding_group.ranks[param2rank[param.name]],
@@ -596,7 +597,8 @@ class Trainer:
         def filter_func(name):
             return True
 
-        state_dict = self._all_gather_state_dict(state_dict, filter_func)
+        if self.args.load_sharding_stage1_model:
+            state_dict = self._all_gather_state_dict(state_dict, filter_func)
 
         return state_dict
 
@@ -729,7 +731,7 @@ class Trainer:
 
         self.state = TrainerState()
 
-        if self.args.load_sharding_stage1_model:
+        if self.args.load_sharded_model:
             model = self._load_sharded_check_point(resume_from_checkpoint, delay_optimizer_creation, max_steps)
         else:
             model = self._load_check_point(resume_from_checkpoint, delay_optimizer_creation, max_steps)
@@ -2308,62 +2310,64 @@ class Trainer:
 
             del tmp
 
+        if self.args.load_sharding_stage1_model:
             # gather all opt names
-        # list of list
-        opt_names_list = self._all_gather_simple_object(list(state_dict.keys()))
-        opt_names = []
-        for e in opt_names_list:
-            opt_names.extend(e)
+            # list of list
+            opt_names_list = self._all_gather_simple_object(list(state_dict.keys()))
+            opt_names = []
+            for e in opt_names_list:
+                opt_names.extend(e)
 
-        # opt name to param name
-        opt_to_p = self._map_optimizer_state_to_param(opt_names)
+            # opt name to param name
+            opt_to_p = self._map_optimizer_state_to_param(opt_names)
 
-        optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
-        param2rank = optimizer._param2rank
+            optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
+            param2rank = optimizer._param2rank
 
-        def all_gather_state_dict(state_dict, filter_func):
-            remote_state_dict_keys = [k for k in state_dict.keys() if not filter_func(k)]
-            tmp_state_dict = OrderedDict()
-            for k in remote_state_dict_keys:
-                tmp_state_dict[k] = state_dict[k]
-                state_dict.pop(k)
-            tmp_state_dict = self._all_gather_state_dict(tmp_state_dict, filter_func)
-            for (k, v) in tmp_state_dict.items():
-                state_dict[k] = v
-            return state_dict
+            def all_gather_state_dict(state_dict, filter_func):
+                remote_state_dict_keys = [k for k in state_dict.keys() if not filter_func(k)]
+                tmp_state_dict = OrderedDict()
+                for k in remote_state_dict_keys:
+                    tmp_state_dict[k] = state_dict[k]
+                    state_dict.pop(k)
+                tmp_state_dict = self._all_gather_state_dict(tmp_state_dict, filter_func)
+                for (k, v) in tmp_state_dict.items():
+                    state_dict[k] = v
+                return state_dict
 
-        def opt_filter_func(name):
-            assert name in opt_to_p, f"name {name} not in opt_to_p"
-            param_name = opt_to_p[name]
-            assert param_name in param2rank, f"param_name {param_name} not in param2rank param2"
-            return param2rank[param_name] == self.args.sharding_parallel_rank
+            def opt_filter_func(name):
+                assert name in opt_to_p, f"name {name} not in opt_to_p"
+                param_name = opt_to_p[name]
+                assert param_name in param2rank, f"param_name {param_name} not in param2rank param2"
+                return param2rank[param_name] == self.args.sharding_parallel_rank
 
-        state_dict = all_gather_state_dict(state_dict, opt_filter_func)
+            state_dict = all_gather_state_dict(state_dict, opt_filter_func)
 
-        def master_weights_filter_func(name):
-            assert (name in param2rank) or (name in opt_to_p), f"name {name} not in param2rank or opt_to_p"
-            if name in opt_to_p:
-                name = opt_to_p[name]
-            return param2rank[name] == self.args.sharding_parallel_rank
+            def master_weights_filter_func(name):
+                assert (name in param2rank) or (name in opt_to_p), f"name {name} not in param2rank or opt_to_p"
+                if name in opt_to_p:
+                    name = opt_to_p[name]
+                return param2rank[name] == self.args.sharding_parallel_rank
 
-        # master weights
-        master_weights = all_gather_state_dict(master_weights, master_weights_filter_func)
+            # master weights
+            master_weights = all_gather_state_dict(master_weights, master_weights_filter_func)
+
+            # lr scheduler
+            print(lr_scheduler)
+            lr_schedulers = self._all_gather_simple_object(lr_scheduler)
+            lr_scheduler = {}
+            for e in lr_schedulers:
+                for (k, v) in e.items():
+                    lr_scheduler[k] = v
+
         state_dict["master_weights"] = master_weights
-
-        # lr scheduler
-        print(lr_scheduler)
-        lr_schedulers = self._all_gather_simple_object(lr_scheduler)
-        lr_scheduler = {}
-        for e in lr_schedulers:
-            for (k, v) in e.items():
-                lr_scheduler[k] = v
         if lr_scheduler:
             state_dict["LR_Scheduler"] = lr_scheduler[0]
 
         return state_dict
 
     def _load_optimizer_state(self, checkpoint):
-        if self.args.load_sharding_stage1_model:
+        if self.args.load_sharded_model:
             return self._load_optimizer_state_with_reshard(checkpoint)
         else:
             return self._load_optimizer_state_of_one_shard(checkpoint, self.args.optimizer_name_suffix)
