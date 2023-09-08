@@ -179,7 +179,7 @@ class ModelArguments:
         metadata={"help": "whether to use fuse sequence parallel allreduce"},
     )
     rope_fusion_level: Optional[str] = field(
-        default=None,
+        default="core",
         metadata={
             "help": "The level of fusion of rope embedding. Can be chosen from:\n"
             "(1) 'full': fuse sin cos compute and rope embedding\n"

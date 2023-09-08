@@ -744,7 +744,13 @@ class LlamaAttention(nn.Layer):
             elif self.rope_fusion_level == "core":
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states, _ = fused_rotary_position_embedding(
-                    query_states, key_states, v=None, sin=sin, cos=cos
+                    query_states,
+                    key_states,
+                    v=None,
+                    sin=sin,
+                    cos=cos,
+                    position_ids=position_ids,
+                    use_neox_rotary_style=False,
                 )
             else:
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
