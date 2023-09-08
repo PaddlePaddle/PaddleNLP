@@ -21,7 +21,7 @@ import sys
 import paddle
 import paddle.distributed as dist
 import yaml
-from paddle.fluid.reader import use_pinned_memory
+from paddle.base.reader import use_pinned_memory
 
 from . import check
 from .log import advertise, logger
