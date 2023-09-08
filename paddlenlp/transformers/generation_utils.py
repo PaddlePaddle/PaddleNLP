@@ -295,7 +295,7 @@ class BeamSearchScorer(object):
 
         # fill with hypotheses and eos_token_id if the latter fits in
         for i, (hypo, score) in enumerate(best):
-            decoded[i, : sent_lengths[i].item()] = hypo.numpy()
+            decoded[i, : sent_lengths[i].item()] = hypo.cpu().numpy()
             decoded_score[i] = score
             if sent_lengths[i] < self.max_length:
                 decoded[i, sent_lengths[i].item()] = eos_token_id
@@ -729,7 +729,7 @@ class GenerationMixin(object):
                     decode_strategy="greedy_search")
                 print(ids.shape, scores.shape)
                 # [1, 3] [1, 1]
-                sequence_ids = ids.numpy().tolist()[0]
+                sequence_ids = ids.cpu().numpy().tolist()[0]
                 sequence_ids = sequence_ids[:sequence_ids.index(tokenizer.sep_token_id)]
                 response = tokenizer.convert_ids_to_string(sequence_ids, keep_space=False)
                 print(response)
@@ -749,7 +749,7 @@ class GenerationMixin(object):
                 print(ids.shape, scores.shape)
                 # [2, 7] [2, 1]
                 response = []
-                for sequence_ids in ids.numpy().tolist():
+                for sequence_ids in ids.cpu().numpy().tolist():
                     sequence_ids = sequence_ids[:sequence_ids.index(tokenizer.sep_token_id)]
                     text = tokenizer.convert_ids_to_string(sequence_ids, keep_space=False)
                     response.append(text)
@@ -770,7 +770,7 @@ class GenerationMixin(object):
                 print(ids.shape, scores.shape)
                 # [2, 3] [2, 1]
                 response = []
-                for sequence_ids in ids.numpy().tolist():
+                for sequence_ids in ids.cpu().numpy().tolist():
                     sequence_ids = sequence_ids[:sequence_ids.index(tokenizer.sep_token_id)]
                     text = tokenizer.convert_ids_to_string(sequence_ids, keep_space=False)
                     response.append(text)

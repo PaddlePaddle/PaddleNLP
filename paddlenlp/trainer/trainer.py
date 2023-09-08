@@ -859,10 +859,10 @@ class Trainer:
                     )
                     optimizer_was_run = True
                     if self.do_grad_scaling:
-                        scale_before = self.scaler._scale.numpy()
+                        scale_before = self.scaler._scale.cpu().numpy()
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
-                        scale_after = self.scaler._scale.numpy()
+                        scale_after = self.scaler._scale.cpu().numpy()
                         optimizer_was_run = not self.scaler._cache_founf_inf
                         if not optimizer_was_run:
                             logger.warning(
