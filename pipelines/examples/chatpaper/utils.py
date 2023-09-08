@@ -29,10 +29,7 @@ from pipelines.nodes.combine_documents import (
     ReduceDocuments,
     StuffDocuments,
 )
-from pipelines.nodes.preprocessor.text_splitter import (
-    CharacterTextSplitter,
-    SpacyTextSplitter,
-)
+from pipelines.nodes.preprocessor.text_splitter import SpacyTextSplitter
 
 
 def load_all_json_path(path):
@@ -222,12 +219,8 @@ def summarize_abstract(abstract, api_key, secret_key, chunk_size=300, max_token=
     总结输出:
     """
     if len(llm_prompt.format(abstract)) > max_token:
-        try:
-            file_splitter_chinese = SpacyTextSplitter(chunk_size=chunk_size, separator="\n", chunk_overlap=0)
-            txt_split = file_splitter_chinese.split_text(abstract)
-        except:
-            file_splitter_chinese = CharacterTextSplitter(chunk_size=chunk_size, separator="\n", chunk_overlap=0)
-            txt_split = file_splitter_chinese.split_text(abstract)
+        file_splitter_chinese = SpacyTextSplitter(chunk_size=chunk_size, separator="\n", chunk_overlap=0)
+        txt_split = file_splitter_chinese.split_text(abstract)
         txt_list = []
         for split in txt_split:
             txt_list.append({"content": split, "meta": {}})
@@ -290,10 +283,7 @@ def translate_part(text, api_key, secret_key, task="翻译", max_length=10000, l
         翻译结果：
         """
     if len(prompt_all.format(content=text, l_s=lang, l_t=dict_l[lang])) > max_length:
-        try:
-            documents = file_splitter.split_text(text)
-        except:
-            documents = CharacterTextSplitter(chunk_size=chunk_size, separator="\n", chunk_overlap=0).split_text(text)
+        documents = file_splitter.split_text(text)
         txt = ""
         for split in documents:
             txt_split = ernie_bot_translation(

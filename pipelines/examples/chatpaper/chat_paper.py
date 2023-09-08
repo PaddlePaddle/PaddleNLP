@@ -158,7 +158,7 @@ def retrieval_papers(history=[]):
                         "**" + str(len(paper_id_list)) + "." + title + "**" + "\n" + key_words + "\n" + abstract
                     )
                     all_content += paper_content + "\n\n"
-            history.append(["下面请基于这几篇论文进行问题，单篇文档问答请使用单篇问答精读翻译", ",".join(paper_id_list)])
+            history.append(["下面请基于这几篇论文进行问答，单篇文档问答请使用单篇问答精读翻译", ",".join(paper_id_list)])
             confine_summary = merge_summary(papers_absatract, api_key=args.api_key, secret_key=args.secret_key)
             confine_summary = "**下面是对上面几篇文档进行的总结**" + "\n" + confine_summary
             confine_summary = confine_summary.replace("\n\n", "\n")
