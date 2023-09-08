@@ -73,7 +73,7 @@ Learnt by ERNIE：[mask] [mask] [mask] 是黑龙江的省会，国际 [mask] [ma
 ├── pretraining_introduction.md 中文预训练详细介绍文档
 ├── preprocess
 │   ├── docs                部分数据制作文档，包括CLUECorpusSmall，WuDaoCorpusBase
-│   |── xxx.py              文件处理的python脚本
+│   ├─ xxx.py              文件处理的python脚本
 │   └──README.md            PaddleNLP 预训练数据流程
 ├── vocab                   全中文字符词表制作教程
 ├── run_gb512_s1m.sh        训练启动shell脚本，batch size 512. max steps 100w
