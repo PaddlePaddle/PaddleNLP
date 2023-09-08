@@ -218,9 +218,8 @@ class StaticGraphPredictor(BasePredictor):
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
         super().__init__(config, tokenizer)
 
-        params_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdiparams")
-        model_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdmodel")
-        inference_config = paddle.inference.Config(model_path, params_path)
+        infer_model_path = get_infer_model_path(self.config.model_name_or_path, self.config.model_prefix)
+        inference_config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
 
         if self.config.device == "gpu":
             # set GPU configs accordingly
@@ -231,8 +230,22 @@ class StaticGraphPredictor(BasePredictor):
             inference_config.disable_gpu()
         elif self.config.device == "mlu":
             inference_config.disable_gpu()
-            inference_config.enable_custom_device("mlu", 0)
+            dev_id = int(paddle.get_device()[-1])
+            inference_config.enable_custom_device("mlu", dev_id)
+            inference_config.switch_ir_optim(True)
         inference_config.disable_glog_info()
+
+        if self.tensor_parallel_degree > 1:
+            trainer_endpoints = fleet.worker_endpoints()
+            current_endpoint = trainer_endpoints[self.tensor_parallel_rank]
+
+            dist_config = inference_config.dist_config()
+            dist_config.set_ranks(self.tensor_parallel_degree, self.tensor_parallel_rank)
+            dist_config.set_endpoints(trainer_endpoints, current_endpoint)
+            dist_config.enable_dist_model(True)
+
+            dist_config.set_comm_init_config(os.path.join(self.config.model_name_or_path, "rank_mapping.csv"))
+            inference_config.set_dist_config(dist_config)
 
         with static_mode_guard():
             self.predictor = paddle.inference.create_predictor(inference_config)
@@ -265,6 +278,16 @@ class StaticGraphPredictor(BasePredictor):
         # the first result is decoding_ids
         decoded_ids = results.tolist()
         return decoded_ids
+    
+    def _postprocess(self, predictions):
+        if paddle.distributed.get_rank() == 0:
+            # tokens: np.ndarray = load_real_time_tokens()
+            decoded_predictions = self.tokenizer.batch_decode(
+                predictions, skip_special_tokens=False, clean_up_tokenization_spaces=False
+            )
+            return decoded_predictions
+        else:
+            return None
 
 
 class StaticInferencePredictor(BasePredictor):
