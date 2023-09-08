@@ -287,7 +287,7 @@ class SpacyTextSplitter(TextSplitter):
     def split_text(self, text: str, separator: Optional[str] = None, **kwargs) -> List[str]:
         """Split incoming text and return chunks."""
         if len(text) > 1000000:
-            self._tokenizer.max_length = len(text)
+            self._tokenizer.max_length = len(text) + 100
         splits = (str(s) for s in self._tokenizer(text).sents)
         return self._merge_splits(splits, separator, **kwargs)
 
