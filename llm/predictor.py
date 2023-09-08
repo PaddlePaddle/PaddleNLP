@@ -52,8 +52,8 @@ class PredictorArgument:
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
     src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
     max_length: int = field(default=2048, metadata={"help": "the max length for decoding."})
-    top_k: int = field(default=1, metadata={"help": "top_k parameter for generation"})
-    top_p: float = field(default=1.0, metadata={"help": "top_p parameter for generation"})
+    top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
+    top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
     temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
     repetition_penalty: float = field(default=1.0, metadata={"help": "repetition penalty parameter for generation"})
     device: str = field(default="gpu", metadata={"help": "Device"})
@@ -555,6 +555,11 @@ def create_predictor(
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer):
         tokenizer.pad_token = tokenizer.eos_token
+
+    # update config parameter for inference predictor
+    if predictor_args.decode_strategy == "greedy_search" and predictor_args.inference_model:
+        predictor_args.top_p = 0.0
+        predictor_args.temperature = 1.0
 
     tensor_parallel_rank, tensor_parallel_degree = init_dist_env()
     if not predictor_args.inference_model:
