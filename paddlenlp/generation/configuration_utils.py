@@ -23,18 +23,20 @@ from huggingface_hub import hf_hub_download
 from paddle.common_ops_import import convert_dtype
 
 from paddlenlp import __version__
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
+from paddlenlp.transformers.utils import resolve_cache_dir
 from paddlenlp.utils.log import logger
 
-from ...utils import GENERATION_CONFIG_NAME
-from ...utils.downloader import (
+from ..utils import GENERATION_CONFIG_NAME
+from ..utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     get_path_from_url_with_filelock,
     hf_file_exists,
     is_url,
     url_file_exists,
 )
-from ..configuration_utils import PretrainedConfig
-from ..utils import resolve_cache_dir
+
+DEFAULT_MAX_NEW_TOKEN = 20
 
 
 def resolve_hf_generation_config_path(repo_id: str, cache_dir: str, subfolder=None) -> str:
@@ -143,7 +145,9 @@ class GenerationConfig:
 
     def __init__(self, **kwargs):
         # Parameters that control the length of the output
-        self.max_length = kwargs.pop("max_length", 20)
+        self.max_new_token = kwargs.get("max_new_token", DEFAULT_MAX_NEW_TOKEN)
+        self.min_new_token = kwargs.pop("min_new_token", 0)
+        self.max_length = kwargs.pop("max_length", 0)
         self.min_length = kwargs.pop("min_length", 0)
         self.early_stopping = kwargs.pop("early_stopping", False)
 
@@ -176,11 +180,6 @@ class GenerationConfig:
         self._from_model_config = kwargs.pop("_from_model_config", False)
         self.paddlenlp_version = kwargs.pop("paddlenlp_version", __version__)
 
-        # Parameters that control the generation strategy used
-        self.decode_strategy = kwargs.pop("decode_strategy", None)
-        if self.decode_strategy is None:
-            self.decode_strategy = self._get_generation_mode()
-
         # Additional attributes without default values
         if not self._from_model_config:
             # we don't want to copy values from the model config if we're initializing a `GenerationConfig` from a
@@ -192,6 +191,12 @@ class GenerationConfig:
                     logger.error(f"Can't set {key} with value {value} for {self}")
                     raise err
 
+        # Parameters that control the generation strategy used
+        if "decode_strategy" in kwargs:
+            self.decode_strategy = kwargs.pop("decode_strategy")
+        else:
+            self.decode_strategy = self._get_generation_mode()
+
         # Validate the values of the attributes
         self.validate(is_init=True)
 
@@ -202,7 +207,7 @@ class GenerationConfig:
         self_dict = self.__dict__.copy()
         other_dict = other.__dict__.copy()
         # ignore metadata
-        for metadata_field in "paddlenlp_version":
+        for metadata_field in ["_from_model_config", "paddlenlp_version"]:
             self_dict.pop(metadata_field, None)
             other_dict.pop(metadata_field, None)
         return self_dict == other_dict
@@ -432,7 +437,7 @@ class GenerationConfig:
             community_url = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, GENERATION_CONFIG_NAME])
             if url_file_exists(community_url):
                 resolved_config_file = get_path_from_url_with_filelock(
-                    pretrained_model_name_or_path, cache_dir, check_exist=not force_download
+                    community_url, cache_dir, check_exist=not force_download
                 )
             else:
                 raise FileNotFoundError(f"configuration file<{GENERATION_CONFIG_NAME}> not found")
@@ -483,7 +488,7 @@ class GenerationConfig:
         config = cls(**{**config_dict, **kwargs})
         unused_kwargs = config.update(**kwargs)
 
-        logger.info(f"Generate config {config}")
+        # logger.info(f"Generate config {config}")
         if return_unused_kwargs:
             return config, unused_kwargs
         else:

@@ -110,18 +110,18 @@ class MultiHeadAttention(nn.Layer):
         self.head_dim = config.hidden_size // self.num_heads
 
         # get the `num_heads`
-        assert self.num_heads % config.mp_degree == 0
-        self.num_heads = self.num_heads // config.mp_degree
+        assert self.num_heads % config.tensor_parallel_degree == 0
+        if config.tensor_parallel_degree > 0:
+            self.num_heads = self.num_heads // config.tensor_parallel_degree
+            assert (
+                self.head_dim * self.num_heads * config.tensor_parallel_degree == config.hidden_size
+            ), "hidden_size must be divisible by num_heads"
 
         self.dropout = config.attention_probs_dropout_prob
         self.need_weights = need_weights
         self.fuse_attention_qkv = config.fuse_attention_qkv
 
-        assert (
-            self.head_dim * self.num_heads * config.mp_degree == config.hidden_size
-        ), "hidden_size must be divisible by num_heads"
-
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             if self.fuse_attention_qkv:
                 self.qkv_proj = fleet.meta_parallel.ColumnParallelLinear(
                     config.hidden_size,
@@ -315,22 +315,22 @@ class TransformerDecoderLayer(nn.Layer):
         bias_attrs = _convert_param_attr_to_list(bias_attr, 3)
 
         self.self_attn = MultiHeadAttention(config, need_weights=True)
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.linear1 = fleet.meta_parallel.ColumnParallelLinear(
                 d_model,
                 dim_feedforward,
                 gather_output=False,
-                has_bias=False,
+                has_bias=True,
             )
         else:
             self.linear1 = nn.Linear(d_model, dim_feedforward, weight_attrs[2], bias_attr=bias_attrs[2])
 
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.linear2 = fleet.meta_parallel.RowParallelLinear(
                 dim_feedforward,
                 d_model,
                 input_is_parallel=True,
-                has_bias=False,
+                has_bias=True,
             )
         else:
             self.linear2 = nn.Linear(dim_feedforward, d_model, weight_attrs[2], bias_attr=bias_attrs[2])
@@ -390,7 +390,7 @@ class TransformerDecoder(Layer):
         super(TransformerDecoder, self).__init__()
 
         if config.word_embed_proj_dim != config.hidden_size:
-            if config.mp_degree > 1:
+            if config.tensor_parallel_degree > 1:
                 self.project_out = fleet.meta_parallel.ColumnParallelLinear(
                     config.hidden_size,
                     config.word_embed_proj_dim,
@@ -535,7 +535,7 @@ class OPTEmbeddings(Layer):
 
     def __init__(self, config: OPTConfig):
         super(OPTEmbeddings, self).__init__()
-        if config.mp_degree > 1:
+        if config.tensor_parallel_degree > 1:
             self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
                 config.vocab_size,
                 config.word_embed_proj_dim,
@@ -554,7 +554,7 @@ class OPTEmbeddings(Layer):
             )
 
         if config.word_embed_proj_dim != config.hidden_size:
-            if config.mp_degree > 1:
+            if config.tensor_parallel_degree > 1:
                 self.project_in = fleet.meta_parallel.ColumnParallelLinear(
                     config.word_embed_proj_dim,
                     config.hidden_size,
@@ -615,16 +615,20 @@ class OPTPretrainedModel(PretrainedModel):
             num_attention_heads=config.num_attention_heads,
         )
         actions = {
-            "word_embeddings.weight": partial(fn, is_column=False),
+            "embeddings.word_embeddings.weight": partial(fn, is_column=False),
         }
         for layer_index in range(config.num_hidden_layers):
             actions.update(
                 {
                     # Column Linear
                     f"decoder.layers.{layer_index}.self_attn.q_proj.weight": partial(fn, is_column=True),
+                    f"decoder.layers.{layer_index}.self_attn.q_proj.bias": partial(fn, is_column=True),
                     f"decoder.layers.{layer_index}.self_attn.k_proj.weight": partial(fn, is_column=True),
+                    f"decoder.layers.{layer_index}.self_attn.k_proj.bias": partial(fn, is_column=True),
                     f"decoder.layers.{layer_index}.self_attn.v_proj.weight": partial(fn, is_column=True),
+                    f"decoder.layers.{layer_index}.self_attn.v_proj.bias": partial(fn, is_column=True),
                     f"decoder.layers.{layer_index}.linear1.weight": partial(fn, is_column=True),
+                    f"decoder.layers.{layer_index}.linear1.bias": partial(fn, is_column=True),
                     # Row Linear
                     f"decoder.layers.{layer_index}.linear2.weight": partial(fn, is_column=False),
                     f"decoder.layers.{layer_index}.self_attn.out_proj.weight": partial(fn, is_column=False),
@@ -953,7 +957,12 @@ class OPTLMHead(Layer):
         super(OPTLMHead, self).__init__()
         self.config = config
         self.decoder_weight = (
-            self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=config.dtype, is_bias=True)
+            self.create_parameter(
+                default_initializer=paddle.nn.initializer.Uniform(low=-0.1, high=0.1),
+                shape=[config.vocab_size, config.hidden_size],
+                dtype=config.dtype,
+                is_bias=True,
+            )
             if embedding_weights is None
             else embedding_weights
         )
@@ -980,7 +989,6 @@ class OPTForCausalLM(OPTPretrainedModel):
         self.opt = OPTModel(config)
         self.lm_head = OPTLMHead(
             config,
-            embedding_weights=self.opt.embeddings.word_embeddings.weight,
         )
 
     def _get_model_inputs_spec(self, dtype: str):
