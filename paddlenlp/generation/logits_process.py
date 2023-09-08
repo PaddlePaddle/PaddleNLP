@@ -284,7 +284,7 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids, scores):
         cur_len = input_ids.shape[-1]
         if cur_len == self.max_length - 1:
-            scores[:] = -1e9  # TODO change back to -inf after paddle.topk is fixed
+            scores[:] = paddle.finfo(scores.dtype).min
             scores[:, self.forced_eos_token_id] = 0
         return scores
 
