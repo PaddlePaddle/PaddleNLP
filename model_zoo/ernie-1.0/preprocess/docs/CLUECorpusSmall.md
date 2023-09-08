@@ -40,7 +40,7 @@ python -u  create_pretraining_data.py \
     --model_name "idea-ccnl/ziya-llama-13b-v1" \
     --tokenizer_name "LlamaTokenizer" \
     --input_path "clue_corpus_small_14g.jsonl" \
-    --output_prefix "clue_corpus_small_14g_20220104" \
+    --output_prefix "clue_corpus_small_14g" \
     --data_format "JSON" \
     --json_key "text" \
     --data_impl "mmap" \
@@ -55,7 +55,7 @@ python -u  create_pretraining_data.py \
     --model_name "ernie-3.0-base-zh" \
     --tokenizer_name "ErnieTokenizer" \
     --input_path "clue_corpus_small_14g.jsonl" \
-    --output_prefix "clue_corpus_small_14g_20220104"  \
+    --output_prefix "clue_corpus_small_14g"  \
     --data_format "JSON" \
     --json_key "text" \
     --split_sentences \
@@ -72,7 +72,7 @@ python -u  create_pretraining_data.py \
 
 数据共有文档`15702702`条左右，由于分词比较耗时，大概一小时左右可以完成。在当前目录下产出训练所需数据。
 ```
-clue_corpus_small_14g_20220104.bin
-clue_corpus_small_14g_20220104.idx
+clue_corpus_small_14g.bin
+clue_corpus_small_14g.idx
 ```
 用户可以使用此数据进行预训练任务。
