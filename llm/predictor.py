@@ -557,7 +557,7 @@ def create_predictor(
         tokenizer.pad_token = tokenizer.eos_token
 
     # update config parameter for inference predictor
-    if predictor_args.decode_strategy == "greedy_search" and predictor_args.inference_model:
+    if predictor_args.decode_strategy == "greedy_search":
         predictor_args.top_p = 0.0
         predictor_args.temperature = 1.0
 
