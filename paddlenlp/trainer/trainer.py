@@ -153,7 +153,7 @@ except:
 try:
     from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
 except:
-    from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
+    from paddle.base.dataloader.dataloader_iter import _DataLoaderIterBase
 
 
 def is_dp_group_support_in_group_sharded_parallel():
@@ -659,7 +659,7 @@ class Trainer:
                 None,  # return_dict
             ],
         )
-        paddle.fluid.core._set_prim_forward_blacklist("expand_v2")
+        paddle.base.core._set_prim_forward_blacklist("expand_v2")
         start_time = time.time()
         self._globalstep_last_start_time = time.time()
         self.state.epoch = 0
