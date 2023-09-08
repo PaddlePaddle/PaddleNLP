@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import glob
+import math
 import os
 import struct
 from typing import Dict, Optional
@@ -351,6 +352,21 @@ def deserialize_from_file(fp):
     return data_arr
 
 
+def get_alibi_slopes(num_heads):
+    closest_power_of_2 = 2 ** math.floor(math.log2(num_heads))
+    base = 2 ** (-(2 ** -(math.log2(closest_power_of_2) - 3)))
+    powers = np.arange(1, 1 + closest_power_of_2)
+    slopes = np.power(base, powers)
+
+    if closest_power_of_2 != num_heads:
+        extra_base = 2 ** (-(2 ** -(math.log2(2 * closest_power_of_2) - 3)))
+        num_remaining_heads = min(closest_power_of_2, num_heads - closest_power_of_2)
+        extra_powers = np.arange(1, 1 + 2 * num_remaining_heads, 2)
+        slopes = np.concatante([slopes, np.power(extra_base, extra_powers)], axis=0)
+
+    return slopes.astype("float32")
+
+
 def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
     """Pad sequences to the max sequence length in batch."""
     max_len = max(map(len, insts))
@@ -366,7 +382,16 @@ def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
         return inst_data.astype("int64").reshape([-1, max_len])
 
 
-def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectures: str, benchmark=False):
+def dybatch_preprocess(
+    tokenizer,
+    texts: list[str],
+    max_length: int,
+    architectures: str,
+    top_p: float,
+    temperature: float,
+    pre_caches_length: int = 0,
+    benchmark: bool = False,
+):
     """Pre-process generation inputs."""
     if "chatglm" in architectures:
         input_ids = []
@@ -379,7 +404,6 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
 
         inputs = {}
         pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][0]
-
         inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
         bs = inputs["input_ids"].shape[0]
         max_len = max(map(len, input_ids))
@@ -410,9 +434,10 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
         bs = inputs["input_ids"].shape[0]
         max_len = max(map(len, input_ids))
 
-        position_ids = paddle.zeros(shape=[bs, max_len], dtype="int64")
+        position_ids = paddle.zeros(shape=[bs, max_length], dtype="int64")
+
         for i in range(bs):
-            position_ids[i, : seq_len[i]] = paddle.arange(seq_len[i])
+            position_ids[i, pre_caches_length : pre_caches_length + seq_len[i]] = paddle.arange(seq_len[i])
         inputs["position_ids"] = position_ids
 
     tgt_ids = [input[-1:] for input in input_ids]
@@ -437,7 +462,7 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
     inputs["top_p"] = (
         np.array(
             [
-                0.0,
+                top_p,
             ]
             * bs
         )
@@ -447,7 +472,7 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
     inputs["temperature"] = (
         np.array(
             [
-                1.0,
+                temperature,
             ]
             * bs
         )
@@ -455,7 +480,7 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
         .astype("float32")
     )
     inputs["seq_len_encoder"] = seq_len.astype("int32").reshape(-1, 1)
-    inputs["seq_len_decoder"] = seq_len.astype("int32").reshape(-1, 1)
+    inputs["seq_len_decoder"] = (seq_len + pre_caches_length).astype("int32").reshape(-1, 1)
     inputs["step_idx"] = np.array(step_idx).astype("int64").reshape(-1, 1)
     inputs["tgt_ids"] = np.array(tgt_ids).astype("int64").reshape(-1, 1)
     inputs["tgt_pos"] = tgt_pos.reshape(-1, 1)
