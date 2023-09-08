@@ -122,12 +122,22 @@ def get_dp_seed():
 
 def init_dist_env(config):
     paddle.set_device(config.Global.device)
-
     strategy = fleet.DistributedStrategy()
+    def is_segment_parallel_supported():
+        import inspect
+        members = [name for (name, date) in inspect.getmembers(fleet.HybridCommunicateGroup)]
+        return "get_sep_parallel_world_size" in members
+
     if config.Distributed.mp_degree == 1 and config.Distributed.sharding.sharding_degree == 1:
-        order = ["pp", "dp", "sharding", "mp"]
+        if is_segment_parallel_supported():
+            order = ["pp", "dp", "sharding", "sep", "mp"]
+        else:
+            order = ["pp", "dp", "sharding", "mp"]
     else:
-        order = ["dp", "pp", "sharding", "mp"]
+        if is_segment_parallel_supported():
+            order = ["dp", "pp", "sharding", "sep", "mp"]
+        else:
+            order = ["dp", "pp", "sharding", "mp"]
 
     strategy.hybrid_configs = {
         "dp_degree": config.Distributed.dp_degree,
