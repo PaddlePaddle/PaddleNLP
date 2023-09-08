@@ -59,6 +59,7 @@ class PredictorArgument:
     device: str = field(default="gpu", metadata={"help": "Device"})
     dtype: str = field(default=None, metadata={"help": "Model dtype"})
     lora_path: str = field(default=None, metadata={"help": "The directory of LoRA parameters. Default to None"})
+    export_precache: bool = field(default=False, metadata={"help": "whether use prefix weight to do infer"})
     prefix_path: str = field(
         default=None, metadata={"help": "The directory of Prefix Tuning parameters. Default to None"}
     )
@@ -296,16 +297,27 @@ class InferencePredictorMixin:
         )
         self.arange_tensor_encoder = paddle.zeros(shape=(config.batch_size, 1, total_max_length), dtype=self.dtype)
 
-        if config.prefix_path:
-            prefix_cache = paddle.to_tensor(np.load(f"{config.prefix_path}/pre_caches.npy")).unsqueeze(2)
-            num_layers = self.model_config.num_hidden_layers
-            num_attention_heads = self.model_config.num_attention_heads
-            head_dim = self.model_config.hidden_size // num_attention_heads
-            prefix_cache = paddle.expand(
-                prefix_cache, [num_layers, 2, config.batch_size, num_attention_heads, prefix_cache.shape[-2], head_dim]
-            )
-
-            self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, num_layers, axis=0)]
+        if config.export_precache:
+            if config.prefix_path:
+                prefix_cache = (
+                    paddle.to_tensor(np.load(f"{config.prefix_path}/pre_caches.npy")).astype(self.dtype).unsqueeze(2)
+                )
+                num_layers = self.model_config.num_hidden_layers
+                num_attention_heads = self.model_config.num_attention_heads
+                head_dim = self.model_config.hidden_size // num_attention_heads
+                prefix_cache = paddle.expand(
+                    prefix_cache,
+                    [num_layers, 2, config.batch_size, num_attention_heads, prefix_cache.shape[-2], head_dim],
+                )
+                self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, num_layers, axis=0)]
+            else:
+                num_layers = self.model_config.num_hidden_layers
+                num_attention_heads = self.model_config.num_attention_heads
+                head_dim = self.model_config.hidden_size // num_attention_heads
+                prefix_cache = paddle.zeros(
+                    [num_layers, 2, config.batch_size, num_attention_heads, 128, head_dim], dtype=self.dtype
+                )
+                self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, num_layers, axis=0)]
 
     def _postprocess(self, predictions):
         if paddle.distributed.get_rank() == 0:
@@ -398,8 +410,7 @@ class InferencePredictorMixin:
             )
 
         else:
-            pre_caches_length = 0 if self.config.prefix_path is None else self.pre_caches[0].shape[-2]
-
+            pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
             inputs = dybatch_preprocess(
                 self.tokenizer,
                 source,
@@ -417,9 +428,14 @@ class InferencePredictorMixin:
                 )
 
                 if pre_caches_length > 0:
-                    prefix_attention_mask = paddle.ones(
-                        [1, length, pre_caches_length], dtype=self.attention_mask.dtype
-                    )
+                    if self.config.prefix_path is None:
+                        prefix_attention_mask = paddle.zeros(
+                            [1, length, pre_caches_length], dtype=self.attention_mask.dtype
+                        )
+                    else:
+                        prefix_attention_mask = paddle.ones(
+                            [1, length, pre_caches_length], dtype=self.attention_mask.dtype
+                        )
                     post_attention_mask = paddle.tril(
                         paddle.ones(shape=(length, length), dtype=self.attention_mask.dtype)
                     ).unsqueeze_(axis=0)
@@ -427,15 +443,26 @@ class InferencePredictorMixin:
                         [prefix_attention_mask, post_attention_mask], axis=2
                     )
 
-                self.tgt_generation_mask[i, 0, 0, : length + pre_caches_length] = paddle.ones(
-                    shape=[1, length + pre_caches_length], dtype=self.config.dtype
-                )
+                if self.config.prefix_path is None:
+                    self.tgt_generation_mask[i, 0, 0, pre_caches_length : length + pre_caches_length] = paddle.ones(
+                        shape=[1, length], dtype="float16"
+                    )
+                else:
+                    self.tgt_generation_mask[i, 0, 0, : length + pre_caches_length] = paddle.ones(
+                        shape=[1, length + pre_caches_length], dtype=self.config.dtype
+                    )
 
         inputs["pre_ids"] = self.pre_ids
         inputs["attention_mask"] = self.attention_mask
         inputs["tgt_generation_mask"] = self.tgt_generation_mask
-        if self.config.prefix_path:
-            inputs["pre_caches"] = self.pre_caches
+
+        if pre_caches_length > 0:
+            if self.config.mode == "dynamic":
+                inputs["pre_caches"] = self.pre_caches
+            else:
+                for i in range(len(self.pre_caches)):
+                    inputs["pre_caches_{}".format(i)] = self.pre_caches[i].numpy()
+
         return inputs
 
 
