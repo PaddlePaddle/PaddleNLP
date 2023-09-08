@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import inspect
 from typing import List, Union
 
 import paddle
@@ -61,6 +62,12 @@ class GenerationInferenceModel(GenerationMixin):
     def get_cache_kvs_shape(cls, max_batch_size: int = None, max_length: int = None) -> list[list[int]]:
         raise NotImplementedError
 
+    def _get_to_static_optional_kwargs(self):
+        kwargs = inspect.signature(paddle.jit.save).parameters
+        if "skip_prune_program" in kwargs:
+            return {"skip_prune_program": True}
+        return {}
+
     def to_static(self, output_path: str, config: dict):
         dtype = config.get("dtype", paddle.get_default_dtype())
 
@@ -107,7 +114,7 @@ class GenerationInferenceModel(GenerationMixin):
             input_spec[16] = paddle.static.InputSpec(shape=[None, 2, 1], dtype="int64", name="tgt_pos")  # tgt_pos
         model = paddle.jit.to_static(self.generate, input_spec=input_spec)
         paddle.jit.save(
-            model, output_path, skip_prune_program=True
+            model, output_path, **self._get_to_static_optional_kwargs()
         )  # Note(Zhengzekang): If we prune program it may cause some inference error.
 
     @staticmethod
