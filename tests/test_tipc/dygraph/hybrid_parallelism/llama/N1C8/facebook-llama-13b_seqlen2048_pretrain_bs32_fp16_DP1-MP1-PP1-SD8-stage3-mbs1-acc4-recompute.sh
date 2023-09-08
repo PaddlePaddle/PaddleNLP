@@ -13,7 +13,7 @@
 # limitations under the License.
 
 model_name_or_path="facebook/llama-13b"
-per_device_train_batch_size="2"
+per_device_train_batch_size="1"
 use_flash_attention="1"
 tensor_parallel_degree="1"
 pipeline_parallel_degree="1"
@@ -29,7 +29,7 @@ device_num="N1C8"
 global_batch_size=32
 model_item="facebook-llama-13b_seqlen2048_pretrain"
 max_step=150
-gradient_accumulation_steps=2
+gradient_accumulation_steps=4
 pp_recompute_interval=1
 
 cd ./tests
