@@ -22,6 +22,7 @@ import re
 import tempfile
 import warnings
 from contextlib import contextmanager
+from functools import partial
 
 # from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
@@ -57,10 +58,10 @@ from paddlenlp.utils.env import (
 )
 from paddlenlp.utils.log import logger
 
+from ..generation import GenerationConfig, GenerationMixin
 from ..utils import device_guard
 from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
-from .generation_utils import GenerationMixin
 from .utils import (  # convert_ndarray_dtype,
     ContextManagers,
     InitTrackerMeta,
@@ -317,9 +318,7 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike], tensor_parallel_sp
             )
         if metadata["format"] == "pd":
             raise ValueError("Currently unsupport paddle weights file, use numpy instead.")
-            return safe_load_file(checkpoint_file)
         if metadata["format"] == "np":
-            logger.warning("loading safe.")
             state_dict = {}
             with safe_open(checkpoint_file, framework="np") as f:
                 for key in f.keys():
@@ -330,12 +329,10 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike], tensor_parallel_sp
                         weight = py_safe_slice_[:]
                     state_dict[key] = weight
 
-            logger.warning("loading done.")
             for k in list(state_dict.keys()):
                 with device_guard():
                     state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
 
-            logger.warning("copy paddle tensor done.")
             return state_dict
 
     state_dict = paddlenlp_load(checkpoint_file, map_location="cpu")
@@ -554,7 +551,7 @@ def shard_checkpoint(
     return shards, index
 
 
-def load_sharded_checkpoint(model, folder, strict=True):
+def load_sharded_checkpoint(model, folder, variant=None, strict=True, prefer_safe=False):
     """
     This is the same as [`paddle.nn.Layer.set_state_dict`]
     but for a sharded checkpoint.
@@ -565,8 +562,12 @@ def load_sharded_checkpoint(model, folder, strict=True):
     Args:
         model (`paddle.nn.Module`): The model in which to load the checkpoint.
         folder (`str` or `os.PathLike`): A path to a folder containing the sharded checkpoint.
+        variant (`str`): The model variant.
         strict (`bool`, *optional`, defaults to `True`):
             Whether to strictly enforce that the keys in the model state dict match the keys in the sharded checkpoint.
+        prefer_safe (`bool`, *optional*, defaults to `False`):
+            If both safetensors and Paddle save files are present in checkpoint and `prefer_safe` is True, the safetensors
+            files will be loaded. Otherwise, Paddle files are always loaded when possible.
 
     Returns:
         `NamedTuple`: A named tuple with `missing_keys` and `unexpected_keys` fields
@@ -574,11 +575,35 @@ def load_sharded_checkpoint(model, folder, strict=True):
             - `unexpected_keys` is a list of str containing the unexpected keys
     """
     # Load the index
-    index_file = os.path.join(folder, PADDLE_WEIGHTS_INDEX_NAME)
-    if not os.path.isfile(index_file):
-        raise ValueError(f"Can't find a checkpoint index ({PADDLE_WEIGHTS_INDEX_NAME}) in {folder}.")
+    index_file = os.path.join(folder, _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant))
+    safe_index_file = os.path.join(folder, _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant))
 
-    with open(index_file, "r", encoding="utf-8") as f:
+    index_present = os.path.isfile(index_file)
+    safe_index_present = os.path.isfile(safe_index_file)
+
+    if not index_present and not (safe_index_present and is_safetensors_available()):
+        filenames = (
+            (_add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant), _add_variant(SAFE_WEIGHTS_INDEX_NAME, variant))
+            if is_safetensors_available()
+            else (_add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant),)
+        )
+        raise ValueError(f"Can't find a checkpoint index ({' or '.join(filenames)}) in {folder}.")
+
+    load_safe = False
+    if safe_index_present:
+        if prefer_safe:
+            if is_safetensors_available():
+                load_safe = True  # load safe due to preference
+            else:
+                logger.warning(
+                    f"Cannot load sharded checkpoint at {folder} safely since safetensors is not installed!"
+                )
+        elif not index_present:
+            load_safe = True
+
+    load_index = safe_index_file if load_safe else index_file
+
+    with open(load_index, "r", encoding="utf-8") as f:
         index = json.load(f)
 
     shard_files = list(set(index["weight_map"].values()))
@@ -598,12 +623,14 @@ def load_sharded_checkpoint(model, folder, strict=True):
             error_message += f"\nMissing key(s): {str_unexpected_keys}."
         raise RuntimeError(error_message)
 
+    loader = safe_load_file if load_safe else partial(paddlenlp_load, map_location="cpu")
+
     for shard_file in shard_files:
-        state_dict = paddlenlp_load(os.path.join(folder, shard_file), map_location="cpu")
+        state_dict = loader(os.path.join(folder, shard_file))
         with warnings.catch_warnings():
             warnings.resetwarnings()
             warnings.filterwarnings("ignore", message=r".*is not found in the provided dict.*")
-            model.set_state_dict(state_dict)
+            logger.info(f"set state-dict: {model.set_state_dict(state_dict)}")
 
         # Make sure memory is fred before we load the next state dict.
         del state_dict
@@ -836,6 +863,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if config is not None:
             self.config: PretrainedConfig = config
             self.model_config_file = CONFIG_NAME
+            self.generation_config = GenerationConfig.from_model_config(self.config) if self.can_generate() else None
             return
 
         # extract config from kwargs
@@ -849,6 +877,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             raise TypeError("config parameter should be the instance of PretrainedConfig")
 
         self.config: PretrainedConfig = kwargs["config"]
+        self.generation_config = GenerationConfig.from_model_config(self.config) if self.can_generate() else None
         self.model_config_file = CONFIG_NAME
         self.warnings_issued = {}
 
@@ -1966,6 +1995,22 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             keep_in_fp32_modules=keep_in_fp32_modules,
         )
 
+        # load generation_config.json
+        if model.can_generate() and pretrained_model_name_or_path is not None:
+            try:
+                model.generation_config = GenerationConfig.from_pretrained(
+                    pretrained_model_name_or_path,
+                    cache_dir=cache_dir,
+                    force_download=force_download,
+                    subfolder=subfolder,
+                    **kwargs,
+                )
+            except OSError:
+                logger.info(
+                    "Generation config file not found, using a generation config created from the model config."
+                )
+                pass
+
         if paddle.in_dynamic_mode():
             return model
 
@@ -2059,9 +2104,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if is_main_process:
             config_to_save.save_pretrained(save_directory)
             if self.can_generate():
-                # to do support generation_config
-                pass
-                # model_to_save.generation_config.save_pretrained(save_directory)
+                model_to_save.generation_config.save_pretrained(save_directory)
 
         # Handle the case where some state_dict keys shouldn't be saved
         if self._keys_to_ignore_on_save is not None:
@@ -2105,7 +2148,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 # joyfulness), but for now this enough.
                 for k in list(shard.keys()):
                     if isinstance(shard[k], paddle.Tensor):
-                        shard[k] = shard.pop(k).numpy()
+                        shard[k] = shard.pop(k).cpu().numpy()
                 safe_save_file(shard, os.path.join(save_directory, shard_file), metadata={"format": "np"})
             else:
                 save_function(shard, os.path.join(save_directory, shard_file))

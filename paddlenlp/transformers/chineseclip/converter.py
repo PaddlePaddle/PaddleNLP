@@ -74,7 +74,7 @@ class ChineseCLIPConverter(Converter):
 
         state_dict = torch.load(model_file)
         for key in state_dict.keys():
-            state_dict[key] = state_dict[key].numpy()
+            state_dict[key] = state_dict[key].cpu().numpy()
             if state_dict[key].ndim == 0:
                 state_dict[key] = state_dict[key].reshape((1,))
         return state_dict

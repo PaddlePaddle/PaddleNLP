@@ -464,6 +464,7 @@ class GLMTransformer(nn.Layer):
 
     def __init__(self, config: ChatGLMv2Config):
         super(GLMTransformer, self).__init__()
+        self.config = config
         self.enable_recompute = False
         self.fp32_residual_connection = config.fp32_residual_connection
         self.post_layer_norm = config.post_layer_norm
@@ -508,7 +509,7 @@ class GLMTransformer(nn.Layer):
             rotary_embeds,
             kv_cache,
             use_cache,
-            use_reentrant=False,
+            use_reentrant=self.config.recompute_use_reentrant,
         )
         return hidden_states, kv_cache
 
@@ -811,6 +812,7 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
             "position_ids": position_ids,
             "attention_mask": attention_mask,
             "return_last_logit": True,
+            "use_cache": True,
         }
 
     def forward(

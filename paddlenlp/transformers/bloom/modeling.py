@@ -114,6 +114,7 @@ def _expand_2d_mask(mask: Tensor, tgt_length: int) -> Tensor:
     batch_size, src_length = mask.shape[0], mask.shape[-1]
     tgt_length = tgt_length if tgt_length is not None else src_length
 
+    mask.stop_gradient = True
     return mask.unsqueeze(axis=[1, 2]).expand([batch_size, 1, tgt_length, src_length])
 
 
@@ -136,7 +137,7 @@ def build_alibi_tensor(attention_mask: Tensor, num_heads: int, dtype) -> Tensor:
     """
     # _, seq_length = attention_mask.shape[0], attention_mask.shape[-1]
     closest_power_of_2 = 2 ** math.floor(math.log2(num_heads))
-    base = paddle.to_tensor(2 ** (-(2 ** -(math.log2(closest_power_of_2) - 3))), dtype=paddle.float32)
+    base = paddle.full([], 2 ** (-(2 ** -(math.log2(closest_power_of_2) - 3))), dtype=paddle.float32)
     powers = paddle.arange(1, 1 + closest_power_of_2, dtype=paddle.float32)
     slopes = paddle.pow(base, powers)
 
@@ -763,6 +764,7 @@ class BloomModel(BloomPreTrainedModel):
 
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
+        self.config = config
         self.embed_dim = config.hidden_size
         self.n_head = config.n_head
 
@@ -845,7 +847,7 @@ class BloomModel(BloomPreTrainedModel):
             use_cache,
             output_attentions,
             alibi,
-            use_reentrant=False,
+            use_reentrant=self.config.recompute_use_reentrant,
         )
         return hidden_states
 

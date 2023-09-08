@@ -33,7 +33,7 @@ sys.path.append(os.path.abspath(".."))
 # -- Project information -----------------------------------------------------
 
 project = "PaddleNLP"
-copyright = "2021, PaddleNLP"
+copyright = "2023, PaddleNLP"
 author = "PaddleNLP"
 default_role = "py:obj"
 
