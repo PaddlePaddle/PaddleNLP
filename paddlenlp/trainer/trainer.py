@@ -1794,6 +1794,9 @@ class Trainer:
         if output_dir is None:
             output_dir = self.args.output_dir
 
+        if ShardingOption.FULL_SHARD in self.args.sharding:
+            self.model_wrapped.get_all_parameters(convert2cpu=True)
+
         if self.args.should_save_model_state:
             self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
 
@@ -1806,10 +1809,6 @@ class Trainer:
         run_dir = self.args.output_dir
 
         output_dir = os.path.join(run_dir, checkpoint_folder)
-
-        if ShardingOption.FULL_SHARD in self.args.sharding:
-            # TODO(ZHUI) fix it and set convert2cpu=True to save gpu memory
-            model.get_all_parameters(convert2cpu=False)
 
         self.save_model(output_dir)
 
