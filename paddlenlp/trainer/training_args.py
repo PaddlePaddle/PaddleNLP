@@ -804,9 +804,14 @@ class TrainingArguments:
             self.distributed_dataloader = False
 
         if self.amp_master_grad:
-            if self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1:
+            if (
+                self.pipeline_parallel_degree <= 1
+                and self.tensor_parallel_degree <= 1
+                and not (self.sharding and ShardingOption.SHARD_OP in self.sharding)
+            ):
                 raise ValueError(
-                    "Temporarily amp master grad only suport for tensor/pipeline parallel. please set amp_master_grad to False."
+                    "Temporarily amp master grad only support for tensor/pipeline/sharding parallel. "
+                    "Please set amp_master_grad to False."
                 )
             if not (self.bf16 or self.fp16):
                 logger.warning("set amp_master_grad to false since amp is disabled.")
@@ -981,6 +986,14 @@ class TrainingArguments:
                                     f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap."
                                 )
                     try:
+                        if (
+                            "enable_stage1_tensor_fusion" in sharding_parallel_config
+                            or "enable_stage1_overlap" in sharding_parallel_config
+                        ):
+                            assert pipeline_parallel_degree == 1, (
+                                "For pipeline parallel with sharding, the sharding overlap and tensor fusion "
+                                "should be configured in pipeline_parallel_config."
+                            )
                         strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
                             True if "enable_stage1_tensor_fusion" in sharding_parallel_config else False
                         )
