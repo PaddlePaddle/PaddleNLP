@@ -32,19 +32,39 @@ python trans_to_json.py  --input_path ./clue_corpus_small_14g --output_path clue
 
 ## 中文预训练数据制作
 
-下面是针对训练任务的数据集应用，此处以llama为例。
+下面是针对训练任务的数据集应用。
 
-```
+* llama为例
+```shell
 python -u  create_pretraining_data.py \
-    --model_name idea-ccnl/ziya-llama-13b-v1 \
-    --tokenizer_name LlamaTokenizer \
+    --model_name "idea-ccnl/ziya-llama-13b-v1" \
+    --tokenizer_name "LlamaTokenizer" \
+    --input_path "clue_corpus_small_14g.jsonl" \
+    --output_prefix "clue_corpus_small_14g_20220104" \
     --data_format "JSON" \
-    --input_path clue_corpus_small_14g.jsonl \
+    --json_key "text" \
+    --data_impl "mmap" \
     --append_eos \
-    --output_prefix clue_corpus_small_14g_20220104 \
-    --workers 48 \
     --log_interval 10000 \
-    --data_impl "mmap"
+    --workers 48
+```
+
+* ernie为例
+```shell
+python -u  create_pretraining_data.py \
+    --model_name "ernie-3.0-base-zh" \
+    --tokenizer_name "ErnieTokenizer" \
+    --input_path "clue_corpus_small_14g.jsonl" \
+    --output_prefix "clue_corpus_small_14g_20220104"  \
+    --data_format "JSON" \
+    --json_key "text" \
+    --split_sentences \
+    --data_impl "mmap" \
+    --chinese \
+    --cn_whole_word_segment \
+    --cn_seg_func "lac" \
+    --log_interval 10000 \
+    --workers 48
 ```
 
 - model_name 可以更换为[其他模型](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/llama/README.md)。

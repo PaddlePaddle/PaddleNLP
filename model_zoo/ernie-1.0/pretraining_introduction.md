@@ -40,8 +40,9 @@ PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao �
 - tool_helpers
 - visualdl
 - pybind11
+- lac (可选)
 
-安装命令 `pip install visualdl pybind11 tool_helpers`
+安装命令 `pip install tool_helpers visualdl pybind11 lac`
 
 <a name="数据准备"> </a>
 
@@ -62,7 +63,7 @@ PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao �
 
 **CLUECorpus2020 语料**
 
-CLUECorpus2020 过对Common Crawl的中文部分进行语料清洗得到。开源部分提供了约200G左右的语料文本，详细介绍见[官网](https://github.com/CLUEbenchmark/CLUECorpus2020#%E6%95%B0%E6%8D%AE%E4%B8%8B%E8%BD%BD)，用户可以通过邮件申请下载。
+CLUECorpus2020 是通过Common Crawl中文部分语料清洗得到。开源部分提供了约200G左右的语料文本，详细介绍见[官网](https://github.com/CLUEbenchmark/CLUECorpus2020#%E6%95%B0%E6%8D%AE%E4%B8%8B%E8%BD%BD)，用户可以通过邮件申请下载。
 
 **WuDaoCorpus2.0 Base 语料**
 
@@ -82,7 +83,7 @@ tar -xvf WuDaoCorpus2.0_base_200G_sample.tar.gz
 
 ### 1.2 高精准中文分词
 
-ERNIE 使用知识嵌入的方式进行预训练。文本中的知识，比如 文本的中的人名、地名、成语、短语等都是知识。如何把这知识训练融合到模型中呢？ERNIE给出的方案，是对这些知识短语一起MASK，然后预测，也就是Whole Words MASK。
+ERNIE 使用知识嵌入的方式进行预训练。文本中的知识，比如 文本的中的人名、地名、成语、短语等都是知识。如何把这知识训练融合到模型中呢？ERNIE给出的方案是对这些知识短语一起MASK，然后预测，也就是Whole Words MASK。
 
 在我们数据处理层面，如何尽可能精确的从原始文本中提取知识，直接关系预训练模型的效果。我们对目前PaddleNLP常用的分词方式的有`jieba`，`lac`，`Wordtag`进行分析。`jieba`采用HMM隐马尔可模型，`lac`是LSTM模型，`wordtag`是基于Transformer的模型。
 
@@ -106,7 +107,7 @@ python ./preprocess/words_segmentation.py \
     --workers 40  \
     --data_format wudao \
     --cn_seg_func seg \
-    --output_path ./wudao_lac_cut \
+    --output_path ./wudao_lac_cut
 ```
 
 注：预训练需要实现 SOP( Sentence Order Predict) 任务，在分词的同时，我们使用 简单规则 进行了文本断句。如果语料只有一句话，建议去除SOP loss，训练时设置 `binary_head=False`。
@@ -148,6 +149,7 @@ python -u  ./preprocess/create_pretraining_data.py \
     --tokenizer_name ErnieTokenizer \
     --input_path wudao_corpus_200g_0623.jsonl \
     --split_sentences\
+    --data_impl mmap \
     --chinese \
     --cn_splited \
     --cn_whole_word_segment \

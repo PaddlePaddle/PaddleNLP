@@ -46,25 +46,47 @@ python ./trans_to_json.py  \
 
 ## 中文预训练数据制作
 
-下面是针对训练任务的数据集应用，此处以ziya-llama-13b-v1为例。
+下面是针对训练任务的数据集应用。
 
-```
+* llama为例
+```shell
 python -u  create_pretraining_data.py \
-    --model_name idea-ccnl/ziya-llama-13b-v1 \
-    --tokenizer_name LlamaTokenizer \
+    --model_name "idea-ccnl/ziya-llama-13b-v1" \
+    --tokenizer_name "LlamaTokenizer" \
+    --input_path "wudao_corpus_200g_0623.jsonl" \
+    --output_prefix "wudao_corpus_200g_0623" \
     --data_format "JSON" \
-    --input_path wudao_corpus_200g_0623.jsonl \
-    --cn_seg_func jieba \
+    --json_key "text" \
+    --data_impl "mmap" \
+    --cn_seg_func "jieba" \
     --cn_splited \
     --append_eos \
-    --output_prefix wudao_corpus_200g_0623 \
-    --workers 48 \
     --log_interval 10000 \
-    --data_impl "mmap"
+    --workers 48
 ```
 
-- 我们提前分词好了，所以加上了 `cn_splited`，否则不需要使用此选项。
-- model_name 可以更换为[其他模型](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/llama/README.md)。
+* ernie为例
+```shell
+python -u  create_pretraining_data.py \
+    --model_name "ernie-3.0-base-zh" \
+    --tokenizer_name "ErnieTokenizer" \
+    --input_path "wudao_corpus_200g_0623.jsonl" \
+    --output_prefix "wudao_corpus_200g_0623"  \
+    --data_format "JSON" \
+    --json_key "text" \
+    --split_sentences \
+    --data_impl "mmap" \
+    --chinese \
+    --cn_whole_word_segment \
+    --cn_seg_func "jieba" \
+    --cn_splited \
+    --log_interval 10000 \
+    --workers 48
+```
+
+
+- 我们提前进行了分词，所以加上了 `cn_splited`，否则不需要使用此选项。
+- model_name 可以更换为[其他模型](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm)。
 - workers 表示转化的线程数目
 
 在当前目录下产出训练所需数据。

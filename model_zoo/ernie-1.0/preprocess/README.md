@@ -110,7 +110,9 @@ optional arguments:
 根据说明，我们使用下面简单命令，可以得到`baike_sample.jsonl`文件。此处，我们对文章所有doc进行了shuffle。
 ```shell
 python trans_to_json.py  --input_path ./data --output_path baike_sample
+```
 
+```shell
 #查看数据
 head -1 baike_sample.jsonl
 {"text": "中国效仿西方发展工业的过程，于中华民国国民政府成立后至中日战争开战前夕已顺畅发展，尽管其间受到内外因素的多重干扰。尔后直至中日战争和国共战争的结束，
@@ -167,7 +169,7 @@ chinese words:
 
 common config:
   --append_eos          Append an <eos> token to the end of a document.
-                        gpt模型专用，gpt设置此选项，表示doc结束。
+                        gpt类模型专用，gpt设置此选项，表示doc结束。针对tokenier中不包含eos_token情况，输出提示warning并且不添加<eos>。
   --log_interval LOG_INTERVAL
                         Interval between progress updates
                         打印日志间隔，interval表示处理 文本行数/doc数的 间隔。
@@ -175,17 +177,40 @@ common config:
                         处理文本id化的进程个数。
 ```
 通过下面脚本转化，我们可以得到处理好的预训练数据，token ids:`baike_sample.bin`, 文章索引信息`baike_sample.idx`.
-```
+
+* 针对 llama 模型
+```shell
 python -u  create_pretraining_data.py \
     --model_name "idea-ccnl/ziya-llama-13b-v1" \
     --tokenizer_name "LlamaTokenizer" \
-    --data_format "JSON" \
     --input_path "baike_sample.jsonl" \
-    --append_eos \
     --output_prefix "baike_sample"  \
-    --workers 1 \
+    --data_format "JSON" \
+    --json_key "text" \
+    --data_impl "mmap" \
+    --cn_seg_func "jieba" \
+    --append_eos \
     --log_interval 5 \
-    --data_impl "mmap"
+    --workers 40
+
+```
+
+* 针对 ernie 模型
+```shell
+python -u  create_pretraining_data.py \
+    --model_name "ernie-3.0-base-zh" \
+    --tokenizer_name "ErnieTokenizer" \
+    --input_path "baike_sample.jsonl" \
+    --output_prefix "baike_sample"  \
+    --data_format "JSON" \
+    --json_key "text" \
+    --split_sentences \
+    --data_impl "mmap" \
+    --chinese \
+    --cn_whole_word_segment \
+    --cn_seg_func "jieba" \
+    --log_interval 5 \
+    --workers 40
 ```
 1. 如果您使用已经分好词的语料，可以设置 --cn_splited 为 True，同时指定--cn_split_dimer如空格。
 2. 使用自定义词表的话，请指定model_name为词表所在的文件夹地址。
@@ -213,19 +238,18 @@ arguments:
 ```
 
 ### 预训练开始
-得到了处理好的训练数据，就可以开始Llama模型的预训练了。预训练的代码在`llm/llama`。
+得到了处理好的训练数据，就可以开始模型的预训练了。预训练的代码在[`llm`](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm)。
 简单将预处理好的数据，拷贝到data目录，即可开始预训练。
-```
+```shell
 mkdir data
 mv ./preprocess/baike_sample* ./data
-sh run_trainer.sh
 ```
-代码说明：
 
+代码说明：
 - 动态mask相关代码实现在`./data_tools/dataset_utils.py`
-用户可以根据自己的需求，灵活修改mask方式。具体可以参考`dataset_utils.py`中`create_masked_lm_predictions`函数。
-可以自定义的选项有do_whole_word_mask, favor_longer_ngram, do_permutation, geometric_dist等，
-可以参考[Megatron](https://github.com/NVIDIA/Megatron-LM)使用这些lm_mask策略。
+  用户可以根据自己的需求，灵活修改mask方式。具体可以参考`dataset_utils.py`中`create_masked_lm_predictions`函数。
+  可以自定义的选项有do_whole_word_mask, favor_longer_ngram, do_permutation, geometric_dist等，
+  可以参考[Megatron](https://github.com/NVIDIA/Megatron-LM)使用这些lm_mask策略。
 
 ## 参考内容
 
