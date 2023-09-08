@@ -192,10 +192,14 @@ class ModelArguments:
         metadata={"help": "Specify the full transformer layers that should not be recomputed."},
     )
     pp_recompute_interval: int = field(
-        default=0,
+        default=1,
         metadata={
             "help": "The interval for the number of layers at which recomputation occurs. A value of 0 indicates no recomputation. Default is 0."
         },
+    )
+    recompute_use_reentrant: bool = field(
+        default=False,
+        metadata={"help": "recompute_use_reentrant"},
     )
 
 
@@ -442,6 +446,7 @@ def main():
     config.rope_fusion_level = model_args.rope_fusion_level
     config.no_recompute_layers = model_args.no_recompute_layers
     config.pp_recompute_interval = model_args.pp_recompute_interval
+    config.recompute_use_reentrant = model_args.recompute_use_reentrant
 
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
