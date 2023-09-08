@@ -47,11 +47,11 @@
 
 注意：
 - **❇️(**可选**)数据中文分词** 是中文预训练做 WWM 的可选步骤
-  - 当你的数据比较少时，分词耗时较少，不需要词步骤。直接在`create_pretrain_data.py`步骤中分词即可。
+  - 当你的数据比较少时，分词耗时较少，不需要分词步骤。直接在`create_pretrain_data.py`步骤中分词即可。
   - 目的是为了提前分词，加快后续数据ID转化步骤。
   - 如果这里输入的是 jsonl格式文件，最好为多文件，`trans_to_json.py` 时候开启`no-merge`选项。
   - 当你的数据集比较大，或者需要尝试多次转换数据的时候，提前分词可以避免`create_pretrain_data.py`时每次都运行一次分词程序。
-- 转换后，需要重新 进行步骤 1️⃣`原始数据转换 trans_to_json.py`，最后2️⃣`数据ID化`步骤设置`--cn_splited=True`参数。
+- 转换后，需要重新进行步骤 1️⃣`原始数据转换 trans_to_json.py`，最后2️⃣`数据ID化`步骤设置`--cn_splited=True`参数。
 - 2️⃣`数据ID化`也可以在转化ID的同时，一起实现分词。不需要❇️`数据中文分词`步骤。
 
 
@@ -238,12 +238,15 @@ arguments:
 ```
 
 ### 预训练开始
-得到了处理好的训练数据，就可以开始模型的预训练了。预训练的代码在[`llm`](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm)。
-简单将预处理好的数据，拷贝到data目录，即可开始预训练。
+得到了处理好的训练数据，就可以开始模型的预训练了。简单将预处理好的数据，拷贝到data目录，即可开始预训练。
 ```shell
 mkdir data
 mv ./preprocess/baike_sample* ./data
 ```
+
+* llama预训练请参考[预训练](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/llama/README.md)。
+* ernie预训练请参考[预训练](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-1.0/pretraining_introduction.md)。
+
 
 代码说明：
 - 动态mask相关代码实现在`./data_tools/dataset_utils.py`
