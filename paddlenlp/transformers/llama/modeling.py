@@ -92,7 +92,7 @@ def build_alibi_tensor(
     bool_attention_mask: Tensor, num_heads: int, dtype: paddle.dtype, tensor_parallel_degree=1
 ) -> Tensor:
     attention_mask = bool_attention_mask.astype("float32")
-    batch_size, seq_length = attention_mask.shape
+    batch_size, seq_length = attention_mask.shape[0], attention_mask.shape[-1]
     slopes = paddle.to_tensor(_get_interleave(num_heads), dtype="float32")
     alibi = slopes.unsqueeze(axis=[1, 2]) * paddle.arange(seq_length, dtype="float32").unsqueeze(axis=[0, 1]).expand(
         [num_heads, -1, -1]

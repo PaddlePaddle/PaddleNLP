@@ -17,6 +17,11 @@ export nlp_dir=${PWD}
 export log_path=${nlp_dir}/model_logs
 export cudaid1=$2
 export cudaid2=$3
+export C_COMPILER_PATH=$(which gcc)
+export CXX_COMPILER_PATH=$(which g++)
+export CC=$(which gcc)
+export CXX=$(which g++)
+
 if [ ! -d "model_logs" ];then
     mkdir model_logs
 fi
@@ -238,17 +243,18 @@ cd ${nlp_dir}/paddlenlp/ops
 #python
 mkdir build_gpt_so
 cd build_gpt_so/
-cmake ..  -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python -DWITH_GPT=ON -DPADDLE_LIB=${nlp_dir}/paddle_inference/ -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/gpt.cc \
- -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON  -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON -DPYTHON_EXECUTABLE=/opt/_internal/cpython-3.8.0/bin/python \
- -DPYTHON_INCLUDE_DIR=/opt/_internal/cpython-3.8.0/lib -DPYTHON_LIBRARY=/opt/_internal/cpython-3.8.0/include/python3.8 
+cmake ..  -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=${C_COMPILER_PATH} -DCMAKE_CXX_COMPILER=${CXX_COMPILER_PATH} \
+-DPADDLE_LIB=${nlp_dir}/paddle_inference/ -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/gpt.cc \
+-DPY_CMD=python -DWITH_GPT=ON -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
 make -j >${log_path}/GPT_python_FT >>${log_path}/gpt_python_FT 2>&1
 print_info $? gpt_python_FT
 cd ../
 #c++
 mkdir build_gpt_cc
 cd build_gpt_cc/
-cmake ..  -DWITH_GPT=ON -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=${nlp_dir}/paddle_inference/ -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/gpt.cc \
- -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON -DPYTHON_EXECUTABLE=/opt/_internal/cpython-3.8.0/bin/python -DPYTHON_INCLUDE_DIR=/opt/_internal/cpython-3.8.0/lib -DPYTHON_LIBRARY=/opt/_internal/cpython-3.8.0/include/python3.8 
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=${C_COMPILER_PATH} -DCMAKE_CXX_COMPILER=${CXX_COMPILER_PATH} \
+-DPADDLE_LIB=${nlp_dir}/paddle_inference/ -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/gpt.cc \
+-DWITH_GPT=ON -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
 make -j >${log_path}/GPT_C_FT >>${log_path}/gpt_C_FT 2>&1
 print_info $? gpt_C_FT
 #depoly python
@@ -332,16 +338,17 @@ print_info $? gpt_p_depoly
 # python -m pytest ./tests/model_zoo/test_gpt.py >${log_path}/gpt >>${log_path}/gpt 2>&1
 # print_info $? gpt
 
-# fast_gpt
-# cd ${nlp_dir}/fast_generation/samples
-# python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
-# print_info $? fast_generation_gpt
+fast_gpt
+cd ${nlp_dir}/fast_generation/samples
+python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
+print_info $? fast_generation_gpt
 }
 # 9 ernie
 ernie(){
 #data process
 cd ${nlp_dir}/model_zoo/ernie-1.0/
-mkdir data && cd data
+mkdir data
+cd ./data
 wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_ids.npy
 wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_idx.npz
 cd ../
@@ -694,15 +701,24 @@ cd ${nlp_dir}/paddlenlp/ops
 #python op
 mkdir build_tr_so
 cd build_tr_so/
-cmake ..  -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python -DPADDLE_LIB=${nlp_dir}/paddle_inference -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/transformer_e2e.cc \
- -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON -DPYTHON_EXECUTABLE=/opt/_internal/cpython-3.8.0/bin/python -DPYTHON_INCLUDE_DIR=/opt/_internal/cpython-3.8.0/lib -DPYTHON_LIBRARY=/opt/_internal/cpython-3.8.0/include/python3.8 
+cmake ..  -DCMAKE_BUILD_TYPE=Release \
+-DCMAKE_C_COMPILER=${C_COMPILER_PATH} \
+-DCMAKE_CXX_COMPILER=${CXX_COMPILER_PATH} \
+-DPY_CMD=python \
+-DPADDLE_LIB=${nlp_dir}/paddle_inference \
+-DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/transformer_e2e.cc \
+-DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
 make -j >${log_path}/transformer_python_FT >>${log_path}/transformer_python_FT 2>&1
 print_info $? transformer_python_FT
 cd ../
 #C++ op
 mkdir build_tr_cc
 cd build_tr_cc/
-cmake .. -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=${nlp_dir}/paddle_inference -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
+cmake .. -DCMAKE_BUILD_TYPE=Release \
+-DCMAKE_C_COMPILER=${C_COMPILER_PATH} \
+-DCMAKE_CXX_COMPILER=${CXX_COMPILER_PATH} \
+-DPADDLE_LIB=${nlp_dir}/paddle_inference -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/transformer_e2e.cc \
+-DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
 make -j >${log_path}/transformer_C_FT >>${log_path}/transformer_C_FT 2>&1
 print_info $? transformer_C_FT
 #deploy python
@@ -1073,35 +1089,31 @@ for apicase in `ls`;do
 done
 }
 fast_generation(){
-
-# export CC=/usr/local/gcc-8.2/bin/gcc
-# export CXX=/usr/local/gcc-8.2/bin/g++
-
-# cd ${nlp_dir}/fast_generation/samples
+cd ${nlp_dir}/fast_generation/samples
 # python codegen_sample.py >${log_path}/fast_generation_codegen >>${log_path}/fast_generation_codegen 2>&1
 # print_info $? fast_generation_codegen
 
-# python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
-# print_info $? fast_generation_gpt
+python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
+print_info $? fast_generation_gpt
 
-# python mbart_sample.py >${log_path}/fast_generation_mbart >>${log_path}/fast_generation_mbart 2>&1
-# print_info $? fast_generation_mbart
+python mbart_sample.py >${log_path}/fast_generation_mbart >>${log_path}/fast_generation_mbart 2>&1
+print_info $? fast_generation_mbart
 
-# python plato_sample.py >${log_path}/fast_generation_plato >>${log_path}/fast_generation_plato 2>&1
-# print_info $? fast_generation_plato
+python plato_sample.py >${log_path}/fast_generation_plato >>${log_path}/fast_generation_plato 2>&1
+print_info $? fast_generation_plato
 
-# python t5_sample.py --use_faster >${log_path}/fast_generation_t5 >>${log_path}/fast_generation_t5 2>&1
-# print_info $? fast_generation_t5
+python t5_sample.py --use_faster >${log_path}/fast_generation_t5 >>${log_path}/fast_generation_t5 2>&1
+print_info $? fast_generation_t5
 
-# cd ${nlp_dir}/paddlenlp/ops/fast_transformer/sample/
-# python bart_decoding_sample.py >${log_path}/fast_generation_bart >>${log_path}/fast_generation_bart 2>&1
-# print_info $? fast_generation_bart
+cd ${nlp_dir}/paddlenlp/ops/fast_transformer/sample/
+python bart_decoding_sample.py >${log_path}/fast_generation_bart >>${log_path}/fast_generation_bart 2>&1
+print_info $? fast_generation_bart
 
-# python t5_export_model_sample.py >${log_path}/t5_export_model_sample >>${log_path}/t5_export_model_sample 2>&1
-# print_info $? t5_export_model_sample
+python t5_export_model_sample.py >${log_path}/t5_export_model_sample >>${log_path}/t5_export_model_sample 2>&1
+print_info $? t5_export_model_sample
 
-# python t5_export_model_sample.py >${log_path}/t5_export_model_sample >>${log_path}/t5_export_model_sample 2>&1
-# print_info $? t5_export_model_sample
+python t5_export_model_sample.py >${log_path}/t5_export_model_sample >>${log_path}/t5_export_model_sample 2>&1
+print_info $? t5_export_model_sample
 
 # fast_gpt
 # fast_transformer
