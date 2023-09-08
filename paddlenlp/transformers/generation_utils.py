@@ -1198,10 +1198,13 @@ class GenerationMixin(object):
 
         use_top_p = config.get("use_top_p", True)
 
-        top_k_spec = paddle.static.InputSpec(shape=[1], dtype="int64") if not use_top_p else 0
+        top_k_spec = paddle.static.InputSpec(shape=[1], dtype="int64") \
+            if not use_top_p else config.get("top_k", 1)
 
-        top_p_spec = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
-        temperature = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
+        top_p_spec = paddle.static.InputSpec(shape=[1], dtype="float32") \
+            if use_top_p else config.get("top_p", 1.0)
+        temperature = paddle.static.InputSpec(shape=[1], dtype="float32") \
+            if use_top_p else config.get("temperature", 1.0)
         dtype = config.get("dtype", paddle.get_default_dtype())
 
         model_inputs_spec = self._get_model_inputs_spec(dtype)
@@ -1226,11 +1229,11 @@ class GenerationMixin(object):
             # early_stopping
             False,
             # bos_token_id
-            config.get("bos_token_id", 0),
+            config.get("bos_token_id", 1),
             # eos_token_id
-            config.get("eos_token_id", 0),
+            config.get("eos_token_id", 2),
             # pad_token_id
-            config.get("pad_token_id", 0),
+            config.get("pad_token_id", 3),
             # decoder_start_token_id
             None,
             # forced_bos_token_id

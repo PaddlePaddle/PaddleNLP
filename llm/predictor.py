@@ -52,6 +52,7 @@ class PredictorArgument:
     max_length: int = field(default=2048, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=1, metadata={"help": "top_k parameter for generation"})
     top_p: float = field(default=1.0, metadata={"help": "top_p parameter for generation"})
+    use_top_p: bool = field(default=False, metadata={"help": "whether use top_p"})
     temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
     repetition_penalty: float = field(default=1.0, metadata={"help": "repetition penalty parameter for generation"})
     device: str = field(default="gpu", metadata={"help": "Device"})
@@ -228,6 +229,9 @@ class StaticGraphPredictor(BasePredictor):
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             inference_config.disable_gpu()
+        elif self.config.device == "mlu":
+            inference_config.disable_gpu()
+            inference_config.enable_custom_device("mlu", 0)
         inference_config.disable_glog_info()
 
         with static_mode_guard():

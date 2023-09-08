@@ -51,9 +51,18 @@ def main():
     # set predictor type
     predictor = create_predictor(predictor_args, model_args, tensor_parallel_degree, tensor_parallel_rank)
     predictor.model.eval()
+    args_dict = {"dtype": predictor_args.dtype,
+                 "top_k": predictor_args.top_k,
+                 "top_p": predictor_args.top_p,
+                 "temperature": predictor_args.temperature,
+                 "use_top_p": predictor_args.use_top_p,
+                 "bos_token_id": predictor.tokenizer.bos_token_id,
+                 "eos_token_id": predictor.tokenizer.eos_token_id,
+                 "pad_token_id": predictor.tokenizer.pad_token_id}
 
     predictor.model.to_static(
-        get_infer_model_path(export_args.output_path, predictor_args.model_prefix), {"dtype": predictor_args.dtype}
+        get_infer_model_path(export_args.output_path, predictor_args.model_prefix), \
+             args_dict
     )
     predictor.model.config.save_pretrained(export_args.output_path)
     predictor.tokenizer.save_pretrained(export_args.output_path)
