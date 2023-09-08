@@ -208,7 +208,10 @@ def main():
     else:
         trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
     if data_args.intokens:
-        if model.base_model_prefix not in ["llama", "bloom", "chatglm"] and training_args.pipeline_parallel_degree < 1:
+        if (
+            model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2"]
+            and training_args.pipeline_parallel_degree < 1
+        ):
             raise NotImplementedError("InTokens data stream is only implemented for LLaMA, Bloom and ChatGLM so far.")
     train_ds = train_ds.map(partial(trans_func, is_test=False, intokens=data_args.intokens))
     eval_intokens = data_args.intokens
@@ -223,7 +226,6 @@ def main():
             intoken_dataset = InTokensIterableDataset
         else:
             intoken_dataset = InTokensMapDataset
-
         logger.info("Creating InTokens Data Stream. This may take a few minutes.")
         train_ds = intoken_dataset(
             train_ds,
@@ -395,6 +397,7 @@ def main():
             apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config)
 
         apply_ptq(quant_args, trainer, ptq_dataloader)
+        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
 
     if quant_args.do_gptq:
         if isinstance(model, LoRAModel):
@@ -420,8 +423,8 @@ def main():
                 f"Not found quant.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
             )
         ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
-
         apply_gptq(quant_args, trainer, ptq_dataloader)
+        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
 
     # Evaluation dev set
     if training_args.do_eval:

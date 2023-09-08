@@ -205,10 +205,9 @@ class DygraphPredictor(BasePredictor):
     def _infer(self, inputs: dict[str, paddle.Tensor]):
         # the `max_length` of generate is: max_new_length, it will occur error when `max_length` + sequence_length > max_position_embeddings.
         # so change max_length to control the length of decoding.
-        max_length = max(self.config.max_length - inputs["input_ids"].shape[-1], 1)
         result = self.model.generate(
             **inputs,
-            max_length=max_length,
+            max_length=self.config.max_length,
             bos_token_id=self.tokenizer.bos_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
             pad_token_id=self.tokenizer.pad_token_id,
@@ -249,8 +248,7 @@ class StaticGraphPredictor(BasePredictor):
 
         # reduce the max_length to prevent length overflow
         # same as DygraphPredictor
-        max_length = max(self.config.max_length - inputs["input_ids"].shape[-1], 1)
-        inputs["max_length"] = np.array(max_length, dtype="int64")
+        inputs["max_length"] = np.array(self.config.max_length, dtype="int64")
 
         inputs["top_p"] = np.array(self.config.top_p, dtype="float32")
         inputs["temperature"] = np.array(self.config.temperature, dtype="float32")
@@ -296,11 +294,12 @@ class StaticInferencePredictor(BasePredictor):
         self.dtype = dtype
         self.architectures = self.model_config.architectures[0].lower()
         self.cache_kvs = [paddle.zeros(shape, dtype=dtype) for shape in cache_kv_shapes]
-        self.pre_ids = paddle.full([config.batch_size, config.max_length + 1], -1, dtype="int64")
+        total_max_length = config.src_length + config.max_length
+        self.pre_ids = paddle.full([config.batch_size, total_max_length + 1], -1, dtype="int64")
 
         if "chatglm" in self.architectures:
             self.attention_mask = paddle.ones(
-                shape=(config.batch_size, 1, config.max_length, config.max_length),
+                shape=(config.batch_size, 1, total_max_length, total_max_length),
                 dtype=dtype,
             )
             self.tgt_pos = paddle.ones(
@@ -309,12 +308,12 @@ class StaticInferencePredictor(BasePredictor):
             )
         else:
             self.attention_mask = paddle.zeros(
-                shape=(config.batch_size, 1, config.max_length, config.max_length),
+                shape=(config.batch_size, 1, total_max_length, total_max_length),
                 dtype=dtype,
             )
 
         self.tgt_generation_mask = paddle.zeros(
-            shape=[config.batch_size, 1, 1, config.max_length + 1],
+            shape=[config.batch_size, 1, 1, total_max_length + 1],
             dtype=dtype,
         )
         self.predictor = self._create_predictor(config)
@@ -438,12 +437,13 @@ class DygraphInferencePredictor(BasePredictor):
 
         self.cache_kvs = [
             paddle.zeros(shape, dtype=dtype)
-            for shape in self.model.get_cache_kvs_shape(self.model.config, config.max_batch_size, config.max_length)
+            for shape in self.model.get_cache_kvs_shape(self.model.config, config.max_batch_size)
         ]
-        self.pre_ids = paddle.full([config.max_batch_size, config.max_length], -1, dtype="int64")
+        total_max_length = config.src_length + config.max_length
+        self.pre_ids = paddle.full([config.max_batch_size, total_max_length], -1, dtype="int64")
         if "chatglm" in self.architectures:
             self.attention_mask = paddle.ones(
-                shape=(config.batch_size, 1, config.max_length, config.max_length),
+                shape=(config.batch_size, 1, total_max_length, total_max_length),
                 dtype=dtype,
             )
             self.tgt_pos = paddle.ones(
@@ -452,12 +452,12 @@ class DygraphInferencePredictor(BasePredictor):
             )
         else:
             self.attention_mask = paddle.zeros(
-                shape=(config.batch_size, 1, config.max_length, config.max_length),
+                shape=(config.batch_size, 1, total_max_length, total_max_length),
                 dtype=dtype,
             )
 
         self.tgt_generation_mask = paddle.zeros(
-            shape=[config.max_batch_size, 1, 1, config.max_length],
+            shape=[config.max_batch_size, 1, 1, total_max_length],
             dtype=dtype,
         )
 
@@ -558,7 +558,6 @@ def create_predictor(
                 model = AutoModelForCausalLM.from_pretrained(
                     predictor_args.model_name_or_path,
                     dtype=predictor_args.dtype,
-                    low_cpu_mem_usage=True,
                     tensor_parallel_degree=tensor_parallel_degree,
                     tensor_parallel_rank=tensor_parallel_rank,
                 )
@@ -573,13 +572,19 @@ def create_predictor(
             # TODO(wj-Mcat): complete AutoInferenceModel & AutoPredictor
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
             if "llama" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    LlamaForCausalLMInferenceModel,
-                )
+                if model_args.model_type == "llama-img2txt":
+                    # we use llama for img2txt.
+                    from paddlenlp.experimental.transformers import (
+                        LlamaForMiniGPT4InferenceModel as LlamaInferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        LlamaForCausalLMInferenceModel as LlamaInferenceModel,
+                    )
 
                 config.tensor_parallel_degree = tensor_parallel_degree
                 config.tensor_parallel_rank = tensor_parallel_rank
-                model = LlamaForCausalLMInferenceModel.from_pretrained(
+                model = LlamaInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
                 model.eval()

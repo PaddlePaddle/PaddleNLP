@@ -163,7 +163,7 @@ class LoRAModel(nn.Layer):
                 tensor = action(ret) if is_dst else None
                 trainable_state_dict[key] = tensor
             else:
-                trainable_state_dict[key] = tensor.numpy() if is_dst else None
+                trainable_state_dict[key] = tensor.cpu().numpy() if is_dst else None
 
         return trainable_state_dict
 

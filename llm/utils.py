@@ -200,7 +200,7 @@ class CausalLMTrainer(Trainer):
                 input_ids=inputs["input_ids"],
                 attention_mask=inputs["attention_mask"] if "attention_mask" in inputs else None,
                 position_ids=inputs["position_ids"] if "position_ids" in inputs else None,
-                max_length=self.data_args.tgt_length,
+                max_length=max(self.data_args.max_length - inputs["input_ids"].shape[-1], 1),
                 decode_strategy="sampling",
                 top_k=self.gen_args.top_k,
                 top_p=self.gen_args.top_p,
@@ -459,11 +459,13 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
     inputs["step_idx"] = np.array(step_idx).astype("int64").reshape(-1, 1)
     inputs["tgt_ids"] = np.array(tgt_ids).astype("int64").reshape(-1, 1)
     inputs["tgt_pos"] = tgt_pos.reshape(-1, 1)
-    inputs["max_length"] = np.array(max_length - seq_len).astype("int64").reshape((-1, 1))
+    inputs["max_length"] = np.array(max_length).astype("int64").reshape((-1, 1))
     inputs["min_length"] = (
         np.array(
             [
-                1 if not benchmark else max_length - seq_len, # Note(Zhengzekang): When in benchmark mode, we need to set a fixed decode length. 
+                1
+                if not benchmark
+                else max_length,  # Note(Zhengzekang): When in benchmark mode, we need to set a fixed decode length.
             ]
             * bs
         )
@@ -517,7 +519,7 @@ def dybatch_preprocess(tokenizer, texts: list[str], max_length: int, architectur
 def load_real_time_tokens():
     tokens = []
     files = glob.glob(os.path.join("./real_time_save.*"))
-    for j in range(1, len(files)):
+    for j in range(1, len(files) + 1):
         filename = "./real_time_save.temp_ids_rank_0_step_{}".format(j)
         if not os.path.exists(filename):
             break
