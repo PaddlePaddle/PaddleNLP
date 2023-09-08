@@ -60,6 +60,14 @@ def main():
     # set predictor type
     predictor = create_predictor(predictor_args, model_args, tensor_parallel_degree, tensor_parallel_rank)
     predictor.model.eval()
+    args_dict = {"dtype": predictor_args.dtype,
+                 "top_k": predictor_args.top_k,
+                 "top_p": predictor_args.top_p,
+                 "temperature": predictor_args.temperature,
+                 "use_top_p": predictor_args.use_top_p,
+                 "bos_token_id": predictor.tokenizer.bos_token_id,
+                 "eos_token_id": predictor.tokenizer.eos_token_id,
+                 "pad_token_id": predictor.tokenizer.pad_token_id}
 
     predictor.model.to_static(
         llm_utils.get_infer_model_path(export_args.output_path, predictor_args.model_prefix),
@@ -67,7 +75,7 @@ def main():
             "dtype": predictor_args.dtype,
             "export_precache": predictor_args.export_precache,
             "cachekv_int8_type": predictor_args.cachekv_int8_type,
-        },
+        }
     )
     add_inference_args_to_config(predictor.model.config, predictor_args)
     predictor.model.config.save_pretrained(export_args.output_path)
