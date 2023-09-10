@@ -19,6 +19,7 @@ import sys
 import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
+from distutils.command.config import config
 
 import numpy as np
 import paddle
@@ -73,6 +74,10 @@ class PredictorArgument:
         default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
+    quant_type: str = field(
+        default="None",
+        metadata={"help": "The quant type of inference model, support `weight_only_int8`, `weight_only_int4`."},
+    )
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     benchmark: bool = field(
         default=False,
@@ -616,6 +621,14 @@ def create_predictor(
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMInferenceModel as LlamaInferenceModel,
                     )
+                  
+                    config.tensor_parallel_degree = tensor_parallel_degree
+                    config.tensor_parallel_rank = tensor_parallel_rank
+                    config.quant_bits = -1
+
+                    if predictor_args.quant_type.startswith("weight_only_int"):
+                        quant_bits = int(predictor_args.quant_type[-1])
+                        config.quant_bits = quant_bits
 
                 model = LlamaInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
