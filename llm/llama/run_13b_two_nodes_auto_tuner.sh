@@ -18,9 +18,6 @@ unset CUDA_VISIBLE_DEVICES
 rm -rf log
 rm -rf output
 
-export  FLAGS_shard_norm_align_dp=0
-export FLAGS_shard_use_reduce=1
-
 
 export PYTHONPATH=../../:$PYTHONPATH
 python -u  -m paddle.distributed.launch \
