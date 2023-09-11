@@ -13,24 +13,24 @@
 # limitations under the License.
 
 model_name_or_path="facebook/llama-13b"
-per_device_train_batch_size="4"
+per_device_train_batch_size="1"
 use_flash_attention="1"
 tensor_parallel_degree="2"
-data_parallel_degree="2"
-pipeline_parallel_degree="2"
-virtual_pp_degree="1"
+data_parallel_degree="1"
+pipeline_parallel_degree="4"
+virtual_pp_degree="2"
 sequence_parallel="0"
-sharding_parallel_degree="-1"
+sharding_parallel_degree="2"
 num_train_epochs="1"
 save_steps="200"
-sharding="''"
+sharding="stage2"
 recompute="1"
-run_mode="DP2-MP2-PP2-mbs4-acc8-recompute"
+run_mode="DP1-MP2-PP4-mbs1-acc32-recompute"
 device_num="N2C16"
 global_batch_size=64
 model_item="facebook-llama-13b_seqlen2048_pretrain"
 max_step=150
-gradient_accumulation_steps=8
+gradient_accumulation_steps=32
 pp_recompute_interval=1
 
 cd ./tests
