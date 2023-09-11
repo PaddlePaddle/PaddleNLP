@@ -129,6 +129,7 @@ function _train(){
     --fuse_attention_qkv true \
     --fuse_attention_ffn true \
     --tensor_parallel_config ${tensor_parallel_config} \
+    --recompute ${recompute} \
     --recompute_use_reentrant ${recompute_use_reentrant} \
     --data_cache ./data_cache"
 
