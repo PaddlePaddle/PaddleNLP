@@ -364,28 +364,18 @@ class GenerationInferenceModel(GenerationMixin):
         model_kwargs["cache"] = 0
 
         # decoder
-        # while paddle.less_than(
-        #     paddle.sum(paddle.cast(model_kwargs["stop_flags"], "int64")),
-        #     model_kwargs["stop_nums"],
-        # ):
-        #     next_tokens, model_kwargs = _post_process_(
-        #         _forward_(**model_kwargs),
-        #         top_p,
-        #         temperature,
-        #         step_idx_ori,
-        #         model_kwargs,
-        #     )
-        #     step_idx_ori += 1
-
-        # Note(zhengzekang): Just test for while op. 
-        next_tokens, model_kwargs = _post_process_(
-            _forward_(**model_kwargs),
-            top_p,
-            temperature,
-            step_idx_ori,
-            model_kwargs,
-        )
-        step_idx_ori += 1
+        while paddle.less_than(
+            paddle.sum(paddle.cast(model_kwargs["stop_flags"], "int64")),
+            model_kwargs["stop_nums"],
+        ):
+            next_tokens, model_kwargs = _post_process_(
+                _forward_(**model_kwargs),
+                top_p,
+                temperature,
+                step_idx_ori,
+                model_kwargs,
+            )
+            step_idx_ori += 1
 
         return (
             next_tokens,
