@@ -32,7 +32,7 @@ function _set_params(){
     device_num=${device_num:-"N2C16"}
     global_batch_size=${global_batch_size:-64}
     model_item=${model_item:-"facebook-llama-13b_seqlen2048_pretrain"}
-    max_step=${max_step:-150}
+    max_steps=${max_steps:-150}
     gradient_accumulation_steps=${gradient_accumulation_steps:-32}
     pp_recompute_interval=${pp_recompute_interval:-1}
     tensor_parallel_config=${tensor_parallel_config:-"enable_mp_async_allreduce enable_mp_skip_c_identity enable_mp_fused_linear_param_grad_add"}
