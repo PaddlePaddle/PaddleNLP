@@ -597,7 +597,6 @@ class FAISSDocumentStore(SQLDocumentStore):
             return_embedding = self.return_embedding
 
         query_emb = query_emb.reshape(1, -1).astype(np.float32)
-
         if self.similarity == "cosine":
             self.normalize_embedding(query_emb)
 

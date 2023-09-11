@@ -158,7 +158,7 @@ class IndexedDataset(paddle.io.Dataset):
             self.dim_offsets = read_longs(f, self._len + 1)
             self.data_offsets = read_longs(f, self._len + 1)
             self.sizes = read_shorts(f, self.s)
-            self.doc_idx = read_longs(f, self.doc_count)
+            self._doc_idx = read_longs(f, self.doc_count)
 
     def read_data(self, path):
         self.data_file = open(data_file_path(path), "rb", buffering=0)
@@ -230,6 +230,16 @@ class IndexedDataset(paddle.io.Dataset):
     @property
     def supports_prefetch(self):
         return False  # avoid prefetching to save memory
+
+    @property
+    def doc_idx(self):
+        return self._doc_idx
+
+    def get_doc_idx(self):
+        return self._doc_idx
+
+    def set_doc_idx(self, doc_idx_):
+        self._doc_idx = doc_idx_
 
 
 class IndexedDatasetBuilder(object):

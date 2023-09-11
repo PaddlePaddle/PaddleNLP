@@ -19,8 +19,8 @@ from paddle import _C_ops
 from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
     device_guard,
 )
-from paddle.fluid import core, framework
-from paddle.fluid.framework import Variable
+from paddle.base import core, framework
+from paddle.base.framework import Variable
 from paddle.optimizer import Adam, AdamW, Momentum
 from ppfleetx.distributed.apis import env
 from ppfleetx.utils.tensor_fusion_helper import fused_parameters

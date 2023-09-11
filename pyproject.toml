@@ -18,6 +18,7 @@ testpaths = [
     "tests/datasets",
     "tests/embeddings",
     "tests/experimental",
+    "tests/generation",
     "tests/layers",
     "tests/metrics",
     "tests/ops",

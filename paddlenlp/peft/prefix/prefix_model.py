@@ -252,10 +252,16 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         return past_key_values
 
     def train(self):
+        self.training = True
+        self.model.training = True
+        self.prefix_encoder.training = True
         self.model.train()
         self.prefix_encoder.train()
 
     def eval(self):
+        self.training = False
+        self.model.training = False
+        self.prefix_encoder.training = False
         self.model.eval()
         self.prefix_encoder.eval()
 
@@ -344,7 +350,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
             ]
         )
         # (num_layers, 2, num_heads, prefixlen, head_dim)
-        past_key_values = paddle.transpose(past_key_values, perm=[2, 1, 3, 0, 4]).numpy()
+        past_key_values = paddle.transpose(past_key_values, perm=[2, 1, 3, 0, 4]).cpu().numpy()
 
         if merge_tensor_parallel and self.prefix_config.tensor_parallel_degree > 1:
             trainable_state_dict = self.prefix_encoder.state_dict()
@@ -411,7 +417,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
                 tensor = action(ret) if is_dst else None
                 trainable_state_dict[key] = tensor
             else:
-                trainable_state_dict[key] = tensor.numpy() if is_dst else None
+                trainable_state_dict[key] = tensor.cpu().numpy() if is_dst else None
 
         return trainable_state_dict
 
