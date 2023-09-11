@@ -24,7 +24,6 @@ model_item="facebook-llama-13b_sft"
 run_mode="MP8-recompute"
 device_num="N1C8"
 num_train_epochs=5
-export CUDA_VISIBLE_DEVICES=0
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 cd ./tests
 bash ./test_tipc/dygraph/ft/benchmark_common/prepare.sh
