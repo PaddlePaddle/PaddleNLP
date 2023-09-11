@@ -286,7 +286,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             input_ids, position_ids, self.head_dim_shape_tensor, position_offset, True
         )
 
-        with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
+        with paddle.base.framework._stride_in_no_check_dy2st_diff():
             hidden_states, _ = self.transformer_block(
                 input_ids,
                 hidden_states,
