@@ -274,6 +274,11 @@ class InferencePredictorMixin:
 
         self.dtype = config.dtype or self.model_config
         self.cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.cache_kvs_shape]
+        self.num_layers, self.num_attention_heads, self.head_dim = (
+            len(self.cache_kvs),
+            self.cache_kvs[0].shape[-3],
+            self.cache_kvs[0].shape[-1],
+        )
         total_max_length = config.src_length + config.max_length
         self.pre_ids = paddle.full([config.batch_size, total_max_length], -1, dtype="int64")
         if "chatglm" in self.architectures:
@@ -302,22 +307,24 @@ class InferencePredictorMixin:
                 prefix_cache = (
                     paddle.to_tensor(np.load(f"{config.prefix_path}/pre_caches.npy")).astype(self.dtype).unsqueeze(2)
                 )
-                num_layers = self.model_config.num_hidden_layers
-                num_attention_heads = self.model_config.num_attention_heads
-                head_dim = self.model_config.hidden_size // num_attention_heads
                 prefix_cache = paddle.expand(
                     prefix_cache,
-                    [num_layers, 2, config.batch_size, num_attention_heads, prefix_cache.shape[-2], head_dim],
+                    [
+                        self.num_layers,
+                        2,
+                        config.batch_size,
+                        self.num_attention_heads,
+                        prefix_cache.shape[-2],
+                        self.head_dim,
+                    ],
                 )
-                self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, num_layers, axis=0)]
+                self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, self.num_layers, axis=0)]
             else:
-                num_layers = self.model_config.num_hidden_layers
-                num_attention_heads = self.model_config.num_attention_heads
-                head_dim = self.model_config.hidden_size // num_attention_heads
                 prefix_cache = paddle.zeros(
-                    [num_layers, 2, config.batch_size, num_attention_heads, 128, head_dim], dtype=self.dtype
+                    [self.num_layers, 2, config.batch_size, self.num_attention_heads, 128, self.head_dim],
+                    dtype=self.dtype,
                 )
-                self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, num_layers, axis=0)]
+                self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, self.num_layers, axis=0)]
 
     def _postprocess(self, predictions):
         if paddle.distributed.get_rank() == 0:
@@ -580,8 +587,8 @@ def create_predictor(
 ):
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
-    if isinstance(tokenizer, LlamaTokenizer):
-        tokenizer.pad_token = tokenizer.eos_token
+    if isinstance(tokenizer, LlamaTokenizer) and not tokenizer.pad_token:
+        tokenizer.pad_token = tokenizer.unk_token
 
     # update config parameter for inference predictor
     if predictor_args.decode_strategy == "greedy_search" and predictor_args.inference_model:
@@ -748,8 +755,8 @@ def benchmark(predictor, predictor_args, model_args):
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
-    warmup_time = 1
-    test_time = 1
+    warmup_time = 10
+    test_time = 100
 
     print("***********Start Warmup**********")
     for _ in range(warmup_time):
@@ -767,7 +774,7 @@ def benchmark(predictor, predictor_args, model_args):
     print(
         "Input length is: {}, Output length is: {}, bs is: {}, Generate speed is: {:.3f} tokens/s(ips), QPS: {:.3f} requests/s. ".format(
             predictor_args.src_length,
-            predictor_args.max_length - predictor_args.src_length,
+            predictor_args.max_length,
             predictor_args.batch_size,
             (output_tokens / (end - start) / test_time),
             (predictor_args.batch_size / (end - start) / test_time),

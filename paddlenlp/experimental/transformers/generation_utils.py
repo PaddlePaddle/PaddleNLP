@@ -51,7 +51,7 @@ class ForcedDecodingEOSTokenLogitsProcessor(LogitsProcessor):
         self.forced_eos_token_id = forced_eos_token_id
 
     def __call__(self, input_ids, scores, decoding_step):
-        if decoding_step == self.max_decoding_step - 1:
+        if decoding_step == self.max_decoding_step:
             scores[:] = paddle.finfo(scores.dtype).min
             scores[:, self.forced_eos_token_id] = 0
         return scores
@@ -211,7 +211,7 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs["step_idx"],
                 model_kwargs["step_idx"] + 1,
             )
-        length_cond = paddle.greater_than(model_kwargs["step_idx"], model_kwargs["max_dec_len"])
+        length_cond = paddle.greater_equal(model_kwargs["step_idx"], model_kwargs["max_dec_len"])
         model_kwargs["stop_flags"] = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
         if cache is None:
             next_tokens = paddle.where(just_decoder, paddle.full_like(next_tokens, -1), next_tokens)
