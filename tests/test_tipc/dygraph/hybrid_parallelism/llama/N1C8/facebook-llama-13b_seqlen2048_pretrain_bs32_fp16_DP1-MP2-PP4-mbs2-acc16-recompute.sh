@@ -31,7 +31,7 @@ param+="model_item=facebook-llama-13b_seqlen2048_pretrain "
 param+="max_steps=150 "
 param+="gradient_accumulation_steps=16 "
 param+="pp_recompute_interval=1 "
-param+="tensor_parallel_config=\"enable_mp_async_allreduce enable_mp_skip_c_identity enable_mp_fused_linear_param_grad_add\" "
+param+="tensor_parallel_config=enable_mp_async_allreduce,enable_mp_skip_c_identity,enable_mp_fused_linear_param_grad_add "
 param+="recompute_use_reentrant=true "
 
 cd ./tests
