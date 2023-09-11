@@ -16,7 +16,6 @@ faiss-cpu>=1.7.2
 opencv-python>=4.4
 opencv-contrib-python-headless
 python-multipart
-st-annotated-text
 click==8.0
 fastapi
 uvicorn
