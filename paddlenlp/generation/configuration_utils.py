@@ -145,7 +145,7 @@ class GenerationConfig:
 
     def __init__(self, **kwargs):
         # Parameters that control the length of the output
-        self.max_new_token = kwargs.get("max_new_token", DEFAULT_MAX_NEW_TOKEN)
+        self.max_new_tokens = kwargs.get("max_new_tokens", DEFAULT_MAX_NEW_TOKEN)
         self.min_new_token = kwargs.pop("min_new_token", 0)
         self.max_length = kwargs.pop("max_length", 0)
         self.min_length = kwargs.pop("min_length", 0)
