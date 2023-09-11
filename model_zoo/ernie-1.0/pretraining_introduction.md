@@ -163,15 +163,14 @@ python -u  ./preprocess/create_pretraining_data.py \
 
 转化后的数据如下，使用这份数据，即可开始ERNIE预训练：
 ```
--rw-rw-r-- 1 500 501 129G Jul  4 03:39 wudao_corpus_200g.bin
--rw-rw-r-- 1 500 501 6.4G Jul  4 03:39 wudao_corpus_200g.idx
+wudao_corpus_200g.bin
+wudao_corpus_200g.idx
 ```
 同样，对于 WuDaoCorpus2.0_base_200G_sample.tar.gz 数据，使用`ernie-3.0-bash-zh`的tokenizer，可以得到数据。
 ```
 mkdir data && cd data
-wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_corpus_200g_sample_ernie-3.0-base-zh.bin
-wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_corpus_200g_sample_ernie-3.0-base-zh.idx
-cd -
+wget https://paddlenlp.bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_corpus_200g_sample_ernie-3.0-base-zh.bin
+wget https://paddlenlp.bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_corpus_200g_sample_ernie-3.0-base-zh.idx
 ```
 
 <a name="中文词表制作"> </a>
