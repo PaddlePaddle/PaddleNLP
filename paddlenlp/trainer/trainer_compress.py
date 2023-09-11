@@ -998,7 +998,7 @@ def cut_embeddings(model, tokenizer, config, word_emb_index, max_seq_length, max
     state_dict = model.state_dict()
 
     word_emb_name = model.base_model_prefix + ".embeddings.word_embeddings.weight"
-    word_emb_np = state_dict[word_emb_name].numpy()
+    word_emb_np = state_dict[word_emb_name].cpu().numpy()
     word_emb_np_new = [word_emb_np[idx] for idx in word_emb_index]
 
     state_dict[word_emb_name] = paddle.to_tensor(word_emb_np_new)

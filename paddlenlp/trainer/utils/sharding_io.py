@@ -446,7 +446,7 @@ class ShardingIO:
 
         def map_func(weight):
             if isinstance(weight, paddle.Tensor):
-                weight = weight.numpy()
+                weight = weight.cpu().numpy()
             return weight
 
         state_dict = {k: map_func(v) for (k, v) in state_dict.items()}

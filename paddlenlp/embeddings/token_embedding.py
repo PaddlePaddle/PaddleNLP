@@ -235,7 +235,7 @@ class TokenEmbedding(nn.Embedding):
         """
         idx_list = self.get_idx_list_from_words(words)
         idx_tensor = paddle.to_tensor(idx_list)
-        return self(idx_tensor).numpy()
+        return self(idx_tensor).cpu().numpy()
 
     def get_idx_from_word(self, word):
         """
