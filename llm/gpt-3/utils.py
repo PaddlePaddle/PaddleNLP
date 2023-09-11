@@ -129,10 +129,23 @@ def init_dist_env(
 ):
 
     strategy = fleet.DistributedStrategy()
+
+    def is_segment_parallel_supported():
+        import inspect
+
+        members = [name for (name, date) in inspect.getmembers(fleet.HybridCommunicateGroup)]
+        return "get_sep_parallel_world_size" in members
+
     if tensor_parallel_degree == 1 and sharding_parallel_degree == 1:
-        order = ["pp", "dp", "sharding", "mp"]
+        if is_segment_parallel_supported():
+            order = ["pp", "dp", "sharding", "sep", "mp"]
+        else:
+            order = ["pp", "dp", "sharding", "mp"]
     else:
-        order = ["dp", "pp", "sharding", "mp"]
+        if is_segment_parallel_supported():
+            order = ["dp", "pp", "sharding", "sep", "mp"]
+        else:
+            order = ["dp", "pp", "sharding", "mp"]
 
     strategy.hybrid_configs = {
         "dp_degree": data_parallel_degree,
