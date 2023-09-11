@@ -222,6 +222,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         inputs_embeds=None,
         use_cache=None,
         cache_kvs=None,
+        pre_caches=None,
         seq_len_encoder=None,
         seq_len_decoder=None,
         past_key_values=None,
@@ -278,7 +279,12 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
         seq_lens = seq_len_decoder if is_decoder else seq_len_encoder
 
-        new_rope = fused_get_rotary_embedding(input_ids, position_ids, self.head_dim_shape_tensor, 0, True)
+        position_offset = 0
+        if not is_decoder and pre_caches is not None:
+            position_offset = 128
+        new_rope = fused_get_rotary_embedding(
+            input_ids, position_ids, self.head_dim_shape_tensor, position_offset, True
+        )
 
         with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
             hidden_states, _ = self.transformer_block(
@@ -288,6 +294,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 padding_offset=padding_offset,
                 attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
                 caches=cache_kvs,
+                pre_caches=pre_caches,
+                pre_caches_length=position_offset,
                 seq_lens=seq_lens,
                 rotary_embs=new_rope,
                 rotary_emb_dims=1,
@@ -465,6 +473,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
         cache = kwargs.get("cache", None)
+        pre_caches = kwargs.get("pre_caches", None)
         inputs_embeds = kwargs.get("inputs_embeds", None)
         if cache is not None:
             input_ids = tgt_ids
@@ -484,6 +493,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
             "seq_len_encoder": seq_len_encoder,
             "seq_len_decoder": seq_len_decoder,
             "cache": cache,
+            "pre_caches": pre_caches,
         }
         return model_inputs
 
@@ -497,6 +507,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         use_cache=False,
         cache=None,
         cache_kvs=None,
+        pre_caches=None,
         seq_len_encoder=None,
         seq_len_decoder=None,
         past_key_values=None,
@@ -518,6 +529,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
             use_cache=use_cache,
             cache=cache,
             cache_kvs=cache_kvs,
+            pre_caches=pre_caches,
             seq_len_encoder=seq_len_encoder,
             seq_len_decoder=seq_len_decoder,
             past_key_values=past_key_values,

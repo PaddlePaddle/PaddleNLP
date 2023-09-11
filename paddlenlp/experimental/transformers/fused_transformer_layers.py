@@ -481,6 +481,8 @@ class FusedMultiTransformer(Layer):
         padding_offset=None,
         attn_mask=None,
         caches=None,
+        pre_caches=None,
+        pre_caches_length=0,
         rotary_embs=None,
         rotary_emb_dims=0,
         seq_lens=None,
@@ -565,12 +567,23 @@ class FusedMultiTransformer(Layer):
                     rotary_emb_dims=rotary_emb_dims,
                     use_neox=self.use_neox_rotary_style,
                 )
+
+                if pre_caches is not None:
+                    k_out = paddle.concat([pre_caches[i][0], k_out], axis=2)
+                    v_out = paddle.concat([pre_caches[i][1], v_out], axis=2)
+
                 # write cache kv (inplace)
-                write_cache_kv(k_out, v_out, caches[i], seq_lens)
+                write_cache_kv(k_out, v_out, caches[i], seq_lens + pre_caches_length)
 
                 # cutlass fmha
                 qktv_out = variable_length_memory_efficient_attention(
-                    q_out, k_out, v_out, seq_lens, seq_lens, mask=attn_mask, scale=float(self.head_dim**-0.5)
+                    q_out,
+                    k_out,
+                    v_out,
+                    seq_lens,
+                    seq_lens + pre_caches_length,
+                    mask=attn_mask,
+                    scale=float(self.head_dim**-0.5),
                 )
 
                 fmha_out = transpose_remove_padding(qktv_out, seq_lens, padding_offset)

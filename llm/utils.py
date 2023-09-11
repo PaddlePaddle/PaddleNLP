@@ -484,7 +484,7 @@ def dybatch_preprocess(
     inputs["step_idx"] = np.array(step_idx).astype("int64").reshape(-1, 1)
     inputs["tgt_ids"] = np.array(tgt_ids).astype("int64").reshape(-1, 1)
     inputs["tgt_pos"] = tgt_pos.reshape(-1, 1)
-    inputs["max_length"] = np.array(max_length).astype("int64").reshape((-1, 1))
+    inputs["max_length"] = np.array(max_length - pre_caches_length).astype("int64").reshape((-1, 1))
     inputs["min_length"] = (
         np.array(
             [
