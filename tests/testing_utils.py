@@ -18,9 +18,9 @@ import gc
 import inspect
 import json
 import os
+import subprocess
 import sys
 import unittest
-import subprocess
 from collections.abc import Mapping
 from contextlib import contextmanager
 
@@ -374,13 +374,17 @@ def update_params(json_file: str, params: dict):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
-def run_command(command: List[str], return_stdout=False):
+class SubprocessCallException(Exception):
+    pass
+
+
+def run_command(command: list[str], return_stdout=False):
     """
     Runs `command` with `subprocess.check_output` and will potentially return the `stdout`. Will also properly capture
     if an error occured while running `command`
     """
     try:
-        output = subprocess.check_output(command, stderr=subprocess.STDOUT,shell=True)
+        output = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
         if return_stdout:
             if hasattr(output, "decode"):
                 output = output.decode("utf-8")
