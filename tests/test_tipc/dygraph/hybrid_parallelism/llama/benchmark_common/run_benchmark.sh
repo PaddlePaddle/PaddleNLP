@@ -158,7 +158,7 @@ function _train(){
                 run_pretrain.py ${train_cmd}"
             workerlog_id=0
             ;;
-        DP1-MP2-PP4-mbs1-acc32-recompute|DP1-MP1-PP8-acc32-recompute) echo "run run_mode: ${run_mode}"
+        DP1-MP2-PP4-mbs2-acc16-recompute|DP1-MP1-PP8-mbs1-acc32-recompute|DP1-MP2-PP4-VPP2-mbs1-acc32-recompute|DP1-MP2-PP4-VPP1-mbs1-acc32-recompute) echo "run run_mode: ${run_mode}"
             train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
                 run_pretrain.py ${train_cmd}"
             workerlog_id=0
