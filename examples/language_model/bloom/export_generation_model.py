@@ -77,8 +77,8 @@ def main():
         paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
         None,
         None,
-        paddle.static.InputSpec(shape=[None], dtype="float"),  # topp
-        paddle.static.InputSpec(shape=[None], dtype="float"),  # topk
+        paddle.static.InputSpec(shape=[None, 1], dtype="float32"),  # topp
+        paddle.static.InputSpec(shape=[None, 1], dtype="float32"),  # topk
         # max_length
         args.max_length,
         # min_length
