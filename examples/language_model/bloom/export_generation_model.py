@@ -77,6 +77,8 @@ def main():
         paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
         None,
         None,
+        paddle.static.InputSpec(shape=[None], dtype="float"),  # topp
+        paddle.static.InputSpec(shape=[None], dtype="float"),  # topk
         # max_length
         args.max_length,
         # min_length
@@ -84,10 +86,6 @@ def main():
         # decode_strategy
         "sampling",
         # temperature
-        1.0,
-        # top_k
-        1,
-        # top_p
         1.0,
         1.0,
         # repetition_penalty
