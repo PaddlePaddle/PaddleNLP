@@ -21,6 +21,7 @@ from paddle.static import InputSpec
 from ppfleetx.core.module.basic_module import BasicModule
 from ppfleetx.data.tokenizers import GPTTokenizer
 from ppfleetx.utils.log import logger
+from ppfleetx.models.language_model.language_module import vocab_size_with_padding
 
 from paddlenlp.transformers.gpt.tokenizer import GPTChineseTokenizer
 
@@ -123,6 +124,12 @@ class GPTModuleAuto(LanguageModuleAuto):
         model_name = model_setting.pop("name")
         tokenizer_class, pretrained_name = MODEL_CLASSES[model_name]
         self.tokenizer = tokenizer_class.from_pretrained(pretrained_name)
+
+        model_setting["vocab_size"] = vocab_size_with_padding(
+            model_setting.get("vocab_size", self.tokenizer.vocab_size),
+            model_setting.pop("vocab_size_divisible_unit", 128),
+            self.configs.Distributed.get("mp_degree", 1),
+        )
 
         l = model_setting["num_layers"]
         h = model_setting["hidden_size"]
