@@ -1978,7 +1978,7 @@ class Trainer:
                         )
                     else:
                         state_dict, config_to_save = self.sharded_ckpt_io.manipulate_state_dict_and_config(
-                            unwrap_model(self.model)
+                            unwrap_model(self.model), self.args.weight_name_suffix
                         )
                         weight_name_suffix = self.args.weight_name_suffix
                     unwrap_model(self.model).save_pretrained(
@@ -2009,7 +2009,7 @@ class Trainer:
                         )
                     else:
                         state_dict, config_to_save = self.sharded_ckpt_io.manipulate_state_dict_and_config(
-                            unwrap_model(self.model)
+                            unwrap_model(self.model), self.args.weight_name_suffix
                         )
                         weight_name_suffix = self.args.weight_name_suffix
                     self.model.save_pretrained(
@@ -2091,6 +2091,9 @@ class Trainer:
                     )
         if self.args.should_save_sharding_stage1_model:
             self.sharding_io.save_distributed_model_meta(output_dir)
+
+        if not self.args.old_save_load and not self.args.should_save_sharding_stage1_model:
+            self.sharded_ckpt_io.save_sharded_index(output_dir)
 
         if self.args.should_save:
             if self.tokenizer is not None:

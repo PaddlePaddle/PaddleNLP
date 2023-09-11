@@ -1054,7 +1054,7 @@ class ConversionMixin:
     @classmethod
     def merge_tensor_parallel_with_shard(cls, state_dict, config, all_filter_keys) -> None:
         name_action_mappings = cls._get_tensor_parallel_mappings(config, is_split=False)
-        state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys())
+        state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys(), ignore_error=True)
 
         for k, v in state_keys_map.items():
             name_action_mappings[v] = name_action_mappings.pop(k)
