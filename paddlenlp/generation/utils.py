@@ -38,7 +38,7 @@ from paddlenlp.transformers.model_outputs import ModelOutput
 from paddlenlp.transformers.utils import get_scale_by_dtype
 from paddlenlp.utils.log import logger
 
-from .configuration_utils import DEFAULT_MAX_NEW_TOKEN, GenerationConfig
+from .configuration_utils import DEFAULT_MAX_NEW_TOKENS, GenerationConfig
 from .logits_process import (
     ForcedBOSTokenLogitsProcessor,
     ForcedEOSTokenLogitsProcessor,
@@ -902,15 +902,15 @@ class GenerationMixin(object):
             print("Setting `pad_token_id` to `eos_token_id`:{} for " "open-end generation.".format(eos_token_id))
             pad_token_id = eos_token_id
 
-        if generation_config.max_length != 0 and generation_config.max_new_token == DEFAULT_MAX_NEW_TOKEN:
-            logger.warning("`max_length` will be deprecated in future releases, use `max_new_token` instead.")
-            generation_config.max_new_token = generation_config.max_length
+        if generation_config.max_length != 0 and generation_config.max_new_tokens == DEFAULT_MAX_NEW_TOKENS:
+            logger.warning("`max_length` will be deprecated in future releases, use `max_new_tokens` instead.")
+            generation_config.max_new_tokens = generation_config.max_length
 
         if generation_config.min_length != 0 and generation_config.min_new_token == 0:
             logger.warning("`min_length` will be deprecated in future releases, use `min_new_token` instead.")
             generation_config.min_new_token = generation_config.min_length
 
-        max_length = generation_config.max_new_token
+        max_length = generation_config.max_new_tokens
         min_length = generation_config.min_new_token
         if is_tracing and not paddle.is_tensor(max_length):
             if hasattr(paddle.framework, "_no_check_dy2st_diff"):
