@@ -386,14 +386,14 @@ def dybatch_preprocess(
     tokenizer,
     texts: list[str],
     max_length: int,
-    architectures: str,
+    model_type: str,
     top_p: float,
     temperature: float,
     pre_caches_length: int = 0,
     benchmark: bool = False,
 ):
     """Pre-process generation inputs."""
-    if "chatglm" in architectures:
+    if "chatglm" in model_type:
         input_ids = []
         position_ids = []
 
