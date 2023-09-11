@@ -918,9 +918,11 @@ class GenerationD2STestMixin:
 
     def setUp(self):
         paddle.disable_static()
+        super().setUp()
 
     def tearDown(self):
         paddle.disable_static()
+        super().setUp()
 
     def test_to_static_use_top_k(self):
         tokenizer = self.TokenizerClass.from_pretrained(self.internal_testing_model)
@@ -973,7 +975,7 @@ class GenerationD2STestMixin:
                 predictor = paddle.inference.create_predictor(config)
 
                 model_kwargs["top_k"] = 1
-                model_kwargs["max_length"] = self.max_length - model_kwargs["input_ids"].shape[-1]
+                model_kwargs["max_length"] = self.max_length
 
                 # create input
                 for key in model_kwargs.keys():
