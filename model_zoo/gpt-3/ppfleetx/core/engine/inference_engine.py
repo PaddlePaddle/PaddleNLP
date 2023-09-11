@@ -190,10 +190,10 @@ class InferenceEngine(object):
 
         config.enable_memory_optim()
         config.switch_ir_optim(True)
-        if paddle.fluid.core.is_compiled_with_cuda():
+        if paddle.base.core.is_compiled_with_cuda():
             device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
             config.enable_use_gpu(100, device_id)
-        elif paddle.fluid.core.is_compiled_with_xpu():
+        elif paddle.base.core.is_compiled_with_xpu():
             device_id = int(os.environ.get("FLAGS_selected_xpus", 0))
             config.enable_xpu()
             config.set_xpu_device_id(device_id)

@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
+import time
 from typing import Optional
 
 import fitz
@@ -19,6 +21,15 @@ import requests
 from pipelines.document_stores import BaiduElasticsearchDocumentStore
 from pipelines.nodes import EmbeddingRetriever, ErnieRanker
 from pipelines.pipelines import Pipeline
+
+logging.getLogger().setLevel(logging.INFO)
+from pipelines.nodes import ErnieBot
+from pipelines.nodes.combine_documents import (
+    MapReduceDocuments,
+    ReduceDocuments,
+    StuffDocuments,
+)
+from pipelines.nodes.preprocessor.text_splitter import SpacyTextSplitter
 
 
 def load_all_json_path(path):
@@ -164,3 +175,136 @@ def retrieval(
             params={"Retriever": {"top_k": retriever_topk, "filters": filters}, "Ranker": {"top_k": rank_topk}},
         )
         return prediction
+
+
+# Summary of a paper
+def summarize_collapse(text_list, api_key, secret_key):
+    document_prompt = "这是一篇论文摘要的第{index}部分的内容：{content}"
+    llm_prompt = """
+    我需要你的帮助来阅读和总结输入论文摘要的主要内容，请你使用中文输出。
+    根据以下四点进行总结。(专有名词需要用英语标记）
+    （1）：论文研究背景是什么？
+    （2）：过去的方法是什么？他们有什么问题？这种方法是否有良好的动机？
+    （3）：论文提出的研究方法是什么？
+    （4）：在什么任务上，通过论文的方法实现了什么性能？表现能支持他们的目标吗？
+    （5）意义是什么？
+    （6）从创新点、绩效和工作量三个维度总结论文优势和劣势
+    语句尽可能简洁和学术，不要有太多重复的信息，数值使用原始数字，请你使用中文输出
+    输入论文摘要:{}
+    总结输出:
+    """
+    combine_documents = StuffDocuments(
+        api_key=api_key, secret_key=secret_key, llm_prompt=llm_prompt, document_prompt=document_prompt
+    )
+    reduce_documents = ReduceDocuments(combine_documents=combine_documents)
+    MapReduce = MapReduceDocuments(
+        api_key=api_key, secret_key=secret_key, llm_prompt=llm_prompt, reduce_documents=reduce_documents
+    )
+    summary = MapReduce.run(text_list)
+    return summary[0]["result"]
+
+
+def summarize_abstract(abstract, api_key, secret_key, chunk_size=300, max_token=4200):
+    llm_prompt = """
+    我需要你的帮助来阅读和总结输入论文摘要的主要内容，请你使用中文输出。
+    根据以下四点进行总结。(专有名词需要用英语标记）
+    （1）：论文研究背景是什么？
+    （2）：过去的方法是什么？他们有什么问题？这种方法是否有良好的动机？
+    （3）：论文提出的研究方法是什么？
+    （4）：在什么任务上，通过论文的方法实现了什么性能？表现能支持他们的目标吗？
+    （5）意义是什么？
+    （6）从创新点、绩效和工作量三个维度总结论文优势和劣势
+    语句尽可能简洁和学术，不要有太多重复的信息，数值使用原始数字，请你使用中文输出
+    输入论文摘要:{}
+    总结输出:
+    """
+    if len(llm_prompt.format(abstract)) > max_token:
+        file_splitter_chinese = SpacyTextSplitter(chunk_size=chunk_size, separator="\n", chunk_overlap=0)
+        txt_split = file_splitter_chinese.split_text(abstract)
+        txt_list = []
+        for split in txt_split:
+            txt_list.append({"content": split, "meta": {}})
+        summary = summarize_collapse(txt_list, api_key, secret_key)
+    else:
+        ernie_bot = ErnieBot(api_key=api_key, secret_key=secret_key, model_name="ERNIE-Bot")
+        summary = ernie_bot.run(llm_prompt.format(abstract))[0]["result"]
+    return summary.replace("\n\n", "\n")
+
+
+# Summary of multiple papers
+def merge_summary(text_list, api_key, secret_key):
+    document_prompt = "输入的第{index}论文的内容：{content}"
+    llm_prompt = """你需要完成多篇论文总结任务，不要分别进行单篇论文总结。
+    我需要你的帮助来总结一下多篇论文在背景、研究方法、数据集、结论这四个方面的共同之处和不同之处。
+    输入的多篇论文:{}
+    总结输出:
+    """
+    sum_prompt = "总结输入的论文摘要，保留主要内容，论文摘要:{}"
+    combine_documents = StuffDocuments(
+        api_key=api_key, secret_key=secret_key, llm_prompt=llm_prompt, document_prompt=document_prompt
+    )
+    reduce_documents = ReduceDocuments(combine_documents=combine_documents)
+    MapReduce = MapReduceDocuments(
+        api_key=api_key, secret_key=secret_key, llm_prompt=sum_prompt, reduce_documents=reduce_documents
+    )
+    summary = MapReduce.run(text_list)
+    return summary[0]["result"]
+
+
+# translation
+dict_l = {"中文": "英文", "英文": "中文"}
+
+
+def ernie_bot_translation(prompt, api_key, secret_key, cycle_num=3, key="文本翻译"):
+    ernie_bot = ErnieBot(api_key=api_key, secret_key=secret_key, model_name="ERNIE-Bot")
+    i = 0
+    while i < cycle_num:
+        try:
+            txt = ernie_bot.run(prompt)[0]["result"]
+            return str(txt)
+        except:
+            i += 1
+            time.sleep(0.5)
+    return None
+
+
+def translate_part(text, api_key, secret_key, task="翻译", max_length=10000, lang="中文", chunk_size=1000, cycle_num=3):
+    if lang == "中文":
+        file_splitter = SpacyTextSplitter(chunk_size=chunk_size, separator="\n", chunk_overlap=0)
+    elif lang == "英文":
+        file_splitter = SpacyTextSplitter(
+            chunk_size=chunk_size, separator="\n", pipeline="en_core_web_sm", chunk_overlap=0
+        )
+    text = text.replace("\n\n", "\n")
+    prompt_all = """
+        你现在是一个翻译助手。你需要将输入的{l_s}内容翻译为{l_t}，你必须保证完成了将{l_s}内容翻译为{l_t}内容的任务。
+        下面让我们正式开始：输入的{l_s}内容为：{content}
+        你必须保证完成了将{l_s}内容翻译为{l_t}内容的任务，并输出翻译结果。
+        翻译结果：
+        """
+    if len(prompt_all.format(content=text, l_s=lang, l_t=dict_l[lang])) > max_length:
+        documents = file_splitter.split_text(text)
+        txt = ""
+        for split in documents:
+            txt_split = ernie_bot_translation(
+                prompt_all.format(content=split, l_s=lang, l_t=dict_l[lang]),
+                api_key=api_key,
+                secret_key=secret_key,
+                cycle_num=cycle_num,
+                key="文本翻译",
+            )
+            if txt_split:
+                txt += txt_split
+            else:
+                txt += split
+    else:
+        txt = ernie_bot_translation(
+            prompt_all.format(content=text, l_s=lang, l_t=dict_l[lang]),
+            api_key=api_key,
+            secret_key=secret_key,
+            cycle_num=cycle_num,
+            key="文本翻译",
+        )
+        if not txt:
+            txt = text
+    return txt
