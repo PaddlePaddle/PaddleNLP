@@ -34,7 +34,7 @@ from paddle.distributed.fleet.meta_parallel import (
     get_rng_state_tracker,
 )
 from paddle.distributed.fleet.utils import recompute
-from paddle.fluid import layers
+from paddle.base import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from ppfleetx.distributed.apis import env
 from ppfleetx.utils.log import logger
