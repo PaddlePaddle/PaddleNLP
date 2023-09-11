@@ -38,6 +38,8 @@ function _set_params(){
     tensor_parallel_config=${tensor_parallel_config:-"enable_mp_async_allreduce enable_mp_skip_c_identity enable_mp_fused_linear_param_grad_add"}
     recompute_use_reentrant=${recompute_use_reentrant:-"true"}
 
+    base_batch_size=${global_batch_size}
+
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递
     model_repo="PaddleNLP"          # (必选) 模型套件的名字
     speed_unit="tokens/s"         # (必选)速度指标单位
