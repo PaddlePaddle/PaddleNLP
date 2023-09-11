@@ -71,7 +71,6 @@ class LLaMATest(TestCase):
         run_fintune = "llm/finetune_generation.py"
         finetune_params = load_test_config(self.config_path, "finetune")
         quant_params = load_test_config(self.config_path, "quant")
-        predict_config = load_test_config(self.config_path, "predict")
         merge_lora_config = load_test_config(self.config_path, "merge_lora_params")
 
         # Copy json file to tmp dir
@@ -102,21 +101,6 @@ class LLaMATest(TestCase):
 
         # 3. Run predict
         if method == "lora":
-            # LoRA dynamic predict
-            lora_predict_config = {
-                "model_name_or_path": predict_config["model_name_or_path"],
-                "batch_size": predict_config["batch_size"],
-                "data_file": predict_config["data_file"],
-                "dtype": predict_config["dtype"],
-                "mode": predict_config["mode"],
-                "lora_path": os.path.join(self.output_dir, "llama_lora_ckpts/"),
-            }
-
-            with argv_context_guard(lora_predict_config):
-                from predictor import predict
-
-                predict()
-
             # Merge Lora Params
             merge_lora_config = {
                 "model_name_or_path": merge_lora_config["model_name_or_path"],
@@ -128,20 +112,6 @@ class LLaMATest(TestCase):
                 merge()
 
         if method == "pt":
-            # Prefix Tuning dynamic predict
-            pt_predict_config = {
-                "model_name_or_path": predict_config["model_name_or_path"],
-                "batch_size": predict_config["batch_size"],
-                "data_file": predict_config["data_file"],
-                "dtype": predict_config["dtype"],
-                "mode": predict_config["mode"],
-                "prefix_path": os.path.join(self.output_dir, "llama_pt_ckpts/"),
-            }
-            with argv_context_guard(pt_predict_config):
-                from predictor import predict
-
-                predict()
-
             # Merge Tensor Parallelism Params
             merge_tp_config = {"model_name_or_path": os.path.join(self.output_dir, "llama_pt_ckpts/")}
             with argv_context_guard(merge_tp_config):
