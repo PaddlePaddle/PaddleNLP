@@ -72,6 +72,9 @@ def launch(args):
         }
         result = requests.post(f"http://0.0.0.0:{args.flask_port}/api/chat", json=data).json()
         bot_response = result["result"]["response"]
+
+        # replace \n with br: https://github.com/gradio-app/gradio/issues/4344
+        bot_response["utterance"] = bot_response["utterance"].replace("\n", "<br>")
         context.append(bot_response)
         shown_context = get_shown_context(context)
         return None, shown_context, context, state
