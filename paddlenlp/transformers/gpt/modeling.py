@@ -40,6 +40,7 @@ from ..model_outputs import (
     SequenceClassifierOutputWithPast,
     TokenClassifierOutput,
 )
+from ..model_utils import dy2st_nocheck_guard_context
 from .configuration import (
     GPT_PRETRAINED_INIT_CONFIGURATION,
     GPT_PRETRAINED_RESOURCE_FILES_MAP,
@@ -1318,7 +1319,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
         src_ids = paddle.concat([src_ids, nid], axis=1)
         cur_len = 0
-        with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
+        with dy2st_nocheck_guard_context():
             while cur_len < self.max_predict_len:
                 output, cached_kvs = self.model(nid, use_cache=True, cache=cached_kvs)
                 nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
