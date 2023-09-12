@@ -760,7 +760,7 @@ def predict():
                 target_texts.append(example["tgt"])
     else:
         source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
-        target_texts = ["", "", ""]
+        target_texts = ["", ""]
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
