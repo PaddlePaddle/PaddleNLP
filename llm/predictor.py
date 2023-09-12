@@ -206,7 +206,7 @@ class DygraphPredictor(BasePredictor):
     def _infer(self, inputs: dict[str, paddle.Tensor]):
         result = self.model.generate(
             **inputs,
-            max_length=self.config.max_length,
+            max_new_tokens=self.config.max_length,
             bos_token_id=self.tokenizer.bos_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
             pad_token_id=self.tokenizer.pad_token_id,
@@ -255,7 +255,10 @@ class StaticGraphPredictor(BasePredictor):
 
     def _infer(self, inputs: dict[str, np.ndarray]):
         for name in self.predictor.get_input_names():
-            self.predictor.get_input_handle(name).copy_from_cpu(inputs[name])
+            if name == "max_new_tokens":
+                self.predictor.get_input_handle(name).copy_from_cpu(inputs["max_length"])
+            else:
+                self.predictor.get_input_handle(name).copy_from_cpu(inputs[name])
 
         self.predictor.run()
         output_names = self.predictor.get_output_names()

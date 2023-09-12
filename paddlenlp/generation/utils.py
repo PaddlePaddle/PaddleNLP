@@ -22,9 +22,6 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.common_ops_import import convert_dtype
-
-# TODO(guosheng): update this workaround import for in_declarative_mode
-from paddle.nn.layer.layers import in_declarative_mode
 from paddle.utils import map_structure
 
 try:
@@ -759,18 +756,6 @@ class GenerationMixin(object):
             generation_config.decode_strategy
         )
 
-        # Whether to dynamic to static
-        is_tracing = False
-        if in_declarative_mode():
-            is_tracing = True
-
-        if is_tracing:
-            assert generation_config.decode_strategy in [
-                "sampling",
-            ], "`generate()` only supports 'sampling' temporarily but received {}.".format(
-                generation_config.decode_strategy
-            )
-
         if getattr(self, "deprecated_warnings", None) is None:
             self.deprecated_warnings = {}
 
@@ -813,9 +798,6 @@ class GenerationMixin(object):
             if generation_config.no_repeat_ngram_size is not None
             else self.config.no_repeat_ngram_size
         )
-
-        if is_tracing:
-            self._fast_entry = None
 
         if getattr(self, "_fast_entry", None) is not False and use_fast:
             fg_args = locals()
@@ -912,25 +894,10 @@ class GenerationMixin(object):
 
         max_length = generation_config.max_new_token
         min_length = generation_config.min_new_token
-        if is_tracing and not paddle.is_tensor(max_length):
-            if hasattr(paddle.framework, "_no_check_dy2st_diff"):
-                # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
-                # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
-                # removed after static graphs support inplace and stride.
-                with paddle.framework._no_check_dy2st_diff():
-                    min_len = input_ids.shape[-1]
-                    max_len = input_ids.shape[-1]
-                    paddle.increment(min_len, min_length)
-                    paddle.increment(max_len, max_length)
-            else:
-                min_len = input_ids.shape[-1]
-                max_len = input_ids.shape[-1]
-                paddle.increment(min_len, min_length)
-                paddle.increment(max_len, max_length)
-        else:
-            input_len = input_ids.shape[-1]
-            min_len = input_len + min_length
-            max_len = input_len + max_length
+
+        input_len = input_ids.shape[-1]
+        min_len = input_len + min_length
+        max_len = input_len + max_length
 
         logits_processors = self.get_logits_processor(
             min_length=min_len if min_length > 0 else None,
@@ -976,32 +943,19 @@ class GenerationMixin(object):
                     input_ids, expand_size=generation_config.num_return_sequences, **model_kwargs
                 )
 
-            if is_tracing:
-                return self.sample_d2s(
-                    input_ids,
-                    logits_processors,
-                    max_len,
-                    pad_token_id,
-                    eos_token_id,
-                    generation_config.top_k,
-                    generation_config.top_p,
-                    generation_config.temperature,
-                    **model_kwargs,
-                )
-            else:
-                return self.sample(
-                    input_ids,
-                    logits_processors,
-                    max_len,
-                    pad_token_id,
-                    eos_token_id,
-                    generation_config.top_k,
-                    generation_config.top_p,
-                    generation_config.temperature,
-                    stopping_criteria=stopping_criteria,
-                    streamer=streamer,
-                    **model_kwargs,
-                )
+            return self.sample(
+                input_ids,
+                logits_processors,
+                max_len,
+                pad_token_id,
+                eos_token_id,
+                generation_config.top_k,
+                generation_config.top_p,
+                generation_config.temperature,
+                stopping_criteria=stopping_criteria,
+                streamer=streamer,
+                **model_kwargs,
+            )
 
         elif generation_config.decode_strategy == "beam_search":
             batch_size = input_ids.shape[0]
@@ -1313,7 +1267,7 @@ class GenerationMixin(object):
         attention_mask,
         position_ids,
         logits_processors,
-        max_length,
+        max_new_tokens,
         pad_token_id,
         eos_token_id,
         top_k=None,
@@ -1434,14 +1388,14 @@ class GenerationMixin(object):
         # make the shape of attention_mask = (-1, -1, -1, -1) in dy2static.
         model_kwargs["attention_mask"] = paddle.reshape(attn_mask, paddle.shape(attn_mask))
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
-        max_length = paddle.full([1], max_length, dtype="int64")
+        max_new_tokens = paddle.full([1], max_new_tokens + cur_len - 1, dtype="int64")
 
         if hasattr(paddle.framework, "_no_check_dy2st_diff"):
             # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
             # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
             # removed after static graphs support inplace and stride.
             with paddle.framework._no_check_dy2st_diff():
-                while cur_len < max_length and paddle.any(unfinished_flag):
+                while cur_len < max_new_tokens and paddle.any(unfinished_flag):
                     input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
                         _forward_(**model_kwargs),
                         input_ids,
@@ -1454,7 +1408,7 @@ class GenerationMixin(object):
                     paddle.increment(cur_len)
                     paddle.increment(cur_len_gpu)
         else:
-            while cur_len < max_length and paddle.any(unfinished_flag):
+            while cur_len < max_new_tokens and paddle.any(unfinished_flag):
                 input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
                     _forward_(**model_kwargs),
                     input_ids,
