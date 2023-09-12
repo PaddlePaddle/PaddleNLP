@@ -527,15 +527,16 @@ def main():
         data_args, training_args, data_file, tokenizer
     )
 
-    if data_args.train_data_size > 0:
-        # GPTDataset is the type of `paddle.io.Dataset`, which dosen't contains `select` method
-        # modify the `__len__` function to change the length of dataset in current python process
-        GPTDataset.__len__ = lambda *_: data_args.train_data_size
-        total_effective_tokens = (
-            sum([len(train_dataset[i][0]) for i in range(data_args.train_data_size)]) * training_args.num_train_epochs
-        )
-    else:
-        total_effective_tokens = sum([len(i[0]) for i in train_dataset]) * training_args.num_train_epochs
+    # if data_args.train_data_size > 0:
+    #     # GPTDataset is the type of `paddle.io.Dataset`, which dosen't contains `select` method
+    #     # modify the `__len__` function to change the length of dataset in current python process
+    #     GPTDataset.__len__ = lambda *_: data_args.train_data_size
+    #     total_effective_tokens = (
+    #         sum([len(train_dataset[i][0]) for i in range(data_args.train_data_size)]) * training_args.num_train_epochs
+    #     )
+    # else:
+    #     total_effective_tokens = sum([len(i[0]) for i in train_dataset]) * training_args.num_train_epochs
+    total_effective_tokens = 0
 
     trainer = PretrainingTrainer(
         model=model,
