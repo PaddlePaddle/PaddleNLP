@@ -559,14 +559,15 @@ class FusedMultiTransformer(Layer):
                 )
 
                 # rotary emb (inplace)
-                encode_rotary_qk(
-                    q_out,
-                    k_out,
-                    rotary_embs,
-                    seq_lens,
-                    rotary_emb_dims=rotary_emb_dims,
-                    use_neox=self.use_neox_rotary_style,
-                )
+                if rotary_embs is not None:
+                    encode_rotary_qk(
+                        q_out,
+                        k_out,
+                        rotary_embs,
+                        seq_lens,
+                        rotary_emb_dims=rotary_emb_dims,
+                        use_neox=self.use_neox_rotary_style,
+                    )
 
                 if pre_caches is not None:
                     k_out = paddle.concat([pre_caches[i][0], k_out], axis=2)
@@ -618,11 +619,12 @@ class FusedMultiTransformer(Layer):
             if self.normalize_before is True:
                 norm_out = self.norm_func(
                     out_linear_out,
-                    self.ffn_ln_scales[i],
-                    self.ffn_ln_biases[i],
-                    self._epsilon,
-                    residual=bias_residual_input,
+                    norm_weight=self.ffn_ln_scales[i],
+                    norm_bias=self.ffn_ln_biases[i],
+                    epsilon=self._epsilon,
                     begin_norm_axis=1,
+                    bias=self.linear_biases[i],
+                    residual=bias_residual_input,
                 )
                 tmp_out, bias_residual_input = norm_out[0], norm_out[1]
             else:
