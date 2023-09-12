@@ -279,22 +279,41 @@ else(ON_INFER)
     )
   endif()
 
-  if(EXISTS ${PY_LIB_DIR}/../fluid/libpaddle.so)
-    set(lib_link
-      -lpaddle
+  if(EXISTS ${PY_LIB_DIR}/../fluid/)
+    if(EXISTS ${PY_LIB_DIR}/../fluid/libpaddle.so)
+      set(lib_link
+        -lpaddle
+      )
+    elseif(EXISTS ${PY_LIB_DIR}/../fluid/core_avx.so)
+      set(lib_link
+        -l:core_avx.so
+      )
+    else()
+      set(lib_link
+        -l:core_noavx.so
+      )
+    endif()
+    link_directories(
+      ${PY_LIB_DIR}/../fluid/
     )
-  elseif(EXISTS ${PY_LIB_DIR}/../fluid/core_avx.so)
-    set(lib_link
-      -l:core_avx.so
-    )
-  else()
-    set(lib_link
-      -l:core_noavx.so
+  elseif(EXISTS ${PY_LIB_DIR}/../base/)
+    if(EXISTS ${PY_LIB_DIR}/../base/libpaddle.so)
+      set(lib_link
+        -lpaddle
+      )
+    elseif(EXISTS ${PY_LIB_DIR}/../base/core_avx.so)
+      set(lib_link
+        -l:core_avx.so
+      )
+    else()
+      set(lib_link
+        -l:core_noavx.so
+      )
+    endif()
+    link_directories(
+      ${PY_LIB_DIR}/../base/
     )
   endif()
-  link_directories(
-    ${PY_LIB_DIR}/../fluid/
-  )
 
   set(ft_lib_link
     -ldecoder -ldecoding -ltopk -lcuda_int8_kernels -lcuda_kernels -lonline_softmax_beamsearch -ltransformer_kernels -lattention_kernels -lencoder -lnccl_utils -lnvtx_utils
