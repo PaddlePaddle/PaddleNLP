@@ -220,7 +220,6 @@ def infer(history=[]):
                 retriever_topk=30,
                 rank_topk=2,
             )
-            logger.info("hello")
             content = "\n".join([item.content for item in prediction["documents"]])
             content = PROMPT_SYSTEM + PROMPT_RETRIVER.format(documents=content, query=query)
             content = content[: args.max_token]
@@ -262,7 +261,6 @@ def upload_file(file_name, file_url, file_upload, history=[]):
     if file_name:
         try:
             json_content, file_id = retrieval_title(file_name)
-            # 中国房地产投资信托基金（REITs）市场风险评估及管控研究
             content = (
                 "**"
                 + json_content.meta["title"]
@@ -298,6 +296,7 @@ def upload_file(file_name, file_url, file_upload, history=[]):
             ),
         )
     elif file_url:
+        # temp image save dir
         root_path = "./images"
         os.makedirs(root_path, exist_ok=True)
         paper = next(arxiv.Search(id_list=[file_url.split("/")[-1]]).results())
