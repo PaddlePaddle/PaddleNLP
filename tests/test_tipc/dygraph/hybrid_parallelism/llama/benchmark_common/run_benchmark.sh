@@ -35,7 +35,7 @@ function _set_params(){
     max_steps=${max_steps:-150}
     gradient_accumulation_steps=${gradient_accumulation_steps:-32}
     pp_recompute_interval=${pp_recompute_interval:-1}
-    tensor_parallel_config=${tensor_parallel_config:-"enable_mp_async_allreduce enable_mp_skip_c_identity enable_mp_fused_linear_param_grad_add"}
+    tensor_parallel_config=${tensor_parallel_config:-"enable_mp_async_allreduce,enable_mp_skip_c_identity,enable_mp_fused_linear_param_grad_add"}
     recompute_use_reentrant=${recompute_use_reentrant:-"true"}
 
     base_batch_size=${global_batch_size}
