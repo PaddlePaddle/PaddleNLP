@@ -41,7 +41,6 @@ fh.setLevel(logging.DEBUG)
 logger.addHandler(fh)
 
 args = get_parse_args()
-args.txt_file = os.path.join(os.path.dirname(__file__), args.txt_file)
 PROMPT_SYSTEM = """
 你现在需要一步步执行下面的操作
 你需要先完成关键句抽取任务，从背景信息中抽取与输入问题相关的关键句，
