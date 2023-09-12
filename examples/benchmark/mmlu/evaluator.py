@@ -23,10 +23,21 @@ choices = ["A", "B", "C", "D"]
 
 
 class ModelEvaluator(object):
-    def __init__(self, model_name_or_path, ntrain, temperature=0.2, dtype="float32"):
+    def __init__(self, model_name_or_path, ntrain, temperature=0.2, dtype="float32", tensor_parallel_degree=1):
         self.model_name_or_path = model_name_or_path
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name_or_path, dtype=dtype, low_cpu_mem_usage=True)
+        self.tensor_parallel_degree = tensor_parallel_degree
+        if self.tensor_parallel_degree > 1:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_name_or_path,
+                dtype=dtype,
+                low_cpu_mem_usage=True,
+                tensor_parallel_output=False,
+                tensor_parallel_degree=self.tensor_parallel_degree,
+                tensor_parallel_rank=paddle.distributed.get_rank(),
+            )
+        else:
+            self.model = AutoModelForCausalLM.from_pretrained(model_name_or_path, dtype=dtype, low_cpu_mem_usage=True)
         self.model.eval()
         self.generation_config = dict(
             temperature=temperature,

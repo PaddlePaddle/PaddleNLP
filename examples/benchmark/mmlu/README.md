@@ -16,13 +16,26 @@ tar xf data.tar
 
 在当前目录下运行以下脚本：
 
+- 单卡运行
 ```
+export CUDA_VISIBLE_DEVICES=0
 python eval.py \
     --model_name_or_path /path/to/your/model \
     --temperature 0.2 \
     --ntrain 5 \
     --output_dir ${output_path} \
     --dtype 'float16'
+```
+- 多卡运行
+```
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+python -m paddle.distributed.fleet.launch eval.py \
+    --model_name_or_path /path/to/your/model \
+    --temperature 0.2 \
+    --ntrain 5 \
+    --output_dir ${output_path} \
+    --dtype 'float16' \
+    --tensor_parallel_degree 4
 ```
 
 参数说明

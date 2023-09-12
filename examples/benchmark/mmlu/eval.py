@@ -17,6 +17,7 @@ import json
 import os
 
 import numpy as np
+import paddle
 import pandas as pd
 from categories import categories, subcategories
 from evaluator import ModelEvaluator
@@ -29,9 +30,9 @@ def main(args, evaluator):
         [f.split("_test.csv")[0] for f in os.listdir(os.path.join(args.data_dir, "test")) if "_test.csv" in f]
     )
     if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
+        os.makedirs(args.output_dir, exist_ok=True)
     if not os.path.exists(os.path.join(args.output_dir, "results_{}".format(args.model_name_or_path))):
-        os.makedirs(os.path.join(args.output_dir, "results_{}".format(args.model_name_or_path)))
+        os.makedirs(os.path.join(args.output_dir, "results_{}".format(args.model_name_or_path)), exist_ok=True)
 
     all_cors = []
     subcat_cors = {subcat: [] for subcat_lists in subcategories.values() for subcat in subcat_lists}
@@ -95,15 +96,25 @@ if __name__ == "__main__":
     parser.add_argument("--data_dir", "-d", type=str, default="data")
     parser.add_argument("--output_dir", type=str, default="results")
     parser.add_argument("--dtype", default="float32", type=str)
+    parser.add_argument("--tensor_parallel_degree", default=1, type=int)
 
     args = parser.parse_args()
     print(args)
 
+    if args.tensor_parallel_degree > 1:
+        strategy = paddle.distributed.fleet.DistributedStrategy()
+        strategy.hybrid_configs = {
+            "mp_degree": args.tensor_parallel_degree,
+        }
+        # Set control in tensor parallel
+        strategy.tensor_parallel_configs = {"tensor_init_seed": 1234}
+        paddle.distributed.fleet.init(is_collective=True, strategy=strategy)
     evaluator = ModelEvaluator(
         model_name_or_path=args.model_name_or_path,
         ntrain=args.ntrain,
         temperature=args.temperature,
         dtype=args.dtype,
+        tensor_parallel_degree=args.tensor_parallel_degree,
     )
 
     main(args, evaluator=evaluator)
