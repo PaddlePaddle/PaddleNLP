@@ -279,11 +279,11 @@ else(ON_INFER)
     )
   endif()
 
-  if(EXISTS ${PY_LIB_DIR}/../fluid/libpaddle.so)
+  if(EXISTS ${PY_LIB_DIR}/../base/libpaddle.so)
     set(lib_link
       -lpaddle
     )
-  elseif(EXISTS ${PY_LIB_DIR}/../fluid/core_avx.so)
+  elseif(EXISTS ${PY_LIB_DIR}/../base/core_avx.so)
     set(lib_link
       -l:core_avx.so
     )
@@ -293,7 +293,7 @@ else(ON_INFER)
     )
   endif()
   link_directories(
-    ${PY_LIB_DIR}/../fluid/
+    ${PY_LIB_DIR}/../base/
   )
 
   set(ft_lib_link

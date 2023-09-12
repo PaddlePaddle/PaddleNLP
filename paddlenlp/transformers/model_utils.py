@@ -86,9 +86,9 @@ __all__ = [
 ]
 
 
-def stridecheck_guard_context():
+def dy2st_nocheck_guard_context():
     try:
-        context = paddle.base.framework._stride_in_no_check_dy2st_diff()
+        context = paddle.framework._no_check_dy2st_diff()
     except:
         context = contextlib.nullcontext()
     return context
