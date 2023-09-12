@@ -20,6 +20,7 @@ import paddle.nn.functional as F
 from paddlenlp_ops import (
     get_token_penalty_multi_scores,
     save_with_output,
+    set_alibi_mask_value,
     set_mask_value,
     set_stop_value_multi_ends,
     set_value_by_flags_and_idx,
@@ -228,11 +229,20 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs["tgt_pos"] = paddle.where(
                     just_decoder, model_kwargs["tgt_pos"], model_kwargs["tgt_pos"] + 1
                 )
-            model_kwargs["seq_len_decoder"] = set_mask_value(
-                model_kwargs["tgt_generation_mask"],
-                model_kwargs["stop_flags"],
-                model_kwargs["seq_len_decoder"],
-            )
+            if "bloom" in self.config.architectures[0].lower():
+                model_kwargs["seq_len_decoder"] = set_alibi_mask_value(
+                    model_kwargs["tgt_generation_mask"],
+                    model_kwargs["stop_flags"],
+                    model_kwargs["seq_len_decoder"],
+                    model_kwargs["position_ids"],
+                    model_kwargs["tgt_pos"],
+                )
+            else:
+                model_kwargs["seq_len_decoder"] = set_mask_value(
+                    model_kwargs["tgt_generation_mask"],
+                    model_kwargs["stop_flags"],
+                    model_kwargs["seq_len_decoder"],
+                )
         else:
             model_kwargs["tgt_ids"] = next_tokens
             if self.config["position_encoding_2d"] and self.config.position_encoding_2d is True:
@@ -250,16 +260,26 @@ class GenerationInferenceModel(GenerationMixin):
                     model_kwargs["tgt_pos"],
                     model_kwargs["tgt_pos"] + 1,
                 )
-            model_kwargs["seq_len_decoder"] = set_mask_value(
-                model_kwargs["tgt_generation_mask"],
-                model_kwargs["stop_flags"],
-                model_kwargs["seq_len_decoder"],
-            )
+
             model_kwargs["seq_len_decoder"] = paddle.where(
                 model_kwargs["stop_flags"],
                 model_kwargs["seq_len_decoder"],
                 model_kwargs["seq_len_decoder"] + 1,
             )
+            if "bloom" in self.config.architectures[0].lower():
+                model_kwargs["seq_len_decoder"] = set_alibi_mask_value(
+                    model_kwargs["tgt_generation_mask"],
+                    model_kwargs["stop_flags"],
+                    model_kwargs["seq_len_decoder"],
+                    model_kwargs["position_ids"],
+                    model_kwargs["tgt_pos"],
+                )
+            else:
+                model_kwargs["seq_len_decoder"] = set_mask_value(
+                    model_kwargs["tgt_generation_mask"],
+                    model_kwargs["stop_flags"],
+                    model_kwargs["seq_len_decoder"],
+                )
 
         model_kwargs["next_tokens"] = next_tokens
         return model_kwargs
