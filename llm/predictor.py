@@ -53,8 +53,8 @@ class PredictorArgument:
     src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
     max_length: int = field(default=2048, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
-    top_p: float = field(default=0, metadata={"help": "top_p parameter for generation"})
-    temperature: float = field(default=1, metadata={"help": "top_p parameter for generation"})
+    top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
+    temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
     repetition_penalty: float = field(default=1.0, metadata={"help": "repetition penalty parameter for generation"})
     device: str = field(default="gpu", metadata={"help": "Device"})
     dtype: str = field(default=None, metadata={"help": "Model dtype"})
@@ -759,11 +759,7 @@ def predict():
                 source_texts.append(example["src"])
                 target_texts.append(example["tgt"])
     else:
-        source_texts = [
-            "My name is",
-            "Today is",
-            "中国的首都在哪里",
-        ]
+        source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
         target_texts = ["", "", ""]
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
