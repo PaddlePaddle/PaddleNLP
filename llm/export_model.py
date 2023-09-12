@@ -19,14 +19,43 @@ from dataclasses import dataclass, field
 import paddle
 from paddle.distributed import fleet
 from predictor import ModelArgument, PredictorArgument, create_predictor
+from tqdm import tqdm
 from utils import generate_rank_mapping, get_infer_model_path
 
 from paddlenlp.trainer import PdArgumentParser
+from paddlenlp.utils.log import logger
 
 
 @dataclass
 class ExportArgument:
     output_path: str = field(default=None, metadata={"help": "The output path of model."})
+
+
+def load_inference_model(model_path, model_name, param_name, exe):
+    model_abs_path = os.path.join(model_path, model_name)
+    param_abs_path = os.path.join(model_path, param_name)
+    if os.path.exists(model_abs_path) and os.path.exists(param_abs_path):
+        return paddle.static.io.load_inference_model(model_path, exe, model_name, param_name)
+    else:
+        return paddle.static.io.load_inference_model(model_path, exe)
+
+
+def validate_pdmodel(model_path, model_prefix):
+    paddle.enable_static()
+    place = paddle.CUDAPlace(0)
+    exe = paddle.static.Executor(place)
+    scope = paddle.static.Scope()
+
+    with paddle.static.scope_guard(scope):
+        net_program, feed_target_names, fetch_targets = paddle.static.io.load_inference_model(
+            os.path.join(model_path, model_prefix), exe
+        )
+
+        for block in net_program.blocks:
+            ops: list[paddle.framework.Operator] = block.ops
+            for op in tqdm(ops, desc="checking the validation of ops"):
+                if op.type.lower() == "print":
+                    logger.warning(f"UNEXPECTED OP<{op.type}> which will reduce the performace of the static model")
 
 
 def main():
@@ -53,11 +82,14 @@ def main():
     predictor.model.eval()
 
     predictor.model.to_static(
-        get_infer_model_path(export_args.output_path, predictor_args.model_prefix), {"dtype": predictor_args.dtype}
+        get_infer_model_path(export_args.output_path, predictor_args.model_prefix),
+        {"dtype": predictor_args.dtype, "export_precache": predictor_args.export_precache},
     )
     predictor.model.config.save_pretrained(export_args.output_path)
     predictor.tokenizer.save_pretrained(export_args.output_path)
     generate_rank_mapping(os.path.join(export_args.output_path, "rank_mapping.csv"))
+
+    validate_pdmodel(export_args.output_path, "model")
 
 
 if __name__ == "__main__":

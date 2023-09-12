@@ -13,6 +13,8 @@
 # limitations under the License.
 from __future__ import annotations
 
+from typing import List, Union
+
 import paddle
 import paddle.nn.functional as F
 from paddlenlp_ops import (
@@ -23,14 +25,35 @@ from paddlenlp_ops import (
     set_value_by_flags_and_idx,
 )
 
+from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList
+
 try:
     from paddle import top_p_sampling
 except:
     from paddlenlp_ops import top_p_sampling
 
-from ...generation import GenerationMixin
 
 __all__ = ["GenerationInferenceModel"]
+
+
+class ForcedDecodingEOSTokenLogitsProcessor(LogitsProcessor):
+    """
+    This `LogitsProcessor` enforces the last generated token to be the selected `forced_eos_token`.
+
+    Args:
+        max_length (int): The maximum length of the sequence to be generated.
+        forced_eos_token_id (int): The id of the token to be generated as the last token.
+    """
+
+    def __init__(self, max_decoding_step: int, forced_eos_token_id: Union[int, List[int]]):
+        self.max_decoding_step = max_decoding_step
+        self.forced_eos_token_id = forced_eos_token_id
+
+    def __call__(self, input_ids, scores, decoding_step):
+        if decoding_step == self.max_decoding_step:
+            scores[:] = paddle.finfo(scores.dtype).min
+            scores[:, self.forced_eos_token_id] = 0
+        return scores
 
 
 class GenerationInferenceModel(GenerationMixin):
@@ -42,6 +65,14 @@ class GenerationInferenceModel(GenerationMixin):
         dtype = config.get("dtype", paddle.get_default_dtype())
 
         cache_kvs_shapes = self.get_cache_kvs_shape(self.config, max_length=config.get("max_length", None))
+        export_precache = config.get("export_precache", False)
+        if export_precache:
+            precache_input_spec = [
+                paddle.static.InputSpec(shape=[2, None, None, None, None], dtype=dtype, name=f"pre_caches_{i}")
+                for i in range(len(cache_kvs_shapes))
+            ]
+        else:
+            precache_input_spec = None
 
         input_spec = [
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),  # input_ids
@@ -74,6 +105,9 @@ class GenerationInferenceModel(GenerationMixin):
                 )
                 for i, shape in enumerate(cache_kvs_shapes)
             ],  # cache_kvs
+            None,  # inputs_embeds
+            config.get("logits_processors", None),
+            precache_input_spec,
         ]
         if self.config["model_type"] and "chatglm" in self.config.model_type:
             input_spec[2] = paddle.static.InputSpec(
@@ -121,6 +155,8 @@ class GenerationInferenceModel(GenerationMixin):
         stop_nums=None,
         cache_kvs=[],
         inputs_embeds=None,
+        logits_processors=None,
+        pre_caches=None,
         **model_kwargs,
     ):
 
@@ -141,6 +177,8 @@ class GenerationInferenceModel(GenerationMixin):
         model_kwargs["penalty_score"] = penalty_score
         model_kwargs["frequency_score"] = frequency_score
         model_kwargs["presence_score"] = presence_score
+        model_kwargs["logits_processors"] = logits_processors or LogitsProcessorList()
+        model_kwargs["pre_caches"] = pre_caches
 
         ret = self.sample(
             input_ids,
@@ -166,7 +204,7 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs["step_idx"],
                 model_kwargs["step_idx"] + 1,
             )
-        length_cond = paddle.greater_than(model_kwargs["step_idx"], model_kwargs["max_dec_len"])
+        length_cond = paddle.greater_equal(model_kwargs["step_idx"], model_kwargs["max_dec_len"])
         model_kwargs["stop_flags"] = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
         if cache is None:
             next_tokens = paddle.where(just_decoder, paddle.full_like(next_tokens, -1), next_tokens)
@@ -242,6 +280,8 @@ class GenerationInferenceModel(GenerationMixin):
         # let inputs_embeds enter into model_kwargs.
         # because the code below directly use the model_kwargs as a parameter without using inputs_embeds.
         model_kwargs["inputs_embeds"] = inputs_embeds
+        model_kwargs["all_input_ids"] = input_ids
+        logits_processors = model_kwargs["logits_processors"]
 
         def _forward_(**args):
             # cache_kvs is never empty because it is passed as a parameter in def sample.
@@ -268,6 +308,8 @@ class GenerationInferenceModel(GenerationMixin):
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
 
             logits = paddle.cast(logits, paddle.float32)
+            logits = logits_processors(model_kwargs["all_input_ids"], logits, decoding_step=step_idx_ori)
+
             logits = get_token_penalty_multi_scores(
                 model_kwargs["pre_ids"],
                 logits,
@@ -293,6 +335,7 @@ class GenerationInferenceModel(GenerationMixin):
                 cache, just_decoder, next_tokens, eos_token_id, model_kwargs
             )
             next_tokens = model_kwargs["next_tokens"]
+            model_kwargs["all_input_ids"] = paddle.concat([model_kwargs["all_input_ids"], next_tokens], axis=1)
 
             save_with_output(
                 next_tokens,

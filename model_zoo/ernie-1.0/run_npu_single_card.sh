@@ -28,6 +28,7 @@ python -u run_pretrain.py \
     --model_name_or_path "ernie-3.0-base-zh" \
     --tokenizer_name_or_path "ernie-3.0-base-zh" \
     --input_dir "./data" \
+    --data_impl "mmap" \
     --output_dir "output/$task_name" \
     --split 949,50,1 \
     --max_seq_len 512 \

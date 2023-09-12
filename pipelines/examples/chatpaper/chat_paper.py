@@ -15,11 +15,21 @@
 import argparse
 import json
 import os
+import re
 
 import arxiv
 import erniebot as eb
 import gradio as gr
-from utils import _apply_token, load_all_json_path, pdf2image, retrieval, tackle_history
+from utils import (
+    _apply_token,
+    load_all_json_path,
+    merge_summary,
+    pdf2image,
+    retrieval,
+    summarize_abstract,
+    tackle_history,
+    translate_part,
+)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--api_type", type=str, default="qianfan")
@@ -57,18 +67,53 @@ parser.add_argument(
 parser.add_argument("--retriever_threshold", type=float, default=0.95, help="the threshold of retriever")
 parser.add_argument("--txt_file", type=str, default="", help="the path of a txt file which includes all papers path")
 parser.add_argument("--max_token", type=int, default=11200, help=" the max number of tokens of LLM")
+parser.add_argument("--translation_chunk_size", type=int, default=300, help="the chunk size of translation")
+parser.add_argument("--translation_cycle_num", type=int, default=3, help="fault tolerance times")
+parser.add_argument(
+    "--translation_max_token", type=int, default=500, help="the max number of tokens of translation segment"
+)
 args = parser.parse_args()
-PROMPT_RETRIVER = """<指令>根据已知信息，简洁和专业的来回答问题。如果无法从中得到答案，
-请说 “根据已知信息无法回答该问题”，不允许在答案中添加编造成分，答案请使用中文。 </指令>
-<已知信息>{documents}</已知信息>
-<问题>{query}</问题>"""
+PROMPT_SYSTEM = """
+你现在需要一步步执行下面的操作
+你需要先完成关键句抽取任务，从背景信息中抽取与输入问题相关的关键句，
+并输出信关键句抽取任务的结果,关键句需要按照1,2,3,...序号编号，然后你需要基于抽取的内容完成问答任务,回答输出问题。
+请记住你输出的格式是一个json格式的字符串。
+json有两个key值，一个是"关键句抽取任务的结果",对应的value是关键句需要按照1,2,3,...序号编号后的结果，第二个是"问答任务的结果",对应的value是问答任务的结果。
+输出格式如下:
+```
+json{'关键句抽取任务的结果':'1.关键句1 \n2.关键句1\n...','问答任务的结果':''}
+```
+"""
+PROMPT_RETRIVER = """
+现在我给你背景信息和问题：
+背景信息：{documents}
+输入问题：{query}
+根据背景信息，来完成关键句抽取任务和问答任务。
+请记住你需要先执行关键句抽取任务，再执行问答任务。你的输出格式需要是一个json格式的字符串。
+"""
+PROMPT_RETRIVER_MUL = """
+根据背景信息，简洁和专业的来回答问题。如果无法从中得到答案，
+请说 “根据已知信息无法回答该问题”，不允许在答案中添加编造成分，答案请使用中文。
+背景信息：{documents}
+问题：{query}
+"""
+PROMPT_PROBLEM = """
+给你一篇论文的标题和关键词，请你给出一些用户可能针对这篇论文进行问答的问题，问题的数量不要超过3个。
+论文的标题：{title}
+论文的关键词：{key_words}
+问题："""
 all_json_id = load_all_json_path(args.txt_file)
+eb.api_type = args.api_type
+access_token = _apply_token(args.api_key, args.secret_key)
+eb.access_token = access_token
+model = "ernie-bot-3.5" if args.ernie_model is None or args.ernie_model.strip() == "" else args.ernie_model
 
 
-def retrieval_papers(query, history=[]):
+def retrieval_papers(history=[]):
     """
     Retrieve papers
     """
+    query = history.pop()[0]
     query = query.strip().replace("<br>", "\n")
     context = tackle_history(history)
     if query:
@@ -90,22 +135,34 @@ def retrieval_papers(query, history=[]):
                 retriever_secret_key=args.retriever_secret_key,
                 retriever_embed_title=args.retriever_embed_title,
                 retriever_topk=30,
-                rank_topk=5,
+                rank_topk=3,
             )
             documents = prediction["documents"]
             all_content = ""
+            papers_absatract = []
             for i in range(len(documents)):
                 if documents[i].meta["id"] not in paper_id_list:
                     paper_id_list.append(documents[i].meta["id"])
                     key_words = documents[i].meta.get("key_words", "")
                     title = documents[i].meta.get("title", "")
                     abstract = documents[i].meta.get("abstracts", "")
+                    abstract = summarize_abstract(
+                        abstract,
+                        api_key=args.api_key,
+                        secret_key=args.secret_key,
+                        chunk_size=500,
+                        max_token=args.max_token,
+                    )
+                    papers_absatract.append({"content": abstract, "meta": {}})
                     paper_content = (
                         "**" + str(len(paper_id_list)) + "." + title + "**" + "\n" + key_words + "\n" + abstract
                     )
                     all_content += paper_content + "\n\n"
-            history.append(["下面请基于这几篇论文进行问题，单篇文档问答请使用单篇问答精读翻译", ",".join(paper_id_list)])
-            history.append([query, all_content])
+            history.append(["下面请基于这几篇论文进行问答，单篇文档问答请使用单篇问答精读翻译", ",".join(paper_id_list)])
+            confine_summary = merge_summary(papers_absatract, api_key=args.api_key, secret_key=args.secret_key)
+            confine_summary = "**下面是对上面几篇文档进行的总结**" + "\n" + confine_summary
+            confine_summary = confine_summary.replace("\n\n", "\n")
+            history.append([query, all_content + confine_summary])
         else:
             # history = [[user_msg(None),system_msg],[user_hint(None),paper_id]]
             paper_id_list = history[1][1].split(",")
@@ -130,7 +187,7 @@ def retrieval_papers(query, history=[]):
                     rank_topk=2,
                 )
                 content += "\n".join([item.content for item in prediction["documents"]])
-            content = PROMPT_RETRIVER.format(documents=content, query=query)
+            content = PROMPT_RETRIVER_MUL.format(documents=content, query=query)
             content = content[: args.max_token]
             context.append({"role": "user", "content": content})
             eb.api_type = args.api_type
@@ -140,7 +197,7 @@ def retrieval_papers(query, history=[]):
             response = eb.ChatCompletion.create(model=model, messages=context, stream=False)
             bot_response = response.result
             history.append([query, bot_response])
-    return None, history
+    return history
 
 
 def retrieval_title(title):
@@ -169,11 +226,9 @@ def retrieval_title(title):
     return None
 
 
-def infer(query, history=[]):
+def infer(history=[]):
     """Model inference."""
-    eb.api_type = args.api_type
-    access_token = _apply_token(args.api_key, args.secret_key)
-    eb.access_token = access_token
+    query = history.pop()[0]
     query = query.strip().replace("<br>", "\n")
     context = tackle_history(history)
     single_paper_id = history[1][1]
@@ -198,19 +253,37 @@ def infer(query, history=[]):
                 rank_topk=2,
             )
             content = "\n".join([item.content for item in prediction["documents"]])
-            content = PROMPT_RETRIVER.format(documents=content, query=query)
+            content = PROMPT_SYSTEM + PROMPT_RETRIVER.format(documents=content, query=query)
             content = content[: args.max_token]
-            context.append({"system": args.system_prompt, "role": "user", "content": content})
-            model = "ernie-bot-3.5" if args.ernie_model is None or args.ernie_model.strip() == "" else args.ernie_model
+            context.append({"role": "user", "content": content})
             response = eb.ChatCompletion.create(model=model, messages=context, stream=False)
             bot_response = response.result
+            try:
+                bot_response = bot_response[bot_response.find("{") :]
+                bot_response = bot_response[: bot_response.find("}") + 1]
+                bot_response = json.loads(bot_response)
+                if type(bot_response["关键句抽取任务的结果"]) == list:
+                    bot_response["关键句抽取任务的结果"] = "\n".join(bot_response["关键句抽取任务的结果"])
+                bot_response = (
+                    "以下是我的分析内容：\n"
+                    + str(bot_response["关键句抽取任务的结果"])
+                    + "\n\n"
+                    + "以下是我的总结："
+                    + str(bot_response["问答任务的结果"])
+                )
+            except:
+                bot_response = (
+                    str(bot_response).replace("'关键句抽取任务的结果':", "以下是我的分析内容").replace("'问答任务的结果':", "\n以下是我的总结\n")
+                )
+            bot_response = re.sub(r"\[|\]|{|}", "", bot_response)
+            bot_response = bot_response.replace("\\n", "\n")
             history.append([query, bot_response])
         else:
-            context.append({"system": args.system_prompt, "role": "user", "content": query})
+            context.append({"role": "user", "content": query})
             response = eb.ChatFile.create(messages=context, stream=False)
             bot_response = response.result
             history.append([query, bot_response])
-    return None, history
+    return history
 
 
 def upload_file(file_name, file_url, file_upload, history=[]):
@@ -225,9 +298,20 @@ def upload_file(file_name, file_url, file_upload, history=[]):
             with open(json_file_path, mode="r") as json_file:
                 json_content = json.load(json_file)
             content = json_content["content"]
+            title = json_content["标题"]
+            key_words = json_content["关键词"]
+            response = eb.ChatCompletion.create(
+                model=model,
+                messages=[{"role": "user", "content": PROMPT_PROBLEM.format(title=title, key_words=key_words)}],
+                stream=False,
+            )
+            response = response.result
+            history.append([None, file_id])
+            history.append(["你可以参考以下问题，对论文进行提问", response])
         except:
-            content = "这篇论文目前尚未加入到论文库中"
-        history.append([None, file_id])
+            content = "这篇论文目前尚未加入到论文库中,请你自行上传论文的pdf或者url链接."
+            file_id = None
+            history.append([None, file_id])
         return (
             gr.Gallery.update(visible=False),
             gr.File.update(visible=False),
@@ -261,9 +345,6 @@ def upload_file(file_name, file_url, file_upload, history=[]):
     content = content.strip().replace("<br>", "\n")
     context = tackle_history(history)
     context.append({"role": "user", "content": content})
-    access_token = _apply_token(args.api_key, args.secret_key)
-    eb.api_type = args.api_type
-    eb.access_token = access_token
     response = eb.ChatFile.create(messages=context, stream=False)
     bot_response = response.result
     history.append([content, bot_response])
@@ -273,6 +354,30 @@ def upload_file(file_name, file_url, file_upload, history=[]):
         history,
         gr.Chatbot.update(visible=False),
     )
+
+
+def add_messaget_chatbot(messages, history):
+    history.append([messages, None])
+    return None, history
+
+
+def translation_txt(history=[], lang=""):
+    if not lang:
+        lang = "中文"
+    message = history.pop()[0]
+    if message:
+        translation_content = translate_part(
+            text=message,
+            api_key=args.api_key,
+            secret_key=args.secret_key,
+            task="翻译",
+            max_length=args.translation_max_token,
+            lang=lang,
+            chunk_size=args.translation_chunk_size,
+            cycle_num=args.translation_cycle_num,
+        )
+        history.append([message, translation_content])
+    return history
 
 
 with gr.Blocks(title="维普小助手", theme=gr.themes.Base()) as demo:
@@ -301,17 +406,17 @@ with gr.Blocks(title="维普小助手", theme=gr.themes.Base()) as demo:
             retrieval_submit_btn = gr.Button("🚀 提交", variant="primary", scale=2, min_width=0)
             retrieval_clear_btn = gr.Button("清除", variant="primary", scale=2, min_width=0)
     retrieval_submit_btn.click(
-        retrieval_papers,
+        add_messaget_chatbot,
         inputs=[retrieval_textbox, retrieval_chatbot],
         outputs=[retrieval_textbox, retrieval_chatbot],
-    )
+    ).then(retrieval_papers, retrieval_chatbot, retrieval_chatbot)
     retrieval_clear_btn.click(
         lambda _: ([[None, "你好, 我是维普Chatpaper文章精读翻译小助手,可以提供您专业的学术咨询.请问有什么可以帮您的吗?"]]),
         inputs=[retrieval_clear_btn],
         outputs=[retrieval_chatbot],
     )
-    with gr.Tab("单篇精读翻译"):  # 封装chatFile的能力
-        with gr.Accordion("文章精读翻译：输入区（输入方式三选一，三种输入方式优先级依次降低）", open=True, elem_id="input-panel") as area_input_primary:
+    with gr.Tab("单篇精读"):  # 封装chatFile的能力
+        with gr.Accordion("文章精读：输入区（输入方式三选一，三种输入方式优先级依次降低）", open=True, elem_id="input-panel") as area_input_primary:
             with gr.Row():
                 with gr.Group():
                     file_name = gr.Textbox(
@@ -334,7 +439,7 @@ with gr.Blocks(title="维普小助手", theme=gr.themes.Base()) as demo:
             with gr.Row():
                 clear = gr.Button(value="清空输入区")
                 submit = gr.Button(value="全文精读")
-        with gr.Accordion("文章精读翻译：输出区", open=True, elem_id="input-panel") as area_input_primary:
+        with gr.Accordion("文章精读：输出区", open=True, elem_id="input-panel") as area_input_primary:
             with gr.Tab("单文解读"):  # 包含下载功能
                 with gr.Row():
                     with gr.Column():
@@ -365,7 +470,9 @@ with gr.Blocks(title="维普小助手", theme=gr.themes.Base()) as demo:
                     inputs=[],
                     outputs=[file_name, file_url, file_upload, chatbot],
                 )
-                submit_btn.click(infer, inputs=[message, chatbot], outputs=[message, chatbot])
+                submit_btn.click(add_messaget_chatbot, inputs=[message, chatbot], outputs=[message, chatbot]).then(
+                    infer, chatbot, chatbot
+                )
                 clear_btn.click(
                     lambda _: ([[None, "你好, 我是维普Chatpaper文章精读翻译小助手,可以提供您专业的学术咨询.请问有什么可以帮您的吗?"]]),
                     inputs=clear_btn,
@@ -373,5 +480,21 @@ with gr.Blocks(title="维普小助手", theme=gr.themes.Base()) as demo:
                     api_name="clear",
                     show_progress=False,
                 )
+    with gr.Tab("翻译"):
+        with gr.Column():
+            chatbot_translation = gr.Chatbot(value=[[None, "你好, 我是翻译小助手"]], scale=35, height=500)
+            message_translation = gr.Textbox(placeholder="请输出需要翻译的内容", lines=5, max_lines=20)
+            with gr.Row():
+                lang = gr.Radio(choices=["中文", "英文"], max_choices=1, scale=1, value="中文", label="输入语言")
+                submit_translation = gr.Button("🚀 提交", variant="primary", scale=1)
+                clear_translation = gr.Button("清除", variant="primary", scale=1)
+        submit_translation.click(
+            add_messaget_chatbot,
+            inputs=[message_translation, chatbot_translation],
+            outputs=[message_translation, chatbot_translation],
+        ).then(translation_txt, inputs=[chatbot_translation, lang], outputs=[chatbot_translation])
+        clear_translation.click(
+            lambda _: ([[None, "你好, 你好, 我是翻译小助手"]]), inputs=[clear_translation], outputs=[chatbot_translation]
+        )
 demo.queue(concurrency_count=40, max_size=40)
 demo.launch(server_name="0.0.0.0", server_port=8084)
