@@ -857,9 +857,7 @@ class GenerationMixin(object):
             model_kwargs["attention_mask"] = self.prepare_attention_mask_for_generation(
                 input_ids, pad_token_id, eos_token_id
             )
-        self.is_encoder_decoder = (
-            getattr(self, "encoder", None) is not None and getattr(self, "decoder", None) is not None
-        )
+        self.is_encoder_decoder = self.config.is_encoder_decoder
 
         if self.is_encoder_decoder:
             model_kwargs = self.prepare_encoder_decoder_kwargs_for_generation(input_ids, model_kwargs)
@@ -1098,7 +1096,7 @@ class GenerationMixin(object):
                 break
 
             model_kwargs = self.update_model_kwargs_for_generation(
-                outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
+                outputs, model_kwargs, is_encoder_decoder=self.config.is_encoder_decoder
             )
 
         if streamer is not None:
@@ -1238,9 +1236,6 @@ class GenerationMixin(object):
         dtype = config.get("dtype", None)
 
         logits_processors = config.get("logits_processors", None)
-        self.is_encoder_decoder = (
-            getattr(self, "encoder", None) is not None and getattr(self, "decoder", None) is not None
-        )
         model_inputs_spec = self._get_model_inputs_spec(dtype)
 
         input_spec = [
@@ -1363,7 +1358,7 @@ class GenerationMixin(object):
                 unfinished_flag = get_unfinished_flag(input_ids, unfinished_flag, eos_token_id)
 
             model_kwargs = self.update_model_kwargs_for_generation(
-                outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
+                outputs, model_kwargs, is_encoder_decoder=self.config.is_encoder_decoder
             )
 
             return input_ids, scores, unfinished_flag, model_kwargs
