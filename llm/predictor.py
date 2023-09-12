@@ -19,7 +19,6 @@ import sys
 import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
-from distutils.command.config import config
 
 import numpy as np
 import paddle
@@ -139,6 +138,7 @@ class BasePredictor:
         self.tokenizer = tokenizer
         self.return_tensors = "pd"
         self.tensor_parallel_rank, self.tensor_parallel_degree = init_dist_env()
+        self.model_config.tensor_parallel_rank, self.model_config.tensor_parallel_degree = init_dist_env()
 
     def _preprocess(self, source):
         tokenized_source = self.tokenizer(
@@ -284,11 +284,11 @@ class InferencePredictorMixin:
             self.cache_kvs[0].shape[-3],
             self.cache_kvs[0].shape[-1],
         )
-        total_max_length = config.src_length + config.max_length
-        self.pre_ids = paddle.full([config.batch_size, total_max_length], -1, dtype="int64")
+        self.total_max_length = config.src_length + config.max_length
+        self.pre_ids = paddle.full([config.batch_size, self.total_max_length], -1, dtype="int64")
         if "chatglm" in self.architectures:
             self.attention_mask = paddle.ones(
-                shape=(config.batch_size, 1, total_max_length, total_max_length),
+                shape=(config.batch_size, 1, self.total_max_length, self.total_max_length),
                 dtype=self.dtype,
             )
             self.tgt_pos = paddle.ones(
@@ -297,15 +297,17 @@ class InferencePredictorMixin:
             )
         else:
             self.attention_mask = paddle.zeros(
-                shape=(config.batch_size, 1, total_max_length, total_max_length),
+                shape=(config.batch_size, 1, self.total_max_length, self.total_max_length),
                 dtype=self.dtype,
             )
 
         self.tgt_generation_mask = paddle.zeros(
-            shape=[config.batch_size, 1, 1, total_max_length],
+            shape=[config.batch_size, 1, 1, self.total_max_length],
             dtype=self.dtype,
         )
-        self.arange_tensor_encoder = paddle.zeros(shape=(config.batch_size, 1, total_max_length), dtype=self.dtype)
+        self.arange_tensor_encoder = paddle.zeros(
+            shape=(config.batch_size, 1, self.total_max_length), dtype=self.dtype
+        )
 
         if config.export_precache:
             if config.prefix_path:
@@ -342,6 +344,10 @@ class InferencePredictorMixin:
             return None
 
     def _preprocess(self, source):
+        self.attention_mask[:] = 0
+        self.tgt_generation_mask[:] = 0
+        pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
+
         if "chatglm" in self.architectures:
             inputs = dybatch_preprocess(
                 self.tokenizer,
@@ -370,12 +376,12 @@ class InferencePredictorMixin:
             )
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
-                self.attention_mask[i, 0, :length, :length] = paddle.tril(
+                self.attention_mask[i, :, :length, :length] = paddle.tril(
                     paddle.ones(shape=(length, length), dtype=self.config.dtype)
                 )
-                self.arange_tensor_encoder[i, 0, :length] = paddle.arange(length).astype(self.config.dtype)
+                self.arange_tensor_encoder[i, :, :length] = paddle.arange(length).astype(self.config.dtype)
 
-                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype=self.config.dtype)
+                self.tgt_generation_mask[i, :, 0, :length] = paddle.ones(shape=[1, length], dtype=self.config.dtype)
             # alibi encoder
             alibi_slopes = get_alibi_slopes(self.model_config.n_head)
             inputs["position_ids"] = paddle.to_tensor(alibi_slopes, dtype="float32")
@@ -402,8 +408,8 @@ class InferencePredictorMixin:
                 [
                     inputs["input_ids"].shape[0],
                     self.model_config.n_head // self.model_config.tensor_parallel_degree,
-                    self.config.max_length,
-                    self.config.max_length,
+                    self.total_max_length,
+                    self.total_max_length,
                 ]
             )
             alibi_decoder = alibi.expand(
@@ -411,7 +417,7 @@ class InferencePredictorMixin:
                     inputs["input_ids"].shape[0],
                     self.model_config.n_head // self.model_config.tensor_parallel_degree,
                     1,
-                    self.config.max_length,
+                    self.total_max_length,
                 ]
             )
             self.attention_mask = (
@@ -422,7 +428,6 @@ class InferencePredictorMixin:
             )
 
         else:
-            pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
             inputs = dybatch_preprocess(
                 self.tokenizer,
                 source,
@@ -655,7 +660,7 @@ def create_predictor(
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMInferenceModel as LlamaInferenceModel,
                     )
-                  
+
                     config.tensor_parallel_degree = tensor_parallel_degree
                     config.tensor_parallel_rank = tensor_parallel_rank
                     config.quant_bits = -1
@@ -679,6 +684,20 @@ def create_predictor(
                     dtype=predictor_args.dtype,
                 )
                 model.eval()
+            elif "bloom" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    BloomForCausalLMInferenceModel,
+                )
+
+                config.tensor_parallel_degree = tensor_parallel_degree
+                config.tensor_parallel_rank = tensor_parallel_rank
+                model = BloomForCausalLMInferenceModel.from_pretrained(
+                    predictor_args.model_name_or_path,
+                    config=config,
+                    dtype=predictor_args.dtype,
+                )
+                cache_kvs_shape = BloomForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
+                model.eval()
             predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
         elif predictor_args.mode == "static":
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
@@ -698,6 +717,15 @@ def create_predictor(
                     config, predictor_args.batch_size
                 )
                 predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
+            elif "bloom" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    BloomForCausalLMInferenceModel,
+                )
+
+                cache_kvs_shape = BloomForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
+                predictor = StaticInferencePredictor(
+                    predictor_args, cache_kvs_shape=cache_kvs_shape, tokenizer=tokenizer
+                )
         else:
             raise ValueError("the `mode` should be one of [dynamic, static]")
     return predictor
