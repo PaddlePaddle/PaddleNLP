@@ -1496,9 +1496,7 @@ class GenerationMixin(object):
         return input_ids[:, origin_len:], scores
 
     def reorder_cache(self, cache, beam_idx):
-        cache = map_structure(
-            lambda x: paddle.index_select(x, beam_idx), cache
-        )
+        cache = map_structure(lambda x: paddle.index_select(x, beam_idx), cache)
 
     def beam_search(
         self,

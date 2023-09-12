@@ -15,6 +15,7 @@
 import unittest
 
 import paddle
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import ChatGLMv2Config, ChatGLMv2ForCausalLM, ChatGLMv2Model
 from tests.transformers.test_generation_utils import GenerationTesterMixin
@@ -23,8 +24,6 @@ from tests.transformers.test_modeling_common import (  # GenerationD2STestMixin,
     ids_tensor,
     random_attention_mask,
 )
-
-from parameterized import parameterized_class
 
 
 class ChatGLMv2Tester:

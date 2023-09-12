@@ -767,9 +767,7 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
         self.chatglm_v2 = ChatGLMv2Model(config)
 
     def reorder_cache(self, cache: paddle.Tensor, beam_idx):
-        cache = map_structure(
-            lambda x: paddle.index_select(x, beam_idx, axis=1), cache
-        )
+        cache = map_structure(lambda x: paddle.index_select(x, beam_idx, axis=1), cache)
 
     def update_model_kwargs_for_generation(
         self,
