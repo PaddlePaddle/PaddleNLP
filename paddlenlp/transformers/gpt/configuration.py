@@ -95,7 +95,7 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
         "hidden_dropout_prob": 0.1,
         "attention_probs_dropout_prob": 0.1,
         "max_position_embeddings": 1024,
-        "type_vocab_size": 16,  # no use
+        "type_vocab_size": 1,  # no use
         "initializer_range": 0.02,
         "eos_token_id": 50256,
         "eol_token_id": 198,
