@@ -386,7 +386,11 @@ class GPTDataset(paddle.io.Dataset):
         )
 
         # The doc cumsum start pos
-        self.start_pos = [0] + np.cumsum(self.sample_lens).tolist()
+        # ???
+        self.start_pos = np.empty(len(self.sample_lens) + 1, dtype=np.int64)
+        self.start_pos[0] = 0
+        np.cumsum(self.sample_lens, out=self.start_pos[1:])
+
 
     def _construct_sample(self, tokens):
         tokens = np.array(tokens).astype("int64").tolist()
