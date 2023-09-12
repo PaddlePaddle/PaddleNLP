@@ -212,9 +212,13 @@ class FusedMultiTransformer(Layer):
         self.quant_bits = quant_bits
         self.use_weight_only = False
         self.weight_dtype = self._dtype
+        self.create_params_type = self._dtype
 
         if self.quant_bits != -1:
             self.use_weight_only = True
+            self.create_params_type = (
+                "int8"  # If use weightonly int4, params dtype is int8, and one of the dimension will be half.
+            )
             self.weight_dtype = "int" + str(self.quant_bits)
 
         self.ln_scales, self.ln_biases = [], []
@@ -292,7 +296,7 @@ class FusedMultiTransformer(Layer):
             qkv_weight = self.create_parameter(
                 shape=qkv_weight_shape,
                 attr=qkv_weight_attr,
-                dtype=self.weight_dtype,
+                dtype=self.create_params_type,
                 is_bias=False,
             )
 
@@ -321,7 +325,7 @@ class FusedMultiTransformer(Layer):
             linear_weight = self.create_parameter(
                 shape=linear_weight_shape,
                 attr=linear_weight_attr,
-                dtype=self.weight_dtype,
+                dtype=self.create_params_type,
                 is_bias=False,
             )
 
@@ -371,7 +375,7 @@ class FusedMultiTransformer(Layer):
             ffn1_weight = self.create_parameter(
                 shape=ffn1_weight_shape,
                 attr=ffn1_weight_attr,
-                dtype=self.weight_dtype,
+                dtype=self.create_params_type,
                 is_bias=False,
             )
 
@@ -401,7 +405,7 @@ class FusedMultiTransformer(Layer):
             ffn2_weight = self.create_parameter(
                 shape=ffn2_weight_shape,
                 attr=ffn2_weight_attr,
-                dtype=self.weight_dtype,
+                dtype=self.create_params_type,
                 is_bias=False,
             )
 
