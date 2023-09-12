@@ -511,7 +511,7 @@ msgstr ""
 #: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead:1
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion:1
 #: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion:1
-msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgid "基类：:class:`paddle.base.dygraph.layers.Layer`"
 msgstr ""
 
 #: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead:1

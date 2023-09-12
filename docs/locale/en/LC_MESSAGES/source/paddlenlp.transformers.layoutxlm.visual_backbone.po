@@ -72,7 +72,7 @@ msgstr ""
 #: paddlenlp.transformers.layoutxlm.visual_backbone.CNNBlockBase:1
 #: paddlenlp.transformers.layoutxlm.visual_backbone.LastLevelMaxPool:1
 #: paddlenlp.transformers.layoutxlm.visual_backbone.VisualBackbone:1
-msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgid "基类：:class:`paddle.base.dygraph.layers.Layer`"
 msgstr ""
 
 #: of paddlenlp.transformers.layoutxlm.visual_backbone.ShapeSpec:1
@@ -112,7 +112,7 @@ msgid "返回类型"
 msgstr ""
 
 #: of paddlenlp.transformers.layoutxlm.visual_backbone.FrozenBatchNorm:1
-msgid "基类：:class:`paddle.fluid.dygraph.nn.BatchNorm`"
+msgid "基类：:class:`paddle.base.dygraph.nn.BatchNorm`"
 msgstr ""
 
 #: of paddlenlp.transformers.layoutxlm.visual_backbone.BasicBlock:1

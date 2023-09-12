@@ -108,7 +108,7 @@ msgstr ""
 #: paddlenlp.transformers.transformer.modeling.TransformerDecodeCell:1
 #: paddlenlp.transformers.transformer.modeling.TransformerModel:1
 #: paddlenlp.transformers.transformer.modeling.WordEmbedding:1
-msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
+msgid "基类：:class:`paddle.base.dygraph.layers.Layer`"
 msgstr ""
 
 #: of paddlenlp.transformers.transformer.modeling.WordEmbedding:1
@@ -422,7 +422,7 @@ msgstr ""
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder:1
-msgid "基类：:class:`paddle.fluid.layers.rnn.BeamSearchDecoder`"
+msgid "基类：:class:`paddle.base.layers.rnn.BeamSearchDecoder`"
 msgstr ""
 
 #: of

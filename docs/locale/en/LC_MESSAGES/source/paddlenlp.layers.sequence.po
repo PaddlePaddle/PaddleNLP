@@ -24,7 +24,7 @@ msgstr ""
 #: of paddlenlp.layers.sequence.sequence_mask:1
 msgid ""
 "To boost the performance, this sequence_mask is different with "
-"paddle.fluid.layers.sequence_mask"
+"paddle.base.layers.sequence_mask"
 msgstr ""
 
 #: of paddlenlp.layers.sequence.sequence_mask

@@ -298,9 +298,15 @@ python export_model.py \
     --output_path ./inference_ptq \
     --dtype float16 \
     --inference_model \
-    --max_batch_size 8 \
     --quant_type "A8W8" \
     --shift_smooth 1
+
+python export_model.py \
+    --model_name_or_path meta-llama/Llama-2-7b-chat \
+    --output_path ./inference_wint8 \
+    --quant_type "weight_only_int8" \
+    --dtype float16 \
+    --inference_model
 
 # InferenceModel 静态图推理
 python predictor.py \

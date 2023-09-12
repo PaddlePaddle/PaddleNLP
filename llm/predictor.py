@@ -79,7 +79,7 @@ class PredictorArgument:
         metadata={"help": "The quant type of inference model, support `weight_only_int8`, `weight_only_int4`."},
     )
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
-    quant_type: str = field(default="", metadata={"help": "Quantization type. Supported values: A8W8, WINT4,WINT8"})
+    # quant_type: str = field(default="", metadata={"help": "Quantization type. Supported values: A8W8, WINT4,WINT8"})
     quant_round_type: int = field(
         default=0,
         metadata={
@@ -343,14 +343,15 @@ class InferencePredictorMixin:
                 self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, self.num_layers, axis=0)]
 
     def _postprocess(self, predictions):
-        if paddle.distributed.get_rank() == 0:
-            tokens: np.ndarray = load_real_time_tokens()
-            decoded_predictions = self.tokenizer.batch_decode(
-                tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
-            )
-            return decoded_predictions
-        else:
-            return None
+        # if paddle.distributed.get_rank() == 0:
+        tokens: np.ndarray = load_real_time_tokens()
+        decoded_predictions = self.tokenizer.batch_decode(
+            tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
+        )
+        return decoded_predictions
+
+    # else:
+    #     return None
 
     def _preprocess(self, source):
         if "chatglm" in self.architectures:
@@ -442,6 +443,8 @@ class InferencePredictorMixin:
                 top_p=self.config.top_p,
                 temperature=self.config.temperature,
                 pre_caches_length=pre_caches_length,
+                benchmark=benchmark,
+                src_length=self.config.src_length,
             )
 
             for i in range(inputs["input_ids"].shape[0]):
@@ -787,8 +790,8 @@ def benchmark(predictor, predictor_args, model_args):
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
-    warmup_time = 10
-    test_time = 100
+    warmup_time = 2
+    test_time = 10
 
     print("***********Start Warmup**********")
     for _ in range(warmup_time):
@@ -797,17 +800,31 @@ def benchmark(predictor, predictor_args, model_args):
 
     print("***********Start Speed Test**********")
     start = time.perf_counter()
-    for _ in range(test_time):
+    from paddle import profiler
+
+    def my_on_trace_ready(prof):  # 定义回调函数，性能分析器结束采集数据时会被调用
+        callback = profiler.export_chrome_tracing("./profiler_demo")  # 创建导出性能数据到profiler_demo文件夹的回调函数
+        callback(prof)  # 执行该导出函数
+        prof.summary(sorted_by=profiler.SortedKeys.GPUTotal)  # 打印表单，按GPUTotal排序表单项
+
+    # p = profiler.Profiler(scheduler=[4, 5], on_trace_ready=my_on_trace_ready, timer_only=False)  # 初始化Profiler对象
+
+    # p.start()
+    for i in range(test_time):
+        print(i)
         for bs, batch_source_text in enumerate(batch_benchmark_texts):
             outputs = predictor.predict(batch_source_text)
+            # p.step()
+    # p.stop()
     end = time.perf_counter()
 
     output_tokens = sum([len(output) for output in outputs])
     print(
-        "Input length is: {}, Output length is: {}, bs is: {}, Generate speed is: {:.3f} tokens/s(ips), QPS: {:.3f} requests/s. ".format(
+        "Input length is: {}, Output length is: {}, bs is: {}, elapse, {} Generate speed is: {:.3f} tokens/s(ips), QPS: {:.3f} requests/s. ".format(
             predictor_args.src_length,
             predictor_args.max_length,
             predictor_args.batch_size,
+            (end - start) / test_time,
             (output_tokens / (end - start) / test_time),
             (predictor_args.batch_size / (end - start) / test_time),
         )
@@ -815,4 +832,6 @@ def benchmark(predictor, predictor_args, model_args):
 
 
 if __name__ == "__main__":
+    paddle.base.core.enable_autotune()
+    paddle.base.core.update_autotune_status()
     predict()

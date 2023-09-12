@@ -18,8 +18,8 @@ from __future__ import absolute_import, division, print_function
 from functools import partial
 
 import paddle
-import paddle.fluid as fluid
-import paddle.fluid.layers as layers
+import paddle.base as fluid
+import paddle.base.layers as layers
 
 
 def multi_head_attention(

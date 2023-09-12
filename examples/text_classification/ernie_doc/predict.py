@@ -147,7 +147,7 @@ class LongDocClassifier:
             mode="eval",
             preprocess_text_fn=preprocess_text_fn,
         )
-        self.test_dataloader = paddle.fluid.reader.DataLoader.from_generator(capacity=70, return_list=True)
+        self.test_dataloader = paddle.base.reader.DataLoader.from_generator(capacity=70, return_list=True)
         self.test_dataloader.set_batch_generator(self.test_ds_iter, paddle.get_device())
 
     def _construct_tokenizer(self, tokenizer_class):

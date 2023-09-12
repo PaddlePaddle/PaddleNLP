@@ -153,7 +153,7 @@ except:
 try:
     from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
 except:
-    from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
+    from paddle.base.dataloader.dataloader_iter import _DataLoaderIterBase
 
 
 def is_dp_group_support_in_group_sharded_parallel():

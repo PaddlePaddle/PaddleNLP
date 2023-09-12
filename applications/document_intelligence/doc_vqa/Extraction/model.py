@@ -13,13 +13,13 @@
 # limitations under the License.
 
 import paddle
-import paddle.fluid as fluid
+import paddle.base as fluid
 import paddle.nn as nn
 
 from paddlenlp.transformers import LayoutXLMPretrainedModel
 
 
-class Crf_decoding(paddle.fluid.dygraph.Layer):
+class Crf_decoding(paddle.base.dygraph.Layer):
     def __init__(self, param_attr, size=None, is_test=True, dtype="float32"):
         super(Crf_decoding, self).__init__()
 
@@ -56,7 +56,7 @@ class Crf_decoding(paddle.fluid.dygraph.Layer):
         return viterbi_path
 
 
-class Chunk_eval(paddle.fluid.dygraph.Layer):
+class Chunk_eval(paddle.base.dygraph.Layer):
     def __init__(self, num_chunk_types, chunk_scheme, excluded_chunk_types=None):
         super(Chunk_eval, self).__init__()
         self.num_chunk_types = num_chunk_types
@@ -96,7 +96,7 @@ class Chunk_eval(paddle.fluid.dygraph.Layer):
         return (precision, recall, f1_score, num_infer_chunks, num_label_chunks, num_correct_chunks)
 
 
-class Linear_chain_crf(paddle.fluid.dygraph.Layer):
+class Linear_chain_crf(paddle.base.dygraph.Layer):
     def __init__(self, param_attr, size=None, is_test=False, dtype="float32"):
         super(Linear_chain_crf, self).__init__()
 
@@ -150,9 +150,9 @@ class LayoutXLMForTokenClassification_with_CRF(LayoutXLMPretrainedModel):
         self.emission_classifier = nn.Linear(self.layoutxlm.config["hidden_size"], self.num_classes)
         self.emission_classifier.apply(self.init_weights)
         self.linear_chain_crf = Linear_chain_crf(
-            size=self.num_classes, param_attr=paddle.fluid.ParamAttr(name="liner_chain_crfw")
+            size=self.num_classes, param_attr=paddle.base.ParamAttr(name="liner_chain_crfw")
         )
-        self.crf_decoding = Crf_decoding(param_attr=paddle.fluid.ParamAttr(name="crfw_decode"), size=self.num_classes)
+        self.crf_decoding = Crf_decoding(param_attr=paddle.base.ParamAttr(name="crfw_decode"), size=self.num_classes)
         self.crf_decoding.weight = self.linear_chain_crf.weight
         self.crfw = fluid.layers.create_parameter(
             shape=[self.num_classes + 2, self.num_classes], dtype="float32", name="crfw"

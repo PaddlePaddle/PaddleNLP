@@ -294,7 +294,7 @@ class ChatGLMStackDyBatch(nn.Layer):
         new_cache = [None]
         hidden_states = self.input_layernorm(hidden_states)
 
-        with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
+        with paddle.base.framework._stride_in_no_check_dy2st_diff():
             hidden_states, new_cache = self.transformer_block(
                 input_ids,
                 hidden_states,

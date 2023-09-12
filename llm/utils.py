@@ -391,6 +391,7 @@ def dybatch_preprocess(
     temperature: float,
     pre_caches_length: int = 0,
     benchmark: bool = False,
+    src_length: int = 0,
 ):
     """Pre-process generation inputs."""
     if "chatglm" in architectures:
@@ -434,7 +435,7 @@ def dybatch_preprocess(
         bs = inputs["input_ids"].shape[0]
         max_len = max(map(len, input_ids))
 
-        position_ids = paddle.zeros(shape=[bs, max_length], dtype="int64")
+        position_ids = paddle.zeros(shape=[bs, src_length + max_length], dtype="int64")
 
         for i in range(bs):
             position_ids[i, pre_caches_length : pre_caches_length + seq_len[i]] = paddle.arange(seq_len[i])

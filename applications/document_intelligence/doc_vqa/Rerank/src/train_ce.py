@@ -27,17 +27,17 @@ import warnings
 os.environ["FLAGS_eager_delete_tensor_gb"] = "0"  # enable gc
 
 import paddle  # noqa: E402
-import paddle.fluid as fluid  # noqa: E402
+import paddle.base as fluid  # noqa: E402
 
 if hasattr(paddle, "enable_static"):
     paddle.enable_static()
-import paddle.fluid.incubate.fleet.base.role_maker as role_maker  # noqa: E402
+import paddle.base.incubate.fleet.base.role_maker as role_maker  # noqa: E402
 import reader_ce as reader_ce  # noqa: E402
 from cross_encoder import create_model, evaluate, predict  # noqa: E402
 from finetune_args import parser  # noqa: E402
 from model.ernie import ErnieConfig  # noqa: E402
 from optimization import optimization  # noqa: E402
-from paddle.fluid.incubate.fleet.collective import (  # noqa: E402
+from paddle.base.incubate.fleet.collective import (  # noqa: E402
     DistributedStrategy,
     fleet,
 )

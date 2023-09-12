@@ -135,7 +135,7 @@ class PretrainingHDF5DataLoader:
 
                 lod_feed_list = []
                 for data in np_feed_list:
-                    tensor = paddle.fluid.core.LoDTensor()
+                    tensor = paddle.base.core.LoDTensor()
                     place = paddle.CPUPlace()
                     tensor.set(data, place)
                     lod_feed_list.append(tensor)
