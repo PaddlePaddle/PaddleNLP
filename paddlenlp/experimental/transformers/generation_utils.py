@@ -362,14 +362,12 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs,
             )
             step_idx_ori += 1
-            encoder_output = outputs
         else:
             outputs = None
             # first decoder
             next_tokens = None
             model_kwargs["next_tokens"] = next_tokens
             step_idx_ori += 0
-            encoder_output = outputs
 
         # gives it a value, means we will entered into decoder phase.
         model_kwargs["cache"] = 0
@@ -394,5 +392,4 @@ class GenerationInferenceModel(GenerationMixin):
             paddle.cast(model_kwargs["stop_flags"], "int32"),
             model_kwargs["seq_len_decoder"],
             model_kwargs["tgt_pos"],
-            encoder_output,
         )
