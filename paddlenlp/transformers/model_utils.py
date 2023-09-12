@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import contextlib
 import copy
 import gc
 import inspect
@@ -83,6 +84,14 @@ __all__ = [
     "PretrainedModel",
     "register_base_model",
 ]
+
+
+def stridecheck_guard_context():
+    try:
+        context = paddle.base.framework._stride_in_no_check_dy2st_diff()
+    except:
+        context = contextlib.nullcontext()
+    return context
 
 
 def unwrap_optimizer(optimizer, optimizer_instances=()):
