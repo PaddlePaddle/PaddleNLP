@@ -352,6 +352,7 @@ class InferencePredictorMixin:
             inputs = dybatch_preprocess(
                 self.tokenizer,
                 source,
+                self.config.src_length,
                 self.config.max_length,
                 self.architectures,
                 top_p=self.config.top_p,
@@ -369,6 +370,7 @@ class InferencePredictorMixin:
             inputs = dybatch_preprocess(
                 self.tokenizer,
                 source,
+                self.config.src_length,
                 self.config.max_length,
                 self.architectures,
                 top_p=self.config.top_p,
@@ -431,6 +433,7 @@ class InferencePredictorMixin:
             inputs = dybatch_preprocess(
                 self.tokenizer,
                 source,
+                self.config.src_length,
                 self.config.max_length,
                 self.architectures,
                 top_p=self.config.top_p,
@@ -790,9 +793,6 @@ def benchmark(predictor, predictor_args, model_args):
     test_texts = "hello world, how are you?"
     benchmark_texts = [test_texts + "<pad>" * predictor_args.src_length for _ in range(predictor_args.batch_size)]
 
-    benchmark_texts = [
-        "<pad>" * (predictor_args.src_length // 2 - 3) + "My name is " for _ in range(predictor_args.batch_size)
-    ]
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
