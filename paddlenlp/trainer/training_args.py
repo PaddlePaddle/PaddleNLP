@@ -714,18 +714,15 @@ class TrainingArguments:
             self.use_hybrid_parallel = True
 
         if self.amp_master_grad:
-            # if (
-            #     self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1
-            # ) or self.fp16_opt_level != "O2":
-            #     raise ValueError(
-            #         "Temporarily amp master grad only suport for tensor/pipeline parallel with fp16_opt_level O2. please set amp_master_grad to False."
-            #     )
-            # if not (self.bf16 or self.fp16) or self.fp16_opt_level != "O2":
-            #     logger.warning("set amp_master_grad to false since amp is disabled.")
-            #     self.amp_master_grad = False
-            if self.pipeline_parallel_degree <= 1 and self.tensor_parallel_degree <= 1 and len(self.sharding) > 1:
-                logger.warning("set amp_master_grad to false, not support pure sharding yet.")
-                self.amp_master_grad = False
+            if (
+                self.pipeline_parallel_degree <= 1
+                and self.tensor_parallel_degree <= 1
+                and not (self.sharding and ShardingOption.SHARD_OP in self.sharding)
+            ):
+                raise ValueError(
+                    "Temporarily amp master grad only support for tensor/pipeline/sharding parallel. "
+                    "Please set amp_master_grad to False."
+                )
 
         if self.use_hybrid_parallel:
             world_size = paddle.distributed.get_world_size()
