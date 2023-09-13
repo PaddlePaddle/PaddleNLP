@@ -1497,6 +1497,7 @@ class GenerationMixin(object):
 
     def reorder_cache(self, cache, beam_idx):
         cache = map_structure(lambda x: paddle.index_select(x, beam_idx), cache)
+        return cache
 
     def beam_search(
         self,
@@ -1626,7 +1627,7 @@ class GenerationMixin(object):
             cache_name = "cache" if "cache" in model_kwargs else "past_key_values"
             if model_kwargs[cache_name] is not None:
                 # reorder the cache
-                self.reorder_cache(model_kwargs[cache_name], beam_idx)
+                model_kwargs[cache_name] = self.reorder_cache(model_kwargs[cache_name], beam_idx)
 
         pred_ids, scores = beam_scorer.finalize(
             input_ids,
@@ -1774,7 +1775,7 @@ class GenerationMixin(object):
             cache_name = "cache" if "cache" in model_kwargs else "past_key_values"
             if model_kwargs[cache_name] is not None:
                 # reorder the cache
-                self.reorder_cache(model_kwargs[cache_name], beam_idx)
+                model_kwargs[cache_name] = self.reorder_cache(model_kwargs[cache_name], reordering_indices)
 
         pred_ids, scores = beam_scorer.finalize(
             input_ids,
