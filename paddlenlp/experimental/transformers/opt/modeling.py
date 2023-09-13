@@ -189,7 +189,6 @@ class OPTInferenceModel(OPTPretrainedModel):
         self.past_key_values_length = self.past_key_values_length.reshape([1])
         past_key_values_length = paddle.to_tensor([self.past_key_values_length])
         self.past_key_values_length += input_shape[1]
-
         embedding_output = self.embeddings(
             input_ids=input_ids,
             attention_mask=paddle.ones([input_shape[0], past_key_values_length + input_shape[1]], dtype="int64"),
@@ -202,8 +201,8 @@ class OPTInferenceModel(OPTPretrainedModel):
             import numpy as np
             npzfile = np.load('/zhoukangkang/output.npz')
             embedding_output = paddle.to_tensor(np.array(npzfile['output']))
-            embedding_output = paddle.cast(embedding_output, dtype='float32')
-            print("embedding_output", embedding_output)
+            embedding_output = paddle.cast(embedding_output, dtype='float16')
+            print("embedding_output11", embedding_output)
 
         if not is_decoder:
             batch, seq_len, hidden_dim = embedding_output.shape
@@ -242,11 +241,11 @@ class OPTInferenceModel(OPTPretrainedModel):
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
 
-        self.embeddings.position_embeddings.weight.set_value((paddle.to_tensor(state_dict["opt.embeddings.position_embeddings.weight"].astype("float32"))))
-        self.embeddings.word_embeddings.weight.set_value(paddle.to_tensor(state_dict["opt.embeddings.word_embeddings.weight"].astype("float32")))
-        self.final_layer_norm.weight.set_value(paddle.to_tensor(state_dict["opt.decoder.final_layer_norm.weight"].astype("float32")))
-        self.final_layer_norm.bias.set_value(paddle.to_tensor(state_dict["opt.decoder.final_layer_norm.bias"].astype("float32")))
-
+        self.embeddings.position_embeddings.weight.set_value(paddle.to_tensor(state_dict["opt.embeddings.position_embeddings.weight"]))
+        self.embeddings.word_embeddings.weight.set_value(paddle.to_tensor(state_dict["opt.embeddings.word_embeddings.weight"]))
+        self.final_layer_norm.weight.set_value(paddle.to_tensor(state_dict["opt.decoder.final_layer_norm.weight"]))
+        self.final_layer_norm.bias.set_value(paddle.to_tensor(state_dict["opt.decoder.final_layer_norm.bias"]))
+        
         for i in range(self.num_layers):
             ln_scale = paddle.to_tensor(state_dict["opt.decoder.layers.{}.norm1.weight".format(i)])
             ln_bias = paddle.to_tensor(state_dict["opt.decoder.layers.{}.norm1.bias".format(i)])
@@ -264,17 +263,13 @@ class OPTInferenceModel(OPTPretrainedModel):
             concated_qkv_weight = concated_qkv_weight.transpose(1, 0)
             concated_qkv_weight = concated_qkv_weight.reshape(3 * self.num_heads * self.head_size, self.hidden_size)
             concated_qkv_weight = paddle.to_tensor(concated_qkv_weight)
-            concated_qkv_weight = paddle.cast(concated_qkv_weight, "float32")
 
             concated_qkv_bias = np.concatenate([q_bias, k_bias, v_bias], axis=-1)
             concated_qkv_bias = concated_qkv_bias.reshape(3 * self.num_heads * self.head_size)
             concated_qkv_bias = paddle.to_tensor(concated_qkv_bias)
-            concated_qkv_bias = paddle.cast(concated_qkv_bias, "float32")
 
             out_proj_weight = paddle.to_tensor(state_dict["opt.decoder.layers.{}.self_attn.out_proj.weight".format(i)])
             out_proj_bias =  paddle.to_tensor(state_dict["opt.decoder.layers.{}.self_attn.out_proj.bias".format(i)])
-            out_proj_weight = paddle.cast(out_proj_weight, "float32")
-            out_proj_bias = paddle.cast(out_proj_bias, "float32")
 
             ffn_ln_scale = paddle.to_tensor(state_dict["opt.decoder.layers.{}.norm2.weight".format(i)])
             ffn_ln_bias = paddle.to_tensor(state_dict["opt.decoder.layers.{}.norm2.bias".format(i)])
@@ -285,36 +280,24 @@ class OPTInferenceModel(OPTPretrainedModel):
             ffn1_bias = paddle.to_tensor(state_dict["opt.decoder.layers.{}.linear1.bias".format(i)])
             ffn2_weight = paddle.to_tensor(state_dict["opt.decoder.layers.{}.linear2.weight".format(i)])
             ffn2_bias = paddle.to_tensor(state_dict["opt.decoder.layers.{}.linear2.bias".format(i)])
-            ffn1_weight = paddle.cast(ffn1_weight, "float32")
-            ffn1_bias = paddle.cast(ffn1_bias, "float32")
-            ffn2_weight = paddle.cast(ffn2_weight, "float32")
-            ffn2_bias = paddle.cast(ffn2_bias, "float32")
 
-            list_weight = [
-                ln_scale, ln_bias,
-                concated_qkv_weight, concated_qkv_bias,
-                out_proj_weight, out_proj_bias, 
-                ffn_ln_scale, ffn_ln_bias,
-                ffn1_weight, ffn1_bias,
-                ffn2_weight, ffn2_bias,
-            ]
-            self.transformer_block.ln_scales[i].set_value(list_weight[0])
-            self.transformer_block.ln_biases[i].set_value(list_weight[1])
+            self.transformer_block.ln_scales[i].set_value(ln_scale)
+            self.transformer_block.ln_biases[i].set_value(ln_bias)
 
-            self.transformer_block.qkv_weights[i].set_value(list_weight[2])
-            self.transformer_block.qkv_biases[i].set_value(list_weight[3])
+            self.transformer_block.qkv_weights[i].set_value(concated_qkv_weight)
+            self.transformer_block.qkv_biases[i].set_value(concated_qkv_bias)
 
-            self.transformer_block.linear_weights[i].set_value(list_weight[4])
-            self.transformer_block.linear_biases[i].set_value(list_weight[5])
+            self.transformer_block.linear_weights[i].set_value(out_proj_weight)
+            self.transformer_block.linear_biases[i].set_value(out_proj_bias)
 
-            self.transformer_block.ffn_ln_scales[i].set_value(list_weight[6])
-            self.transformer_block.ffn_ln_biases[i].set_value(list_weight[7])
+            self.transformer_block.ffn_ln_scales[i].set_value(ffn_ln_scale)
+            self.transformer_block.ffn_ln_biases[i].set_value(ffn_ln_bias)
 
-            self.transformer_block.ffn1_weights[i].set_value(list_weight[8])
-            self.transformer_block.ffn1_biases[i].set_value(list_weight[9])
+            self.transformer_block.ffn1_weights[i].set_value(ffn1_weight)
+            self.transformer_block.ffn1_biases[i].set_value(ffn1_bias)
 
-            self.transformer_block.ffn2_weights[i].set_value(list_weight[10])
-            self.transformer_block.ffn2_biases[i].set_value(list_weight[11])
+            self.transformer_block.ffn2_weights[i].set_value(ffn2_weight)
+            self.transformer_block.ffn2_biases[i].set_value(ffn2_bias)
 
 
 class OPTForCausalLMInferenceModel(GenerationInferenceModel, OPTPretrainedModel):
@@ -340,7 +323,7 @@ class OPTForCausalLMInferenceModel(GenerationInferenceModel, OPTPretrainedModel)
     def get_cache_kvs_shape(
         cls, config: OPTConfig, max_batch_size: int = None, max_length: int = None
     ) -> list[list[int]]:
-        """get cache_kvs tensor for llama model
+        """get cache_kvs tensor for opt model
 
         Args:
             max_batch_size (int): the max batch size

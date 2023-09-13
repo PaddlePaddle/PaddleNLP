@@ -15,3 +15,4 @@
 from .chatglm import *
 from .fused_transformer_layers import *
 from .llama import *
+from .opt import *
