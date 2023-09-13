@@ -70,13 +70,8 @@ class OPTInferenceModel(OPTPretrainedModel):
         self.num_heads = config.num_attention_heads
         self.head_size = self.hidden_size // self.num_heads
 
-        weight_file = "/root/.paddlenlp/models/facebook/opt-2.7b/model_state.pdparams"
-        self.state_dict = paddle.load(weight_file, return_numpy=True)
+        self.epsilon = 1e-5
 
-        for k  in self.state_dict.keys():
-            pass
-
-        #paddle.set_default_dtype("float16")
         ln_scale_attrs = [paddle.ParamAttr(name="opt.decoder.layers.{}.norm1.weight".format(i)) for i in range(config.num_hidden_layers)]
         ln_bias_attrs = [paddle.ParamAttr(name="opt.decoder.layers.{}.norm1.bias".format(i)) for i in range(config.num_hidden_layers)]
 
@@ -115,83 +110,9 @@ class OPTInferenceModel(OPTPretrainedModel):
                                                     ffn1_bias_attrs=ffn1_bias_attrs,
                                                     ffn2_weight_attrs=ffn2_weight_attrs,
                                                     ffn2_bias_attrs=ffn2_bias_attrs, 
-                                                    epsilon=1e-5)
+                                                    epsilon=self.epsilon)
 
         self.cache_kvs = []
-
-        for i in range(self.num_layers):
-            break
-            ln_scale = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.norm1.weight".format(i)])
-            ln_scale = paddle.cast(ln_scale, "float32")
-            ln_bias = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.norm1.bias".format(i)])
-            ln_bias = paddle.cast(ln_bias, "float32")
-
-            q_weight = self.state_dict["opt.decoder.layers.{}.self_attn.q_proj.weight".format(i)]
-            k_weight = self.state_dict["opt.decoder.layers.{}.self_attn.k_proj.weight".format(i)]
-            v_weight = self.state_dict["opt.decoder.layers.{}.self_attn.v_proj.weight".format(i)]
-            q_bias = self.state_dict["opt.decoder.layers.{}.self_attn.q_proj.bias".format(i)]
-            k_bias = self.state_dict["opt.decoder.layers.{}.self_attn.k_proj.bias".format(i)]
-            v_bias = self.state_dict["opt.decoder.layers.{}.self_attn.v_proj.bias".format(i)]
-
-            concated_qkv_weight = np.concatenate([q_weight, k_weight, v_weight], axis=-1)
-            concated_qkv_weight = concated_qkv_weight.transpose(1, 0)
-            concated_qkv_weight = concated_qkv_weight.reshape(3 * self.num_heads * self.head_size, self.hidden_size)
-            concated_qkv_weight = paddle.to_tensor(concated_qkv_weight)
-            concated_qkv_weight = paddle.cast(concated_qkv_weight, "float32")
-
-            concated_qkv_bias = np.concatenate([q_bias, k_bias, v_bias], axis=-1)
-            concated_qkv_bias = concated_qkv_bias.reshape(3 * self.num_heads * self.head_size)
-            concated_qkv_bias = paddle.to_tensor(concated_qkv_bias)
-            concated_qkv_bias = paddle.cast(concated_qkv_bias, "float32")
-
-            out_proj_weight = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.self_attn.out_proj.weight".format(i)])
-            out_proj_bias =  paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.self_attn.out_proj.bias".format(i)])
-            out_proj_weight = paddle.cast(out_proj_weight, "float32")
-            out_proj_bias = paddle.cast(out_proj_bias, "float32")
-
-            ffn_ln_scale = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.norm2.weight".format(i)])
-            ffn_ln_bias = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.norm2.bias".format(i)])
-            ffn_ln_scale = paddle.cast(ffn_ln_scale, "float32")
-            ffn_ln_bias = paddle.cast(ffn_ln_bias, "float32")
-
-            ffn1_weight = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.linear1.weight".format(i)])
-            ffn1_bias = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.linear1.bias".format(i)])
-            ffn2_weight = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.linear2.weight".format(i)])
-            ffn2_bias = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.linear2.bias".format(i)])
-            ffn1_weight = paddle.cast(ffn1_weight, "float32")
-            ffn1_bias = paddle.cast(ffn1_bias, "float32")
-            ffn2_weight = paddle.cast(ffn2_weight, "float32")
-            ffn2_bias = paddle.cast(ffn2_bias, "float32")
-
-            # qkv_weight = paddle.concat(q_weight, k_weight, v_weight)
-            list_weight = [
-                ln_scale, ln_bias,
-                concated_qkv_weight, concated_qkv_bias,
-                out_proj_weight, out_proj_bias, 
-                ffn_ln_scale, ffn_ln_bias,
-                ffn1_weight, ffn1_bias,
-                ffn2_weight, ffn2_bias,
-            ]
-            self.transformer_block.ln_scales[i].set_value(list_weight[0])
-            self.transformer_block.ln_biases[i].set_value(list_weight[1])
-
-            self.transformer_block.qkv_weights[i].set_value(list_weight[2])
-            self.transformer_block.qkv_biases[i].set_value(list_weight[3])
-
-            self.transformer_block.linear_weights[i].set_value(list_weight[4])
-            self.transformer_block.linear_biases[i].set_value(list_weight[5])
-
-            self.transformer_block.ffn_ln_scales[i].set_value(list_weight[6])
-            self.transformer_block.ffn_ln_biases[i].set_value(list_weight[7])
-
-            self.transformer_block.ffn1_weights[i].set_value(list_weight[8])
-            self.transformer_block.ffn1_biases[i].set_value(list_weight[9])
-
-            self.transformer_block.ffn2_weights[i].set_value(list_weight[10])
-            self.transformer_block.ffn2_biases[i].set_value(list_weight[11])
-
-        paddle.set_default_dtype("float32")
-
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -258,7 +179,6 @@ class OPTInferenceModel(OPTPretrainedModel):
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         use_cache = use_cache if use_cache is not None else self.config.use_cache
-        cache_kvs = cache_kvs if cache_kvs is not None else self.cache_kvs
 
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
@@ -278,6 +198,7 @@ class OPTInferenceModel(OPTPretrainedModel):
         )
 
         if not is_decoder:
+            pass
             import numpy as np
             npzfile = np.load('/zhoukangkang/output.npz')
             embedding_output = paddle.to_tensor(np.array(npzfile['output']))
@@ -311,95 +232,6 @@ class OPTInferenceModel(OPTPretrainedModel):
                     rotary_emb_dims=0,
                     time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
                 )
-
-        for i in range(self.num_layers):
-            break
-            batch = 1
-            seq_len = 37
-            embed_dim = self.hidden_size
-            embedding_output.reshape([batch,seq_len,embed_dim])
-
-            ln_scale = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.norm1.weight".format(i)])
-            ln_bias = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.norm1.bias".format(i)])
-            ln_scale = paddle.cast(ln_scale, "float32")
-            ln_bias = paddle.cast(ln_bias, "float32")
-
-            q_weight = self.state_dict["opt.decoder.layers.{}.self_attn.q_proj.weight".format(i)]
-            k_weight = self.state_dict["opt.decoder.layers.{}.self_attn.k_proj.weight".format(i)]
-            v_weight = self.state_dict["opt.decoder.layers.{}.self_attn.v_proj.weight".format(i)]
-            q_bias = self.state_dict["opt.decoder.layers.{}.self_attn.q_proj.bias".format(i)]
-            k_bias = self.state_dict["opt.decoder.layers.{}.self_attn.k_proj.bias".format(i)]
-            v_bias = self.state_dict["opt.decoder.layers.{}.self_attn.v_proj.bias".format(i)]
-            concated_qkv_weight = np.concatenate([q_weight, k_weight, v_weight], axis=-1)
-            concated_qkv_weight = concated_qkv_weight.transpose(1, 0)
-            concated_qkv_weight = concated_qkv_weight.reshape(3 * self.num_heads * self.head_size, self.hidden_size)
-            concated_qkv_weight = paddle.to_tensor(concated_qkv_weight)
-            concated_qkv_weight = paddle.cast(concated_qkv_weight, "float32")
-            concated_qkv_bias = np.concatenate([q_bias, k_bias, v_bias], axis=-1)
-            concated_qkv_bias = concated_qkv_bias.reshape(3 * self.num_heads * self.head_size)
-            concated_qkv_bias = paddle.to_tensor(concated_qkv_bias)
-            concated_qkv_bias = paddle.cast(concated_qkv_bias, "float32")
-
-            out_proj_weight = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.self_attn.out_proj.weight".format(i)])
-            out_proj_bias =  paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.self_attn.out_proj.bias".format(i)])
-            out_proj_weight = paddle.cast(out_proj_weight, "float32")
-            out_proj_bias = paddle.cast(out_proj_bias, "float32")
-
-            ffn_ln_scale = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.norm2.weight".format(i)])
-            ffn_ln_bias = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.norm2.bias".format(i)])
-            ffn_ln_scale = paddle.cast(ffn_ln_scale, "float32")
-            ffn_ln_bias = paddle.cast(ffn_ln_bias, "float32")
-
-            ffn1_weight = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.linear1.weight".format(i)])
-            ffn1_bias = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.linear1.bias".format(i)])
-            ffn2_weight = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.linear2.weight".format(i)])
-            ffn2_bias = paddle.to_tensor(self.state_dict["opt.decoder.layers.{}.linear2.bias".format(i)])
-            ffn1_weight = paddle.cast(ffn1_weight, "float32")
-            ffn1_bias = paddle.cast(ffn1_bias, "float32")
-            ffn2_weight = paddle.cast(ffn2_weight, "float32")
-            ffn2_bias = paddle.cast(ffn2_bias, "float32")
-
-            # enc_input是输入哦！
-            # layer_norm
-            enc_out2 = F.layer_norm(embedding_output, self.hidden_size, weight=ln_scale, bias = ln_bias, epsilon=1e-5)
-            enc_out2 = paddle.matmul(enc_out2, concated_qkv_weight.reshape([3 * self.num_heads * self.hidden_size // self.num_heads, self.hidden_size]).transpose([1, 0]))
-            enc_out2 += concated_qkv_bias.reshape([3 * self.num_heads * self.hidden_size // self.num_heads])
-            #print("enc_out2",i, enc_out2)
-            enc_out2 = enc_out2.reshape([batch, seq_len, 3, self.num_heads, self.hidden_size // self.num_heads])
-            enc_out2 = enc_out2.transpose([2, 0, 3, 1, 4])
-            q,k,v = paddle.unbind(enc_out2, axis=0)
-
-
-            #q:[batch, head, seq, head_dim]
-            #k:[batch, head, seq, head_dim]
-            out = paddle.matmul(q, k.transpose([0, 1, 3, 2]))
-            out = out / (np.sqrt(self.hidden_size / self.num_heads))
-            # 记得屏蔽啊
-            for k in range(seq_len):
-                for j in range(k+1, seq_len):
-                    out[:,:,k,j] = -1000.0
-            out = paddle.nn.functional.softmax(out, -1)
-            out =  paddle.matmul(out, v)
-            out = out.transpose([0, 2, 1, 3])
-            out = out.reshape([batch, seq_len, embed_dim])
-
-            out = paddle.matmul(out, out_proj_weight)
-
-            out += out_proj_bias
-
-            out += embedding_output
-            ## ffn
-
-            ffn_out = F.layer_norm(out, embed_dim, weight=ffn_ln_scale, bias = ffn_ln_bias, epsilon=1e-5)
-
-            ffn_out = paddle.matmul(ffn_out, ffn1_weight)
-            ffn_out += ffn1_bias
-            ffn_out = F.relu(ffn_out)
-            ffn_out = paddle.matmul(ffn_out, ffn2_weight)
-            ffn_out += ffn2_bias
-            out = out + ffn_out
-
-            embedding_output = out
 
         output = hidden_states
 
@@ -458,7 +290,6 @@ class OPTInferenceModel(OPTPretrainedModel):
             ffn2_weight = paddle.cast(ffn2_weight, "float32")
             ffn2_bias = paddle.cast(ffn2_bias, "float32")
 
-            # qkv_weight = paddle.concat(q_weight, k_weight, v_weight)
             list_weight = [
                 ln_scale, ln_bias,
                 concated_qkv_weight, concated_qkv_bias,
@@ -609,46 +440,11 @@ class OPTForCausalLMInferenceModel(GenerationInferenceModel, OPTPretrainedModel)
         )
 
         hidden_states = outputs
-        
-        print("hidden_states", hidden_states)
-
         logits = self.lm_head(hidden_states)
+        return logits
 
-        loss = None
-        if labels is not None:
-            logits = logits[:, -labels.shape[1] :, :]
-            shift_logits = logits[:, :-1, :]
-            shift_labels = labels[:, 1:]
-
-            loss_fct = CrossEntropyLoss(reduction="mean", label_smoothing=None)
-            labels = shift_labels.reshape((-1,))
-
-            valid_index = paddle.where(labels != -100)[0].flatten()
-            logits = shift_logits.reshape((-1, shift_logits.shape[-1]))
-            logits = paddle.gather(logits, valid_index, axis=0)
-            labels = paddle.gather(labels, valid_index, axis=0)
-            lm_loss = loss_fct(logits, labels)
-
-            loss = lm_loss
-
-        if not return_dict:
-            if not use_cache:
-                return (loss, logits) if loss is not None else logits
-
-            outputs = (logits,) + outputs[1:]
-            return ((loss,) + outputs) if loss is not None else outputs
-
-        return CausalLMOutputWithCrossAttentions(
-            loss=loss,
-            logits=logits,
-            past_key_values=outputs.past_key_values,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-            cross_attentions=outputs.cross_attentions,
-        )
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         if "lm_head.decoder_weight" in state_dict:
-            print("牛逼")
             self.lm_head.decoder_weight.set_value(state_dict["lm_head.decoder_weight"])
         self.opt.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
