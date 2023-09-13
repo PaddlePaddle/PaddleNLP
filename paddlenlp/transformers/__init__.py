@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-from .configuration_utils import PretrainedConfig
 from .model_utils import PretrainedModel, register_base_model
 from .tokenizer_utils import (
     PretrainedTokenizer,
@@ -40,6 +39,7 @@ from .sequence_parallel_utils import (
     register_sequence_parallel_allreduce_hooks,
 )
 from .export import export_model
+from .configuration_utils import PretrainedConfig
 
 # isort: split
 from .bert.modeling import *
