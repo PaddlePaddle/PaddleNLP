@@ -35,7 +35,7 @@ from paddlenlp.transformers.model_outputs import ModelOutput
 from paddlenlp.transformers.utils import get_scale_by_dtype
 from paddlenlp.utils.log import logger
 
-from .configuration_utils import DEFAULT_MAX_NEW_TOKEN, GenerationConfig
+from .configuration_utils import DEFAULT_MAX_NEW_TOKENS, GenerationConfig
 from .logits_process import (
     ForcedBOSTokenLogitsProcessor,
     ForcedEOSTokenLogitsProcessor,
@@ -882,15 +882,15 @@ class GenerationMixin(object):
             print("Setting `pad_token_id` to `eos_token_id`:{} for " "open-end generation.".format(eos_token_id))
             pad_token_id = eos_token_id
 
-        if generation_config.max_length != 0 and generation_config.max_new_token == DEFAULT_MAX_NEW_TOKEN:
-            logger.warning("`max_length` will be deprecated in future releases, use `max_new_token` instead.")
-            generation_config.max_new_token = generation_config.max_length
+        if generation_config.max_length != 0 and generation_config.max_new_tokens == DEFAULT_MAX_NEW_TOKENS:
+            logger.warning("`max_length` will be deprecated in future releases, use `max_new_tokens` instead.")
+            generation_config.max_new_tokens = generation_config.max_length
 
         if generation_config.min_length != 0 and generation_config.min_new_token == 0:
             logger.warning("`min_length` will be deprecated in future releases, use `min_new_token` instead.")
             generation_config.min_new_token = generation_config.min_length
 
-        max_length = generation_config.max_new_token
+        max_length = generation_config.max_new_tokens
         min_length = generation_config.min_new_token
 
         input_len = input_ids.shape[-1]
@@ -1418,6 +1418,9 @@ class GenerationMixin(object):
 
         return input_ids[:, origin_len:], scores
 
+    def reorder_cache(self, cache, beam_idx):
+        cache = map_structure(lambda x: paddle.index_select(x, beam_idx), cache)
+
     def beam_search(
         self,
         input_ids,
@@ -1546,9 +1549,7 @@ class GenerationMixin(object):
             cache_name = "cache" if "cache" in model_kwargs else "past_key_values"
             if model_kwargs[cache_name] is not None:
                 # reorder the cache
-                model_kwargs[cache_name] = map_structure(
-                    lambda x: paddle.index_select(x, beam_idx), model_kwargs[cache_name]
-                )
+                self.reorder_cache(model_kwargs[cache_name], beam_idx)
 
         pred_ids, scores = beam_scorer.finalize(
             input_ids,
@@ -1696,9 +1697,7 @@ class GenerationMixin(object):
             cache_name = "cache" if "cache" in model_kwargs else "past_key_values"
             if model_kwargs[cache_name] is not None:
                 # reorder the cache
-                model_kwargs[cache_name] = map_structure(
-                    lambda x: paddle.index_select(x, reordering_indices), model_kwargs[cache_name]
-                )
+                self.reorder_cache(model_kwargs[cache_name], beam_idx)
 
         pred_ids, scores = beam_scorer.finalize(
             input_ids,

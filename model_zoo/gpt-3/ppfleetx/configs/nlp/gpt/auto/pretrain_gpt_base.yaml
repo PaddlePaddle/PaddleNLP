@@ -71,3 +71,8 @@ Optimizer:
   grad_clip:
     name: "ClipGradByGlobalNorm"
     clip_norm: 1.0
+
+
+FusedPasses:
+  fused_linear: False
+  fused_adamw: False

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .blendable_dataset import *
+from .causal_dataset import *
 from .collate import *
 from .data_collator import *
 from .dist_dataloader import *

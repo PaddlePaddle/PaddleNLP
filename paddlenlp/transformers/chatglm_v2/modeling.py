@@ -21,6 +21,7 @@ import paddle.distributed.fleet as fleet
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.distributed.fleet.utils import recompute
+from paddle.utils import map_structure
 
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -764,6 +765,9 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
         super().__init__(config)
         self.max_sequence_length = config.max_sequence_length
         self.chatglm_v2 = ChatGLMv2Model(config)
+
+    def reorder_cache(self, cache: paddle.Tensor, beam_idx):
+        cache = map_structure(lambda x: paddle.index_select(x, beam_idx, axis=1), cache)
 
     def update_model_kwargs_for_generation(
         self,

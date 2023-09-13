@@ -25,7 +25,6 @@ from functools import partial
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_path", type=str, required=True, help="Path to you raw files. Folder or file path.")
-    parser.add_argument("--workers", type=int, default=1, help="Number of worker processes to launch")
     parser.add_argument("--output_path", type=str, default="./tmp", help="Path to save the output json files.")
     parser.add_argument(
         "--data_format",
@@ -41,6 +40,7 @@ def get_args():
         choices=["lac", "seg", "jieba"],
         help="Words segment function for chinese words.",
     )
+    parser.add_argument("--workers", type=int, default=1, help="Number of worker processes to launch")
     parser.add_argument("--log_interval", type=int, default=1, help="Interval between progress updates.")
     args = parser.parse_args()
     return args

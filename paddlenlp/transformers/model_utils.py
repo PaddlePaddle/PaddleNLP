@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import contextlib
 import copy
 import gc
 import inspect
@@ -83,6 +84,14 @@ __all__ = [
     "PretrainedModel",
     "register_base_model",
 ]
+
+
+def dy2st_nocheck_guard_context():
+    try:
+        context = paddle.framework._no_check_dy2st_diff()
+    except:
+        context = contextlib.nullcontext()
+    return context
 
 
 def unwrap_optimizer(optimizer, optimizer_instances=()):
@@ -630,7 +639,7 @@ def load_sharded_checkpoint(model, folder, variant=None, strict=True, prefer_saf
         with warnings.catch_warnings():
             warnings.resetwarnings()
             warnings.filterwarnings("ignore", message=r".*is not found in the provided dict.*")
-            logger.info(f"set state-dict: {model.set_state_dict(state_dict)}")
+            model.set_state_dict(state_dict)
 
         # Make sure memory is fred before we load the next state dict.
         del state_dict
