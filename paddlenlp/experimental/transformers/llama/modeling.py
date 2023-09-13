@@ -286,7 +286,26 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             input_ids, position_ids, self.head_dim_shape_tensor, position_offset, True
         )
 
-        with paddle.base.framework._stride_in_no_check_dy2st_diff():
+        if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+            # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
+            # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+            # removed after static graphs support inplace and stride.
+            with paddle.framework._no_check_dy2st_diff():
+                hidden_states, _ = self.transformer_block(
+                    input_ids,
+                    hidden_states,
+                    cum_offsets=cum_offsets,
+                    padding_offset=padding_offset,
+                    attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
+                    caches=cache_kvs,
+                    pre_caches=pre_caches,
+                    pre_caches_length=position_offset,
+                    seq_lens=seq_lens,
+                    rotary_embs=new_rope,
+                    rotary_emb_dims=1,
+                    time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
+                )
+        else:
             hidden_states, _ = self.transformer_block(
                 input_ids,
                 hidden_states,
