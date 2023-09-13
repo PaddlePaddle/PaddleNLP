@@ -12,19 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-model_name_or_path="facebook/llama-7b"
-dataset_name_or_path="llm_benchmark_en"
-max_length=3072
-learning_rate="3e-05"
-recompute="1"
-tensor_parallel_degree="8"
-lora="0"
+model_name_or_path="bigscience/bloomz-7b1-mt"
+dataset_name_or_path="llm_benchmark_zh"
+base_batch_size=1
+learning_rate="3e-04"
+recompute="0"
+tensor_parallel_degree="1"
+lora="1"
 prefix_tuning="0"
-model_item="facebook-llama-7b_sft"
-run_mode="MP8-recompute"
-device_num="N1C8"
-num_train_epochs=5
-export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+model_item="bigscience-bloomz-7b1-mt_lora"
+run_mode="DP1"
+device_num="N1C1"
+num_train_epochs=2
+export CUDA_VISIBLE_DEVICES=0
 cd ./tests
 bash ./test_tipc/dygraph/ft/benchmark_common/prepare.sh
-bash ./test_tipc/dygraph/ft/benchmark_common/run_benchmark.sh ${model_name_or_path} ${dataset_name_or_path} ${max_length} ${learning_rate} ${recompute} ${tensor_parallel_degree} ${lora} ${prefix_tuning} ${model_item} ${run_mode} ${device_num} ${num_train_epochs}
+bash ./test_tipc/dygraph/ft/benchmark_common/run_benchmark.sh ${model_name_or_path} ${dataset_name_or_path} ${base_batch_size} ${learning_rate} ${recompute} ${tensor_parallel_degree} ${lora} ${prefix_tuning} ${model_item} ${run_mode} ${device_num} ${num_train_epochs}
