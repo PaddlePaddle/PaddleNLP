@@ -16,7 +16,9 @@ from __future__ import annotations
 import copy
 import gc
 import inspect
+import json
 import os
+import subprocess
 import sys
 import unittest
 from collections.abc import Mapping
@@ -356,3 +358,38 @@ def argv_context_guard(config: dict):
     sys.argv = argv
     yield
     sys.argv = old_argv
+
+
+def update_params(json_file: str, params: dict):
+    """update params in json file
+
+    Args:
+        json_file (str): the path of json file
+        params (dict): the parameters need to update
+    """
+    with open(json_file, "r") as f:
+        data = json.load(f)
+        data.update(params)
+    with open(json_file, "w") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+class SubprocessCallException(Exception):
+    pass
+
+
+def run_command(command: list[str], return_stdout=False):
+    """
+    Runs `command` with `subprocess.check_output` and will potentially return the `stdout`. Will also properly capture
+    if an error occured while running `command`
+    """
+    try:
+        output = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)
+        if return_stdout:
+            if hasattr(output, "decode"):
+                output = output.decode("utf-8")
+            return output
+    except subprocess.CalledProcessError as e:
+        raise SubprocessCallException(
+            f"Command `{' '.join(command)}` failed with the following error:\n\n{e.output.decode()}"
+        ) from e
