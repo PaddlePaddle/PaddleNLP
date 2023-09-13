@@ -33,7 +33,6 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--output_dir", default=None, type=str, required=True, help="The output directory where the training logs and checkpoints will be written.")
     parser.add_argument("--split", type=str, default='949,50,1', help="Train/valid/test data split.")
     parser.add_argument("--data_impl", type=str, default='mmap', help="mmap/lazy format converted from preprocessed data.")
-
     parser.add_argument("--binary_head", type=strtobool, default=True, help="True for NSP task.")
     parser.add_argument("--max_seq_len", type=int, default=1024, help="Max sequence length.")
     parser.add_argument("--micro_batch_size", default=8, type=int, help="Batch size per device for one step training.", )
