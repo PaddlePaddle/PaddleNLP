@@ -1779,7 +1779,9 @@ class GenerationMixin(object):
                 model_kwargs["cache"] = self.reorder_cache(model_kwargs["cache"], reordering_indices)
             if model_kwargs["past_key_values"] is not None:
                 # reorder the cache
-                model_kwargs["past_key_values"] = self.reorder_cache(model_kwargs["past_key_values"], reordering_indices)
+                model_kwargs["past_key_values"] = self.reorder_cache(
+                    model_kwargs["past_key_values"], reordering_indices
+                )
 
         pred_ids, scores = beam_scorer.finalize(
             input_ids,
