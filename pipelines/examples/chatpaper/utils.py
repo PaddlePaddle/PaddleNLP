@@ -13,7 +13,7 @@
 # limitations under the License.
 import argparse
 import logging
-import time
+import os
 from typing import Optional
 
 import fitz
@@ -24,6 +24,10 @@ from pipelines.nodes import EmbeddingRetriever, ErnieRanker
 from pipelines.pipelines import Pipeline
 
 logging.getLogger().setLevel(logging.INFO)
+import time
+from functools import partial
+from multiprocessing import Pool
+
 from pipelines.nodes import ErnieBot
 from pipelines.nodes.combine_documents import (
     MapReduceDocuments,
@@ -45,19 +49,43 @@ def load_all_json_path(path):
     return json_path
 
 
-def pdf2image(pdfPath, imgPath, zoom_x=10, zoom_y=10, rotation_angle=0):
+def pdf2image_index(start, end, pdfPath, imgPath, zoom_x=10, zoom_y=10, rotation_angle=0):
+    pdf = fitz.open(pdfPath)
+    image_path = []
+    for index in range(start, end):
+        page = pdf[index]
+        trans = fitz.Matrix(zoom_x, zoom_y).prerotate(rotation_angle)
+        pm = page.get_pixmap(matrix=trans, alpha=False)
+        pm._writeIMG(imgPath + "/" + str(index) + ".png", format=1)
+        image_path.append((imgPath + "/" + str(index) + ".png", "page:" + str(index)))
+    return image_path
+
+
+def pdf2image(pdfPath, imgPath, zoom_x=10, zoom_y=10, rotation_angle=0, number_process_page=5):
     """
     Convert PDF to Image
     """
     pdf = fitz.open(pdfPath)
     image_path = []
-    for pg in range(0, pdf.page_count):
-        page = pdf[pg]
-        trans = fitz.Matrix(zoom_x, zoom_y).prerotate(rotation_angle)
-        pm = page.get_pixmap(matrix=trans, alpha=False)
-        pm._writeIMG(imgPath + "/" + str(pg) + ".png", format=1)
-        image_path.append((imgPath + "/" + str(pg) + ".png", "page:" + str(pg)))
+    if pdf.page_count % number_process_page == 0:
+        number_process = pdf.page_count // number_process_page
+    else:
+        number_process = pdf.page_count // number_process_page + 1
+    number_process = min(number_process, os.cpu_count())
+    pool = Pool(processes=number_process)
+    index_list = [i for i in range(0, pdf.page_count, number_process_page)]
+    if index_list[-1] < pdf.page_count:
+        index_list.append(pdf.page_count)
+    print(number_process)
+    func = partial(
+        pdf2image_index, pdfPath=pdfPath, imgPath=imgPath, zoom_x=zoom_x, zoom_y=zoom_y, rotation_angle=rotation_angle
+    )
+    result = pool.starmap(func, [(start, end) for start, end in zip(index_list, index_list[1:])])
+    pool.close()
+    pool.join()
     pdf.close()
+    for item in result:
+        image_path.extend(item)
     return image_path
 
 
@@ -360,5 +388,8 @@ def get_parse_args():
     )
     parser.add_argument("--serving_name", default="0.0.0.0", help="Serving ip.")
     parser.add_argument("--serving_port", default=8099, type=int, help="Serving port.")
+    parser.add_argument(
+        "--number_process_page", default=5, type=int, help="the number of PDF pages processed per process"
+    )
     args = parser.parse_args()
     return args
