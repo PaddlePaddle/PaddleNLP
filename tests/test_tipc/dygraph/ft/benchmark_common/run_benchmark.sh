@@ -20,7 +20,7 @@ function _set_params(){
     # 脚本所需参数
     model_name_or_path=${1:-"facebook/llama-7b"}
     dataset_name_or_path=${2:-"llm_benchmark_zh"}
-    max_length=${3:-"1024"}
+    base_batch_size=${3:-"1"}
     learning_rate=${4:-"3e-05"}
     recompute=${5:-"true"}
     tensor_parallel_degree=${6:-"1"}
@@ -29,7 +29,6 @@ function _set_params(){
 
     # benchmark配置参数
     model_item=${9:-"facebook/llama-7b"}   # (必选) 模型 item |fastscnn|segformer_b0| ocrnet_hrnetw48
-    base_batch_size=1     # (必选) 如果是静态图单进程，则表示每张卡上的BS，需在训练时*卡数
     fp_item="fp16"            # (必选) fp32|fp16
     run_mode=${10:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP1-MP4-PP1
     device_num=${11:-"N1C1"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
@@ -91,7 +90,7 @@ function _train(){
     train_cmd="    --model_name_or_path ${model_name_or_path} \
             --dataset_name_or_path ${dataset_name_or_path} \
             --output_dir output \
-            --per_device_train_batch_size 1 \
+            --per_device_train_batch_size ${base_batch_size} \
             --gradient_accumulation_steps 1 \
             --num_train_epochs ${num_train_epochs} \
             --learning_rate ${learning_rate} \
@@ -100,7 +99,7 @@ function _train(){
             --save_strategy no \
             --logging_steps 1 \
             --src_length 1024 \
-            --max_length ${max_length} \
+            --max_length 1024 \
             --fp16 1 \
             --fp16_opt_level O2 \
             --do_train 1 \
