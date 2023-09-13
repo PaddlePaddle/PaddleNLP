@@ -305,7 +305,7 @@ class LogitsProcessorTest(unittest.TestCase):
         input_ids = ids_tensor((batch_size, 4), vocab_size=20)
         scores = self._get_uniform_logits(batch_size, vocab_size)
         scores = logits_processor(input_ids, scores)
-        self.assertTrue((scores[:, eos_token_id + 1 :] == -1e9).all())
+        self.assertTrue((scores[:, eos_token_id + 1 :] == paddle.finfo(scores.dtype).min).all())
         self.assertListEqual(scores[:, eos_token_id].tolist(), 4 * [0])  # score for eos_token_id should be zero
 
         # check that eos_token_id is not forced if max_length-1 is not reached

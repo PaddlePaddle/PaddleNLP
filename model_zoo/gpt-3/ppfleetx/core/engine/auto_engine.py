@@ -16,7 +16,7 @@ import os
 import numpy as np
 
 import paddle
-import paddle.fluid.core as core
+import paddle.base.core as core
 import paddle.nn as nn
 from paddle.distributed.fleet import auto
 from paddle.profiler import SummaryView
