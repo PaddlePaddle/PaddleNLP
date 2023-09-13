@@ -81,6 +81,7 @@ from ..transformers.model_utils import (
     unwrap_model,
 )
 from ..transformers.tokenizer_utils import PretrainedTokenizer
+from ..transformers.segment_parallel_utils import split_inputs_sequence_dim
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
     LORA_WEIGHTS_NAME,
@@ -733,6 +734,11 @@ class Trainer:
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
+                # split sequence dim
+                logger.info("before split inputs shape:{}".format(inputs["input_ids"].shape))
+                inputs = split_inputs_sequence_dim(inputs)
+                logger.info("after split inputs shape:{}".format(inputs["input_ids"].shape))
+                #
                 self.timers and self.timers("read-data").stop()
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)

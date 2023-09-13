@@ -32,6 +32,7 @@ import paddle
 import paddle.distributed as dist
 from paddle.autograd import PyLayer
 from paddle.distributed.communication.group import _get_global_group
+from paddle.distributed.fleet import fleet
 
 sys.path.append("../../")
 
@@ -40,6 +41,37 @@ from paddlenlp.trainer.plugins import timer
 # llama attention module in paddlenlp/transformers/llama/modeling.py-LlamaAttention
 # gpt model_zoo/gpt-3/ppfleetx/models/language_model/gpt/dygraph/hybrid_model.py-MultiHeadAttention
 
+_hcg = fleet.get_hybrid_communicate_group()
+
+def split_inputs_sequence_dim(inputs, sep_rank=None, sep_degree=None):
+    if sep_degree is None and sep_rank is None:
+        sep_degree = _hcg.get_sep_parallel_world_size()
+        sep_rank = _hcg.get_sep_parallel_rank()
+    assert isinstance(sep_degree, int) and isinstance(sep_rank, int), f"sep_degree and sep_rank must be int"
+    if sep_degree <= 1:
+        return inputs
+    def do_split_sequence_dim(data, sep_rank, split_sequence_len):
+        if data is None:
+            return None
+        assert isinstance(data, paddle.Tensor), f"data should be paddle.Tensor, but is type:{type(data)}"
+        assert len(data.shape) == 2, f"data dims should be 2, but shaped: {data.shape}"
+        sliced_data = paddle.slice(
+            data, [-1], [sep_rank * split_sequence_len], [(sep_rank + 1) * split_sequence_len])
+        return sliced_data
+
+    if isinstance(inputs, dict):
+        res = {}
+        for k, tensor in inputs.items():
+            assert tensor.shape[-1] % sep_degree == 0, f"The last dim of {tensor} should be divisible by {sep_degree}"
+            split_sequence_len = tensor.shape[-1] // sep_degree
+            res[k] = do_split_sequence_dim(tensor, sep_rank, split_sequence_len)
+    elif isinstance(inputs, list):
+        res = []
+        for tensor in inputs:
+            res.append(do_split_sequence_dim(tensor))
+    else:
+        raise ValueError(f"the inputs should be a list or a dict, but is type: {type(inputs)}")
+    return res
 
 class ReshardAxis:
     # Corresponding to shape [b, s, h] or [b, s, num_head, h/num_head]
@@ -98,13 +130,18 @@ class ReshardQKV(PyLayer):
 
 
 class ReshardLayer(paddle.nn.Layer):
-    def __init__(self) -> None:
+    def __init__(self, sep_group=None) -> None:
+        if hasattr(_hcg, "get_sep_parallel_group"):
+            print("Get sep_parallel_group")
+            self.sep_group = _hcg.get_sep_parallel_group() if sep_group is None else sep_group
+        else:
+            self.sep_group =  _get_global_group() if sep_group is None else sep_group
+        self.sep_degree = dist.get_world_size(group=self.sep_group)
         super(ReshardLayer, self).__init__()
 
     def forward(
         self,
         x,
-        group=None,
         split_axis=ReshardAxis.SEQUENCE,
         concat_axis=ReshardAxis.HIDDEN,
         batch_major_in=False,
@@ -116,8 +153,6 @@ class ReshardLayer(paddle.nn.Layer):
         shape = x.shape
         assert len(shape) == 3 or len(shape) == 4, "Only support 3D or 4D tensor"
         input_data = x
-        group = _get_global_group() if group is None else group
-        nranks = dist.get_world_size(group=group)
         perm = [1, 0, 2] if len(shape) == 3 else [1, 0, 2, 3]
         batch_dim_idx = 0 if batch_major_in else 1
         seq_dim_idx = 1 if batch_major_in else 0
@@ -135,18 +170,18 @@ class ReshardLayer(paddle.nn.Layer):
                 input_data = paddle.reshape(input_data, new_shape)
 
         if split_axis == ReshardAxis.SEQUENCE:
-            resharded_seq_size = seq_size // nranks
-            resharded_num_head_size = shape[2] * nranks
+            resharded_seq_size = seq_size // self.sep_degree
+            resharded_num_head_size = shape[2] * self.sep_degree
         elif split_axis == ReshardAxis.HIDDEN or ReshardAxis.NUM_HEAD:
-            resharded_seq_size = seq_size * nranks
-            resharded_num_head_size = shape[2] // nranks
+            resharded_seq_size = seq_size * self.sep_degree
+            resharded_num_head_size = shape[2] // self.sep_degree
 
         if len(shape) == 3:
-            reshard_tensor = ReshardQKV.apply(input_data, group, split_axis=split_axis, concat_axis=concat_axis)
+            reshard_tensor = ReshardQKV.apply(input_data, self.sep_group, split_axis=split_axis, concat_axis=concat_axis)
         else:
             input_data = input_data.clone() if input_data.is_leaf else input_data
             input_data.reshape_([0, 0, -1])
-            reshard_tensor = ReshardQKV.apply(input_data, group, split_axis=split_axis, concat_axis=concat_axis)
+            reshard_tensor = ReshardQKV.apply(input_data, self.sep_group, split_axis=split_axis, concat_axis=concat_axis)
 
             reshard_tensor.reshape_([resharded_seq_size, batch_size, resharded_num_head_size, shape[3]])
 
@@ -192,7 +227,6 @@ class ReshardQKVUtest(PyLayer):
 def test_qkv_out(x, y_grad, func, split_axis=2, concat_axis=0):
     x = x.detach()
     x.stop_gradient = False
-    # y = func(x)
     reshard_layer = ReshardLayer()
     y = reshard_layer(x, split_axis=split_axis, concat_axis=concat_axis)
     paddle.autograd.backward([y], [y_grad], True)
@@ -342,6 +376,31 @@ def prepare_data(batch_major=True, dim_size=4, batch_size=2, seq_len=2, num_head
 
 def main():
     dist.init_parallel_env()
+    test_split_inputs()
+    test_reshard()
+
+def test_split_inputs():
+    batch_size = 8
+    seq_len = 4096
+    sep = dist.get_world_size()
+    sep_rank = dist.get_rank()
+    assert sep == 2, f"sep should be 2, but {sep}"
+    
+    inputs_ids = paddle.randint(low=0, high=65535, shape=(batch_size, seq_len))
+    labels = paddle.randint(low=0, high=2, shape=(batch_size, seq_len))
+    inputs = {"inputs_ids": inputs_ids, "labels": labels}
+
+    splited_inputs = split_inputs_sequence_dim(inputs, sep_rank, sep)
+    print(f"splited_inputs:{splited_inputs}")
+    expected_local_inputs = {}
+    for k, v in inputs.items():
+        expected_local_inputs[k] = paddle.split(v, sep, axis=1)[sep_rank]
+        assert k in splited_inputs
+        np.testing.assert_equal(expected_local_inputs[k].numpy(), splited_inputs[k].numpy())
+
+
+def test_reshard():
+    # dist.init_parallel_env()
     timer.set_timers()
 
     # [s / sep, b, h] -> [s, b, h / sep]

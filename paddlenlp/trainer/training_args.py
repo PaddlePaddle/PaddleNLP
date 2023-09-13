@@ -225,6 +225,7 @@ class TrainingArguments:
             pipeline_parallel_degree means split all transformer layers to how many stages.
             default -1 for not use pipeline parallel.
             Note. this need model support in source code, see llama modeling_pp.py file
+        sep_parallel_degree (`int`, *optional*, defaults to `-1`)
         pipeline_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it.
             following config is support:
@@ -545,6 +546,14 @@ class TrainingArguments:
             )
         },
     )
+    sep_parallel_degree: int = field(
+        default=-1,
+        metadata={
+            "help": (
+                "sequence parallel"
+            )
+        },
+    )
     tensor_parallel_config: str = field(
         default="",
         metadata={
@@ -815,6 +824,7 @@ class TrainingArguments:
         if self.use_hybrid_parallel:
             world_size = paddle.distributed.get_world_size()
             tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
+            sep_parallel_degree = max(self.sep_parallel_degree, 1)
             pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
 
             assert (
@@ -823,21 +833,21 @@ class TrainingArguments:
 
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
-                    self.sharding_parallel_degree = world_size // (tensor_parallel_degree * pipeline_parallel_degree)
+                    self.sharding_parallel_degree = world_size // (tensor_parallel_degree * sep_parallel_degree * pipeline_parallel_degree)
 
             sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
             if sharding_parallel_degree == 1 and len(self.sharding) > 0:
                 logger.warning("sharding_parallel_degree=1 means no sharding, please set sharding to empty!")
                 self.sharding = []
 
-            assert world_size % (sharding_parallel_degree * tensor_parallel_degree * pipeline_parallel_degree) == 0, (
-                "The world size for workers should be divided by sharding_parallel_degree, tensor_parallel_degree, and pipeline_parallel_degree, "
+            assert world_size % (sharding_parallel_degree * tensor_parallel_degree * sep_parallel_degree * pipeline_parallel_degree) == 0, (
+                "The world size for workers should be divided by sharding_parallel_degree, tensor_parallel_degree, sep_parallel_degree and pipeline_parallel_degree, "
                 "sharding_parallel_degree:{sharding_parallel_degree}, tensor_parallel_degree:{tensor_parallel_degree}, "
-                "pipeline_parallel_degree:{pipeline_parallel_degree}, "
+                "sep_parallel_degree:{sep_parallel_degree}, pipeline_parallel_degree:{pipeline_parallel_degree}, "
                 " world_size:{world_size}"
             )
             self.data_parallel_degree = world_size // (
-                sharding_parallel_degree * tensor_parallel_degree * pipeline_parallel_degree
+                sharding_parallel_degree * tensor_parallel_degree * sep_parallel_degree * pipeline_parallel_degree
             )
             # TODO(liuzhenhai): remove this when framework is ready
             if sharding_parallel_degree > 1 and ShardingOption.SHARD_OP in self.sharding:
@@ -961,6 +971,7 @@ class TrainingArguments:
                     "mp_degree": tensor_parallel_degree,
                     "pp_degree": pipeline_parallel_degree,
                     "sharding_degree": sharding_parallel_degree,
+                    "sep_degree": sep_parallel_degree,
                     "order": order,
                 }
 

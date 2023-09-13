@@ -53,6 +53,7 @@ from ..sequence_parallel_utils import (
     ScatterOp,
     mark_as_sequence_parallel_parameter,
 )
+from ..segment_parallel_utils import ReshardLayer, ReshardAxis
 from .configuration import (
     LLAMA_PRETRAINED_INIT_CONFIGURATION,
     LLAMA_PRETRAINED_RESOURCE_FILES_MAP,
@@ -183,6 +184,7 @@ def scaled_dot_product_attention(
     alibi=None,
     sequence_parallel=False,
     is_causal=True,
+    reshard_layer=None,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
@@ -194,7 +196,10 @@ def scaled_dot_product_attention(
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
         if alibi is not None:
             raise ValueError("Flash Attention does not support ALiBi yet")
-
+        if reshard_layer is not None:
+            query_states = reshard_layer(query_states, split_axis=ReshardAxis.SEQUENCE, concat_axis=ReshardAxis.HIDDEN, batch_major_in=True, batch_major_out=True)
+            key_states = reshard_layer(key_states, split_axis=ReshardAxis.SEQUENCE, concat_axis=ReshardAxis.HIDDEN, batch_major_in=True, batch_major_out=True)
+            value_states = reshard_layer(value_states, split_axis=ReshardAxis.SEQUENCE, concat_axis=ReshardAxis.HIDDEN, batch_major_in=True, batch_major_out=True)
         attn_output, attn_weights = flash_attention(
             query_states,
             key_states,
@@ -202,6 +207,8 @@ def scaled_dot_product_attention(
             causal=is_causal and query_states.shape[1] != 1,
             return_softmax=output_attentions,
         )
+        if reshard_layer is not None:
+            attn_output = reshard_layer(attn_output, split_axis=ReshardAxis.SEQUENCE, concat_axis=ReshardAxis.HIDDEN, batch_major_in=True, batch_major_out=True)
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
@@ -666,6 +673,11 @@ class LlamaAttention(nn.Layer):
 
         if config.rope and self.rope_fusion_level != "full":
             self._init_rope()
+        
+        self.reshard_layer = None
+        if config.sep_parallel_degree > 1:
+            logger.info(f"Set ReshardLayer, config.sep_parallel_degree:{config.sep_parallel_degree}")
+            self.reshard_layer = ReshardLayer()
 
         self.config = config
 
@@ -784,6 +796,7 @@ class LlamaAttention(nn.Layer):
                 output_attentions,
                 alibi,
                 self.sequence_parallel,
+                reshard_layer = self.reshard_layer,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
@@ -796,6 +809,7 @@ class LlamaAttention(nn.Layer):
                 output_attentions,
                 alibi,
                 self.sequence_parallel,
+                reshard_layer = self.reshard_layer,
             )
         if output_attentions:
             attn_output, attn_weights = outputs
