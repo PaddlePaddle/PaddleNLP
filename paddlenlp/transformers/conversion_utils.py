@@ -317,6 +317,7 @@ def naive_fuse_split_tp(
             ret = []
             for tensor_parallel_rank in range(tensor_parallel_degree):
                 ret.append(np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis))
+            return ret
 
         return np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis)
 
