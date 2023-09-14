@@ -1076,10 +1076,9 @@ python -m pytest scripts/regression/test_taskflow.py >${log_path}/taskflow >>${l
 print_info $? taskflow
 }
 transformers(){
-echo ' RUN all LLMs unittest'
-export RUN_SLOW_TEST=True
-python -m pytest tests/llm/test_*.py >${nlp_dir}/unittest_logs/llm_unittest.log 2>&1
-print_info $? llm_unittest
+echo ' Testing all LLMs '
+python -m pytest tests/llm/test_*.py >${log_path}/llm >>${log_path}/llm 2>&1
+print_info $? llm
 }
 fast_generation(){
 cd ${nlp_dir}/fast_generation/samples

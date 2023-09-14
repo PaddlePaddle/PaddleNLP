@@ -109,7 +109,7 @@ class LLaMATest(TestCase):
                 "data_file": predict_config["data_file"],
                 "dtype": predict_config["dtype"],
                 "mode": predict_config["mode"],
-                "lora_path": os.path.join(self.output_dir, "llama_lora_ckpts/"),
+                "lora_path": os.path.join(self.output_dir, "llama_lora_ckpts"),
             }
 
             with argv_context_guard(lora_predict_config):
@@ -120,7 +120,7 @@ class LLaMATest(TestCase):
             # Merge Lora Params
             merge_lora_config = {
                 "model_name_or_path": merge_lora_config["model_name_or_path"],
-                "lora_path": os.path.join(self.output_dir, "llama_lora_ckpts/"),
+                "lora_path": os.path.join(self.output_dir, "llama_lora_ckpts"),
             }
             with argv_context_guard(merge_lora_config):
                 from merge_lora_params import merge
@@ -135,7 +135,7 @@ class LLaMATest(TestCase):
                 "data_file": predict_config["data_file"],
                 "dtype": predict_config["dtype"],
                 "mode": predict_config["mode"],
-                "prefix_path": os.path.join(self.output_dir, "llama_pt_ckpts/"),
+                "prefix_path": os.path.join(self.output_dir, "llama_pt_ckpts"),
             }
             with argv_context_guard(pt_predict_config):
                 from predictor import predict
@@ -143,7 +143,7 @@ class LLaMATest(TestCase):
                 predict()
 
             # Merge Tensor Parallelism Params
-            merge_tp_config = {"model_name_or_path": os.path.join(self.output_dir, "llama_pt_ckpts/")}
+            merge_tp_config = {"model_name_or_path": os.path.join(self.output_dir, "llama_pt_ckpts")}
             with argv_context_guard(merge_tp_config):
                 from merge_tp_params import main
 
@@ -170,7 +170,7 @@ class LLaMATest(TestCase):
         # Export model
         export_config = {
             "model_name_or_path": predict_config["model_name_or_path"],
-            "output_path": "./llm/inference",
+            "output_path": os.path.join(self.output_dir, "inference"),
             "dtype": predict_config["dtype"],
         }
         with argv_context_guard(export_config):
@@ -180,7 +180,7 @@ class LLaMATest(TestCase):
 
         # Static predict
         st_predict_config = {
-            "model_name_or_path": "./llm/inference",
+            "model_name_or_path": os.path.join(self.output_dir, "inference"),
             "batch_size": predict_config["batch_size"],
             "data_file": predict_config["data_file"],
             "dtype": predict_config["dtype"],
