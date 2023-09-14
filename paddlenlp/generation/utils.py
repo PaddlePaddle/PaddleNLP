@@ -1624,10 +1624,12 @@ class GenerationMixin(object):
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
-            cache_name = "cache" if "cache" in model_kwargs else "past_key_values"
-            if model_kwargs[cache_name] is not None:
+            if "cache" in model_kwargs:
                 # reorder the cache
-                model_kwargs[cache_name] = self.reorder_cache(model_kwargs[cache_name], beam_idx)
+                model_kwargs["cache"] = self.reorder_cache(model_kwargs["cache"], beam_idx)
+            if "past_key_values" in model_kwargs:
+                # reorder the cache
+                model_kwargs["past_key_values"] = self.reorder_cache(model_kwargs["past_key_values"], beam_idx)
 
         pred_ids, scores = beam_scorer.finalize(
             input_ids,
@@ -1772,10 +1774,14 @@ class GenerationMixin(object):
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
 
-            cache_name = "cache" if "cache" in model_kwargs else "past_key_values"
-            if model_kwargs[cache_name] is not None:
+            if "cache" in model_kwargs:
                 # reorder the cache
-                model_kwargs[cache_name] = self.reorder_cache(model_kwargs[cache_name], reordering_indices)
+                model_kwargs["cache"] = self.reorder_cache(model_kwargs["cache"], reordering_indices)
+            if "past_key_values" in model_kwargs:
+                # reorder the cache
+                model_kwargs["past_key_values"] = self.reorder_cache(
+                    model_kwargs["past_key_values"], reordering_indices
+                )
 
         pred_ids, scores = beam_scorer.finalize(
             input_ids,
