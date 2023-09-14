@@ -12,19 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-model_name_or_path="bigscience/bloomz-7b1-mt"
+model_name_or_path="THUDM/chatglm-6b"
 dataset_name_or_path="llm_benchmark_zh"
-max_length=3072
-learning_rate="3e-04"
-recompute="1"
+base_batch_size=1
+learning_rate="3e-02"
+recompute="0"
 tensor_parallel_degree="1"
-lora="1"
-prefix_tuning="0"
-model_item="bigscience-bloomz-7b1-mt_lora"
-run_mode="DP1-recompute"
+lora="0"
+prefix_tuning="1"
+model_item="THUDM-chatglm-6b_pt"
+run_mode="DP1"
 device_num="N1C1"
 num_train_epochs=2
 export CUDA_VISIBLE_DEVICES=0
 cd ./tests
 bash ./test_tipc/dygraph/ft/benchmark_common/prepare.sh
-bash ./test_tipc/dygraph/ft/benchmark_common/run_benchmark.sh ${model_name_or_path} ${dataset_name_or_path} ${max_length} ${learning_rate} ${recompute} ${tensor_parallel_degree} ${lora} ${prefix_tuning} ${model_item} ${run_mode} ${device_num} ${num_train_epochs}
+bash ./test_tipc/dygraph/ft/benchmark_common/run_benchmark.sh ${model_name_or_path} ${dataset_name_or_path} ${base_batch_size} ${learning_rate} ${recompute} ${tensor_parallel_degree} ${lora} ${prefix_tuning} ${model_item} ${run_mode} ${device_num} ${num_train_epochs}

@@ -113,7 +113,7 @@ def _download(url, fullname):
 def download(url, path):
     local_rank = 0
     world_size = 1
-    if paddle.fluid.core.is_compiled_with_dist() and paddle.distributed.get_world_size() > 1:
+    if paddle.base.core.is_compiled_with_dist() and paddle.distributed.get_world_size() > 1:
         local_rank = paddle.distributed.ParallelEnv().dev_id
         world_size = paddle.distributed.get_world_size()
     if world_size > 1 and local_rank != 0:
