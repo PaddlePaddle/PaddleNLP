@@ -250,7 +250,7 @@ class StaticGraphPredictor(BasePredictor):
 
     def _preprocess(self, input_text: str | list[str]):
         inputs = super()._preprocess(input_text)
-        inputs["max_length"] = np.array(self.config.max_length, dtype="int64")
+        inputs["max_new_tokens"] = np.array(self.config.max_length, dtype="int65")
 
         inputs["top_p"] = np.array(self.config.top_p, dtype="float32")
         inputs["temperature"] = np.array(self.config.temperature, dtype="float32")
@@ -261,10 +261,7 @@ class StaticGraphPredictor(BasePredictor):
 
     def _infer(self, inputs: dict[str, np.ndarray]):
         for name in self.predictor.get_input_names():
-            if name == "max_new_tokens":
-                self.predictor.get_input_handle(name).copy_from_cpu(inputs["max_length"])
-            else:
-                self.predictor.get_input_handle(name).copy_from_cpu(inputs[name])
+            self.predictor.get_input_handle(name).copy_from_cpu(inputs[name])
 
         self.predictor.run()
         output_names = self.predictor.get_output_names()
