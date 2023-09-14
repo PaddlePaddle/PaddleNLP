@@ -250,7 +250,7 @@ class StaticGraphPredictor(BasePredictor):
 
     def _preprocess(self, input_text: str | list[str]):
         inputs = super()._preprocess(input_text)
-        inputs["max_new_tokens"] = np.array(self.config.max_length, dtype="int65")
+        inputs["max_new_tokens"] = np.array(self.config.max_length, dtype="int64")
 
         inputs["top_p"] = np.array(self.config.top_p, dtype="float32")
         inputs["temperature"] = np.array(self.config.temperature, dtype="float32")
