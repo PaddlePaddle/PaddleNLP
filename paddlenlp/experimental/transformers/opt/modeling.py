@@ -184,10 +184,11 @@ class OPTInferenceModel(OPTPretrainedModel):
 
         input_shape = input_ids.shape
 
-        if (input_shape[1] > 1):
-             self.past_key_values_length = paddle.to_tensor([0])
-        self.past_key_values_length = self.past_key_values_length.reshape([1])
+        if not is_decoder: 
+            self.past_key_values_length = paddle.to_tensor([0])
+        #self.past_key_values_length = self.past_key_values_length.reshape([1])
         past_key_values_length = paddle.to_tensor([self.past_key_values_length])
+        # update it.
         self.past_key_values_length += input_shape[1]
         embedding_output = self.embeddings(
             input_ids=input_ids,
@@ -196,15 +197,15 @@ class OPTInferenceModel(OPTPretrainedModel):
             past_key_values_length=past_key_values_length,
         )
 
-        if not is_decoder:
-            pass
-            import numpy as np
-            npzfile = np.load('/zhoukangkang/output.npz')
-            embedding_output = paddle.to_tensor(np.array(npzfile['output']))
-            embedding_output = paddle.cast(embedding_output, dtype='float16')
-            print("embedding_output11", embedding_output)
+        # if not is_decoder:
+        #     pass
+        #     import numpy as np
+        #     npzfile = np.load('/zhoukangkang/output.npz')
+        #     embedding_output = paddle.to_tensor(np.array(npzfile['output']))
+        #     embedding_output = paddle.cast(embedding_output, dtype='float16')
+        #     print("embedding_output11", embedding_output)
 
-        if not is_decoder:
+        if not is_decoder or True:
             batch, seq_len, hidden_dim = embedding_output.shape
             # merge batch and seq_len dimension.
             embedding_output = embedding_output.reshape([batch * seq_len, hidden_dim])
