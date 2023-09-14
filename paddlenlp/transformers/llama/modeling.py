@@ -198,9 +198,9 @@ def scaled_dot_product_attention(
         if alibi is not None:
             raise ValueError("Flash Attention does not support ALiBi yet")
         if reshard_layer is not None:
-            query_states = reshard_layer(query_states, split_axis=ReshardAxis.SEQUENCE, concat_axis=ReshardAxis.HIDDEN, batch_major_in=True, batch_major_out=True)
-            key_states = reshard_layer(key_states, split_axis=ReshardAxis.SEQUENCE, concat_axis=ReshardAxis.HIDDEN, batch_major_in=True, batch_major_out=True)
-            value_states = reshard_layer(value_states, split_axis=ReshardAxis.SEQUENCE, concat_axis=ReshardAxis.HIDDEN, batch_major_in=True, batch_major_out=True)
+            query_states = reshard_layer(query_states, split_axis=ReshardAxis.NUM_HEAD, concat_axis=ReshardAxis.SEQUENCE, batch_major_in=True, batch_major_out=True)
+            key_states = reshard_layer(key_states, split_axis=ReshardAxis.NUM_HEAD, concat_axis=ReshardAxis.SEQUENCE, batch_major_in=True, batch_major_out=True)
+            value_states = reshard_layer(value_states, split_axis=ReshardAxis.NUM_HEAD, concat_axis=ReshardAxis.SEQUENCE, batch_major_in=True, batch_major_out=True)
         attn_output, attn_weights = flash_attention(
             query_states,
             key_states,
@@ -209,7 +209,7 @@ def scaled_dot_product_attention(
             return_softmax=output_attentions,
         )
         if reshard_layer is not None:
-            attn_output = reshard_layer(attn_output, split_axis=ReshardAxis.SEQUENCE, concat_axis=ReshardAxis.HIDDEN, batch_major_in=True, batch_major_out=True)
+            attn_output = reshard_layer(attn_output, split_axis=ReshardAxis.SEQUENCE, concat_axis=ReshardAxis.NUM_HEAD, batch_major_in=True, batch_major_out=True)
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
@@ -1353,12 +1353,38 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
 
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
+            _hcg = fleet.get_hybrid_communicate_group()
+            sep_size = _hcg.get_sep_parallel_world_size()
+            if sep_size > 1:
+                masked_lm_loss = ConcatSePMaskedLoss.apply(
+                    masked_lm_loss, axis=1, group=_hcg.get_sep_parallel_group())
             # skip ignore_index which loss == 0
             masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
             loss = paddle.mean(masked_lm_loss)
 
         return loss
 
+from paddle.autograd import PyLayer
+class ConcatSePMaskedLoss(PyLayer):
+    @staticmethod
+    def forward(ctx, inp, axis, group):
+        inputs = []
+        paddle.distributed.all_gather(inputs, inp, group=group)
+        with paddle.no_grad():
+            cat = paddle.concat(inputs, axis=axis)
+        ctx.args_axis = axis
+        ctx.args_group = group
+        return cat
+
+    @staticmethod
+    def backward(ctx, grad):
+        axis = ctx.args_axis
+        group = ctx.args_group
+        with paddle.no_grad():
+            grads = paddle.split(
+                grad, paddle.distributed.get_world_size(group), axis=axis)
+        grad = grads[paddle.distributed.get_rank(group)]
+        return grad
 
 class LlamaLMHead(nn.Layer):
     def __init__(self, config: LlamaConfig):

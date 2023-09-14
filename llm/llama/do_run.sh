@@ -43,7 +43,7 @@ python -u  -m paddle.distributed.launch \
     --pp_recompute_interval 1 \
     --learning_rate 0.00001 \
     --min_learning_rate 0.000001 \
-    --max_steps 2 \
+    --max_steps 100 \
     --save_steps 50000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
