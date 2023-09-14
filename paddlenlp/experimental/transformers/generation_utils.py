@@ -331,7 +331,11 @@ class GenerationInferenceModel(GenerationMixin):
                 cache, just_decoder, next_tokens, eos_token_id, model_kwargs
             )
             next_tokens = model_kwargs["next_tokens"]
-            model_kwargs["all_input_ids"] = paddle.concat([model_kwargs["all_input_ids"], next_tokens], axis=1)
+
+            if model_kwargs["all_input_ids"] is None:
+                model_kwargs["all_input_ids"] = next_tokens
+            else:
+                model_kwargs["all_input_ids"] = paddle.concat([model_kwargs["all_input_ids"], next_tokens], axis=1)
 
             save_with_output(
                 next_tokens,
