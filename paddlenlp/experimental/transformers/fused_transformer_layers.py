@@ -552,20 +552,9 @@ class FusedMultiTransformer(Layer):
                 q_out: bsz, numhead, seq_len, headsize
                 kv_out: 2, bsz, numhead, seq_len, headsize
                 """
-                # print("qkv_out",qkv_out)
-                # print("padding_offset",padding_offset)
-                # print("input_ids",input_ids)
-                # print("seq_lens", seq_lens)
-                # print("self.num_heads", self.num_heads)
-                # print("self.nranks", self.nranks)
-                # print("self.head_dim", self.head_dim)
-
                 q_out, k_out, v_out = qkv_transpose_split(
                     qkv_out, padding_offset, seq_lens, input_ids, self.num_heads // self.nranks, self.head_dim
                 )
-                # print("qq:",i, " ", q_out)
-                # print("kk:",i, " ", k_out)
-                # print("vv:",i, " " ,v_out)
 
                 # rotary emb (inplace)
                 if rotary_embs is not None:
@@ -581,27 +570,12 @@ class FusedMultiTransformer(Layer):
                 write_cache_kv(k_out, v_out, caches[i], seq_lens)
 
                 # cutlass fmha
-                # qktv_out is [batch, headsize, seq_len, headsize]
+                # qktv_out is [batch, numhead, seq_len, headsize]
                 qktv_out = variable_length_memory_efficient_attention(
                     q_out, k_out, v_out, seq_lens, seq_lens, mask=attn_mask, scale=float(self.head_dim**-0.5)
                 )
 
-                # import numpy as np
-                # q = q_out
-                # k = k_out
-                # v = v_out
-                # out = paddle.matmul(q, k.transpose([0, 1, 3, 2]))
-                # out = out / (np.sqrt(80))
-                # # 记得屏蔽啊
-                # for k in range(37):
-                #     for j in range(k+1, 37):
-                #         out[:,:,k,j] = -1000.0
-                # out = paddle.nn.functional.softmax(out, -1)
-                # out =  paddle.matmul(out, v)
-                # qktv_out = out
-
                 fmha_out = transpose_remove_padding(qktv_out, seq_lens, padding_offset)
-                # fmha_out is [batch, headsize, seq_len, headsize]
 
             else:
                 fmha_out = masked_multihead_attention(
