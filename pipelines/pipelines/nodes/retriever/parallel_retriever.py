@@ -337,3 +337,6 @@ class ParallelRetriever(BaseRetriever):
 
     def embed_queries(self, texts: List[str], **kwargs) -> List[np.ndarray]:
         return run_main_query(texts, self.url)
+
+    def embed_documents(self, docs: List[Document], **kwargs):
+        return run_main_query([d.content for d in docs], self.url)

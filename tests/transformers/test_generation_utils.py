@@ -235,7 +235,7 @@ class GenerationTesterMixin:
                 input_ids,
                 attention_mask=attention_mask,
                 generation_config=GenerationConfig(
-                    max_new_token=max_length,
+                    max_new_tokens=max_length,
                     decode_strategy="greedy_search",
                     **logits_process_kwargs,
                 ),
@@ -277,7 +277,7 @@ class GenerationTesterMixin:
                 input_ids,
                 attention_mask=attention_mask,
                 generation_config=GenerationConfig(
-                    max_new_token=max_length,
+                    max_new_tokens=max_length,
                     decode_strategy="sampling",
                     num_return_sequences=num_return_sequences,
                     top_k=1,
@@ -332,7 +332,7 @@ class GenerationTesterMixin:
                 attention_mask=attention_mask,
                 generation_config=GenerationConfig(
                     decode_strategy="beam_search",
-                    max_new_token=max_length,
+                    max_new_tokens=max_length,
                     **beam_kwargs,
                     **logits_process_kwargs,
                 ),
@@ -390,7 +390,7 @@ class GenerationTesterMixin:
                 attention_mask=attention_mask,
                 generation_config=GenerationConfig(
                     decode_strategy="beam_search",
-                    max_new_token=max_length,
+                    max_new_tokens=max_length,
                     **beam_kwargs,
                     **logits_process_kwargs,
                 ),

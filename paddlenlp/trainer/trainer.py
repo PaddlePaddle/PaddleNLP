@@ -496,9 +496,10 @@ class Trainer:
                     del state_dict
                 else:
                     # We load the sharded checkpoint.
-                    _ = load_sharded_checkpoint(
+                    missing_keys, unexpected_keys = load_sharded_checkpoint(
                         self.model, resume_from_checkpoint, self.args.weight_name_suffix, prefer_safe=False
                     )
+                    logger.info(f"set state_dict: {missing_keys, unexpected_keys}")
 
             elif resume_from_checkpoint is not None:
                 logger.info(f"not loading ckpt :{self.args.dataset_rank}")
