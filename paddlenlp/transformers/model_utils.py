@@ -749,6 +749,7 @@ def _load_state_dict_into_meta_model(
     for param_name, param in state_dict.items():
         # First part of the test is always true as loaded_state_dict_keys always contains state_dict keys.
         if param_name not in loaded_state_dict_keys or param_name not in expected_keys:
+            print(param_name, param_name not in loaded_state_dict_keys, param_name not in expected_keys)
             continue
 
         if param_name.startswith(start_prefix):
@@ -779,11 +780,10 @@ def _load_state_dict_into_meta_model(
 
             if old_param is not None:
                 param = param.astype(dtype=old_param.dtype)
-
+        print(param_name, param.dtype)
         with paddle.no_grad():
             model.state_dict()[param_name].get_tensor()._share_data_with(param.value().get_tensor())
             param.value().get_tensor()._clear()
-
     return error_msgs
 
 
@@ -1599,8 +1599,31 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             _prefix = f"{prefix}."
             expected_keys_not_prefixed = [s for s in expected_keys if not s.startswith(_prefix)]
             expected_keys = [s[len(_prefix) :] if s.startswith(_prefix) else s for s in expected_keys]
+            if quantization_linear_list is not None:
+                quantization_linear_list = [
+                    s[len(_prefix) :] if s.startswith(_prefix) else s for s in quantization_linear_list
+                ]
         elif add_prefix_to_model:
             expected_keys = [".".join([prefix, s]) for s in expected_keys]
+            if quantization_linear_list is not None:
+                quantization_linear_list = [".".join([prefix, s]) for s in quantization_linear_list]
+
+        if quantization_config is not None:
+            if state_dict is not None:
+                import time
+
+                start = time.time()
+                state_dict, quantization_scale_list = convert_to_quantize_state_dict(
+                    state_dict, quantization_linear_list, config.quantization_config["quant_algo"]
+                )
+                print(time.time() - start)
+                loaded_keys = [k for k in state_dict.keys()]
+            else:
+                loaded_keys, quantization_scale_list = update_loaded_state_dict_keys(
+                    loaded_keys, quantization_linear_list
+                )
+
+            keep_in_fp32_modules += quantization_scale_list
 
         missing_keys = list(set(expected_keys) - set(loaded_keys))
         unexpected_keys = list(set(loaded_keys) - set(expected_keys))
@@ -1619,7 +1642,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if keep_in_fp32_modules is not None:
             for name, param in model.named_parameters():
                 if any(module_to_keep_in_fp32 in name for module_to_keep_in_fp32 in keep_in_fp32_modules):
-                    param = param.to(dtype=paddle.float32)
+                    if param.dtype != paddle.float32:
+                        param = param.to(dtype=paddle.float32)
 
         # Make sure we are able to load base models as well as derived models (with heads)
         start_prefix = ""
@@ -1920,9 +1944,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # refine options for config
         convert_from_torch = cls.support_conversion(config) and convert_from_torch
 
-        if config.quantization_config is not None and (dtype != "float16" or dtype != "bfloat16"):
-            dtype = "float16"
-            logger.warning("should be float")
+        if config.quantization_config is not None:
+            if dtype != "float16" and dtype != "bfloat16":
+                dtype = "float16"
+                logger.warning(
+                    "Quantization only supports DataTypes: float16, bfloat16. We set default dtype as float16"
+                )
 
         if dtype is None:
             dtype = config.dtype
@@ -2019,18 +2046,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if config.quantization_config is not None:
             with ContextManagers(quantization_init_contexts):
                 quantization_linear_list = replace_with_quantization_linear(model, **config.quantization_config)
-            if state_dict is not None:
-                import time
-
-                start = time.time()
-                state_dict = convert_to_quantize_state_dict(
-                    state_dict, quantization_linear_list, config.quantization_config["quant_algo"]
-                )
-                print(time.time() - start)
-            loaded_state_dict_keys, quant_keep_in_fp32_modules = update_loaded_state_dict_keys(
-                loaded_state_dict_keys, quantization_linear_list
-            )
-            keep_in_fp32_modules += quant_keep_in_fp32_modules
 
         model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
             model=model,

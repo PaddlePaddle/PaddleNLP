@@ -18,6 +18,8 @@ import paddle
 import paddle.nn as nn
 from paddle.nn.quant import llm_int8_linear, weight_only_linear, weight_quantize
 
+from .log import logger
+
 QuantDtypeMapping = {
     "weight_only_int8": "int8",
     "weight_only_int4": "int4",
@@ -64,7 +66,6 @@ class QuantizationLinear(nn.Layer):
     def forward(self, x):
         with paddle.amp.auto_cast(enable=False):
             if "weight_only" in self.quant_algo:
-                # import pdb;pdb.set_trace()
                 out = weight_only_linear(x, self.quant_weight, self.bias, self.quant_scale, self.quant_dtype)
             else:
                 out = llm_int8_linear(x, self.quant_weight, self.bias, self.quant_scale, self.llm_int8_threshold)
@@ -77,6 +78,9 @@ def replace_with_quantization_linear(model, quant_algo, name_prefix="", **kwargs
         if isinstance(child, nn.Linear):
             if child.bias is None:
                 bias_attr = False
+            else:
+                bias_attr = None
+
             model._sub_layers[name] = QuantizationLinear(
                 child.weight.shape[0], child.weight.shape[1], quant_algo, child._dtype, bias_attr=bias_attr, **kwargs
             )
@@ -93,7 +97,7 @@ def replace_with_quantization_linear(model, quant_algo, name_prefix="", **kwargs
 
 
 def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quant_algo):
-
+    quantization_scale_list = []
     for name in quantization_linear_list:
         weight_name = name + ".weight"
         quant_weight_name = name + ".quant_weight"
@@ -108,6 +112,7 @@ def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quant_a
                 raise ValueError(
                     f"{quant_scale_name} should be {paddle.float32} in state_dict but recieved dtype {state_dict[quant_scale_name].dtype}"
                 )
+            quantization_scale_list.append(quant_scale_name)
         elif weight_name in state_dict:
             target_weight = state_dict.pop(weight_name)
             if target_weight.dtype == paddle.float16 or target_weight.dtype == paddle.bfloat16:
@@ -115,30 +120,33 @@ def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quant_a
                 state_dict[quant_weight_name] = quant_weight
                 state_dict[quant_scale_name] = quant_scale
                 del target_weight
+                quantization_scale_list.append(quant_scale_name)
             else:
                 raise ValueError(
                     f"Cannot convert {weight_name} state dict to quantized state dict. {target_weight.dtype} is not in supported dtype list (['float16', 'bfloat16'])."
                 )
         paddle.device.cuda.empty_cache()
         gc.collect()
-    return state_dict
+    return state_dict, quantization_scale_list
 
 
 def update_loaded_state_dict_keys(state_dict, quantization_linear_list):
-    keep_in_fp32_modules = []
+    quantization_scale_list = []
     for name in quantization_linear_list:
         weight_name = name + ".weight"
         quant_weight_name = name + ".quant_weight"
         quant_scale_name = name + ".quant_scale"
 
         if quant_weight_name in state_dict and quant_scale_name in state_dict:
-            keep_in_fp32_modules.append(quant_scale_name)
+            quantization_scale_list.append(quant_scale_name)
         elif weight_name in state_dict:
             state_dict.remove(weight_name)
-            keep_in_fp32_modules.append(quant_scale_name)
+            state_dict.append(quant_weight_name)
+            state_dict.append(quant_scale_name)
+            quantization_scale_list.append(quant_scale_name)
         else:
-            raise ValueError(
+            logger.warning(
                 f"Cannot find {weight_name} in state_dict or {quant_weight_name}  and {quant_scale_name} in state_dict"
             )
 
-    return state_dict, keep_in_fp32_modules
+    return state_dict, quantization_scale_list
