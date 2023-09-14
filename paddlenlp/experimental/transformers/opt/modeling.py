@@ -100,7 +100,7 @@ class OPTInferenceModel(OPTPretrainedModel):
                                                     epsilon=self.epsilon)
 
     def get_input_embeddings(self):
-        return self.embed_tokens
+        return self.embeddings.word_embeddings
 
     def set_input_embeddings(self, value):
         self.embed_tokens = value
@@ -166,9 +166,8 @@ class OPTInferenceModel(OPTPretrainedModel):
         batch, seq_len = input_ids.shape
 
         if not is_decoder: 
-            self.past_key_values_length = paddle.to_tensor([0])
-        #self.past_key_values_length = self.past_key_values_length.reshape([1])
-        past_key_values_length = paddle.to_tensor([self.past_key_values_length])
+            self.past_key_values_length = 0
+        past_key_values_length = self.past_key_values_length
         # update it.
         self.past_key_values_length += seq_len
         embedding_output = self.embeddings(
