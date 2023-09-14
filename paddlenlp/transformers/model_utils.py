@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import contextlib
 import copy
 import gc
 import inspect
@@ -58,10 +59,10 @@ from paddlenlp.utils.env import (
 )
 from paddlenlp.utils.log import logger
 
+from ..generation import GenerationConfig, GenerationMixin
 from ..utils import device_guard
 from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
-from .generation_utils import GenerationMixin
 from .utils import (  # convert_ndarray_dtype,
     ContextManagers,
     InitTrackerMeta,
@@ -83,6 +84,14 @@ __all__ = [
     "PretrainedModel",
     "register_base_model",
 ]
+
+
+def dy2st_nocheck_guard_context():
+    try:
+        context = paddle.framework._no_check_dy2st_diff()
+    except:
+        context = contextlib.nullcontext()
+    return context
 
 
 def unwrap_optimizer(optimizer, optimizer_instances=()):
@@ -630,7 +639,7 @@ def load_sharded_checkpoint(model, folder, variant=None, strict=True, prefer_saf
         with warnings.catch_warnings():
             warnings.resetwarnings()
             warnings.filterwarnings("ignore", message=r".*is not found in the provided dict.*")
-            logger.info(f"set state-dict: {model.set_state_dict(state_dict)}")
+            model.set_state_dict(state_dict)
 
         # Make sure memory is fred before we load the next state dict.
         del state_dict
@@ -863,6 +872,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if config is not None:
             self.config: PretrainedConfig = config
             self.model_config_file = CONFIG_NAME
+            self.generation_config = GenerationConfig.from_model_config(self.config) if self.can_generate() else None
             return
 
         # extract config from kwargs
@@ -876,6 +886,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             raise TypeError("config parameter should be the instance of PretrainedConfig")
 
         self.config: PretrainedConfig = kwargs["config"]
+        self.generation_config = GenerationConfig.from_model_config(self.config) if self.can_generate() else None
         self.model_config_file = CONFIG_NAME
         self.warnings_issued = {}
 
@@ -1944,8 +1955,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
             else:
                 # 4. loading non-sharded ckpt from the state dict
-                if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
-                    state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
+                if config.tensor_parallel_degree > 1:
+                    if resolved_archive_file.endswith("model_state.pdparams"):
+                        state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
+                    elif resolved_archive_file.endswith("model.safetensors"):
+                        with safe_open(resolved_archive_file, framework="np", device="cpu") as f:
+                            loaded_keys = f.keys()
+                        tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
+                        state_dict = load_state_dict(resolved_archive_file, tp_actions)
                 else:
                     state_dict = load_state_dict(resolved_archive_file)
 
@@ -1992,6 +2009,22 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             dtype=dtype,
             keep_in_fp32_modules=keep_in_fp32_modules,
         )
+
+        # load generation_config.json
+        if model.can_generate() and pretrained_model_name_or_path is not None:
+            try:
+                model.generation_config = GenerationConfig.from_pretrained(
+                    pretrained_model_name_or_path,
+                    cache_dir=cache_dir,
+                    force_download=force_download,
+                    subfolder=subfolder,
+                    **kwargs,
+                )
+            except OSError:
+                logger.info(
+                    "Generation config file not found, using a generation config created from the model config."
+                )
+                pass
 
         if paddle.in_dynamic_mode():
             return model
@@ -2086,9 +2119,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if is_main_process:
             config_to_save.save_pretrained(save_directory)
             if self.can_generate():
-                # to do support generation_config
-                pass
-                # model_to_save.generation_config.save_pretrained(save_directory)
+                model_to_save.generation_config.save_pretrained(save_directory)
 
         # Handle the case where some state_dict keys shouldn't be saved
         if self._keys_to_ignore_on_save is not None:
@@ -2132,7 +2163,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 # joyfulness), but for now this enough.
                 for k in list(shard.keys()):
                     if isinstance(shard[k], paddle.Tensor):
-                        shard[k] = shard.pop(k).numpy()
+                        shard[k] = shard.pop(k).cpu().numpy()
                 safe_save_file(shard, os.path.join(save_directory, shard_file), metadata={"format": "np"})
             else:
                 save_function(shard, os.path.join(save_directory, shard_file))

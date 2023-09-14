@@ -14,6 +14,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import copy
 from typing import Union
 
 import paddle
@@ -37,7 +38,7 @@ from paddlenlp.transformers.model_outputs import ModelOutput
 from paddlenlp.transformers.utils import get_scale_by_dtype
 from paddlenlp.utils.log import logger
 
-from .configuration_utils import GenerationConfig
+from .configuration_utils import DEFAULT_MAX_NEW_TOKENS, GenerationConfig
 from .logits_process import (
     ForcedBOSTokenLogitsProcessor,
     ForcedEOSTokenLogitsProcessor,
@@ -322,7 +323,7 @@ class BeamSearchScorer(object):
 
         # fill with hypotheses and eos_token_id if the latter fits in
         for i, (hypo, score) in enumerate(best):
-            decoded[i, : sent_lengths[i].item()] = hypo.numpy()
+            decoded[i, : sent_lengths[i].item()] = hypo.cpu().numpy()
             decoded_score[i] = score
             if sent_lengths[i] < self.max_length:
                 decoded[i, sent_lengths[i].item()] = eos_token_id
@@ -686,7 +687,7 @@ class GenerationMixin(object):
                     decode_strategy="greedy_search")
                 print(ids.shape, scores.shape)
                 # [1, 3] [1, 1]
-                sequence_ids = ids.numpy().tolist()[0]
+                sequence_ids = ids.cpu().numpy().tolist()[0]
                 sequence_ids = sequence_ids[:sequence_ids.index(tokenizer.sep_token_id)]
                 response = tokenizer.convert_ids_to_string(sequence_ids, keep_space=False)
                 print(response)
@@ -707,7 +708,7 @@ class GenerationMixin(object):
                 print(ids.shape, scores.shape)
                 # [2, 7] [2, 1]
                 response = []
-                for sequence_ids in ids.numpy().tolist():
+                for sequence_ids in ids.cpu().numpy().tolist():
                     sequence_ids = sequence_ids[:sequence_ids.index(tokenizer.sep_token_id)]
                     text = tokenizer.convert_ids_to_string(sequence_ids, keep_space=False)
                     response.append(text)
@@ -729,7 +730,7 @@ class GenerationMixin(object):
                 print(ids.shape, scores.shape)
                 # [2, 3] [2, 1]
                 response = []
-                for sequence_ids in ids.numpy().tolist():
+                for sequence_ids in ids.cpu().numpy().tolist():
                     sequence_ids = sequence_ids[:sequence_ids.index(tokenizer.sep_token_id)]
                     text = tokenizer.convert_ids_to_string(sequence_ids, keep_space=False)
                     response.append(text)
@@ -737,8 +738,17 @@ class GenerationMixin(object):
                 # ['是的', '嗯嗯']
         """
         if generation_config is None:
-            generation_config = GenerationConfig.from_model_config(self.config)
+            if self.generation_config._from_model_config:
+                new_generation_config = GenerationConfig.from_model_config(self.config)
+                if new_generation_config != self.generation_config:
+                    logger.warning(
+                        "model.generation_config is in conflict with model.config, " "model.config is used."
+                    )
+                    self.generation_config = new_generation_config
+            generation_config = self.generation_config
 
+        # without update model.generation_config
+        generation_config = copy.deepcopy(generation_config)
         model_kwargs = generation_config.update(**kwargs)
 
         assert generation_config.decode_strategy in [
@@ -892,8 +902,16 @@ class GenerationMixin(object):
             print("Setting `pad_token_id` to `eos_token_id`:{} for " "open-end generation.".format(eos_token_id))
             pad_token_id = eos_token_id
 
-        max_length = generation_config.max_length
-        min_length = generation_config.min_length
+        if generation_config.max_length != 0 and generation_config.max_new_tokens == DEFAULT_MAX_NEW_TOKENS:
+            logger.warning("`max_length` will be deprecated in future releases, use `max_new_tokens` instead.")
+            generation_config.max_new_tokens = generation_config.max_length
+
+        if generation_config.min_length != 0 and generation_config.min_new_token == 0:
+            logger.warning("`min_length` will be deprecated in future releases, use `min_new_token` instead.")
+            generation_config.min_new_token = generation_config.min_length
+
+        max_length = generation_config.max_new_tokens
+        min_length = generation_config.min_new_token
         if is_tracing and not paddle.is_tensor(max_length):
             if hasattr(paddle.framework, "_no_check_dy2st_diff"):
                 # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
@@ -1477,6 +1495,10 @@ class GenerationMixin(object):
 
         return input_ids[:, origin_len:], scores
 
+    def reorder_cache(self, cache, beam_idx):
+        cache = map_structure(lambda x: paddle.index_select(x, beam_idx), cache)
+        return cache
+
     def beam_search(
         self,
         input_ids,
@@ -1605,9 +1627,7 @@ class GenerationMixin(object):
             cache_name = "cache" if "cache" in model_kwargs else "past_key_values"
             if model_kwargs[cache_name] is not None:
                 # reorder the cache
-                model_kwargs[cache_name] = map_structure(
-                    lambda x: paddle.index_select(x, beam_idx), model_kwargs[cache_name]
-                )
+                model_kwargs[cache_name] = self.reorder_cache(model_kwargs[cache_name], beam_idx)
 
         pred_ids, scores = beam_scorer.finalize(
             input_ids,
@@ -1755,9 +1775,7 @@ class GenerationMixin(object):
             cache_name = "cache" if "cache" in model_kwargs else "past_key_values"
             if model_kwargs[cache_name] is not None:
                 # reorder the cache
-                model_kwargs[cache_name] = map_structure(
-                    lambda x: paddle.index_select(x, reordering_indices), model_kwargs[cache_name]
-                )
+                model_kwargs[cache_name] = self.reorder_cache(model_kwargs[cache_name], reordering_indices)
 
         pred_ids, scores = beam_scorer.finalize(
             input_ids,
