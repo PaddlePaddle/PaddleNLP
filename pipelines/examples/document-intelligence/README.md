@@ -85,6 +85,7 @@ curl --request POST --url 'http://0.0.0.0:8891/query_documents' -H "Content-Type
 #### 2.3.2 启动 WebUI
 
 ```bash
+pip install gradio
 python ui/webapp_docprompt_gradio.py  --serving_port 8891
 ```
 

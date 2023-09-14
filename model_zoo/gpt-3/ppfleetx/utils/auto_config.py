@@ -150,20 +150,21 @@ def process_strategy(config):
     strategy.auto_mode = "semi"
     # strategy.seed = config["Global"]["seed"]
 
-    # amp config
-    amp_cfg = config.Engine.get("mix_precision", {})
-    amp = strategy.amp
-    amp.enable = amp_cfg.get("enable", False)
-    amp.dtype = amp_cfg.get("dtype", "float16")
-    amp.level = amp_cfg.get("level", "o2")
-    amp.init_loss_scaling = amp_cfg.get("scale_loss", 32768)
-    amp.custom_black_list = amp_cfg.get("custom_black_list", [])
-    amp.custom_white_list = amp_cfg.get("custom_white_list", [])
-    amp.use_fp16_guard = amp_cfg.get("use_fp16_guard", False)
-    amp.use_bf16_guard = amp_cfg.get("use_bf16_guard", False)
+    if config.get("FusedPasses", None) is not None:
+        # fused passes config
+        fused_passes_list = []
+        fused_linear = config.FusedPasses.pop("fused_linear", False)
+        fused_adamw = config.FusedPasses.pop("fused_adamw", False)
+        if fused_linear:
+            fused_passes_list.append("fuse_gemm_epilogue")
+        if fused_adamw:
+            fused_passes_list.append("fuse_adamw")
+        fused_passes = strategy.fused_passes
+        fused_passes.enable = len(fused_passes_list) > 0
+        fused_passes.fused_passes_list = fused_passes_list
 
-    # recompute config
     if config.get("Model", None) is not None:
+        # recompute config
         if not config.Model.get("no_recompute_layers", None):
             config.Model["no_recompute_layers"] = []
         else:
@@ -179,6 +180,18 @@ def process_strategy(config):
         recompute.enable = config.Model.get("use_recompute", False)
         recompute.no_recompute_segments = config.Model.pop("no_recompute_layers", [])
         recompute.enable_tuning = config.get("Tuning", False) and config.Tuning.get("tuning_recompute", False)
+
+    # amp config
+    amp_cfg = config.Engine.get("mix_precision", {})
+    amp = strategy.amp
+    amp.enable = amp_cfg.get("enable", False)
+    amp.dtype = amp_cfg.get("dtype", "float16")
+    amp.level = amp_cfg.get("level", "o2")
+    amp.init_loss_scaling = amp_cfg.get("scale_loss", 32768)
+    amp.custom_black_list = amp_cfg.get("custom_black_list", [])
+    amp.custom_white_list = amp_cfg.get("custom_white_list", [])
+    amp.use_fp16_guard = amp_cfg.get("use_fp16_guard", False)
+    amp.use_bf16_guard = amp_cfg.get("use_bf16_guard", False)
 
     # sharding config
     sharding_cfg = config.Distributed.get("sharding", {})

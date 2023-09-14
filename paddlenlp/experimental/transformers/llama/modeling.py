@@ -17,6 +17,7 @@ import numpy as np
 import paddle
 from paddle import nn
 from paddle.distributed import fleet
+from paddle.nn.quant import weight_quantize
 from paddlenlp_ops import fused_get_rotary_embedding, get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
@@ -74,6 +75,19 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.num_layers = config.num_hidden_layers
         self.epsilon = config.rms_norm_eps
         self.max_position_embeddings = config.max_position_embeddings
+        self.use_weight_only = False
+
+        self.quant_bits = config.quant_bits
+        self.quant_algo = "weight_only_int" + str(self.quant_bits)
+        if self.quant_bits != -1:
+            self.use_weight_only = True
+
+        if self.use_weight_only:
+            assert (
+                self.quant_algo == "weight_only_int8" or self.quant_algo == "weight_only_int4"
+            ), "Expected quant_algo equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
+                self.quant_algo
+            )
 
         if config.tensor_parallel_degree > 1:
             self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
@@ -97,33 +111,72 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             pass
 
         ln_scale_attrs = [paddle.ParamAttr(name="fusellama.{}.ln_scale".format(i)) for i in range(self.num_layers)]
-        qkv_weight_attrs = [paddle.ParamAttr(name="fusellama.{}.qkv_weight".format(i)) for i in range(self.num_layers)]
+        qkv_weight_attrs = [
+            paddle.ParamAttr(
+                name="fusellama.{}.qkv_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(self.num_layers)
+        ]
         out_proj_weight_attrs = [
-            paddle.ParamAttr(name="fusellama.{}.out_proj_weight".format(i)) for i in range(self.num_layers)
+            paddle.ParamAttr(
+                name="fusellama.{}.out_proj_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(self.num_layers)
         ]
         ffn_ln_scale_attrs = [
             paddle.ParamAttr(name="fusellama.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
         ]
         ffn1_weight_attrs = [
-            paddle.ParamAttr(name="fusellama.{}.ffn1_weight".format(i)) for i in range(self.num_layers)
+            paddle.ParamAttr(
+                name="fusellama.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(self.num_layers)
         ]
         ffn2_weight_attrs = [
-            paddle.ParamAttr(name="fusellama.{}.ffn2_weight".format(i)) for i in range(self.num_layers)
+            paddle.ParamAttr(
+                name="fusellama.{}.ffn2_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(self.num_layers)
         ]
+
+        qkv_weight_scale_attrs = None
+        out_proj_weight_scale_attrs = None
+        ffn1_weight_scale_attrs = None
+        ffn2_weight_scale_attrs = None
+
+        if self.use_weight_only:
+            qkv_weight_scale_attrs = [
+                paddle.ParamAttr(name="fusellama.{}.qkv_weight_scale".format(i)) for i in range(self.num_layers)
+            ]
+            out_proj_weight_scale_attrs = [
+                paddle.ParamAttr(name="fusellama.{}.out_proj_weight_scale".format(i)) for i in range(self.num_layers)
+            ]
+            ffn1_weight_scale_attrs = [
+                paddle.ParamAttr(name="fusellama.{}.ffn1_weight_scale".format(i)) for i in range(self.num_layers)
+            ]
+            ffn2_weight_scale_attrs = [
+                paddle.ParamAttr(name="fusellama.{}.ffn2_weight_scale".format(i)) for i in range(self.num_layers)
+            ]
+
         self.transformer_block = FusedMultiTransformer(
             self.hidden_size,
             self.num_attention_heads,
             self.intermediate_size,
+            quant_bits=self.quant_bits,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
             nranks=config.tensor_parallel_degree,
             ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
+            qkv_weight_scale_attrs=qkv_weight_scale_attrs,
             linear_weight_attrs=out_proj_weight_attrs,
+            linear_weight_scale_attrs=out_proj_weight_scale_attrs,
             ffn_ln_scale_attrs=ffn_ln_scale_attrs,
             ffn1_weight_attrs=ffn1_weight_attrs,
+            ffn1_weight_scale_attrs=ffn1_weight_scale_attrs,
             ffn2_weight_attrs=ffn2_weight_attrs,
+            ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
             epsilon=self.epsilon,
             norm_type="rmsnorm",
             use_neox_rotary_style=True,
@@ -169,6 +222,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         inputs_embeds=None,
         use_cache=None,
         cache_kvs=None,
+        pre_caches=None,
         seq_len_encoder=None,
         seq_len_decoder=None,
         past_key_values=None,
@@ -225,9 +279,33 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
         seq_lens = seq_len_decoder if is_decoder else seq_len_encoder
 
-        new_rope = fused_get_rotary_embedding(input_ids, position_ids, self.head_dim_shape_tensor, 0, True)
+        position_offset = 0
+        if not is_decoder and pre_caches is not None:
+            position_offset = 128
+        new_rope = fused_get_rotary_embedding(
+            input_ids, position_ids, self.head_dim_shape_tensor, position_offset, True
+        )
 
-        with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
+        if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+            # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
+            # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+            # removed after static graphs support inplace and stride.
+            with paddle.framework._no_check_dy2st_diff():
+                hidden_states, _ = self.transformer_block(
+                    input_ids,
+                    hidden_states,
+                    cum_offsets=cum_offsets,
+                    padding_offset=padding_offset,
+                    attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
+                    caches=cache_kvs,
+                    pre_caches=pre_caches,
+                    pre_caches_length=position_offset,
+                    seq_lens=seq_lens,
+                    rotary_embs=new_rope,
+                    rotary_emb_dims=1,
+                    time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
+                )
+        else:
             hidden_states, _ = self.transformer_block(
                 input_ids,
                 hidden_states,
@@ -235,6 +313,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 padding_offset=padding_offset,
                 attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
                 caches=cache_kvs,
+                pre_caches=pre_caches,
+                pre_caches_length=position_offset,
                 seq_lens=seq_lens,
                 rotary_embs=new_rope,
                 rotary_emb_dims=1,
@@ -290,11 +370,28 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     self.hidden_size,
                 )
             )  # reshape(3, self.num_attention_heself.hidden_sizeads // self.config.tensor_parallel_degree, head_size, )
-            self.transformer_block.qkv_weights[idx].set_value(paddle.to_tensor(concated_qkv_weight))
 
-            self.transformer_block.linear_weights[idx].set_value(
-                paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.weight".format(idx)])
-            )
+            qkv_weight_tensor = paddle.to_tensor(concated_qkv_weight)
+            if self.use_weight_only:
+                qkv_weight_tensor = paddle.to_tensor(concated_qkv_weight)
+                qkv_weight_tensor = paddle.transpose(qkv_weight_tensor, perm=[1, 0])
+                qkv_quanted_weight_tensor, qkv_weight_scale_tensor = weight_quantize(
+                    qkv_weight_tensor, algo=self.quant_algo
+                )
+                self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor)
+                self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor)
+            else:
+                self.transformer_block.qkv_weights[idx].set_value(qkv_weight_tensor)
+
+            linear_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.weight".format(idx)])
+            if self.use_weight_only:
+                linear_quanted_weight_tensor, linear_weight_scale_tensor = weight_quantize(
+                    linear_weight_tensor, algo=self.quant_algo
+                )
+                self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor)
+                self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor)
+            else:
+                self.transformer_block.linear_weights[idx].set_value(linear_weight_tensor)
 
             unfused_state_dict["mlp.gate_proj.weight"] = state_dict["llama.layers.{}.mlp.gate_proj.weight".format(idx)]
             unfused_state_dict["mlp.up_proj.weight"] = state_dict["llama.layers.{}.mlp.up_proj.weight".format(idx)]
@@ -302,11 +399,26 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             concated_ffn1_weight = np.concatenate(
                 [unfused_state_dict["mlp.gate_proj.weight"], unfused_state_dict["mlp.up_proj.weight"]], axis=-1
             )
-            self.transformer_block.ffn1_weights[idx].set_value(paddle.to_tensor(concated_ffn1_weight))
+            ffn1_weight_tensor = paddle.to_tensor(concated_ffn1_weight)
 
-            self.transformer_block.ffn2_weights[idx].set_value(
-                paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)])
-            )
+            if self.use_weight_only:
+                ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
+                    ffn1_weight_tensor, algo=self.quant_algo
+                )
+                self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor)
+                self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor)
+            else:
+                self.transformer_block.ffn1_weights[idx].set_value(ffn1_weight_tensor)
+
+            ffn2_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)])
+            if self.use_weight_only:
+                ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(
+                    ffn2_weight_tensor, algo=self.quant_algo
+                )
+                self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
+                self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
+            else:
+                self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight_tensor)
 
             self.transformer_block.ln_scales[idx].set_value(
                 paddle.to_tensor(state_dict["llama.layers.{}.input_layernorm.weight".format(idx)])
@@ -328,6 +440,14 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         super().__init__(config)
         self.llama = LlamaInferenceModel(config)
         self.lm_head = LlamaLMHead(config)
+
+    @classmethod
+    def from_pretrained(
+        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
+    ):
+        # TODO: Support safetensors loading.
+        kwargs["use_safetensors"] = False
+        return super().from_pretrained(pretrained_model_name_or_path, from_hf_hub, subfolder, *args, **kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
@@ -372,6 +492,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
         cache = kwargs.get("cache", None)
+        pre_caches = kwargs.get("pre_caches", None)
         inputs_embeds = kwargs.get("inputs_embeds", None)
         if cache is not None:
             input_ids = tgt_ids
@@ -391,6 +512,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
             "seq_len_encoder": seq_len_encoder,
             "seq_len_decoder": seq_len_decoder,
             "cache": cache,
+            "pre_caches": pre_caches,
         }
         return model_inputs
 
@@ -404,6 +526,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         use_cache=False,
         cache=None,
         cache_kvs=None,
+        pre_caches=None,
         seq_len_encoder=None,
         seq_len_decoder=None,
         past_key_values=None,
@@ -425,6 +548,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
             use_cache=use_cache,
             cache=cache,
             cache_kvs=cache_kvs,
+            pre_caches=pre_caches,
             seq_len_encoder=seq_len_encoder,
             seq_len_decoder=seq_len_decoder,
             past_key_values=past_key_values,

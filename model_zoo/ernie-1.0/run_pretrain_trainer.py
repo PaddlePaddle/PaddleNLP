@@ -117,6 +117,10 @@ class DataArguments:
         default=3,
         metadata={"help": "Max N Grams"},
     )
+    data_impl: str = field(
+        default="mmap",
+        metadata={"help": "mmap/lazy format converted from json"},
+    )
 
 
 @dataclass
