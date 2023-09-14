@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import collections
+from distutils.command.config import config
 from functools import partial
 from typing import Any, Dict, List
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
@@ -160,6 +161,14 @@ class OPTInferenceModel(OPTPretrainedModel):
         past_key_values = kwargs.get("cache", None)
         is_decoder = past_key_values is not None
 
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is None and inputs_embeds is None:
@@ -169,46 +178,24 @@ class OPTInferenceModel(OPTPretrainedModel):
         # this is usually occurred in img2txt multimodal model when first enter into this forward function.
         if input_ids is None and inputs_embeds is not None:
             input_ids = self.prepare_input_ids_for_generation(self.config.bos_token_id, inputs_embeds)
-        if inputs_embeds is not None:
-            batch, seq_len, hidden_dim = inputs_embeds.shape
-            # merge batch and seq_len dimension.
-            inputs_embeds = inputs_embeds.reshape([batch * seq_len, hidden_dim])
 
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
-        )
-        use_cache = use_cache if use_cache is not None else self.config.use_cache
-
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
-        input_shape = input_ids.shape
+        batch, seq_len = input_ids.shape
 
         if not is_decoder: 
             self.past_key_values_length = paddle.to_tensor([0])
         #self.past_key_values_length = self.past_key_values_length.reshape([1])
         past_key_values_length = paddle.to_tensor([self.past_key_values_length])
         # update it.
-        self.past_key_values_length += input_shape[1]
+        self.past_key_values_length += seq_len
         embedding_output = self.embeddings(
             input_ids=input_ids,
-            attention_mask=paddle.ones([input_shape[0], past_key_values_length + input_shape[1]], dtype="int64"),
+            attention_mask=paddle.ones([batch, past_key_values_length + seq_len], dtype="int64"),
             input_embeddings=inputs_embeds,
             past_key_values_length=past_key_values_length,
         )
-
-        # if not is_decoder:
-        #     pass
-        #     import numpy as np
-        #     npzfile = np.load('/zhoukangkang/output.npz')
-        #     embedding_output = paddle.to_tensor(np.array(npzfile['output']))
-        #     embedding_output = paddle.cast(embedding_output, dtype='float16')
-        #     print("embedding_output11", embedding_output)
-
-        if not is_decoder or True:
-            batch, seq_len, hidden_dim = embedding_output.shape
-            # merge batch and seq_len dimension.
-            embedding_output = embedding_output.reshape([batch * seq_len, hidden_dim])
+        
+        # merge batch and seq_len dimension.
+        embedding_output = embedding_output.reshape([batch * seq_len, self.hidden_size])
         
         if not is_decoder:
             ids_remove_padding, padding_offset, cum_offsets = self.remove_padding(input_ids, seq_len_encoder)
@@ -306,11 +293,7 @@ class OPTForCausalLMInferenceModel(GenerationInferenceModel, OPTPretrainedModel)
     def __init__(self, config: OPTConfig, **kwargs):
         super(OPTForCausalLMInferenceModel, self).__init__(config)
         self.opt = OPTInferenceModel(config)
-        self.lm_head = OPTLMHead(
-            hidden_size=self.opt.config.hidden_size,
-            vocab_size=self.opt.config.vocab_size,
-            # embedding_weights=self.opt.embeddings.word_embeddings.weight,
-        )
+        self.lm_head = OPTLMHead(config)
 
     @classmethod
     def from_pretrained(
