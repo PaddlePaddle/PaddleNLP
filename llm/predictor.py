@@ -212,7 +212,7 @@ class DygraphPredictor(BasePredictor):
     def _infer(self, inputs: dict[str, paddle.Tensor]):
         result = self.model.generate(
             **inputs,
-            max_length=self.config.max_length,
+            max_new_tokens=self.config.max_length,
             bos_token_id=self.tokenizer.bos_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
             pad_token_id=self.tokenizer.pad_token_id,
@@ -250,7 +250,7 @@ class StaticGraphPredictor(BasePredictor):
 
     def _preprocess(self, input_text: str | list[str]):
         inputs = super()._preprocess(input_text)
-        inputs["max_length"] = np.array(self.config.max_length, dtype="int64")
+        inputs["max_new_tokens"] = np.array(self.config.max_length, dtype="int65")
 
         inputs["top_p"] = np.array(self.config.top_p, dtype="float32")
         inputs["temperature"] = np.array(self.config.temperature, dtype="float32")
@@ -604,7 +604,7 @@ def create_predictor(
         tokenizer.pad_token = tokenizer.unk_token
 
     # update config parameter for inference predictor
-    if predictor_args.decode_strategy == "greedy_search" and predictor_args.inference_model:
+    if predictor_args.decode_strategy == "greedy_search":
         predictor_args.top_p = 0.0
         predictor_args.temperature = 1.0
 
