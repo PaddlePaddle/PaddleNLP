@@ -306,7 +306,7 @@ def upload_file(file_name, file_url, file_upload, history=[]):
         tim = time.time()
         image_path = os.path.join(root_path, str(tim))
         os.makedirs(image_path, exist_ok=True)
-        imgs = pdf2image(pdfPath=file_name, imgPath=image_path)
+        imgs = pdf2image(pdfPath=file_name, imgPath=image_path, number_process_page=args.number_process_page)
     elif file_upload:
         file_name = file_upload.name
         real_filename = os.path.split(file_name)[-1]
@@ -314,7 +314,7 @@ def upload_file(file_name, file_url, file_upload, history=[]):
         tim = time.time()
         image_path = os.path.join(root_path, str(tim))
         os.makedirs(image_path, exist_ok=True)
-        imgs = pdf2image(pdfPath=file_name, imgPath=image_path)
+        imgs = pdf2image(pdfPath=file_name, imgPath=image_path, number_process_page=args.number_process_page)
     # 上传到bos后到文件是否需要删除
     filename_in_bos = real_filename
     url = eb.utils.upload_file_to_bos(

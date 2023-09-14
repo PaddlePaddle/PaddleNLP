@@ -1,0 +1,61 @@
+pretrain:
+  default:
+    model_type: llama
+    model_name_or_path: __internal_testing__/micro-random-llama
+    input_dir: ./llm/llama/data/
+    output: ./output/pretrain
+    weight_decay: 0.01
+    max_steps: 2
+    save_steps: 2
+    eval_steps: 2
+    logging_steps: 1
+    warmup_steps: 2
+    warmup_ratio: 0.01
+    per_device_train_batch_size: 1
+    per_device_eval_batch_size: 1
+    device: gpu
+    data_impl: mmap
+    fp16: true
+    fp16_opt_level: O2
+    do_train: true
+    do_predict: true
+    use_flash_attention: 1
+    use_fused_rms_norm: 0
+    continue_training: 1
+
+finetune:
+  default:
+    model_name_or_path: __internal_testing__/micro-random-llama
+    dataset_name_or_path: ./tests/fixtures/llm/data
+    output_dir: ./checkpoints/llama_sft_ckpts
+    save_steps: 2
+    max_steps: 2
+    per_device_train_batch_size: 1
+    per_device_eval_batch_size: 1
+    tensor_parallel_degree: 1
+    pipeline_parallel_degree: 1
+
+quant:
+  default:
+    dataset_name_or_path: ./tests/fixtures/llm/data
+    per_device_train_batch_size: 2
+    per_device_eval_batch_size: 2
+    model_name_or_path: ./checkpoints/llama_sft_ckpts/checkpoint-2
+    output_dir: ./checkpoints/llama_ptq_ckpts
+
+merge_tp_params:
+  default:
+    model_name_or_path: ./checkpoints/llama_sft_ckpts/checkpoint-2
+
+merge_lora_params:
+  default:
+    model_name_or_path: __internal_testing__/micro-random-llama
+    lora_path: ./checkpoints/llama_lora_ckpts/checkpoint-2
+
+predict:
+  default:
+    model_name_or_path: __internal_testing__/micro-random-llama
+    batch_size: 1
+    data_file: ./tests/fixtures/llm/data/dev.json
+    dtype: float16 
+    mode: dynamic
