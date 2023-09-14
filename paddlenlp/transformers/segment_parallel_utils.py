@@ -36,15 +36,14 @@ from paddle.distributed.fleet import fleet
 
 sys.path.append("../../")
 
-from paddlenlp.trainer.plugins import timer
 
 # llama attention module in paddlenlp/transformers/llama/modeling.py-LlamaAttention
 # gpt model_zoo/gpt-3/ppfleetx/models/language_model/gpt/dygraph/hybrid_model.py-MultiHeadAttention
 
-_hcg = fleet.get_hybrid_communicate_group()
 
 def split_inputs_sequence_dim(inputs, sep_rank=None, sep_degree=None):
     if sep_degree is None and sep_rank is None:
+        _hcg = fleet.get_hybrid_communicate_group()
         sep_degree = _hcg.get_sep_parallel_world_size()
         sep_rank = _hcg.get_sep_parallel_rank()
     assert isinstance(sep_degree, int) and isinstance(sep_rank, int), f"sep_degree and sep_rank must be int"
@@ -109,30 +108,25 @@ def _reshard_qkv(x, group, split_axis=2, concat_axis=0):
 class ReshardQKV(PyLayer):
     @staticmethod
     def forward(ctx, x, group=None, split_axis=2, concat_axis=0):
-        _timer = timer.get_timers()
-        _timer("reshard qkv fwd").start()
         ctx.group = _get_global_group() if group is None else group
         ctx.split_axis = split_axis
         ctx.concat_axis = concat_axis
         res = _reshard_qkv(x, group, split_axis=ctx.split_axis, concat_axis=ctx.concat_axis)
-        _timer("reshard qkv fwd").stop()
 
         return res
 
     @staticmethod
     def backward(ctx, dy):
-        _timer = timer.get_timers()
-        _timer("reshard qkv bwd").start()
         res = _reshard_qkv(dy, ctx.group, split_axis=ctx.concat_axis, concat_axis=ctx.split_axis)
-        _timer("reshard qkv bwd").stop()
 
         return res
 
 
 class ReshardLayer(paddle.nn.Layer):
     def __init__(self, sep_group=None) -> None:
+        _hcg = fleet.get_hybrid_communicate_group()
         if hasattr(_hcg, "get_sep_parallel_group"):
-            print("Get sep_parallel_group")
+            # print("Get sep_parallel_group")
             self.sep_group = _hcg.get_sep_parallel_group() if sep_group is None else sep_group
         else:
             self.sep_group =  _get_global_group() if sep_group is None else sep_group
@@ -400,9 +394,6 @@ def test_split_inputs():
 
 
 def test_reshard():
-    # dist.init_parallel_env()
-    timer.set_timers()
-
     # [s / sep, b, h] -> [s, b, h / sep]
     batch_size = 8
     seq_len = 16

@@ -738,9 +738,9 @@ class Trainer:
 
             for step, inputs in enumerate(epoch_iterator):
                 # split sequence dim
-                logger.info("before split inputs shape:{}".format(inputs["input_ids"].shape))
+                # logger.info("before split inputs shape:{}".format(inputs["input_ids"].shape))
                 inputs = split_inputs_sequence_dim(inputs)
-                logger.info("after split inputs shape:{}".format(inputs["input_ids"].shape))
+                # logger.info("after split inputs shape:{}".format(inputs["input_ids"].shape))
                 #
                 self.timers and self.timers("read-data").stop()
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
@@ -843,7 +843,8 @@ class Trainer:
                                 assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
                                 self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
-                            if self.optimizer._dp_enable:
+                            if self.optimizer._dp_enable or self.optimizer._sep_enable:
+                                # logger.info(f"self.optimizer._dp_enable:{self.optimizer._dp_enable}, self.optimizer._sep_enable:{self.optimizer._sep_enable}")
                                 fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
@@ -864,6 +865,7 @@ class Trainer:
                     )
                     optimizer_was_run = True
                     if self.do_grad_scaling:
+                        logger.info(f"fp16:{args.fp16} do grad scaling step.")
                         scale_before = self.scaler._scale.cpu().numpy()
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
@@ -874,6 +876,7 @@ class Trainer:
                                 f"optimizer not run, scale_before: {scale_before[0]}, scale_after: {scale_after[0]}"
                             )
                     elif isinstance(self.optimizer, HybridParallelOptimizer):
+                        # logger.info(f"bf16:{args.bf16} hybrid parallel optimizer step.")
                         self.optimizer._step(parameters_list)
                     else:
                         self.optimizer.step()

@@ -190,6 +190,7 @@ def scaled_dot_product_attention(
     _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention:
+        # logger.info(f"use_flash_attention, reshard_layer:{reshard_layer}")
         # Flash Attention now ignore attention mask
         # Current Flash Attention doesn't support attn maskt
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
@@ -676,7 +677,7 @@ class LlamaAttention(nn.Layer):
         
         self.reshard_layer = None
         if config.sep_parallel_degree > 1:
-            logger.info(f"Set ReshardLayer, config.sep_parallel_degree:{config.sep_parallel_degree}")
+            # logger.info(f"Set ReshardLayer, config.sep_parallel_degree:{config.sep_parallel_degree}")
             self.reshard_layer = ReshardLayer()
 
         self.config = config
@@ -746,8 +747,7 @@ class LlamaAttention(nn.Layer):
 
         if past_key_value is not None:
             kv_seq_len += past_key_value[0].shape[-3]
-
-        if self.config.rope:
+        if self.config.rope and False:
             if self.rope_fusion_level is not None:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
 
