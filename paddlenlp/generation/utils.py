@@ -1624,10 +1624,10 @@ class GenerationMixin(object):
             model_kwargs = self.update_model_kwargs_for_generation(
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
-            if model_kwargs["cache"] is not None:
+            if "cache" in model_kwargs:
                 # reorder the cache
                 model_kwargs["cache"] = self.reorder_cache(model_kwargs["cache"], beam_idx)
-            if model_kwargs["past_key_values"] is not None:
+            if "past_key_values" in model_kwargs:
                 # reorder the cache
                 model_kwargs["past_key_values"] = self.reorder_cache(model_kwargs["past_key_values"], beam_idx)
 
@@ -1774,10 +1774,10 @@ class GenerationMixin(object):
                 outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
             )
 
-            if model_kwargs["cache"] is not None:
+            if "cache" in model_kwargs:
                 # reorder the cache
                 model_kwargs["cache"] = self.reorder_cache(model_kwargs["cache"], reordering_indices)
-            if model_kwargs["past_key_values"] is not None:
+            if "past_key_values" in model_kwargs:
                 # reorder the cache
                 model_kwargs["past_key_values"] = self.reorder_cache(
                     model_kwargs["past_key_values"], reordering_indices
