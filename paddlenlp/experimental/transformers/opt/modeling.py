@@ -15,10 +15,7 @@
 # limitations under the License.
 from __future__ import annotations
 
-import collections
-from distutils.command.config import config
-from functools import partial
-from typing import Any, Dict, List
+
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformer,
 )
@@ -26,19 +23,8 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
 import numpy as np
 import paddle
 import paddle.nn as nn
-import paddle.nn.functional as F
-from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
-from paddle.nn import Layer
-from paddle.nn.functional.flash_attention import flash_attention
-from paddle.nn.layer.transformer import _convert_param_attr_to_list
-from paddlenlp.transformers.conversion_utils import StateDictNameMapping
-from paddlenlp.transformers.model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions,
-    CausalLMOutputWithCrossAttentions,
-)
-from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
+from paddlenlp.transformers.model_utils import register_base_model
 from paddlenlp.transformers.opt.configuration import OPTConfig
-from paddlenlp.utils.log import logger
 from paddlenlp.transformers import OPTPretrainedModel
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
@@ -113,8 +99,6 @@ class OPTInferenceModel(OPTPretrainedModel):
                                                     ffn2_bias_attrs=ffn2_bias_attrs, 
                                                     epsilon=self.epsilon)
 
-        self.cache_kvs = []
-
     def get_input_embeddings(self):
         return self.embed_tokens
 
@@ -145,7 +129,7 @@ class OPTInferenceModel(OPTPretrainedModel):
         self,
         input_ids=None,
         position_ids=None,
-        attention_mask=None, # [batch, 1, max_seq, max_seq]
+        attention_mask=None,
         inputs_embeds=None,
         use_cache=None,
         cache_kvs=None,
