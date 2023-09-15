@@ -252,6 +252,10 @@ class SelfAttention(nn.Layer):
         self.num_multi_query_groups_per_partition = config.multi_query_group_num
 
         if config.tensor_parallel_degree > 1:
+            if config.tensor_parallel_degree > 2:
+                raise ValueError(
+                    "ChatGLM2 does not support `tensor_parallel_degree` > 2. Consider using Sharding stage 3"
+                )
             self.query = fleet.meta_parallel.ColumnParallelLinear(
                 config.hidden_size,
                 config.hidden_size,
@@ -359,6 +363,10 @@ class MLP(nn.Layer):
         self.add_bias = config.add_bias_linear
 
         if config.tensor_parallel_degree > 1:
+            if config.tensor_parallel_degree > 2:
+                raise ValueError(
+                    "ChatGLM2 does not support `tensor_parallel_degree` > 2. Consider using Sharding stage 3"
+                )
             self.dense_h_to_4h = fleet.meta_parallel.ColumnParallelLinear(
                 config.hidden_size, config.ffn_hidden_size * 2, has_bias=self.add_bias, gather_output=False
             )
@@ -691,6 +699,10 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         self.rotary_pos_emb = RotaryEmbedding(rotary_dim // 2)
         self.encoder = GLMTransformer(config)
         if config.tensor_parallel_degree > 1:
+            if config.tensor_parallel_degree > 2:
+                raise ValueError(
+                    "ChatGLM2 does not support `tensor_parallel_degree` > 2. Consider using Sharding stage 3"
+                )
             self.output_layer = fleet.meta_parallel.ColumnParallelLinear(
                 config.hidden_size,
                 config.padded_vocab_size,

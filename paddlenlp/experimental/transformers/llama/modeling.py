@@ -32,7 +32,10 @@ from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
 )
-from paddlenlp.transformers.model_utils import register_base_model
+from paddlenlp.transformers.model_utils import (
+    dy2st_nocheck_guard_context,
+    register_base_model,
+)
 
 __all__ = ["LlamaInferenceModel", "LlamaForCausalLMInferenceModel", "LlamaForMiniGPT4InferenceModel"]
 
@@ -286,26 +289,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             input_ids, position_ids, self.head_dim_shape_tensor, position_offset, True
         )
 
-        if hasattr(paddle.framework, "_no_check_dy2st_diff"):
-            # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
-            # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
-            # removed after static graphs support inplace and stride.
-            with paddle.framework._no_check_dy2st_diff():
-                hidden_states, _ = self.transformer_block(
-                    input_ids,
-                    hidden_states,
-                    cum_offsets=cum_offsets,
-                    padding_offset=padding_offset,
-                    attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
-                    caches=cache_kvs,
-                    pre_caches=pre_caches,
-                    pre_caches_length=position_offset,
-                    seq_lens=seq_lens,
-                    rotary_embs=new_rope,
-                    rotary_emb_dims=1,
-                    time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
-                )
-        else:
+        with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
                 input_ids,
                 hidden_states,

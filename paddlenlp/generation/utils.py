@@ -1535,6 +1535,9 @@ class GenerationMixin(object):
             beam_scores = beam_outputs["next_beam_scores"]
             beam_next_tokens = beam_outputs["next_beam_tokens"]
             beam_idx = beam_outputs["next_beam_indices"]
+            # beam_idx may contain element -1 and cause error
+            # PR: https://github.com/PaddlePaddle/Paddle/issues/57366
+            beam_idx = paddle.maximum(beam_idx, paddle.full_like(beam_idx, 0))
 
             cur_len += 1
             input_ids = paddle.concat(
@@ -1675,6 +1678,9 @@ class GenerationMixin(object):
                 beam_scores[batch_group_indices] = beam_outputs["next_beam_scores"]
                 beam_next_tokens = beam_outputs["next_beam_tokens"]
                 beam_idx = beam_outputs["next_beam_indices"]
+                # beam_idx may contain element -1 and cause error
+                # PR: https://github.com/PaddlePaddle/Paddle/issues/57366
+                beam_idx = paddle.maximum(beam_idx, paddle.full_like(beam_idx, 0))
 
                 input_ids[batch_group_indices] = group_input_ids[beam_idx]
                 group_input_ids = paddle.concat(
