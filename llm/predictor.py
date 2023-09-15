@@ -287,7 +287,7 @@ class InferencePredictorMixin:
         self.total_max_length = config.src_length + config.max_length
         self.pre_ids = paddle.full([config.batch_size, self.total_max_length], -1, dtype="int64")
         if "chatglm" in self.architectures:
-            self.attention_mask = paddle.ones(
+            self.attention_mask = paddle.zeros(
                 shape=(config.batch_size, 1, self.total_max_length, self.total_max_length),
                 dtype=self.dtype,
             )
@@ -357,13 +357,36 @@ class InferencePredictorMixin:
                 self.architectures,
                 top_p=self.config.top_p,
                 temperature=self.config.temperature,
+                pre_caches_length=pre_caches_length,
             )
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
-                self.attention_mask[i, 0, :length, :length] = 0
-                self.attention_mask[i, 0, : length - 1, length - 1] = 1
-                self.tgt_generation_mask[i, 0, 0, :length] = paddle.ones(shape=[1, length], dtype=self.config.dtype)
+                self.attention_mask[i, 0, :length, :length] = 1
+                self.attention_mask[i, 0, : length - 1, length - 1] = 0
+
                 self.tgt_pos[i, 0, 0] = paddle.to_tensor([length], dtype="int64")
+
+                if pre_caches_length > 0:
+                    prefix_attention_mask = paddle.ones(
+                        [1, length, pre_caches_length], dtype=self.attention_mask.dtype
+                    )
+                    post_attention_mask = paddle.ones(
+                        shape=(length, length), dtype=self.attention_mask.dtype
+                    ).unsqueeze_(axis=0)
+                    post_attention_mask[0, : length - 1, length - 1] = 0
+                    self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
+                        [prefix_attention_mask, post_attention_mask], axis=2
+                    )
+                    print("self.attention_mask ---", self.attention_mask)
+
+                if self.config.prefix_path is None:
+                    self.tgt_generation_mask[i, 0, 0, pre_caches_length : length + pre_caches_length] = paddle.ones(
+                        shape=[1, length], dtype=self.config.dtype
+                    )
+                else:
+                    self.tgt_generation_mask[i, 0, 0, : length + pre_caches_length] = paddle.ones(
+                        shape=[1, length + pre_caches_length], dtype=self.config.dtype
+                    )
 
             inputs["tgt_pos"] = self.tgt_pos
         elif "bloom" in self.architectures:
@@ -465,7 +488,7 @@ class InferencePredictorMixin:
 
                 if self.config.prefix_path is None:
                     self.tgt_generation_mask[i, 0, 0, pre_caches_length : length + pre_caches_length] = paddle.ones(
-                        shape=[1, length], dtype="float16"
+                        shape=[1, length], dtype=self.config.dtype
                     )
                 else:
                     self.tgt_generation_mask[i, 0, 0, : length + pre_caches_length] = paddle.ones(
