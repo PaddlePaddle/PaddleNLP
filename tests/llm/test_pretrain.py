@@ -27,13 +27,13 @@ from .testing_utils import LLMTest
 
 
 @parameterized_class(
-    ["config_path", "model_dir"],
+    ["model_dir"],
     [
-        ["./tests/fixtures/llm/pretrain.yaml", "llama"],
+        ["llama"],
     ],
 )
 class PretrainTest(LLMTest, unittest.TestCase):
-    config_path: str = None
+    config_path: str = "./tests/fixtures/llm/pretrain.yaml"
     model_dir: str = None
 
     def setUp(self) -> None:
