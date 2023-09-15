@@ -48,6 +48,7 @@ from . import (
     trainer,
     transformers,
     utils,
+    version,
 )
 from .server import SimpleServer
 from .taskflow import Taskflow
