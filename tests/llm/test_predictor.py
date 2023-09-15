@@ -56,6 +56,7 @@ class PredictorTest(TestCase):
 
             main()
 
+        paddle.disable_static()
         # inference
         config = load_test_config(self.config_path, "inference-infer")
         config["model_name_or_path"] = self.tempdir.name

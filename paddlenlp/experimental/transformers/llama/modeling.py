@@ -446,7 +446,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
     ):
         # TODO: Support safetensors loading.
-        kwargs["use_safetensors"] = False
+        kwargs["use_safetensors"] = kwargs.get("use_safetensors", False)
         return super().from_pretrained(pretrained_model_name_or_path, from_hf_hub, subfolder, *args, **kwargs)
 
     @classmethod

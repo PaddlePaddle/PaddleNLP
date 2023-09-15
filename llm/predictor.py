@@ -450,17 +450,17 @@ class InferencePredictorMixin:
                 if pre_caches_length > 0:
                     if self.config.prefix_path is None:
                         prefix_attention_mask = paddle.zeros(
-                            [1, length, pre_caches_length], dtype=self.attention_mask.dtype
+                            [length, pre_caches_length], dtype=self.attention_mask.dtype
                         )
                     else:
                         prefix_attention_mask = paddle.ones(
-                            [1, length, pre_caches_length], dtype=self.attention_mask.dtype
+                            [length, pre_caches_length], dtype=self.attention_mask.dtype
                         )
                     post_attention_mask = paddle.tril(
                         paddle.ones(shape=(length, length), dtype=self.attention_mask.dtype)
-                    ).unsqueeze_(axis=0)
+                    )
                     self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
-                        [prefix_attention_mask, post_attention_mask], axis=2
+                        [prefix_attention_mask, post_attention_mask], axis=1
                     )
 
                 if self.config.prefix_path is None:
