@@ -35,13 +35,12 @@ commit           = '%(commit)s'
 __all__ = ['show']
 
 def show():
-    """Get the version of paddlenlp if `paddle` package if tagged. Otherwise, output the corresponding commit id.
+    """Get the corresponding commit id of paddlenlp.
 
     Returns:
-        If paddlenlp package is not tagged, the commit-id of paddlenlp will be output.
-        Otherwise, the following information will be output.
+        The commit-id of paddlenlp will be output.
 
-        full_version: version of paddle
+        full_version: version of paddlenlp
 
 
     Examples:
@@ -50,7 +49,7 @@ def show():
             import paddlenlp
 
             paddlenlp.version.show()
-            # commit: cfa357e984bfd2ffa16820e354020529df434f7d
+            # commit: 1ef5b94a18773bb0b1bba1651526e5f5fc5b16fa
 
     """
     print("commit:", commit)

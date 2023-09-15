@@ -25,3 +25,27 @@ if commit.endswith("unknown") and git.is_git_repo(paddlenlp_dir) and git.have_gi
     if git.is_dirty(paddlenlp_dir):
         commit += ".dirty"
 del paddlenlp_dir
+
+
+__all__ = ["show"]
+
+
+def show():
+    """Get the corresponding commit id of paddlenlp.
+
+    Returns:
+        The commit-id of paddlenlp will be output.
+
+        full_version: version of paddlenlp
+
+
+    Examples:
+        .. code-block:: python
+
+            import paddlenlp
+
+            paddlenlp.version.show()
+            # commit: 1ef5b94a18773bb0b1bba1651526e5f5fc5b16fa
+
+    """
+    print("commit:", commit)
