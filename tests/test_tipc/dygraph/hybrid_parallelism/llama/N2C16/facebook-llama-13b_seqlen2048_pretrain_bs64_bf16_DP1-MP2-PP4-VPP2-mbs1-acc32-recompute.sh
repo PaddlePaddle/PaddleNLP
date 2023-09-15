@@ -32,6 +32,7 @@ param+="gradient_accumulation_steps=32 "
 param+="pp_recompute_interval=1 "
 param+="tensor_parallel_config=enable_mp_async_allreduce,enable_mp_skip_c_identity,enable_mp_fused_linear_param_grad_add "
 param+="recompute_use_reentrant=true "
+param+="pipeline_parallel_config=enable_sharding_comm_overlap "
 
 cd ./tests
 bash ./test_tipc/dygraph/hybrid_parallelism/llama/benchmark_common/prepare.sh
