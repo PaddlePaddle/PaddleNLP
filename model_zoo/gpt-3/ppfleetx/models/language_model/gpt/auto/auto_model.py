@@ -24,7 +24,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.common_ops_import import convert_dtype
-from paddle.fluid import layers
+from paddle.base import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from ppfleetx.distributed.apis import auto_env
 
@@ -979,7 +979,7 @@ class GPTForGenerationAuto(nn.Layer):
             x_dims_mapping = [auto_env.get_mesh().dp_dim] + [None] * (len(logits.shape) - 1)
             w_dims_mapping = [auto_env.get_mesh().mp_dim, None]
             matmul = auto.shard_op(paddle.matmul, auto_env.get_mesh()[-1], [x_dims_mapping, w_dims_mapping, None])
-            with paddle.fluid.name_scope("skip_quant"):
+            with paddle.base.name_scope("skip_quant"):
                 logits = matmul(logits, get_attr(self.gpt.embeddings.word_embeddings, "weight"), transpose_y=True)
 
             # [batch_size, vocab_size]

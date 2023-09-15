@@ -25,6 +25,7 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
+from paddle.utils import map_structure
 
 from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
@@ -841,6 +842,10 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
                 "use_cache": True,
                 "attention_mask": attention_mask,
             }
+
+    def reorder_cache(self, cache: paddle.Tensor, beam_idx):
+        cache = map_structure(lambda x: paddle.index_select(x, beam_idx, axis=1), cache)
+        return cache
 
     def update_model_kwargs_for_generation(
         self,

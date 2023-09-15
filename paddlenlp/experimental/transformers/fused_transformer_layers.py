@@ -212,9 +212,13 @@ class FusedMultiTransformer(Layer):
         self.quant_bits = quant_bits
         self.use_weight_only = False
         self.weight_dtype = self._dtype
+        self.create_params_type = self._dtype
 
         if self.quant_bits != -1:
             self.use_weight_only = True
+            self.create_params_type = (
+                "int8"  # If use weightonly int4, params dtype is int8, and one of the dimension will be half.
+            )
             self.weight_dtype = "int" + str(self.quant_bits)
 
         self.ln_scales, self.ln_biases = [], []
@@ -292,7 +296,7 @@ class FusedMultiTransformer(Layer):
             qkv_weight = self.create_parameter(
                 shape=qkv_weight_shape,
                 attr=qkv_weight_attr,
-                dtype=self.weight_dtype,
+                dtype=self.create_params_type,
                 is_bias=False,
             )
 
@@ -321,7 +325,7 @@ class FusedMultiTransformer(Layer):
             linear_weight = self.create_parameter(
                 shape=linear_weight_shape,
                 attr=linear_weight_attr,
-                dtype=self.weight_dtype,
+                dtype=self.create_params_type,
                 is_bias=False,
             )
 
@@ -371,7 +375,7 @@ class FusedMultiTransformer(Layer):
             ffn1_weight = self.create_parameter(
                 shape=ffn1_weight_shape,
                 attr=ffn1_weight_attr,
-                dtype=self.weight_dtype,
+                dtype=self.create_params_type,
                 is_bias=False,
             )
 
@@ -401,7 +405,7 @@ class FusedMultiTransformer(Layer):
             ffn2_weight = self.create_parameter(
                 shape=ffn2_weight_shape,
                 attr=ffn2_weight_attr,
-                dtype=self.weight_dtype,
+                dtype=self.create_params_type,
                 is_bias=False,
             )
 
@@ -481,6 +485,8 @@ class FusedMultiTransformer(Layer):
         padding_offset=None,
         attn_mask=None,
         caches=None,
+        pre_caches=None,
+        pre_caches_length=0,
         rotary_embs=None,
         rotary_emb_dims=0,
         seq_lens=None,
@@ -566,13 +572,23 @@ class FusedMultiTransformer(Layer):
                         rotary_emb_dims=rotary_emb_dims,
                         use_neox=self.use_neox_rotary_style,
                     )
+
+                if pre_caches is not None:
+                    k_out = paddle.concat([pre_caches[i][0], k_out], axis=2)
+                    v_out = paddle.concat([pre_caches[i][1], v_out], axis=2)
+
                 # write cache kv (inplace)
-                write_cache_kv(k_out, v_out, caches[i], seq_lens)
+                write_cache_kv(k_out, v_out, caches[i], seq_lens + pre_caches_length)
 
                 # cutlass fmha
-                # qktv_out is [batch, numhead, seq_len, headsize]
                 qktv_out = variable_length_memory_efficient_attention(
-                    q_out, k_out, v_out, seq_lens, seq_lens, mask=attn_mask, scale=float(self.head_dim**-0.5)
+                    q_out,
+                    k_out,
+                    v_out,
+                    seq_lens,
+                    seq_lens + pre_caches_length,
+                    mask=attn_mask,
+                    scale=float(self.head_dim**-0.5),
                 )
 
                 fmha_out = transpose_remove_padding(qktv_out, seq_lens, padding_offset)
@@ -607,12 +623,12 @@ class FusedMultiTransformer(Layer):
             if self.normalize_before is True:
                 norm_out = self.norm_func(
                     out_linear_out,
-                    self.ffn_ln_scales[i],
-                    self.ffn_ln_biases[i],
-                    self._epsilon,
-                    bias = self.linear_biases[i],
-                    residual=bias_residual_input,
+                    norm_weight=self.ffn_ln_scales[i],
+                    norm_bias=self.ffn_ln_biases[i],
+                    epsilon=self._epsilon,
                     begin_norm_axis=1,
+                    bias=self.linear_biases[i],
+                    residual=bias_residual_input,
                 )
                 tmp_out, bias_residual_input = norm_out[0], norm_out[1]
             else:

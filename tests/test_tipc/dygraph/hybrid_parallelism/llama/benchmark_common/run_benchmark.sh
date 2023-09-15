@@ -15,30 +15,28 @@
 # limitations under the License.
 
 # Test training benchmark for a model.
-# Usage：bash benchmark/run_benchmark.sh ${model_name_or_path} ${per_device_train_batch_size} ${use_flash_attention} ${tensor_parallel_degree} ${pipeline_parallel_degree} ${virtual_pp_degree} ${sequence_parallel} ${sharding_degree} ${num_train_epochs} ${save_steps} ${sharding} ${recompute} ${run_mode} ${device_num}
+# Usage：bash benchmark/run_benchmark.sh ${model_name_or_path} ${per_device_train_batch_size} ${tensor_parallel_degree} ${pipeline_parallel_degree} ${virtual_pp_degree} ${sequence_parallel} ${sharding_parallel_degree} ${save_steps} ${sharding} ${recompute} ${run_mode} ${device_num}
 function _set_params(){
-    model_name_or_path=${1:-"facebook/llama-7b"}
-
-    per_device_train_batch_size=${2:-""}
-    use_flash_attention=${3:-"1"}
-    tensor_parallel_degree=${4:-"2"}
-    pipeline_parallel_degree=${5:-"2"}
-
-    virtual_pp_degree=${6:-"1"}
-    sequence_parallel=${7:-"0"}
-    sharding_degree=${8:-"1"}      # (可选)
-    num_train_epochs=${9:-"200"}
-    save_steps=${10:-"200"}
-    sharding=${11:-"stage1"}
-    recompute=${12:-"1"}
-    run_mode=${13:-"DP"}             # (必选) MP模型并行|DP数据并行|PP流水线并行|混合并行DP1-MP1-PP1|DP2-MP8-PP2|DP1-MP8-PP4|DP4-MP8-PP1
-    device_num=${14:-"N2C32"}         # (必选) 使用的卡数量，N1C1|N1C8|N4C32 （4机32卡）
-    global_batch_size=${15:-"16"}
-    model_item=${16:-"facebook-llama-13b"}
-    max_step=${17:-"20"}
-    gradient_accumulation_steps=${18:-"4"}
-    pp_recompute_interval=${19:-"1"}
-
+    model_name_or_path=${model_name_or_path:-"facebook/llama-13b"}
+    per_device_train_batch_size=${per_device_train_batch_size:-1}
+    tensor_parallel_degree=${tensor_parallel_degree:-2}
+    data_parallel_degree=${data_parallel_degree:-1}
+    pipeline_parallel_degree=${pipeline_parallel_degree:-4}
+    virtual_pp_degree=${virtual_pp_degree:-2}
+    sequence_parallel=${sequence_parallel:-0}
+    sharding_parallel_degree=${sharding_parallel_degree:-2}
+    save_steps=${save_steps:-200}
+    sharding=${sharding:-"stage1"}
+    recompute=${recompute:-1}
+    run_mode=${run_mode:-"DP1-MP2-PP4-mbs1-acc32-recompute"}
+    device_num=${device_num:-"N2C16"}
+    global_batch_size=${global_batch_size:-64}
+    model_item=${model_item:-"facebook-llama-13b_seqlen2048_pretrain"}
+    max_steps=${max_steps:-150}
+    gradient_accumulation_steps=${gradient_accumulation_steps:-32}
+    pp_recompute_interval=${pp_recompute_interval:-1}
+    tensor_parallel_config=${tensor_parallel_config:-"enable_mp_async_allreduce,enable_mp_skip_c_identity,enable_mp_fused_linear_param_grad_add"}
+    recompute_use_reentrant=${recompute_use_reentrant:-"true"}
 
     base_batch_size=${global_batch_size}
 
@@ -50,7 +48,7 @@ function _set_params(){
 
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
 
-    fp_item="fp16"
+    fp_item="bf16"
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -95,48 +93,48 @@ function _train(){
     fi
 
     use_pure_fp16=False
+    train_cmd="--model_type llama \
+    --model_name_or_path ${model_name_or_path} \
+    --tokenizer_name_or_path ${model_name_or_path} \
+    --input_dir ./data \
+    --output_dir ./output \
+    --split 949,50,1 \
+    --max_seq_length 2048 \
+    --per_device_train_batch_size ${per_device_train_batch_size} \
+    --gradient_accumulation_steps ${gradient_accumulation_steps} \
+    --use_flash_attention 1 \
+    --use_fused_rms_norm 1 \
+    --bf16  \
+    --fp16_opt_level O2  \
+    --amp_master_grad \
+    --tensor_parallel_degree ${tensor_parallel_degree} \
+    --pipeline_parallel_degree ${pipeline_parallel_degree} \
+    --virtual_pp_degree ${virtual_pp_degree} \
+    --pp_recompute_interval ${pp_recompute_interval} \
+    --learning_rate 0.00001 \
+    --min_learning_rate 0.000001 \
+    --max_steps ${max_steps} \
+    --save_steps 50000 \
+    --weight_decay 0.01 \
+    --warmup_ratio 0.01 \
+    --max_grad_norm 1.0 \
+    --logging_steps 1 \
+    --dataloader_num_workers 1 \
+    --eval_steps 1001 \
+    --sharding ${sharding} \
+    --disable_tqdm true \
+    --continue_training 0 \
+    --do_train \
+    --device gpu \
+    --rope_fusion_level core \
+    --enable_linear_fused_grad_add true \
+    --fuse_attention_qkv true \
+    --fuse_attention_ffn true \
+    --tensor_parallel_config ${tensor_parallel_config} \
+    --recompute ${recompute} \
+    --recompute_use_reentrant ${recompute_use_reentrant} \
+    --data_cache ./data_cache"
 
-    train_cmd="    --model_type llama \
-            --model_name_or_path ${model_name_or_path} \
-            --tokenizer_name_or_path ${model_name_or_path} \
-            --input_dir ./data \
-            --output_dir output \
-            --split 949,50,1 \
-            --max_seq_length 2048 \
-            --per_device_train_batch_size ${per_device_train_batch_size} \
-            --gradient_accumulation_steps ${gradient_accumulation_steps} \
-            --per_device_eval_batch_size ${per_device_train_batch_size} \
-            --use_flash_attention ${use_flash_attention} \
-            --use_fused_rms_norm 1 \
-            --fuse_attention_qkv 1 \
-            --fuse_attention_ffn 1 \
-            --fp16  \
-            --fp16_opt_level O2  \
-            --scale_loss 512 \
-            --tensor_parallel_degree ${tensor_parallel_degree} \
-            --pipeline_parallel_degree ${pipeline_parallel_degree} \
-            --virtual_pp_degree ${virtual_pp_degree} \
-            --sequence_parallel ${sequence_parallel} \
-            --learning_rate 0.00001 \
-            --min_learning_rate 0.000001 \
-            --save_steps ${save_steps} \
-            --weight_decay 0.01 \
-            --pp_recompute_interval ${pp_recompute_interval}\
-            --warmup_ratio 0.01 \
-            --num_train_epochs ${num_train_epochs} \
-            --max_grad_norm 1.0 \
-            --logging_steps 10 \
-            --dataloader_num_workers 1 \
-            --eval_steps 100000000 \
-            --report_to visualdl \
-            --data_cache ./data \
-            --sharding ${sharding} \
-            --disable_tqdm true \
-            --continue_training 1\
-            --recompute ${recompute} \
-            --max_step ${max_step} \
-            --do_train \
-            --device gpu"
     if [ ${PADDLE_TRAINER_ID} ]
     then
         PADDLE_RANK_OPTION=" --rank ${PADDLE_TRAINER_ID}"
@@ -163,7 +161,7 @@ function _train(){
                 run_pretrain.py ${train_cmd}"
             workerlog_id=0
             ;;
-        DP1-MP2-PP2-SD4|DP1-MP2-PP2-SD2) echo "run run_mode: ${run_mode}"
+        DP1-MP2-PP4-mbs2-acc16-recompute|DP1-MP1-PP8-mbs1-acc32-recompute|DP1-MP2-PP4-VPP2-mbs1-acc32-recompute|DP1-MP2-PP4-VPP1-mbs1-acc32-recompute) echo "run run_mode: ${run_mode}"
             train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
                 run_pretrain.py ${train_cmd}"
             workerlog_id=0

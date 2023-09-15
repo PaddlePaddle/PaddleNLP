@@ -141,7 +141,9 @@ def adapt_stale_fwd_patch(self, name, value):
         # NOTE(guosheng): In dygraph to static, `layer.forward` would be patched
         # by an instance of `StaticFunction`. And use string compare to avoid to
         # import fluid.
-        if type(value).__name__.endswith("StaticFunction"):
+        if type(value).__name__.endswith("StaticFunction") or self.forward.__class__.__name__.endswith(
+            "StaticFunction"
+        ):
             return value
         if hasattr(inspect, "getfullargspec"):
             (
