@@ -25,7 +25,8 @@ from paddlenlp.transformers import LlamaConfig, LlamaForCausalLM, LlamaModel
 from tests.testing_utils import require_package, slow
 from tests.transformers.test_configuration_common import ConfigTester
 from tests.transformers.test_generation_utils import GenerationTesterMixin
-from tests.transformers.test_modeling_common import (  # GenerationD2STestMixin,
+from tests.transformers.test_modeling_common import (
+    GenerationD2STestMixin,
     ModelTesterMixin,
     ModelTesterPretrainedMixin,
     ids_tensor,
@@ -368,8 +369,8 @@ class LlamaModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
-# class LlamaGenerationD2STest(GenerationD2STestMixin, unittest.TestCase):
-#    internal_testing_model = "__internal_testing__/micro-random-llama"
+class LlamaGenerationD2STest(GenerationD2STestMixin, unittest.TestCase):
+    internal_testing_model = "__internal_testing__/micro-random-llama"
 
 
 class LlamaCompatibilityTest(unittest.TestCase):
