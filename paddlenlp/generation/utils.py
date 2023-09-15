@@ -69,16 +69,6 @@ __all__ = [
 ]
 
 
-# using paddle.topk in beam search will cause error by now,
-# using paddle.argsort instead temporarily.
-# PR: https://github.com/PaddlePaddle/Paddle/issues/57366
-def topk_(scores: Tensor, k: int = 1, axis: int = -1):
-    batch_size = scores.shape[0]
-    next_tokens = paddle.argsort(scores, axis=axis, descending=True)[:, :k]
-    next_scores = scores[paddle.arange(batch_size).unsqueeze(1), next_tokens]
-    return next_scores, next_tokens
-
-
 def get_unfinished_flag(
     input_ids: Tensor, unfinished_flag: Tensor, eos_token_id: Union[int, list[int], list[list[int]]]
 ) -> Tensor:
@@ -1503,13 +1493,13 @@ class GenerationMixin(object):
                 # reshape for beam search
                 next_scores = next_scores.reshape([batch_size, num_beams * vocab_size])
 
-                next_scores, next_tokens = topk_(next_scores, 2 * num_beams, axis=1)
+                next_scores, next_tokens = paddle.topk(next_scores, 2 * num_beams, axis=1)
 
                 next_indices = next_tokens // vocab_size
                 next_tokens = next_tokens % vocab_size
 
             else:
-                next_scores, next_tokens = topk_(next_scores, 2 * num_beams, axis=1)
+                next_scores, next_tokens = paddle.topk(next_scores, 2 * num_beams, axis=1)
 
                 sibling_score = paddle.arange(1, 2 * num_beams + 1, dtype="int64").unsqueeze(0) * diversity_rate
 
@@ -1519,7 +1509,7 @@ class GenerationMixin(object):
                 next_tokens = next_tokens.reshape([batch_size, 2 * num_beams * num_beams])
 
                 diversed_score = diversed_score.reshape([batch_size, 2 * num_beams * num_beams])
-                diversed_score, diversed_tokens = topk_(diversed_score, 2 * num_beams, axis=1)
+                diversed_score, diversed_tokens = paddle.topk(diversed_score, 2 * num_beams, axis=1)
 
                 # TODO
                 # Use gather_nd() to select origan token and score
@@ -1545,6 +1535,7 @@ class GenerationMixin(object):
             beam_scores = beam_outputs["next_beam_scores"]
             beam_next_tokens = beam_outputs["next_beam_tokens"]
             beam_idx = beam_outputs["next_beam_indices"]
+            beam_idx = paddle.maximum(beam_idx, paddle.full_like(beam_idx, 0))
 
             cur_len += 1
             input_ids = paddle.concat(
@@ -1667,7 +1658,7 @@ class GenerationMixin(object):
                 # reshape for beam search
                 next_scores = next_scores.reshape([batch_size, group_size * vocab_size])
 
-                next_scores, next_tokens = topk_(next_scores, 2 * group_size, axis=1)
+                next_scores, next_tokens = paddle.topk(next_scores, 2 * group_size, axis=1)
 
                 next_indices = next_tokens // vocab_size
                 next_tokens = next_tokens % vocab_size
@@ -1685,6 +1676,7 @@ class GenerationMixin(object):
                 beam_scores[batch_group_indices] = beam_outputs["next_beam_scores"]
                 beam_next_tokens = beam_outputs["next_beam_tokens"]
                 beam_idx = beam_outputs["next_beam_indices"]
+                beam_idx = paddle.maximum(beam_idx, paddle.full_like(beam_idx, 0))
 
                 input_ids[batch_group_indices] = group_input_ids[beam_idx]
                 group_input_ids = paddle.concat(
