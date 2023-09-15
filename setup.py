@@ -11,10 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import errno
 import io
 import os
 
 import setuptools
+
+from paddlenlp.version import commit
 
 PADDLENLP_STABLE_VERSION = "PADDLENLP_STABLE_VERSION"
 
@@ -23,6 +26,53 @@ def read_requirements_file(filepath):
     with open(filepath) as fin:
         requirements = fin.read()
     return requirements
+
+
+def write_version_py(filename="paddlenlp/version/__init__.py", content=None):
+    cnt = '''# THIS FILE IS GENERATED FROM PADDLENLP SETUP.PY
+commit           = '%(commit)s'
+
+__all__ = ['show']
+
+def show():
+    """Get the corresponding commit id of paddlenlp.
+
+    Returns:
+        The commit-id of paddlenlp will be output.
+
+        full_version: version of paddlenlp
+
+
+    Examples:
+        .. code-block:: python
+
+            import paddlenlp
+
+            paddlenlp.version.show()
+            # commit: 1ef5b94a18773bb0b1bba1651526e5f5fc5b16fa
+
+    """
+    print("commit:", commit)
+
+'''
+    commit_id = commit
+    if content is None:
+        content = cnt % {"commit": commit_id}
+
+    dirname = os.path.dirname(filename)
+
+    try:
+        os.makedirs(dirname)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+    backup = None
+    if os.path.exists(filename):
+        backup = open(filename, "r").read()
+
+    with open(filename, "w") as f:
+        f.write(content)
+    return backup
 
 
 __version__ = "2.6.1.post"
@@ -65,41 +115,49 @@ def get_package_data_files(package, data, package_dir=None):
     return all_files
 
 
-setuptools.setup(
-    name="paddlenlp",
-    version=__version__,
-    author="PaddleNLP Team",
-    author_email="paddlenlp@baidu.com",
-    description="Easy-to-use and powerful NLP library with Awesome model zoo, supporting wide-range of NLP tasks from research to industrial applications, including Neural Search, Question Answering, Information Extraction and Sentiment Analysis end-to-end system.",
-    long_description=read("README_en.md"),
-    long_description_content_type="text/markdown",
-    url="https://github.com/PaddlePaddle/PaddleNLP",
-    license_files=("LICENSE",),
-    packages=setuptools.find_packages(
-        where=".",
-        exclude=("examples*", "tests*", "applications*", "fast_tokenizer*", "fast_generation*", "model_zoo*"),
-    ),
-    package_data={
-        "paddlenlp.ops": get_package_data_files(
-            "paddlenlp.ops", ["CMakeLists.txt", "README.md", "cmake", "fast_transformer", "patches", "optimizer"]
+origin_version_file = write_version_py(filename="paddlenlp/version/__init__.py")
+
+try:
+    setuptools.setup(
+        name="paddlenlp",
+        version=__version__,
+        author="PaddleNLP Team",
+        author_email="paddlenlp@baidu.com",
+        description="Easy-to-use and powerful NLP library with Awesome model zoo, supporting wide-range of NLP tasks from research to industrial applications, including Neural Search, Question Answering, Information Extraction and Sentiment Analysis end-to-end system.",
+        long_description=read("README_en.md"),
+        long_description_content_type="text/markdown",
+        url="https://github.com/PaddlePaddle/PaddleNLP",
+        license_files=("LICENSE",),
+        packages=setuptools.find_packages(
+            where=".",
+            exclude=("examples*", "tests*", "applications*", "fast_tokenizer*", "fast_generation*", "model_zoo*"),
         ),
-        "paddlenlp.transformers.layoutxlm": get_package_data_files(
-            "paddlenlp.transformers.layoutxlm", ["visual_backbone.yaml"]
-        ),
-    },
-    setup_requires=["cython", "numpy"],
-    install_requires=REQUIRED_PACKAGES,
-    entry_points={"console_scripts": ["paddlenlp = paddlenlp.cli:main"]},
-    extras_require=extras,
-    python_requires=">=3.6",
-    classifiers=[
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
-        "License :: OSI Approved :: Apache Software License",
-        "Operating System :: OS Independent",
-    ],
-    license="Apache 2.0",
-)
+        package_data={
+            "paddlenlp.ops": get_package_data_files(
+                "paddlenlp.ops", ["CMakeLists.txt", "README.md", "cmake", "fast_transformer", "patches", "optimizer"]
+            ),
+            "paddlenlp.transformers.layoutxlm": get_package_data_files(
+                "paddlenlp.transformers.layoutxlm", ["visual_backbone.yaml"]
+            ),
+        },
+        setup_requires=["cython", "numpy"],
+        install_requires=REQUIRED_PACKAGES,
+        entry_points={"console_scripts": ["paddlenlp = paddlenlp.cli:main"]},
+        extras_require=extras,
+        python_requires=">=3.6",
+        classifiers=[
+            "Programming Language :: Python :: 3",
+            "Programming Language :: Python :: 3.6",
+            "Programming Language :: Python :: 3.7",
+            "Programming Language :: Python :: 3.8",
+            "Programming Language :: Python :: 3.9",
+            "License :: OSI Approved :: Apache Software License",
+            "Operating System :: OS Independent",
+        ],
+        license="Apache 2.0",
+    )
+except Exception as e:
+    write_version_py(filename="paddlenlp/version/__init__.py", content=origin_version_file)
+    raise e
+
+write_version_py(filename="paddlenlp/version/__init__.py", content=origin_version_file)
