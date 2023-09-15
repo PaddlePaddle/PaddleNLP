@@ -492,7 +492,11 @@ def shard_checkpoint(
 
     if shard_format == "naive":
         for key, weight in state_dict.items():
-            weight_size = weight.numel().item() * dtype_byte_size(weight.dtype)
+            # _C_ops.numel not yet support paddle.int8
+            if weight.dtype == paddle.int8:
+                weight_size = weight.shape[0] * weight.shape[1] * dtype_byte_size(weight.dtype)
+            else:
+                weight_size = weight.numel().item() * dtype_byte_size(weight.dtype)
             # If this weight is going to tip up over the maximal size, we split.
             if current_block_size + weight_size > max_shard_size:
                 # fix if the first param is large than max_shard_size
@@ -1610,7 +1614,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if quantization_config is not None:
             if state_dict is not None:
                 state_dict, quantization_scale_list = convert_to_quantize_state_dict(
-                    state_dict, quantization_linear_list, config.quantization_config["quant_algo"]
+                    state_dict, quantization_linear_list, config.quantization_config["quant_algo"], dtype
                 )
                 loaded_keys = [k for k in state_dict.keys()]
             else:
@@ -1745,7 +1749,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None)
                 if quantization_config is not None:
                     state_dict, _ = convert_to_quantize_state_dict(
-                        state_dict, quantization_linear_list, quantization_config["quant_algo"]
+                        state_dict, quantization_linear_list, quantization_config["quant_algo"], dtype
                     )
 
                 # Mistmatched keys contains tuples key/shape1/shape2 of weights in the checkpoint that have a shape not

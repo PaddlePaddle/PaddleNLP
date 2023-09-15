@@ -96,7 +96,7 @@ def replace_with_quantization_linear(model, quant_algo, name_prefix="", **kwargs
     return quantization_linear_list
 
 
-def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quant_algo):
+def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quant_algo, dtype):
     quantization_scale_list = []
     for name in quantization_linear_list:
         weight_name = name + ".weight"
@@ -114,17 +114,12 @@ def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quant_a
                 )
             quantization_scale_list.append(quant_scale_name)
         elif weight_name in state_dict:
-            target_weight = state_dict.pop(weight_name)
-            if target_weight.dtype == paddle.float16 or target_weight.dtype == paddle.bfloat16:
-                quant_weight, quant_scale = weight_quantize(target_weight, quant_algo)
-                state_dict[quant_weight_name] = quant_weight
-                state_dict[quant_scale_name] = quant_scale
-                del target_weight
-                quantization_scale_list.append(quant_scale_name)
-            else:
-                raise ValueError(
-                    f"Cannot convert {weight_name} state dict to quantized state dict. {target_weight.dtype} is not in supported dtype list (['float16', 'bfloat16'])."
-                )
+            target_weight = state_dict.pop(weight_name).cast(dtype)
+            quant_weight, quant_scale = weight_quantize(target_weight, quant_algo)
+            state_dict[quant_weight_name] = quant_weight
+            state_dict[quant_scale_name] = quant_scale
+            del target_weight
+            quantization_scale_list.append(quant_scale_name)
         paddle.device.cuda.empty_cache()
         gc.collect()
     return state_dict, quantization_scale_list
