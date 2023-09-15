@@ -1,5 +1,5 @@
 pretrain:
-  slow:
+  default:
     model_type: llama
     model_name_or_path: __internal_testing__/tiny-random-llama
     weight_decay: 0.01
@@ -23,7 +23,7 @@ pretrain:
 
 
 inference-predict:
-  slow:
+  default:
     mode: dynamic 
     max_length: 20
     batch_size: 2
@@ -31,11 +31,11 @@ inference-predict:
     dtype: float16
 
 inference-to-static:
-  slow:
+  default:
     dtype: float16
 
 inference-infer:
-  slow:
+  default:
     mode: static
     dtype: float16
     batch_size: 2
