@@ -2042,7 +2042,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         if use_keep_in_fp32_modules:
             # low_cpu_mem_usage = True
-            keep_in_fp32_modules += model._keep_in_fp32_modules
+            keep_in_fp32_modules = model._keep_in_fp32_modules
         else:
             keep_in_fp32_modules = []
 
