@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Iterator, List, Optional, Union
 from unittest import mock
 
-from ..utils import (
+from ..utils.import_utils import (
     is_paddle_available,
     is_paddle_bf16_cpu_available,
     is_paddle_bf16_gpu_available,

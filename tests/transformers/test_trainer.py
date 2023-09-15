@@ -141,13 +141,6 @@ class RegressionModelConfig(PretrainedConfig):
         self.hidden_size = 1
 
 
-def nn_Parameter(x):
-    print(x)
-    v = paddle.create_parameter(x.shape, x.dtype)
-    v.set_value(x)
-    return v
-
-
 if is_paddle_available():
 
     class SampleIterableDataset(IterableDataset):
@@ -191,8 +184,8 @@ if is_paddle_available():
     class RegressionModel(nn.Layer):
         def __init__(self, a=0, b=0, double_output=False):
             super().__init__()
-            self.a = nn_Parameter(paddle.to_tensor(a).astype("float32"))
-            self.b = nn_Parameter(paddle.to_tensor(b).astype("float32"))
+            self.a = paddle.create_parameter(shape=[1], dtype=paddle.float32).set_value(paddle.to_tensor(a))
+            self.b = paddle.create_parameter(shape=[1], dtype=paddle.float32).set_value(paddle.to_tensor(b))
             self.double_output = double_output
             self.config = None
 
@@ -206,8 +199,8 @@ if is_paddle_available():
     class RegressionDictModel(nn.Layer):
         def __init__(self, a=0, b=0):
             super().__init__()
-            self.a = nn_Parameter(paddle.to_tensor(a).astype("float32"))
-            self.b = nn_Parameter(paddle.to_tensor(b).astype("float32"))
+            self.a = paddle.create_parameter(shape=[1], dtype=paddle.float32).set_value(paddle.to_tensor(a))
+            self.b = paddle.create_parameter(shape=[1], dtype=paddle.float32).set_value(paddle.to_tensor(b))
             self.config = None
 
         def forward(self, input_x, labels=None, **kwargs):
@@ -223,8 +216,8 @@ if is_paddle_available():
 
         def __init__(self, config):
             super().__init__(config)
-            self.a = nn_Parameter(paddle.to_tensor(config.a).astype("float32"))
-            self.b = nn_Parameter(paddle.to_tensor(config.b).astype("float32"))
+            self.a = paddle.create_parameter(shape=[1], dtype=paddle.float32).set_value(paddle.to_tensor(config.a))
+            self.b = paddle.create_parameter(shape=[1], dtype=paddle.float32).set_value(paddle.to_tensor(config.b))
             self.double_output = config.double_output
 
         def forward(self, input_x, labels=None, **kwargs):
@@ -240,8 +233,8 @@ if is_paddle_available():
 
         def __init__(self, config):
             super().__init__(config)
-            self.a = nn_Parameter(paddle.to_tensor(config.a).astype("float32"))
-            self.b = nn_Parameter(paddle.to_tensor(config.b).astype("float32"))
+            self.a = paddle.create_parameter(shape=[1], dtype=paddle.float32).set_value(paddle.to_tensor(config.a))
+            self.b = paddle.create_parameter(shape=[1], dtype=paddle.float32).set_value(paddle.to_tensor(config.b))
             self.random_paddle = config.random_paddle
 
         def forward(self, input_x, labels=None, **kwargs):
@@ -267,7 +260,7 @@ if is_paddle_available():
             self.ln1 = nn.LayerNorm(hidden_size)
             self.linear2 = nn.Linear(hidden_size, hidden_size)
             self.ln2 = nn.LayerNorm(hidden_size)
-            self.bias = nn_Parameter(paddle.zeros(hidden_size))
+            self.bias = paddle.create_parameter(shape=hidden_size.shape).set_value(paddle.zeros(hidden_size))
 
         def forward(self, x):
             h = self.ln1(nn.functional.relu(self.linear1(x)))
@@ -450,6 +443,23 @@ class TrainerIntegrationPrerunTest(TestCasePlus, TrainerIntegrationCommon):
         trainer.train()
         self.check_trained_model(trainer.model)
 
+    def test_model_init(self):
+        # TODO 此处需要测试模型从ckpt加载后训练结构是否相同， 此处需要后续修改
+        train_dataset = RegressionDataset()
+        args = TrainingArguments("./regression", learning_rate=0.1)
+        trainer = Trainer(args=args, train_dataset=train_dataset, model_init=lambda: RegressionModel())
+        trainer.train()
+        self.check_trained_model(trainer.model)
+
+        # Re-training should restart from scratch, thus lead the same results.
+        trainer.train()
+        self.check_trained_model(trainer.model)
+
+        # Re-training should restart from scratch, thus lead the same results and new seed should be used.
+        trainer.args.seed = 314
+        trainer.train()
+        self.check_trained_model(trainer.model, alternate_seed=True)
+
     def test_gradient_accumulation(self):
         # Training with half the batch size but accumulation steps as 2 should give the same results.
         trainer = get_regression_trainer(
@@ -530,7 +540,6 @@ class TrainerIntegrationTest(TestCasePlus, TrainerIntegrationCommon):
         _ = trainer.evaluate()
         _ = trainer.predict(eval_dataset)
 
-    #  @unittest.skipIf(True, "GPTConfig missing")
     def test_evaluation_with_keys_to_drop(self):
         config = GPTConfig(vocab_size=100, n_positions=128, n_embd=32, n_layer=3, n_head=4)
         tiny_gpt2 = GPTLMHeadModel(config)
@@ -573,7 +582,6 @@ class TrainerIntegrationTest(TestCasePlus, TrainerIntegrationCommon):
         train_output = trainer.train()
         self.assertEqual(train_output.global_step, 10)
 
-    # @unittest.skipIf(True, "GPTConfig missing")
     def test_logging_inf_nan_filter(self):
         config = GPTConfig(vocab_size=100, n_positions=128, n_embd=32, n_layer=3, n_head=4)
         tiny_gpt2 = GPTLMHeadModel(config)
