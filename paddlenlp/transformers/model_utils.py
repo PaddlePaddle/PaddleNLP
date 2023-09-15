@@ -749,7 +749,6 @@ def _load_state_dict_into_meta_model(
     for param_name, param in state_dict.items():
         # First part of the test is always true as loaded_state_dict_keys always contains state_dict keys.
         if param_name not in loaded_state_dict_keys or param_name not in expected_keys:
-            print(param_name, param_name not in loaded_state_dict_keys, param_name not in expected_keys)
             continue
 
         if param_name.startswith(start_prefix):
@@ -780,7 +779,6 @@ def _load_state_dict_into_meta_model(
 
             if old_param is not None:
                 param = param.astype(dtype=old_param.dtype)
-        print(param_name, param.dtype)
         with paddle.no_grad():
             model.state_dict()[param_name].get_tensor()._share_data_with(param.value().get_tensor())
             param.value().get_tensor()._clear()
@@ -1608,22 +1606,21 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if quantization_linear_list is not None:
                 quantization_linear_list = [".".join([prefix, s]) for s in quantization_linear_list]
 
+        # Weight quantization if not yet quantized & updtate loaded_keys
         if quantization_config is not None:
             if state_dict is not None:
-                import time
-
-                start = time.time()
                 state_dict, quantization_scale_list = convert_to_quantize_state_dict(
                     state_dict, quantization_linear_list, config.quantization_config["quant_algo"]
                 )
-                print(time.time() - start)
                 loaded_keys = [k for k in state_dict.keys()]
             else:
                 loaded_keys, quantization_scale_list = update_loaded_state_dict_keys(
                     loaded_keys, quantization_linear_list
                 )
-
-            keep_in_fp32_modules += quantization_scale_list
+            if keep_in_fp32_modules is None:
+                keep_in_fp32_modules = quantization_scale_list
+            else:
+                keep_in_fp32_modules += quantization_scale_list
 
         missing_keys = list(set(expected_keys) - set(loaded_keys))
         unexpected_keys = list(set(loaded_keys) - set(expected_keys))
@@ -1747,7 +1744,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
                 state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None)
                 if quantization_config is not None:
-                    state_dict = convert_to_quantize_state_dict(
+                    state_dict, _ = convert_to_quantize_state_dict(
                         state_dict, quantization_linear_list, quantization_config["quant_algo"]
                     )
 
@@ -1770,7 +1767,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
                     logger.info("Converted state_dict to Tensor Parallel Format")
 
-                if low_cpu_mem_usage:
+                if low_cpu_mem_usage or quantization_config is not None:
                     new_error_msgs = _load_state_dict_into_meta_model(
                         model_to_load,
                         state_dict,
@@ -1945,10 +1942,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         convert_from_torch = cls.support_conversion(config) and convert_from_torch
 
         if config.quantization_config is not None:
+            if config.tensor_parallel_degree > 1:
+                raise NotImplementedError("Quantization method dosen't support tensor parallelism.")
             if dtype != "float16" and dtype != "bfloat16":
                 dtype = "float16"
                 logger.warning(
-                    "Quantization only supports DataTypes: float16, bfloat16. We set default dtype as float16"
+                    "Overriding dtype='float16' due to quantization method required DataTypes: float16, bfloat16. Pass your own dtype to remove this warning"
                 )
 
         if dtype is None:
@@ -1963,14 +1962,15 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if is_paddle_support_lazy_init():
                 init_contexts.append(paddle.LazyGuard())
 
+        if dtype:
+            init_contexts.append(dtype_guard(dtype))
+
+        # Quantization method requires empty init to avoid unnecessary GPU allocation
         if config.quantization_config is not None:
             quantization_init_contexts = []
             quantization_init_contexts.append(no_init_weights(_enable=True))
             if is_paddle_support_lazy_init():
                 quantization_init_contexts.append(paddle.LazyGuard())
-
-        if dtype:
-            init_contexts.append(dtype_guard(dtype))
 
         # Keep in fp32 modules
         keep_in_fp32_modules = None
