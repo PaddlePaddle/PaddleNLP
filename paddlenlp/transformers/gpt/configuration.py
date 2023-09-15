@@ -89,7 +89,7 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
         "vocab_size": 50304,
         "hidden_size": 5120,
         "num_hidden_layers": 40,
-        "num_attention_heads": 128,
+        "num_attention_heads": 40,
         "intermediate_size": 20480,
         "hidden_act": "gelu",
         "hidden_dropout_prob": 0.1,
@@ -102,7 +102,7 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
     },
     "gpt3-6.7B-en": {  # 6.7B
         "vocab_size": 50304,
-        "hidden_size": 1024,
+        "hidden_size": 4096,
         "num_hidden_layers": 32,
         "num_attention_heads": 32,
         "intermediate_size": 16384,

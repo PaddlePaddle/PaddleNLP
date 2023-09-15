@@ -385,6 +385,7 @@ def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
 def dybatch_preprocess(
     tokenizer,
     texts: list[str],
+    src_length: int,
     max_length: int,
     architectures: str,
     top_p: float,
@@ -398,7 +399,7 @@ def dybatch_preprocess(
         position_ids = []
 
         for text in texts:
-            tokens = tokenizer(text, return_tensors="np", padding=True)
+            tokens = tokenizer(text, return_tensors="np", padding=True, max_length=src_length)
             input_ids.append(tokens["input_ids"][0])
             position_ids.append(tokens["position_ids"][0])
 
@@ -423,6 +424,7 @@ def dybatch_preprocess(
                 text,
                 return_tensors="np",
                 padding=False,
+                max_length=src_length,
                 return_attention_mask=False,
                 return_token_type_ids=False,
             )
@@ -434,7 +436,7 @@ def dybatch_preprocess(
         bs = inputs["input_ids"].shape[0]
         max_len = max(map(len, input_ids))
 
-        position_ids = paddle.zeros(shape=[bs, max_length], dtype="int64")
+        position_ids = paddle.zeros(shape=[bs, max_length + src_length], dtype="int64")
 
         for i in range(bs):
             position_ids[i, pre_caches_length : pre_caches_length + seq_len[i]] = paddle.arange(seq_len[i])
@@ -490,7 +492,8 @@ def dybatch_preprocess(
             [
                 1
                 if not benchmark
-                else max_length,  # Note(Zhengzekang): When in benchmark mode, we need to set a fixed decode length.
+                else max_length
+                - pre_caches_length,  # Note(Zhengzekang): When in benchmark mode, we need to set a fixed decode length.
             ]
             * bs
         )

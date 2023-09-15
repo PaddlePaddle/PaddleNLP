@@ -212,9 +212,13 @@ class FusedMultiTransformer(Layer):
         self.quant_bits = quant_bits
         self.use_weight_only = False
         self.weight_dtype = self._dtype
+        self.create_params_type = self._dtype
 
         if self.quant_bits != -1:
             self.use_weight_only = True
+            self.create_params_type = (
+                "int8"  # If use weightonly int4, params dtype is int8, and one of the dimension will be half.
+            )
             self.weight_dtype = "int" + str(self.quant_bits)
 
         self.ln_scales, self.ln_biases = [], []
@@ -292,7 +296,7 @@ class FusedMultiTransformer(Layer):
             qkv_weight = self.create_parameter(
                 shape=qkv_weight_shape,
                 attr=qkv_weight_attr,
-                dtype=self.weight_dtype,
+                dtype=self.create_params_type,
                 is_bias=False,
             )
 
@@ -321,7 +325,7 @@ class FusedMultiTransformer(Layer):
             linear_weight = self.create_parameter(
                 shape=linear_weight_shape,
                 attr=linear_weight_attr,
-                dtype=self.weight_dtype,
+                dtype=self.create_params_type,
                 is_bias=False,
             )
 
@@ -371,7 +375,7 @@ class FusedMultiTransformer(Layer):
             ffn1_weight = self.create_parameter(
                 shape=ffn1_weight_shape,
                 attr=ffn1_weight_attr,
-                dtype=self.weight_dtype,
+                dtype=self.create_params_type,
                 is_bias=False,
             )
 
@@ -401,7 +405,7 @@ class FusedMultiTransformer(Layer):
             ffn2_weight = self.create_parameter(
                 shape=ffn2_weight_shape,
                 attr=ffn2_weight_attr,
-                dtype=self.weight_dtype,
+                dtype=self.create_params_type,
                 is_bias=False,
             )
 
@@ -559,14 +563,15 @@ class FusedMultiTransformer(Layer):
                 )
 
                 # rotary emb (inplace)
-                encode_rotary_qk(
-                    q_out,
-                    k_out,
-                    rotary_embs,
-                    seq_lens,
-                    rotary_emb_dims=rotary_emb_dims,
-                    use_neox=self.use_neox_rotary_style,
-                )
+                if rotary_embs is not None:
+                    encode_rotary_qk(
+                        q_out,
+                        k_out,
+                        rotary_embs,
+                        seq_lens,
+                        rotary_emb_dims=rotary_emb_dims,
+                        use_neox=self.use_neox_rotary_style,
+                    )
 
                 if pre_caches is not None:
                     k_out = paddle.concat([pre_caches[i][0], k_out], axis=2)
@@ -618,11 +623,12 @@ class FusedMultiTransformer(Layer):
             if self.normalize_before is True:
                 norm_out = self.norm_func(
                     out_linear_out,
-                    self.ffn_ln_scales[i],
-                    self.ffn_ln_biases[i],
-                    self._epsilon,
-                    residual=bias_residual_input,
+                    norm_weight=self.ffn_ln_scales[i],
+                    norm_bias=self.ffn_ln_biases[i],
+                    epsilon=self._epsilon,
                     begin_norm_axis=1,
+                    bias=self.linear_biases[i],
+                    residual=bias_residual_input,
                 )
                 tmp_out, bias_residual_input = norm_out[0], norm_out[1]
             else:

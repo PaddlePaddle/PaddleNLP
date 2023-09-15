@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import contextlib
 import copy
 import gc
 import inspect
@@ -83,6 +84,14 @@ __all__ = [
     "PretrainedModel",
     "register_base_model",
 ]
+
+
+def dy2st_nocheck_guard_context():
+    try:
+        context = paddle.framework._no_check_dy2st_diff()
+    except:
+        context = contextlib.nullcontext()
+    return context
 
 
 def unwrap_optimizer(optimizer, optimizer_instances=()):
@@ -1946,8 +1955,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
             else:
                 # 4. loading non-sharded ckpt from the state dict
-                if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
-                    state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
+                if config.tensor_parallel_degree > 1:
+                    if resolved_archive_file.endswith("model_state.pdparams"):
+                        state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
+                    elif resolved_archive_file.endswith("model.safetensors"):
+                        with safe_open(resolved_archive_file, framework="np", device="cpu") as f:
+                            loaded_keys = f.keys()
+                        tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
+                        state_dict = load_state_dict(resolved_archive_file, tp_actions)
                 else:
                     state_dict = load_state_dict(resolved_archive_file)
 

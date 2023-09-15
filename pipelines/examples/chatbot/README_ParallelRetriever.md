@@ -38,7 +38,7 @@ models
     └── config.pbtxt
 ```
 *注意*:如果使用TensorRT引擎，用 pipelines/examples/chatbot/config.pbtxt 替换 models/m3e_model/config.pbtxt
-
+*BAAI/bge-small-zh-v1.5配置链接https://paddlenlp.bj.bcebos.com/pipelines/bge-small-zh.tar.gz
 ## 拉取并运行镜像
 
 以GPU镜像部署为例：

@@ -20,6 +20,7 @@ import paddle.nn.functional as F
 from paddlenlp_ops import (
     get_token_penalty_multi_scores,
     save_with_output,
+    set_alibi_mask_value,
     set_mask_value,
     set_stop_value_multi_ends,
     set_value_by_flags_and_idx,
@@ -228,11 +229,20 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs["tgt_pos"] = paddle.where(
                     just_decoder, model_kwargs["tgt_pos"], model_kwargs["tgt_pos"] + 1
                 )
-            model_kwargs["seq_len_decoder"] = set_mask_value(
-                model_kwargs["tgt_generation_mask"],
-                model_kwargs["stop_flags"],
-                model_kwargs["seq_len_decoder"],
-            )
+            if "bloom" in self.config.architectures[0].lower():
+                model_kwargs["seq_len_decoder"] = set_alibi_mask_value(
+                    model_kwargs["tgt_generation_mask"],
+                    model_kwargs["stop_flags"],
+                    model_kwargs["seq_len_decoder"],
+                    model_kwargs["position_ids"],
+                    model_kwargs["tgt_pos"],
+                )
+            else:
+                model_kwargs["seq_len_decoder"] = set_mask_value(
+                    model_kwargs["tgt_generation_mask"],
+                    model_kwargs["stop_flags"],
+                    model_kwargs["seq_len_decoder"],
+                )
         else:
             model_kwargs["tgt_ids"] = next_tokens
             if self.config["position_encoding_2d"] and self.config.position_encoding_2d is True:
@@ -250,16 +260,26 @@ class GenerationInferenceModel(GenerationMixin):
                     model_kwargs["tgt_pos"],
                     model_kwargs["tgt_pos"] + 1,
                 )
-            model_kwargs["seq_len_decoder"] = set_mask_value(
-                model_kwargs["tgt_generation_mask"],
-                model_kwargs["stop_flags"],
-                model_kwargs["seq_len_decoder"],
-            )
+
             model_kwargs["seq_len_decoder"] = paddle.where(
                 model_kwargs["stop_flags"],
                 model_kwargs["seq_len_decoder"],
                 model_kwargs["seq_len_decoder"] + 1,
             )
+            if "bloom" in self.config.architectures[0].lower():
+                model_kwargs["seq_len_decoder"] = set_alibi_mask_value(
+                    model_kwargs["tgt_generation_mask"],
+                    model_kwargs["stop_flags"],
+                    model_kwargs["seq_len_decoder"],
+                    model_kwargs["position_ids"],
+                    model_kwargs["tgt_pos"],
+                )
+            else:
+                model_kwargs["seq_len_decoder"] = set_mask_value(
+                    model_kwargs["tgt_generation_mask"],
+                    model_kwargs["stop_flags"],
+                    model_kwargs["seq_len_decoder"],
+                )
 
         model_kwargs["next_tokens"] = next_tokens
         return model_kwargs
@@ -277,11 +297,14 @@ class GenerationInferenceModel(GenerationMixin):
         step_idx_ori = paddle.full(shape=[1], dtype="int64", fill_value=1)
         batch_idx = paddle.full(shape=[1], dtype="int32", fill_value=-1)
 
+        # fake temp next_tokens
+        next_tokens = paddle.full(shape=[paddle.shape(input_ids).shape[0], 1], dtype="int32", fill_value=0)
+
         # let inputs_embeds enter into model_kwargs.
         # because the code below directly use the model_kwargs as a parameter without using inputs_embeds.
         model_kwargs["inputs_embeds"] = inputs_embeds
         model_kwargs["all_input_ids"] = input_ids
-        logits_processors = model_kwargs["logits_processors"]
+        logits_processors = model_kwargs.pop("logits_processors")
 
         def _forward_(**args):
             # cache_kvs is never empty because it is passed as a parameter in def sample.
@@ -347,18 +370,25 @@ class GenerationInferenceModel(GenerationMixin):
 
             return next_tokens, model_kwargs
 
-        # encoder
-        outputs = _forward_(**model_kwargs)
-        # first decoder
-        next_tokens, model_kwargs = _post_process_(
-            outputs,
-            top_p,
-            temperature,
-            step_idx_ori,
-            model_kwargs,
-        )
-        step_idx_ori += 1
-        encoder_output = outputs
+        if paddle.max(model_kwargs["seq_len_encoder"]) > 0:
+            # encoder
+            outputs = _forward_(**model_kwargs)
+            # first decoder
+            next_tokens, model_kwargs = _post_process_(
+                outputs,
+                top_p,
+                temperature,
+                step_idx_ori,
+                model_kwargs,
+            )
+            step_idx_ori += 1
+        else:
+            outputs = None
+            # first decoder
+            next_tokens = None
+            model_kwargs["next_tokens"] = next_tokens
+            step_idx_ori += 0
+
         # gives it a value, means we will entered into decoder phase.
         model_kwargs["cache"] = 0
 
@@ -382,5 +412,4 @@ class GenerationInferenceModel(GenerationMixin):
             paddle.cast(model_kwargs["stop_flags"], "int32"),
             model_kwargs["seq_len_decoder"],
             model_kwargs["tgt_pos"],
-            encoder_output,
         )
