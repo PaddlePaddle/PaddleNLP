@@ -125,6 +125,7 @@ export CUDA_VISIBLE_DEVICES=${cudaid2}
 # cd ${nlp_dir}/model_zoo/bert/
 # wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/bert.tar.gz
 # tar -xzvf bert.tar.gz
+python -c "import datasets;from datasets import load_dataset; train_dataset=load_dataset('glue', 'sst2', split='train')"
 cd ${nlp_dir}/model_zoo/bert/data/
 wget -q https://bj.bcebos.com/paddlenlp/models/transformers/bert/data/training_data.hdf5
 cd ../
@@ -1079,7 +1080,7 @@ llm(){
 cd ${nlp_dir}/csrc
 echo "build paddlenlp_op"
 
-pip install -r requirements.txt
+python pip install -r requirements.txt
 python setup_cuda.py install
 
 echo ' Testing all LLMs '
