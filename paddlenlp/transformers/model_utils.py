@@ -763,7 +763,7 @@ def _load_state_dict_into_meta_model(
 
         # # We convert floating dtypes to the `dtype` passed. We want to keep the buffers/params
         # # in int/uint/bool and not cast them.
-        if dtype is not None and paddle.is_floating_point(param):
+        if dtype is not None and paddle.is_floating_point(param) and "quant_scale" not in param_name:
             if (
                 keep_in_fp32_modules is not None
                 and any(module_to_keep_in_fp32 in param_name for module_to_keep_in_fp32 in keep_in_fp32_modules)
@@ -1613,18 +1613,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # Weight quantization if not yet quantized & updtate loaded_keys
         if quantization_config is not None:
             if state_dict is not None:
-                state_dict, quantization_scale_list = convert_to_quantize_state_dict(
+                state_dict = convert_to_quantize_state_dict(
                     state_dict, quantization_linear_list, config.quantization_config["quant_algo"], dtype
                 )
                 loaded_keys = [k for k in state_dict.keys()]
             else:
-                loaded_keys, quantization_scale_list = update_loaded_state_dict_keys(
-                    loaded_keys, quantization_linear_list
-                )
-            if keep_in_fp32_modules is None:
-                keep_in_fp32_modules = quantization_scale_list
-            else:
-                keep_in_fp32_modules += quantization_scale_list
+                loaded_keys = update_loaded_state_dict_keys(loaded_keys, quantization_linear_list)
 
         missing_keys = list(set(expected_keys) - set(loaded_keys))
         unexpected_keys = list(set(loaded_keys) - set(expected_keys))
@@ -1748,7 +1742,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
                 state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None)
                 if quantization_config is not None:
-                    state_dict, _ = convert_to_quantize_state_dict(
+                    state_dict = convert_to_quantize_state_dict(
                         state_dict, quantization_linear_list, quantization_config["quant_algo"], dtype
                     )
 

@@ -97,7 +97,6 @@ def replace_with_quantization_linear(model, quant_algo, name_prefix="", **kwargs
 
 
 def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quant_algo, dtype):
-    quantization_scale_list = []
     for name in quantization_linear_list:
         weight_name = name + ".weight"
         quant_weight_name = name + ".quant_weight"
@@ -112,36 +111,32 @@ def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quant_a
                 raise ValueError(
                     f"{quant_scale_name} should be {paddle.float32} in state_dict but recieved dtype {state_dict[quant_scale_name].dtype}"
                 )
-            quantization_scale_list.append(quant_scale_name)
         elif weight_name in state_dict:
             target_weight = state_dict.pop(weight_name).cast(dtype)
             quant_weight, quant_scale = weight_quantize(target_weight, quant_algo)
             state_dict[quant_weight_name] = quant_weight
             state_dict[quant_scale_name] = quant_scale
             del target_weight
-            quantization_scale_list.append(quant_scale_name)
         paddle.device.cuda.empty_cache()
         gc.collect()
-    return state_dict, quantization_scale_list
+    return state_dict
 
 
 def update_loaded_state_dict_keys(state_dict, quantization_linear_list):
-    quantization_scale_list = []
     for name in quantization_linear_list:
         weight_name = name + ".weight"
         quant_weight_name = name + ".quant_weight"
         quant_scale_name = name + ".quant_scale"
 
         if quant_weight_name in state_dict and quant_scale_name in state_dict:
-            quantization_scale_list.append(quant_scale_name)
+            continue
         elif weight_name in state_dict:
             state_dict.remove(weight_name)
             state_dict.append(quant_weight_name)
             state_dict.append(quant_scale_name)
-            quantization_scale_list.append(quant_scale_name)
         else:
             logger.warning(
                 f"Cannot find {weight_name} in state_dict or {quant_weight_name}  and {quant_scale_name} in state_dict"
             )
 
-    return state_dict, quantization_scale_list
+    return state_dict
