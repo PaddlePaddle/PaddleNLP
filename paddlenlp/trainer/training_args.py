@@ -1372,8 +1372,11 @@ class TrainingArguments:
             args = self
             key = "Training"
 
+        import paddlenlp
+
         logger.info("{:^40}".format("{} Configuration Arguments".format(key)))
         logger.info("{:30}: {}".format("paddle commit id", paddle.version.commit))
+        logger.info("{:30}: {}".format("paddlenlp commit id", paddlenlp.version.commit))
 
         for a in dir(args):
             if a[:2] != "__":  # don't print double underscore methods
