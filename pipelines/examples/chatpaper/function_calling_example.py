@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import json
-import logging
 
 import erniebot
 import gradio as gr
@@ -22,8 +21,6 @@ from prompt_utils import functions, get_parse_args
 from pipelines.document_stores import BaiduElasticsearchDocumentStore
 from pipelines.nodes import EmbeddingRetriever
 from pipelines.pipelines import Pipeline
-
-logger = logging.getLogger(__name__)
 
 args = get_parse_args()
 erniebot.api_type = "qianfan"
@@ -106,35 +103,7 @@ def searchSinglePaper(query, title):
     return documents
 
 
-def chat_paper(messages):
-    # Steo 1, decide whether we need function call
-    # history = history_transform(history)
-    response = erniebot.ChatCompletion.create(
-        model="ernie-bot-3.5",
-        messages=messages,
-        functions=functions,
-    )
-    # Step 2: execute command
-    if "function_call" not in response:
-        return response
-    else:
-        function_call = response.function_call
-        name2function = {"search_multi_paper": searchAbstract, "search_single_paper": searchSinglePaper}
-        func = name2function[function_call["name"]]
-        func_args = json.loads(function_call["arguments"])
-        res = func(**func_args)
-        # Step 3: return msg to erniebot
-        messages.append({"role": "assistant", "content": None, "function_call": function_call})
-        messages.append(
-            {"role": "function", "name": function_call["name"], "content": json.dumps(res, ensure_ascii=False)}
-        )
-        # messages.append({"role": "user", "content": "请根据论文检索工具的结果返回每篇论文的标题, 内容以及关键词"})
-        response = erniebot.ChatCompletion.create(model="ernie-bot-3.5", messages=messages, functions=functions)
-    return response
-
-
 def history_transform(history=[]):
-    print("history input", history)
     messages = []
     if len(history) < 2:
         return messages
@@ -147,6 +116,7 @@ def history_transform(history=[]):
 
 
 def prediction(history):
+    logs = []
     query = history.pop()[0]
     for turn_idx in range(len(history)):
         if history[turn_idx][0] is not None:
@@ -154,15 +124,35 @@ def prediction(history):
         if history[turn_idx][1] is not None:
             history[turn_idx][1] = history[turn_idx][1].replace("<br>", "")
 
-    context = history_transform(history)
-    print("context")
-    print(context)
-    context.append({"role": "user", "content": query})
-    result = chat_paper(context)["result"]
+    messages = history_transform(history)
+    messages.append({"role": "user", "content": query})
+    # Step 1, decide whether we need function call
+    response = erniebot.ChatCompletion.create(
+        model="ernie-bot-3.5",
+        messages=messages,
+        functions=functions,
+    )
+    # Step 2: execute command
+    if "function_call" not in response:
+        logs.append("Function Call未触发")
+        result = response["result"]
+    else:
+        function_call = response.function_call
+        logs.append(f"Function Call已触发: {function_call}")
+        name2function = {"search_multi_paper": searchAbstract, "search_single_paper": searchSinglePaper}
+        func = name2function[function_call["name"]]
+        func_args = json.loads(function_call["arguments"])
+        res = func(**func_args)
+        logs.append(f"Function Call调用结果: {res}")
+        # Step 3: return msg to erniebot
+        messages.append({"role": "assistant", "content": None, "function_call": function_call})
+        messages.append(
+            {"role": "function", "name": function_call["name"], "content": json.dumps(res, ensure_ascii=False)}
+        )
+        response = erniebot.ChatCompletion.create(model="ernie-bot-3.5", messages=messages, functions=functions)
+        result = response["result"]
     history.append([query, result])
-    print()
-    print(history)
-    return history
+    return history, "\n".join(logs)
 
 
 def add_message_chatbot(messages, history):
@@ -175,13 +165,14 @@ def launch_ui():
         gr.HTML("""<h1 align="center">ChatPaper维普小助手</h1>""")
         with gr.Tab("ChatPaper"):
             with gr.Column():
-                chatbot = gr.Chatbot(value=[[None, "您好, 我是维普论文小助手"]], scale=35, height=800)
+                chatbot = gr.Chatbot(value=[[None, "您好, 我是维普论文小助手"]], scale=35, height=500)
                 message = gr.Textbox(placeholder="你能帮我找一些有关机器学习和强化学习方面的论文吗", lines=5, max_lines=20)
                 with gr.Row():
                     submit = gr.Button("🚀 提交", variant="primary", scale=1)
                     clear = gr.Button("清除", variant="primary", scale=1)
+                log = gr.Textbox(value="当前轮次日志")
             submit.click(add_message_chatbot, inputs=[message, chatbot], outputs=[message, chatbot]).then(
-                prediction, inputs=[chatbot], outputs=[chatbot]
+                prediction, inputs=[chatbot], outputs=[chatbot, log]
             )
             clear.click(lambda _: ([[None, "您好, 我是维普论文小助手"]]), inputs=[clear], outputs=[chatbot])
     demo.launch(server_name=args.serving_name, server_port=args.serving_port, debug=True)
