@@ -98,7 +98,6 @@ def searchSinglePaper(query, title):
         documents.append(
             {
                 "document": doc.content,
-                "uuid": doc.meta["id"],
                 "key_words": doc.meta["key_words"],
                 "title": doc.meta["title"],
             }
@@ -108,35 +107,34 @@ def searchSinglePaper(query, title):
 
 
 def chat_paper(messages):
-    # Steo 1, register function call
+    # Steo 1, decide whether we need function call
+    # history = history_transform(history)
     response = erniebot.ChatCompletion.create(
         model="ernie-bot-3.5",
         messages=messages,
         functions=functions,
     )
     # Step 2: execute command
-    # try 3 times
-    for i in range(3):
-        if "function_call" not in response:
-            return response
-
+    if "function_call" not in response:
+        return response
+    else:
         function_call = response.function_call
-        logger.info(response)
         name2function = {"search_multi_paper": searchAbstract, "search_single_paper": searchSinglePaper}
         func = name2function[function_call["name"]]
         func_args = json.loads(function_call["arguments"])
         res = func(**func_args)
-        logger.info(res)
         # Step 3: return msg to erniebot
         messages.append({"role": "assistant", "content": None, "function_call": function_call})
         messages.append(
             {"role": "function", "name": function_call["name"], "content": json.dumps(res, ensure_ascii=False)}
         )
+        # messages.append({"role": "user", "content": "请根据论文检索工具的结果返回每篇论文的标题, 内容以及关键词"})
         response = erniebot.ChatCompletion.create(model="ernie-bot-3.5", messages=messages, functions=functions)
     return response
 
 
 def history_transform(history=[]):
+    print("history input", history)
     messages = []
     if len(history) < 2:
         return messages
@@ -150,14 +148,24 @@ def history_transform(history=[]):
 
 def prediction(history):
     query = history.pop()[0]
+    for turn_idx in range(len(history)):
+        if history[turn_idx][0] is not None:
+            history[turn_idx][0] = history[turn_idx][0].replace("<br>", "")
+        if history[turn_idx][1] is not None:
+            history[turn_idx][1] = history[turn_idx][1].replace("<br>", "")
+
     context = history_transform(history)
+    print("context")
+    print(context)
     context.append({"role": "user", "content": query})
     result = chat_paper(context)["result"]
     history.append([query, result])
+    print()
+    print(history)
     return history
 
 
-def add_messaget_chatbot(messages, history):
+def add_message_chatbot(messages, history):
     history.append([messages, None])
     return None, history
 
@@ -167,17 +175,16 @@ def launch_ui():
         gr.HTML("""<h1 align="center">ChatPaper维普小助手</h1>""")
         with gr.Tab("ChatPaper"):
             with gr.Column():
-                chatbot = gr.Chatbot(value=[[None, "你好, 我是论文小助手"]], scale=35, height=500)
+                chatbot = gr.Chatbot(value=[[None, "您好, 我是维普论文小助手"]], scale=35, height=800)
                 message = gr.Textbox(placeholder="你能帮我找一些有关机器学习和强化学习方面的论文吗", lines=5, max_lines=20)
                 with gr.Row():
                     submit = gr.Button("🚀 提交", variant="primary", scale=1)
                     clear = gr.Button("清除", variant="primary", scale=1)
-            submit.click(add_messaget_chatbot, inputs=[message, chatbot], outputs=[message, chatbot]).then(
+            submit.click(add_message_chatbot, inputs=[message, chatbot], outputs=[message, chatbot]).then(
                 prediction, inputs=[chatbot], outputs=[chatbot]
             )
-            clear.click(lambda _: ([[None, "你好, 我是论文小助手"]]), inputs=[clear], outputs=[chatbot])
-    demo.queue(concurrency_count=40, max_size=40)
-    demo.launch(server_name=args.serving_name, server_port=args.serving_port)
+            clear.click(lambda _: ([[None, "您好, 我是维普论文小助手"]]), inputs=[clear], outputs=[chatbot])
+    demo.launch(server_name=args.serving_name, server_port=args.serving_port, debug=True)
 
 
 if "__main__" == __name__:
