@@ -66,9 +66,6 @@ class BiEncoderModel(nn.Layer):
             self.process_rank = dist.get_rank()
             self.world_size = dist.get_world_size()
 
-    def gradient_checkpointing_enable(self):
-        self.model.gradient_checkpointing_enable()
-
     def sentence_embedding(self, hidden_state, mask):
         if self.sentence_pooling_method == "mean":
             s = paddle.sum(hidden_state * mask.unsqueeze(-1), axis=1)

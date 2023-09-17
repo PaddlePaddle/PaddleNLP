@@ -35,10 +35,6 @@ class BiTrainer(Trainer):
         if self.tokenizer is not None and self.is_world_process_zero():
             self.tokenizer.save_pretrained(output_dir)
 
-        # torch.save(self.args, os.path.join(output_dir, "training_args.bin"))
-
-        # save the checkpoint for sentence-transformers library
-
     def compute_loss(self, model, inputs, return_outputs=False):
         """
         How the loss is computed by Trainer. By default, all models return the loss in the first element.
