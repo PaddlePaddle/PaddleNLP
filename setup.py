@@ -14,10 +14,9 @@
 import errno
 import io
 import os
+import subprocess
 
 import setuptools
-
-from paddlenlp.version import commit
 
 PADDLENLP_STABLE_VERSION = "PADDLENLP_STABLE_VERSION"
 
@@ -28,7 +27,47 @@ def read_requirements_file(filepath):
     return requirements
 
 
-def write_version_py(filename="paddlenlp/version/__init__.py", content=None):
+def is_git_repo(dir: str) -> bool:
+    """Is the given directory version-controlled with git?"""
+    return os.path.exists(os.path.join(dir, ".git"))
+
+
+def have_git() -> bool:
+    """Can we run the git executable?"""
+    try:
+        subprocess.check_output(["git", "--help"])
+        return True
+    except subprocess.CalledProcessError:
+        return False
+    except OSError:
+        return False
+
+
+def git_revision(dir: str) -> bytes:
+    """Get the SHA-1 of the HEAD of a git repository."""
+    return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=dir).strip()
+
+
+def git_checkout(dir: str, filename: str) -> bytes:
+    """Get the SHA-1 of the HEAD of a git repository."""
+    return subprocess.check_output(["git", "checkout", filename], cwd=dir).strip()
+
+
+def is_dirty(dir: str) -> bool:
+    """Check whether a git repository has uncommitted changes."""
+    output = subprocess.check_output(["git", "status", "-uno", "--porcelain"], cwd=dir)
+    return output.strip() != b""
+
+
+commit = "unknown"
+paddlenlp_dir = os.path.abspath(os.path.dirname(__file__))
+if commit.endswith("unknown") and is_git_repo(paddlenlp_dir) and have_git():
+    commit = git_revision(paddlenlp_dir).decode("utf-8")
+    if is_dirty(paddlenlp_dir):
+        commit += ".dirty"
+
+
+def write_version_py(filename="paddlenlp/version/__init__.py"):
     cnt = '''# THIS FILE IS GENERATED FROM PADDLENLP SETUP.PY
 commit           = '%(commit)s'
 
@@ -56,8 +95,7 @@ def show():
 
 '''
     commit_id = commit
-    if content is None:
-        content = cnt % {"commit": commit_id}
+    content = cnt % {"commit": commit_id}
 
     dirname = os.path.dirname(filename)
 
@@ -66,13 +104,9 @@ def show():
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
-    backup = None
-    if os.path.exists(filename):
-        backup = open(filename, "r").read()
 
     with open(filename, "w") as f:
         f.write(content)
-    return backup
 
 
 __version__ = "2.6.1.post"
@@ -115,7 +149,8 @@ def get_package_data_files(package, data, package_dir=None):
     return all_files
 
 
-origin_version_file = write_version_py(filename="paddlenlp/version/__init__.py")
+if commit != "unknown":
+    write_version_py(filename="paddlenlp/version/__init__.py")
 
 try:
     setuptools.setup(
@@ -157,7 +192,7 @@ try:
         license="Apache 2.0",
     )
 except Exception as e:
-    write_version_py(filename="paddlenlp/version/__init__.py", content=origin_version_file)
+    git_checkout(paddlenlp_dir, "paddlenlp/version/__init__.py") if commit != "unknown" else None
     raise e
 
-write_version_py(filename="paddlenlp/version/__init__.py", content=origin_version_file)
+git_checkout(paddlenlp_dir, "paddlenlp/version/__init__.py") if commit != "unknown" else None
