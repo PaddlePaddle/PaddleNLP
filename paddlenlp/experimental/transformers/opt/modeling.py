@@ -15,28 +15,27 @@
 # limitations under the License.
 from __future__ import annotations
 
+import numpy as np
+import paddle
+import paddle.nn as nn
+from paddlenlp_ops import get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformer,
 )
-
-import numpy as np
-import paddle
-import paddle.nn as nn
-from paddlenlp.transformers.model_utils import register_base_model
-from paddlenlp.transformers.opt.configuration import OPTConfig
-from paddlenlp.transformers import OPTPretrainedModel
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
-from paddlenlp.transformers.opt.modeling import OPTLMHead,OPTEmbeddings
-from paddlenlp_ops import get_padding_offset
+from paddlenlp.transformers import OPTPretrainedModel
+from paddlenlp.transformers.model_utils import register_base_model
+from paddlenlp.transformers.opt.configuration import OPTConfig
+from paddlenlp.transformers.opt.modeling import OPTEmbeddings, OPTLMHead
 
 __all__ = ["OPTForCausalLMInferenceModel", "OPTForBlip2InferenceModel"]
 
+
 @register_base_model
 class OPTInferenceModel(OPTPretrainedModel):
-
     def __init__(self, config: OPTConfig):
         super(OPTInferenceModel, self).__init__(config)
         self.pad_token_id = config.pad_token_id
@@ -44,7 +43,7 @@ class OPTInferenceModel(OPTPretrainedModel):
         self.hidden_size = config.hidden_size
         self.vocab_size = config.vocab_size
         self.embeddings = OPTEmbeddings(config)
-        
+
         self.past_key_values_length = 0
         self.num_layers = config.num_hidden_layers
 
@@ -59,45 +58,82 @@ class OPTInferenceModel(OPTPretrainedModel):
 
         self.epsilon = 1e-5
 
-        ln_scale_attrs = [paddle.ParamAttr(name="opt.decoder.layers.{}.norm1.weight".format(i)) for i in range(config.num_hidden_layers)]
-        ln_bias_attrs = [paddle.ParamAttr(name="opt.decoder.layers.{}.norm1.bias".format(i)) for i in range(config.num_hidden_layers)]
+        ln_scale_attrs = [
+            paddle.ParamAttr(name="opt.decoder.layers.{}.norm1.weight".format(i))
+            for i in range(config.num_hidden_layers)
+        ]
+        ln_bias_attrs = [
+            paddle.ParamAttr(name="opt.decoder.layers.{}.norm1.bias".format(i))
+            for i in range(config.num_hidden_layers)
+        ]
 
-        qkv_weight_attrs = [paddle.ParamAttr(name="opt.decoder.layers.{}.qkv_weight".format(i)) for i in range(config.num_hidden_layers)]
-        qkv_bias_attrs = [paddle.ParamAttr(name="opt.decoder.layers.{}.qkv_bias".format(i)) for i in range(config.num_hidden_layers)]
+        qkv_weight_attrs = [
+            paddle.ParamAttr(name="opt.decoder.layers.{}.qkv_weight".format(i))
+            for i in range(config.num_hidden_layers)
+        ]
+        qkv_bias_attrs = [
+            paddle.ParamAttr(name="opt.decoder.layers.{}.qkv_bias".format(i)) for i in range(config.num_hidden_layers)
+        ]
 
-        out_proj_weight_attrs = [paddle.ParamAttr(name="opt.decoder.layers.{}.self_attn.out_proj.weight".format(i)) for i in range(config.num_hidden_layers)]
-        out_proj_bias_attrs = [paddle.ParamAttr(name="opt.decoder.layers.{}.self_attn.out_proj.bias".format(i)) for i in range(config.num_hidden_layers)]
+        out_proj_weight_attrs = [
+            paddle.ParamAttr(name="opt.decoder.layers.{}.self_attn.out_proj.weight".format(i))
+            for i in range(config.num_hidden_layers)
+        ]
+        out_proj_bias_attrs = [
+            paddle.ParamAttr(name="opt.decoder.layers.{}.self_attn.out_proj.bias".format(i))
+            for i in range(config.num_hidden_layers)
+        ]
 
-        ffn_ln_scale_attrs = [paddle.ParamAttr(name="opt.decoder.layers.{}.norm2.weight".format(i)) for i in range(config.num_hidden_layers)]
-        ffn_ln_bias_attrs = [paddle.ParamAttr(name="opt.decoder.layers.{}.norm2.bias".format(i)) for i in range(config.num_hidden_layers)]
+        ffn_ln_scale_attrs = [
+            paddle.ParamAttr(name="opt.decoder.layers.{}.norm2.weight".format(i))
+            for i in range(config.num_hidden_layers)
+        ]
+        ffn_ln_bias_attrs = [
+            paddle.ParamAttr(name="opt.decoder.layers.{}.norm2.bias".format(i))
+            for i in range(config.num_hidden_layers)
+        ]
 
-        ffn1_weight_attrs = [paddle.ParamAttr(name="opt.decoder.layers.{}.linear1.weight".format(i)) for i in range(config.num_hidden_layers)]
-        ffn1_bias_attrs = [paddle.ParamAttr(name="opt.decoder.layers.{}.linear1.bias".format(i)) for i in range(config.num_hidden_layers)]
-        ffn2_weight_attrs = [paddle.ParamAttr(name="opt.decoder.layers.{}.linear2.weight".format(i)) for i in range(config.num_hidden_layers)]
-        ffn2_bias_attrs = [paddle.ParamAttr(name="opt.decoder.layers.{}.linear2.bias".format(i)) for i in range(config.num_hidden_layers)]
+        ffn1_weight_attrs = [
+            paddle.ParamAttr(name="opt.decoder.layers.{}.linear1.weight".format(i))
+            for i in range(config.num_hidden_layers)
+        ]
+        ffn1_bias_attrs = [
+            paddle.ParamAttr(name="opt.decoder.layers.{}.linear1.bias".format(i))
+            for i in range(config.num_hidden_layers)
+        ]
+        ffn2_weight_attrs = [
+            paddle.ParamAttr(name="opt.decoder.layers.{}.linear2.weight".format(i))
+            for i in range(config.num_hidden_layers)
+        ]
+        ffn2_bias_attrs = [
+            paddle.ParamAttr(name="opt.decoder.layers.{}.linear2.bias".format(i))
+            for i in range(config.num_hidden_layers)
+        ]
 
-        self.transformer_block = FusedMultiTransformer(config.hidden_size,
-                                                    config.num_attention_heads,
-                                                    config.intermediate_size,
-                                                    dropout_rate=0.0,
-                                                    activation="relu",
-                                                    normalize_before=True,
-                                                    num_layers=config.num_hidden_layers,
-                                                    nranks=1,
-                                                    ring_id=-1,
-                                                    ln_scale_attrs=ln_scale_attrs,
-                                                    ln_bias_attrs = ln_bias_attrs,
-                                                    qkv_weight_attrs=qkv_weight_attrs,
-                                                    qkv_bias_attrs=qkv_bias_attrs,
-                                                    linear_weight_attrs=out_proj_weight_attrs,
-                                                    linear_bias_attrs=out_proj_bias_attrs,
-                                                    ffn_ln_scale_attrs=ffn_ln_scale_attrs,
-                                                    ffn_ln_bias_attrs=ffn_ln_bias_attrs,
-                                                    ffn1_weight_attrs=ffn1_weight_attrs,
-                                                    ffn1_bias_attrs=ffn1_bias_attrs,
-                                                    ffn2_weight_attrs=ffn2_weight_attrs,
-                                                    ffn2_bias_attrs=ffn2_bias_attrs, 
-                                                    epsilon=self.epsilon)
+        self.transformer_block = FusedMultiTransformer(
+            config.hidden_size,
+            config.num_attention_heads,
+            config.intermediate_size,
+            dropout_rate=0.0,
+            activation="relu",
+            normalize_before=True,
+            num_layers=config.num_hidden_layers,
+            nranks=1,
+            ring_id=-1,
+            ln_scale_attrs=ln_scale_attrs,
+            ln_bias_attrs=ln_bias_attrs,
+            qkv_weight_attrs=qkv_weight_attrs,
+            qkv_bias_attrs=qkv_bias_attrs,
+            linear_weight_attrs=out_proj_weight_attrs,
+            linear_bias_attrs=out_proj_bias_attrs,
+            ffn_ln_scale_attrs=ffn_ln_scale_attrs,
+            ffn_ln_bias_attrs=ffn_ln_bias_attrs,
+            ffn1_weight_attrs=ffn1_weight_attrs,
+            ffn1_bias_attrs=ffn1_bias_attrs,
+            ffn2_weight_attrs=ffn2_weight_attrs,
+            ffn2_bias_attrs=ffn2_bias_attrs,
+            epsilon=self.epsilon,
+        )
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -173,32 +209,42 @@ class OPTInferenceModel(OPTPretrainedModel):
             input_embeddings=inputs_embeds,
             past_key_values_length=past_kv_length,
         )
-        
-        # merge batch and seq_len dimension.
-        embedding_output = embedding_output.reshape([batch * seq_len, self.hidden_size])
-        
+
+        var_embedding_output = None
+        if not is_decoder:
+            # support variable seqence length embeddings
+            var_embedding_output = embedding_output[0, 0 : seq_len_encoder[0][0], :]
+            for b in range(1, batch):
+                var_embedding_output = paddle.concat(
+                    [var_embedding_output, embedding_output[b, 0 : seq_len_encoder[b][0], :]], axis=0
+                )
+        else:
+            # merge batch and seq_len dimension.
+            var_embedding_output = embedding_output.reshape([batch * seq_len, self.hidden_size])
+        embedding_output = var_embedding_output
+
         if not is_decoder:
             ids_remove_padding, padding_offset, cum_offsets = self.remove_padding(input_ids, seq_len_encoder)
         else:
             ids_remove_padding = input_ids
             padding_offset = None
             cum_offsets = None
-        
+
         seq_lens = seq_len_decoder if is_decoder else seq_len_encoder
         with paddle.base.framework._stride_in_no_check_dy2st_diff():
 
             hidden_states, _ = self.transformer_block(
-                    input_ids,
-                    embedding_output,
-                    cum_offsets=cum_offsets,
-                    padding_offset=padding_offset,
-                    attn_mask=paddle.cast(attention_mask, dtype=embedding_output.dtype),
-                    caches=cache_kvs,
-                    seq_lens=seq_lens,
-                    rotary_embs=None,
-                    rotary_emb_dims=0,
-                    time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
-                )
+                input_ids,
+                embedding_output,
+                cum_offsets=cum_offsets,
+                padding_offset=padding_offset,
+                attn_mask=paddle.cast(attention_mask, dtype=embedding_output.dtype),
+                caches=cache_kvs,
+                seq_lens=seq_lens,
+                rotary_embs=None,
+                rotary_emb_dims=0,
+                time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
+            )
 
         output = hidden_states
 
@@ -209,11 +255,15 @@ class OPTInferenceModel(OPTPretrainedModel):
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
 
-        self.embeddings.position_embeddings.weight.set_value(paddle.to_tensor(state_dict["opt.embeddings.position_embeddings.weight"]))
-        self.embeddings.word_embeddings.weight.set_value(paddle.to_tensor(state_dict["opt.embeddings.word_embeddings.weight"]))
+        self.embeddings.position_embeddings.weight.set_value(
+            paddle.to_tensor(state_dict["opt.embeddings.position_embeddings.weight"])
+        )
+        self.embeddings.word_embeddings.weight.set_value(
+            paddle.to_tensor(state_dict["opt.embeddings.word_embeddings.weight"])
+        )
         self.final_layer_norm.weight.set_value(paddle.to_tensor(state_dict["opt.decoder.final_layer_norm.weight"]))
         self.final_layer_norm.bias.set_value(paddle.to_tensor(state_dict["opt.decoder.final_layer_norm.bias"]))
-        
+
         for i in range(self.num_layers):
             ln_scale = paddle.to_tensor(state_dict["opt.decoder.layers.{}.norm1.weight".format(i)])
             ln_bias = paddle.to_tensor(state_dict["opt.decoder.layers.{}.norm1.bias".format(i)])
@@ -237,7 +287,7 @@ class OPTInferenceModel(OPTPretrainedModel):
             concated_qkv_bias = paddle.to_tensor(concated_qkv_bias)
 
             out_proj_weight = paddle.to_tensor(state_dict["opt.decoder.layers.{}.self_attn.out_proj.weight".format(i)])
-            out_proj_bias =  paddle.to_tensor(state_dict["opt.decoder.layers.{}.self_attn.out_proj.bias".format(i)])
+            out_proj_bias = paddle.to_tensor(state_dict["opt.decoder.layers.{}.self_attn.out_proj.bias".format(i)])
 
             ffn_ln_scale = paddle.to_tensor(state_dict["opt.decoder.layers.{}.norm2.weight".format(i)])
             ffn_ln_bias = paddle.to_tensor(state_dict["opt.decoder.layers.{}.norm2.bias".format(i)])
@@ -269,7 +319,6 @@ class OPTInferenceModel(OPTPretrainedModel):
 
 
 class OPTForCausalLMInferenceModel(GenerationInferenceModel, OPTPretrainedModel):
-
     def __init__(self, config: OPTConfig, **kwargs):
         super(OPTForCausalLMInferenceModel, self).__init__(config)
         self.opt = OPTInferenceModel(config)
@@ -327,7 +376,7 @@ class OPTForCausalLMInferenceModel(GenerationInferenceModel, OPTPretrainedModel)
         attention_mask = kwargs.get("attention_mask", None)
         cache = kwargs.get("cache", None)
         inputs_embeds = kwargs.get("inputs_embeds", None)
-        past_kv_length =  kwargs.get("past_kv_length")
+        past_kv_length = kwargs.get("past_kv_length")
         if cache is not None:
             input_ids = tgt_ids
             position_ids = tgt_pos
@@ -349,6 +398,7 @@ class OPTForCausalLMInferenceModel(GenerationInferenceModel, OPTPretrainedModel)
             "past_kv_length": past_kv_length,
         }
         return model_inputs
+
     def forward(
         self,
         input_ids,
@@ -387,7 +437,7 @@ class OPTForCausalLMInferenceModel(GenerationInferenceModel, OPTPretrainedModel)
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
-            past_kv_length=past_kv_length
+            past_kv_length=past_kv_length,
         )
 
         hidden_states = outputs
@@ -399,8 +449,6 @@ class OPTForCausalLMInferenceModel(GenerationInferenceModel, OPTPretrainedModel)
         if "lm_head.decoder_weight" in state_dict:
             self.lm_head.decoder_weight.set_value(state_dict["lm_head.decoder_weight"])
         self.opt.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
-
-
 
 
 class OPTForBlip2InferenceModel(OPTForCausalLMInferenceModel):
@@ -510,7 +558,3 @@ class OPTForBlip2InferenceModel(OPTForCausalLMInferenceModel):
 
         model = paddle.jit.to_static(self.generate_text_with_image_features, input_spec=input_spec)
         paddle.jit.save(model, output_path)
-
-
-
-
