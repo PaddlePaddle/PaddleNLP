@@ -28,7 +28,7 @@ def print_rank_0(*args, **kwargs):
 
 
 class BlendableDataset(paddle.io.Dataset):
-    def __init__(self, datasets, weights, size, *, data_cache_path=None):
+    def __init__(self, datasets, weights, size, share_folder, *, data_cache_path=None):
 
         self.datasets = datasets
         num_datasets = len(datasets)
@@ -73,7 +73,9 @@ class BlendableDataset(paddle.io.Dataset):
         desc += f"Weights: {weights}\n"
         desc += f"Size: {size}\n"
         self.desc = desc
+        import pdb
 
+        pdb.set_trace()
         if data_cache_path:
             desc_hash = hashlib.md5(desc.encode("utf-8")).hexdigest()
             desc_path = os.path.join(data_cache_path, desc_hash + ".dsc")
@@ -82,7 +84,11 @@ class BlendableDataset(paddle.io.Dataset):
             cache_hit = os.path.isfile(index_path) and os.path.isfile(sample_index_path)
             # cache_success = True
             # if paddle.distributed.get_rank() == 0 and not cache_hit:
-            if local_rank == 0 and not cache_hit:
+            check_rank_flag = not cache_hit and local_rank == 0
+            if share_folder:
+                check_rank_flag = not cache_hit and paddle.distributed.get_rank() == 0
+
+            if check_rank_flag:
                 print(
                     " > WARNING: could not find index map files for blendable"
                     " dataset, building indices on rank 0 ...",
@@ -114,9 +120,17 @@ class BlendableDataset(paddle.io.Dataset):
             #     print_rank_0("Data index creation unsuccessful, exiting.")
             #     exit()
 
-            if paddle.distributed.get_world_size() > 1:
-                if paddle.in_dynamic_mode():
-                    paddle.distributed.barrier()
+            else:
+                while True:
+                    if (not os.path.isfile(index_path)) or (not os.path.isfile(sample_index_path)):
+                        time.sleep(3)
+                    else:
+                        try:
+                            np.load(index_path, allow_pickle=True, mmap_mode="r")
+                            break
+                        except Exception:
+                            print("%s file is still writing or damaged, please wait for a moment." % index_path)
+                            time.sleep(3)
 
             # paddle.distributed.barrier()
             # Load on all ranks.

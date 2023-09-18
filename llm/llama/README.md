@@ -47,7 +47,7 @@ Llama2 模型的权重的使用则需要遵循[License](../../paddlenlp/transfor
 
 ## 3. 预训练
 
-预训练数据制作参考[此处](../../../model_zoo/ernie-1.0/preprocess/docs/OpenWebText2.md)
+OpenWebText2预训练数据制作参考[此处](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-1.0/preprocess/docs/OpenWebText2.md)，详细制作流程可参考[此处](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-1.0/preprocess/README.md)。
 
 为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
 ```shell

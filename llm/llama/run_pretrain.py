@@ -236,6 +236,7 @@ def create_pretrained_dataset(
         seq_length=data_args.max_seq_length,
         seed=training_args.seed,
         skip_warmup=data_args.skip_warmup,
+        share_folder=data_args.share_folder,
         data_cache_path=data_args.data_cache,
         need_data=need_data,
     )

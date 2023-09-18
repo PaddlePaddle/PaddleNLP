@@ -100,6 +100,7 @@ def build_train_valid_test_datasets(
     valid_data_prefix=None,
     test_data_prefix=None,
     return_doc_ids=False,
+    share_folder=False,
     *,
     data_cache_path=None,
     need_data=True,
@@ -116,6 +117,7 @@ def build_train_valid_test_datasets(
             seq_length,
             seed,
             skip_warmup,
+            share_folder=share_folder,
             data_cache_path=data_cache_path,
             need_data=need_data,
         )
@@ -140,6 +142,7 @@ def build_train_valid_test_datasets(
             seed,
             skip_warmup,
             return_doc_ids,
+            share_folder=share_folder,
             data_cache_path=data_cache_path,
             need_data=need_data,
         )
@@ -153,17 +156,21 @@ def build_train_valid_test_datasets(
     blending_train_dataset = None
     if train_datasets:
         blending_train_dataset = BlendableDataset(
-            train_datasets, weights, train_num_samples, data_cache_path=data_cache_path
+            train_datasets, weights, train_num_samples, share_folder, data_cache_path=data_cache_path
         )
     blending_valid_dataset = None
     if valid_datasets:
         blending_valid_dataset = BlendableDataset(
-            valid_datasets, weights, valid_num_samples, data_cache_path=data_cache_path
+            valid_datasets, weights, valid_num_samples, share_folder, data_cache_path=data_cache_path
         )
     blending_test_dataset = None
     if test_datasets:
         blending_test_dataset = BlendableDataset(
-            test_datasets, weights, test_num_samples, data_cache_path=data_cache_path
+            test_datasets,
+            weights,
+            test_num_samples,
+            share_folder,
+            data_cache_path=data_cache_path,
         )
 
     return (blending_train_dataset, blending_valid_dataset, blending_test_dataset)
@@ -178,6 +185,7 @@ def _build_train_valid_test_datasets(
     seed,
     skip_warmup,
     return_doc_ids=False,
+    share_folder=False,
     *,
     data_cache_path=None,
     need_data=True,
@@ -220,6 +228,7 @@ def _build_train_valid_test_datasets(
             seq_length,
             seed,
             return_doc_ids,
+            share_folder,
             data_cache_path=data_cache_path,
             need_data=need_data,
         )
@@ -259,6 +268,7 @@ class GPTDataset(paddle.io.Dataset):
         seq_length,
         seed,
         return_doc_ids=False,
+        share_folder=False,
         *,
         data_cache_path=None,
         need_data=True,
@@ -290,6 +300,7 @@ class GPTDataset(paddle.io.Dataset):
                 num_samples,
                 seq_length,
                 seed,
+                share_folder,
                 data_cache_path=data_cache_path,
             )
 
@@ -356,7 +367,7 @@ class GPTDataset(paddle.io.Dataset):
 
 
 def _build_index_mappings(
-    name, data_prefix, documents, sizes, splits_string, num_samples, seq_length, seed, *, data_cache_path
+    name, data_prefix, documents, sizes, splits_string, num_samples, seq_length, seed, share_folder, *, data_cache_path
 ):
     """Build doc-idx, sample-idx, and shuffle-idx.
     doc-idx: is an array (ordered) of documents to be used in training.
@@ -409,10 +420,10 @@ def _build_index_mappings(
     data_cache_dir = os.path.dirname(idx_path["desc"])
     # data_cache_success = True
     # Build the indexed mapping if not exist.
-    if data_cache_path is not None:
-        check_rank_flag = build_indices and local_rank == 0
-    else:
+    if data_cache_path is not None and share_folder:
         check_rank_flag = build_indices and paddle.distributed.get_rank() == 0
+    else:
+        check_rank_flag = build_indices and local_rank == 0
     # if build_indices and paddle.distributed.get_rank() == 0:
     if check_rank_flag:
         print_rank_0(" > WARNING: could not find index map files, building " "the indices on rank 0 ...")
