@@ -2290,6 +2290,7 @@ class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
         """
         # check if the existing index has the embedding field; if not create it
         if self.client.indices.exists(index=index_name, headers=headers):
+            # import pdb;pdb.set_trace()
             mapping = self.client.indices.get(index_name, headers=headers)[index_name]["mappings"]
             if self.search_fields:
                 for search_field in self.search_fields:
@@ -2311,7 +2312,11 @@ class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
                         f" with the type '{mapping['properties'][self.embedding_field]['type']}'. Please update the "
                         f"document_store to use a different name for the embedding_field parameter."
                     )
-                mapping["properties"][self.embedding_field] = {"type": self.vector_type, "dims": self.embedding_dim}
+                if self.index_type != "hnsw":
+                    mapping["properties"][self.embedding_field] = {
+                        "type": self.vector_type,
+                        "dims": self.embedding_dim,
+                    }
                 self.client.indices.put_mapping(index=index_name, body=mapping, headers=headers)
             return
 
@@ -2362,17 +2367,29 @@ class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
             if self.embedding_field:
                 mapping["settings"]["number_of_shards"] = 1
                 mapping["settings"]["number_of_replicas"] = 2
+                if self.index_type == "hnsw":
+                    mapping["mappings"]["properties"][self.embedding_field] = {
+                        "type": self.vector_type,
+                        "dims": self.embedding_dim,
+                        "index_type": "hnsw",
+                        "space_type": "l2",
+                        "parameters": {"ef_construction": 200, "m": 32},
+                    }
+            else:
                 mapping["mappings"]["properties"][self.embedding_field] = {
                     "type": self.vector_type,
                     "dims": self.embedding_dim,
                 }
+
             if self.index_type == "hnsw":
-                mapping["settings"]["index"] = {
-                    "codec": "bpack_knn_hnsw",
-                    "bpack.knn.hnsw.space": "cosine",
-                    "bpack.knn.hnsw.m": 16,
-                    "bpack.knn.hnsw.ef_construction": 512,
-                }
+                # mapping["settings"]["index"] = {
+                #     "codec": "bpack_knn_hnsw",
+                #     "bpack.knn.hnsw.space": "cosine",
+                #     "bpack.knn.hnsw.m": 16,
+                #     "bpack.knn.hnsw.ef_construction": 512,
+                # }
+                mapping["settings"]["index"] = {"knn": True}
+        # import pdb;pdb.set_trace()
         try:
             self.client.indices.create(index=index_name, body=mapping, headers=headers)
         except RequestError as e:
