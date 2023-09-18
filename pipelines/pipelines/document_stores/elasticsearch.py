@@ -2290,7 +2290,6 @@ class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
         """
         # check if the existing index has the embedding field; if not create it
         if self.client.indices.exists(index=index_name, headers=headers):
-            # import pdb;pdb.set_trace()
             mapping = self.client.indices.get(index_name, headers=headers)[index_name]["mappings"]
             if self.search_fields:
                 for search_field in self.search_fields:
@@ -2382,14 +2381,7 @@ class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
                 }
 
             if self.index_type == "hnsw":
-                # mapping["settings"]["index"] = {
-                #     "codec": "bpack_knn_hnsw",
-                #     "bpack.knn.hnsw.space": "cosine",
-                #     "bpack.knn.hnsw.m": 16,
-                #     "bpack.knn.hnsw.ef_construction": 512,
-                # }
                 mapping["settings"]["index"] = {"knn": True}
-        # import pdb;pdb.set_trace()
         try:
             self.client.indices.create(index=index_name, body=mapping, headers=headers)
         except RequestError as e:
