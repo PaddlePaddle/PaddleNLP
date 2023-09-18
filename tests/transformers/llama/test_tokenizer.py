@@ -28,6 +28,7 @@ VOCAB_FILES_NAMES = {
 class LlamaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = LlamaTokenizer
+    test_decode_token = True
     # from_pretrained_kwargs = {"add_prefix_space": True}
     # test_seq2seq = False
 
