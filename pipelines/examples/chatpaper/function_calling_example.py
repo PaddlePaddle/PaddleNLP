@@ -180,7 +180,7 @@ def launch_ui():
                 prediction, inputs=[chatbot], outputs=[chatbot, log]
             )
             clear.click(lambda _: ([[None, "您好, 我是维普论文小助手"]]), inputs=[clear], outputs=[chatbot])
-    demo.launch()
+    demo.launch(server_name=args.serving_name, server_port=args.serving_port, debug=True)
 
 
 if "__main__" == __name__:
