@@ -101,10 +101,8 @@ class LlamaConfig(PretrainedConfig):
             relevant if `config.is_decoder=True`.
         tie_word_embeddings(`bool`, *optional*, defaults to `False`):
             Whether to tie weight embeddings
-        rope_fusion_level(`str`, *optional*, defaults to ``):
-            The level of fusion of rope embedding. Can be chosen from:
-            (1) 'core': only fuse rope embedding, will compute the sin and cos
-            (2) None: don't fuse any part of the rope embedding
+        use_fuse_rope(`bool`, *optional*, defaults to False):
+            Enable rope fusion or not.
         num_key_value_heads (`int`, *optional*):
             This is the number of key_value heads that should be used to implement Grouped Query Attention. If
             `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
@@ -166,7 +164,7 @@ class LlamaConfig(PretrainedConfig):
         eos_token_id=2,
         tie_word_embeddings=False,
         alibi=False,
-        rope_fusion_level=None,
+        use_fuse_rope=False,
         rope_scaling_factor=1.0,
         rope_scaling_type=None,
         **kwargs,
@@ -204,7 +202,7 @@ class LlamaConfig(PretrainedConfig):
         self.eos_token_id = eos_token_id
         self.alibi = alibi
 
-        self.rope_fusion_level = rope_fusion_level
+        self.use_fuse_rope = use_fuse_rope
         self.rope_scaling_factor = rope_scaling_factor
         self.rope_scaling_type = rope_scaling_type
 
