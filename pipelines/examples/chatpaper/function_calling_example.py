@@ -118,6 +118,8 @@ def history_transform(history=[]):
 def prediction(history):
     logs = []
     query = history.pop()[0]
+    if query=='':
+        return history,"注意：问题不能为空"
     for turn_idx in range(len(history)):
         if history[turn_idx][0] is not None:
             history[turn_idx][0] = history[turn_idx][0].replace("<br>", "")
@@ -166,11 +168,14 @@ def launch_ui():
         with gr.Tab("ChatPaper"):
             with gr.Column():
                 chatbot = gr.Chatbot(value=[[None, "您好, 我是维普论文小助手"]], scale=35, height=500)
-                message = gr.Textbox(placeholder="你能帮我找一些有关机器学习和强化学习方面的论文吗", lines=5, max_lines=20)
+                message = gr.Textbox(placeholder="你能帮我找一些有关机器学习和强化学习方面的论文吗", lines=1, max_lines=20)
                 with gr.Row():
                     submit = gr.Button("🚀 提交", variant="primary", scale=1)
                     clear = gr.Button("清除", variant="primary", scale=1)
                 log = gr.Textbox(value="当前轮次日志")
+            message.submit(add_message_chatbot, inputs=[message, chatbot], outputs=[message, chatbot]).then(
+                prediction, inputs=[chatbot], outputs=[chatbot, log]
+            )
             submit.click(add_message_chatbot, inputs=[message, chatbot], outputs=[message, chatbot]).then(
                 prediction, inputs=[chatbot], outputs=[chatbot, log]
             )
