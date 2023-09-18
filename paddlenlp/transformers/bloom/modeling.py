@@ -819,6 +819,7 @@ class BloomModel(BloomPreTrainedModel):
 
         mask_shape = expanded_attn_mask.shape
         expanded_attn_mask = expanded_attn_mask.expand([mask_shape[0], num_heads, mask_shape[2], mask_shape[3]])
+        # Attention score will be cast to float32 in the following calculation, therefore we set attention_mask dtype as float32
         zero = paddle.zeros(expanded_attn_mask.shape, dtype=paddle.float32)
         neg_inf = paddle.full(expanded_attn_mask.shape, paddle.finfo(paddle.float32).min, dtype=paddle.float32)
         expanded_attn_mask = paddle.where(expanded_attn_mask, zero, neg_inf)
