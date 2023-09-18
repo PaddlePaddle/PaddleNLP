@@ -370,24 +370,17 @@ class GenerationInferenceModel(GenerationMixin):
 
             return next_tokens, model_kwargs
 
-        if paddle.max(model_kwargs["seq_len_encoder"]) > 0:
-            # encoder
-            outputs = _forward_(**model_kwargs)
-            # first decoder
-            next_tokens, model_kwargs = _post_process_(
-                outputs,
-                top_p,
-                temperature,
-                step_idx_ori,
-                model_kwargs,
-            )
-            step_idx_ori += 1
-        else:
-            outputs = None
-            # first decoder
-            next_tokens = None
-            model_kwargs["next_tokens"] = next_tokens
-            step_idx_ori += 0
+        # encoder
+        outputs = _forward_(**model_kwargs)
+        # first decoder
+        next_tokens, model_kwargs = _post_process_(
+            outputs,
+            top_p,
+            temperature,
+            step_idx_ori,
+            model_kwargs,
+        )
+        step_idx_ori += 1
 
         # gives it a value, means we will entered into decoder phase.
         model_kwargs["cache"] = 0
