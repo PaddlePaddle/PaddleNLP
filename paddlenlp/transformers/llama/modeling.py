@@ -195,13 +195,23 @@ def scaled_dot_product_attention(
         if alibi is not None:
             raise ValueError("Flash Attention does not support ALiBi yet")
 
-        attn_output, attn_weights = flash_attention(
+        # attn_output, attn_weights = flash_attention(
+        #     query_states,
+        #     key_states,
+        #     value_states,
+        #     causal=is_causal and query_states.shape[1] != 1,
+        #     return_softmax=output_attentions,
+        # )
+        # print(attention_mask.shape)
+        # print(attention_mask)
+        attn_output = F.scaled_dot_product_attention(
             query_states,
             key_states,
             value_states,
-            causal=is_causal and query_states.shape[1] != 1,
-            return_softmax=output_attentions,
+            attn_mask=attention_mask,
+            is_causal=False,
         )
+        attn_weights = None
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
@@ -1478,7 +1488,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
         outputs = self.llama(
             input_ids,  # [bs, seq_len]
             position_ids=position_ids,
