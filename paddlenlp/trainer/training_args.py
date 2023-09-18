@@ -906,7 +906,12 @@ class TrainingArguments:
 
                 if tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
-                    mp_config = set(self.tensor_parallel_config.split(" "))
+
+                    if " " in self.tensor_parallel_config:
+                        mp_config = set(self.tensor_parallel_config.split(" "))
+                    else:
+                        mp_config = set(self.tensor_parallel_config.split(","))
+
                     for x in mp_config:
                         if len(x) > 0:
                             if x not in [
@@ -1367,8 +1372,11 @@ class TrainingArguments:
             args = self
             key = "Training"
 
+        import paddlenlp
+
         logger.info("{:^40}".format("{} Configuration Arguments".format(key)))
         logger.info("{:30}: {}".format("paddle commit id", paddle.version.commit))
+        logger.info("{:30}: {}".format("paddlenlp commit id", paddlenlp.version.commit))
 
         for a in dir(args):
             if a[:2] != "__":  # don't print double underscore methods

@@ -297,11 +297,14 @@ class GenerationInferenceModel(GenerationMixin):
         step_idx_ori = paddle.full(shape=[1], dtype="int64", fill_value=1)
         batch_idx = paddle.full(shape=[1], dtype="int32", fill_value=-1)
 
+        # fake temp next_tokens
+        next_tokens = paddle.full(shape=[paddle.shape(input_ids).shape[0], 1], dtype="int32", fill_value=0)
+
         # let inputs_embeds enter into model_kwargs.
         # because the code below directly use the model_kwargs as a parameter without using inputs_embeds.
         model_kwargs["inputs_embeds"] = inputs_embeds
         model_kwargs["all_input_ids"] = input_ids
-        logits_processors = model_kwargs["logits_processors"]
+        logits_processors = model_kwargs.pop("logits_processors")
 
         def _forward_(**args):
             # cache_kvs is never empty because it is passed as a parameter in def sample.
@@ -378,7 +381,7 @@ class GenerationInferenceModel(GenerationMixin):
             model_kwargs,
         )
         step_idx_ori += 1
-        encoder_output = outputs
+
         # gives it a value, means we will entered into decoder phase.
         model_kwargs["cache"] = 0
 
@@ -402,5 +405,4 @@ class GenerationInferenceModel(GenerationMixin):
             paddle.cast(model_kwargs["stop_flags"], "int32"),
             model_kwargs["seq_len_decoder"],
             model_kwargs["tgt_pos"],
-            encoder_output,
         )
