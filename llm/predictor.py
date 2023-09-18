@@ -698,7 +698,6 @@ def create_predictor(
                 cache_kvs_shape = BloomForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
                 model.eval()
             elif "gpt" in config.architectures[0].lower():
-                # raise NotImplementedError()
                 from paddlenlp.experimental.transformers import (
                     GPTForCausalLMInferenceModel,
                 )
@@ -708,7 +707,7 @@ def create_predictor(
                 )
                 model.eval()
             else:
-                raise ValueError("the `model type` should be one of [llama, chatglm, gpt]")
+                raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt]")
             predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
         elif predictor_args.mode == "static":
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
