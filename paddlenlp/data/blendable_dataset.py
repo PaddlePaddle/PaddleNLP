@@ -73,9 +73,7 @@ class BlendableDataset(paddle.io.Dataset):
         desc += f"Weights: {weights}\n"
         desc += f"Size: {size}\n"
         self.desc = desc
-        import pdb
 
-        pdb.set_trace()
         if data_cache_path:
             desc_hash = hashlib.md5(desc.encode("utf-8")).hexdigest()
             desc_path = os.path.join(data_cache_path, desc_hash + ".dsc")
