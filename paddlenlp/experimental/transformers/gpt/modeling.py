@@ -64,11 +64,17 @@ class GPTEmbeddingsDyBatch(nn.Layer):
 
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    def forward(self, input_ids, position_ids):
+    def forward(self, input_ids, position_ids, seq_lens):
         inputs_embeddings = self.word_embeddings(input_ids)
 
-        position_ids = paddle.slice(position_ids, axes=[1], starts=[0], ends=[input_ids.shape[0]])
-        position_ids = position_ids.squeeze(0)
+        if position_ids is None:
+            position_ids = paddle.arange(input_ids.shape[0], dtype=input_ids.dtype)
+            pre_len = seq_lens[0]
+            seq_lens = seq_lens[1:]
+            for seq_len in seq_lens:
+                position_ids[pre_len:seq_len + pre_len] = position_ids[pre_len:seq_len + pre_len] - pre_len
+                pre_len += seq_len
+
         position_embeddings = self.position_embeddings(position_ids)
         embeddings = inputs_embeddings + position_embeddings
         embeddings = self.dropout(embeddings)
@@ -239,8 +245,10 @@ class GPTInferenceModel(GPTPretrainedModel):
             padding_offset = None
             cum_offsets = None
 
-        if inputs_embeds is None:
-            inputs_embeds = self.embeddings(input_ids=ids_remove_padding, position_ids=position_ids)
+        seq_lens = seq_len_decoder if is_decoder else seq_len_encoder
+        if not is_decoder:
+            position_ids = None
+        inputs_embeds = self.embeddings(input_ids=ids_remove_padding, position_ids=position_ids, seq_lens=seq_lens)
 
         if cache is None:
             cache = tuple([None] * self.num_layers)
@@ -261,8 +269,6 @@ class GPTInferenceModel(GPTPretrainedModel):
 
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
-
-        seq_lens = seq_len_decoder if is_decoder else seq_len_encoder
 
         hidden_states = inputs_embeds
 
