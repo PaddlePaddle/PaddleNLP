@@ -118,8 +118,8 @@ def history_transform(history=[]):
 def prediction(history):
     logs = []
     query = history.pop()[0]
-    if query=='':
-        return history,"注意：问题不能为空"
+    if query == "":
+        return history, "注意：问题不能为空"
     for turn_idx in range(len(history)):
         if history[turn_idx][0] is not None:
             history[turn_idx][0] = history[turn_idx][0].replace("<br>", "")
@@ -151,6 +151,7 @@ def prediction(history):
         messages.append(
             {"role": "function", "name": function_call["name"], "content": json.dumps(res, ensure_ascii=False)}
         )
+
         response = erniebot.ChatCompletion.create(model="ernie-bot-3.5", messages=messages, functions=functions)
         result = response["result"]
     history.append([query, result])
