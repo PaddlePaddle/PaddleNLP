@@ -1478,7 +1478,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         prefix_offset: int = 0,
         read_offset: int = 0,
     ) -> Tuple[str, int, int]:
-        """支持tokenizer流式解码, 如果继承的tokenizer不符合此逻辑, 可以override此函数"""
+        """tokenizer decoding for the streaming generation use case. This method can be overrided for tokenizer that doesn't follow this API"""
         # The prefix text is necessary only to defeat cleanup algorithms in the decode
         # which decide to add a space or not depending on the surrounding ids.
         prefix_text = self.decode(all_input_ids[prefix_offset:read_offset], skip_special_tokens=False)
