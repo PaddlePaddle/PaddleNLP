@@ -72,13 +72,13 @@ def convert_ndarray_dtype(np_array: np.ndarray, target_dtype: str) -> np.ndarray
     if source_dtype == "uint16" or target_dtype == "bfloat16":
         tensor = paddle.to_tensor(np_array)
         tensor = paddle.cast(tensor, target_dtype)
-        return tensor.numpy()
+        return tensor.cpu().numpy()
 
         # TODO(wj-Mcat): device_guard will slow the converting
         # with device_guard("cpu"):
         #     tensor = paddle.to_tensor(np_array)
         #     tensor = paddle.cast(tensor, target_dtype)
-        # return tensor.numpy()
+        # return tensor.cpu().numpy()
 
     if target_dtype == "bfloat16":
         target_dtype = "uint16"
@@ -141,7 +141,9 @@ def adapt_stale_fwd_patch(self, name, value):
         # NOTE(guosheng): In dygraph to static, `layer.forward` would be patched
         # by an instance of `StaticFunction`. And use string compare to avoid to
         # import fluid.
-        if type(value).__name__.endswith("StaticFunction"):
+        if type(value).__name__.endswith("StaticFunction") or self.forward.__class__.__name__.endswith(
+            "StaticFunction"
+        ):
             return value
         if hasattr(inspect, "getfullargspec"):
             (

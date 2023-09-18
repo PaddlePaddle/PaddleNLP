@@ -25,6 +25,7 @@ from tqdm import tqdm
 
 import paddlenlp.transformers as tfs
 from paddlenlp.data import indexed_dataset
+from paddlenlp.utils.log import logger
 
 try:
     import nltk
@@ -286,7 +287,14 @@ class Converter(object):
                 doc_ids.append(sentence_ids)
 
         if len(doc_ids) > 0 and self.args.append_eos:
-            doc_ids[-1].append(Converter.tokenizer.eos_token_id)
+            if Converter.tokenizer.eos_token_id is None:
+                logger.warning(
+                    "{}: eos_token_id is not set, ".format(self.args.tokenizer_name)
+                    + "please set other tokenizer "
+                    + "or config eos_token_id or unset append_eos."
+                )
+            else:
+                doc_ids[-1].append(Converter.tokenizer.eos_token_id)
 
         return doc_ids, len(text.encode("utf-8"))
 

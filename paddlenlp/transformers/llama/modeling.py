@@ -1431,6 +1431,13 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         )
         return model_inputs
 
+    def _get_model_inputs_spec(self, dtype: str):
+        return {
+            "input_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            "attention_mask": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            "position_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+        }
+
     @staticmethod
     def update_model_kwargs_for_generation(outputs, model_kwargs, is_encoder_decoder=False):
         # update cache

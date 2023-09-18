@@ -14,9 +14,9 @@
 
 model_name_or_path="facebook/llama-7b"
 dataset_name_or_path="llm_benchmark_en"
-max_length=3072
+base_batch_size=2
 learning_rate="3e-05"
-recompute="1"
+recompute="0"
 tensor_parallel_degree="8"
 lora="0"
 prefix_tuning="0"
@@ -27,4 +27,4 @@ num_train_epochs=5
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 cd ./tests
 bash ./test_tipc/dygraph/ft/benchmark_common/prepare.sh
-bash ./test_tipc/dygraph/ft/benchmark_common/run_benchmark.sh ${model_name_or_path} ${dataset_name_or_path} ${max_length} ${learning_rate} ${recompute} ${tensor_parallel_degree} ${lora} ${prefix_tuning} ${model_item} ${run_mode} ${device_num} ${num_train_epochs}
+bash ./test_tipc/dygraph/ft/benchmark_common/run_benchmark.sh ${model_name_or_path} ${dataset_name_or_path} ${base_batch_size} ${learning_rate} ${recompute} ${tensor_parallel_degree} ${lora} ${prefix_tuning} ${model_item} ${run_mode} ${device_num} ${num_train_epochs}

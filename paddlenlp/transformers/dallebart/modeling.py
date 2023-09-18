@@ -22,10 +22,10 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.common_ops_import import convert_dtype
 
+from ...generation import BeamSearchScorer
 from ...transformers import PretrainedModel, register_base_model
 from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
-from ..generation_utils import BeamSearchScorer
 from .configuration import (
     DALLEBART_PRETRAINED_INIT_CONFIGURATION,
     DALLEBART_PRETRAINED_RESOURCE_FILES_MAP,
