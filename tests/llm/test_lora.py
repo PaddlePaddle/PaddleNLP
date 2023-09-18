@@ -19,6 +19,7 @@ import sys
 import tempfile
 import unittest
 
+import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.utils.downloader import get_path_from_url
@@ -31,20 +32,22 @@ from .testing_utils import LLMTest
     ["model_dir"],
     [
         ["llama"],
+        # TODO(wj-Mcat): to enable chatglm/chatglm2 unit test
         # ["chatglm"],
         # ["chatglm2"],
         ["bloom"],
     ],
 )
-class FinetuneTest(LLMTest, unittest.TestCase):
-    config_path: str = "./tests/fixtures/llm/finetune.yaml"
+class LoraTest(LLMTest, unittest.TestCase):
+    config_path: str = "./tests/fixtures/llm/lora.yaml"
     model_dir: str = None
 
     def setUp(self) -> None:
         LLMTest.setUp(self)
 
         self.data_dir = tempfile.mkdtemp()
-        sys.path.insert(0, self.model_dir)
+        self.model_codes_dir = os.path.join(self.root_path, self.model_dir)
+        sys.path.insert(0, self.model_codes_dir)
 
         # Run pretrain
         URL = "https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz"
@@ -71,27 +74,34 @@ class FinetuneTest(LLMTest, unittest.TestCase):
     def tearDown(self) -> None:
         LLMTest.tearDown(self)
         shutil.rmtree(self.data_dir)
+        sys.path.remove(self.model_codes_dir)
 
-    def test_pretrain(self):
-        finetune_config = load_test_config(self.config_path, "finetune", self.model_dir)
+    def test_lora(self):
+        self.disable_static()
+        paddle.set_default_dtype("float32")
 
-        finetune_config["dataset_name_or_path"] = self.data_dir
-        finetune_config["output_dir"] = self.output_dir
+        lora_config = load_test_config(self.config_path, "lora", self.model_dir)
 
-        with argv_context_guard(finetune_config):
+        lora_config["dataset_name_or_path"] = self.data_dir
+        lora_config["output_dir"] = self.output_dir
+
+        with argv_context_guard(lora_config):
             from finetune_generation import main
 
             main()
 
-        self._test_inference_predictor()
-        self._test_predictor()
+        # merge weights
+        merge_lora_weights_config = {
+            "model_name_or_path": lora_config["model_name_or_path"],
+            "lora_path": lora_config["output_dir"],
+            "merge_model_path": lora_config["output_dir"],
+        }
+        with argv_context_guard(merge_lora_weights_config):
+            from merge_lora_params import merge
 
-    def _test_inference_predictor(self):
-        # TODO(wj-Mcat): OPTModel do not support inference model
-        if self.model_dir == "opt":
-            return
+            merge()
 
-        self.run_predictor({"inference_model": "true"})
+        if self.model_dir not in ["chatglm2"]:
+            self.run_predictor({"inference_model": "true"})
 
-    def _test_predictor(self):
         self.run_predictor({"inference_model": "false"})

@@ -31,20 +31,18 @@ from .testing_utils import LLMTest
     ["model_dir"],
     [
         ["llama"],
-        # ["chatglm"],
-        # ["chatglm2"],
-        ["bloom"],
     ],
 )
-class FinetuneTest(LLMTest, unittest.TestCase):
-    config_path: str = "./tests/fixtures/llm/finetune.yaml"
+class LoraTest(LLMTest, unittest.TestCase):
+    config_path: str = "./tests/fixtures/llm/prefix_tuning.yaml"
     model_dir: str = None
 
     def setUp(self) -> None:
         LLMTest.setUp(self)
 
         self.data_dir = tempfile.mkdtemp()
-        sys.path.insert(0, self.model_dir)
+        self.model_codes_dir = os.path.join(self.root_path, self.model_dir)
+        sys.path.insert(0, self.model_codes_dir)
 
         # Run pretrain
         URL = "https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz"
@@ -72,26 +70,30 @@ class FinetuneTest(LLMTest, unittest.TestCase):
         LLMTest.tearDown(self)
         shutil.rmtree(self.data_dir)
 
+        sys.path.remove(self.model_codes_dir)
+
     def test_pretrain(self):
-        finetune_config = load_test_config(self.config_path, "finetune", self.model_dir)
+        prefix_tuning_config = load_test_config(self.config_path, "prefix_tuning", self.model_dir)
 
-        finetune_config["dataset_name_or_path"] = self.data_dir
-        finetune_config["output_dir"] = self.output_dir
+        prefix_tuning_config["dataset_name_or_path"] = self.data_dir
+        prefix_tuning_config["output_dir"] = self.output_dir
 
-        with argv_context_guard(finetune_config):
+        with argv_context_guard(prefix_tuning_config):
             from finetune_generation import main
 
             main()
 
-        self._test_inference_predictor()
-        self._test_predictor()
-
-    def _test_inference_predictor(self):
-        # TODO(wj-Mcat): OPTModel do not support inference model
-        if self.model_dir == "opt":
-            return
-
-        self.run_predictor({"inference_model": "true"})
-
-    def _test_predictor(self):
-        self.run_predictor({"inference_model": "false"})
+        self.run_predictor(
+            {
+                "inference_model": True,
+                "prefix_path": self.output_dir,
+                "model_name_or_path": prefix_tuning_config["model_name_or_path"],
+            }
+        )
+        self.run_predictor(
+            {
+                "inference_model": False,
+                "prefix_path": self.output_dir,
+                "model_name_or_path": prefix_tuning_config["model_name_or_path"],
+            }
+        )

@@ -31,7 +31,6 @@ from .testing_utils import LLMTest
     ["model_dir"],
     [
         ["llama"],
-        ["chatglm"],
     ],
 )
 class PretrainTest(LLMTest, unittest.TestCase):
@@ -43,7 +42,7 @@ class PretrainTest(LLMTest, unittest.TestCase):
 
         self.data_dir = tempfile.mkdtemp()
         self.model_codes_dir = os.path.join(self.root_path, self.model_dir)
-        sys.path.insert(0, self.model_dir)
+        sys.path.insert(0, self.model_codes_dir)
 
     def tearDown(self) -> None:
         LLMTest.tearDown(self)

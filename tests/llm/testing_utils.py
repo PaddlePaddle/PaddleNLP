@@ -31,29 +31,39 @@ class LLMTest:
         self.output_dir = tempfile.mkdtemp()
         self.inference_output_dir = tempfile.mkdtemp()
         sys.path.insert(0, self.root_path)
+        self.disable_static()
+        paddle.set_default_dtype("float32")
 
     def tearDown(self) -> None:
         sys.path.remove(self.root_path)
         shutil.rmtree(self.output_dir)
         shutil.rmtree(self.inference_output_dir)
+        self.disable_static()
+
+    def disable_static(self):
+        paddle.utils.unique_name.switch()
+        paddle.disable_static()
 
     def run_predictor(self, config_params=None):
         config_params = config_params or {}
         # to avoid the same parameter
-        paddle.utils.unique_name.switch()
+        self.disable_static()
         predict_config = load_test_config(self.config_path, "inference-predict")
         predict_config["output_file"] = os.path.join(self.output_dir, "predict.json")
-        predict_config.update(config_params)
         predict_config["model_name_or_path"] = self.output_dir
+        predict_config.update(config_params)
 
         with argv_context_guard(predict_config):
             from predictor import predict
 
             predict()
 
+        # prefix_tuning dynamic graph do not support to_static
+        if not predict_config["inference_model"]:
+            return
+
         # to static
-        paddle.disable_static()
-        paddle.utils.unique_name.switch()
+        self.disable_static()
         config = load_test_config(self.config_path, "inference-to-static")
         config["output_path"] = self.inference_output_dir
         config["model_name_or_path"] = self.output_dir
@@ -64,17 +74,20 @@ class LLMTest:
             main()
 
         # inference
-        paddle.disable_static()
+        self.disable_static()
         config = load_test_config(self.config_path, "inference-infer")
         config["model_name_or_path"] = self.inference_output_dir
         config["output_file"] = os.path.join(self.inference_output_dir, "infer.json")
-        enable_compare = config.pop("enable_compare", False)
+
+        config_params.pop("model_name_or_path", None)
         config.update(config_params)
+        enable_compare = config.pop("enable_compare", False)
         with argv_context_guard(config):
             from predictor import predict
 
             predict()
 
+        self.disable_static()
         # compare result
         if enable_compare:
             predict_result = self._read_result(predict_config["output_file"])

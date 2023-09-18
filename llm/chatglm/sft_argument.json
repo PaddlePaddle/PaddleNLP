@@ -1,5 +1,5 @@
 {
-    "model_name_or_path": "THUDM/chatglm-6b",
+    "model_name_or_path": "__internal_testing__/tiny-fused-chatglm",
     "dataset_name_or_path": "./data",
     "output_dir": "./checkpoints/chatglm_sft_ckpts",
     "per_device_train_batch_size": 4,
@@ -10,6 +10,7 @@
     "learning_rate": 3e-05,
     "warmup_steps": 30,
     "logging_steps": 1,
+    "max_steps": 10,
     "evaluation_strategy": "epoch",
     "save_strategy": "epoch",
     "src_length": 1024,
@@ -24,6 +25,6 @@
     "metric_for_best_model": "accuracy",
     "recompute": true,
     "save_total_limit": 1,
-    "tensor_parallel_degree": 4,
+    "tensor_parallel_degree": 1,
     "pipeline_parallel_degree": 1
   }
