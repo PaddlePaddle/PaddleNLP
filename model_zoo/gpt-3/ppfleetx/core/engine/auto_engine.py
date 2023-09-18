@@ -195,6 +195,9 @@ class AutoEngine(BasicEngine):
                             final_loss = np.sum(outs["loss"])
                         else:
                             final_loss += np.sum(outs["loss"])
+
+                if final_loss is not None and self._accumulate_steps > 1:
+                    final_loss /= self._accumulate_steps
             else:
                 if self._pp_degree == 1 and self._accumulate_steps > 1:  # gradient merge
                     local_steps = self._accumulate_steps
@@ -209,9 +212,6 @@ class AutoEngine(BasicEngine):
                             final_loss = np.sum(outs["loss"])
                         else:
                             final_loss += np.sum(outs["loss"])
-
-            if final_loss is not None and self._accumulate_steps > 1:
-                final_loss /= self._accumulate_steps
 
             if final_loss is not None:
                 train_losses.append(final_loss)
