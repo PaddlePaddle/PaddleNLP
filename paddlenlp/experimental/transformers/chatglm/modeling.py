@@ -30,7 +30,10 @@ from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithPast,
 )
-from paddlenlp.transformers.model_utils import register_base_model
+from paddlenlp.transformers.model_utils import (
+    dy2st_nocheck_guard_context,
+    register_base_model,
+)
 
 __all__ = ["ChatGLMForCausalLMInferenceModel"]
 
@@ -294,7 +297,7 @@ class ChatGLMStackDyBatch(nn.Layer):
         new_cache = [None]
         hidden_states = self.input_layernorm(hidden_states)
 
-        with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
+        with dy2st_nocheck_guard_context():
             hidden_states, new_cache = self.transformer_block(
                 input_ids,
                 hidden_states,
