@@ -298,7 +298,7 @@ class GenerationInferenceModel(GenerationMixin):
         batch_idx = paddle.full(shape=[1], dtype="int32", fill_value=-1)
 
         # fake temp next_tokens
-        batch = input_ids.shape[0] if input_ids is not None else inputs_embeds.shape[0]
+        batch, encoder_max_seq = input_ids.shape if input_ids is not None else inputs_embeds.shape[0:2]
         next_tokens = paddle.full(shape=[batch, 1], dtype="int32", fill_value=0)
 
         # let inputs_embeds enter into model_kwargs.
@@ -306,7 +306,7 @@ class GenerationInferenceModel(GenerationMixin):
         model_kwargs["inputs_embeds"] = inputs_embeds
         model_kwargs["all_input_ids"] = input_ids
         # we need record this length for opt model's use.
-        model_kwargs["past_kv_length"] = paddle.full(shape=[batch], dtype="int32", fill_value=0)
+        model_kwargs["past_kv_length"] = paddle.zeros(shape=[1], dtype="int32")
         logits_processors = model_kwargs.pop("logits_processors")
 
         def _forward_(**args):
@@ -389,7 +389,7 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs,
             )
             step_idx_ori += 1
-            model_kwargs["past_kv_length"] = model_kwargs["seq_len_encoder"].reshape([batch])
+            model_kwargs["past_kv_length"] = encoder_max_seq
         else:
             outputs = None
             # first decoder

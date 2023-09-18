@@ -27,7 +27,10 @@ from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
 from paddlenlp.transformers import OPTPretrainedModel
-from paddlenlp.transformers.model_utils import register_base_model
+from paddlenlp.transformers.model_utils import (
+    dy2st_nocheck_guard_context,
+    register_base_model,
+)
 from paddlenlp.transformers.opt.configuration import OPTConfig
 from paddlenlp.transformers.opt.modeling import OPTEmbeddings, OPTLMHead
 
@@ -231,7 +234,7 @@ class OPTInferenceModel(OPTPretrainedModel):
             cum_offsets = None
 
         seq_lens = seq_len_decoder if is_decoder else seq_len_encoder
-        with paddle.base.framework._stride_in_no_check_dy2st_diff():
+        with dy2st_nocheck_guard_context():
 
             hidden_states, _ = self.transformer_block(
                 input_ids,
@@ -256,23 +259,21 @@ class OPTInferenceModel(OPTPretrainedModel):
     def set_state_dict(self, state_dict):
 
         self.embeddings.position_embeddings.weight.set_value(
-            paddle.to_tensor(state_dict["opt.embeddings.position_embeddings.weight"])
+            state_dict.pop("opt.embeddings.position_embeddings.weight")
         )
-        self.embeddings.word_embeddings.weight.set_value(
-            paddle.to_tensor(state_dict["opt.embeddings.word_embeddings.weight"])
-        )
-        self.final_layer_norm.weight.set_value(paddle.to_tensor(state_dict["opt.decoder.final_layer_norm.weight"]))
-        self.final_layer_norm.bias.set_value(paddle.to_tensor(state_dict["opt.decoder.final_layer_norm.bias"]))
+        self.embeddings.word_embeddings.weight.set_value(state_dict.pop("opt.embeddings.word_embeddings.weight"))
+        self.final_layer_norm.weight.set_value(state_dict.pop("opt.decoder.final_layer_norm.weight"))
+        self.final_layer_norm.bias.set_value(state_dict.pop("opt.decoder.final_layer_norm.bias"))
 
         for i in range(self.num_layers):
-            ln_scale = paddle.to_tensor(state_dict["opt.decoder.layers.{}.norm1.weight".format(i)])
-            ln_bias = paddle.to_tensor(state_dict["opt.decoder.layers.{}.norm1.bias".format(i)])
+            ln_scale = state_dict.pop("opt.decoder.layers.{}.norm1.weight".format(i))
+            ln_bias = state_dict.pop("opt.decoder.layers.{}.norm1.bias".format(i))
             ln_scale = paddle.cast(ln_scale, "float32")
             ln_bias = paddle.cast(ln_bias, "float32")
 
-            q_weight = state_dict["opt.decoder.layers.{}.self_attn.q_proj.weight".format(i)]
-            k_weight = state_dict["opt.decoder.layers.{}.self_attn.k_proj.weight".format(i)]
-            v_weight = state_dict["opt.decoder.layers.{}.self_attn.v_proj.weight".format(i)]
+            q_weight = state_dict.pop("opt.decoder.layers.{}.self_attn.q_proj.weight".format(i))
+            k_weight = state_dict.pop("opt.decoder.layers.{}.self_attn.k_proj.weight".format(i))
+            v_weight = state_dict.pop("opt.decoder.layers.{}.self_attn.v_proj.weight".format(i))
             q_bias = state_dict["opt.decoder.layers.{}.self_attn.q_proj.bias".format(i)]
             k_bias = state_dict["opt.decoder.layers.{}.self_attn.k_proj.bias".format(i)]
             v_bias = state_dict["opt.decoder.layers.{}.self_attn.v_proj.bias".format(i)]
@@ -286,18 +287,18 @@ class OPTInferenceModel(OPTPretrainedModel):
             concated_qkv_bias = concated_qkv_bias.reshape(3 * self.num_heads * self.head_size)
             concated_qkv_bias = paddle.to_tensor(concated_qkv_bias)
 
-            out_proj_weight = paddle.to_tensor(state_dict["opt.decoder.layers.{}.self_attn.out_proj.weight".format(i)])
-            out_proj_bias = paddle.to_tensor(state_dict["opt.decoder.layers.{}.self_attn.out_proj.bias".format(i)])
+            out_proj_weight = state_dict.pop("opt.decoder.layers.{}.self_attn.out_proj.weight".format(i))
+            out_proj_bias = state_dict.pop("opt.decoder.layers.{}.self_attn.out_proj.bias".format(i))
 
-            ffn_ln_scale = paddle.to_tensor(state_dict["opt.decoder.layers.{}.norm2.weight".format(i)])
-            ffn_ln_bias = paddle.to_tensor(state_dict["opt.decoder.layers.{}.norm2.bias".format(i)])
+            ffn_ln_scale = state_dict.pop("opt.decoder.layers.{}.norm2.weight".format(i))
+            ffn_ln_bias = state_dict.pop("opt.decoder.layers.{}.norm2.bias".format(i))
             ffn_ln_scale = paddle.cast(ffn_ln_scale, "float32")
             ffn_ln_bias = paddle.cast(ffn_ln_bias, "float32")
 
-            ffn1_weight = paddle.to_tensor(state_dict["opt.decoder.layers.{}.linear1.weight".format(i)])
-            ffn1_bias = paddle.to_tensor(state_dict["opt.decoder.layers.{}.linear1.bias".format(i)])
-            ffn2_weight = paddle.to_tensor(state_dict["opt.decoder.layers.{}.linear2.weight".format(i)])
-            ffn2_bias = paddle.to_tensor(state_dict["opt.decoder.layers.{}.linear2.bias".format(i)])
+            ffn1_weight = state_dict.pop("opt.decoder.layers.{}.linear1.weight".format(i))
+            ffn1_bias = state_dict.pop("opt.decoder.layers.{}.linear1.bias".format(i))
+            ffn2_weight = state_dict.pop("opt.decoder.layers.{}.linear2.weight".format(i))
+            ffn2_bias = state_dict.pop("opt.decoder.layers.{}.linear2.bias".format(i))
 
             self.transformer_block.ln_scales[i].set_value(ln_scale)
             self.transformer_block.ln_biases[i].set_value(ln_bias)
@@ -329,7 +330,7 @@ class OPTForCausalLMInferenceModel(GenerationInferenceModel, OPTPretrainedModel)
         cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
     ):
         # TODO: Support safetensors loading.
-        kwargs["use_safetensors"] = False
+        kwargs["use_safetensors"] = kwargs.get("use_safetensors", False)
         return super().from_pretrained(pretrained_model_name_or_path, from_hf_hub, subfolder, *args, **kwargs)
 
     @classmethod
