@@ -256,7 +256,7 @@ class EagerEngine(BasicEngine):
             self.profiler.start()
             logger.warning("Profiler is enabled, do not enable it in production.")
 
-        # Profiler_auto configs
+        # Profiler_pretrain configs
         self.memory_stats = configs.get("Profiler_pretrain", {}).get("memory_stats", False)
         self.nvprof_start = configs.get("Profiler_pretrain", {}).get("nvprof_start", -1)
         self.nvprof_end = configs.get("Profiler_pretrain", {}).get("nvprof_end", -1)
