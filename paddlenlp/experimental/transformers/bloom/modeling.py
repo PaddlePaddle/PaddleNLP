@@ -31,7 +31,10 @@ from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
 )
-from paddlenlp.transformers.model_utils import register_base_model
+from paddlenlp.transformers.model_utils import (
+    dy2st_nocheck_guard_context,
+    register_base_model,
+)
 
 __all__ = [
     "BloomModelInferenceModel",
@@ -191,7 +194,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
 
         hidden_states = self.word_embeddings_layernorm(inputs_embeds)
 
-        with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
+        with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
                 src=hidden_states,
                 input_ids=input_ids,

@@ -89,7 +89,7 @@ def main():
     predictor.tokenizer.save_pretrained(export_args.output_path)
     generate_rank_mapping(os.path.join(export_args.output_path, "rank_mapping.csv"))
 
-    validate_pdmodel(export_args.output_path, "model")
+    validate_pdmodel(export_args.output_path, predictor_args.model_prefix)
 
 
 if __name__ == "__main__":
