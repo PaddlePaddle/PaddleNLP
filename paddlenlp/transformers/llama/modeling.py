@@ -444,19 +444,29 @@ def rotate_half(x):
     return paddle.concat([-x2, x1], axis=-1)  # shape is the same as x
 
 
-def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
-
-    if position_ids is None:
-        # Note: Only for LlamaForCausalLMPipe model pretraining
-        cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
-        sin = sin[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+def apply_rotary_pos_emb(q, k, cos, sin, position_ids, rope_fusion_level=None):
+    if rope_fusion_level is not None and rope_fusion_level == "core":
+        q_embed, k_embed, _ = fused_rotary_position_embedding(
+            q,
+            k,
+            v=None,
+            sin=sin,
+            cos=cos,
+            position_ids=position_ids,
+            use_neox_rotary_style=False,
+        )
     else:
-        cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
-        sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
-        cos = cos[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
-        sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
-    q_embed = (q * cos) + (rotate_half(q) * sin)
-    k_embed = (k * cos) + (rotate_half(k) * sin)
+        if position_ids is None:
+            # Note: Only for LlamaForCausalLMPipe model pretraining
+            cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+            sin = sin[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
+        else:
+            cos = cos.squeeze(axis=[0, 2])  # [seq_len, dim]
+            sin = sin.squeeze(axis=[0, 2])  # [seq_len, dim]
+            cos = cos[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
+            sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, dim]
+        q_embed = (q * cos) + (rotate_half(q) * sin)
+        k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
 
 
@@ -736,23 +746,12 @@ class LlamaAttention(nn.Layer):
             kv_seq_len += past_key_value[0].shape[-3]
 
         if self.config.rope:
-            if self.rope_fusion_level is not None:
-                assert past_key_value is None, "fuse rotary not support cache kv for now"
-
-            if self.rope_fusion_level == "core":
-                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-                query_states, key_states, _ = fused_rotary_position_embedding(
-                    query_states,
-                    key_states,
-                    v=None,
-                    sin=sin,
-                    cos=cos,
-                    position_ids=position_ids,
-                    use_neox_rotary_style=False,
-                )
-            else:
-                cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-                query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+            # Not test Fused ROPE in finetune yet, which cache kv is used.
+            rope_fusion_level = None if past_key_value is not None else self.rope_fusion_level
+            cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+            query_states, key_states = apply_rotary_pos_emb(
+                query_states, key_states, cos, sin, position_ids, rope_fusion_level
+            )
 
         # [bsz, nh, t, hd]
         if past_key_value is not None:

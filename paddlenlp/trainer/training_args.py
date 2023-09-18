@@ -991,22 +991,21 @@ class TrainingArguments:
                                     f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap."
                                 )
                     try:
-                        if (
-                            "enable_stage1_tensor_fusion" in sharding_parallel_config
-                            or "enable_stage1_overlap" in sharding_parallel_config
-                        ):
-                            assert pipeline_parallel_degree == 1, (
-                                "For pipeline parallel with sharding, the sharding overlap and tensor fusion "
-                                "should be configured in pipeline_parallel_config."
+                        if pipeline_parallel_degree == 1:
+                            strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
+                                True if "enable_stage1_tensor_fusion" in sharding_parallel_config else False
                             )
-                        strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
-                            True if "enable_stage1_tensor_fusion" in sharding_parallel_config else False
-                        )
-                        if "enable_stage1_overlap" in sharding_parallel_config:
-                            strategy.hybrid_configs["sharding_configs"].comm_overlap = True
-                            strategy.hybrid_configs[
-                                "sharding_configs"
-                            ].accumulate_steps = self.gradient_accumulation_steps
+                            if "enable_stage1_overlap" in sharding_parallel_config:
+                                strategy.hybrid_configs["sharding_configs"].comm_overlap = True
+                                strategy.hybrid_configs[
+                                    "sharding_configs"
+                                ].accumulate_steps = self.gradient_accumulation_steps
+                        else:
+                            warnings.warn(
+                                "For pipeline parallel with sharding, the sharding overlap and tensor fusion "
+                                "should be configured in pipeline_parallel_config. "
+                                '"enable_stage1_tensor_fusion" and "enable_stage1_overlap" in sharding_parallel_config will be ignored.'
+                            )
                     except KeyError:
                         warnings.warn(
                             "The enable_stage1_tensor_fusion or enable_stage1_overlap is not supported "
