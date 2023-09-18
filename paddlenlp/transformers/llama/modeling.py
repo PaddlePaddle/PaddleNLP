@@ -577,7 +577,7 @@ class LlamaAttention(nn.Layer):
                     "Enable fuse rope in the config, but fuse rope is not available. "
                     "Will disable fuse rope. Try using latest gpu version of Paddle."
                 )
-                self.use_fuse_rope = None
+                self.use_fuse_rope = False
 
         if config.sequence_parallel:
             ColumnParallelLinear = ColumnSequenceParallelLinear
