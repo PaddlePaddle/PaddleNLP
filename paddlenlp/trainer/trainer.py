@@ -858,14 +858,16 @@ class Trainer:
                     )
                     optimizer_was_run = True
                     if self.do_grad_scaling:
-                        scale_before = self.scaler._scale.cpu().numpy()
+                        scale_before = paddle.assign(self.scaler._scale)
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
-                        scale_after = self.scaler._scale.cpu().numpy()
+                        scale_after = self.scaler._scale
                         optimizer_was_run = not self.scaler._cache_founf_inf
                         if not optimizer_was_run:
+                            scale_before_value = scale_before.cpu().numpy()
+                            scale_after_value = scale_after.cpu().numpy()
                             logger.warning(
-                                f"optimizer not run, scale_before: {scale_before[0]}, scale_after: {scale_after[0]}"
+                                f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
                             )
                     elif isinstance(self.optimizer, HybridParallelOptimizer):
                         self.optimizer._step(parameters_list)
