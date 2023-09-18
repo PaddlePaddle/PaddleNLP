@@ -178,7 +178,7 @@ class ModelArguments:
         default=False,
         metadata={"help": "whether to use fuse sequence parallel allreduce"},
     )
-    use_fuse_rope: Optional[bool] = field(
+    use_fused_rope: Optional[bool] = field(
         default=False,
         metadata={"help": "Enable rope fusion or not."},
     )
@@ -438,7 +438,7 @@ def main():
     config.virtual_pp_degree = model_args.virtual_pp_degree
     config.sequence_parallel = model_args.sequence_parallel
     config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
-    config.use_fuse_rope = model_args.use_fuse_rope
+    config.use_fused_rope = model_args.use_fused_rope
     config.no_recompute_layers = model_args.no_recompute_layers
     config.pp_recompute_interval = model_args.pp_recompute_interval
     config.recompute_use_reentrant = model_args.recompute_use_reentrant

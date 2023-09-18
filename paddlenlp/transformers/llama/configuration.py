@@ -101,7 +101,7 @@ class LlamaConfig(PretrainedConfig):
             relevant if `config.is_decoder=True`.
         tie_word_embeddings(`bool`, *optional*, defaults to `False`):
             Whether to tie weight embeddings
-        use_fuse_rope(`bool`, *optional*, defaults to False):
+        use_fused_rope(`bool`, *optional*, defaults to False):
             Enable rope fusion or not.
         num_key_value_heads (`int`, *optional*):
             This is the number of key_value heads that should be used to implement Grouped Query Attention. If
@@ -164,7 +164,7 @@ class LlamaConfig(PretrainedConfig):
         eos_token_id=2,
         tie_word_embeddings=False,
         alibi=False,
-        use_fuse_rope=False,
+        use_fused_rope=False,
         rope_scaling_factor=1.0,
         rope_scaling_type=None,
         **kwargs,
@@ -202,7 +202,7 @@ class LlamaConfig(PretrainedConfig):
         self.eos_token_id = eos_token_id
         self.alibi = alibi
 
-        self.use_fuse_rope = use_fuse_rope
+        self.use_fused_rope = use_fused_rope
         self.rope_scaling_factor = rope_scaling_factor
         self.rope_scaling_type = rope_scaling_type
 
