@@ -119,7 +119,7 @@ def prediction(history):
     logs = []
     query = history.pop()[0]
     if query=='':
-        return history,"问题不能为空"
+        return history,"注意：问题不能为空"
     for turn_idx in range(len(history)):
         if history[turn_idx][0] is not None:
             history[turn_idx][0] = history[turn_idx][0].replace("<br>", "")
