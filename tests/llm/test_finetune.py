@@ -31,40 +31,52 @@ from .testing_utils import LLMTest
     ["model_dir"],
     [
         ["llama"],
-        ["chatglm"],
     ],
 )
-class PretrainTest(LLMTest, unittest.TestCase):
-    config_path: str = "./tests/fixtures/llm/pretrain.yaml"
+class FinetuneTest(LLMTest, unittest.TestCase):
+    config_path: str = "./tests/fixtures/llm/finetune.yaml"
     model_dir: str = None
 
     def setUp(self) -> None:
         LLMTest.setUp(self)
 
         self.data_dir = tempfile.mkdtemp()
-        self.model_codes_dir = os.path.join(self.root_path, self.model_dir)
         sys.path.insert(0, self.model_dir)
+
+        # Run pretrain
+        URL = "https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz"
+        get_path_from_url(URL, root_dir=self.data_dir)
+        self.data_dir = os.path.join(self.data_dir, "data")
+        self.use_small_datasets()
+
+    def use_small_datasets(self):
+        # use 20 examples
+        def use_few_examples(file):
+            with open(os.path.join(self.data_dir, file), "r", encoding="utf8") as f:
+                lines = [line.strip() for line in f.readlines()]
+            with open(os.path.join(self.data_dir, file), "w+", encoding="utf8") as f:
+                f.write("\n".join(lines[:20]))
+
+        shutil.copyfile(
+            os.path.join(self.data_dir, "dev.json"),
+            os.path.join(self.data_dir, "validation.json"),
+        )
+        use_few_examples("train.json")
+        use_few_examples("dev.json")
+        use_few_examples("validation.json")
 
     def tearDown(self) -> None:
         LLMTest.tearDown(self)
-
-        sys.path.remove(self.model_codes_dir)
         shutil.rmtree(self.data_dir)
 
     def test_pretrain(self):
-        # Run pretrain
-        URL = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy"
-        URL2 = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz"
-        get_path_from_url(URL, root_dir=self.data_dir)
-        get_path_from_url(URL2, root_dir=self.data_dir)
+        finetune_config = load_test_config(self.config_path, "finetune", self.model_dir)
 
-        pretrain_config = load_test_config(self.config_path, "pretrain", self.model_dir)
+        finetune_config["dataset_name_or_path"] = self.data_dir
+        finetune_config["output_dir"] = self.output_dir
 
-        pretrain_config["input_dir"] = self.data_dir
-        pretrain_config["output_dir"] = self.output_dir
-
-        with argv_context_guard(pretrain_config):
-            from run_pretrain import main
+        with argv_context_guard(finetune_config):
+            from finetune_generation import main
 
             main()
 

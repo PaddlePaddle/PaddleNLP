@@ -300,7 +300,7 @@ def is_slow_test() -> bool:
     return os.getenv("RUN_SLOW_TEST") is not None
 
 
-def load_test_config(config_file: str, key: str) -> dict | None:
+def load_test_config(config_file: str, key: str, sub_key: str = None) -> dict | None:
     """parse config file to argv
 
     Args:
@@ -314,12 +314,26 @@ def load_test_config(config_file: str, key: str) -> dict | None:
     assert key in config, f"<{key}> should be the top key in configuration file"
     config = config[key]
 
-    sub_key = "slow" if is_slow_test() else "default"
+    mode_key = "slow" if is_slow_test() else "default"
 
-    if sub_key not in config:
+    if mode_key not in config:
         return None
 
-    config = config[sub_key]
+    # 2. load base common config
+    base_config = config.get("base", {})
+
+    config = config.get(mode_key, {})
+    config.update(base_config)
+
+    # 3. load sub key config
+    sub_config = config.get(sub_key, {})
+    config.update(sub_config)
+
+    # remove dict value
+    for key in list(config.keys()):
+        if isinstance(config[key], dict):
+            config.pop(key)
+
     return config
 
 
