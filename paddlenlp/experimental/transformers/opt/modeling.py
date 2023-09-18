@@ -227,9 +227,10 @@ class OPTInferenceModel(OPTPretrainedModel):
         embedding_output = var_embedding_output
 
         if not is_decoder:
-            ids_remove_padding, padding_offset, cum_offsets = self.remove_padding(input_ids, seq_len_encoder)
+            # ids_remove_padding
+            _, padding_offset, cum_offsets = self.remove_padding(input_ids, seq_len_encoder)
         else:
-            ids_remove_padding = input_ids
+            _ = input_ids
             padding_offset = None
             cum_offsets = None
 
