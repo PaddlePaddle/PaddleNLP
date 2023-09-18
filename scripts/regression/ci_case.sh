@@ -1080,10 +1080,11 @@ llm(){
 cd ${nlp_dir}/csrc
 echo "build paddlenlp_op"
 
-python pip install -r requirements.txt
+python -m pip install -r requirements.txt
 python setup_cuda.py install
 
 echo ' Testing all LLMs '
+cd ${nlp_dir}
 python -m pytest tests/llm/test_*.py >${log_path}/llm >>${log_path}/llm 2>&1
 print_info $? llm
 }
