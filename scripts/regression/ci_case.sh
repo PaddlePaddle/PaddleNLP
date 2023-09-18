@@ -1077,12 +1077,6 @@ python -m pytest scripts/regression/test_taskflow.py >${log_path}/taskflow >>${l
 print_info $? taskflow
 }
 llm(){
-cd ${nlp_dir}/csrc
-echo "build paddlenlp_op"
-
-python -m pip install -r requirements.txt
-python setup_cuda.py install
-
 echo ' Testing all LLMs '
 cd ${nlp_dir}
 python -m pytest tests/llm/test_*.py >${log_path}/llm >>${log_path}/llm 2>&1
