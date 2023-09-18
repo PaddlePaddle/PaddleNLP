@@ -125,6 +125,7 @@ export CUDA_VISIBLE_DEVICES=${cudaid2}
 # cd ${nlp_dir}/model_zoo/bert/
 # wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/bert.tar.gz
 # tar -xzvf bert.tar.gz
+python -c "import datasets;from datasets import load_dataset; train_dataset=load_dataset('glue', 'sst2', split='train')"
 cd ${nlp_dir}/model_zoo/bert/data/
 wget -q https://bj.bcebos.com/paddlenlp/models/transformers/bert/data/training_data.hdf5
 cd ../
@@ -1075,11 +1076,16 @@ print_info $? taskflow_unittest
 python -m pytest scripts/regression/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
 print_info $? taskflow
 }
-transformers(){
-echo ' RUN all LLMs unittest'
-export RUN_SLOW_TEST=True
-python -m pytest tests/llm/test_*.py >${nlp_dir}/unittest_logs/llm_unittest.log 2>&1
-print_info $? llm_unittest
+llm(){
+cd ${nlp_dir}/csrc
+echo "build paddlenlp_op"
+
+python pip install -r requirements.txt
+python setup_cuda.py install
+
+echo ' Testing all LLMs '
+python -m pytest tests/llm/test_*.py >${log_path}/llm >>${log_path}/llm 2>&1
+print_info $? llm
 }
 fast_generation(){
 cd ${nlp_dir}/fast_generation/samples

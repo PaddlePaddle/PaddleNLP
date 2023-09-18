@@ -444,8 +444,8 @@ def rotate_half(x):
     return paddle.concat([-x2, x1], axis=-1)  # shape is the same as x
 
 
-def apply_rotary_pos_emb(q, k, cos, sin, position_ids, rope_fusion_level=None):
-    if rope_fusion_level is not None and rope_fusion_level == "core":
+def apply_rotary_pos_emb(q, k, cos, sin, position_ids, use_fused_rope=False):
+    if use_fused_rope:
         q_embed, k_embed, _ = fused_rotary_position_embedding(
             q,
             k,
@@ -580,14 +580,14 @@ class LlamaAttention(nn.Layer):
                     ]
                 )
 
-        self.rope_fusion_level = config.rope_fusion_level
-        if self.rope_fusion_level is not None:
+        self.use_fused_rope = config.use_fused_rope
+        if self.use_fused_rope:
             if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
                     "Will disable fuse rope. Try using latest gpu version of Paddle."
                 )
-                self.rope_fusion_level = None
+                self.use_fused_rope = False
 
         if config.sequence_parallel:
             ColumnParallelLinear = ColumnSequenceParallelLinear
@@ -747,10 +747,10 @@ class LlamaAttention(nn.Layer):
 
         if self.config.rope:
             # Not test Fused ROPE in finetune yet, which cache kv is used.
-            rope_fusion_level = None if past_key_value is not None else self.rope_fusion_level
+            use_fused_rope = False if past_key_value is not None else self.use_fused_rope
             cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
             query_states, key_states = apply_rotary_pos_emb(
-                query_states, key_states, cos, sin, position_ids, rope_fusion_level
+                query_states, key_states, cos, sin, position_ids, use_fused_rope
             )
 
         # [bsz, nh, t, hd]

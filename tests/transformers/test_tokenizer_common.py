@@ -68,6 +68,7 @@ class TokenizerTesterMixin:
     # test_sentencepiece must also be set to True
     test_sentencepiece_ignore_case = False
     test_offsets = True
+    test_decode_token = False
 
     only_english_character: bool = True
 
@@ -244,6 +245,22 @@ class TokenizerTesterMixin:
             {value: batch_encode_plus_sequences[value][i] for value in batch_encode_plus_sequences.keys()}
             for i in range(len(batch_encode_plus_sequences["input_ids"]))
         ]
+
+    def test_tokenizer_decode_token(self) -> None:
+        if not self.test_decode_token:
+            return
+        tokenizer = self.get_tokenizer()
+        test_cases = ["1. 百度 2. 腾讯", "hello world! I like eating banana", "🤓😖", "🤓😖testtest"]
+        for test_case in test_cases:
+            input_ids = tokenizer(test_case)["input_ids"]
+            decoded_text = tokenizer.decode(input_ids)
+            stream_decoded_text = ""
+            offset = 0
+            token_offset = 0
+            for i in range(len(input_ids)):
+                token_text, offset, token_offset = tokenizer.decode_token(input_ids[: i + 1], offset, token_offset)
+                stream_decoded_text += token_text
+            self.assertEqual(decoded_text, stream_decoded_text)
 
     # TODO: this test can be combined with `test_sentencepiece_tokenize_and_convert_tokens_to_string` after the latter is extended to all tokenizers.
     def test_tokenize_special_tokens(self):
