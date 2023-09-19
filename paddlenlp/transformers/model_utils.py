@@ -489,7 +489,7 @@ def shard_checkpoint(
         for key, weight in state_dict.items():
             # _C_ops.numel not yet support paddle.int8
             if weight.dtype == paddle.int8:
-                weight_size = weight.shape[0] * weight.shape[1] * dtype_byte_size(weight.dtype)
+                weight_size = np.prod(weight.shape) * dtype_byte_size(weight.dtype)
             else:
                 weight_size = weight.numel().item() * dtype_byte_size(weight.dtype)
             # If this weight is going to tip up over the maximal size, we split.
@@ -758,7 +758,7 @@ def _load_state_dict_into_meta_model(
 
         # # We convert floating dtypes to the `dtype` passed. We want to keep the buffers/params
         # # in int/uint/bool and not cast them.
-        if dtype is not None and paddle.is_floating_point(param) and "quant_scale" not in param_name:
+        if dtype is not None and paddle.is_floating_point(param):
             if (
                 keep_in_fp32_modules is not None
                 and any(module_to_keep_in_fp32 in param_name for module_to_keep_in_fp32 in keep_in_fp32_modules)
@@ -1621,6 +1621,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 loaded_keys = [k for k in state_dict.keys()]
             else:
                 loaded_keys = update_loaded_state_dict_keys(loaded_keys, quantization_linear_list)
+            if keep_in_fp32_modules is None:
+                keep_in_fp32_modules = ["quant_scale"]
+            else:
+                keep_in_fp32_modules += ["quant_scale"]
 
         missing_keys = list(set(expected_keys) - set(loaded_keys))
         unexpected_keys = list(set(loaded_keys) - set(expected_keys))

@@ -269,13 +269,13 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         freeze_numel = 0
         trainable_numel = 0
         for _, weight in self.model.state_dict().items():
-            weight_size = weight.shape[0] * weight.shape[1] if weight.dtype == paddle.int8 else weight.numel().item()
+            weight_size = np.prod(weight.shape) if weight.dtype == paddle.int8 else weight.numel().item()
             if weight.stop_gradient:
                 freeze_numel += weight_size
             else:
                 trainable_numel += weight_size
         for _, weight in self.prefix_encoder.state_dict().items():
-            weight_size = weight.shape[0] * weight.shape[1] if weight.dtype == paddle.int8 else weight.numel().item()
+            weight_size = np.prod(weight.shape) if weight.dtype == paddle.int8 else weight.numel().item()
             if weight.stop_gradient:
                 freeze_numel += weight_size
             else:
