@@ -1940,7 +1940,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # refine options for config
         convert_from_torch = cls.support_conversion(config) and convert_from_torch
-
+        if dtype is None:
+            dtype = config.dtype
         if config.quantization_config is not None:
             try:
                 from ..utils.quantization import replace_with_quantization_linear
@@ -1953,11 +1954,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 logger.warning(
                     "Overriding dtype='float16' due to quantization method required DataTypes: float16, bfloat16. Pass your own dtype to remove this warning"
                 )
-
-        if dtype is None:
-            dtype = config.dtype
-        else:
-            config.dtype = dtype
+        config.dtype = dtype
 
         init_contexts = []
         if low_cpu_mem_usage or config.quantization_config is not None:
