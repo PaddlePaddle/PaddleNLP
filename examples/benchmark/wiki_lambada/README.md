@@ -1,4 +1,15 @@
 
+## 数据准备
+```
+wget https://paddlenlp.bj.bcebos.com/data/benchmark/lambada_test.jsonl
+```
+```
+wget https://paddlenlp.bj.bcebos.com/data/benchmark/wikitext-103.tar.gz
+```
+```
+wget https://paddlenlp.bj.bcebos.com/data/benchmark/wikitext-2.tar.gz
+```
+
 
 ## 运行预测脚本
 
