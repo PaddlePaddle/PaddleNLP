@@ -817,7 +817,7 @@ class BloomModel(BloomPreTrainedModel):
         return self.word_embeddings
 
     def _prepare_attn_mask(
-        self, attention_mask: Tensor, input_shape: Tuple[int, int], past_key_values_length: int, num_heads: int, dtype
+        self, attention_mask: Tensor, input_shape: Tuple[int, int], past_key_values_length: int, num_heads: int
     ) -> Tensor:
         # create causal mask
         # [batch_size, seq_length] -> [batch_size, 1, tgt_length, src_length]
@@ -841,8 +841,9 @@ class BloomModel(BloomPreTrainedModel):
 
         mask_shape = expanded_attn_mask.shape
         expanded_attn_mask = expanded_attn_mask.expand([mask_shape[0], num_heads, mask_shape[2], mask_shape[3]])
-        zero = paddle.zeros(expanded_attn_mask.shape, dtype=dtype)
-        neg_inf = paddle.full(expanded_attn_mask.shape, paddle.finfo(dtype).min, dtype=dtype)
+        # Attention score will be cast to float32 in the following calculation, therefore we set attention_mask dtype as float32
+        zero = paddle.zeros(expanded_attn_mask.shape, dtype=paddle.float32)
+        neg_inf = paddle.full(expanded_attn_mask.shape, paddle.finfo(paddle.float32).min, dtype=paddle.float32)
         expanded_attn_mask = paddle.where(expanded_attn_mask, zero, neg_inf)
         batch_size, num_heads, sq_len, kv_len = expanded_attn_mask.shape
         return expanded_attn_mask.reshape([batch_size * num_heads, sq_len, kv_len])
@@ -951,7 +952,6 @@ class BloomModel(BloomPreTrainedModel):
                 input_shape=(batch_size, seq_length),
                 past_key_values_length=past_key_values_length,
                 num_heads=block_size,
-                dtype=hidden_states.dtype,
             )
         else:
             alibi = alibi.reshape([batch_size * self.config.n_head, 1, seq_length_with_past])
@@ -960,7 +960,6 @@ class BloomModel(BloomPreTrainedModel):
                 input_shape=(batch_size, seq_length),
                 past_key_values_length=past_key_values_length,
                 num_heads=self.config.n_head,
-                dtype=hidden_states.dtype,
             )
 
         for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
@@ -1110,7 +1109,7 @@ class BloomForCausalLM(BloomPreTrainedModel):
         self.lm_head = BloomLMHead(config, self.bloom.word_embeddings.weight)
         self.criterion = BloomPretrainingCriterion(
             tensor_parallel_degree=config.tensor_parallel_degree,
-            tensor_parallel_output=True,
+            tensor_parallel_output=config.tensor_parallel_output,
         )
 
     def get_output_embeddings(self):

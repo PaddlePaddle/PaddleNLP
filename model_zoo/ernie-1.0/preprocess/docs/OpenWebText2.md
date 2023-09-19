@@ -19,7 +19,7 @@ tar -xvf openwebtext2.json.zst.tar -C  /path/to/openwebtext
 
 ## Llama训练数据制作
 
-然后使用[proprecess](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-1.0/proprecess) 工具下的`create_pretraining_data.py`脚本进行数据集制作：
+然后使用[preprocess](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-1.0/preprocess) 工具下的`create_pretraining_data.py`脚本进行数据集制作：
 ```
 python -u  create_pretraining_data.py \
     --model_name meta-llama/Llama-2-7b \
