@@ -25,6 +25,10 @@
 | baichuan-inc/Baichuan-7B          |
 | baichuan-inc/Baichuan-13B-Base    |
 | baichuan-inc/Baichuan-13B-Chat    |
+| baichuan-inc/Baichuan2-7B-Base    |
+| baichuan-inc/Baichuan2-7B-Chat    |
+| baichuan-inc/Baichuan2-13B-Base   |
+| baichuan-inc/Baichuan2-13B-Chat   |
 | FlagAlpha/Llama2-Chinese-7b-Chat  |
 | FlagAlpha/Llama2-Chinese-13b-Chat |
 
