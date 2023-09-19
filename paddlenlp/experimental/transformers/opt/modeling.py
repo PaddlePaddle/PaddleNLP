@@ -47,7 +47,6 @@ class OPTInferenceModel(OPTPretrainedModel):
         self.vocab_size = config.vocab_size
         self.embeddings = OPTEmbeddings(config)
 
-        self.past_key_values_length = 0
         self.num_layers = config.num_hidden_layers
 
         if config.normalize_before:
