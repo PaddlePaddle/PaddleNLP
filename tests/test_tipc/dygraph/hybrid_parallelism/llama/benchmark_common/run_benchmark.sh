@@ -126,7 +126,7 @@ function _train(){
     --continue_training 0 \
     --do_train \
     --device gpu \
-    --rope_fusion_level core \
+    --use_fused_rope true \
     --enable_linear_fused_grad_add true \
     --fuse_attention_qkv true \
     --fuse_attention_ffn true \
