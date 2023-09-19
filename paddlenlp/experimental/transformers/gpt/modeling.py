@@ -30,7 +30,10 @@ from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
 )
-from paddlenlp.transformers.model_utils import register_base_model
+from paddlenlp.transformers.model_utils import (
+    dy2st_nocheck_guard_context,
+    register_base_model,
+)
 
 __all__ = ["GPTInferenceModel", "GPTForCausalLMInferenceModel"]
 
@@ -68,22 +71,46 @@ class GPTInferenceModel(GPTPretrainedModel):
         except:
             pass
 
-        ln_scale_attrs = [paddle.ParamAttr(name="fusemt.{}.ln_scale".format(i)) for i in range(self.num_layers)]
-        ln_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ln_bias".format(i)) for i in range(self.num_layers)]
-        qkv_weight_attrs = [paddle.ParamAttr(name="fusemt.{}.qkv_weight".format(i)) for i in range(self.num_layers)]
-        qkv_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.qkv_bias".format(i)) for i in range(self.num_layers)]
+        ln_scale_attrs = [
+            paddle.ParamAttr(name="gpt.decoder.layers.{}.norm1.weight".format(i)) for i in range(self.num_layers)
+        ]
+        ln_bias_attrs = [
+            paddle.ParamAttr(name="gpt.decoder.layers.{}.norm1.bias".format(i)) for i in range(self.num_layers)
+        ]
+        qkv_weight_attrs = [
+            paddle.ParamAttr(name="gpt.decoder.layers.{}.self_attn.qkv_proj.weight".format(i))
+            for i in range(self.num_layers)
+        ]
+        qkv_bias_attrs = [
+            paddle.ParamAttr(name="gpt.decoder.layers.{}.self_attn.qkv_proj.bias".format(i))
+            for i in range(self.num_layers)
+        ]
         linear_weight_attrs = [
-            paddle.ParamAttr(name="fusemt.{}.linear_weight".format(i)) for i in range(self.num_layers)
+            paddle.ParamAttr(name="gpt.decoder.layers.{}.self_attn.out_proj.weight".format(i))
+            for i in range(self.num_layers)
         ]
-        linear_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.linear_bias".format(i)) for i in range(self.num_layers)]
+        linear_bias_attrs = [
+            paddle.ParamAttr(name="gpt.decoder.layers.{}.self_attn.out_proj.bias".format(i))
+            for i in range(self.num_layers)
+        ]
         ffn_ln_scale_attrs = [
-            paddle.ParamAttr(name="fusemt.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
+            paddle.ParamAttr(name="gpt.decoder.layers.{}.norm2.weight".format(i)) for i in range(self.num_layers)
         ]
-        ffn_ln_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn_ln_bias".format(i)) for i in range(self.num_layers)]
-        ffn1_weight_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn1_weight".format(i)) for i in range(self.num_layers)]
-        ffn1_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn1_bias".format(i)) for i in range(self.num_layers)]
-        ffn2_weight_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn2_weight".format(i)) for i in range(self.num_layers)]
-        ffn2_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn2_bias".format(i)) for i in range(self.num_layers)]
+        ffn_ln_bias_attrs = [
+            paddle.ParamAttr(name="gpt.decoder.layers.{}.norm2.bias".format(i)) for i in range(self.num_layers)
+        ]
+        ffn1_weight_attrs = [
+            paddle.ParamAttr(name="gpt.decoder.layers.{}.linear1.weight".format(i)) for i in range(self.num_layers)
+        ]
+        ffn1_bias_attrs = [
+            paddle.ParamAttr(name="gpt.decoder.layers.{}.linear1.bias".format(i)) for i in range(self.num_layers)
+        ]
+        ffn2_weight_attrs = [
+            paddle.ParamAttr(name="gpt.decoder.layers.{}.linear2.weight".format(i)) for i in range(self.num_layers)
+        ]
+        ffn2_bias_attrs = [
+            paddle.ParamAttr(name="gpt.decoder.layers.{}.linear2.bias".format(i)) for i in range(self.num_layers)
+        ]
         self.transformer_block = FusedMultiTransformer(
             config.hidden_size,
             config.num_attention_heads,
@@ -171,7 +198,7 @@ class GPTInferenceModel(GPTPretrainedModel):
 
         hidden_states = inputs_embeds
 
-        with paddle.base.framework._stride_in_no_check_dy2st_diff():
+        with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
                 input_ids,
                 hidden_states,
