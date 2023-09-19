@@ -357,6 +357,7 @@ class InferencePredictorMixin:
                 self.architectures,
                 top_p=self.config.top_p,
                 temperature=self.config.temperature,
+                benchmark=self.config.benchmark,
             )
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
@@ -375,6 +376,7 @@ class InferencePredictorMixin:
                 self.architectures,
                 top_p=self.config.top_p,
                 temperature=self.config.temperature,
+                benchmark=self.config.benchmark,
             )
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
@@ -439,6 +441,7 @@ class InferencePredictorMixin:
                 top_p=self.config.top_p,
                 temperature=self.config.temperature,
                 pre_caches_length=pre_caches_length,
+                benchmark=self.config.benchmark,
             )
 
             for i in range(inputs["input_ids"].shape[0]):
@@ -703,7 +706,9 @@ def create_predictor(
                 )
 
                 model = GPTForCausalLMInferenceModel.from_pretrained(
-                    predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype,
+                    predictor_args.model_name_or_path,
+                    config=config,
+                    dtype=predictor_args.dtype,
                 )
                 model.eval()
             else:
@@ -722,7 +727,9 @@ def create_predictor(
                     ChatGLMForCausalLMInferenceModel,
                 )
 
-                cache_kvs_shape = ChatGLMForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
+                cache_kvs_shape = ChatGLMForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size
+                )
             elif "bloom" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     BloomForCausalLMInferenceModel,
