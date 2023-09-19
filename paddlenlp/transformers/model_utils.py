@@ -1613,7 +1613,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     update_loaded_state_dict_keys,
                 )
             except ImportError:
-                raise ImportError("You need to install paddlepaddle >= 2.5.2")
+                raise ImportError("Quantization features require `paddlepaddle >= 2.5.2`")
             if state_dict is not None:
                 state_dict = convert_to_quantize_state_dict(
                     state_dict, quantization_linear_list, config.quantization_config["quant_algo"], dtype
