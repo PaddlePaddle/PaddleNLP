@@ -1472,6 +1472,28 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         else:
             return text
 
+    def decode_token(
+        self,
+        all_input_ids: List[int],
+        prefix_offset: int = 0,
+        read_offset: int = 0,
+    ) -> Tuple[str, int, int]:
+        """tokenizer decoding for the streaming generation use case. This method can be overrided for tokenizer that doesn't follow this API"""
+        # The prefix text is necessary only to defeat cleanup algorithms in the decode
+        # which decide to add a space or not depending on the surrounding ids.
+        prefix_text = self.decode(all_input_ids[prefix_offset:read_offset], skip_special_tokens=False)
+        new_text = self.decode(all_input_ids[prefix_offset:], skip_special_tokens=False)
+
+        if len(new_text) > len(prefix_text) and not new_text.endswith("�"):
+            # utf-8 char at the end means it's a potential unfinished byte sequence
+            # from byte fallback tokenization.
+            # If it's in the middle, it's probably a real invalid id generated
+            # by the model
+            new_text = new_text[len(prefix_text) :]
+            return new_text, read_offset, len(all_input_ids)
+        else:
+            return "", prefix_offset, read_offset
+
 
 class BPETokenizer(PretrainedTokenizer):
     """
