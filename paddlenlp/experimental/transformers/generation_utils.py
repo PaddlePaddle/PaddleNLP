@@ -111,7 +111,9 @@ class GenerationInferenceModel(GenerationMixin):
             precache_input_spec,
         ]
         if self.config["model_type"] and "chatglm" in self.config.model_type:
-            input_spec[2] = paddle.static.InputSpec(shape=[None, None, None], dtype="int64", name="position_ids")  # position_ids
+            input_spec[2] = paddle.static.InputSpec(
+                shape=[None, None, None], dtype="int64", name="position_ids"
+            )  # position_ids
             input_spec[16] = paddle.static.InputSpec(shape=[None, 2, 1], dtype="int64", name="tgt_pos")  # tgt_pos
         elif self.config["model_type"] and "gpt" in self.config.model_type:
             input_spec[2] = paddle.static.InputSpec(shape=[None], dtype="int64", name="position_ids")  # position_ids

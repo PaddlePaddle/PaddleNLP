@@ -54,6 +54,7 @@ class GPTInferenceModel(GPTPretrainedModel):
         self.hidden_size = config.hidden_size
         self.num_attention_heads = config.num_attention_heads
         self.num_layers = config.num_hidden_layers
+
         self.max_position_embeddings = config.max_position_embeddings
 
         self.embeddings = GPTEmbeddings(config)
@@ -74,27 +75,15 @@ class GPTInferenceModel(GPTPretrainedModel):
         linear_weight_attrs = [
             paddle.ParamAttr(name="fusemt.{}.linear_weight".format(i)) for i in range(self.num_layers)
         ]
-        linear_bias_attrs = [
-            paddle.ParamAttr(name="fusemt.{}.linear_bias".format(i)) for i in range(self.num_layers)
-        ]
+        linear_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.linear_bias".format(i)) for i in range(self.num_layers)]
         ffn_ln_scale_attrs = [
             paddle.ParamAttr(name="fusemt.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
         ]
-        ffn_ln_bias_attrs = [
-            paddle.ParamAttr(name="fusemt.{}.ffn_ln_bias".format(i)) for i in range(self.num_layers)
-        ]
-        ffn1_weight_attrs = [
-            paddle.ParamAttr(name="fusemt.{}.ffn1_weight".format(i)) for i in range(self.num_layers)
-        ]
-        ffn1_bias_attrs = [
-            paddle.ParamAttr(name="fusemt.{}.ffn1_bias".format(i)) for i in range(self.num_layers)
-        ]
-        ffn2_weight_attrs = [
-            paddle.ParamAttr(name="fusemt.{}.ffn2_weight".format(i)) for i in range(self.num_layers)
-        ]
-        ffn2_bias_attrs = [
-            paddle.ParamAttr(name="fusemt.{}.ffn2_bias".format(i)) for i in range(self.num_layers)
-        ]
+        ffn_ln_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn_ln_bias".format(i)) for i in range(self.num_layers)]
+        ffn1_weight_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn1_weight".format(i)) for i in range(self.num_layers)]
+        ffn1_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn1_bias".format(i)) for i in range(self.num_layers)]
+        ffn2_weight_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn2_weight".format(i)) for i in range(self.num_layers)]
+        ffn2_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.ffn2_bias".format(i)) for i in range(self.num_layers)]
         self.transformer_block = FusedMultiTransformer(
             config.hidden_size,
             config.num_attention_heads,
@@ -119,7 +108,6 @@ class GPTInferenceModel(GPTPretrainedModel):
             norm_type="layernorm",
         )
         self.norm = nn.LayerNorm(config.hidden_size, epsilon=1e-5)
-
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -155,19 +143,11 @@ class GPTInferenceModel(GPTPretrainedModel):
         cache = kwargs.get("cache", cache)
         is_decoder = cache is not None
 
-        output_attentions = (
-            output_attentions
-            if output_attentions is not None
-            else self.config.output_attentions
-        )
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
-            output_hidden_states
-            if output_hidden_states is not None
-            else self.config.output_hidden_states
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
-        return_dict = (
-            return_dict if return_dict is not None else self.config.use_return_dict
-        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
@@ -202,7 +182,7 @@ class GPTInferenceModel(GPTPretrainedModel):
                 seq_lens=seq_lens,
                 time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
             )
-        
+
         hidden_states = self.norm(hidden_states)
 
         if output_hidden_states:
@@ -218,7 +198,6 @@ class GPTInferenceModel(GPTPretrainedModel):
             attentions=all_self_attns,
             cross_attentions=None,
         )
-
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
@@ -256,8 +235,12 @@ class GPTInferenceModel(GPTPretrainedModel):
                         .transpose([2, 1, 3, 0])
                         .reshape(
                             [
-                                self.num_attention_heads // self.config.tensor_parallel_degree * 3 * self.hidden_size // self.num_attention_heads,
-                                self.hidden_size
+                                self.num_attention_heads
+                                // self.config.tensor_parallel_degree
+                                * 3
+                                * self.hidden_size
+                                // self.num_attention_heads,
+                                self.hidden_size,
                             ]
                         )
                         .astype(dtype)
@@ -274,7 +257,11 @@ class GPTInferenceModel(GPTPretrainedModel):
                         .transpose([1, 0, 2])
                         .reshape(
                             [
-                                self.num_attention_heads // self.config.tensor_parallel_degree * 3 * self.hidden_size // self.num_attention_heads
+                                self.num_attention_heads
+                                // self.config.tensor_parallel_degree
+                                * 3
+                                * self.hidden_size
+                                // self.num_attention_heads
                             ]
                         )
                         .astype(dtype)
@@ -428,9 +415,11 @@ class GPTForCausalLMInferenceModel(GenerationInferenceModel, GPTPretrainedModel)
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        
+
         hidden_states = outputs[0]
-        logits = parallel_matmul(hidden_states, self.gpt.embeddings.word_embeddings.weight, tensor_parallel_output=False)
+        logits = parallel_matmul(
+            hidden_states, self.gpt.embeddings.word_embeddings.weight, tensor_parallel_output=False
+        )
 
         if not return_dict:
             return (logits, outputs[1:])
@@ -442,7 +431,6 @@ class GPTForCausalLMInferenceModel(GenerationInferenceModel, GPTPretrainedModel)
             attentions=outputs.attentions,
             cross_attentions=outputs.cross_attentions,
         )
-
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
