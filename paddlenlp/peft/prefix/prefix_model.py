@@ -266,8 +266,8 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         self.prefix_encoder.eval()
 
     def print_trainable_parameters(self) -> None:
-        freeze_numel = 0
         trainable_numel = 0
+        freeze_numel = 0
         for _, weight in self.model.state_dict().items():
             weight_size = np.prod(weight.shape) if weight.dtype == paddle.int8 else weight.numel().item()
             if weight.stop_gradient:
