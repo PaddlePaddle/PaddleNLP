@@ -1240,8 +1240,12 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
         """
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
-            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
-            loss = paddle.mean(masked_lm_loss)
+            # skip ignore_index which loss == 0
+            if loss_mask is None:
+                loss_mask = (masked_lm_loss > 0).astype("float32")
+                loss_mask = loss_mask.reshape([-1])
+            masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
+            loss = masked_lm_loss / loss_mask.sum()
         return loss
 
 
