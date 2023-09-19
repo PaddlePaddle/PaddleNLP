@@ -154,8 +154,7 @@ def prediction(history):
         messages.append(
             {"role": "function", "name": function_call["name"], "content": json.dumps(res, ensure_ascii=False)}
         )
-
-        response = erniebot.ChatCompletion.create(model="ernie-bot-3.5", messages=messages, functions=functions)
+        response = erniebot.ChatCompletion.create(model="ernie-bot-3.5", messages=messages)
         result = response["result"]
     history.append([query, result])
     return history, "\n".join(logs)
