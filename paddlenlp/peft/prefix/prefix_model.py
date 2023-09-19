@@ -303,7 +303,7 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
 
         return prefix_model
 
-    def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
+    def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = True, **kwargs):
         variant = kwargs.get("variant", None)
         is_main_process = kwargs.get("is_main_process", paddle.distributed.get_rank() == 0)
 
@@ -349,8 +349,12 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
         # save prefix config & past key values
         if is_main_process:
             self.prefix_config.save_pretrained(save_directory)
-            self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
             np.save(os.path.join(save_directory, PAST_KEY_VALUES_FILE_NAME), past_key_values)
+
+        if self.model.base_model_prefix == "chatglm2":
+            self.prefix_config.tensor_parallel_degree = -1
+        else:
+            self.prefix_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
 
     def set_state_dict(self, state_dict):
         self.prefix_encoder.set_state_dict(state_dict)

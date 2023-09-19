@@ -409,23 +409,33 @@ class Trainer:
             else:
                 weight_name = PADDLE_WEIGHTS_NAME
 
-            if not os.path.isfile(
-                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix))
-            ):
-                raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
+            if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
+                if (isinstance(self.model, LoRAModel) and self.model.lora_config.tensor_parallel_degree > 1) or (
+                    isinstance(self.model, PrefixModelForCausalLM)
+                    and self.model.prefix_config.tensor_parallel_degree > 1
+                ):
+                    file_path = os.path.join(resume_from_checkpoint, weight_name)
+                    state_dict = paddle.load(file_path, return_numpy=True)
+                    state_dict = self.model._convert_tensor_parallel(state_dict)
+                else:
+                    file_path = os.path.join(
+                        resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
+                    )
+                    if not os.path.isfile(file_path):
+                        raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}, no {file_path}")
 
-            logger.info(f"Loading model from {resume_from_checkpoint} .")
+                    logger.info(f"Loading model from {resume_from_checkpoint} .")
 
-            # We load the model state dict on the CPU to avoid an OOM error.
-            state_dict = paddle.load(
-                os.path.join(resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)),
-                return_numpy=True,
-            )
-            # If the model is on the GPU, it still works!
-            self._set_state_dict_in_model(state_dict)
+                    # We load the model state dict on the CPU to avoid an OOM error.
+                    state_dict = paddle.load(file_path, return_numpy=True)
 
-            # release memory
-            del state_dict
+                # If the model is on the GPU, it still works!
+                self._set_state_dict_in_model(state_dict)
+
+                # release memory
+                del state_dict
+            elif resume_from_checkpoint is not None:
+                logger.info(f"not loading ckpt :{self.args.dataset_rank}")
 
     def train(
         self,
@@ -1795,11 +1805,14 @@ class Trainer:
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
 
-        if (
-            not isinstance(self.model, PretrainedModel)
-            and not isinstance(self.model, LoRAModel)
-            and not isinstance(self.model, PrefixModelForCausalLM)
-        ):
+        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+            self.model.save_pretrained(
+                output_dir,
+                variant=self.args.weight_name_suffix,
+                merge_tensor_parallel=True,
+                is_main_process=self.args.should_save,
+            )
+        elif not isinstance(self.model, PretrainedModel):
             if isinstance(unwrap_model(self.model), PretrainedModel):
                 unwrap_model(self.model).save_pretrained(
                     output_dir,
