@@ -394,14 +394,15 @@ class AutoEngine(BasicEngine):
                 )
             else:
                 valid_data_loader = self._auto_engine.dataloader_from_generator(
-                dataset=valid_dataset,
-                batch_size=self._global_batch_size,
-                steps_per_epoch=self._max_steps,
-                epochs=self._num_train_epochs,
-                collate_fn=valid_dataset.collate_fn,
-                sample_split=valid_dataset.sample_split,
-                mode="eval",
-            )
+                    dataset=valid_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=valid_dataset.collate_fn,
+                    num_workers=1,
+                    sample_split=valid_dataset.sample_split,
+                    mode="eval",
+                )
 
         for epoch_index in range(epoch):
             eval_epoch_start = get_timestamp()
@@ -465,14 +466,15 @@ class AutoEngine(BasicEngine):
                 )
             else:
                 test_data_loader = self._auto_engine.dataloader_from_generator(
-                dataset=test_dataset,
-                batch_size=self._global_batch_size,
-                steps_per_epoch=self._max_steps,
-                epochs=self._num_train_epochs,
-                collate_fn=test_dataset.collate_fn,
-                sample_split=test_dataset.sample_split,
-                mode="predict",
-            )
+                    dataset=test_dataset,
+                    batch_size=self._global_batch_size,
+                    steps_per_epoch=self._max_steps,
+                    epochs=self._num_train_epochs,
+                    collate_fn=test_dataset.collate_fn,
+                    num_workers=1,
+                    sample_split=test_dataset.sample_split,
+                    mode="predict",
+                )
 
         test_start = get_timestamp()
         test_losses = []
