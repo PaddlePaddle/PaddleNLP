@@ -10,7 +10,6 @@ wget https://paddlenlp.bj.bcebos.com/data/benchmark/wikitext-103.tar.gz
 wget https://paddlenlp.bj.bcebos.com/data/benchmark/wikitext-2.tar.gz
 ```
 
-
 ## 运行预测脚本
 
 验证Lambada数据集，运行以下脚本：
