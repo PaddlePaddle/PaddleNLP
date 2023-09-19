@@ -184,8 +184,12 @@ if is_paddle_available():
     class RegressionModel(nn.Layer):
         def __init__(self, a=0, b=0, double_output=False):
             super().__init__()
-            self.a = paddle.create_parameter(shape=[1], dtype=paddle.float32).set_value(paddle.to_tensor(a))
-            self.b = paddle.create_parameter(shape=[1], dtype=paddle.float32).set_value(paddle.to_tensor(b))
+            self.a = paddle.create_parameter(shape=[], dtype=paddle.float32).set_value(
+                paddle.to_tensor(a, paddle.float32)
+            )
+            self.b = paddle.create_parameter(shape=[], dtype=paddle.float32).set_value(
+                paddle.to_tensor(b, paddle.float32)
+            )
             self.double_output = double_output
             self.config = None
 
@@ -199,8 +203,12 @@ if is_paddle_available():
     class RegressionDictModel(nn.Layer):
         def __init__(self, a=0, b=0):
             super().__init__()
-            self.a = paddle.create_parameter(shape=[1], dtype=paddle.float32).set_value(paddle.to_tensor(a))
-            self.b = paddle.create_parameter(shape=[1], dtype=paddle.float32).set_value(paddle.to_tensor(b))
+            self.a = paddle.create_parameter(shape=[], dtype=paddle.float32).set_value(
+                paddle.to_tensor(a, paddle.float32)
+            )
+            self.b = paddle.create_parameter(shape=[], dtype=paddle.float32).set_value(
+                paddle.to_tensor(b, paddle.float32)
+            )
             self.config = None
 
         def forward(self, input_x, labels=None, **kwargs):
@@ -216,8 +224,12 @@ if is_paddle_available():
 
         def __init__(self, config):
             super().__init__(config)
-            self.a = paddle.create_parameter(shape=[1], dtype=paddle.float32).set_value(paddle.to_tensor(config.a))
-            self.b = paddle.create_parameter(shape=[1], dtype=paddle.float32).set_value(paddle.to_tensor(config.b))
+            self.a = paddle.create_parameter(shape=[], dtype=paddle.float32).set_value(
+                paddle.to_tensor(config.a, paddle.float32)
+            )
+            self.b = paddle.create_parameter(shape=[], dtype=paddle.float32).set_value(
+                paddle.to_tensor(config.b, paddle.float32)
+            )
             self.double_output = config.double_output
 
         def forward(self, input_x, labels=None, **kwargs):
@@ -233,8 +245,12 @@ if is_paddle_available():
 
         def __init__(self, config):
             super().__init__(config)
-            self.a = paddle.create_parameter(shape=[1], dtype=paddle.float32).set_value(paddle.to_tensor(config.a))
-            self.b = paddle.create_parameter(shape=[1], dtype=paddle.float32).set_value(paddle.to_tensor(config.b))
+            self.a = paddle.create_parameter(shape=[], dtype=paddle.float32).set_value(
+                paddle.to_tensor(config.a, paddle.float32)
+            )
+            self.b = paddle.create_parameter(shape=[], dtype=paddle.float32).set_value(
+                paddle.to_tensor(config.b, paddle.float32)
+            )
             self.random_paddle = config.random_paddle
 
         def forward(self, input_x, labels=None, **kwargs):
@@ -1328,3 +1344,6 @@ class TrainerIntegrationTest(TestCasePlus, TrainerIntegrationCommon):
         no_wd_params = [p for n, p in model.named_parameters() if n not in wd_names]
         self.assertListEqual(trainer.optimizer.param_groups[0]["params"], wd_params)
         self.assertListEqual(trainer.optimizer.param_groups[1]["params"], no_wd_params)
+
+
+unittest.main()
