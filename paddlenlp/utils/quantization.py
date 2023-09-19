@@ -92,7 +92,6 @@ def replace_with_quantization_linear(model, quant_algo, name_prefix="", **kwargs
             )
 
     gc.collect()
-    paddle.device.cuda.empty_cache()
     return quantization_linear_list
 
 
@@ -105,11 +104,11 @@ def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quant_a
         if quant_weight_name in state_dict and quant_scale_name in state_dict:
             if state_dict[quant_weight_name].dtype != paddle.int8:
                 raise ValueError(
-                    f"{quant_weight_name} should be {paddle.int8} in state_dict but recieved dtype {state_dict[quant_weight_name].dtype}"
+                    f"{quant_weight_name} should be {paddle.int8} in state_dict but received dtype {state_dict[quant_weight_name].dtype}"
                 )
             if state_dict[quant_scale_name].dtype != paddle.float32:
                 raise ValueError(
-                    f"{quant_scale_name} should be {paddle.float32} in state_dict but recieved dtype {state_dict[quant_scale_name].dtype}"
+                    f"{quant_scale_name} should be {paddle.float32} in state_dict but received dtype {state_dict[quant_scale_name].dtype}"
                 )
         elif weight_name in state_dict:
             target_weight = state_dict.pop(weight_name).cast(dtype)
@@ -117,7 +116,6 @@ def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quant_a
             state_dict[quant_weight_name] = quant_weight
             state_dict[quant_scale_name] = quant_scale
             del target_weight
-        paddle.device.cuda.empty_cache()
         gc.collect()
     return state_dict
 

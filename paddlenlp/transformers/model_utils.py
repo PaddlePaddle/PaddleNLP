@@ -59,12 +59,7 @@ from paddlenlp.utils.env import (
 from paddlenlp.utils.log import logger
 
 from ..generation import GenerationConfig, GenerationMixin
-from ..utils import (
-    convert_to_quantize_state_dict,
-    device_guard,
-    replace_with_quantization_linear,
-    update_loaded_state_dict_keys,
-)
+from ..utils import device_guard
 from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
 from .utils import (  # convert_ndarray_dtype,
@@ -1610,8 +1605,15 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if quantization_linear_list is not None:
                 quantization_linear_list = [".".join([prefix, s]) for s in quantization_linear_list]
 
-        # Weight quantization if not yet quantized & updtate loaded_keys
+        # Weight quantization if not yet quantized & update loaded_keys
         if quantization_config is not None:
+            try:
+                from ..utils.quantization import (
+                    convert_to_quantize_state_dict,
+                    update_loaded_state_dict_keys,
+                )
+            except ImportError:
+                raise ImportError("You need to install paddlepaddle >= 2.5.2")
             if state_dict is not None:
                 state_dict = convert_to_quantize_state_dict(
                     state_dict, quantization_linear_list, config.quantization_config["quant_algo"], dtype
@@ -1940,6 +1942,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         convert_from_torch = cls.support_conversion(config) and convert_from_torch
 
         if config.quantization_config is not None:
+            try:
+                from ..utils.quantization import replace_with_quantization_linear
+            except ImportError:
+                raise ImportError("You need to install paddlepaddle >= 2.5.2")
             if config.tensor_parallel_degree > 1:
                 raise NotImplementedError("Quantization method dosen't support tensor parallelism.")
             if dtype != "float16" and dtype != "bfloat16":
