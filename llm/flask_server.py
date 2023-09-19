@@ -30,6 +30,7 @@ class ServerArgument:
     port: int = field(default=8011, metadata={"help": "The port of ui service"})
     flask_port: int = field(default=8010, metadata={"help": "The port of flask service"})
     title: str = field(default="LLM", metadata={"help": "The title of gradio"})
+    sub_title: str = field(default="用户12小时无操作平台将自动停止预测部署服务", metadata={"help": "The sub-title of gradio"})
 
 
 def read_shared_memory(memory: SharedMemory):
