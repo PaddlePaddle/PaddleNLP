@@ -22,7 +22,6 @@ from functools import partial
 
 import numpy as np
 import paddle
-import paddle.incubate as incubate
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
@@ -307,39 +306,23 @@ class MultiHeadAttention(nn.Layer):
         return (out, weights) if output_attentions else out
 
     def core_attn(self, q, k, v, attn_mask=None, output_attentions=False):
-        perm = [0, 2, 1, 3]
-        q = tensor.transpose(x=q, perm=perm)
-        k = tensor.transpose(x=k, perm=perm)
-        v = tensor.transpose(x=v, perm=perm)
 
         # scale dot product attention
-        scale_qk_coeff = self.config.scale_qk_coeff * self.head_dim**0.5
-        product = paddle.matmul(x=q.scale(1.0 / scale_qk_coeff), y=k, transpose_y=True)
-
-        if self.config.scale_qk_coeff != 1.0:
-            product = product.scale(self.config.scale_qk_coeff)
-
-        # softmax_mask_fuse_upper_triangle is not supported sif paddle is not compiled with cuda/rocm
-        if not paddle.is_compiled_with_cuda():
-            attn_mask = get_triangle_upper_mask(product, attn_mask)
+        product = paddle.matmul(x=q * (self.head_dim**-0.5), y=k, transpose_y=True)
 
         if attn_mask is not None:
             product = product + attn_mask
-            weights = F.softmax(product)
-        else:
-            weights = incubate.softmax_mask_fuse_upper_triangle(product)
 
-        if self.config.hidden_dropout_prob:
+        weights = F.softmax(product)
+        if self.dropout:
             with seed_guard_context("local_seed"):
-                weights = F.dropout(
-                    weights, self.config.hidden_dropout_prob, training=self.training, mode="upscale_in_train"
-                )
+                weights = F.dropout(weights, self.dropout, training=self.training, mode="upscale_in_train")
 
-        out = paddle.matmul(weights, v)
+        out = tensor.matmul(weights, v)
 
         # combine heads
         out = tensor.transpose(out, perm=[0, 2, 1, 3])
-        out = tensor.reshape(x=out, shape=[0, 0, -1])
+        out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
 
         return (out, weights) if output_attentions else out
 
@@ -356,38 +339,19 @@ class MultiHeadAttention(nn.Layer):
         else:
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
 
-        if self.config.use_flash_attention:
-            # Flash Attention now ignore attention mask
-            # Current Flash Attention doesn't support attn maskt
-            # Paddle Flash Attention input [batch_size, seq_len, num_heads, head_dim]
-            # Torch Flash Attention input (batch_size, seqlen, nheads, headdim)
-            bsz, q_len, num_heads, head_dim = q.shape
-            # Q Shape:  [1, 16, 2048, 64]
-            # bs, nhead, seqlen, head_dim
-            attn_output, weights = flash_attention(
-                q,
-                k,
-                v,
-                causal=q.shape[1] != 1,
-                return_softmax=self.need_weights,
-            )
-            out = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+        if self.config.use_flash_attention and attn_mask is None:
+            attn_func = self._flash_attention
         else:
-            # scale dot product attention
-            product = paddle.matmul(x=q * (self.head_dim**-0.5), y=k, transpose_y=True)
+            attn_func = self.core_attn
 
-            if attn_mask is not None:
-                product = product + attn_mask
+        has_gradient = (not q.stop_gradient) or (not k.stop_gradient) or (not v.stop_gradient)
+        if self.enable_recompute and self.config.recompute_granularity == "core_attn" and has_gradient:
+            out = recompute(attn_func, q, k, v, attn_mask, output_attentions, use_reentrant=False)
+        else:
+            out = attn_func(q, k, v, attn_mask=attn_mask, output_attentions=output_attentions)
 
-            weights = F.softmax(product)
-            if self.dropout:
-                weights = F.dropout(weights, self.dropout, training=self.training, mode="upscale_in_train")
-
-            out = tensor.matmul(weights, v)
-
-            # combine heads
-            out = tensor.transpose(out, perm=[0, 2, 1, 3])
-            out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
+        if output_attentions:
+            out, weights = out
 
         # project to output
         out = self.out_proj(out)
