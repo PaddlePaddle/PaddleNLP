@@ -50,7 +50,7 @@ pipeline = Pipeline()
 pipeline.add_node(component=dpr_retriever, name="DenseRetriever", inputs=["Query"])
 
 
-def searchAbstract(query):
+def search_multi_paper(query):
     prediction = pipeline.run(
         query=query,
         params={
@@ -70,10 +70,10 @@ def searchAbstract(query):
                 "title": doc.meta["title"],
             }
         )
-    return documents
+    return {"documents": documents}
 
 
-def searchSinglePaper(query, title):
+def search_single_paper(query, title):
     filters = {
         "$and": {
             "title": {"$eq": title},
@@ -83,7 +83,7 @@ def searchSinglePaper(query, title):
         query=query,
         params={
             "DenseRetriever": {
-                "top_k": 2,
+                "top_k": 3,
                 "index": args.full_text_index_name,
                 "filters": filters,
             },
@@ -100,7 +100,7 @@ def searchSinglePaper(query, title):
             }
         )
 
-    return documents
+    return {"documents": documents}
 
 
 def history_transform(history=[]):
@@ -141,10 +141,13 @@ def prediction(history):
     else:
         function_call = response.function_call
         logs.append(f"Function Call已触发: {function_call}")
-        name2function = {"search_multi_paper": searchAbstract, "search_single_paper": searchSinglePaper}
+        name2function = {"search_multi_paper": search_multi_paper, "search_single_paper": search_single_paper}
         func = name2function[function_call["name"]]
         func_args = json.loads(function_call["arguments"])
         res = func(**func_args)
+        # 对于多篇论文检索加入润色prompt
+        if function_call["name"] == "search_multi_paper":
+            res["prompt"] = "请根据论文检索工具的结果返回每篇论文的标题（加粗）, 内容以及关键词"
         logs.append(f"Function Call调用结果: {res}")
         # Step 3: return msg to erniebot
         messages.append({"role": "assistant", "content": None, "function_call": function_call})
