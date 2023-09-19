@@ -195,21 +195,13 @@ def scaled_dot_product_attention(
         if alibi is not None:
             raise ValueError("Flash Attention does not support ALiBi yet")
 
-        # attn_output, attn_weights = flash_attention(
-        #     query_states,
-        #     key_states,
-        #     value_states,
-        #     causal=is_causal and query_states.shape[1] != 1,
-        #     return_softmax=output_attentions,
-        # )
-        # print(attention_mask.shape)
-        # print(attention_mask)
+        # TODO: attention_mask is None is not reliable
         attn_output = F.scaled_dot_product_attention(
             query_states,
             key_states,
             value_states,
             attn_mask=attention_mask,
-            is_causal=False,
+            is_causal=attention_mask is None,
         )
         attn_weights = None
         if sequence_parallel:
