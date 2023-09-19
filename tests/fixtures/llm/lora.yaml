@@ -56,4 +56,3 @@ inference-infer:
     batch_size: 2
     decode_strategy: greedy_search
     max_length: 20
-    enable_compare: false

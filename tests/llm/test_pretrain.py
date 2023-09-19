@@ -67,11 +67,5 @@ class PretrainTest(LLMTest, unittest.TestCase):
 
             main()
 
-        self._test_inference_predictor()
-        self._test_predictor()
-
-    def _test_inference_predictor(self):
-        self.run_predictor({"inference_model": "true"})
-
-    def _test_predictor(self):
-        self.run_predictor({"inference_model": "false"})
+        self.run_predictor({"inference_model": True})
+        self.run_predictor({"inference_model": False})

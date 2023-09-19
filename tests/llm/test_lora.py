@@ -29,9 +29,9 @@ from .testing_utils import LLMTest
 
 
 @parameterized_class(
-    ["model_dir"],
+    ["model_dir", "enable_compare"],
     [
-        ["llama"],
+        ["llama", False],
         # TODO(wj-Mcat): to enable chatglm/chatglm2 unit test
         # ["chatglm"],
         # ["chatglm2"],
@@ -102,6 +102,6 @@ class LoraTest(LLMTest, unittest.TestCase):
             merge()
 
         if self.model_dir not in ["chatglm2"]:
-            self.run_predictor({"inference_model": "true"})
+            self.run_predictor({"inference_model": True})
 
-        self.run_predictor({"inference_model": "false"})
+        self.run_predictor({"inference_model": False})

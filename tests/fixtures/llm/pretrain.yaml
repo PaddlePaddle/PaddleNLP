@@ -24,7 +24,7 @@ pretrain:
       model_name_or_path: __internal_testing__/tiny-random-llama
     chatglm:
       model_type: chatglm
-      model_name_or_path: __internal_testing__/tiny-random-chatglm
+      model_name_or_path: __internal_testing__/tiny-fused-chatglm
 
 inference-predict:
   default:
@@ -45,4 +45,3 @@ inference-infer:
     batch_size: 2
     decode_strategy: greedy_search
     max_length: 20
-    enable_compare: false

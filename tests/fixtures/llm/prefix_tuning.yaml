@@ -29,6 +29,12 @@ prefix_tuning:
   default:
     llama:
       model_name_or_path: __internal_testing__/tiny-random-llama
+    chatglm:
+      model_name_or_path: __internal_testing__/tiny-fused-chatglm
+    chatglm2:
+      model_name_or_path: __internal_testing__/tiny-random-chatglm2
+    bloom:
+      model_name_or_path: __internal_testing__/tiny-fused-bloom
 
 inference-predict:
   default:
@@ -51,5 +57,4 @@ inference-infer:
     batch_size: 2
     decode_strategy: greedy_search
     max_length: 20
-    enable_compare: false
     export_precache: true

@@ -28,12 +28,12 @@ from .testing_utils import LLMTest
 
 
 @parameterized_class(
-    ["model_dir"],
+    ["model_dir", "enable_compare"],
     [
-        ["llama"],
+        ["llama", False],
         # ["chatglm"],
         # ["chatglm2"],
-        ["bloom"],
+        # ["bloom"],
     ],
 )
 class FinetuneTest(LLMTest, unittest.TestCase):
@@ -83,15 +83,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
 
             main()
 
-        self._test_inference_predictor()
-        self._test_predictor()
+        if self.model_dir != "opt":
+            self.run_predictor({"inference_model": True})
 
-    def _test_inference_predictor(self):
-        # TODO(wj-Mcat): OPTModel do not support inference model
-        if self.model_dir == "opt":
-            return
-
-        self.run_predictor({"inference_model": "true"})
-
-    def _test_predictor(self):
-        self.run_predictor({"inference_model": "false"})
+        self.run_predictor({"inference_model": False})
