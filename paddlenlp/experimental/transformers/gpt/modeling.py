@@ -25,7 +25,7 @@ from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
 from paddlenlp.transformers import GPTConfig, GPTPretrainedModel
-from paddlenlp.transformers.gpt.modeling import parallel_matmul
+from paddlenlp.transformers.gpt.modeling import GPTEmbeddings, parallel_matmul
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
@@ -33,53 +33,6 @@ from paddlenlp.transformers.model_outputs import (
 from paddlenlp.transformers.model_utils import register_base_model
 
 __all__ = ["GPTInferenceModel", "GPTForCausalLMInferenceModel"]
-
-
-class GPTEmbeddingsDyBatch(nn.Layer):
-    """
-    Include embeddings from word and position embeddings.
-    """
-
-    def __init__(
-        self,
-        config,
-    ):
-        super(GPTEmbeddingsDyBatch, self).__init__()
-
-        if config.tensor_parallel_degree > 1:
-            self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
-                config.vocab_size,
-                config.hidden_size,
-            )
-        else:
-            self.word_embeddings = nn.Embedding(
-                config.vocab_size,
-                config.hidden_size,
-            )
-
-        self.position_embeddings = nn.Embedding(
-            config.max_position_embeddings,
-            config.hidden_size,
-        )
-
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
-
-    def forward(self, input_ids, position_ids, seq_lens):
-        inputs_embeddings = self.word_embeddings(input_ids)
-
-        if position_ids is None:
-            position_ids = paddle.arange(input_ids.shape[0], dtype=input_ids.dtype)
-            pre_len = seq_lens[0]
-            seq_lens = seq_lens[1:]
-            for seq_len in seq_lens:
-                position_ids[pre_len:seq_len + pre_len] = position_ids[pre_len:seq_len + pre_len] - pre_len
-                pre_len += seq_len
-
-        position_embeddings = self.position_embeddings(position_ids)
-        embeddings = inputs_embeddings + position_embeddings
-        embeddings = self.dropout(embeddings)
-
-        return embeddings
 
 
 @register_base_model
@@ -103,11 +56,7 @@ class GPTInferenceModel(GPTPretrainedModel):
         self.num_layers = config.num_hidden_layers
         self.max_position_embeddings = config.max_position_embeddings
 
-        self.bias = paddle.tril(
-            paddle.ones([1, 1, config.max_position_embeddings, config.max_position_embeddings], dtype="int64")
-        )
-
-        self.embeddings = GPTEmbeddingsDyBatch(config)
+        self.embeddings = GPTEmbeddings(config)
 
         # get ring_id
         ring_id = -1
@@ -221,22 +170,9 @@ class GPTInferenceModel(GPTPretrainedModel):
         )
 
         if input_ids is not None and inputs_embeds is not None:
-            raise ValueError(
-                "You cannot specify both input_ids and inputs_embeds at the same time"
-            )
-        elif input_ids is not None:
-            input_shape = paddle.shape(input_ids)
-            input_ids = input_ids.reshape((-1, input_shape[-1]))
-            batch_size, seq_length = input_ids.shape
-        elif inputs_embeds is not None:
-            input_shape = paddle.shape(inputs_embeds)[:-1]
-            batch_size, seq_length, _ = inputs_embeds.shape
-        else:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        elif input_ids is None and inputs_embeds is None:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
-
-        # embed positions
-        if attention_mask is None:
-            attention_mask = paddle.ones((batch_size, seq_length), dtype=paddle.bool)
 
         if not is_decoder:
             ids_remove_padding, padding_offset, cum_offsets = self.remove_padding(input_ids, seq_len_encoder)
@@ -245,30 +181,13 @@ class GPTInferenceModel(GPTPretrainedModel):
             padding_offset = None
             cum_offsets = None
 
-        seq_lens = seq_len_decoder if is_decoder else seq_len_encoder
-        if not is_decoder:
-            position_ids = None
-        inputs_embeds = self.embeddings(input_ids=ids_remove_padding, position_ids=position_ids, seq_lens=seq_lens)
-
-        if cache is None:
-            cache = tuple([None] * self.num_layers)
-
-        # TODO, use registered buffer
-        length = input_shape[-1]
-        if is_decoder:
-            cache_length = paddle.shape(attention_mask)[-1] - 1
-            length = length + cache_length
-        else:
-            cache_length = 0
-        causal_mask = self.bias[:, :, cache_length:length, :length]
-
-        attention_mask = (1.0 - causal_mask) * -1e4
-
-        # The tensor returned by triu not in static graph.
-        attention_mask.stop_gradient = True
+        if inputs_embeds is None:
+            inputs_embeds = self.embeddings(input_ids=ids_remove_padding, position_ids=position_ids)
 
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
+
+        seq_lens = seq_len_decoder if is_decoder else seq_len_encoder
 
         hidden_states = inputs_embeds
 
