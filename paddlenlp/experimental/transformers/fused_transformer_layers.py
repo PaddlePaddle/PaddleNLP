@@ -186,8 +186,10 @@ class FusedMultiTransformer(Layer):
         self.norm_type = norm_type
         if norm_type == "layernorm":
             self.norm_func = fused_layer_norm
-        else:
+        elif norm_type == "rmsnorm":
             self.norm_func = fused_rms_norm
+        else:
+            raise NotImplementedError("Only support norm type of [layernorm, rmsnorm]")
         self.use_neox_rotary_style = use_neox_rotary_style
         self._norm_weight_dtype = "float32" if self.norm_type == "layernorm" else self._dtype
 
