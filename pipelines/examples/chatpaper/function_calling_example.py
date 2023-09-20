@@ -117,10 +117,7 @@ def history_transform(history=[]):
 
 def prediction(history):
     logs = []
-    if history is not None:
-        query = history.pop()[0]
-    else:
-        return history, "注意：问题不能为空"
+    query = history.pop()[0]
 
     if query == "":
         return history, "注意：问题不能为空"
