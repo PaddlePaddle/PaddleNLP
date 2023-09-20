@@ -137,7 +137,7 @@ def prediction(history):
     # Step 2: execute command
     if "function_call" not in response:
         logs.append("Function Call未触发")
-        result = response["result"]
+        stream_output = response["result"]
     else:
         function_call = response.function_call
         logs.append(f"Function Call已触发: {function_call}")
