@@ -225,6 +225,12 @@ class TrainingArguments:
             pipeline_parallel_degree means split all transformer layers to how many stages.
             default -1 for not use pipeline parallel.
             Note. this need model support in source code, see llama modeling_pp.py file
+        tensor_parallel_config (`str`, *optional*)(
+            Some additional configs which affect model parallel performance, we provide some option to config it.
+            following config is support:
+              enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance.
+              enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.
+              enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true. It can accelerate model parallel further.
         pipeline_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it.
             following config is support:
