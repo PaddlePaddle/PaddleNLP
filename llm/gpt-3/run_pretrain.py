@@ -382,8 +382,7 @@ def main():
             load_state_as_np=True,
         )
     else:
-        model_config = config_class.from_pretrained(model_args.model_name_or_path)
-        model = model_class(model_config)
+        model = model_class(config)
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
