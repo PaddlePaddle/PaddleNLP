@@ -1785,7 +1785,12 @@ class Trainer:
 
         return loss.detach()
 
-    def save_model(self, output_dir: Optional[str] = None, merge_tensor_parallel: Optional[bool] = False):
+    def save_model(
+        self,
+        output_dir: Optional[str] = None,
+        merge_tensor_parallel: Optional[bool] = False,
+        max_shard_size: str = "10GB",
+    ):
         """
         Will save the model, so you can reload it using `from_pretrained()`.
 
@@ -1799,7 +1804,9 @@ class Trainer:
             self.model_wrapped.get_all_parameters(convert2cpu=True)
 
         if self.args.should_save_model_state:
-            self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
+            self._save(
+                output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel, max_shard_size=max_shard_size
+            )
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
@@ -1948,7 +1955,9 @@ class Trainer:
             logger.info(f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit")
             shutil.rmtree(checkpoint)
 
-    def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
+    def _save(
+        self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False, max_shard_size="10GB"
+    ):
         # If we are executing this function, we are the process zero, so we don't check for that.
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
@@ -1965,6 +1974,7 @@ class Trainer:
                 variant=self.args.weight_name_suffix,
                 merge_tensor_parallel=True,
                 is_main_process=self.args.should_save,
+                max_shard_size=max_shard_size,
             )
         elif not isinstance(self.model, PretrainedModel):
             if isinstance(unwrap_model(self.model), PretrainedModel):
@@ -1980,6 +1990,7 @@ class Trainer:
                         merge_tensor_parallel=merge_tensor_parallel,
                         variant=weight_name_suffix,
                         is_main_process=self.args.should_save,
+                        max_shard_size=max_shard_size,
                     )
                 else:
                     unwrap_model(self.model).save_pretrained(
@@ -1987,6 +1998,7 @@ class Trainer:
                         merge_tensor_parallel=merge_tensor_parallel,
                         variant=self.args.weight_name_suffix,
                         is_main_process=self.args.should_save,
+                        max_shard_size=max_shard_size,
                     )
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
@@ -2011,6 +2023,7 @@ class Trainer:
                     merge_tensor_parallel=merge_tensor_parallel,
                     variant=weight_name_suffix,
                     is_main_process=self.args.should_save,
+                    max_shard_size=max_shard_size,
                 )
             else:
                 self.model.save_pretrained(
@@ -2018,6 +2031,7 @@ class Trainer:
                     merge_tensor_parallel=merge_tensor_parallel,
                     variant=self.args.weight_name_suffix,
                     is_main_process=self.args.should_save,
+                    max_shard_size=max_shard_size,
                 )
         if self.args.should_save_sharding_stage1_model:
             self.sharding_io.save_distributed_model_meta(output_dir)

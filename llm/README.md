@@ -268,6 +268,16 @@ python predictor.py \
     --max_length 1024 \
     --mode "dynamic" \
     --inference_model
+
+#A8W8 动态图量化推理
+python predictor.py \
+    --model_name_or_path "checkpoints/llama_ptq_ckpts" \
+    --dtype float16 \
+    --max_length 1024 \
+    --mode "dynamic" \
+    --quant_type "A8W8" \
+    --inference_model \
+    --shift_smooth 1
 ```
 
 ### 4.4 InferenceModel 静态图推理
@@ -282,9 +292,27 @@ python export_model.py \
     --dtype float16 \
     --inference_model
 
+#导出A8W8量化模型静态图
+python export_model.py \
+    --model_name_or_path "checkpoints/llama_ptq_ckpts" \
+    --output_path ./inference_ptq \
+    --dtype float16 \
+    --inference_model \
+    --quant_type "A8W8" \
+    --shift_smooth 1
+
 # InferenceModel 静态图推理
 python predictor.py \
     --model_name_or_path ./inference \
+    --dtype float16 \
+    --max_length 1024 \
+    --output_file "infer.json" \
+    --mode "static" \
+    --inference_model
+
+# InferenceModel 静态图推理A8W8量化模型
+python predictor.py \
+    --model_name_or_path ./inference_ptq \
     --dtype float16 \
     --max_length 1024 \
     --output_file "infer.json" \

@@ -399,7 +399,9 @@ def main():
             apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config)
 
         apply_ptq(quant_args, trainer, ptq_dataloader)
-        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
+        trainer.save_model(
+            merge_tensor_parallel=training_args.tensor_parallel_degree > 1, max_shard_size=quant_args.max_shard_size
+        )
 
     if quant_args.do_gptq:
         if isinstance(model, LoRAModel):

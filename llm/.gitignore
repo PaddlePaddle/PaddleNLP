@@ -1,0 +1,6 @@
+data/
+checkpoints/
+inference_*/
+
+infer.json
+output.json

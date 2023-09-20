@@ -74,9 +74,17 @@ class PredictorArgument:
         default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
-    quant_type: str = field(
-        default="None",
-        metadata={"help": "The quant type of inference model, support `weight_only_int8`, `weight_only_int4`."},
+    quant_type: str = field(default="", metadata={"help": "Quantization type. Supported values: A8W8, WINT4, WINT8"})
+    quant_round_type: int = field(
+        default=0,
+        metadata={
+            "help": "The quant round type, 0:-rounding to nearest ties to even， 1: -rounding to nearest ties away from zero"
+        },
+    )
+    quant_max_bound: float = field(default=127.0, metadata={"help": "The max bound of float type to int type"})
+    quant_min_bound: float = field(default=-127.0, metadata={"help": "The min bound of float type to int type"})
+    shift_smooth: int = field(
+        default=0, metadata={"help": "Whether to apply shift and smooth in ptq, valid when quant_type is A8W8"}
     )
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     benchmark: bool = field(
@@ -668,9 +676,16 @@ def create_predictor(
                     config.tensor_parallel_rank = tensor_parallel_rank
                     config.quant_bits = -1
 
-                    if predictor_args.quant_type.startswith("weight_only_int"):
+                    if predictor_args.quant_type.startswith("WINT"):
                         quant_bits = int(predictor_args.quant_type[-1])
                         config.quant_bits = quant_bits
+                    elif "A8W8" in predictor_args.quant_type:
+                        config.quant_type = predictor_args.quant_type
+                        config.model_name_or_path = predictor_args.model_name_or_path
+                        config.quant_round_type = predictor_args.quant_round_type
+                        config.quant_max_bound = predictor_args.quant_max_bound
+                        config.quant_min_bound = predictor_args.quant_min_bound
+                        config.shift_smooth = predictor_args.shift_smooth
 
                 model = LlamaInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype

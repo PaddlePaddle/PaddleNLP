@@ -100,6 +100,9 @@ class QuantArgument:
     do_gptq: bool = field(default=False, metadata={"help": "Whether to use GPTQ"})
     gptq_step: int = field(default=8, metadata={"help": "Step for GPTQ"})
 
+    # Model saving related parameters
+    max_shard_size: str = field(default="10GB", metadata={"help": "Max sharding size when saving quantized model"})
+
 
 @dataclass
 class GenerateArgument:
