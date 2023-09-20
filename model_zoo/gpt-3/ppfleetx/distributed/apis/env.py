@@ -44,6 +44,9 @@ def set_seed(seed):
         mp_rank = hcg.get_model_parallel_rank()
         mp_size = hcg.get_model_parallel_world_size()
 
+        sep_rank = hcg.get_sep_parallel_rank()
+        sep_size = hcg.get_sep_parallel_world_size()
+
         pp_rank = hcg.get_stage_id()
         pp_size = hcg.get_pipe_parallel_world_size()
 
@@ -54,6 +57,7 @@ def set_seed(seed):
         # sharding_size = hcg.get_sharding_parallel_world_size()
     else:
         mp_rank, mp_size = 0, 1
+        sep_rank, sep_size = 0, 1
         pp_rank, pp_size = 0, 1
         dp_rank, dp_size = 0, 1
         sharding_rank, _ = 0, 1
@@ -71,19 +75,23 @@ def set_seed(seed):
 
     seed_offset = seed + 1024 + paddle.distributed.get_world_size()
     global_seed = (
-        seed_offset
-        + pp_rank * (mp_size)
-        + dp_rank * (mp_size * pp_size)
-        + sharding_rank * (mp_size * pp_size * dp_size)
+        seed_offset + \
+        sep_rank * (mp_size) + \
+        pp_rank * (mp_size * sep_size) + \
+        dp_rank * (mp_size * sep_size * pp_size) + \
+        sharding_rank * (mp_size * sep_size * pp_size * dp_size)
+
     )
 
     seed_offset += paddle.distributed.get_world_size()
     local_seed = (
-        seed_offset
-        + mp_rank
-        + pp_rank * (mp_size)
-        + dp_rank * (mp_size * pp_size)
-        + sharding_rank * (mp_size * pp_size * dp_size)
+        seed_offset + \
+        mp_rank + \
+        sep_rank * (mp_size) + \
+        pp_rank * (mp_size * sep_size) + \
+        dp_rank * (mp_size * sep_size * pp_size) + \
+        sharding_rank * (mp_size * sep_size * pp_size * dp_size)
+
     )
 
     tracker = get_rng_state_tracker()
@@ -95,9 +103,16 @@ def set_seed(seed):
     logger.info("The global seed is set to {} and local seed is set to {}.".format(global_seed, local_seed))
 
     global _seed
-    global _dp_seed
     _seed = seed
-    _dp_seed = global_seed
+
+    global _dp_seed
+    _dp_seed = (
+        seed_offset
+        + pp_rank * (mp_size)
+        + dp_rank * (mp_size * pp_size)
+        + sharding_rank * (mp_size * pp_size * dp_size)
+    )
+    # _dp_seed = global_seed
 
 
 def set_hcg(hcg):
@@ -144,6 +159,7 @@ def init_dist_env(config):
         "mp_degree": config.Distributed.mp_degree,
         "pp_degree": config.Distributed.pp_degree,
         "sharding_degree": config.Distributed.sharding.sharding_degree,
+        "sep_degree": config.Distributed.sep_degree,
         "order": order,
     }
 

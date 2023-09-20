@@ -804,7 +804,7 @@ class TrainingArguments:
             warnings.warn("`--sharding_parallel_degree` is useful only when `--sharding` is specified.")
 
         if paddle.distributed.get_world_size() > 1 and (
-            len(self.sharding) > 0 or self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1
+            len(self.sharding) > 0 or self.tensor_parallel_degree > 1 or self.pipeline_parallel_degree > 1 or self.sep_parallel_degree > 1
         ):
             self.use_hybrid_parallel = True
 
@@ -816,6 +816,7 @@ class TrainingArguments:
             if (
                 self.pipeline_parallel_degree <= 1
                 and self.tensor_parallel_degree <= 1
+                and self.sep_parallel_degree <= 1
                 and not (self.sharding and ShardingOption.SHARD_OP in self.sharding)
             ):
                 raise ValueError(

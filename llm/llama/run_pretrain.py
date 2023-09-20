@@ -453,6 +453,11 @@ def main():
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
     config.sep_parallel_degree = training_args.sep_parallel_degree
 
+    # hack to change model size
+    config.num_hidden_layers = 16
+    config.intermediate_size = config.hidden_size
+    #
+
     print("Final pre-training config:", config)
 
     # Set the dtype for loading model
@@ -544,10 +549,10 @@ def main():
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         metrics = train_result.metrics
-        trainer.save_model()
+        # trainer.save_model()
         trainer.log_metrics("train", metrics)
-        trainer.save_metrics("train", metrics)
-        trainer.save_state()
+        # trainer.save_metrics("train", metrics)
+        # trainer.save_state()
 
     if training_args.do_predict:
         test_ret = trainer.predict(test_dataset)

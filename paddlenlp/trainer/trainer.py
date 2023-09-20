@@ -739,7 +739,8 @@ class Trainer:
             for step, inputs in enumerate(epoch_iterator):
                 # split sequence dim
                 # logger.info("before split inputs shape:{}".format(inputs["input_ids"].shape))
-                inputs = split_inputs_sequence_dim(inputs)
+                if self.args.use_hybrid_parallel:
+                    inputs = split_inputs_sequence_dim(inputs)
                 # logger.info("after split inputs shape:{}".format(inputs["input_ids"].shape))
                 #
                 self.timers and self.timers("read-data").stop()
@@ -1485,6 +1486,8 @@ class Trainer:
         in_sharding_parallel_mode = self.sharding is not None
         in_tensor_parallel_model = self.args.tensor_parallel_degree > 1
 
+        in_sep_parallel_mode = self.args.sep_parallel_degree > 1
+
         # Pipeline mode
         if in_pipeline_parallel_mode:
             if self.args.amp_master_grad:
@@ -1587,11 +1590,13 @@ class Trainer:
                 )
                 self.optimizer = optimizer
 
+
         # pure tesnor parallel mode, no pipeline_parallel, no sharding.
-        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and in_tensor_parallel_model:
+        if not in_pipeline_parallel_mode and not in_sharding_parallel_mode and (in_tensor_parallel_model or in_sep_parallel_mode):
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
 
+            logger.info("distributed_model")
             model = fleet.distributed_model(model)
             assert self.optimizer is not None, "Tensor parallel mode need decorate optimizer, pelease init optimizer."
             if self.args.amp_master_grad:
@@ -1634,8 +1639,9 @@ class Trainer:
         arguments, depending on the situation.
         """
         if self.enable_autocast_context_manager:
-            custom_black_list = ["reduce_sum", "c_softmax_with_cross_entropy"]
-            custom_white_list = []
+            # custom_black_list = ["reduce_sum", "c_softmax_with_cross_entropy"]
+            custom_black_list = ["reduce_sum", "c_softmax_with_cross_entropy", "matmul_v2"]
+            custom_white_list = ["flash_attn"]
             if self.args.fp16_opt_level == "O2":
                 # https://github.com/PaddlePaddle/Paddle/blob/eb97f4f0adca40b16a309b927e480178beb8ae96/python/paddle/amp/amp_lists.py#L85-L86
                 # the lookup_table is in black_list, but in O2, we need it return fp16

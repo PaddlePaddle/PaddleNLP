@@ -55,6 +55,8 @@ from .sequence_parallel_utils import (
     mark_as_sequence_parallel_parameter,
 )
 
+from ppfleetx.models.language_model.gpt.segment_parallel_utils  import ReshardLayer, ReshardAxis
+
 try:
     from paddle.nn.functional.flash_attention import flash_attention
 except:
@@ -208,6 +210,11 @@ class MultiHeadAttention(nn.Layer):
             fuse_matmul_bias=fused_linear,
         )
 
+        self.reshard_layer = None
+        if env.get_hcg().get_sep_parallel_world_size() > 1:
+            self.reshard_layer = ReshardLayer()
+        logger.info(f"self.reshard_layer:{self.reshard_layer}")
+
     def _fuse_prepare_qkv(self, query, use_cache=False, cache=None):
         mix_layer = self.qkv_proj(query)
         mix_layer = paddle.reshape_(mix_layer, [0, 0, -1, 3 * self.head_dim])
@@ -289,21 +296,34 @@ class MultiHeadAttention(nn.Layer):
             return self.Cache(key, value)
 
     def _flash_attention(self, q, k, v, attn_mask=None):
-        if self.sequence_parallel:
-            perm = [1, 0, 2, 3]
-            q = tensor.transpose(x=q, perm=perm)
-            k = tensor.transpose(x=k, perm=perm)
-            v = tensor.transpose(x=v, perm=perm)
+        if self.reshard_layer is not None:
+            batch_major_in = False if self.sequence_parallel else True
+            batch_major_out = True
+            q = self.reshard_layer(q, split_axis=ReshardAxis.NUM_HIDDEN, concat_axis=ReshardAxis.SEQUENCE, batch_major_in=batch_major_in, batch_major_out=batch_major_out)
+            k = self.reshard_layer(k, split_axis=ReshardAxis.NUM_HIDDEN, concat_axis=ReshardAxis.SEQUENCE, batch_major_in=batch_major_in, batch_major_out=batch_major_out)
+            v = self.reshard_layer(v, split_axis=ReshardAxis.NUM_HIDDEN, concat_axis=ReshardAxis.SEQUENCE, batch_major_in=batch_major_in, batch_major_out=batch_major_out)
+        else:
+            if self.sequence_parallel:
+                perm = [1, 0, 2, 3]
+                q = tensor.transpose(x=q, perm=perm)
+                k = tensor.transpose(x=k, perm=perm)
+                v = tensor.transpose(x=v, perm=perm)
         out, weights = flash_attention(
             q, k, v, self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
         )
-        out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
-        if self.sequence_parallel:
-            perm = [1, 0, 2]
-            out = tensor.transpose(x=out, perm=perm)
+        if self.reshard_layer is not None:
+            batch_major_in = True
+            batch_major_out = False if self.sequence_parallel else True
+            out = self.reshard_layer(out, split_axis=ReshardAxis.SEQUENCE, concat_axis=ReshardAxis.NUM_HIDDEN, batch_major_in=batch_major_in, batch_major_out=batch_major_out)
+        else:
+            out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
+            if self.sequence_parallel:
+                perm = [1, 0, 2]
+                out = tensor.transpose(x=out, perm=perm)
         return (out, weights) if self.need_weights else out
 
     def core_attn(self, q, k, v, attn_mask=None):
+        assert self.reshard_layer is None
         perm = [1, 2, 0, 3] if self.sequence_parallel else [0, 2, 1, 3]
         q = tensor.transpose(x=q, perm=perm)
         k = tensor.transpose(x=k, perm=perm)
@@ -936,11 +956,38 @@ class GPTPretrainingCriterionHybird(nn.Layer):
                 masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
         else:
             masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
+        _hcg = env.get_hcg()
+        if _hcg.get_sep_parallel_world_size() > 1:
+            sep_axis = 0 if self.sequence_parallel else 1
+            masked_lm_loss = ConcatSePMaskedLoss.apply(
+                masked_lm_loss, axis=sep_axis, group=_hcg.get_sep_parallel_group())
         loss_mask = loss_mask.reshape([-1])
         masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
         loss = masked_lm_loss / loss_mask.sum()
         return loss
 
+
+from paddle.autograd import PyLayer
+class ConcatSePMaskedLoss(PyLayer):
+    @staticmethod
+    def forward(ctx, inp, axis, group):
+        inputs = []
+        paddle.distributed.all_gather(inputs, inp, group=group)
+        with paddle.no_grad():
+            cat = paddle.concat(inputs, axis=axis)
+        ctx.args_axis = axis
+        ctx.args_group = group
+        return cat
+
+    @staticmethod
+    def backward(ctx, grad):
+        axis = ctx.args_axis
+        group = ctx.args_group
+        with paddle.no_grad():
+            grads = paddle.split(
+                grad, paddle.distributed.get_world_size(group), axis=axis)
+        grad = grads[paddle.distributed.get_rank(group)]
+        return grad
 
 # these Layers is just for PipelineParallel
 

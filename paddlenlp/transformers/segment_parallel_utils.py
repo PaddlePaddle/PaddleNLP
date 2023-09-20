@@ -24,7 +24,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import os
 import sys
 
 import numpy as np
@@ -40,6 +40,62 @@ sys.path.append("../../")
 # llama attention module in paddlenlp/transformers/llama/modeling.py-LlamaAttention
 # gpt model_zoo/gpt-3/ppfleetx/models/language_model/gpt/dygraph/hybrid_model.py-MultiHeadAttention
 
+def save_tensor(input_data, save_dir="dp_input_data", suffix_name="", save_once=False, save_as_numpy=False):
+    os.makedirs(save_dir, exist_ok=True)
+    dp_rank = 0
+    sep_rank = 0
+    try:
+        _hcg = fleet.get_hybrid_communicate_group()
+        dp_rank = _hcg.get_data_parallel_rank()
+        sep_rank = _hcg.get_sep_parallel_rank()
+        save_dir="sep_input_data"
+    except:
+        pass
+    def unique_name(file_path):
+        i = -1
+        prefix = file_path.split(".")[0]
+        suffix = file_path.split(".")[1]
+        while os.path.exists(file_path):
+            i += 1
+            file_path = f"{prefix}_{i}.{suffix}"
+        print(f"unique_name file_path:{file_path}")
+        return file_path
+
+    def save_path_name(dp_rank, sep_rank, param_name=""):
+        suffix = "npy" if save_as_numpy else "pd"
+        if param_name == "":
+            return f"{save_dir}/dp{dp_rank}_sep{sep_rank}_{suffix_name}.{suffix}"
+        else:
+            return f"{save_dir}/dp{dp_rank}_sep{sep_rank}_{suffix_name}_{param_name}.{suffix}"
+        # if suffix_name == "":
+        #     return f"{save_dir}/dp{dp_rank}_sep{sep_rank}_{param_name}.{suffix}"
+        # else:
+        #     return f"{save_dir}/dp{dp_rank}_sep{sep_rank}_{suffix_name}_{param_name}.{suffix}"
+
+    def save(save_path, tensor):
+        if save_as_numpy:
+            np.save(save_path, tensor.numpy())
+        else:
+            assert isinstance(tensor, paddle.Tensor)
+            paddle.save(tensor, save_path)
+
+    if isinstance(input_data, dict):
+        for k, v in input_data.items():
+            save_path = save_path_name(dp_rank, sep_rank, k)
+            assert isinstance(v, paddle.Tensor), f"{v} is not  paddle.Tensor"
+            if save_once and os.path.exists(save_path):
+                continue
+            else:
+                save(unique_name(save_path), v)
+    elif isinstance(input_data, paddle.Tensor):
+        # save_path = save_path_name(dp_rank, sep_rank, input_data.name)
+        save_path = save_path_name(dp_rank, sep_rank)
+        if save_once and os.path.exists(save_path):
+            return
+        else:
+            save(unique_name(save_path), input_data)
+    else:
+        raise ValueError(f"not support:{input_data}")
 
 def split_inputs_sequence_dim(inputs, sep_rank=None, sep_degree=None):
     if sep_degree is None and sep_rank is None:
