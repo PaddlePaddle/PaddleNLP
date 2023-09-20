@@ -100,7 +100,7 @@ def process_global_configs(config):
     pp_degree = config["Distributed"]["pp_degree"]
     sharding_degree = config["Distributed"]["sharding"]["sharding_degree"]
 
-    config["Global"]["enable_partial_send_recv"] = True
+    config["Global"]["enable_partial_send_recv"] = config["Global"]["enable_partial_send_recv"] if "enable_partial_send_recv" in config["Global"] else True
     if "sequence_parallel" in config["Model"] and pp_degree > 1:
         if config["Model"]["sequence_parallel"]:
             config["Global"]["enable_partial_send_recv"] = False
