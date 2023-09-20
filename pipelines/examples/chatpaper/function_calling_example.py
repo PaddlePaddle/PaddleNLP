@@ -136,9 +136,12 @@ def prediction(history):
     # Step 2: execute command
     stream_output = ""
     output_response = ""
+    function_flag = False
     for resp in resp_stream:
         if not hasattr(resp, "function_call"):
-            logs.append("Function Call未触发")
+            if not function_flag:
+                logs.append("Function Call未触发")
+                function_flag = True
             stream_output += resp["result"]
             yield history + [[query, stream_output]], "\n".join(logs)
 
