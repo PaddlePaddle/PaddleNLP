@@ -309,7 +309,9 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
     return last_dtype
 
 
-def load_state_dict(checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None):
+def load_state_dict(
+    checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None, fliter_dict_keys=None
+):
     """
     Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
     """
@@ -331,6 +333,8 @@ def load_state_dict(checkpoint_file: Union[str, os.PathLike], tensor_parallel_sp
             state_dict = {}
             with safe_open(checkpoint_file, framework="np") as f:
                 for key in f.keys():
+                    if fliter_dict_keys is not None and key not in fliter_dict_keys:
+                        continue
                     py_safe_slice_ = f.get_slice(key)
                     if key in tensor_parallel_split_mapping:
                         weight = tensor_parallel_split_mapping[key](py_safe_slice_)
@@ -1755,7 +1759,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     assert loaded_keys is not None, "loaded_keys is not None."
                     tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
 
-                state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None)
+                state_dict = load_state_dict(
+                    shard_file, tp_actions if pre_tensor_parallel_split else None, set(expected_keys)
+                )
                 if quantization_config is not None:
                     state_dict = convert_to_quantize_state_dict(
                         state_dict, quantization_linear_list, quantization_config["quant_algo"], dtype
@@ -1810,7 +1816,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if len(unexpected_keys) > 0:
             logger.warning(
                 f"Some weights of the model checkpoint at {pretrained_model_name_or_path} were not used when"
-                f" initializing {model.__class__.__name__}: {unexpected_keys}\n- This IS expected if you are"
+                f" initializing {model.__class__.__name__}: {sorted(unexpected_keys)}\n- This IS expected if you are"
                 f" initializing {model.__class__.__name__} from the checkpoint of a model trained on another task or"
                 " with another architecture (e.g. initializing a BertForSequenceClassification model from a"
                 " BertForPreTraining model).\n- This IS NOT expected if you are initializing"
@@ -2256,3 +2262,76 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 f"split in {len(shards)} checkpoint shards. You can find where each parameters has been saved in the "
                 f"index located at {save_index_file}."
             )
+
+
+class PipelinePretrainedModel(PretrainedModel):
+    _sequential_layers = []
+    _pipeline_name_mapping = None
+
+    def __init__(self, config, *args, **kwargs):
+        super().__init__(config, *args, **kwargs)
+
+    def add_sequential_layer(self, layer_desc, name_prefix=""):
+        self._sequential_layers.append({"layer": layer_desc, "name_prefix": name_prefix})
+
+    def get_sequential_layers(self):
+        return [x["layer"] for x in self._sequential_layers]
+
+    def get_sequential_name_prefixs(self):
+        return {str(index): x["name_prefix"] for index, x in enumerate(self._sequential_layers)}
+
+    def _set_pipeline_name_mapping(self, mappings=None):
+        if mappings is not None:
+            self._pipeline_name_mapping = mappings
+        else:
+            mapping = {}
+            state_dict_keys = list(super().state_dict().keys())
+            first_key = state_dict_keys[0].split(".")
+            # if use virtual pp_degree, the prefix is like 0.0.xxx
+            # else it will be like 0.xxx
+            use_virtual_pp_degree = first_key[0].isdigit() and first_key[1].isdigit()
+
+            prefixs = self.get_sequential_name_prefixs()
+            for k in state_dict_keys:
+                name_splited = k.split(".")
+                if use_virtual_pp_degree:
+                    idx = str(int(name_splited[0]) + int(name_splited[1]))
+                    single_name = [prefixs[idx]]
+                    single_name.extend(name_splited[2:])
+                else:
+                    idx = name_splited[0]
+                    single_name = [prefixs[idx]]
+                    single_name.extend(name_splited[1:])
+                mapping[".".join(single_name)] = k
+
+            self._pipeline_name_mapping = mapping
+
+        return self._pipeline_name_mapping
+
+    def state_dict(self, *args, **kwargs):
+        state_dict = super().state_dict(*args, **kwargs)
+
+        if self._pipeline_name_mapping is None:
+            self._set_pipeline_name_mapping()
+        assert len(self._pipeline_name_mapping) > 0, "The pipeline stage must have parameters!"
+        pp_to_single_mapping = {v: k for k, v in self._pipeline_name_mapping.items()}
+
+        for k in list(state_dict.keys()):
+            v = state_dict.pop(k)
+            state_dict[pp_to_single_mapping[k]] = v
+
+        return state_dict
+
+    def set_state_dict(self, state_dict, *args, **kwargs):
+        if self._pipeline_name_mapping is None:
+            self._set_pipeline_name_mapping()
+        assert len(self._pipeline_name_mapping) > 0, "The pipeline stage must have parameters!"
+
+        for k in list(state_dict.keys()):
+            v = state_dict.pop(k)
+            if k not in self._pipeline_name_mapping:
+                continue
+            state_dict[self._pipeline_name_mapping[k]] = v
+
+        ret = super().set_state_dict(state_dict, *args, **kwargs)
+        return ret

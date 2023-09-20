@@ -120,9 +120,7 @@ from .fnet.configuration import *
 from .funnel.modeling import *
 from .funnel.tokenizer import *
 from .funnel.configuration import *
-from .llama.configuration import *
-from .llama.modeling import *
-from .llama.tokenizer import *
+from .llama import *
 from .layoutlm.configuration import *
 from .layoutlm.modeling import *
 from .layoutlm.tokenizer import *
