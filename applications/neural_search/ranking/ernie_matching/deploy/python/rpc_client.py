@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import time
-import numpy as np
 
+import numpy as np
 from paddle_serving_server.pipeline import PipelineClient
 
 client = PipelineClient()

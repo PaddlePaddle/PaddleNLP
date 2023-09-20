@@ -50,6 +50,12 @@ from .bert.configuration import *
 from .gpt.modeling import *
 from .gpt.tokenizer import *
 from .gpt.configuration import *
+from .deberta.modeling import *
+from .deberta.tokenizer import *
+from .deberta.configuration import *
+from .deberta_v2.modeling import *
+from .deberta_v2.tokenizer import *
+from .deberta_v2.configuration import *
 from .roberta.modeling import *
 from .roberta.tokenizer import *
 from .roberta.configuration import *
