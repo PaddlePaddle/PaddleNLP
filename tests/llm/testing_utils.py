@@ -27,6 +27,7 @@ from tests.testing_utils import argv_context_guard, load_test_config
 class LLMTest:
     config_path: str = None
     enable_compare: bool = True
+    data_dir = "./tests/fixtures/llm/data/"
 
     def setUp(self) -> None:
         self.root_path = "./llm"

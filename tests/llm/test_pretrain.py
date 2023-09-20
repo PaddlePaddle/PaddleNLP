@@ -40,7 +40,7 @@ class PretrainTest(LLMTest, unittest.TestCase):
     def setUp(self) -> None:
         LLMTest.setUp(self)
 
-        self.data_dir = tempfile.mkdtemp()
+        self.dataset_dir = tempfile.mkdtemp()
         self.model_codes_dir = os.path.join(self.root_path, self.model_dir)
         sys.path.insert(0, self.model_codes_dir)
 
@@ -48,18 +48,18 @@ class PretrainTest(LLMTest, unittest.TestCase):
         LLMTest.tearDown(self)
 
         sys.path.remove(self.model_codes_dir)
-        shutil.rmtree(self.data_dir)
+        shutil.rmtree(self.dataset_dir)
 
     def test_pretrain(self):
         # Run pretrain
         URL = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy"
         URL2 = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz"
-        get_path_from_url(URL, root_dir=self.data_dir)
-        get_path_from_url(URL2, root_dir=self.data_dir)
+        get_path_from_url(URL, root_dir=self.dataset_dir)
+        get_path_from_url(URL2, root_dir=self.dataset_dir)
 
         pretrain_config = load_test_config(self.config_path, "pretrain", self.model_dir)
 
-        pretrain_config["input_dir"] = self.data_dir
+        pretrain_config["input_dir"] = self.dataset_dir
         pretrain_config["output_dir"] = self.output_dir
 
         with argv_context_guard(pretrain_config):

@@ -14,14 +14,11 @@
 from __future__ import annotations
 
 import os
-import shutil
 import sys
-import tempfile
 import unittest
 
 from parameterized import parameterized_class
 
-from paddlenlp.utils.downloader import get_path_from_url
 from tests.testing_utils import argv_context_guard, load_test_config
 
 from .testing_utils import LLMTest
@@ -40,39 +37,14 @@ class LoraTest(LLMTest, unittest.TestCase):
     def setUp(self) -> None:
         LLMTest.setUp(self)
 
-        self.data_dir = tempfile.mkdtemp()
         self.model_codes_dir = os.path.join(self.root_path, self.model_dir)
         sys.path.insert(0, self.model_codes_dir)
 
-        # Run pretrain
-        URL = "https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz"
-        get_path_from_url(URL, root_dir=self.data_dir)
-        self.data_dir = os.path.join(self.data_dir, "data")
-        self.use_small_datasets()
-
-    def use_small_datasets(self):
-        # use 20 examples
-        def use_few_examples(file):
-            with open(os.path.join(self.data_dir, file), "r", encoding="utf8") as f:
-                lines = [line.strip() for line in f.readlines()]
-            with open(os.path.join(self.data_dir, file), "w+", encoding="utf8") as f:
-                f.write("\n".join(lines[:20]))
-
-        shutil.copyfile(
-            os.path.join(self.data_dir, "dev.json"),
-            os.path.join(self.data_dir, "validation.json"),
-        )
-        use_few_examples("train.json")
-        use_few_examples("dev.json")
-        use_few_examples("validation.json")
-
     def tearDown(self) -> None:
         LLMTest.tearDown(self)
-        shutil.rmtree(self.data_dir)
-
         sys.path.remove(self.model_codes_dir)
 
-    def test_pretrain(self):
+    def test_prefix_tuning(self):
         prefix_tuning_config = load_test_config(self.config_path, "prefix_tuning", self.model_dir)
 
         prefix_tuning_config["dataset_name_or_path"] = self.data_dir
