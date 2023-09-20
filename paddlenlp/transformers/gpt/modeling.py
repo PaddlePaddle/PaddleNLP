@@ -203,20 +203,25 @@ class MultiHeadAttention(nn.Layer):
             self.out_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
 
     def _fuse_prepare_qkv(self, query, use_cache=False, cache=None):
+        # bs, seqlen, nhead * 3*headdim
         mix_layer = self.qkv_proj(query)
-        # bs, seqlen, nhead, headdim
+        # bs, seqlen, nhead, 3*headdim
         mix_layer = paddle.reshape_(mix_layer, [0, 0, self.num_attention_heads, 3 * self.head_dim])
-        # bs, nhead, seqlen, headdim
-        if not self.config.use_flash_attention:
-            # falsh attn need: [ bz, seqlen, nhead, head_dim]
+
+        if not self.config.use_flash_attention:  # TODO: del
+            # falsh attn need: [ bs, seqlen, nhead, head_dim]
+            # bs, nhead, seqlen, 3*head_dim
             mix_layer = paddle.transpose(mix_layer, [0, 2, 1, 3])
 
+        # 1. use flash attention: bs, seqlen, nhead, head_dim
+        # 2. not use flash attention: bs, nhead, seqlen, head_dim
         q, k, v = paddle.split(mix_layer, num_or_sections=3, axis=-1)
 
         assert not isinstance(cache, self.StaticCache), "cache currently does not support the StaticCache type"
 
         if isinstance(cache, self.Cache):
             # for decoder self-attention in inference
+            # concat along seqlen dimension
             k = tensor.concat([cache.k, k], axis=2)
             v = tensor.concat([cache.v, v], axis=2)
         if use_cache is True:
@@ -231,9 +236,11 @@ class MultiHeadAttention(nn.Layer):
         to reduce redundant calculations.
 
         """
+        # bs, seqlen, nhead * headdim
         q = self.q_proj(query)
+        # bs, seqlen, nhead, headdim
         q = tensor.reshape(x=q, shape=[0, 0, self.num_attention_heads, self.head_dim])
-        if not self.config.use_flash_attention:
+        if not self.config.use_flash_attention:  # TODO del
             # falsh attn need: [ bz, seqlen, nhead, head_dim]
             q = tensor.transpose(x=q, perm=[0, 2, 1, 3])
 
@@ -307,7 +314,7 @@ class MultiHeadAttention(nn.Layer):
         return (out, weights) if output_attentions else out
 
     def core_attn(self, q, k, v, attn_mask=None, output_attentions=False):
-        perm = [0, 2, 1, 3]
+        perm = [0, 2, 1, 3]  # bs, nhead, seqlen, headdim
         q = tensor.transpose(x=q, perm=perm)
         k = tensor.transpose(x=k, perm=perm)
         v = tensor.transpose(x=v, perm=perm)
@@ -338,8 +345,8 @@ class MultiHeadAttention(nn.Layer):
         out = paddle.matmul(weights, v)
 
         # combine heads
-        out = tensor.transpose(out, perm=[0, 2, 1, 3])
-        out = tensor.reshape(x=out, shape=[0, 0, -1])
+        out = tensor.transpose(out, perm=[0, 2, 1, 3])  # bs, seqlen, nhead, headdim
+        out = tensor.reshape(x=out, shape=[0, 0, -1])  # bs, seqlen, dim
 
         return (out, weights) if output_attentions else out
 
@@ -355,6 +362,11 @@ class MultiHeadAttention(nn.Layer):
             q, k, v, cache = self._fuse_prepare_qkv(query, use_cache, cache)
         else:
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
+
+        # if self.use_flash_attention and attn_mask is None:
+        #     attn_func = self._flash_attention
+        # else:
+        #     attn_func = self.core_attn
 
         if self.config.use_flash_attention:
             # Flash Attention now ignore attention mask
