@@ -88,7 +88,6 @@ def save_tensor(input_data, save_dir="dp_input_data", suffix_name="", save_once=
             else:
                 save(unique_name(save_path), v)
     elif isinstance(input_data, paddle.Tensor):
-        # save_path = save_path_name(dp_rank, sep_rank, input_data.name)
         save_path = save_path_name(dp_rank, sep_rank)
         if save_once and os.path.exists(save_path):
             return
@@ -127,19 +126,6 @@ def split_inputs_sequence_dim(inputs, sep_rank=None, sep_degree=None):
     else:
         raise ValueError(f"the inputs should be a list or a dict, but is type: {type(inputs)}")
     return res
-
-class ReshardAxis:
-    # Corresponding to shape [b, s, h] or [b, s, num_head, h/num_head]
-    SEQUENCE = 0  # s
-    HIDDEN = 2  # h
-    NUM_HEAD = 2  # num_head
-
-    @classmethod
-    def check(cls, axis):
-        if not isinstance(axis, list):
-            axis = [axis]
-        for i in axis:
-            assert i == cls.SEQUENCE or i == cls.HIDDEN or i == cls.NUM_HEAD, f"Wrong axis: {i}"
 
 
 @paddle.no_grad()
@@ -180,71 +166,35 @@ class ReshardQKV(PyLayer):
 
 class ReshardLayer(paddle.nn.Layer):
     def __init__(self, sep_group=None) -> None:
-        _hcg = fleet.get_hybrid_communicate_group()
-        if hasattr(_hcg, "get_sep_parallel_group"):
-            # print("Get sep_parallel_group")
-            self.sep_group = _hcg.get_sep_parallel_group() if sep_group is None else sep_group
-        else:
-            self.sep_group =  _get_global_group() if sep_group is None else sep_group
+        if sep_group is None:
+            _hcg = fleet.get_hybrid_communicate_group()
+            sep_group = _hcg.get_sep_parallel_group() if sep_group is None else sep_group
+        self.sep_group = sep_group
         self.sep_degree = dist.get_world_size(group=self.sep_group)
         super(ReshardLayer, self).__init__()
 
     def forward(
         self,
         x,
-        split_axis=ReshardAxis.SEQUENCE,
-        concat_axis=ReshardAxis.HIDDEN,
-        batch_major_in=False,
-        batch_major_out=False,
+        split_axis=1,
+        concat_axis=2,
     ):
         # if x dims==3, its shape can be [s/sep, b, h] or [b, s/sep, h], the output shape can be [s, b, h/sep] or [b, s, h/sep]
         # if x dims==4, its shape can be [s, b, num_head/sep, head_dim] or [b, s, num_head/sep, head_dim], the output shape can be [s/sep, b, num_head, head_dim] or [b, s/sep, num_head, head_dim]
-        ReshardAxis.check([split_axis, concat_axis])
         shape = x.shape
         assert len(shape) == 3 or len(shape) == 4, "Only support 3D or 4D tensor"
+        if len(shape) == 4:
+            assert shape[split_axis] % self.sep_degree == 0
+            shape[split_axis] = shape[split_axis] // self.sep_degree
+            shape[concat_axis] = shape[concat_axis] * self.sep_degree
+
         input_data = x
-        perm = [1, 0, 2] if len(shape) == 3 else [1, 0, 2, 3]
-        batch_dim_idx = 0 if batch_major_in else 1
-        seq_dim_idx = 1 if batch_major_in else 0
-        batch_size = shape[batch_dim_idx]
-        seq_size = shape[seq_dim_idx]
-        if batch_major_in:
-            # NOTE(shenliang03): if batch_size == 1, we don't need to transpose.
-            # It will be faster. Otherwise, we need to transpose batch_size behind seq_len.
-            if not (batch_size == 1):
-                input_data = paddle.transpose(input_data, perm)
-            else:
-                new_shape = [seq_size, batch_size, 0] if len(shape) == 3 else [seq_size, batch_size, 0, 0]
-                input_data = input_data.clone() if input_data.is_leaf else input_data
-                input_data.reshape_(new_shape)
-                input_data = paddle.reshape(input_data, new_shape)
-
-        if split_axis == ReshardAxis.SEQUENCE:
-            resharded_seq_size = seq_size // self.sep_degree
-            resharded_num_head_size = shape[2] * self.sep_degree
-        elif split_axis == ReshardAxis.HIDDEN or ReshardAxis.NUM_HEAD:
-            resharded_seq_size = seq_size * self.sep_degree
-            resharded_num_head_size = shape[2] // self.sep_degree
-
         if len(shape) == 3:
             reshard_tensor = ReshardQKV.apply(input_data, self.sep_group, split_axis=split_axis, concat_axis=concat_axis)
         else:
-            input_data = input_data.clone() if input_data.is_leaf else input_data
-            input_data.reshape_([0, 0, -1])
+            input_data = input_data.reshape([0, 0, -1])
             reshard_tensor = ReshardQKV.apply(input_data, self.sep_group, split_axis=split_axis, concat_axis=concat_axis)
-
-            reshard_tensor.reshape_([resharded_seq_size, batch_size, resharded_num_head_size, shape[3]])
-
-        if batch_major_out:
-            if not (batch_size == 1):
-                reshard_tensor = paddle.transpose(reshard_tensor, perm)
-            else:
-                new_shape = (
-                    [batch_size, resharded_seq_size, 0]
-                    if len(shape) == 3
-                    else [batch_size, resharded_seq_size, resharded_num_head_size, shape[3]]
-                )
-                reshard_tensor.reshape_(new_shape)
+            reshard_tensor.reshape_(shape)
         return reshard_tensor
 
 
@@ -277,27 +227,24 @@ class ReshardQKVUtest(PyLayer):
 def test_qkv_out(x, y_grad, func, split_axis=2, concat_axis=0):
     x = x.detach()
     x.stop_gradient = False
-    reshard_layer = ReshardLayer()
+    reshard_layer = ReshardLayer(sep_group=_get_global_group())
     y = reshard_layer(x, split_axis=split_axis, concat_axis=concat_axis)
     paddle.autograd.backward([y], [y_grad], True)
     return y, x.grad
 
 
-def test_reshard_layer(x, y_grad, batch_major_in, batch_major_out, split_axis=0, concat_axis=2):
+def test_reshard_layer(x, y_grad, split_axis=0, concat_axis=2):
     x = x.detach()
     x.stop_gradient = False
     input_data = x
-    reshard_layer = ReshardLayer()
+    reshard_layer = ReshardLayer(sep_group=_get_global_group())
     y = reshard_layer(
         x,
         split_axis=split_axis,
         concat_axis=concat_axis,
-        batch_major_in=batch_major_in,
-        batch_major_out=batch_major_out,
     )
     #
     paddle.autograd.backward([y], [y_grad], True)
-    print(f"x_ grad:{input_data.grad}, x.grad:{x.grad}")
     return y, x.grad
 
 
@@ -367,12 +314,7 @@ def prepare_manual_data():
     input_data = input_data_list[dist.get_rank()]
     expected_output = [s[local_rank] for s in split_tensor_list]
     expected_output = paddle.concat(expected_output, axis=2)
-    print(f"expected_output:{expected_output}")
     np.testing.assert_equal(sin_sout_expected_output_data.numpy(), expected_output.numpy())
-    print(
-        f"input_data:{input_data}, bin_bout_expected_output_data:{bin_bout_expected_output_data}, bin_sout_expected_output_data:{bin_sout_expected_output_data}, \
-          sin_bout_expected_output_data:{sin_bout_expected_output_data}, sin_sout_expected_output_data:{sin_sout_expected_output_data}"
-    )
     return (
         input_data,
         bin_bout_expected_output_data,
@@ -441,7 +383,6 @@ def test_split_inputs():
     inputs = {"inputs_ids": inputs_ids, "labels": labels}
 
     splited_inputs = split_inputs_sequence_dim(inputs, sep_rank, sep)
-    print(f"splited_inputs:{splited_inputs}")
     expected_local_inputs = {}
     for k, v in inputs.items():
         expected_local_inputs[k] = paddle.split(v, sep, axis=1)[sep_rank]
@@ -467,14 +408,11 @@ def test_reshard():
     np.testing.assert_equal(yb.numpy(), y.numpy())
     np.testing.assert_equal(xb_grad.numpy(), x_grad.numpy())
 
-    def check_equal(input_data, expected_output_data, batch_major_in, batch_major_out, split_axis=0, concat_axis=2):
-        print(f"batch_major_in:{batch_major_in}, batch_major_out:{batch_major_out}")
+    def check_equal(input_data, expected_output_data, split_axis=0, concat_axis=2):
         bin_bout_output_grad = expected_output_data
         bin_bout_output, bin_bout_input_grad = test_reshard_layer(
             input_data,
             bin_bout_output_grad,
-            batch_major_in=batch_major_in,
-            batch_major_out=batch_major_out,
             split_axis=split_axis,
             concat_axis=concat_axis,
         )
@@ -487,18 +425,8 @@ def test_reshard():
     check_equal(
         input_data,
         bin_bout_expected_output_data,
-        batch_major_in=True,
-        batch_major_out=True,
         split_axis=2,
-        concat_axis=0,
-    )
-    check_equal(
-        input_data,
-        bin_sout_expected_output_data,
-        batch_major_in=True,
-        batch_major_out=False,
-        split_axis=2,
-        concat_axis=0,
+        concat_axis=1,
     )
     input_data, sin_sout_expected_output_data, sin_bout_expected_output_data = prepare_data(
         batch_major=False, dim_size=3
@@ -506,16 +434,6 @@ def test_reshard():
     check_equal(
         input_data,
         sin_sout_expected_output_data,
-        batch_major_in=False,
-        batch_major_out=False,
-        split_axis=2,
-        concat_axis=0,
-    )
-    check_equal(
-        input_data,
-        sin_bout_expected_output_data,
-        batch_major_in=False,
-        batch_major_out=True,
         split_axis=2,
         concat_axis=0,
     )
@@ -523,38 +441,20 @@ def test_reshard():
     input_data, bin_bout_expected_output_data, bin_sout_expected_output_data = prepare_data(
         batch_major=True, dim_size=3, batch_size=2, seq_len=4, num_head=4, h=8
     )
+    print(f"input_data shape: {input_data.shape}, bin_bout_expected_output_data shape: {bin_bout_expected_output_data.shape}")
     check_equal(
         input_data,
         bin_bout_expected_output_data,
-        batch_major_in=True,
-        batch_major_out=True,
         split_axis=2,
-        concat_axis=0,
+        concat_axis=1,
     )
-    check_equal(
-        input_data,
-        bin_sout_expected_output_data,
-        batch_major_in=True,
-        batch_major_out=False,
-        split_axis=2,
-        concat_axis=0,
-    )
+
     input_data, sin_sout_expected_output_data, sin_bout_expected_output_data = prepare_data(
         batch_major=False, dim_size=3, batch_size=2, seq_len=4, num_head=4, h=8
     )
     check_equal(
         input_data,
         sin_sout_expected_output_data,
-        batch_major_in=False,
-        batch_major_out=False,
-        split_axis=2,
-        concat_axis=0,
-    )
-    check_equal(
-        input_data,
-        sin_bout_expected_output_data,
-        batch_major_in=False,
-        batch_major_out=True,
         split_axis=2,
         concat_axis=0,
     )
@@ -565,36 +465,16 @@ def test_reshard():
     check_equal(
         input_data,
         bin_bout_expected_output_data,
-        batch_major_in=True,
-        batch_major_out=True,
         split_axis=2,
-        concat_axis=0,
+        concat_axis=1,
     )
 
-    check_equal(
-        input_data,
-        bin_sout_expected_output_data,
-        batch_major_in=True,
-        batch_major_out=False,
-        split_axis=2,
-        concat_axis=0,
-    )
     input_data, sin_sout_expected_output_data, sin_bout_expected_output_data = prepare_data(
         batch_major=False, dim_size=3, batch_size=1, seq_len=4, num_head=4, h=8
     )
     check_equal(
         input_data,
         sin_sout_expected_output_data,
-        batch_major_in=False,
-        batch_major_out=False,
-        split_axis=2,
-        concat_axis=0,
-    )
-    check_equal(
-        input_data,
-        sin_bout_expected_output_data,
-        batch_major_in=False,
-        batch_major_out=True,
         split_axis=2,
         concat_axis=0,
     )
@@ -622,34 +502,30 @@ def test_reshard():
     np_test(sin_sout_expected_output_data, sin_sout_expected_output_data2)
 
     input_data, bin_bout_expected_output_data, bin_sout_expected_output_data = prepare_data(batch_major=True)
-    check_equal(input_data, bin_bout_expected_output_data, batch_major_in=True, batch_major_out=True)
-    check_equal(input_data, bin_sout_expected_output_data, batch_major_in=True, batch_major_out=False)
+    check_equal(input_data, bin_bout_expected_output_data, split_axis=1, concat_axis=2)
+
     input_data, sin_sout_expected_output_data, sin_bout_expected_output_data = prepare_data(batch_major=False)
-    check_equal(input_data, sin_sout_expected_output_data, batch_major_in=False, batch_major_out=False)
-    check_equal(input_data, sin_bout_expected_output_data, batch_major_in=False, batch_major_out=True)
+    check_equal(input_data, sin_sout_expected_output_data, split_axis=0, concat_axis=2)
 
     input_data, bin_bout_expected_output_data, bin_sout_expected_output_data = prepare_data(
         batch_major=True, batch_size=2, seq_len=4, num_head=4, h=8
     )
-    check_equal(input_data, bin_bout_expected_output_data, batch_major_in=True, batch_major_out=True)
-    check_equal(input_data, bin_sout_expected_output_data, batch_major_in=True, batch_major_out=False)
+    check_equal(input_data, bin_bout_expected_output_data, split_axis=1, concat_axis=2)
+
     input_data, sin_sout_expected_output_data, sin_bout_expected_output_data = prepare_data(
         batch_major=False, batch_size=2, seq_len=4, num_head=4, h=8
     )
-    check_equal(input_data, sin_sout_expected_output_data, batch_major_in=False, batch_major_out=False)
-    check_equal(input_data, sin_bout_expected_output_data, batch_major_in=False, batch_major_out=True)
+    check_equal(input_data, sin_sout_expected_output_data, split_axis=0, concat_axis=2)
 
     input_data, bin_bout_expected_output_data, bin_sout_expected_output_data = prepare_data(
         batch_major=True, batch_size=1, seq_len=4, num_head=4, h=8
     )
-    check_equal(input_data, bin_bout_expected_output_data, batch_major_in=True, batch_major_out=True)
-    check_equal(input_data, bin_sout_expected_output_data, batch_major_in=True, batch_major_out=False)
+    check_equal(input_data, bin_bout_expected_output_data, split_axis=1, concat_axis=2)
 
     input_data, sin_sout_expected_output_data, sin_bout_expected_output_data = prepare_data(
         batch_major=False, batch_size=1, seq_len=4, num_head=4, h=8
     )
-    check_equal(input_data, sin_sout_expected_output_data, batch_major_in=False, batch_major_out=False)
-    check_equal(input_data, sin_bout_expected_output_data, batch_major_in=False, batch_major_out=True)
+    check_equal(input_data, sin_sout_expected_output_data, split_axis=0, concat_axis=2)
 
     print("testing reshard output pass")
 

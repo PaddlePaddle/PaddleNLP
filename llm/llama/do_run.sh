@@ -24,14 +24,14 @@ export FLAGS_flash_attn_version=v1
 export USE_FAST_LN=0
 
 mode="dp"
-# mode="sep"
+mode="sep"
 
 export PYTHONPATH=../../:$PYTHONPATH
 if [[ $mode == "dp" ]]; then
 rm -rf dp_input_data/*
 python -u  -m paddle.distributed.launch \
     --gpus "0" \
-    --log_dir "./dp_log" \
+    --log_dir "./log" \
     run_pretrain.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
@@ -51,7 +51,7 @@ python -u  -m paddle.distributed.launch \
     --pp_recompute_interval 1 \
     --learning_rate 0.00001 \
     --min_learning_rate 0.000001 \
-    --max_steps 2000 \
+    --max_steps 1 \
     --save_steps 50000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
@@ -80,7 +80,7 @@ elif [[ $mode == "sep" ]]; then
 rm -rf sep_input_data/*
 python -u  -m paddle.distributed.launch \
     --gpus "1, 2" \
-    --log_dir "./sep_log" \
+    --log_dir "./log" \
     run_pretrain.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
@@ -100,7 +100,7 @@ python -u  -m paddle.distributed.launch \
     --pp_recompute_interval 1 \
     --learning_rate 0.00001 \
     --min_learning_rate 0.000001 \
-    --max_steps 2000 \
+    --max_steps 1 \
     --save_steps 50000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \

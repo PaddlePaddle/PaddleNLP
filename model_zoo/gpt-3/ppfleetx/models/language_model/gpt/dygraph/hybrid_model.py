@@ -55,7 +55,7 @@ from .sequence_parallel_utils import (
     mark_as_sequence_parallel_parameter,
 )
 
-from ppfleetx.models.language_model.gpt.segment_parallel_utils  import ReshardLayer, ReshardAxis
+from ppfleetx.models.language_model.gpt.segment_parallel_utils  import ReshardLayer
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
@@ -297,11 +297,9 @@ class MultiHeadAttention(nn.Layer):
 
     def _flash_attention(self, q, k, v, attn_mask=None):
         if self.reshard_layer is not None:
-            batch_major_in = False if self.sequence_parallel else True
-            batch_major_out = True
-            q = self.reshard_layer(q, split_axis=ReshardAxis.NUM_HIDDEN, concat_axis=ReshardAxis.SEQUENCE, batch_major_in=batch_major_in, batch_major_out=batch_major_out)
-            k = self.reshard_layer(k, split_axis=ReshardAxis.NUM_HIDDEN, concat_axis=ReshardAxis.SEQUENCE, batch_major_in=batch_major_in, batch_major_out=batch_major_out)
-            v = self.reshard_layer(v, split_axis=ReshardAxis.NUM_HIDDEN, concat_axis=ReshardAxis.SEQUENCE, batch_major_in=batch_major_in, batch_major_out=batch_major_out)
+            q = self.reshard_layer(q, split_axis=2, concat_axis=1,)
+            k = self.reshard_layer(k, split_axis=2, concat_axis=1,)
+            v = self.reshard_layer(v, split_axis=2, concat_axis=1,)
         else:
             if self.sequence_parallel:
                 perm = [1, 0, 2, 3]
@@ -312,9 +310,7 @@ class MultiHeadAttention(nn.Layer):
             q, k, v, self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
         )
         if self.reshard_layer is not None:
-            batch_major_in = True
-            batch_major_out = False if self.sequence_parallel else True
-            out = self.reshard_layer(out, split_axis=ReshardAxis.SEQUENCE, concat_axis=ReshardAxis.NUM_HIDDEN, batch_major_in=batch_major_in, batch_major_out=batch_major_out)
+            out = self.reshard_layer(out, split_axis=1, concat_axis=2,)
         else:
             out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
             if self.sequence_parallel:

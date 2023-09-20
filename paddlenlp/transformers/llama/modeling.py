@@ -53,7 +53,7 @@ from ..sequence_parallel_utils import (
     ScatterOp,
     mark_as_sequence_parallel_parameter,
 )
-from ..segment_parallel_utils import ReshardLayer, ReshardAxis, save_tensor
+from ..segment_parallel_utils import ReshardLayer, save_tensor
 from .configuration import (
     LLAMA_PRETRAINED_INIT_CONFIGURATION,
     LLAMA_PRETRAINED_RESOURCE_FILES_MAP,
@@ -190,20 +190,12 @@ def scaled_dot_product_attention(
     _, kv_seq_len, _, _ = value_states.shape
 
     if config.use_flash_attention and flash_attention:
-        # logger.info(f"use_flash_attention, reshard_layer:{reshard_layer}")
         # Flash Attention now ignore attention mask
         # Current Flash Attention doesn't support attn maskt
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
         if alibi is not None:
             raise ValueError("Flash Attention does not support ALiBi yet")
-        # save_tensor(query_states, suffix_name="q_before_flash_attn")
-        # save_tensor(key_states, suffix_name="k_before_flash_attn")
-        # save_tensor(value_states, suffix_name="v_before_flash_attn")
-        if reshard_layer is not None:
-            query_states = reshard_layer(query_states, split_axis=ReshardAxis.NUM_HEAD, concat_axis=ReshardAxis.SEQUENCE, batch_major_in=True, batch_major_out=True)
-            key_states = reshard_layer(key_states, split_axis=ReshardAxis.NUM_HEAD, concat_axis=ReshardAxis.SEQUENCE, batch_major_in=True, batch_major_out=True)
-            value_states = reshard_layer(value_states, split_axis=ReshardAxis.NUM_HEAD, concat_axis=ReshardAxis.SEQUENCE, batch_major_in=True, batch_major_out=True)
         attn_output, attn_weights = flash_attention(
             query_states,
             key_states,
@@ -212,29 +204,19 @@ def scaled_dot_product_attention(
             return_softmax=output_attentions,
         )
         if reshard_layer is not None:
-            attn_output = reshard_layer(attn_output, split_axis=ReshardAxis.SEQUENCE, concat_axis=ReshardAxis.NUM_HEAD, batch_major_in=True, batch_major_out=True)
-        # save_tensor(attn_output, suffix_name="flash_attn_output")
+            # input attn_output shape: [bs, seqlen, num_head/sep, head_dim]
+            attn_output = reshard_layer(attn_output, split_axis=1, concat_axis=2,)
+            # output attn_output shape: [bs, seqlen/sep, num_head, head_dim]
+            # restore the sequence len and num_head
+            assert q_len % config.sep_parallel_degree == 0, f"q_len:{q_len}, config.sep_parallel_degree:{config.sep_parallel_degree}"
+            q_len = q_len // config.sep_parallel_degree
+            num_heads = num_heads * config.sep_parallel_degree
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
             attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
         return (attn_output, attn_weights) if output_attentions else attn_output
     else:
-        logger.info("not flash attn")
-        ##
-        # save_tensor(query_states, suffix_name="q_before_core_attn")
-        # save_tensor(key_states, suffix_name="k_before_core_attn")
-        # save_tensor(value_states, suffix_name="v_before_core_attn")
-        if reshard_layer is not None:
-            query_states = reshard_layer(query_states, split_axis=ReshardAxis.NUM_HEAD, concat_axis=ReshardAxis.SEQUENCE, batch_major_in=True, batch_major_out=True)
-            key_states = reshard_layer(key_states, split_axis=ReshardAxis.NUM_HEAD, concat_axis=ReshardAxis.SEQUENCE, batch_major_in=True, batch_major_out=True)
-            value_states = reshard_layer(value_states, split_axis=ReshardAxis.NUM_HEAD, concat_axis=ReshardAxis.SEQUENCE, batch_major_in=True, batch_major_out=True)
-            logger.info(f"query_states shape:{query_states.shape}")
-            old_q_len = q_len
-            old_num_heads = num_heads
-            bsz, q_len, num_heads, head_dim = query_states.shape
-            _, kv_seq_len, _, _ = value_states.shape
-        ##
         query_states = paddle.transpose(query_states, [0, 2, 1, 3])
         # merge with the next tranpose
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
@@ -243,7 +225,6 @@ def scaled_dot_product_attention(
         # matmul and devide by sqrt(head_dim)
         attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
         # then add alibi bias
-        # logger.info(f"alibi:{alibi}") # None
         if alibi is not None:
             alibi = alibi.reshape([bsz, num_heads, 1, -1])
             attn_weights = attn_weights + alibi
@@ -257,11 +238,10 @@ def scaled_dot_product_attention(
         # NOTE: we only call get_triangle_upper_mask under PP setup
         # FIXME ZHUI when we use pipeline parallel, the attention_mask can be None
         # we just make it triangle_upper_mask
-        # logger.info(f"attention_mask:{attention_mask}")
-        attention_mask = None
+        if reshard_layer is not None:
+            attention_mask = None
         if attention_mask is None:
             attention_mask = get_triangle_upper_mask(attn_weights)
-        logger.info(f"after gen, attention_mask shape:{attention_mask.shape}")
         attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
         if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
             raise ValueError(
@@ -276,16 +256,13 @@ def scaled_dot_product_attention(
                 attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
 
         attn_output = paddle.matmul(attn_weights, value_states)
-        logger.info(f"attn_output shape:{attn_output.shape}")
         attn_output = attn_output.transpose([0, 2, 1, 3])
-        ##
+
         if reshard_layer is not None:
-            attn_output = reshard_layer(attn_output, split_axis=ReshardAxis.SEQUENCE, concat_axis=ReshardAxis.NUM_HEAD, batch_major_in=True, batch_major_out=True)
-            logger.info(f"after reshard attn_output shape:{attn_output.shape}")
-            q_len = old_q_len
-            num_heads = old_num_heads
-        ##
-        # save_tensor(attn_output, suffix_name="flash_attn_output")
+            attn_output = reshard_layer(attn_output, split_axis=1, concat_axis=2,)
+            q_len = q_len //  config.sep_parallel_degree
+            num_heads = num_heads * config.sep_parallel_degree
+
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
@@ -557,14 +534,6 @@ class LlamaMLP(nn.Layer):
             out = self.down_proj(F.silu(gate_out) * up_out)
         else:
             out = self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
-            # logger.info("not fuse_attention_ffn")
-            # silu_res = F.silu(self.gate_proj(x))
-            # # save_tensor(silu_res, suffix_name="silu_res")
-            # up_proj = silu_res * self.up_proj(x)
-            # # save_tensor(up_proj, suffix_name="up_proj")
-            # out = self.down_proj(up_proj)
-            # # save_tensor(self.down_proj.weight, suffix_name="down_proj_weight")
-            # # save_tensor(out, suffix_name="down_proj")
 
         return out
 
@@ -717,7 +686,6 @@ class LlamaAttention(nn.Layer):
         
         self.reshard_layer = None
         if config.sep_parallel_degree > 1:
-            # logger.info(f"Set ReshardLayer, config.sep_parallel_degree:{config.sep_parallel_degree}")
             self.reshard_layer = ReshardLayer()
 
         self.config = config
@@ -763,25 +731,41 @@ class LlamaAttention(nn.Layer):
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
 
         if self.fuse_attention_qkv:
-            if self.sequence_parallel:
-                target_shape = [-1, self.seq_length, self.num_heads, 3 * self.head_dim]
-            else:
-                target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
-
             mix_layer = self.qkv_proj(hidden_states)
-            mix_layer = paddle.reshape_(mix_layer, target_shape)
+            if self.reshard_layer is not None:
+                if self.sequence_parallel:
+                    assert self.seq_length % self.config.sep_parallel_degree == 0
+                    mix_layer.reshape_([-1, self.seq_length // self.config.sep_parallel_degree, 0])
+                mix_layer = self.reshard_layer(mix_layer, split_axis=2, concat_axis=1,)
+                mix_layer = paddle.reshape_(mix_layer, [0, self.seq_length, -1, 3 * self.head_dim])  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
+            else:
+                if self.sequence_parallel:
+                    target_shape = [-1, self.seq_length, self.num_heads, 3 * self.head_dim]
+                else:
+                    target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
+                mix_layer = paddle.reshape_(mix_layer, target_shape)
             query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
         else:
-            if self.sequence_parallel:
-                target_query_shape = [-1, self.seq_length, self.num_heads, self.head_dim]
-                target_key_value_shape = [-1, self.seq_length, self.num_key_value_heads, self.head_dim]
+            query_states = self.q_proj(hidden_states)
+            key_states = self.k_proj(hidden_states)
+            value_states = self.v_proj(hidden_states)
+            if self.reshard_layer is not None:
+                query_states = self.reshard_layer(query_states, split_axis=2, concat_axis=1,)
+                key_states = self.reshard_layer(key_states, split_axis=2, concat_axis=1,)
+                value_states = self.reshard_layer(value_states, split_axis=2, concat_axis=1,)
+                query_states = paddle.reshape_(query_states, [0, self.seq_length, -1, self.head_dim])  # [bs, seq_len, num_head/k, head_dim], k is sep degree
+                key_states  = paddle.reshape_(key_states, [0, self.seq_length, -1, self.head_dim])
+                value_states = paddle.reshape_(value_states, [0, self.seq_length, -1, self.head_dim])
             else:
-                target_query_shape = [0, 0, self.num_heads, self.head_dim]
-                target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
-
-            query_states = self.q_proj(hidden_states).reshape(shape=target_query_shape)
-            key_states = self.k_proj(hidden_states).reshape(shape=target_key_value_shape)
-            value_states = self.v_proj(hidden_states).reshape(shape=target_key_value_shape)
+                if self.sequence_parallel:
+                    target_query_shape = [-1, self.seq_length, self.num_heads, self.head_dim]
+                    target_key_value_shape = [-1, self.seq_length, self.num_key_value_heads, self.head_dim]
+                else:
+                    target_query_shape = [0, 0, self.num_heads, self.head_dim]
+                    target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
+                query_states = query_states.reshape(shape=target_query_shape)
+                key_states = key_states.reshape(shape=target_key_value_shape)
+                value_states = value_states.reshape(shape=target_key_value_shape)
 
         kv_seq_len = key_states.shape[-3]
 
@@ -858,13 +842,7 @@ class LlamaAttention(nn.Layer):
 
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
-        # logger.info(f"self.o_proj.weight:{self.o_proj.weight}")
-        # save_tensor(attn_output, suffix_name="reshape_attn_output")
-        # save_tensor(self.o_proj.weight, suffix_name="o_proj_weight")
-        # logger.info(f"self.o_proj:{self.o_proj}, weight dtype:{self.o_proj.weight.dtype}, attn_output shape:{attn_output.shape}, self.o_proj.weight shape:{self.o_proj.weight.shape}")
         attn_output = self.o_proj(attn_output)
-
-        # save_tensor(attn_output, suffix_name="o_proj")
 
         if not output_attentions:
             attn_weights = None

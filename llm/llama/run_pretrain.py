@@ -454,7 +454,7 @@ def main():
     config.sep_parallel_degree = training_args.sep_parallel_degree
 
     # hack to change model size
-    config.num_hidden_layers = 16
+    config.num_hidden_layers = 2
     config.intermediate_size = config.hidden_size
     #
 
