@@ -154,9 +154,14 @@ def prediction(history):
         messages.append(
             {"role": "function", "name": function_call["name"], "content": json.dumps(res, ensure_ascii=False)}
         )
-        response = erniebot.ChatCompletion.create(model="ernie-bot-3.5", messages=messages)
-        result = response["result"]
-    history.append([query, result])
+        response = erniebot.ChatCompletion.create(model="ernie-bot-3.5", messages=messages, stream=True)
+        stream_output = ""
+        for character in response:
+            result = character["result"]
+            stream_output += result
+            yield history + [[query, stream_output]], "\n".join(logs)
+
+    history.append([query, stream_output])
     return history, "\n".join(logs)
 
 
@@ -183,6 +188,7 @@ def launch_ui():
                 prediction, inputs=[chatbot], outputs=[chatbot, log]
             )
             clear.click(lambda _: ([[None, "您好, 我是维普论文小助手"]]), inputs=[clear], outputs=[chatbot])
+    demo.queue()
     demo.launch(server_name=args.serving_name, server_port=args.serving_port, debug=True)
 
 
