@@ -118,6 +118,7 @@ def history_transform(history=[]):
 def prediction(history):
     logs = []
     query = history.pop()[0]
+
     if query == "":
         return history, "注意：问题不能为空"
     for turn_idx in range(len(history)):
@@ -129,17 +130,26 @@ def prediction(history):
     messages = history_transform(history)
     messages.append({"role": "user", "content": query})
     # Step 1, decide whether we need function call
-    response = erniebot.ChatCompletion.create(
-        model="ernie-bot-3.5",
-        messages=messages,
-        functions=functions,
+    resp_stream = erniebot.ChatCompletion.create(
+        model="ernie-bot-3.5", messages=messages, functions=functions, stream=True
     )
     # Step 2: execute command
-    if "function_call" not in response:
-        logs.append("Function Call未触发")
-        result = response["result"]
-    else:
-        function_call = response.function_call
+    stream_output = ""
+    output_response = ""
+    for resp in resp_stream:
+        if not hasattr(resp, "function_call"):
+            logs.append("Function Call未触发")
+            stream_output += resp["result"]
+            yield history + [[query, stream_output]], "\n".join(logs)
+
+        else:
+            # Function Call triggered
+            output_response = resp
+            break
+
+    # 2.1: execute function calling
+    if hasattr(output_response, "function_call"):
+        function_call = output_response.function_call
         logs.append(f"Function Call已触发: {function_call}")
         name2function = {"search_multi_paper": search_multi_paper, "search_single_paper": search_single_paper}
         func = name2function[function_call["name"]]
@@ -147,16 +157,21 @@ def prediction(history):
         res = func(**func_args)
         # 对于多篇论文检索加入润色prompt
         if function_call["name"] == "search_multi_paper":
-            res["prompt"] = "请根据论文检索工具的结果返回每篇论文的标题（加粗）, 内容以及关键词"
+            res["prompt"] = "请根据论文检索工具的结果返回每篇论文的标题（加粗）, 内容以及关键词，使用自然语言的方式输出，不要使用json或者表格的形式。"
         logs.append(f"Function Call调用结果: {res}")
         # Step 3: return msg to erniebot
         messages.append({"role": "assistant", "content": None, "function_call": function_call})
         messages.append(
             {"role": "function", "name": function_call["name"], "content": json.dumps(res, ensure_ascii=False)}
         )
-        response = erniebot.ChatCompletion.create(model="ernie-bot-3.5", messages=messages)
-        result = response["result"]
-    history.append([query, result])
+        response = erniebot.ChatCompletion.create(model="ernie-bot-3.5", messages=messages, stream=True)
+        stream_output = ""
+        for character in response:
+            result = character["result"]
+            stream_output += result
+            yield history + [[query, stream_output]], "\n".join(logs)
+
+    history.append([query, stream_output])
     return history, "\n".join(logs)
 
 
@@ -183,6 +198,7 @@ def launch_ui():
                 prediction, inputs=[chatbot], outputs=[chatbot, log]
             )
             clear.click(lambda _: ([[None, "您好, 我是维普论文小助手"]]), inputs=[clear], outputs=[chatbot])
+    demo.queue()
     demo.launch(server_name=args.serving_name, server_port=args.serving_port, debug=True)
 
 
