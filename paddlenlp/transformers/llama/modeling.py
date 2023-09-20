@@ -193,7 +193,7 @@ def scaled_dot_product_attention(
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
         if alibi is not None:
-            raise ValueError("Flash Attention does not support ALiBi yet")
+            attention_mask = attention_mask.cast(alibi.dtype) + alibi
 
         # TODO: attention_mask is None is not reliable
         attn_output = F.scaled_dot_product_attention(
