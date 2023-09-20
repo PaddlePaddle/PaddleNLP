@@ -117,7 +117,11 @@ def history_transform(history=[]):
 
 def prediction(history):
     logs = []
-    query = history.pop()[0]
+    if history is not None:
+        query = history.pop()[0]
+    else:
+        return history, "注意：问题不能为空"
+
     if query == "":
         return history, "注意：问题不能为空"
     for turn_idx in range(len(history)):
@@ -138,6 +142,7 @@ def prediction(history):
     if "function_call" not in response:
         logs.append("Function Call未触发")
         stream_output = response["result"]
+        yield history + [[query, stream_output]], "\n".join(logs)
     else:
         function_call = response.function_call
         logs.append(f"Function Call已触发: {function_call}")
