@@ -139,7 +139,7 @@ class MultiHeadAttention(nn.Layer):
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
 
-        self.use_flash_attention = config.use_flash_attention if flash_attention else None
+        self.use_flash_attention = config.use_flash_attention if flash_attention else False
 
         self.head_dim = config.hidden_size // config.num_attention_heads
         assert (
@@ -300,7 +300,7 @@ class MultiHeadAttention(nn.Layer):
             key=k,
             value=v,
             dropout=self.config.attention_probs_dropout_prob,
-            causal=True,
+            causal=q.shape[1] != 1,
             return_softmax=output_attentions,
             training=self.training,
         )
@@ -357,7 +357,7 @@ class MultiHeadAttention(nn.Layer):
         else:
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
 
-        if self.use_flash_attention and attn_mask is None:
+        if self.use_flash_attention:
             attn_func = self._flash_attention
         else:
             attn_func = self.core_attn
