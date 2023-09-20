@@ -149,7 +149,7 @@ def prediction(history):
             res = func(**func_args)
             # 对于多篇论文检索加入润色prompt
             if function_call["name"] == "search_multi_paper":
-                res["prompt"] = "请根据论文检索工具的结果返回每篇论文的标题（加粗）, 内容以及关键词"
+                res["prompt"] = "请根据论文检索工具的结果返回每篇论文的标题（加粗）, 内容以及关键词，使用自然语言的方式输出，不要使用json或者表格的形式。"
             logs.append(f"Function Call调用结果: {res}")
             # Step 3: return msg to erniebot
             messages.append({"role": "assistant", "content": None, "function_call": function_call})
