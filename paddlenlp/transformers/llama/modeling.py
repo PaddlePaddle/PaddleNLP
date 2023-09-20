@@ -771,7 +771,7 @@ class LlamaAttention(nn.Layer):
 
         if past_key_value is not None:
             kv_seq_len += past_key_value[0].shape[-3]
-        if self.config.rope and False:
+        if self.config.rope:
             if self.rope_fusion_level is not None:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
 
