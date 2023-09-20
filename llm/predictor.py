@@ -799,8 +799,8 @@ def benchmark(predictor, predictor_args, model_args):
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
-    warmup_time = 1
-    test_time = 10
+    warmup_time = 10
+    test_time = 100
 
     print("***********Start Warmup**********")
     for _ in range(warmup_time):
