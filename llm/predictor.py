@@ -17,6 +17,7 @@ import json
 import os
 import sys
 import time
+from threading import Thread
 from abc import abstractmethod
 from dataclasses import dataclass, field
 
@@ -44,6 +45,7 @@ from paddlenlp.transformers import (
     PretrainedTokenizer,
 )
 from paddlenlp.utils.import_utils import import_module, is_paddlenlp_ops_available
+from paddlenlp.generation import TextIteratorStreamer
 
 
 @dataclass
@@ -136,6 +138,7 @@ class BasePredictor:
             tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path, padding_side="left")
 
         self.tokenizer = tokenizer
+
         self.return_tensors = "pd"
         self.tensor_parallel_rank, self.tensor_parallel_degree = init_dist_env()
         self.model_config.tensor_parallel_rank, self.model_config.tensor_parallel_degree = init_dist_env()
@@ -224,7 +227,27 @@ class DygraphPredictor(BasePredictor):
         )
         result = result[0]
         return result
+    
+    def stream_predict(self, inputs: dict[str, paddle.Tensor]):
+        text_streamer = TextIteratorStreamer(self.tokenizer)
+        input_features = self._preprocess(inputs)
+        generation_kwargs = dict(
+            **input_features,
+            streamer=text_streamer,
+            max_new_tokens=self.config.max_length,
+            bos_token_id=self.tokenizer.bos_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
+            pad_token_id=self.tokenizer.pad_token_id,
+            decode_strategy=self.config.decode_strategy,
+            temperature=self.config.temperature,
+            top_k=self.config.top_k,
+            top_p=self.config.top_p,
+            repetition_penalty=self.config.repetition_penalty,
+        )
+        thread = Thread(target=self.model.generate, kwargs=generation_kwargs)
+        thread.start()
 
+        return text_streamer
 
 class StaticGraphPredictor(BasePredictor):
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
