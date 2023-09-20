@@ -1083,7 +1083,7 @@ python setup_cuda.py install
 
 echo ' Testing all LLMs '
 cd ${nlp_dir}
-python -m pytest tests/llm/test_*.py >${log_path}/llm >>${log_path}/llm 2>&1
+python -m pytest -v -s tests/llm/test_*.py >${log_path}/llm >>${log_path}/llm 2>&1
 print_info $? llm
 }
 fast_generation(){
