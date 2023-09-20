@@ -332,7 +332,7 @@ class ChatGLMStackDyBatch(nn.Layer):
                 continue
             elif k.startswith("lm_head.weight"):
                 continue
-            elif k.endswith("rotary_emb.inv_freq"):
+            elif k.endswith("rotary_embeddings.inv_freq") or k.endswith("rotary_emb.inv_freq"):
                 continue
             idx = int(k.split(".")[2])
             if k.endswith("input_layernorm.weight"):
