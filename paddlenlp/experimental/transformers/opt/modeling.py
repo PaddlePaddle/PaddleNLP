@@ -43,17 +43,15 @@ class OPTInferenceModel(OPTPretrainedModel):
         super(OPTInferenceModel, self).__init__(config)
         self.pad_token_id = config.pad_token_id
         self.initializer_range = config.initializer_range
-        self.hidden_size = config.hidden_size
         self.vocab_size = config.vocab_size
         self.embeddings = OPTEmbeddings(config)
-
-        self.num_layers = config.num_hidden_layers
 
         if config.normalize_before:
             self.final_layer_norm = nn.LayerNorm(config.hidden_size)
         else:
             self.final_layer_norm = None
 
+        self.num_layers = config.num_hidden_layers
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
         self.head_size = self.hidden_size // self.num_heads
