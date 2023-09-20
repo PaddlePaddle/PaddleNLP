@@ -2220,6 +2220,10 @@ class OpenDistroElasticsearchDocumentStore(OpenSearchDocumentStore):
 
 
 class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
+    ef_construction = 200
+    m = 32
+    space_type = "l2"
+
     def similarity_check(self, similarity):
         if similarity in ["cosine", "dot_prod", "l2", "l1"]:
             self.similarity = similarity
@@ -2371,9 +2375,10 @@ class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
                         "type": self.vector_type,
                         "dims": self.embedding_dim,
                         "index_type": "hnsw",
-                        "space_type": "l2",
-                        "parameters": {"ef_construction": 200, "m": 32},
+                        "space_type": self.space_type,
+                        "parameters": {"ef_construction": self.ef_construction, "m": self.m},
                     }
+
             else:
                 mapping["mappings"]["properties"][self.embedding_field] = {
                     "type": self.vector_type,
