@@ -1625,7 +1625,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 raise ImportError("Quantization features require `paddlepaddle >= 2.5.2`")
             if state_dict is not None:
                 state_dict = convert_to_quantize_state_dict(
-                    state_dict, quantization_linear_list, config.quantization_config["quant_algo"], dtype
+                    state_dict,
+                    quantization_linear_list,
+                    config.quantization_config["quant_algo"],
+                    dtype,
+                    config.tensor_parallel_degree > 1,
                 )
                 loaded_keys = [k for k in state_dict.keys()]
             else:
@@ -1758,7 +1762,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None)
                 if quantization_config is not None:
                     state_dict = convert_to_quantize_state_dict(
-                        state_dict, quantization_linear_list, quantization_config["quant_algo"], dtype
+                        state_dict,
+                        quantization_linear_list,
+                        quantization_config["quant_algo"],
+                        dtype,
+                        config.tensor_parallel_degree > 1,
                     )
 
                 # Mistmatched keys contains tuples key/shape1/shape2 of weights in the checkpoint that have a shape not
@@ -1960,8 +1968,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 from ..utils.quantization import replace_with_quantization_linear
             except ImportError:
                 raise ImportError("You need to install paddlepaddle >= 2.5.2")
-            if config.tensor_parallel_degree > 1:
-                raise NotImplementedError("Quantization method dosen't support tensor parallelism.")
+
             if dtype != "float16" and dtype != "bfloat16":
                 dtype = "float16"
                 logger.warning(
