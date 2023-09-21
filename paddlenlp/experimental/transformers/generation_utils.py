@@ -298,7 +298,7 @@ class GenerationInferenceModel(GenerationMixin):
         batch_idx = paddle.full(shape=[1], dtype="int32", fill_value=-1)
 
         # fake temp next_tokens
-        batch, encoder_max_seq = input_ids.shape if input_ids is not None else inputs_embeds.shape[0:2]
+        batch = input_ids.shape[0] if input_ids is not None else inputs_embeds.shape[0]
         next_tokens = paddle.full(shape=[batch, 1], dtype="int32", fill_value=0)
 
         # let inputs_embeds enter into model_kwargs.
