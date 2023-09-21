@@ -1,7 +1,5 @@
 pretrain:
-  default:
-    model_type: llama
-    model_name_or_path: __internal_testing__/tiny-random-llama
+  base:
     weight_decay: 0.01
     max_steps: 2
     save_steps: 2
@@ -20,7 +18,13 @@ pretrain:
     use_flash_attention: 0
     use_fused_rms_norm: 0
     continue_training: 1
-
+  default:
+    llama:
+      model_type: llama
+      model_name_or_path: __internal_testing__/tiny-random-llama
+    chatglm:
+      model_type: chatglm
+      model_name_or_path: __internal_testing__/tiny-fused-chatglm
 
 inference-predict:
   default:
@@ -41,4 +45,3 @@ inference-infer:
     batch_size: 2
     decode_strategy: greedy_search
     max_length: 20
-    enable_compare: false
