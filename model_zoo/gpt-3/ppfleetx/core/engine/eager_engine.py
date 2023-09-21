@@ -44,7 +44,6 @@ from ppfleetx.utils.log import convert_timestamp_to_data, get_timestamp, logger
 from ppfleetx.utils.tensor_fusion_helper import all_reduce_parameters
 from ppfleetx.utils.version import version_check
 
-from ppfleetx.models.language_model.gpt.segment_parallel_utils  import split_inputs_sequence_dim
 
 class EagerEngine(BasicEngine):
     """
@@ -314,9 +313,6 @@ class EagerEngine(BasicEngine):
         valid_data_loader = valid_data_loader() if valid_data_loader is not None else None
         eval_finished_step = 0
         for step, batch in enumerate(train_data_loader()):
-            logger.info(f"before split batch shape:{batch.shape}")
-            batch = split_inputs_sequence_dim(batch)
-            logger.info(f"after split batch shape:{batch.shape}")
             if epoch_index == self._load_recovery["epoch"]:
                 if step < self._load_recovery["step"]:
                     continue

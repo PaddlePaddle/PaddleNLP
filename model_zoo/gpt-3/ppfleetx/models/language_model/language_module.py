@@ -32,6 +32,7 @@ from ppfleetx.utils.log import logger
 # TODO(haohongxiang): to solve the problem of cross-reference
 import paddlenlp  # noqa: F401
 from paddlenlp.transformers.gpt.tokenizer import GPTChineseTokenizer
+from paddlenlp.transformers.segment_parallel_utils  import split_inputs_sequence_dim
 
 from .metrics import Accuracy, AccuracyAndF1, Mcc, PearsonAndSpearman
 from .utils import process_configs
@@ -86,6 +87,10 @@ class LanguageModule(BasicModule):
 
     def training_step(self, batch):
         tokens, position_ids, labels, loss_mask = batch
+        if self.nranks > 1:
+            tokens = split_inputs_sequence_dim(tokens)
+            position_ids = split_inputs_sequence_dim(position_ids)
+            labels = split_inputs_sequence_dim(labels)
 
         loss_mask.stop_gradient = True
         labels.stop_gradient = True

@@ -55,7 +55,7 @@ from .sequence_parallel_utils import (
     mark_as_sequence_parallel_parameter,
 )
 
-from ppfleetx.models.language_model.gpt.segment_parallel_utils  import ReshardLayer
+from paddlenlp.transformers.segment_parallel_utils  import ReshardLayer
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
@@ -211,13 +211,19 @@ class MultiHeadAttention(nn.Layer):
         )
 
         self.reshard_layer = None
-        if env.get_hcg().get_sep_parallel_world_size() > 1:
+        self.sep_parallel_degree = env.get_hcg().get_sep_parallel_world_size()
+        if self.sep_parallel_degree > 1:
             self.reshard_layer = ReshardLayer()
-        logger.info(f"self.reshard_layer:{self.reshard_layer}")
 
     def _fuse_prepare_qkv(self, query, use_cache=False, cache=None):
         mix_layer = self.qkv_proj(query)
-        mix_layer = paddle.reshape_(mix_layer, [0, 0, -1, 3 * self.head_dim])
+        if self.reshard_layer is not None:
+            mix_layer = self.reshard_layer(mix_layer, split_axis=2, concat_axis=1,)
+            assert self.num_heads % self.sep_parallel_degree == 0, f"num_heads:{self.num_heads} must be divisible by sep_parallel_degree:{self.sep_parallel_degree}"
+            mix_layer = paddle.reshape_(mix_layer, [0, -1, self.num_heads // self.sep_parallel_degree, 3 * self.head_dim])  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
+        else:
+            mix_layer = paddle.reshape_(mix_layer, [0, 0, -1, 3 * self.head_dim])
+
         q, k, v = paddle.split(mix_layer, num_or_sections=3, axis=-1)
 
         assert not isinstance(cache, self.StaticCache), "cache currently does not support the StaticCache type"
@@ -296,26 +302,21 @@ class MultiHeadAttention(nn.Layer):
             return self.Cache(key, value)
 
     def _flash_attention(self, q, k, v, attn_mask=None):
-        if self.reshard_layer is not None:
-            q = self.reshard_layer(q, split_axis=2, concat_axis=1,)
-            k = self.reshard_layer(k, split_axis=2, concat_axis=1,)
-            v = self.reshard_layer(v, split_axis=2, concat_axis=1,)
-        else:
-            if self.sequence_parallel:
-                perm = [1, 0, 2, 3]
-                q = tensor.transpose(x=q, perm=perm)
-                k = tensor.transpose(x=k, perm=perm)
-                v = tensor.transpose(x=v, perm=perm)
+        if self.sequence_parallel:
+            perm = [1, 0, 2, 3]
+            q = tensor.transpose(x=q, perm=perm)
+            k = tensor.transpose(x=k, perm=perm)
+            v = tensor.transpose(x=v, perm=perm)
         out, weights = flash_attention(
             q, k, v, self.dropout, causal=True, return_softmax=self.need_weights, training=self.training
         )
         if self.reshard_layer is not None:
             out = self.reshard_layer(out, split_axis=1, concat_axis=2,)
-        else:
-            out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
-            if self.sequence_parallel:
-                perm = [1, 0, 2]
-                out = tensor.transpose(x=out, perm=perm)
+
+        out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
+        if self.sequence_parallel:
+            perm = [1, 0, 2]
+            out = tensor.transpose(x=out, perm=perm)
         return (out, weights) if self.need_weights else out
 
     def core_attn(self, q, k, v, attn_mask=None):
@@ -807,7 +808,7 @@ class GPTModelHybrid(nn.Layer):
                     do_recompute=i not in no_recompute_layers,
                     skip_quant_tensors=skip_tensor_map.get("block_{}".format(i), []),
                     use_flash_attn=use_flash_attn,
-                    use_fused_dropout_add=use_fused_dropout_add,
+                    use_fused_dropout_add=False,
                 )
             )
 
@@ -947,16 +948,16 @@ class GPTPretrainingCriterionHybird(nn.Layer):
                 masked_lm_loss = self.parallel_loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
             else:
                 prediction_scores = ConcatSoftmaxInput.apply(
-                    prediction_scores, group=env.get_hcg().get_model_parallel_group()
+                    prediction_scores, group=hcg.get_model_parallel_group()
                 )
                 masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
         else:
             masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
-        _hcg = env.get_hcg()
-        if _hcg.get_sep_parallel_world_size() > 1:
+
+        if hcg.get_sep_parallel_world_size() > 1:
             sep_axis = 0 if self.sequence_parallel else 1
             masked_lm_loss = ConcatSePMaskedLoss.apply(
-                masked_lm_loss, axis=sep_axis, group=_hcg.get_sep_parallel_group())
+                masked_lm_loss, axis=sep_axis, group=hcg.get_sep_parallel_group())
         loss_mask = loss_mask.reshape([-1])
         masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
         loss = masked_lm_loss / loss_mask.sum()

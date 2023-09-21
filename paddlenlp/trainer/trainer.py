@@ -1639,9 +1639,10 @@ class Trainer:
         arguments, depending on the situation.
         """
         if self.enable_autocast_context_manager:
-            # custom_black_list = ["reduce_sum", "c_softmax_with_cross_entropy"]
-            custom_black_list = ["reduce_sum", "c_softmax_with_cross_entropy", "matmul_v2"]
-            custom_white_list = ["flash_attn"]
+            custom_black_list = ["reduce_sum", "c_softmax_with_cross_entropy"]
+            custom_white_list = []
+            # custom_black_list = ["reduce_sum", "c_softmax_with_cross_entropy", "matmul_v2"]
+            # custom_white_list = ["flash_attn"]
             if self.args.fp16_opt_level == "O2":
                 # https://github.com/PaddlePaddle/Paddle/blob/eb97f4f0adca40b16a309b927e480178beb8ae96/python/paddle/amp/amp_lists.py#L85-L86
                 # the lookup_table is in black_list, but in O2, we need it return fp16

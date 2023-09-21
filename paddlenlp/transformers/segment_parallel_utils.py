@@ -40,7 +40,7 @@ sys.path.append("../../")
 # llama attention module in paddlenlp/transformers/llama/modeling.py-LlamaAttention
 # gpt model_zoo/gpt-3/ppfleetx/models/language_model/gpt/dygraph/hybrid_model.py-MultiHeadAttention
 
-def save_tensor(input_data, save_dir="dp_input_data", suffix_name="", save_once=False, save_as_numpy=False):
+def save_tensor(input_data, suffix_name="", save_dir="dp_input_data", save_once=False, save_as_numpy=False):
     os.makedirs(save_dir, exist_ok=True)
     dp_rank = 0
     sep_rank = 0
@@ -104,26 +104,24 @@ def split_inputs_sequence_dim(inputs, sep_rank=None, sep_degree=None):
     assert isinstance(sep_degree, int) and isinstance(sep_rank, int), f"sep_degree and sep_rank must be int"
     if sep_degree <= 1:
         return inputs
-    def do_split_sequence_dim(data, sep_rank, split_sequence_len):
+    def do_split_sequence_dim(data, sep_rank, sep_degree):
         if data is None:
             return None
         assert isinstance(data, paddle.Tensor), f"data should be paddle.Tensor, but is type:{type(data)}"
         assert len(data.shape) == 2, f"data dims should be 2, but shaped: {data.shape}"
-        sliced_data = paddle.slice(
-            data, [-1], [sep_rank * split_sequence_len], [(sep_rank + 1) * split_sequence_len])
+        sliced_data = paddle.split(data, num_or_sections=sep_degree, axis=-1)[sep_rank]
         return sliced_data
 
-    if isinstance(inputs, dict):
+    if isinstance(inputs, paddle.Tensor):
+        return do_split_sequence_dim(inputs, sep_rank, sep_degree)
+    elif isinstance(inputs, dict):
         res = {}
         for k, tensor in inputs.items():
-            assert tensor.shape[-1] % sep_degree == 0, f"The last dim of {tensor} should be divisible by {sep_degree}"
-            split_sequence_len = tensor.shape[-1] // sep_degree
-            res[k] = do_split_sequence_dim(tensor, sep_rank, split_sequence_len)
+            res[k] = do_split_sequence_dim(tensor, sep_rank, sep_degree)
     elif isinstance(inputs, list):
         res = []
         for tensor in inputs:
-            res.append(do_split_sequence_dim(tensor))
-    else:
+            res.append(do_split_sequence_dim(tensor, sep_rank, sep_degree))
         raise ValueError(f"the inputs should be a list or a dict, but is type: {type(inputs)}")
     return res
 

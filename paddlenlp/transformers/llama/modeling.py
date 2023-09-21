@@ -951,9 +951,7 @@ class LlamaDecoderLayer(nn.Layer):
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        # save_tensor(hidden_states, suffix_name="post_attention_layernorm")
         hidden_states = self.mlp(hidden_states)
-        # save_tensor(hidden_states, suffix_name="mlp")
         hidden_states = residual + hidden_states
 
         outputs = (hidden_states,)

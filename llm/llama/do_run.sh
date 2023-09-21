@@ -31,7 +31,7 @@ if [[ $mode == "dp" ]]; then
 rm -rf dp_input_data/*
 python -u  -m paddle.distributed.launch \
     --gpus "0" \
-    --log_dir "./log" \
+    --log_dir "./dp_log" \
     run_pretrain.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
@@ -80,7 +80,7 @@ elif [[ $mode == "sep" ]]; then
 rm -rf sep_input_data/*
 python -u  -m paddle.distributed.launch \
     --gpus "1, 2" \
-    --log_dir "./log" \
+    --log_dir "./sep_log" \
     run_pretrain.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \

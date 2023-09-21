@@ -93,6 +93,10 @@ def set_seed(seed):
         sharding_rank * (mp_size * sep_size * pp_size * dp_size)
 
     )
+    # hack to force the same seed
+    global_seed = seed
+    local_seed = seed + 1
+    #
 
     tracker = get_rng_state_tracker()
     tracker.add("global_seed", global_seed)
