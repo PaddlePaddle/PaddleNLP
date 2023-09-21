@@ -1529,7 +1529,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                             f"{pretrained_model_name_or_path} does not appear to have a file named"
                             f" {_add_variant(PADDLE_WEIGHTS_NAME, variant)}."
                         )
-                except Exception:
+                except Exception as e:
+                    logger.info(e)
                     # For any other exception, we throw a generic error.
                     raise EnvironmentError(
                         f"Can't load the model for '{pretrained_model_name_or_path}'. If you were trying to load it"
@@ -2266,7 +2267,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
 class PipelinePretrainedModel(PretrainedModel):
     _sequential_layers = []
-    _pipeline_name_mapping = None
+    _single_to_pp_mapping = None
+    _pp_to_single_mapping = None
 
     def __init__(self, config, *args, **kwargs):
         super().__init__(config, *args, **kwargs)
@@ -2282,56 +2284,94 @@ class PipelinePretrainedModel(PretrainedModel):
 
     def _set_pipeline_name_mapping(self, mappings=None):
         if mappings is not None:
-            self._pipeline_name_mapping = mappings
+            self._single_to_pp_mapping = mappings
         else:
-            mapping = {}
+            single_to_pp_mapping = {}
+            pp_to_single_mapping = {}
+
             state_dict_keys = list(super().state_dict().keys())
-            first_key = state_dict_keys[0].split(".")
+            first_key = ""
+            for k in state_dict_keys:
+                if "shared_layers" not in k:
+                    first_key = k
+                    break
+            first_key = first_key.split(".")
             # if use virtual pp_degree, the prefix is like 0.0.xxx
             # else it will be like 0.xxx
             use_virtual_pp_degree = first_key[0].isdigit() and first_key[1].isdigit()
 
             prefixs = self.get_sequential_name_prefixs()
             for k in state_dict_keys:
+                print(k)
                 name_splited = k.split(".")
                 if use_virtual_pp_degree:
-                    idx = str(int(name_splited[0]) + int(name_splited[1]))
-                    single_name = [prefixs[idx]]
-                    single_name.extend(name_splited[2:])
+                    if name_splited[0].isdigit():
+                        if name_splited[1].isdigit():
+                            idx = str(int(name_splited[0]) + int(name_splited[1]))
+                            single_name = [prefixs[idx]]
+                            single_name.extend(name_splited[2:])
+                        else:
+                            single_name = [prefixs[str(len(prefixs) - 1)]]
+                            single_name.extend(name_splited[2:])
+                            logger.warning(
+                                f"Please check! we treat this key as last layer, get {k}, set origin name as {'.'.join(single_name)}"
+                            )
+                    elif name_splited[0] == "shared_layers":
+                        # TODO: it treat shared_layers as first layer
+                        single_name = [prefixs["0"]]
+                        single_name.extend(name_splited[2:])
+                        logger.warning(
+                            f"Please check! we treat shared_layers as first layer, get {k}, set origin name as {'.'.join(single_name)}"
+                        )
+                    else:
+                        raise ValueError(f"Unexpected key: {k} for pp layer.")
                 else:
                     idx = name_splited[0]
-                    single_name = [prefixs[idx]]
-                    single_name.extend(name_splited[1:])
-                mapping[".".join(single_name)] = k
+                    # for normal pp layer
+                    if idx.isdigit():
+                        single_name = [prefixs[idx]]
+                        single_name.extend(name_splited[1:])
+                    elif idx == "shared_layers":
+                        # TODO: it treat shared_layers as first layer
+                        single_name = [prefixs["0"]]
+                        single_name.extend(name_splited[2:])
+                        logger.warning(
+                            f"Please check! we treat shared_layers as first layer, get {k}, set origin name as {'.'.join(single_name)}"
+                        )
+                    else:
+                        raise ValueError(f"Unexpected key: {k} for pp layer.")
 
-            self._pipeline_name_mapping = mapping
+                single_to_pp_mapping[".".join(single_name)] = k
+                pp_to_single_mapping[k] = ".".join(single_name)
 
-        return self._pipeline_name_mapping
+            self._single_to_pp_mapping = single_to_pp_mapping
+            self._pp_to_single_mapping = pp_to_single_mapping
+
+        return self._single_to_pp_mapping
 
     def state_dict(self, *args, **kwargs):
         state_dict = super().state_dict(*args, **kwargs)
 
-        if self._pipeline_name_mapping is None:
+        if self._single_to_pp_mapping is None:
             self._set_pipeline_name_mapping()
-        assert len(self._pipeline_name_mapping) > 0, "The pipeline stage must have parameters!"
-        pp_to_single_mapping = {v: k for k, v in self._pipeline_name_mapping.items()}
+        assert len(self._single_to_pp_mapping) > 0, "The pipeline stage must have parameters!"
 
         for k in list(state_dict.keys()):
             v = state_dict.pop(k)
-            state_dict[pp_to_single_mapping[k]] = v
+            state_dict[self._pp_to_single_mapping[k]] = v
 
         return state_dict
 
     def set_state_dict(self, state_dict, *args, **kwargs):
-        if self._pipeline_name_mapping is None:
+        if self._single_to_pp_mapping is None:
             self._set_pipeline_name_mapping()
-        assert len(self._pipeline_name_mapping) > 0, "The pipeline stage must have parameters!"
+        assert len(self._single_to_pp_mapping) > 0, "The pipeline stage must have parameters!"
 
         for k in list(state_dict.keys()):
             v = state_dict.pop(k)
-            if k not in self._pipeline_name_mapping:
+            if k not in self._single_to_pp_mapping:
                 continue
-            state_dict[self._pipeline_name_mapping[k]] = v
+            state_dict[self._single_to_pp_mapping[k]] = v
 
         ret = super().set_state_dict(state_dict, *args, **kwargs)
         return ret

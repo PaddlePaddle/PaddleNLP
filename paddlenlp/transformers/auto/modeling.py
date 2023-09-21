@@ -320,17 +320,23 @@ class _BaseAutoModelClass:
                         try:
                             model_class = getattr(import_class, init_class)
                         except AttributeError as err:
-                            logger.error(err)
-                            all_model_classes = import_class.__all__
-                            all_tasks = {get_task_name(m) for m in all_model_classes if get_task_name(m) is not None}
-                            raise AttributeError(
-                                f"module '{import_class.__name__}' only supports the following classes: "
-                                + ", ".join(m for m in all_model_classes)
-                                + "\n"
-                                "Hint: you can use interface "
-                                + " or ".join(task + ".from_pretrained" for task in all_tasks)
-                                + f" to load '{pretrained_model_name_or_path}'\n"
-                            )
+                            try:
+                                import_class2 = importlib.import_module(f"paddlenlp.transformers.{class_name}")
+                                model_class = getattr(import_class2, init_class)
+                            except AttributeError:
+                                logger.error(err)
+                                all_model_classes = import_class.__all__
+                                all_tasks = {
+                                    get_task_name(m) for m in all_model_classes if get_task_name(m) is not None
+                                }
+                                raise AttributeError(
+                                    f"module '{import_class.__name__}' only supports the following classes: "
+                                    + ", ".join(m for m in all_model_classes)
+                                    + "\n"
+                                    "Hint: you can use interface "
+                                    + " or ".join(task + ".from_pretrained" for task in all_tasks)
+                                    + f" to load '{pretrained_model_name_or_path}'\n"
+                                )
                         logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
                         return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         # From local dir path
