@@ -38,7 +38,7 @@ class ModelArguments:
         default=None, metadata={"help": "Where do you want to store the pretrained models downloaded from s3"}
     )
 
-    normlized: bool = field(default=True)
+    normalized: bool = field(default=True)
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
 
 
@@ -82,5 +82,7 @@ class RetrieverTrainingArguments(TrainingArguments):
     fix_position_embedding: bool = field(
         default=False, metadata={"help": "Freeze the parameters of position embeddings"}
     )
-    sentence_pooling_method: str = field(default="cls", metadata={"help": "the pooling method, should be cls or mean"})
+    sentence_pooling_method: str = field(
+        default="weighted_mean", metadata={"help": "the pooling method, should be weighted_mean"}
+    )
     fine_tune_type: str = field(default="sft", metadata={"help": "fine-tune type for retrieval,eg: sft, bitfit"})

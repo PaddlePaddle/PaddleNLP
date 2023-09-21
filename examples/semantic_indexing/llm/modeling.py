@@ -41,22 +41,19 @@ class BiEncoderModel(BloomPreTrainedModel):
     def __init__(
         self,
         config: BloomConfig,
-        normlized: bool = False,
+        normalized: bool = False,
         sentence_pooling_method: str = "cls",
         negatives_cross_device: bool = False,
         temperature: float = 1.0,
     ):
         super().__init__(config)
         self.bloom = BloomModel(config)
-        # self.model = BloomModel(config)
-        # self.model = AutoModel.from_pretrained(model_name,dtype='bfloat16',use_flash_attention=use_flash_attention)
-        # self.model = AutoModel.from_pretrained(model_name,dtype='bfloat16')
         self.cross_entropy = nn.CrossEntropyLoss(reduction="mean")
 
-        self.normlized = normlized
+        self.normalized = normalized
         self.sentence_pooling_method = sentence_pooling_method
         self.temperature = temperature
-        if not normlized:
+        if not normalized:
             self.temperature = 1.0
             logger.info("reset temperature = 1.0 due to using inner product to compute similarity")
 
@@ -90,8 +87,6 @@ class BiEncoderModel(BloomPreTrainedModel):
             input_mask_expanded = mask.unsqueeze(-1).expand(hidden_state.shape)
             # bs, seq_len, hidden_dim -> bs, hidden_dim
             sum_embeddings = paddle.sum(hidden_state * input_mask_expanded * weights, axis=1, dtype="float32")
-            # print(sum_embeddings)
-            # sum_embeddings=paddle.clip(sum_embeddings, min=3.5, max=5.0)
             sum_mask = paddle.sum(input_mask_expanded * weights, axis=1)
             embedding = sum_embeddings / sum_mask
             return embedding
@@ -101,7 +96,7 @@ class BiEncoderModel(BloomPreTrainedModel):
             return None
         psg_out = self.bloom(**features, return_dict=True)
         p_reps = self.sentence_embedding(psg_out.last_hidden_state, features["attention_mask"])
-        if self.normlized:
+        if self.normalized:
             p_reps = paddle.nn.functional.normalize(p_reps, axis=-1)
         return p_reps.contiguous()
 
@@ -157,9 +152,3 @@ class BiEncoderModel(BloomPreTrainedModel):
         all_tensors = paddle.concat(all_tensors, axis=0)
 
         return all_tensors
-
-    # def save(self, output_dir: str):
-    #     #state_dict = self.model.state_dict()
-    #     #state_dict = type(state_dict)({k: v.clone().cpu() for k, v in state_dict.items()})
-    #     # self.model.save_pretrained(output_dir, state_dict=state_dict)
-    #     self.model.save_pretrained(output_dir)

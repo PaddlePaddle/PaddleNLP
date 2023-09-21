@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import math
 import os.path
 import random
@@ -25,8 +24,6 @@ from paddle.io import Dataset
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.transformers import BatchEncoding, PretrainedTokenizer
-
-logger = logging.getLogger(__name__)
 
 
 class TrainDatasetForEmbedding(Dataset):
@@ -49,7 +46,6 @@ class TrainDatasetForEmbedding(Dataset):
         self.tokenizer = tokenizer
         self.args = args
         self.total_len = len(self.dataset)
-        logger.info(f"Total number of training examples: {self.total_len}")
 
     def __len__(self):
         return self.total_len
