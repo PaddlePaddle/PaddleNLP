@@ -85,6 +85,10 @@ class PredictorArgument:
             "help": "If benchmark set as `True`, we will force model decode to max_length, which is helpful to compute throughput. "
         },
     )
+    enable_memory_optim: bool = field(
+        default=True,
+        metadata={"help": "whether use `enable_memory_optim` in inference predictor"},
+    )
 
     @property
     def total_max_length(self):
@@ -528,7 +532,8 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
         config.enable_use_gpu(100, device_id)
         # config.disable_glog_info()
-        config.enable_memory_optim()
+        if predictor_args.enable_memory_optim:
+            config.enable_memory_optim()
 
         # Note(zhengzekang): Force to use fleet executor
         if self.tensor_parallel_degree >= 1:

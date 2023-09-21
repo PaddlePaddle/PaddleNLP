@@ -58,6 +58,7 @@ class LLMTest:
 
     def run_predictor(self, config_params=None):
         config_params = config_params or {}
+        config_params.update("enable_memory_optim", False)
         # to avoid the same parameter
         self.disable_static()
         predict_config = load_test_config(self.config_path, "inference-predict")
