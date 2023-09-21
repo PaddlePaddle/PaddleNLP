@@ -86,6 +86,10 @@ class PredictorArgument:
         },
     )
 
+    @property
+    def total_max_length(self):
+        return self.src_length + self.max_length
+
 
 @dataclass
 class ModelArgument:
@@ -284,11 +288,10 @@ class InferencePredictorMixin:
             self.cache_kvs[0].shape[-3],
             self.cache_kvs[0].shape[-1],
         )
-        self.total_max_length = config.src_length + config.max_length
-        self.pre_ids = paddle.full([config.batch_size, self.total_max_length], -1, dtype="int64")
+        self.pre_ids = paddle.full([config.batch_size, config.total_max_length], -1, dtype="int64")
         if "chatglm" in self.architectures:
             self.attention_mask = paddle.ones(
-                shape=(config.batch_size, 1, self.total_max_length, self.total_max_length),
+                shape=(config.batch_size, 1, config.total_max_length, config.total_max_length),
                 dtype=self.dtype,
             )
             self.tgt_pos = paddle.ones(
@@ -297,16 +300,16 @@ class InferencePredictorMixin:
             )
         else:
             self.attention_mask = paddle.zeros(
-                shape=(config.batch_size, 1, self.total_max_length, self.total_max_length),
+                shape=(config.batch_size, 1, config.total_max_length, config.total_max_length),
                 dtype=self.dtype,
             )
 
         self.tgt_generation_mask = paddle.zeros(
-            shape=[config.batch_size, 1, 1, self.total_max_length],
+            shape=[config.batch_size, 1, 1, config.total_max_length],
             dtype=self.dtype,
         )
         self.arange_tensor_encoder = paddle.zeros(
-            shape=(config.batch_size, 1, self.total_max_length), dtype=self.dtype
+            shape=(config.batch_size, 1, config.total_max_length), dtype=self.dtype
         )
 
         if config.export_precache:
@@ -412,8 +415,8 @@ class InferencePredictorMixin:
                 [
                     inputs["input_ids"].shape[0],
                     self.model_config.n_head // self.model_config.tensor_parallel_degree,
-                    self.total_max_length,
-                    self.total_max_length,
+                    self.config.total_max_length,
+                    self.config.total_max_length,
                 ]
             )
             alibi_decoder = alibi.expand(
@@ -421,7 +424,7 @@ class InferencePredictorMixin:
                     inputs["input_ids"].shape[0],
                     self.model_config.n_head // self.model_config.tensor_parallel_degree,
                     1,
-                    self.total_max_length,
+                    self.config.total_max_length,
                 ]
             )
             self.attention_mask = (
@@ -651,7 +654,6 @@ def create_predictor(
         else:
             raise ValueError("the `mode` should be one of [dynamic, static]")
     else:
-        total_max_length = predictor_args.src_length + predictor_args.max_length
         if predictor_args.mode == "dynamic":
             # TODO(wj-Mcat): complete AutoInferenceModel & AutoPredictor
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
@@ -717,7 +719,7 @@ def create_predictor(
                     dtype=predictor_args.dtype,
                 )
                 cache_kvs_shape = BloomForCausalLMInferenceModel.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, total_max_length
+                    config, predictor_args.batch_size, predictor_args.total_max_length
                 )
                 model.eval()
             elif "gpt" in config.architectures[0].lower():
@@ -741,27 +743,33 @@ def create_predictor(
                     LlamaForCausalLMInferenceModel,
                 )
 
-                cache_kvs_shape = LlamaForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size, total_max_length)
+                cache_kvs_shape = LlamaForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
+                )
             elif "chatglm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     ChatGLMForCausalLMInferenceModel,
                 )
 
                 cache_kvs_shape = ChatGLMForCausalLMInferenceModel.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, total_max_length
+                    config, predictor_args.batch_size, predictor_args.total_max_length
                 )
             elif "bloom" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     BloomForCausalLMInferenceModel,
                 )
 
-                cache_kvs_shape = BloomForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size, total_max_length)
+                cache_kvs_shape = BloomForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
+                )
             elif "gpt" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     GPTForCausalLMInferenceModel,
                 )
 
-                cache_kvs_shape = GPTForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size, total_max_length)
+                cache_kvs_shape = GPTForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
+                )
             else:
                 raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt]")
             predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
