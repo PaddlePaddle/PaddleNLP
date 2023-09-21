@@ -152,9 +152,9 @@ class DistDataLoader(paddle.io.DataLoader):
         # broadcast data keys size
         data_keys_size = paddle.to_tensor(data_keys_size)
         if self._data_keys_size is None:
-            if self.mp_group is not None and self.pp_rank == 0:
+            if self.mp_group.rank > -1 and self.pp_rank == 0:
                 paddle.distributed.broadcast(data_keys_size, src=self.mp_src_rank, group=self.mp_group)
-            if self._pp_data_group is not None:
+            if self._pp_data_group.rank > -1:
                 paddle.distributed.broadcast(
                     data_keys_size, src=self._pp_data_group.ranks[0], group=self._pp_data_group
                 )
@@ -165,9 +165,9 @@ class DistDataLoader(paddle.io.DataLoader):
 
         # broadcast data keys name
         if self._data_keys is None:
-            if self.mp_group is not None and self.pp_rank == 0:
+            if self.mp_group.rank > -1 and self.pp_rank == 0:
                 paddle.distributed.broadcast_object_list(data_keys, src=self.mp_src_rank, group=self.mp_group)
-            if self._pp_data_group is not None:
+            if self._pp_data_group.rank > -1:
                 paddle.distributed.broadcast_object_list(
                     data_keys, src=self._pp_data_group.ranks[0], group=self._pp_data_group
                 )
@@ -176,10 +176,10 @@ class DistDataLoader(paddle.io.DataLoader):
         # broadcast data
         if not self._need_data:
             data_list = [None for i in range(self._data_keys_size)]
-        if self.mp_group is not None and self.pp_rank == 0:
+        if self.mp_group.rank > -1 and self.pp_rank == 0:
             data_list = broadcast_data_list(data_list, paddle.int64, self.mp_rank, self.mp_group, self.mp_src_rank)
 
-        if self._pp_data_group is not None:
+        if self._pp_data_group.rank > -1:
             # Note(daisimng): In last stage of pp, we don't need input_ids.
             # It will be removed in future.
             data_list = broadcast_data_list(
