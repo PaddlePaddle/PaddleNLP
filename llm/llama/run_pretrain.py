@@ -178,14 +178,9 @@ class ModelArguments:
         default=False,
         metadata={"help": "whether to use fuse sequence parallel allreduce"},
     )
-    rope_fusion_level: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "The level of fusion of rope embedding. Can be chosen from:\n"
-            "(1) 'full': fuse sin cos compute and rope embedding\n"
-            "(2) 'core': only fuse rope embedding, will compute the sin and cos\n"
-            "(3) None: don't fuse any part of the rope embedding"
-        },
+    use_fused_rope: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable rope fusion or not."},
     )
     no_recompute_layers: Optional[List[int]] = field(
         default=None,
@@ -443,7 +438,7 @@ def main():
     config.virtual_pp_degree = model_args.virtual_pp_degree
     config.sequence_parallel = model_args.sequence_parallel
     config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
-    config.rope_fusion_level = model_args.rope_fusion_level
+    config.use_fused_rope = model_args.use_fused_rope
     config.no_recompute_layers = model_args.no_recompute_layers
     config.pp_recompute_interval = model_args.pp_recompute_interval
     config.recompute_use_reentrant = model_args.recompute_use_reentrant

@@ -31,6 +31,7 @@ class ChatGLMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = ChatGLMTokenizer
     from_pretrained_vocab_key = "model_file"
+    test_decode_token = True
 
     def get_tokenizer(self, **kwargs) -> PretrainedTokenizer:
         tokenizer = ChatGLMTokenizer.from_pretrained("THUDM/chatglm-6b", **kwargs)
