@@ -115,6 +115,8 @@ class GenerationInferenceModel(GenerationMixin):
                 shape=[None, None, None], dtype="int64", name="position_ids"
             )  # position_ids
             input_spec[16] = paddle.static.InputSpec(shape=[None, 2, 1], dtype="int64", name="tgt_pos")  # tgt_pos
+        elif self.config["model_type"] and "gpt" in self.config.model_type:
+            input_spec[2] = paddle.static.InputSpec(shape=[None], dtype="int64", name="position_ids")  # position_ids
         model = paddle.jit.to_static(self.generate, input_spec=input_spec)
         paddle.jit.save(
             model, output_path, skip_prune_program=True

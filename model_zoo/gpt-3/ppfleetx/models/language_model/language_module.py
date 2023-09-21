@@ -103,9 +103,14 @@ class LanguageModule(BasicModule):
         loss_scale_str = (
             "loss_scale: %.9f," % (log_dict["loss_scale"]) if log_dict.get("loss_scale", None) is not None else ""
         )
+        memort_str=(
+            ", max_memory_allocated: %.1f MB, max_memory_reserved: %.1f MB, " \
+            "memory_allocated: %.1f MB, memory_reserved: %.1f MB" \
+            % (log_dict["max_memory_allocated"], log_dict["max_memory_reserved"],log_dict["memory_allocated"], log_dict["memory_reserved"]) if "max_memory_allocated" in log_dict else ""
+        )
         logger.info(
             "[train] epoch: [%d/%d], batch: [%d/%d], loss: %.9f, avg_batch_cost: %.5f sec, speed: %.2f step/s, "
-            "ips_total: %.0f tokens/s, ips: %.0f tokens/s, %s learning rate: %.5e, found_inf: %.0f"
+            "ips_total: %.0f tokens/s, ips: %.0f tokens/s, %s learning rate: %.5e, found_inf: %.0f %s"
             % (
                 log_dict["epoch"],
                 log_dict["total_epoch"],
@@ -119,6 +124,7 @@ class LanguageModule(BasicModule):
                 loss_scale_str,
                 log_dict["lr"],
                 log_dict["found_inf"],
+                memort_str,
             )
         )
 

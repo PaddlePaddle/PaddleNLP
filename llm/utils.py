@@ -394,6 +394,7 @@ def dybatch_preprocess(
     benchmark: bool = False,
 ):
     """Pre-process generation inputs."""
+    inputs = {}
     if "chatglm" in architectures:
         input_ids = []
         position_ids = []
@@ -403,7 +404,6 @@ def dybatch_preprocess(
             input_ids.append(tokens["input_ids"][0])
             position_ids.append(tokens["position_ids"][0])
 
-        inputs = {}
         pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][0]
         inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
         bs = inputs["input_ids"].shape[0]
@@ -413,9 +413,8 @@ def dybatch_preprocess(
         for i in range(len(position_ids)):
             inst_data_pos.append(np.array([list(inst) + [0] * (max_len - len(inst)) for inst in position_ids[i]]))
         inputs["position_ids"] = paddle.to_tensor(np.array(inst_data_pos))
-    else:
+    elif "gpt" in architectures:
         input_ids = []
-        position_ids = []
         if isinstance(texts, str):
             texts = [texts]
 
@@ -430,7 +429,33 @@ def dybatch_preprocess(
             )
             input_ids.append(tokens["input_ids"][0])
 
-        inputs = {}
+        pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][-1]
+        inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
+        bs = inputs["input_ids"].shape[0]
+        max_len = max(map(len, input_ids))
+
+        position_ids = paddle.arange(sum(seq_len), dtype="int64")
+        pre_len = seq_len[0]
+        for length in seq_len[1:]:
+            position_ids[pre_len : length + pre_len] = position_ids[pre_len : length + pre_len] - pre_len
+            pre_len += length
+        inputs["position_ids"] = position_ids
+    else:
+        input_ids = []
+        if isinstance(texts, str):
+            texts = [texts]
+
+        for text in texts:
+            tokens = tokenizer(
+                text,
+                return_tensors="np",
+                padding=False,
+                max_length=src_length,
+                return_attention_mask=False,
+                return_token_type_ids=False,
+            )
+            input_ids.append(tokens["input_ids"][0])
+
         pad_token_id = tokenizer([tokenizer.pad_token], return_tensors="np")["input_ids"][0][-1]
         inputs["input_ids"], seq_len = pad_batch_data(input_ids, pad_id=pad_token_id, return_seq_len=True)
         bs = inputs["input_ids"].shape[0]

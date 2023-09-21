@@ -256,6 +256,11 @@ class EagerEngine(BasicEngine):
             self.profiler.start()
             logger.warning("Profiler is enabled, do not enable it in production.")
 
+        # Profiler_pretrain configs
+        self.memory_stats = configs.get("Profiler_pretrain", {}).get("memory_stats", False)
+        self.nvprof_start = configs.get("Profiler_pretrain", {}).get("nvprof_start", -1)
+        self.nvprof_end = configs.get("Profiler_pretrain", {}).get("nvprof_end", -1)
+
     def _wrap_with_fleet(self):
         if self._sharding_stage in [2, 3]:
             assert self._pp_degree == 1, "sharding stage2/3 will support pipeline parallel later"
@@ -317,8 +322,9 @@ class EagerEngine(BasicEngine):
             if epoch_index == self._load_recovery["epoch"]:
                 if step < self._load_recovery["step"]:
                     continue
-
-            loss = self._fit_impl(batch)
+            
+            with paddle.profiler.utils._nvprof_range(iter_id=step, start=self.nvprof_start, end=self.nvprof_end):
+                loss = self._fit_impl(batch)
             train_losses.append(loss)
 
             if self._lr_scheduler is not None and self._lr_scheduler_mode == "step":
@@ -341,6 +347,13 @@ class EagerEngine(BasicEngine):
                 }
                 if self._amp_enable:
                     log_dict["loss_scale"] = self._scaler._scale.numpy()[0]
+                if self.memory_stats:
+                    # convert from Byte to MB
+                    log_dict["max_memory_allocated"] = paddle.device.cuda.max_memory_allocated() / (1024**2)
+                    log_dict["max_memory_reserved"] = paddle.device.cuda.max_memory_reserved() / (1024**2)
+                    log_dict["memory_allocated"] = paddle.device.cuda.memory_allocated() / (1024**2)
+                    log_dict["memory_reserved"] = paddle.device.cuda.memory_reserved() / (1024**2)
+                    
                 self._module.training_step_end(log_dict)
 
                 train_step_start = get_timestamp()
