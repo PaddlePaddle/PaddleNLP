@@ -424,9 +424,6 @@ def main():
         data_args, training_args, data_file, tokenizer
     )
 
-    # for i,x in enumerate(train_dataset):
-    #     print(i, x.keys())
-
     trainer = PretrainingTrainer(
         model=model,
         args=training_args,
