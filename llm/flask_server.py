@@ -80,7 +80,8 @@ def write_shared_memory(memory: SharedMemory, sentence: str):
     memory.buf[:] = buffer
 
 
-SLEEP_SECOND = 0.5
+SLEEP_SECOND = 0.05
+STOP_SIGNAL = "[END]"
 SHARED_MEMORY_NAME = "shared_memory"
 
 
@@ -100,7 +101,7 @@ def create_shared_memory(name: int, rank: int):
                 print("success create shared_memory")
                 break
             except FileNotFoundError:
-                time.sleep(0.01)
+                time.sleep(SLEEP_SECOND)
                 print("sleep for create shared memory")
     else:
         shared_memory = SharedMemory(file, create=True, size=1024 * 100)
@@ -158,11 +159,11 @@ class PredictorServer:
                             "result": {"response": {"role": "bot", "utterance": result}},
                         }
                         logger.info(f"Response: {json.dumps(output, indent=2, ensure_ascii=False)}")
-                        if result.endswith("[END]"):
+                        if result.endswith(STOP_SIGNAL):
                             done = True
                         yield json.dumps(output, ensure_ascii=False) + "\n"
 
-                    time.sleep(0.05)
+                    time.sleep(SLEEP_SECOND)
 
             return app.response_class(stream_with_context(streaming())) 
 
@@ -183,7 +184,7 @@ def main(args, server: PredictorServer):
     from time import sleep
 
     while True:
-        sleep(0.05)
+        sleep(SLEEP_SECOND)
         content = read_shared_memory(server.input_shared_memory)
 
         if content:
@@ -205,8 +206,8 @@ def main(args, server: PredictorServer):
             streamer = server.predict(context)
             for new_text in streamer:
                 append_shared_memory(server.output_shared_memory, new_text)
-                time.sleep(0.05)
-            append_shared_memory(server.output_shared_memory, "[END]")
+                time.sleep(SLEEP_SECOND)
+            append_shared_memory(server.output_shared_memory, STOP_SIGNAL)
 
             write_shared_memory(server.input_shared_memory, "")
 
