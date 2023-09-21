@@ -677,6 +677,22 @@ def create_predictor(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
                 model.eval()
+
+            elif "opt" in config.architectures[0].lower():
+                if model_args.model_type == "opt-img2txt":
+                    # we use opt for img2txt.
+                    from paddlenlp.experimental.transformers import (
+                        OPTForBlip2InferenceModel as OPTInferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        OPTForCausalLMInferenceModel as OPTInferenceModel,
+                    )
+
+                model = OPTInferenceModel.from_pretrained(
+                    predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
+                )
+                model.eval()
             elif "chatglm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     ChatGLMForCausalLMInferenceModel,
