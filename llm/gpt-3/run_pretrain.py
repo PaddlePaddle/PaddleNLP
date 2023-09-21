@@ -21,7 +21,6 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import paddle
-from modeling_pp import GPTForCausalLMPipe
 
 from paddlenlp.trainer import (
     PdArgumentParser,
@@ -36,6 +35,7 @@ from paddlenlp.transformers import (
     CosineAnnealingWithWarmupDecay,
     GPTConfig,
     GPTForCausalLM,
+    GPTForCausalLMPipe,
     LinearAnnealingWithWarmupDecay,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
