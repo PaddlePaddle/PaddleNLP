@@ -1759,7 +1759,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     pre_tensor_parallel_split = True
                     assert loaded_keys is not None, "loaded_keys is not None."
                     tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
-
+                # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
                 state_dict = load_state_dict(
                     shard_file, tp_actions if pre_tensor_parallel_split else None, set(expected_keys)
                 )
@@ -2302,7 +2302,6 @@ class PipelinePretrainedModel(PretrainedModel):
 
             prefixs = self.get_sequential_name_prefixs()
             for k in state_dict_keys:
-                print(k)
                 name_splited = k.split(".")
                 if use_virtual_pp_degree:
                     if name_splited[0].isdigit():
