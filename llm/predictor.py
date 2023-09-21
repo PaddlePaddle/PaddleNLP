@@ -525,9 +525,10 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
         config.enable_use_gpu(100, device_id)
         # config.disable_glog_info()
-        # config.enable_memory_optim()
+        config.enable_memory_optim()
 
-        if self.tensor_parallel_degree > 1:
+        # Note(zhengzekang): Force to use fleet executor
+        if self.tensor_parallel_degree >= 1:
             trainer_endpoints = fleet.worker_endpoints()
             current_endpoint = trainer_endpoints[self.tensor_parallel_rank]
 
@@ -650,6 +651,7 @@ def create_predictor(
         else:
             raise ValueError("the `mode` should be one of [dynamic, static]")
     else:
+        total_max_length = predictor_args.src_length + predictor_args.max_length
         if predictor_args.mode == "dynamic":
             # TODO(wj-Mcat): complete AutoInferenceModel & AutoPredictor
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
@@ -702,7 +704,9 @@ def create_predictor(
                     config=config,
                     dtype=predictor_args.dtype,
                 )
-                cache_kvs_shape = BloomForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
+                cache_kvs_shape = BloomForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, total_max_length
+                )
                 model.eval()
             predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
         elif predictor_args.mode == "static":
@@ -712,7 +716,9 @@ def create_predictor(
                     LlamaForCausalLMInferenceModel,
                 )
 
-                cache_kvs_shape = LlamaForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
+                cache_kvs_shape = LlamaForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, total_max_length
+                )
                 predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
             elif "chatglm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
@@ -720,7 +726,7 @@ def create_predictor(
                 )
 
                 cache_kvs_shape = ChatGLMForCausalLMInferenceModel.get_cache_kvs_shape(
-                    config, predictor_args.batch_size
+                    config, predictor_args.batch_size, total_max_length
                 )
                 predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
             elif "bloom" in config.architectures[0].lower():
@@ -728,7 +734,9 @@ def create_predictor(
                     BloomForCausalLMInferenceModel,
                 )
 
-                cache_kvs_shape = BloomForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
+                cache_kvs_shape = BloomForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, total_max_length
+                )
                 predictor = StaticInferencePredictor(
                     predictor_args, cache_kvs_shape=cache_kvs_shape, tokenizer=tokenizer
                 )
@@ -745,7 +753,8 @@ def predict():
     paddle.set_default_dtype(predictor_args.dtype)
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
-    if tensor_parallel_degree > 1:
+    # Note(zhengzekang): force to use fleet executor.
+    if tensor_parallel_degree >= 1:
         strategy = fleet.DistributedStrategy()
         strategy.hybrid_configs = {
             "dp_degree": 1,
