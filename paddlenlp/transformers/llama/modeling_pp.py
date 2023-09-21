@@ -34,6 +34,7 @@ def __repr__(self):
     return self.layer_func.__name__
 
 
+# hack LayerDesc for showing to much config
 LayerDesc.__repr__ = __repr__
 
 __all__ = [
@@ -149,7 +150,6 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     # DONOT Add base_model_prefix !!!!
 
     def __init__(self, config):
-        LayerDesc.__repr__ = __repr__
         self.config = config
 
         self.use_recompute = self.config.use_recompute
