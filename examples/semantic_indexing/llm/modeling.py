@@ -40,7 +40,7 @@ class BiEncoderModel(nn.Layer):
     def __init__(
         self,
         model_name: str = None,
-        normlized: bool = False,
+        normalized: bool = False,
         sentence_pooling_method: str = "cls",
         negatives_cross_device: bool = False,
         temperature: float = 1.0,
@@ -49,10 +49,10 @@ class BiEncoderModel(nn.Layer):
         self.model = AutoModel.from_pretrained(model_name)
         self.cross_entropy = nn.CrossEntropyLoss(reduction="mean")
 
-        self.normlized = normlized
+        self.normalized = normalized
         self.sentence_pooling_method = sentence_pooling_method
         self.temperature = temperature
-        if not normlized:
+        if not normalized:
             self.temperature = 1.0
             logger.info("reset temperature = 1.0 due to using inner product to compute similarity")
 
@@ -67,13 +67,8 @@ class BiEncoderModel(nn.Layer):
             self.world_size = dist.get_world_size()
 
     def sentence_embedding(self, hidden_state, mask):
-        if self.sentence_pooling_method == "mean":
-            s = paddle.sum(hidden_state * mask.unsqueeze(-1), axis=1)
-            d = mask.sum(axis=1, keepdim=True)
-            return s / d
-        elif self.sentence_pooling_method == "cls":
-            return hidden_state[:, 0]
-        elif self.sentence_pooling_method == "weighted_mean":
+
+        if self.sentence_pooling_method == "weighted_mean":
             # Use weighted mean to compute similarity for decoder only LLMs
             # refer to https://github.com/Muennighoff/sgpt/blob/9728de441b1dd2e638a8a64e1c83f77716f47d9a/biencoder/beir/beir_dense_retriever.py#L258
             weights = (
@@ -95,7 +90,7 @@ class BiEncoderModel(nn.Layer):
             return None
         psg_out = self.model(**features, return_dict=True)
         p_reps = self.sentence_embedding(psg_out.last_hidden_state, features["attention_mask"])
-        if self.normlized:
+        if self.normalized:
             p_reps = paddle.nn.functional.normalize(p_reps, axis=-1)
         return p_reps.contiguous()
 

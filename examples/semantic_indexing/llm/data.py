@@ -16,14 +16,13 @@ import math
 import os.path
 import random
 from dataclasses import dataclass
-from typing import List, Tuple
 
 import datasets
 from arguments import DataArguments
 from paddle.io import Dataset
 
 from paddlenlp.data import DataCollatorWithPadding
-from paddlenlp.transformers import BatchEncoding, PretrainedTokenizer
+from paddlenlp.transformers import PretrainedTokenizer
 
 
 class TrainDatasetForEmbedding(Dataset):
@@ -50,7 +49,7 @@ class TrainDatasetForEmbedding(Dataset):
     def __len__(self):
         return self.total_len
 
-    def __getitem__(self, item) -> Tuple[BatchEncoding, List[BatchEncoding]]:
+    def __getitem__(self, item):
         query = self.dataset[item]["query"]
         if self.args.query_instruction_for_retrieval is not None:
             query = self.args.query_instruction_for_retrieval + query

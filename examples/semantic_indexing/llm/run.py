@@ -68,7 +68,7 @@ def main():
     )
     model = BiEncoderModel(
         model_name=model_args.model_name_or_path,
-        normlized=model_args.normlized,
+        normalized=model_args.normalized,
         sentence_pooling_method=training_args.sentence_pooling_method,
         negatives_cross_device=training_args.negatives_cross_device,
         temperature=training_args.temperature,
