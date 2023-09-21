@@ -23,8 +23,7 @@ from utils import BiTrainer
 
 from paddlenlp.trainer import PdArgumentParser, set_seed
 from paddlenlp.transformers import AutoTokenizer
-
-logger = logging.getLogger(__name__)
+from paddlenlp.utils.log import logger
 
 
 def main():
@@ -76,7 +75,7 @@ def main():
     if training_args.fix_position_embedding:
         for k, v in model.named_parameters():
             if "position_embeddings" in k:
-                logging.info(f"Freeze the parameters for {k}")
+                logger.info(f"Freeze the parameters for {k}")
                 v.stop_gradient = True
 
     if training_args.fine_tune_type == "bitfit":
@@ -85,7 +84,7 @@ def main():
             if "bias" in k:
                 v.stop_gradient = False
             else:
-                logging.info(f"Freeze the parameters for {k}")
+                logger.info(f"Freeze the parameters for {k}")
                 v.stop_gradient = True
 
     train_dataset = TrainDatasetForEmbedding(args=data_args, tokenizer=tokenizer)
