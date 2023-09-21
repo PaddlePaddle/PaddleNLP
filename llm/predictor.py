@@ -357,6 +357,7 @@ class InferencePredictorMixin:
                 self.architectures,
                 top_p=self.config.top_p,
                 temperature=self.config.temperature,
+                benchmark=self.config.benchmark,
                 pre_caches_length=pre_caches_length,
             )
             for i in range(inputs["input_ids"].shape[0]):
@@ -377,7 +378,6 @@ class InferencePredictorMixin:
                     self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
                         [prefix_attention_mask, post_attention_mask], axis=2
                     )
-                    print("self.attention_mask ---", self.attention_mask)
 
                 if self.config.prefix_path is None:
                     self.tgt_generation_mask[i, 0, 0, pre_caches_length : length + pre_caches_length] = paddle.ones(

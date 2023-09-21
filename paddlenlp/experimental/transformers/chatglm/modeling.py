@@ -30,7 +30,10 @@ from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithPast,
 )
-from paddlenlp.transformers.model_utils import register_base_model
+from paddlenlp.transformers.model_utils import (
+    dy2st_nocheck_guard_context,
+    register_base_model,
+)
 
 __all__ = ["ChatGLMForCausalLMInferenceModel"]
 
@@ -297,7 +300,7 @@ class ChatGLMStackDyBatch(nn.Layer):
         if encode_seq_length > 1 and pre_caches is not None:
             position_offset = 128
 
-        with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
+        with dy2st_nocheck_guard_context():
             hidden_states, new_cache = self.transformer_block(
                 input_ids,
                 hidden_states,
@@ -539,10 +542,10 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
             time_step = self.time_step
             input_ids = tgt_ids
             position_ids = tgt_pos
-            attention_mask = (tgt_generation_mask - 1) * 1e6
+            attention_mask = (1 - tgt_generation_mask) * paddle.finfo(tgt_generation_mask.dtype).min
         else:
             self.time_step = paddle.to_tensor(input_ids.shape[1], dtype="int32", place=paddle.CPUPlace())
-            attention_mask = (attention_mask - 1) * 1e6
+            attention_mask = (1 - attention_mask) * paddle.finfo(tgt_generation_mask.dtype).min
             paddle.increment(self.time_step, -1)
 
         model_inputs = {
