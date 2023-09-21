@@ -305,8 +305,6 @@ class GenerationInferenceModel(GenerationMixin):
         # because the code below directly use the model_kwargs as a parameter without using inputs_embeds.
         model_kwargs["inputs_embeds"] = inputs_embeds
         model_kwargs["all_input_ids"] = input_ids
-        # we need record this length for opt model's use.
-        model_kwargs["past_kv_length"] = paddle.zeros(shape=[1], dtype="int32")
         logits_processors = model_kwargs.pop("logits_processors")
 
         def _forward_(**args):
@@ -388,7 +386,6 @@ class GenerationInferenceModel(GenerationMixin):
             model_kwargs,
         )
         step_idx_ori += 1
-        model_kwargs["past_kv_length"] = encoder_max_seq
 
         # gives it a value, means we will entered into decoder phase.
         model_kwargs["cache"] = 0
@@ -406,7 +403,6 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs,
             )
             step_idx_ori += 1
-            model_kwargs["past_kv_length"] += 1
 
         return (
             next_tokens,

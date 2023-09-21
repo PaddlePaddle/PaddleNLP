@@ -175,7 +175,6 @@ class OPTInferenceModel(OPTPretrainedModel):
         output_attentions=False,
         output_hidden_states=None,
         return_dict=False,
-        past_kv_length=None,
         **kwargs,
     ):
         # kwargs["cache"] is used used to distinguish between encoder and decoder phase.
@@ -202,6 +201,7 @@ class OPTInferenceModel(OPTPretrainedModel):
 
         batch, seq_len = input_ids.shape
 
+        past_kv_length = paddle.max(seq_len_decoder) if is_decoder else 0
         now_len = past_kv_length + seq_len
         embedding_output = self.embeddings(
             input_ids=input_ids,
@@ -375,7 +375,6 @@ class OPTForCausalLMInferenceModel(GenerationInferenceModel, OPTPretrainedModel)
         attention_mask = kwargs.get("attention_mask", None)
         cache = kwargs.get("cache", None)
         inputs_embeds = kwargs.get("inputs_embeds", None)
-        past_kv_length = kwargs.get("past_kv_length")
         if cache is not None:
             input_ids = tgt_ids
             position_ids = tgt_pos
@@ -394,7 +393,6 @@ class OPTForCausalLMInferenceModel(GenerationInferenceModel, OPTPretrainedModel)
             "seq_len_encoder": seq_len_encoder,
             "seq_len_decoder": seq_len_decoder,
             "cache": cache,
-            "past_kv_length": past_kv_length,
         }
         return model_inputs
 
@@ -414,7 +412,6 @@ class OPTForCausalLMInferenceModel(GenerationInferenceModel, OPTPretrainedModel)
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
-        past_kv_length=None,
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -436,7 +433,6 @@ class OPTForCausalLMInferenceModel(GenerationInferenceModel, OPTPretrainedModel)
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
-            past_kv_length=past_kv_length,
         )
 
         hidden_states = outputs
@@ -556,4 +552,4 @@ class OPTForBlip2InferenceModel(OPTForCausalLMInferenceModel):
         ]
 
         model = paddle.jit.to_static(self.generate_text_with_image_features, input_spec=input_spec)
-        paddle.jit.save(model, output_path)
+        paddle.jit.save(model, output_path, skip_prune_program=True)
