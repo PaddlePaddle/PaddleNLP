@@ -92,6 +92,12 @@ function _train(){
         use_fp16_cmd="--use_amp true"
     fi
 
+    if [ "${pipeline_parallel_config}" != "" ]; then
+        pipeline_parallel_config_args="--pipeline_parallel_config ${pipeline_parallel_config}"
+    else
+        pipeline_parallel_config_args=""
+    fi
+
     use_pure_fp16=False
     train_cmd="--model_type llama \
     --model_name_or_path ${model_name_or_path} \
@@ -130,8 +136,7 @@ function _train(){
     --enable_linear_fused_grad_add true \
     --fuse_attention_qkv true \
     --fuse_attention_ffn true \
-    --tensor_parallel_config ${tensor_parallel_config} \
-    --pipeline_parallel_config ${pipeline_parallel_config} \
+    --tensor_parallel_config ${tensor_parallel_config} ${pipeline_parallel_config_args} \
     --recompute ${recompute} \
     --recompute_use_reentrant ${recompute_use_reentrant} \
     --data_cache ./data_cache"
