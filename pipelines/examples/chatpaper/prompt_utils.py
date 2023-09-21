@@ -40,19 +40,22 @@ functions = [
         "description": "根据query, 在论文库内检索最相关的论文",
         "parameters": {
             "type": "object",
-            "properties": {"query": {"type": "string", "description": "论文检索的查询语句"}},
+            "properties": {
+                "query": {"type": "string", "description": "论文检索的查询语句"},
+                "top_k": {"type": "integer", "description": "论文检索的数量，默认值为3"},
+            },
             "required": ["query"],
         },
         "responses": search_response,
         "examples": [
-            {"role": "user", "content": "你好，我想了解一下半监督学习这反面的最新的进展。请给我推荐几篇论文。"},
+            {"role": "user", "content": "你好，我想了解一下半监督学习这反面的最新的进展。请给我推荐6篇论文。"},
             {
                 "role": "assistant",
                 "content": None,
                 "function_call": {
                     "name": "search_multi_paper",
-                    "thoughts": "这是一个多篇论文搜索请求。我需要设置query为'半监督学习'",
-                    "arguments": '{ "query": "半监督学习"}',
+                    "thoughts": "这是一个多篇论文搜索请求。我需要设置query为'半监督学习',检索数量为6",
+                    "arguments": '{ "query": "半监督学习", "top_k": 6}',
                 },
             },
         ],
