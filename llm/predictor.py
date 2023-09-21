@@ -741,7 +741,6 @@ def create_predictor(
                     LlamaForCausalLMInferenceModel,
                 )
 
-                predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
                 cache_kvs_shape = LlamaForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size, total_max_length)
             elif "chatglm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
