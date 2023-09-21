@@ -1240,3 +1240,29 @@ class GPTForGeneration(nn.Layer):
         else:
             raise ValueError(f"Not support {decode_strategy} strategy yet!")
         return ret
+
+#from paddle.base.variable_index import _getitem_static
+from paddle.base.libpaddle.ir import OpResult
+import sys
+def getitem_simple(x, index):
+    if isinstance(index, int):
+        start = index
+        if index == -1: 
+            end = sys.maxsize
+        else:
+            end = index + 1
+        return paddle.slice(x, [0], [start], [end])
+    raise NotImplementedError("Not support fancy indexing yet!")
+
+def mul_simple(x, y):
+    if isinstance(y, (int, float)):
+        return paddle.scale(x, y)
+    else: 
+        return paddle.mutiply(x, y)
+
+def patch_scale(x, s, b=0):
+    return paddle.scale(x, s, b)
+
+setattr(OpResult, "__getitem__", getitem_simple)
+setattr(OpResult, "__mul__", mul_simple)
+setattr(OpResult, "scale", patch_scale)
