@@ -39,6 +39,7 @@ class ModelArguments:
     )
 
     normalized: bool = field(default=True)
+    use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
 
 
 @dataclass

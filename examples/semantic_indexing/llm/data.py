@@ -102,12 +102,10 @@ class EmbedCollator(DataCollatorWithPadding):
     def __call__(self, features):
         query = [f[0] for f in features]
         passage = [f[1] for f in features]
-
         if isinstance(query[0], list):
             query = sum(query, [])
         if isinstance(passage[0], list):
             passage = sum(passage, [])
-
         q_collated = self.tokenizer(
             query,
             padding=True,

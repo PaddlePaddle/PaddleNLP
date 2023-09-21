@@ -1709,7 +1709,6 @@ class Trainer:
 
         model.train()
         inputs = self._prepare_inputs(inputs)
-
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
 

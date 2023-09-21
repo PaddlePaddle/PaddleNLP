@@ -59,18 +59,20 @@ def main():
 
     # Set seed
     set_seed(training_args.seed)
-
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
         cache_dir=model_args.cache_dir,
         use_fast=False,
     )
-    model = BiEncoderModel(
-        model_name=model_args.model_name_or_path,
-        normalized=model_args.normalized,
+
+    model = BiEncoderModel.from_pretrained(
+        pretrained_model_name_or_path=model_args.model_name_or_path,
+        dtype="bfloat16",
+        normlized=model_args.normlized,
         sentence_pooling_method=training_args.sentence_pooling_method,
         negatives_cross_device=training_args.negatives_cross_device,
         temperature=training_args.temperature,
+        use_flash_attention=model_args.use_flash_attention,
     )
     if training_args.fix_position_embedding:
         for k, v in model.named_parameters():
