@@ -466,7 +466,6 @@ def main():
             model_args.model_name_or_path,
             config=config,
             dtype=dtype,
-            load_state_as_np=True,
         )
     else:
         model = model_class._from_config(config, dtype=dtype)

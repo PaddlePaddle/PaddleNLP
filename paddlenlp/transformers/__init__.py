@@ -47,9 +47,7 @@ from .bert.tokenizer import *
 from .bert.configuration import *
 
 # isort: split
-from .gpt.modeling import *
-from .gpt.tokenizer import *
-from .gpt.configuration import *
+from .gpt import *
 from .roberta.modeling import *
 from .roberta.tokenizer import *
 from .roberta.configuration import *
