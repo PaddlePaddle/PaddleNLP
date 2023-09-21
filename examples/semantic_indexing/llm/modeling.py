@@ -75,21 +75,22 @@ class BiEncoderModel(BloomPreTrainedModel):
         elif self.sentence_pooling_method == "cls":
             return hidden_state[:, 0]
         elif self.sentence_pooling_method == "weighted_mean":
-            # Use weighted mean to compute similarity for decoder only LLMs
-            # refer to https://github.com/Muennighoff/sgpt/blob/9728de441b1dd2e638a8a64e1c83f77716f47d9a/biencoder/beir/beir_dense_retriever.py#L258
-            weights = (
-                paddle.arange(start=1, end=hidden_state.shape[1] + 1)
-                .unsqueeze(0)
-                .unsqueeze(-1)
-                .expand(hidden_state.shape)
-            )
-            # [batch_size, seq_len] -> [batch_size, seq_len, higgen_dim]
-            input_mask_expanded = mask.unsqueeze(-1).expand(hidden_state.shape)
-            # bs, seq_len, hidden_dim -> bs, hidden_dim
-            sum_embeddings = paddle.sum(hidden_state * input_mask_expanded * weights, axis=1, dtype="float32")
-            sum_mask = paddle.sum(input_mask_expanded * weights, axis=1)
-            embedding = sum_embeddings / sum_mask
-            return embedding
+            if self.sentence_pooling_method == "weighted_mean":
+                # Use weighted mean to compute similarity for decoder only LLMs
+                # refer to https://github.com/Muennighoff/sgpt/blob/9728de441b1dd2e638a8a64e1c83f77716f47d9a/biencoder/beir/beir_dense_retriever.py#L258
+                weights = (
+                    paddle.arange(start=1, end=hidden_state.shape[1] + 1)
+                    .unsqueeze(0)
+                    .unsqueeze(-1)
+                    .expand(hidden_state.shape)
+                )
+                # [batch_size, seq_len] -> [batch_size, seq_len, higgen_dim]
+                input_mask_expanded = mask.unsqueeze(-1).expand(hidden_state.shape)
+                # bs, seq_len, hidden_dim -> bs, hidden_dim
+                sum_embeddings = paddle.sum(hidden_state * input_mask_expanded * weights, axis=1, dtype="float32")
+                sum_mask = paddle.sum(input_mask_expanded * weights, axis=1)
+                embedding = sum_embeddings / sum_mask
+                return embedding
 
     def encode(self, features):
         if features is None:
