@@ -14,58 +14,67 @@
 from __future__ import annotations
 
 import os
-import shutil
 import sys
-import tempfile
 import unittest
 
+import paddle
 from parameterized import parameterized_class
 
-from paddlenlp.utils.downloader import get_path_from_url
 from tests.testing_utils import argv_context_guard, load_test_config
 
 from .testing_utils import LLMTest
 
 
 @parameterized_class(
-    ["model_dir"],
+    ["model_dir", "enable_compare"],
     [
-        ["llama"],
+        ["llama", False],
+        # TODO(wj-Mcat): to enable chatglm/chatglm2 unit test
+        # ["chatglm"],
+        # ["chatglm2"],
+        ["bloom"],
     ],
 )
-class PretrainTest(LLMTest, unittest.TestCase):
-    config_path: str = "./tests/fixtures/llm/pretrain.yaml"
+class LoraTest(LLMTest, unittest.TestCase):
+    config_path: str = "./tests/fixtures/llm/lora.yaml"
     model_dir: str = None
 
     def setUp(self) -> None:
         LLMTest.setUp(self)
 
-        self.dataset_dir = tempfile.mkdtemp()
         self.model_codes_dir = os.path.join(self.root_path, self.model_dir)
         sys.path.insert(0, self.model_codes_dir)
 
     def tearDown(self) -> None:
         LLMTest.tearDown(self)
-
         sys.path.remove(self.model_codes_dir)
-        shutil.rmtree(self.dataset_dir)
 
-    def test_pretrain(self):
-        # Run pretrain
-        URL = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy"
-        URL2 = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz"
-        get_path_from_url(URL, root_dir=self.dataset_dir)
-        get_path_from_url(URL2, root_dir=self.dataset_dir)
+    def test_lora(self):
+        self.disable_static()
+        paddle.set_default_dtype("float32")
 
-        pretrain_config = load_test_config(self.config_path, "pretrain", self.model_dir)
+        lora_config = load_test_config(self.config_path, "lora", self.model_dir)
 
-        pretrain_config["input_dir"] = self.dataset_dir
-        pretrain_config["output_dir"] = self.output_dir
+        lora_config["dataset_name_or_path"] = self.data_dir
+        lora_config["output_dir"] = self.output_dir
 
-        with argv_context_guard(pretrain_config):
-            from run_pretrain import main
+        with argv_context_guard(lora_config):
+            from finetune_generation import main
 
             main()
 
-        self.run_predictor({"inference_model": True})
+        # merge weights
+        merge_lora_weights_config = {
+            "model_name_or_path": lora_config["model_name_or_path"],
+            "lora_path": lora_config["output_dir"],
+            "merge_model_path": lora_config["output_dir"],
+        }
+        with argv_context_guard(merge_lora_weights_config):
+            from merge_lora_params import merge
+
+            merge()
+
+        if self.model_dir not in ["chatglm2"]:
+            self.run_predictor({"inference_model": True})
+
         self.run_predictor({"inference_model": False})

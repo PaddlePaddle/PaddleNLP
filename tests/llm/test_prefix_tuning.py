@@ -14,14 +14,11 @@
 from __future__ import annotations
 
 import os
-import shutil
 import sys
-import tempfile
 import unittest
 
 from parameterized import parameterized_class
 
-from paddlenlp.utils.downloader import get_path_from_url
 from tests.testing_utils import argv_context_guard, load_test_config
 
 from .testing_utils import LLMTest
@@ -33,39 +30,42 @@ from .testing_utils import LLMTest
         ["llama"],
     ],
 )
-class PretrainTest(LLMTest, unittest.TestCase):
-    config_path: str = "./tests/fixtures/llm/pretrain.yaml"
+class LoraTest(LLMTest, unittest.TestCase):
+    config_path: str = "./tests/fixtures/llm/prefix_tuning.yaml"
     model_dir: str = None
 
     def setUp(self) -> None:
         LLMTest.setUp(self)
 
-        self.dataset_dir = tempfile.mkdtemp()
         self.model_codes_dir = os.path.join(self.root_path, self.model_dir)
         sys.path.insert(0, self.model_codes_dir)
 
     def tearDown(self) -> None:
         LLMTest.tearDown(self)
-
         sys.path.remove(self.model_codes_dir)
-        shutil.rmtree(self.dataset_dir)
 
-    def test_pretrain(self):
-        # Run pretrain
-        URL = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy"
-        URL2 = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz"
-        get_path_from_url(URL, root_dir=self.dataset_dir)
-        get_path_from_url(URL2, root_dir=self.dataset_dir)
+    def test_prefix_tuning(self):
+        prefix_tuning_config = load_test_config(self.config_path, "prefix_tuning", self.model_dir)
 
-        pretrain_config = load_test_config(self.config_path, "pretrain", self.model_dir)
+        prefix_tuning_config["dataset_name_or_path"] = self.data_dir
+        prefix_tuning_config["output_dir"] = self.output_dir
 
-        pretrain_config["input_dir"] = self.dataset_dir
-        pretrain_config["output_dir"] = self.output_dir
-
-        with argv_context_guard(pretrain_config):
-            from run_pretrain import main
+        with argv_context_guard(prefix_tuning_config):
+            from finetune_generation import main
 
             main()
 
-        self.run_predictor({"inference_model": True})
-        self.run_predictor({"inference_model": False})
+        self.run_predictor(
+            {
+                "inference_model": True,
+                "prefix_path": self.output_dir,
+                "model_name_or_path": prefix_tuning_config["model_name_or_path"],
+            }
+        )
+        self.run_predictor(
+            {
+                "inference_model": False,
+                "prefix_path": self.output_dir,
+                "model_name_or_path": prefix_tuning_config["model_name_or_path"],
+            }
+        )

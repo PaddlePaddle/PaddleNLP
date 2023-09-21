@@ -357,6 +357,7 @@ class InferencePredictorMixin:
                 self.architectures,
                 top_p=self.config.top_p,
                 temperature=self.config.temperature,
+                benchmark=self.config.benchmark,
             )
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
@@ -375,6 +376,7 @@ class InferencePredictorMixin:
                 self.architectures,
                 top_p=self.config.top_p,
                 temperature=self.config.temperature,
+                benchmark=self.config.benchmark,
             )
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
@@ -439,6 +441,7 @@ class InferencePredictorMixin:
                 top_p=self.config.top_p,
                 temperature=self.config.temperature,
                 pre_caches_length=pre_caches_length,
+                benchmark=self.config.benchmark,
             )
 
             for i in range(inputs["input_ids"].shape[0]):
@@ -664,8 +667,6 @@ def create_predictor(
                         LlamaForCausalLMInferenceModel as LlamaInferenceModel,
                     )
 
-                    config.tensor_parallel_degree = tensor_parallel_degree
-                    config.tensor_parallel_rank = tensor_parallel_rank
                     config.quant_bits = -1
 
                     if predictor_args.quant_type.startswith("weight_only_int"):
@@ -692,8 +693,6 @@ def create_predictor(
                     BloomForCausalLMInferenceModel,
                 )
 
-                config.tensor_parallel_degree = tensor_parallel_degree
-                config.tensor_parallel_rank = tensor_parallel_rank
                 model = BloomForCausalLMInferenceModel.from_pretrained(
                     predictor_args.model_name_or_path,
                     config=config,
@@ -701,6 +700,19 @@ def create_predictor(
                 )
                 cache_kvs_shape = BloomForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
                 model.eval()
+            elif "gpt" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    GPTForCausalLMInferenceModel,
+                )
+
+                model = GPTForCausalLMInferenceModel.from_pretrained(
+                    predictor_args.model_name_or_path,
+                    config=config,
+                    dtype=predictor_args.dtype,
+                )
+                model.eval()
+            else:
+                raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt]")
             predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
         elif predictor_args.mode == "static":
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
@@ -710,7 +722,6 @@ def create_predictor(
                 )
 
                 cache_kvs_shape = LlamaForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
-                predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
             elif "chatglm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     ChatGLMForCausalLMInferenceModel,
@@ -719,16 +730,21 @@ def create_predictor(
                 cache_kvs_shape = ChatGLMForCausalLMInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size
                 )
-                predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
             elif "bloom" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     BloomForCausalLMInferenceModel,
                 )
 
                 cache_kvs_shape = BloomForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
-                predictor = StaticInferencePredictor(
-                    predictor_args, cache_kvs_shape=cache_kvs_shape, tokenizer=tokenizer
+            elif "gpt" in config.architectures[0].lower():
+                from paddlenlp.experimental.transformers import (
+                    GPTForCausalLMInferenceModel,
                 )
+
+                cache_kvs_shape = GPTForCausalLMInferenceModel.get_cache_kvs_shape(config, predictor_args.batch_size)
+            else:
+                raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt]")
+            predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
         else:
             raise ValueError("the `mode` should be one of [dynamic, static]")
     return predictor
