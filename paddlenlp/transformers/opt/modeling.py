@@ -575,7 +575,7 @@ class OPTEmbeddings(Layer):
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, input_ids=None, attention_mask=None, input_embeddings=None, past_key_values_length=None):
-        if input_ids is not None:
+        if input_ids is not None and input_embeddings is None:
             input_embeddings = self.word_embeddings(input_ids)
 
         if self.project_in:
