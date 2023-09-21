@@ -20,7 +20,8 @@ import paddle
 import paddle.distributed as dist
 import paddle.nn as nn
 
-from paddlenlp.transformers import AutoModel
+from paddlenlp.transformers import AutoModel, BloomConfig
+from paddlenlp.transformers.bloom.modeling import BloomModel, BloomPreTrainedModel
 from paddlenlp.transformers.model_outputs import ModelOutput
 
 logger = logging.getLogger(__name__)
@@ -34,25 +35,28 @@ class EncoderOutput(ModelOutput):
     scores: Optional[paddle.Tensor] = None
 
 
-class BiEncoderModel(nn.Layer):
+class BiEncoderModel(BloomPreTrainedModel):
     TRANSFORMER_CLS = AutoModel
 
     def __init__(
         self,
-        model_name: str = None,
-        normalized: bool = False,
+        config: BloomConfig,
+        normlized: bool = False,
         sentence_pooling_method: str = "cls",
         negatives_cross_device: bool = False,
         temperature: float = 1.0,
     ):
-        super().__init__()
-        self.model = AutoModel.from_pretrained(model_name)
+        super().__init__(config)
+        self.bloom = BloomModel(config)
+        # self.model = BloomModel(config)
+        # self.model = AutoModel.from_pretrained(model_name,dtype='bfloat16',use_flash_attention=use_flash_attention)
+        # self.model = AutoModel.from_pretrained(model_name,dtype='bfloat16')
         self.cross_entropy = nn.CrossEntropyLoss(reduction="mean")
 
-        self.normalized = normalized
+        self.normlized = normlized
         self.sentence_pooling_method = sentence_pooling_method
         self.temperature = temperature
-        if not normalized:
+        if not normlized:
             self.temperature = 1.0
             logger.info("reset temperature = 1.0 due to using inner product to compute similarity")
 
@@ -67,8 +71,13 @@ class BiEncoderModel(nn.Layer):
             self.world_size = dist.get_world_size()
 
     def sentence_embedding(self, hidden_state, mask):
-
-        if self.sentence_pooling_method == "weighted_mean":
+        if self.sentence_pooling_method == "mean":
+            s = paddle.sum(hidden_state * mask.unsqueeze(-1), axis=1)
+            d = mask.sum(axis=1, keepdim=True)
+            return s / d
+        elif self.sentence_pooling_method == "cls":
+            return hidden_state[:, 0]
+        elif self.sentence_pooling_method == "weighted_mean":
             # Use weighted mean to compute similarity for decoder only LLMs
             # refer to https://github.com/Muennighoff/sgpt/blob/9728de441b1dd2e638a8a64e1c83f77716f47d9a/biencoder/beir/beir_dense_retriever.py#L258
             weights = (
@@ -80,7 +89,9 @@ class BiEncoderModel(nn.Layer):
             # [batch_size, seq_len] -> [batch_size, seq_len, higgen_dim]
             input_mask_expanded = mask.unsqueeze(-1).expand(hidden_state.shape)
             # bs, seq_len, hidden_dim -> bs, hidden_dim
-            sum_embeddings = paddle.sum(hidden_state * input_mask_expanded * weights, axis=1)
+            sum_embeddings = paddle.sum(hidden_state * input_mask_expanded * weights, axis=1, dtype="float32")
+            # print(sum_embeddings)
+            # sum_embeddings=paddle.clip(sum_embeddings, min=3.5, max=5.0)
             sum_mask = paddle.sum(input_mask_expanded * weights, axis=1)
             embedding = sum_embeddings / sum_mask
             return embedding
@@ -88,9 +99,9 @@ class BiEncoderModel(nn.Layer):
     def encode(self, features):
         if features is None:
             return None
-        psg_out = self.model(**features, return_dict=True)
+        psg_out = self.bloom(**features, return_dict=True)
         p_reps = self.sentence_embedding(psg_out.last_hidden_state, features["attention_mask"])
-        if self.normalized:
+        if self.normlized:
             p_reps = paddle.nn.functional.normalize(p_reps, axis=-1)
         return p_reps.contiguous()
 
@@ -107,6 +118,7 @@ class BiEncoderModel(nn.Layer):
     ):
         q_reps = self.encode(query)
         p_reps = self.encode(passage)
+        # print(p_reps)
 
         if self.training:
             if self.negatives_cross_device:
@@ -146,7 +158,8 @@ class BiEncoderModel(nn.Layer):
 
         return all_tensors
 
-    def save(self, output_dir: str):
-        state_dict = self.model.state_dict()
-        state_dict = type(state_dict)({k: v.clone().cpu() for k, v in state_dict.items()})
-        self.model.save_pretrained(output_dir, state_dict=state_dict)
+    # def save(self, output_dir: str):
+    #     #state_dict = self.model.state_dict()
+    #     #state_dict = type(state_dict)({k: v.clone().cpu() for k, v in state_dict.items()})
+    #     # self.model.save_pretrained(output_dir, state_dict=state_dict)
+    #     self.model.save_pretrained(output_dir)

@@ -12,17 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import math
 import os.path
 import random
 from dataclasses import dataclass
+from typing import List, Tuple
 
 import datasets
 from arguments import DataArguments
 from paddle.io import Dataset
 
 from paddlenlp.data import DataCollatorWithPadding
-from paddlenlp.transformers import PretrainedTokenizer
+from paddlenlp.transformers import BatchEncoding, PretrainedTokenizer
+
+logger = logging.getLogger(__name__)
 
 
 class TrainDatasetForEmbedding(Dataset):
@@ -45,11 +49,12 @@ class TrainDatasetForEmbedding(Dataset):
         self.tokenizer = tokenizer
         self.args = args
         self.total_len = len(self.dataset)
+        logger.info(f"Total number of training examples: {self.total_len}")
 
     def __len__(self):
         return self.total_len
 
-    def __getitem__(self, item):
+    def __getitem__(self, item) -> Tuple[BatchEncoding, List[BatchEncoding]]:
         query = self.dataset[item]["query"]
         if self.args.query_instruction_for_retrieval is not None:
             query = self.args.query_instruction_for_retrieval + query
@@ -102,12 +107,10 @@ class EmbedCollator(DataCollatorWithPadding):
     def __call__(self, features):
         query = [f[0] for f in features]
         passage = [f[1] for f in features]
-
         if isinstance(query[0], list):
             query = sum(query, [])
         if isinstance(passage[0], list):
             passage = sum(passage, [])
-
         q_collated = self.tokenizer(
             query,
             padding=True,
