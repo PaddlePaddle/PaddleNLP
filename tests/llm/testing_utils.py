@@ -100,9 +100,6 @@ class LLMTest:
 
         self.disable_static()
 
-        if not config_params["inference_model"]:
-            return
-
         predict_result = self._read_result(predict_config["output_file"])
         infer_result = self._read_result(config["output_file"])
         assert len(predict_result) == len(infer_result)
