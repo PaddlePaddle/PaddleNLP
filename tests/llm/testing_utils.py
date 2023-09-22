@@ -42,6 +42,7 @@ class LLMTest:
         shutil.rmtree(self.output_dir)
         shutil.rmtree(self.inference_output_dir)
         self.disable_static()
+        paddle.device.cuda.empty_cache()
 
     def disable_static(self):
         paddle.utils.unique_name.switch()
@@ -57,7 +58,12 @@ class LLMTest:
         return result
 
     def run_predictor(self, config_params=None):
-        config_params = config_params or {}
+        if config_params is None:
+            config_params = {}
+
+        config_params["init_fleet_worker"] = False
+        config_params["enable_memory_optim"] = False
+
         # to avoid the same parameter
         self.disable_static()
         predict_config = load_test_config(self.config_path, "inference-predict")
