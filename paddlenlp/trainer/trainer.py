@@ -1605,7 +1605,8 @@ class Trainer:
                         "please upgrade your paddle (using nightly version)."
                     )
 
-                if level == "os_g":
+                sharding_parallel_config = set(self.args.sharding_parallel_config.split(" "))
+                if level == "os_g" and "enable_stage2_overlap" in sharding_parallel_config:
                     model._set_reduce_overlap(True)
                     optimizer._set_broadcast_overlap(True, model)
 
