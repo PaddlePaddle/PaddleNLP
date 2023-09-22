@@ -85,9 +85,14 @@ class PredictorArgument:
             "help": "If benchmark set as `True`, we will force model decode to max_length, which is helpful to compute throughput. "
         },
     )
+
     enable_memory_optim: bool = field(
         default=True,
         metadata={"help": "whether use `enable_memory_optim` in inference predictor"},
+    )
+    init_fleet_worker: bool = field(
+        default=True,
+        metadata={"help": "whether use `init_fleet_worker` in inference predictor"},
     )
 
     @property
@@ -536,7 +541,7 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
             config.enable_memory_optim()
 
         # Note(zhengzekang): Force to use fleet executor
-        if self.tensor_parallel_degree >= 1:
+        if predictor_args.init_fleet_worker or self.tensor_parallel_degree > 1:
             trainer_endpoints = fleet.worker_endpoints()
             current_endpoint = trainer_endpoints[self.tensor_parallel_rank]
 
@@ -792,7 +797,7 @@ def predict():
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
     # Note(zhengzekang): force to use fleet executor.
-    if tensor_parallel_degree >= 1:
+    if predictor_args.init_fleet_worker or tensor_parallel_degree > 1:
         strategy = fleet.DistributedStrategy()
         strategy.hybrid_configs = {
             "dp_degree": 1,
