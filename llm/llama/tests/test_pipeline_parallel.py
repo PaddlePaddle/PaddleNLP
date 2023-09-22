@@ -17,10 +17,9 @@ import unittest
 import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
-from modeling_pp import LlamaForCausalLMPipe
 from paddle.distributed.fleet.meta_parallel.pipeline_parallel import PipelineParallel
 
-from paddlenlp.transformers import LlamaForCausalLM
+from paddlenlp.transformers import LlamaForCausalLM, LlamaForCausalLMPipe
 
 
 class TestLlama(unittest.TestCase):
