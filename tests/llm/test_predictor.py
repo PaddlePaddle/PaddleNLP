@@ -43,7 +43,7 @@ class PredictorTest(LLMTest, unittest.TestCase):
         self.run_predictor({"inference_model": False})
         result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))
 
-        # compare the generation result of inference & no inference model
+        # compare the generation result of inference & dygraph model
         assert len(result_0) == len(result_1)
         count, full_match = 0, 0
         for inference_item, no_inference_item in zip(result_0, result_1):
