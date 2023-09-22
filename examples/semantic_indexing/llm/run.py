@@ -47,15 +47,12 @@ def main():
         level=logging.INFO if training_args.local_rank in [-1, 0] else logging.WARN,
     )
     logger.warning(
-        "Process rank: %s, device: %s, distributed training: %s, 16-bits training: %s",
-        training_args.local_rank,
-        training_args.device,
-        bool(training_args.local_rank != -1),
-        training_args.fp16,
+        f"Process rank: {training_args.local_rank}, device: {training_args.device},"
+        + f" distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}",
     )
-    logger.info("Training/evaluation parameters %s", training_args)
-    logger.info("Model parameters %s", model_args)
-    logger.info("Data parameters %s", data_args)
+    logger.info(f"Training/evaluation parameters {training_args}")
+    logger.info(f"Model parameters {model_args}")
+    logger.info(f"Data parameters {data_args}")
 
     # Set seed
     set_seed(training_args.seed)
@@ -68,7 +65,7 @@ def main():
     model = BiEncoderModel.from_pretrained(
         pretrained_model_name_or_path=model_args.model_name_or_path,
         dtype="bfloat16",
-        normlized=model_args.normlized,
+        normalized=model_args.normalized,
         sentence_pooling_method=training_args.sentence_pooling_method,
         negatives_cross_device=training_args.negatives_cross_device,
         temperature=training_args.temperature,
@@ -88,8 +85,12 @@ def main():
             else:
                 logger.info(f"Freeze the parameters for {k}")
                 v.stop_gradient = True
-
-    train_dataset = TrainDatasetForEmbedding(args=data_args, tokenizer=tokenizer)
+    train_dataset = TrainDatasetForEmbedding(
+        args=data_args,
+        tokenizer=tokenizer,
+        query_max_len=data_args.query_max_len,
+        passage_max_len=data_args.passage_max_len,
+    )
     trainer = BiTrainer(
         model=model,
         args=training_args,
