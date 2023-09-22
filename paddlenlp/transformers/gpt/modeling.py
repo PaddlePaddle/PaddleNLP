@@ -314,9 +314,7 @@ class MultiHeadAttention(nn.Layer):
         v = tensor.transpose(x=v, perm=perm)
 
         # scale dot product attention
-        scale_qk_coeff = self.config.scale_qk_coeff * self.head_dim**0.5
-        product = paddle.matmul(x=q.scale(1.0 / scale_qk_coeff), y=k, transpose_y=True)
-
+        product = paddle.matmul(x=q * ((self.config.scale_qk_coeff * self.head_dim) ** -0.5), y=k, transpose_y=True)
         if self.config.scale_qk_coeff != 1.0:
             product = product.scale(self.config.scale_qk_coeff)
 
@@ -364,9 +362,7 @@ class MultiHeadAttention(nn.Layer):
 
         has_gradient = (not q.stop_gradient) or (not k.stop_gradient) or (not v.stop_gradient)
         if self.enable_recompute and self.config.recompute_granularity == "core_attn" and has_gradient:
-            out = recompute(
-                attn_func, q, k, v, attn_mask, output_attentions, use_reentrant=self.config.recompute_use_reentrant
-            )
+            out = recompute(attn_func, q, k, v, attn_mask, output_attentions, use_reentrant=False)
         else:
             out = attn_func(q, k, v, attn_mask=attn_mask, output_attentions=output_attentions)
 
@@ -930,10 +926,6 @@ class GPTModel(GPTPretrainedModel):
         self.eol_token_id = config.eol_token_id
         self.vocab_size = config.vocab_size
 
-        self.bias = paddle.tril(
-            paddle.ones([1, 1, config.max_position_embeddings, config.max_position_embeddings], dtype="int64")
-        )
-
         self.embeddings = GPTEmbeddings(config)
 
         decoder_layers = nn.LayerList()
@@ -1060,38 +1052,42 @@ class GPTModel(GPTPretrainedModel):
             input_ids=input_ids, position_ids=position_ids, inputs_embeddings=inputs_embeds
         )
 
-        # TODO, use registered buffer
-        length = input_shape[-1]  # seqlen
-        if cache is not None:
-            # cache => bs, seqlen, nheads, head_dims
-            cache_length = paddle.shape(cache[0].k)[1]
-            length = length + cache_length
-        else:
-            cache_length = 0
-        causal_mask = self.bias[:, :, cache_length:length, :length]
-
-        if attention_mask is not None:
-            if attention_mask.dtype != paddle.int64:
-                attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
-            if len(attention_mask.shape) == 2:
-                attention_mask = attention_mask[:, None, None, :]
-            attention_mask = (1.0 - (attention_mask & causal_mask)) * -1e4
-        else:
-            attention_mask = (1.0 - causal_mask) * -1e4
-
-        # The tensor returned by triu not in static graph.
-        attention_mask.stop_gradient = True
+        if not self.config.fused_softmax_with_triangular or not paddle.is_compiled_with_cuda():
+            # TODO, use registered buffer
+            causal_mask = paddle.tensor.tril(
+                paddle.ones((paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1]), dtype="int64"),
+            )
+            if attention_mask is not None:
+                if attention_mask.dtype != paddle.int64:
+                    attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
+                if len(attention_mask.shape) == 2:
+                    attention_mask = attention_mask[:, None, None, :]
+                attention_mask = (1.0 - (attention_mask & causal_mask)) * -1e4
+            else:
+                attention_mask = (1.0 - causal_mask) * -1e4
+            # The tensor returned by triu not in static graph.
+            attention_mask.stop_gradient = True
 
         outputs = self.decoder(
             embedding_output,
             memory=None,
-            tgt_mask=attention_mask,
+            tgt_mask=None
+            if (self.config.fused_softmax_with_triangular and self.training)
+            else attention_mask,  # use softmax_mask_fuse_upper_triangle,
             use_cache=use_cache,
             cache=cache,
             output_hidden_states=output_hidden_states,
             output_attentions=output_attentions,
             return_dict=return_dict,
         )
+
+        if output_hidden_states:
+            if return_dict:
+                outputs.hidden_states = (embedding_output,) + outputs.hidden_states
+            else:  # outputs is a tuple
+                idx = 2 if use_cache else 1
+                all_hidden_states = (embedding_output,) + outputs[idx]
+                outputs[idx] = all_hidden_states
 
         self.checkpoints.extend(self.decoder.checkpoints)
 
@@ -1484,23 +1480,29 @@ class GPTForCausalLM(GPTPretrainedModel):
         self._fast_entry = FasterGPT(self, use_fp16_decoding=use_fp16_decoding).forward
         return self._fast_entry
 
-    def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, **kwargs):
-        # only last token for inputs_ids if cache is defined in kwargs
-        position_ids = kwargs.get("position_ids", None)
+    def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, inputs_embeds=None, **kwargs):
+        batch_size, seq_length = input_ids.shape
+        position_ids = kwargs.get("position_ids", paddle.arange(seq_length).expand((batch_size, seq_length)))
         attention_mask = kwargs.get("attention_mask", None)
-        if attention_mask is not None and attention_mask.ndim == 4:
-            attention_mask = attention_mask[:, -1:, -1:, :]
-        if cache is not None:
-            input_ids = input_ids[:, -1].unsqueeze(-1)
-            if position_ids is not None:
-                position_ids = position_ids[:, -1].unsqueeze(-1)
-        return {
-            "input_ids": input_ids,
-            "position_ids": position_ids,
-            "attention_mask": attention_mask,
-            "use_cache": use_cache,
-            "cache": cache,
-        }
+        if cache:
+            input_ids = input_ids[:, -1].unsqueeze(axis=-1)
+            position_ids = position_ids[:, -1].unsqueeze(-1)
+
+        # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
+        if inputs_embeds is not None and cache is None:
+            model_inputs = {"inputs_embeds": inputs_embeds}
+        else:
+            model_inputs = {"input_ids": input_ids}
+
+        model_inputs.update(
+            {
+                "position_ids": position_ids,
+                "cache": cache,
+                "use_cache": use_cache,
+                "attention_mask": attention_mask,
+            }
+        )
+        return model_inputs
 
     @staticmethod
     def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
