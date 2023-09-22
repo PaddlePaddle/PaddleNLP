@@ -93,9 +93,9 @@ class BiEncoderModel(BloomPreTrainedModel):
         return p_reps.contiguous()
 
     def compute_similarity(self, q_reps, p_reps):
-        if len(p_reps.shape) == 2:
-            return paddle.matmul(q_reps, p_reps.transpose([1, 0]))
-        return paddle.matmul(q_reps, p_reps.transpose([-2, -1]))
+        # q_reps [batch_size, embedding_dim]
+        # p_reps [batch_size, embedding_dim]
+        return paddle.matmul(q_reps, p_reps.transpose([1, 0]))
 
     def forward(
         self,
