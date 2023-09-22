@@ -643,7 +643,7 @@ class Trainer:
                     all_reduce_dtype = "float32"
                 trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
                 paddle.distributed.all_reduce(trainable_numel_tensor)
-                trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
+                trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size // self.args.sep_parallel_degree
                 # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
                 # so, the trainable numel is a little bigger than real.
                 logger.info(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
@@ -1050,6 +1050,7 @@ class Trainer:
                     self._globalstep_last_start_time,
                     num_samples=total_train_batch_size * num_steps,
                     num_steps=num_steps,
+                    seq_length=self.args.seq_length,
                 )
             )
 

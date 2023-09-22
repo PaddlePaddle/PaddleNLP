@@ -23,15 +23,24 @@ export FLAGS_cudnn_deterministic=1
 export FLAGS_flash_attn_version=v1
 export USE_FAST_LN=0
 
-mode="dp"
-mode="sep"
+mode="tp"
+# mode="sep"
+
+max_seq_length=2048
+if [[ $# > 0 ]]; then
+  max_seq_length=$1
+fi
+echo "max_seq_length:$max_seq_length"
+max_steps=10
+tp_log_dir=tp_log_$max_seq_length
+sep_log_dir=sep_log_$max_seq_length
 
 export PYTHONPATH=../../:$PYTHONPATH
-if [[ $mode == "dp" ]]; then
+if [[ $mode == "tp" ]]; then
 rm -rf dp_input_data/*
 python -u  -m paddle.distributed.launch \
-    --gpus "0, 1" \
-    --log_dir "./dp_log" \
+    --gpus "0,1,2,3,4,5,6,7" \
+    --log_dir "./$tp_log_dir" \
     run_pretrain.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
@@ -39,7 +48,7 @@ python -u  -m paddle.distributed.launch \
     --input_dir "./data" \
     --output_dir "./output" \
     --split 949,50,1 \
-    --max_seq_length 2048 \
+    --max_seq_length $max_seq_length \
     --per_device_train_batch_size 2 \
     --gradient_accumulation_steps 8 \
     --per_device_eval_batch_size 4 \
@@ -51,7 +60,7 @@ python -u  -m paddle.distributed.launch \
     --pp_recompute_interval 1 \
     --learning_rate 0.00001 \
     --min_learning_rate 0.000001 \
-    --max_steps 1 \
+    --max_steps $max_steps \
     --save_steps 50000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
@@ -72,16 +81,16 @@ python -u  -m paddle.distributed.launch \
     --data_cache "./data_cache" \
     --pipeline_parallel_degree 1 \
     --sep_parallel_degree 1 \
-    --tensor_parallel_degree 2 \
-    --sequence_parallel true \
-    # --amp_master_grad \
+    --tensor_parallel_degree 8 \
+    --sequence_parallel false \
+    --amp_master_grad \
     # --sharding "stage1" \
 
 elif [[ $mode == "sep" ]]; then
 rm -rf sep_input_data/*
 python -u  -m paddle.distributed.launch \
-    --gpus "1,2,3,4" \
-    --log_dir "./sep_log" \
+    --gpus "0,1,2,3,4,5,6,7" \
+    --log_dir "./$sep_log_dir" \
     run_pretrain.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
@@ -89,7 +98,7 @@ python -u  -m paddle.distributed.launch \
     --input_dir "./data" \
     --output_dir "./output" \
     --split 949,50,1 \
-    --max_seq_length 2048 \
+    --max_seq_length $max_seq_length \
     --per_device_train_batch_size 2 \
     --gradient_accumulation_steps 8 \
     --per_device_eval_batch_size 4 \
@@ -101,7 +110,7 @@ python -u  -m paddle.distributed.launch \
     --pp_recompute_interval 1 \
     --learning_rate 0.00001 \
     --min_learning_rate 0.000001 \
-    --max_steps 1 \
+    --max_steps $max_steps \
     --save_steps 50000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
@@ -121,9 +130,9 @@ python -u  -m paddle.distributed.launch \
     --recompute_use_reentrant true \
     --data_cache "./data_cache" \
     --pipeline_parallel_degree 1 \
-    --sep_parallel_degree 2 \
-    --tensor_parallel_degree 2 \
-    --sequence_parallel true \
+    --sep_parallel_degree 8 \
+    --tensor_parallel_degree 1 \
+    --sequence_parallel false \
     --amp_master_grad \
     # --sharding "stage1" \
 

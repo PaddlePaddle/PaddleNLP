@@ -395,6 +395,7 @@ def main():
     # Log model and data config
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
+    training_args.seq_length = data_args.max_seq_length
 
     # Log on each process the small summary:
     logger.warning(
@@ -454,7 +455,7 @@ def main():
     config.sep_parallel_degree = training_args.sep_parallel_degree
 
     # hack to change model size
-    # config.num_hidden_layers = 14
+    config.num_hidden_layers = 8
     # config.intermediate_size = config.hidden_size
     #
 
