@@ -399,8 +399,6 @@ def weight_name_suffix(config=None):
             name.append(f"tp{hcg.get_model_parallel_rank():0>2d}")
         if hcg.get_pipe_parallel_world_size() > 1:
             name.append(f"pp{hcg.get_stage_id():0>2d}")
-        if hcg.get_sharding_parallel_world_size() > 1:
-            name.append(f"shard{hcg.get_sharding_parallel_rank():0>2d}")
         if config and getattr(config, "moe_num_experts", 0):
             dp_group = hcg.get_data_parallel_group()
             name.append(f"moe{dp_group.rank:0>2d}")

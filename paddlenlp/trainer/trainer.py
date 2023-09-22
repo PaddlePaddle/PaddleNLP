@@ -915,6 +915,14 @@ class Trainer:
                 else:
                     tr_loss_step, outputs = self.training_step(model, inputs)
 
+                def fused_allreduce_gradients_no_sync(paramlist, hcg):
+                    paramlist = list(paramlist)
+                    nonmoe_list = [p for p in paramlist if not getattr(p, "no_sync", False)]
+                    moelist = [p for p in paramlist if getattr(p, "no_sync", False)]
+                    if moelist and not self.args.use_moe:
+                        logger.warning("found `no sync` param when `use_moe=False`")
+                    fused_allreduce_gradients(nonmoe_list, hcg)
+
                 tr_loss += tr_loss_step
                 if (step + 1) % args.gradient_accumulation_steps == 0:
                     self.timers and self.timers("forward-backward").stop()
@@ -925,19 +933,8 @@ class Trainer:
                     self.timers and self.timers("all-reduce").start()
 
                     if self.sharding and ShardingOption.SHARD_OP not in self.args.sharding:
-                        assert not model._reduce_overlap, type(model)
-                        assert not model._dp_group, type(model)
-                        assert not self.optimizer._reduce_overlap
-                        assert not self.optimizer._broadcast_overlap
-                        if self.args.data_parallel_degree > 1 and (
-                            not is_dp_group_support_in_group_sharded_parallel() or self.args.use_moe
-                        ):
-                            non_moe_parameters_list = [
-                                p for p in model.parameters() if not getattr(p, "no_sync", False)
-                            ]
-                            logger.info(f"moe broadcast, #grad={len(non_moe_parameters_list)}")
-
-                            fused_allreduce_gradients(non_moe_parameters_list, fleet.get_hybrid_communicate_group())
+                        if self.args.data_parallel_degree > 1 and not is_dp_group_support_in_group_sharded_parallel():
+                            fused_allreduce_gradients_no_sync(model.parameters(), fleet.get_hybrid_communicate_group())
                             if ShardingOption.FULL_SHARD in self.args.sharding:
                                 # Why need sync on parm again ?
                                 # TODO: fix this.
@@ -950,44 +947,36 @@ class Trainer:
                     # Case 2: Use recompute and dp / sharding stage1,
                     # manualy collect gradient for dp.
                     elif args.recompute and availiable_no_sync:
-                        assert not self.args.use_moe, "never should come here"
-                        fused_allreduce_gradients(list(model.parameters()), None)
+                        assert not self.args.use_moe, "moe must `no_sync`"
+                        fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
-                    elif args.use_moe and not args.use_hybrid_parallel:  # 纯dp + moe 才在这里手动执行 梯度聚合。
-                        # dp grad reduce
-                        fused_allreduce_gradients(
-                            [p for p in model.parameters() if not getattr(p, "no_sync", False)], None
-                        )
+                    # Case 2.1: # 纯dp + moe 才在这里手动执行 梯度聚合。
+                    elif args.use_moe and not args.use_hybrid_parallel:
+                        fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
                     pipeline_parallel_config = set(args.pipeline_parallel_config.split(" "))
                     enable_delay_scale_loss = "enable_delay_scale_loss" in pipeline_parallel_config
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
 
-                    assert not args.use_moe or not availiable_no_sync
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
                         parameters_list = obtain_optimizer_parameters_list(self.optimizer._inner_opt)
 
-                        non_moe_parameters_list = [p for p in parameters_list if not getattr(p, "no_sync", False)]
+                        if not enable_dp_comm_overlap:
+                            if self.optimizer._sharding_enable:
+                                assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
+                                self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
-                        if self.optimizer._sharding_enable:
-                            assert isinstance(self.optimizer._inner_opt, DygraphShardingOptimizer)
-                            # if self.args.use_moe:
-                            #     assert not self.optimizer._inner_opt.comm_overlap, f'moe will hang when using comm overlap'
-                            self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
-
-                        if self.optimizer._dp_enable or (
-                            self.args.use_moe and self.optimizer._need_dp
-                        ):  # moe下面，DataParallel会被魔改, 不会走reducer，需要手动reduce-grad
-                            assert not enable_dp_comm_overlap
-                            # 广播状态精心跳过moe参数
-                            fused_allreduce_gradients(list(non_moe_parameters_list), self.optimizer._hcg)
-
-                    # Case 3: hack dp with master_grad
-                    if hack_dp_master_grad and not (args.recompute and availiable_no_sync):
-                        fused_allreduce_gradients(list(model.parameters()), None)
+                            if self.optimizer._dp_enable:
+                                fused_allreduce_gradients_no_sync(list(parameters_list), self.optimizer._hcg)
+                        else:
+                            assert self.args.use_moe, "moe should not `enable_dp_comm_overlap`"
 
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
+
+                    # Case 3: hack dp with master_grad
+                    if hack_dp_master_grad and not (args.recompute and availiable_no_sync):
+                        fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
                     # pipeline parallel mode,  handle gradient merge here
                     if args.pipeline_parallel_degree > 1 and enable_delay_scale_loss:
@@ -1786,11 +1775,11 @@ class Trainer:
 
         # We don't use .loss here since the model may return tuples instead of ModelOutput.
         if isinstance(outputs, dict):
-            loss = outputs["loss"]
-        elif len(outputs) == 2:
-            loss, outputs = outputs
+            loss = outputs.pop("loss")
+            outputs = {k: nested_detach(v) for k, v in outputs.items()}
         else:
             loss = outputs[0]
+            outputs = nested_detach(outputs[1:])
 
         return (loss, outputs) if return_outputs else loss
 
@@ -1904,8 +1893,13 @@ class Trainer:
         hcg = fleet.get_hybrid_communicate_group()
         dist.broadcast_object_list(buf, src=hcg._pp_comm_group.ranks[-1], group=hcg.get_pipe_parallel_group())
         info = buf[0]
+
+        # 当 pipenline 模型需要返回并打印多个 loss 时，需要在组网 `model._layers._loss_fn` 中插入 dict `info`.
+        # `info` 中持有需要被打印的 name-tensor 对。
         model._layers._loss_fn.info = {}
-        if isinstance(info, dict) and "loss" in info:
+        assert isinstance(info, dict), f"expect info to dict, got {type(info)}"
+        info = {k: v.detach() if isinstance(v, paddle.Tensor) else v for k, v in info.items()}
+        if "loss" in info:
             loss = paddle.to_tensor(info.pop("loss"))
         return loss.detach(), info
 
