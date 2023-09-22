@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pass
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import (
@@ -22,15 +21,20 @@ from paddle.distributed.fleet.meta_parallel import (
 )
 from paddle.distributed.fleet.utils import recompute
 
-from paddlenlp.transformers import (
+from paddlenlp.transformers.model_utils import PipelinePretrainedModel
+
+from .modeling import (
     GPTConfig,
     GPTDecoderLayer,
     GPTEmbeddings,
     GPTPretrainedModel,
     GPTPretrainingCriterion,
-    PretrainedModel,
+    parallel_matmul,
 )
-from paddlenlp.transformers.gpt.modeling import parallel_matmul
+
+__all__ = [
+    "GPTForCausalLMPipe",
+]
 
 
 def get_hcg():
@@ -113,109 +117,6 @@ class LayerNormPipe(nn.LayerNorm):
         return return_args(hidden_states, attention_mask, position_ids)
 
 
-class PipelinePretrainedModel(PretrainedModel):
-    _sequential_layers = []
-    _pipeline_name_mapping = None
-
-    def __init__(self, config, *args, **kwargs):
-        super().__init__(config, *args, **kwargs)
-
-    def add_sequential_layer(self, layer_desc, name_prefix=""):
-        self._sequential_layers.append({"layer": layer_desc, "name_prefix": name_prefix})
-
-    def get_sequential_layers(self):
-        return [x["layer"] for x in self._sequential_layers]
-
-    def get_sequential_name_prefixs(self):
-        return {str(index): x["name_prefix"] for index, x in enumerate(self._sequential_layers)}
-
-    def _set_pipeline_name_mapping(self, mappings=None):
-        if mappings is not None:
-            self._pipeline_name_mapping = mappings
-        else:
-            mapping = {}
-            state_dict_keys = list(super().state_dict().keys())
-            first_key = state_dict_keys[0].split(".")
-            # if use virtual pp_degree, the prefix is like 0.0.xxx
-            # else it will be like 0.xxx
-            use_virtual_pp_degree = first_key[0].isdigit() and first_key[1].isdigit()
-
-            prefixs = self.get_sequential_name_prefixs()
-            for k in state_dict_keys:
-                name_splited = k.split(".")
-                # TODO(wawltor) Fix the virtual pipeline
-                if use_virtual_pp_degree:
-                    idx = str(int(name_splited[0]) + int(name_splited[1]))
-                    single_name = [prefixs[idx]]
-                    single_name.extend(name_splited[2:])
-                else:
-                    idx = name_splited[0]
-                    if idx == "shared_layers":
-                        single_name = name_splited[2:]
-                        single_name = ["gpt.embeddings"] + single_name
-                    elif idx.isdigit():
-                        single_name = [prefixs[idx]]
-                        single_name.extend(name_splited[1:])
-                    else:
-                        raise ("The mapping table had bad row, please check parameter name:{}".format(k))
-                mapping[".".join(single_name)] = k
-
-            self._pipeline_name_mapping = mapping
-
-        return self._pipeline_name_mapping
-
-    def _prepare_pipeline_inputs_func(self, inputs):
-        first_stage_keys = ["input_ids", "attention_mask"]
-        last_stage_keys = ["labels"]
-
-        def get_expected_keys(inputs, keys):
-            ret = tuple([inputs.pop(k) for k in keys if k in inputs])
-            if len(ret) == 1:
-                ret = ret[0]
-            return ret
-
-        if type(inputs) is dict:
-            return [
-                get_expected_keys(inputs, first_stage_keys),
-                get_expected_keys(inputs, last_stage_keys),
-            ]
-
-        keys = list(inputs[0].keys())
-        inputs_batch = {key: [data.pop(key) for data in inputs] for key in keys}
-        return [
-            get_expected_keys(inputs_batch, first_stage_keys),
-            get_expected_keys(inputs_batch, last_stage_keys),
-        ]
-
-    def state_dict(self, *args, **kwargs):
-        state_dict = super().state_dict(*args, **kwargs)
-
-        if self._pipeline_name_mapping is None:
-            self._set_pipeline_name_mapping()
-        assert len(self._pipeline_name_mapping) > 0, "The pipeline stage must have parameters!"
-        pp_to_single_mapping = {v: k for k, v in self._pipeline_name_mapping.items()}
-
-        for k in list(state_dict.keys()):
-            v = state_dict.pop(k)
-            state_dict[pp_to_single_mapping[k]] = v
-
-        return state_dict
-
-    def set_state_dict(self, state_dict, *args, **kwargs):
-        if self._pipeline_name_mapping is None:
-            self._set_pipeline_name_mapping()
-        assert len(self._pipeline_name_mapping) > 0, "The pipeline stage must have parameters!"
-
-        for k in list(state_dict.keys()):
-            v = state_dict.pop(k)
-            if k not in self._pipeline_name_mapping:
-                continue
-            state_dict[self._pipeline_name_mapping[k]] = v
-
-        ret = super().set_state_dict(state_dict, *args, **kwargs)
-        return ret
-
-
 class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     """LlamaForPretraining adapted for pipeline parallelism.
 
@@ -227,6 +128,9 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
     _get_tensor_parallel_mappings = GPTPretrainedModel._get_tensor_parallel_mappings
     _init_weights = GPTPretrainedModel._init_weights
+
+    pretrained_init_configuration = GPTPretrainedModel.pretrained_init_configuration
+    pretrained_resource_files_map = GPTPretrainedModel.pretrained_resource_files_map
 
     # NO base_model_prefix !!!!
 
@@ -247,7 +151,8 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         config.tensor_parallel_rank = tensor_parallel_rank
 
         self.add_sequential_layer(
-            SharedLayerDesc("gpt", GPTEmbeddingPipe, shared_weight_attr="embedding_weight", config=config), "gpt"
+            SharedLayerDesc("gpt", GPTEmbeddingPipe, shared_weight_attr="embedding_weight", config=config),
+            "gpt.embeddings",
         )
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
@@ -268,7 +173,7 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                 shared_weight_attr="embedding_weight",
                 config=config,
             ),
-            "gpt",
+            "gpt.embeddings",
         )
 
         recompute_interval = 0

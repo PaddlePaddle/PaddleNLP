@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pass
 import paddle
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import LayerDesc, PipelineLayer
 
-from paddlenlp.transformers import PretrainedModel
-from paddlenlp.transformers.llama.modeling import (
+from paddlenlp.transformers.model_utils import PipelinePretrainedModel
+
+from .modeling import (
     LlamaConfig,
     LlamaDecoderLayer,
     LlamaLMHead,
@@ -30,8 +30,16 @@ from paddlenlp.transformers.llama.modeling import (
 )
 
 
-def get_hcg():
-    return fleet.get_hybrid_communicate_group()
+def __repr__(self):
+    return self.layer_func.__name__
+
+
+# hack LayerDesc for showing to much config
+LayerDesc.__repr__ = __repr__
+
+__all__ = [
+    "LlamaForCausalLMPipe",
+]
 
 
 def parse_args(args):
@@ -126,79 +134,6 @@ class LlamaRMSNormPipe(LlamaRMSNorm):
         return super().forward(hidden_states)
 
 
-class PipelinePretrainedModel(PretrainedModel):
-    _sequential_layers = []
-    _pipeline_name_mapping = None
-
-    def __init__(self, config, *args, **kwargs):
-        super().__init__(config, *args, **kwargs)
-
-    def add_sequential_layer(self, layer_desc, name_prefix=""):
-        self._sequential_layers.append({"layer": layer_desc, "name_prefix": name_prefix})
-
-    def get_sequential_layers(self):
-        return [x["layer"] for x in self._sequential_layers]
-
-    def get_sequential_name_prefixs(self):
-        return {str(index): x["name_prefix"] for index, x in enumerate(self._sequential_layers)}
-
-    def _set_pipeline_name_mapping(self, mappings=None):
-        if mappings is not None:
-            self._pipeline_name_mapping = mappings
-        else:
-            mapping = {}
-            state_dict_keys = list(super().state_dict().keys())
-            first_key = state_dict_keys[0].split(".")
-            # if use virtual pp_degree, the prefix is like 0.0.xxx
-            # else it will be like 0.xxx
-            use_virtual_pp_degree = first_key[0].isdigit() and first_key[1].isdigit()
-
-            prefixs = self.get_sequential_name_prefixs()
-            for k in state_dict_keys:
-                name_splited = k.split(".")
-                if use_virtual_pp_degree:
-                    idx = str(int(name_splited[0]) + int(name_splited[1]))
-                    single_name = [prefixs[idx]]
-                    single_name.extend(name_splited[2:])
-                else:
-                    idx = name_splited[0]
-                    single_name = [prefixs[idx]]
-                    single_name.extend(name_splited[1:])
-                mapping[".".join(single_name)] = k
-
-            self._pipeline_name_mapping = mapping
-
-        return self._pipeline_name_mapping
-
-    def state_dict(self, *args, **kwargs):
-        state_dict = super().state_dict(*args, **kwargs)
-
-        if self._pipeline_name_mapping is None:
-            self._set_pipeline_name_mapping()
-        assert len(self._pipeline_name_mapping) > 0, "The pipeline stage must have parameters!"
-        pp_to_single_mapping = {v: k for k, v in self._pipeline_name_mapping.items()}
-
-        for k in list(state_dict.keys()):
-            v = state_dict.pop(k)
-            state_dict[pp_to_single_mapping[k]] = v
-
-        return state_dict
-
-    def set_state_dict(self, state_dict, *args, **kwargs):
-        if self._pipeline_name_mapping is None:
-            self._set_pipeline_name_mapping()
-        assert len(self._pipeline_name_mapping) > 0, "The pipeline stage must have parameters!"
-
-        for k in list(state_dict.keys()):
-            v = state_dict.pop(k)
-            if k not in self._pipeline_name_mapping:
-                continue
-            state_dict[self._pipeline_name_mapping[k]] = v
-
-        ret = super().set_state_dict(state_dict, *args, **kwargs)
-        return ret
-
-
 class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     """LlamaForPretraining adapted for pipeline parallelism.
 
@@ -210,15 +145,11 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
     _get_tensor_parallel_mappings = LlamaPretrainedModel._get_tensor_parallel_mappings
     _init_weights = LlamaPretrainedModel._init_weights
+    _keys_to_ignore_on_load_unexpected = LlamaPretrainedModel._keys_to_ignore_on_load_unexpected
 
-    # NO base_model_prefix !!!!
+    # DONOT Add base_model_prefix !!!!
 
-    def __init__(
-        self,
-        config,
-        # scale_qk_by_layer_num=True,
-        # virtual_pp_degree=4,
-    ):
+    def __init__(self, config):
         self.config = config
 
         self.use_recompute = self.config.use_recompute
@@ -228,13 +159,16 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         if self.recompute_granularity == "full":
             assert len(self.no_recompute_layers) == 0, "for pp with full recompute, no_recompute_layers is not support"
 
-        # virtual_pp_degree = self.config.virtual_pp_degree
         virtual_pp_degree = getattr(self.config, "virtual_pp_degree", 1)
+
+        def get_hcg():
+            return fleet.get_hybrid_communicate_group()
 
         hcg = get_hcg()
         tensor_parallel_degree = max(hcg.get_model_parallel_world_size(), 1)
         tensor_parallel_rank = max(hcg.get_model_parallel_rank(), 0)
 
+        # TODO: fix tensor_parallel_degree rewrite in here
         config.tensor_parallel_degree = tensor_parallel_degree
         config.tensor_parallel_rank = tensor_parallel_rank
 
@@ -244,7 +178,6 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                 LayerDesc(LlamaDecoderLayerPipe, config=config, layerwise_recompute=i not in self.no_recompute_layers),
                 f"llama.layers.{i}",
             )
-
         self.add_sequential_layer(LayerDesc(LlamaRMSNormPipe, config=config), "llama.norm")
         self.add_sequential_layer(LayerDesc(LlamaLMHead, config=config), "lm_head")
 
@@ -273,6 +206,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             },
             num_virtual_pipeline_stages=virtual_pp_degree,
         )
+        # You should call init here, since there is a  diamond inheritance problem
         self.apply(self._init_weights)
         # DON'T init PipelinePretrainedModel
         # PipelinePretrainedModel.__init__(self.super(), config=config)

@@ -24,7 +24,7 @@ mv gpt_en_dataset_300m_idx.npz ./data
 
 注意：
 1. 需要paddle develop版本训练，需要安装`pip install tool_helpers visualdl==2.5.3`等相关缺失whl包
-2. `use_flash_attention` 需要在A100机器开启，否则loss可能不正常（很快变成0.00x,非常小不正常）。建议使用cuda11.8环境。
+2. `use_flash_attention` 需要在A100机器开启。建议使用cuda11.8环境。
 
 使用下面脚本,即可在gpt2-medium-en的基础上,继续训练.
 ```shell
@@ -35,7 +35,7 @@ log_dir="log"
 rm -rf $log_dir
 
 python -u  -m paddle.distributed.launch \
-    --gpus "0" \
+    --gpus "0,1,2,3,4,5,6,7" \
     --log_dir ${log_dir} \
     run_pretrain.py \
     --model_type "gpt" \
@@ -49,7 +49,7 @@ python -u  -m paddle.distributed.launch \
     --per_device_eval_batch_size 1 \
     --tensor_parallel_degree 1 \
     --pipeline_parallel_degree 1 \
-    --fuse_attention_qkv 1 \
+    --fuse_attention_qkv 0 \
     --use_flash_attention 0 \
     --fp16  \
     --fp16_opt_level "O2"  \
@@ -62,6 +62,7 @@ python -u  -m paddle.distributed.launch \
     --warmup_ratio 0.01 \
     --max_grad_norm 1.0 \
     --logging_steps 1\
+    --continue_training \
     --dataloader_num_workers 1 \
     --sharding "stage2" \
     --eval_steps 1000 \
