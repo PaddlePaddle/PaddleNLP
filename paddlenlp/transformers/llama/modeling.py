@@ -735,7 +735,8 @@ class LlamaAttention(nn.Layer):
             if self.reshard_layer is not None:
                 if self.sequence_parallel:
                     assert self.seq_length % self.config.sep_parallel_degree == 0
-                    mix_layer.reshape_([-1, self.seq_length // self.config.sep_parallel_degree, 0])
+                    mix_layer = paddle.reshape_(mix_layer, [-1, self.seq_length // self.config.sep_parallel_degree, 3 * self.num_heads * self.head_dim])
+                # [bs, seq_len / sep, num_head, head_dim] -> [bs, seq_len, num_head / sep, head_dim]
                 mix_layer = self.reshard_layer(mix_layer, split_axis=2, concat_axis=1,)
                 mix_layer = paddle.reshape_(mix_layer, [0, self.seq_length, -1, 3 * self.head_dim])  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
             else:
@@ -1431,7 +1432,11 @@ class LlamaLMHead(nn.Layer):
     def forward(self, hidden_states, tensor_parallel_output=None):
         if self.config.sequence_parallel:
             hidden_states = GatherOp.apply(hidden_states)
-            hidden_states = paddle.reshape_(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
+            seq_length = self.config.seq_length
+            if self.config.sep_parallel_degree > 1:
+                assert seq_length % self.config.sep_parallel_degree == 0
+                seq_length = seq_length // self.config.sep_parallel_degree
+            hidden_states = paddle.reshape_(hidden_states, [-1, seq_length, self.config.hidden_size])
 
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output

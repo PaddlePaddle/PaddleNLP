@@ -30,7 +30,7 @@ export PYTHONPATH=../../:$PYTHONPATH
 if [[ $mode == "dp" ]]; then
 rm -rf dp_input_data/*
 python -u  -m paddle.distributed.launch \
-    --gpus "0" \
+    --gpus "0, 1" \
     --log_dir "./dp_log" \
     run_pretrain.py \
     --model_type "llama" \
@@ -72,14 +72,15 @@ python -u  -m paddle.distributed.launch \
     --data_cache "./data_cache" \
     --pipeline_parallel_degree 1 \
     --sep_parallel_degree 1 \
-    --tensor_parallel_degree 1 \
+    --tensor_parallel_degree 2 \
+    --sequence_parallel true \
     # --amp_master_grad \
     # --sharding "stage1" \
 
 elif [[ $mode == "sep" ]]; then
 rm -rf sep_input_data/*
 python -u  -m paddle.distributed.launch \
-    --gpus "1, 2" \
+    --gpus "1,2,3,4" \
     --log_dir "./sep_log" \
     run_pretrain.py \
     --model_type "llama" \
@@ -121,7 +122,8 @@ python -u  -m paddle.distributed.launch \
     --data_cache "./data_cache" \
     --pipeline_parallel_degree 1 \
     --sep_parallel_degree 2 \
-    --tensor_parallel_degree 1 \
+    --tensor_parallel_degree 2 \
+    --sequence_parallel true \
     --amp_master_grad \
     # --sharding "stage1" \
 
