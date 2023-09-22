@@ -447,8 +447,6 @@ class PretrainedConfig:
             `float16` weights. Since the config object is stored in plain text, this attribute contains just the
             floating type string without the `paddle.` prefix. For example, for `paddle.float16` ``dtype` is the
             `"float16"` string.
-        fp16_opt_level(`str`, *optional*):
-            The `level` of the amp level.
 
             This attribute is currently not being used during model loading time, but this may change in the future
             versions. But we can already start preparing for the future by saving the dtype with save_pretrained.
@@ -505,6 +503,7 @@ class PretrainedConfig:
         self.output_hidden_states = kwargs.pop("output_hidden_states", False)
         self.output_attentions = kwargs.pop("output_attentions", False)
         self.use_cache = kwargs.pop("use_cache", False)
+        self.quantization_config = kwargs.pop("quantization_config", None)
 
         self.pruned_heads = kwargs.pop("pruned_heads", {})
         self.tie_word_embeddings = kwargs.pop(
@@ -523,6 +522,8 @@ class PretrainedConfig:
         # If set to True, this option is used with fleet.meta_parallel.ParallelCrossEntropy
         # to calculate cross-entropy loss for parallel model.
         self.tensor_parallel_output = kwargs.pop("tensor_parallel_output", False)
+        # Temporary switch to control hook vs. PyLayer implementation of recompute
+        self.recompute_use_reentrant = kwargs.pop("recompute_use_reentrant", False)
 
         # Is decoder is used in encoder-decoder models to differentiate encoder from decoder
         self.is_encoder_decoder = kwargs.pop("is_encoder_decoder", False)
@@ -584,8 +585,6 @@ class PretrainedConfig:
         self.pad_token_id = kwargs.pop("pad_token_id", None)
         self.eos_token_id = kwargs.pop("eos_token_id", None)
         self.sep_token_id = kwargs.pop("sep_token_id", None)
-
-        self.fp16_opt_level = kwargs.pop("fp16_opt_level", None)
 
         self.decoder_start_token_id = kwargs.pop("decoder_start_token_id", None)
 

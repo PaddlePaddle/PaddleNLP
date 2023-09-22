@@ -57,6 +57,7 @@ MAPPING_NAMES = OrderedDict(
         ("BigBird", "bigbird"),
         ("BlenderbotSmall", "blenderbot_small"),
         ("Blenderbot", "blenderbot"),
+        ("ChatGLMv2", "chatglm_v2"),
         ("ChatGLM", "chatglm"),
         ("ChineseCLIP", "chineseclip"),
         ("ChineseBert", "chinesebert"),
@@ -124,6 +125,7 @@ MAPPING_NAMES = OrderedDict(
         ("BlipVision", "blip"),
         ("Blip", "blip"),
         ("Bloom", "bloom"),
+        ("QWen", "qwen"),
     ]
 )
 

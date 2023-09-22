@@ -21,8 +21,10 @@ import inspect
 import os
 import re
 import shutil
+import sys
 import warnings
 from contextlib import ExitStack
+from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, ContextManager, List, Optional, Type, Union
 
@@ -70,13 +72,13 @@ def convert_ndarray_dtype(np_array: np.ndarray, target_dtype: str) -> np.ndarray
     if source_dtype == "uint16" or target_dtype == "bfloat16":
         tensor = paddle.to_tensor(np_array)
         tensor = paddle.cast(tensor, target_dtype)
-        return tensor.numpy()
+        return tensor.cpu().numpy()
 
         # TODO(wj-Mcat): device_guard will slow the converting
         # with device_guard("cpu"):
         #     tensor = paddle.to_tensor(np_array)
         #     tensor = paddle.cast(tensor, target_dtype)
-        # return tensor.numpy()
+        # return tensor.cpu().numpy()
 
     if target_dtype == "bfloat16":
         target_dtype = "uint16"
@@ -139,7 +141,9 @@ def adapt_stale_fwd_patch(self, name, value):
         # NOTE(guosheng): In dygraph to static, `layer.forward` would be patched
         # by an instance of `StaticFunction`. And use string compare to avoid to
         # import fluid.
-        if type(value).__name__.endswith("StaticFunction"):
+        if type(value).__name__.endswith("StaticFunction") or self.forward.__class__.__name__.endswith(
+            "StaticFunction"
+        ):
             return value
         if hasattr(inspect, "getfullargspec"):
             (
@@ -684,6 +688,28 @@ def paddlenlp_load(path, map_location="cpu"):
     else:
         with device_guard(map_location):
             return paddle.load(path)
+            # TODO(zhonghui03): the following code has problems when hot start optimizer checkpoint.
+            if map_location == "cpu":
+                from paddle.framework.io import (
+                    _parse_every_object,
+                    _to_LodTensor,
+                    _transformed_from_lodtensor,
+                )
+
+                def _ndarray_to_tensor(obj, return_numpy=False):
+                    if return_numpy:
+                        return obj
+                    if paddle.in_dynamic_mode():
+                        return paddle.Tensor(obj, zero_copy=True)
+                    else:
+                        return _to_LodTensor(obj)
+
+                state_dict = paddle.load(path, return_numpy=True)
+                # Hack for zero copy for saving loading time. for paddle.load there need copy to create paddle.Tensor
+                return _parse_every_object(state_dict, _transformed_from_lodtensor, _ndarray_to_tensor)
+
+            else:
+                return paddle.load(path)
 
 
 def is_paddle_support_lazy_init():
@@ -765,3 +791,108 @@ def dtype_byte_size(dtype):
         raise ValueError(f"`dtype` is not a valid dtype: {dtype}.")
     bit_size = int(bit_search.groups()[0])
     return bit_size // 8
+
+
+def apply_print_resets(buf):
+    return re.sub(r"^.*\r", "", buf, 0, re.M)
+
+
+class CaptureStd:
+    """
+    Context manager to capture:
+
+        - stdout: replay it, clean it up and make it available via `obj.out`
+        - stderr: replay it and make it available via `obj.err`
+
+    Args:
+        out (`bool`, *optional*, defaults to `True`): Whether to capture stdout or not.
+        err (`bool`, *optional*, defaults to `True`): Whether to capture stderr or not.
+        replay (`bool`, *optional*, defaults to `True`): Whether to replay or not.
+            By default each captured stream gets replayed back on context's exit, so that one can see what the test was
+            doing. If this is a not wanted behavior and the captured data shouldn't be replayed, pass `replay=False` to
+            disable this feature.
+
+    Examples:
+
+    ```python
+    # to capture stdout only with auto-replay
+    with CaptureStdout() as cs:
+        print("Secret message")
+    assert "message" in cs.out
+
+    # to capture stderr only with auto-replay
+    import sys
+
+    with CaptureStderr() as cs:
+        print("Warning: ", file=sys.stderr)
+    assert "Warning" in cs.err
+
+    # to capture both streams with auto-replay
+    with CaptureStd() as cs:
+        print("Secret message")
+        print("Warning: ", file=sys.stderr)
+    assert "message" in cs.out
+    assert "Warning" in cs.err
+
+    # to capture just one of the streams, and not the other, with auto-replay
+    with CaptureStd(err=False) as cs:
+        print("Secret message")
+    assert "message" in cs.out
+    # but best use the stream-specific subclasses
+
+    # to capture without auto-replay
+    with CaptureStd(replay=False) as cs:
+        print("Secret message")
+    assert "message" in cs.out
+    ```"""
+
+    def __init__(self, out=True, err=True, replay=True):
+        self.replay = replay
+
+        if out:
+            self.out_buf = StringIO()
+            self.out = "error: CaptureStd context is unfinished yet, called too early"
+        else:
+            self.out_buf = None
+            self.out = "not capturing stdout"
+
+        if err:
+            self.err_buf = StringIO()
+            self.err = "error: CaptureStd context is unfinished yet, called too early"
+        else:
+            self.err_buf = None
+            self.err = "not capturing stderr"
+
+    def __enter__(self):
+        if self.out_buf:
+            self.out_old = sys.stdout
+            sys.stdout = self.out_buf
+
+        if self.err_buf:
+            self.err_old = sys.stderr
+            sys.stderr = self.err_buf
+
+        return self
+
+    def __exit__(self, *exc):
+        if self.out_buf:
+            sys.stdout = self.out_old
+            captured = self.out_buf.getvalue()
+            if self.replay:
+                sys.stdout.write(captured)
+            self.out = apply_print_resets(captured)
+
+        if self.err_buf:
+            sys.stderr = self.err_old
+            captured = self.err_buf.getvalue()
+            if self.replay:
+                sys.stderr.write(captured)
+            self.err = captured
+
+    def __repr__(self):
+        msg = ""
+        if self.out_buf:
+            msg += f"stdout: {self.out}\n"
+        if self.err_buf:
+            msg += f"stderr: {self.err}\n"
+        return msg

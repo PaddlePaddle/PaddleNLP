@@ -24,7 +24,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.common_ops_import import convert_dtype
-from paddle.fluid import layers
+from paddle.base import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 from ppfleetx.distributed.apis import auto_env
 
@@ -979,7 +979,7 @@ class GPTForGenerationAuto(nn.Layer):
             x_dims_mapping = [auto_env.get_mesh().dp_dim] + [None] * (len(logits.shape) - 1)
             w_dims_mapping = [auto_env.get_mesh().mp_dim, None]
             matmul = auto.shard_op(paddle.matmul, auto_env.get_mesh()[-1], [x_dims_mapping, w_dims_mapping, None])
-            with paddle.fluid.name_scope("skip_quant"):
+            with paddle.base.name_scope("skip_quant"):
                 logits = matmul(logits, get_attr(self.gpt.embeddings.word_embeddings, "weight"), transpose_y=True)
 
             # [batch_size, vocab_size]
@@ -1148,10 +1148,20 @@ class GPTForGenerationAuto(nn.Layer):
 
         if self.inference:
             # Note(ZhenyuLi): Avoid the synchronization caused by scale in dy2static
-            min_len = input_ids.shape[-1]
-            max_len = input_ids.shape[-1]
-            paddle.increment(min_len, min_length)
-            paddle.increment(max_len, max_length)
+            if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+                # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior
+                # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+                # removed after static graphs support inplace and stride.
+                with paddle.framework._no_check_dy2st_diff():
+                    min_len = input_ids.shape[-1]
+                    max_len = input_ids.shape[-1]
+                    paddle.increment(min_len, min_length)
+                    paddle.increment(max_len, max_length)
+            else:
+                min_len = input_ids.shape[-1]
+                max_len = input_ids.shape[-1]
+                paddle.increment(min_len, min_length)
+                paddle.increment(max_len, max_length)
         else:
             input_len = input_ids.shape[-1]
             max_len = max_length + input_len
@@ -1174,18 +1184,34 @@ class GPTForGenerationAuto(nn.Layer):
                 input_ids, model_kwargs = self.expand_inputs_for_generation(
                     input_ids, expand_size=num_return_sequences, **model_kwargs
                 )
-
-            ret = self.sample(
-                input_ids,
-                logits_processors,
-                max_len,
-                pad_token_id,
-                eos_token_id,
-                top_k,
-                top_p,
-                temperature,
-                **model_kwargs,
-            )
+            if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+                # TODO(wanghuancoder): _no_check_dy2st_diff is used to turn off the checking of behavior
+                # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+                # removed after static graphs support inplace and stride.
+                with paddle.framework._no_check_dy2st_diff():
+                    ret = self.sample(
+                        input_ids,
+                        logits_processors,
+                        max_len,
+                        pad_token_id,
+                        eos_token_id,
+                        top_k,
+                        top_p,
+                        temperature,
+                        **model_kwargs,
+                    )
+            else:
+                ret = self.sample(
+                    input_ids,
+                    logits_processors,
+                    max_len,
+                    pad_token_id,
+                    eos_token_id,
+                    top_k,
+                    top_p,
+                    temperature,
+                    **model_kwargs,
+                )
         else:
             raise ValueError(f"Not support {decode_strategy} strategy yet!")
         return ret

@@ -25,7 +25,7 @@ from parameterized import parameterized_class
 from paddlenlp.transformers import GPTTokenizer, OPTConfig, OPTForCausalLM, OPTModel
 from tests.testing_utils import PaddleNLPModelTest, require_package, slow
 from tests.transformers.test_generation_utils import GenerationTesterMixin
-from tests.transformers.test_modeling_common import (
+from tests.transformers.test_modeling_common import (  # GenerationD2STestMixin,
     ModelTesterMixin,
     floats_tensor,
     ids_tensor,
@@ -559,3 +559,8 @@ class OPTModelIntegrationTest(unittest.TestCase):
             ]
         )
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+
+# class OPTGenerationD2STest(GenerationD2STestMixin, unittest.TestCase):
+#    internal_testing_model = "__internal_testing__/tiny-random-opt"
+#    TokenizerClass = GPTTokenizer

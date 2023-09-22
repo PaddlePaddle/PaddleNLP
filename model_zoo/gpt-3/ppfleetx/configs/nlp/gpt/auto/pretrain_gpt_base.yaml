@@ -12,7 +12,7 @@ Engine:
   num_train_epochs: 1
   accumulate_steps:
   logging_freq: 1
-  eval_freq: 1
+  eval_freq: 500
   eval_iters: 10
   test_iters:
   mix_precision:
@@ -30,7 +30,8 @@ Engine:
 Model:
   module: "GPTModuleAuto"
   name: "GPT"
-  fuse_attn_qkv: False
+  vocab_size_divisible_unit: 128
+  fuse_attn_qkv: True
   scale_qk_by_layer_num: True
   fused_softmax_with_triangular: True
 
@@ -71,3 +72,8 @@ Optimizer:
   grad_clip:
     name: "ClipGradByGlobalNorm"
     clip_norm: 1.0
+
+
+FusedPasses:
+  fused_linear: False
+  fused_adamw: False

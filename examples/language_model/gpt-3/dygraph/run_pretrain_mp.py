@@ -16,6 +16,7 @@ import os
 import random
 import time
 
+import build_optimizer
 import numpy as np
 import paddle
 from args import parse_args
@@ -23,9 +24,6 @@ from configuration import GPTConfig
 from dataset import create_pretrained_dataset
 from modeling import GPTForPretraining, GPTPretrainingCriterion
 from paddle.distributed import fleet
-from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
-    DygraphShardingOptimizer,
-)
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
@@ -241,35 +239,7 @@ def do_train(args):
     # All bias and LayerNorm parameters are excluded.
     decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
 
-    if args.sharding_stage == 1 and args.sharding_degree > 1:
-        optimizer = DygraphShardingOptimizer(
-            hcg=fleet.get_hybrid_communicate_group(),
-            user_defined_strategy=strategy,
-            params=model.parameters(),
-            inner_optimizer_class=paddle.optimizer.AdamW,
-            learning_rate=lr_scheduler if lr_scheduler is not None else args.max_lr,
-            beta1=args.adam_beta1,
-            beta2=args.adam_beta2,
-            epsilon=args.adam_epsilon,
-            weight_decay=args.weight_decay,
-            grad_clip=clip,
-            apply_decay_param_fun=lambda x: x in decay_params,
-            multi_precision=args.use_pure_fp16,
-        )
-    else:
-        optimizer = paddle.optimizer.AdamW(
-            learning_rate=lr_scheduler if lr_scheduler is not None else args.max_lr,
-            beta1=args.adam_beta1,
-            beta2=args.adam_beta2,
-            epsilon=args.adam_epsilon,
-            parameters=model.parameters(),
-            weight_decay=args.weight_decay,
-            grad_clip=clip,
-            apply_decay_param_fun=lambda x: x in decay_params,
-            # TODO: remove 'multi_precision' in definition of optimizer
-            # and add it to 'paddle.amp.decorate'
-            multi_precision=args.use_pure_fp16,
-        )
+    optimizer = build_optimizer.apply(model, args, lr_scheduler, clip, decay_params, strategy)
 
     if args.use_pure_fp16:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)

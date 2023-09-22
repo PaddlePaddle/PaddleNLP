@@ -1993,7 +1993,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         is_split_into_words: Union[bool, str] = False,
         padding: Union[bool, str, PaddingStrategy] = False,
         truncation: Union[bool, str, TruncationStrategy] = False,
-        return_position_ids: bool = False,
+        return_position_ids: bool = None,
         return_token_type_ids: Optional[bool] = None,
         return_attention_mask: Optional[bool] = None,
         return_length: bool = False,
@@ -2270,7 +2270,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         return_offsets_mapping: bool = False,
         return_length: bool = False,
         verbose: bool = True,
-        return_position_ids=False,
+        return_position_ids=None,
         **kwargs
     ) -> BatchEncoding:
         """
@@ -2439,7 +2439,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         is_split_into_words: bool = False,
         padding: Union[bool, str, PaddingStrategy] = False,
         truncation: Union[bool, str, TruncationStrategy] = False,
-        return_position_ids=False,
+        return_position_ids=None,
         # TODO(wj-mcat): keep align with `encode` method
         return_token_type_ids=None,
         return_attention_mask=None,
@@ -2766,7 +2766,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         stride: int = 0,
         pad_to_multiple_of: Optional[int] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
-        return_position_ids=False,
+        return_position_ids=None,
         return_token_type_ids: Optional[bool] = None,
         return_attention_mask: Optional[bool] = None,
         return_length=False,
@@ -2819,7 +2819,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             return_token_type_ids = "token_type_ids" in self.model_input_names
         if return_attention_mask is None:
             return_attention_mask = "attention_mask" in self.model_input_names
-
+        if return_position_ids is None:
+            return_position_ids = "position_ids" in self.model_input_names
         encoded_inputs = {}
         # Truncation: Handle max sequence length
         total_len = len_ids + len_pair_ids + (self.num_special_tokens_to_add(pair=pair) if add_special_tokens else 0)
