@@ -807,11 +807,11 @@ class TrainingArguments:
             if (
                 self.pipeline_parallel_degree <= 1
                 and self.tensor_parallel_degree <= 1
-                and not (self.sharding and ShardingOption.SHARD_OP in self.sharding)
+                and (not self.sharding or ShardingOption.FULL_SHARD in self.sharding)
             ):
                 raise ValueError(
-                    "Temporarily amp master grad only support for tensor/pipeline/sharding parallel. "
-                    "Please set amp_master_grad to False."
+                    "Temporarily amp master grad only support for tensor/pipeline/sharding"
+                    " (stage 1 and stage 2) parallel. Please set amp_master_grad to False."
                 )
             if not (self.bf16 or self.fp16):
                 logger.warning("set amp_master_grad to false since amp is disabled.")

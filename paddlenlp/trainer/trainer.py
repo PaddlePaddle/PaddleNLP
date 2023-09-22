@@ -363,6 +363,12 @@ class Trainer:
                             GroupShardedScaler,
                         )
 
+                        if self.args.amp_master_grad:
+                            assert (
+                                ShardingOption.SHARD_GRAD_OP in self.args.sharding
+                            ), "Main grad doesn't support sharding stage 3 for now."
+                            mix_precision_utils.MixPrecisionScaler(self.scaler)  # return value has no use
+
                         self.scaler = GroupShardedScaler(self.scaler)
                 else:
                     self.do_grad_scaling = False
@@ -1567,6 +1573,14 @@ class Trainer:
                     extra_kwargs["dp_group"] = self.dp_group
                     extra_kwargs["exclude_layer"] = ["GroupNorm"]
 
+                if self.args.amp_master_grad:
+                    assert level == "os_g", "Main grad doesn't support sharding stage 3 for now."
+                    assert (
+                        self.args.data_parallel_degree == 1
+                    ), "Sharding stage 2 main grad is not compatible with dp for now."
+                    mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
+                    self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
+
                 model, optimizer, _ = group_sharded_parallel(
                     model,
                     self.optimizer,
@@ -1576,6 +1590,11 @@ class Trainer:
                     offload=cpu_offload,
                     **extra_kwargs,
                 )
+                if self.args.amp_master_grad:
+                    assert hasattr(optimizer, "use_main_grad"), (
+                        "Current installed paddle doesn't support sharding stage 2 with main grad, "
+                        "please upgrade your paddle (using nightly version)."
+                    )
                 self.optimizer = optimizer
 
         # pure tesnor parallel mode, no pipeline_parallel, no sharding.
