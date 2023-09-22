@@ -26,7 +26,9 @@ from paddlenlp.transformers import PretrainedTokenizer
 
 
 class TrainDatasetForEmbedding(Dataset):
-    def __init__(self, args: DataArguments, tokenizer: PretrainedTokenizer):
+    def __init__(
+        self, args: DataArguments, tokenizer: PretrainedTokenizer, query_max_len: int = 64, passage_max_len: int = 1048
+    ):
         if os.path.isdir(args.train_data):
             train_datasets = []
             for file in os.listdir(args.train_data):
@@ -45,6 +47,8 @@ class TrainDatasetForEmbedding(Dataset):
         self.tokenizer = tokenizer
         self.args = args
         self.total_len = len(self.dataset)
+        self.query_max_len = query_max_len
+        self.passage_max_len = passage_max_len
 
     def __len__(self):
         return self.total_len
@@ -53,21 +57,25 @@ class TrainDatasetForEmbedding(Dataset):
         query = self.dataset[item]["query"]
         if self.args.query_instruction_for_retrieval is not None:
             query = self.args.query_instruction_for_retrieval + query
-
+        query = self.tokenizer(query, truncation=True, max_length=self.query_max_len, return_attention_mask=False)
         passages = []
         pos = random.choice(self.dataset[item]["pos"])
         passages.append(pos)
-
         if len(self.dataset[item]["neg"]) < self.args.train_group_size - 1:
             num = math.ceil((self.args.train_group_size - 1) / len(self.dataset[item]["neg"]))
             negs = random.sample(self.dataset[item]["neg"] * num, self.args.train_group_size - 1)
         else:
             negs = random.sample(self.dataset[item]["neg"], self.args.train_group_size - 1)
         passages.extend(negs)
-
         if self.args.passage_instruction_for_retrieval is not None:
             passages = [self.args.passage_instruction_for_retrieval + p for p in passages]
-        return query, passages
+        passages = self.tokenizer(
+            passages, truncation=True, max_length=self.passage_max_len, return_attention_mask=False
+        )
+        passages_tackle = []
+        for i in range(len(passages["input_ids"])):
+            passages_tackle.append({"input_ids": passages["input_ids"][i]})
+        return query, passages_tackle
 
 
 @dataclass
@@ -106,20 +114,20 @@ class EmbedCollator(DataCollatorWithPadding):
             query = sum(query, [])
         if isinstance(passage[0], list):
             passage = sum(passage, [])
-        q_collated = self.tokenizer(
+        q_collated = self.tokenizer.pad(
             query,
-            padding=True,
-            truncation=True,
-            return_attention_mask=True,
+            padding="max_length",
             max_length=self.query_max_len,
+            return_attention_mask=True,
+            pad_to_multiple_of=None,
             return_tensors="pd",
         )
-        d_collated = self.tokenizer(
+        d_collated = self.tokenizer.pad(
             passage,
-            padding=True,
-            truncation=True,
-            return_attention_mask=True,
+            padding="max_length",
             max_length=self.passage_max_len,
+            return_attention_mask=True,
+            pad_to_multiple_of=None,
             return_tensors="pd",
         )
         return {"query": q_collated, "passage": d_collated}

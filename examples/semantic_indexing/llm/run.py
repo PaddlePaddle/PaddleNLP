@@ -85,8 +85,12 @@ def main():
             else:
                 logger.info(f"Freeze the parameters for {k}")
                 v.stop_gradient = True
-
-    train_dataset = TrainDatasetForEmbedding(args=data_args, tokenizer=tokenizer)
+    train_dataset = TrainDatasetForEmbedding(
+        args=data_args,
+        tokenizer=tokenizer,
+        query_max_len=data_args.query_max_len,
+        passage_max_len=data_args.passage_max_len,
+    )
     trainer = BiTrainer(
         model=model,
         args=training_args,
