@@ -73,7 +73,8 @@ def set_seed(seed):
     #        sharding_rank * (mp_size * pp_size * dp_size)
     # seed offset is order to avoid conflicts with the parameter initialization seed
 
-    seed_offset = seed + 1024 + paddle.distributed.get_world_size()
+    # seed_offset = seed + 1024 + paddle.distributed.get_world_size()
+    seed_offset = seed + 1024
     global_seed = (
         seed_offset + \
         sep_rank * (mp_size) + \
@@ -93,10 +94,6 @@ def set_seed(seed):
         sharding_rank * (mp_size * sep_size * pp_size * dp_size)
 
     )
-    # hack to force the same seed
-    global_seed = seed
-    local_seed = seed + 1
-    #
 
     tracker = get_rng_state_tracker()
     tracker.add("global_seed", global_seed)

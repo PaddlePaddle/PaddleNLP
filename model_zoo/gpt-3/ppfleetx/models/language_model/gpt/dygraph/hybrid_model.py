@@ -624,7 +624,7 @@ class TransformerDecoderLayer(nn.Layer):
             tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
         # If use sequence_parallel, different input partition in dropout
         # should use different seed.
-        if self.sequence_parallel:
+        if self.sequence_parallel or env.get_hcg().get_sep_parallel_world_size() > 1:
             current_seed = "local_seed"
         else:
             current_seed = "global_seed"

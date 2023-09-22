@@ -27,7 +27,7 @@ export PYTHONPATH=../../:$PYTHONPATH
 mode="dp"
 mode="sep"
 
-num_layers=2
+num_layers=24
 
 if [[ "$mode" == "dp" ]]; then
 rm -rf ./dp_log
