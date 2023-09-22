@@ -92,7 +92,6 @@ def main():
     if model_args.model_name_or_path in ["gpt3-6.7B-en", "gpt3-13B-en"]:
         model = GPTForCausalLM.from_pretrained(
             model_args.model_name_or_path,
-            low_cpu_mem_usage=True,
             use_flash_attention=model_args.use_flash_attention,
             dtype=dtype,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
@@ -104,7 +103,6 @@ def main():
     else:
         model = AutoModelForCausalLM.from_pretrained(
             model_args.model_name_or_path,
-            low_cpu_mem_usage=True,
             use_flash_attention=model_args.use_flash_attention,
             dtype=dtype,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
