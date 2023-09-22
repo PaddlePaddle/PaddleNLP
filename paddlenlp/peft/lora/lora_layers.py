@@ -19,7 +19,10 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.distributed.fleet.layers.mpu import mp_ops
-from paddle.distributed.fleet.meta_parallel import ColumnParallelLinear
+from paddle.distributed.fleet.meta_parallel import (
+    ColumnParallelLinear,
+    RowParallelLinear,
+)
 
 
 class LoRALinear(nn.Linear):
@@ -35,6 +38,8 @@ class LoRALinear(nn.Linear):
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
+        if not isinstance(r, int) or r <= 0:
+            raise ValueError("Lora rank r should be a positive integer")
         self.r = r
         self.lora_alpha = lora_alpha
         # Optional dropout
@@ -47,49 +52,148 @@ class LoRALinear(nn.Linear):
         self.merge_weights = merge_weights
 
         # Actual trainable parameters
-        if r > 0:
-            self.lora_A = self.create_parameter(
-                shape=[in_features, r],
-                dtype=self._dtype,
-                is_bias=False,
-                default_initializer=nn.initializer.KaimingUniform(
-                    negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
-                ),
-            )
-            self.lora_B = self.create_parameter(
-                shape=[r, out_features],
-                dtype=self._dtype,
-                is_bias=False,
-                default_initializer=nn.initializer.Constant(value=0.0),
-            )
-            self.scaling = self.lora_alpha / self.r
+        self.lora_A = self.create_parameter(
+            shape=[in_features, r],
+            dtype=self._dtype,
+            is_bias=False,
+            default_initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu"),
+        )
+        self.lora_B = self.create_parameter(
+            shape=[r, out_features],
+            dtype=self._dtype,
+            is_bias=False,
+            default_initializer=nn.initializer.Constant(value=0.0),
+        )
+        self.scaling = self.lora_alpha / self.r
 
-            # Freezing the pre-trained weight matrix
-            self.weight.stop_gradient = True
+        # Freezing the pre-trained weight matrix
+        self.weight.stop_gradient = True
 
     def train(self):
         super().train()
         if self.merge_weights and self.merged:
             # Make sure that the weights are not merged
-            if self.r > 0:
-                new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
-                self.weight.set_value(new_weight)
+            new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
+            self.weight.set_value(new_weight)
             self.merged = False
 
     def eval(self):
         super().eval()
         if self.merge_weights and not self.merged:
             # Merge the weights and mark it
-            if self.r > 0:
-                new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
-                self.weight.set_value(new_weight)
+            new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
+            self.weight.set_value(new_weight)
             self.merged = True
 
     def forward(self, input: paddle.Tensor):
         result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
-        if self.r > 0 and not self.merged:
+        if not self.merged:
             result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
         return result
+
+    def extra_repr(self):
+        name = f", name={self.name}" if self.name else ""
+        return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}{name}"
+
+
+class RowParallelLoRALinear(RowParallelLinear):
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        r: int = 0,
+        lora_alpha: int = 1,
+        lora_dropout: float = 0.0,
+        merge_weights: bool = True,
+        **kwargs
+    ):
+        RowParallelLinear.__init__(self, in_features, out_features, **kwargs)
+        if not isinstance(r, int) or r <= 0:
+            raise ValueError("Lora rank r should be a positive integer")
+        self.r = r
+        self.lora_alpha = lora_alpha
+        # Optional dropout
+        if lora_dropout > 0.0:
+            self.lora_dropout = nn.Dropout(p=lora_dropout)
+        else:
+            self.lora_dropout = lambda x: x
+        # Mark the weight as unmerged
+        self.merged = False
+        self.merge_weights = merge_weights
+
+        # compatible
+        self.name = self._name
+
+        # Actual trainable parameters
+        self.lora_A = self.create_parameter(
+            shape=[self.input_size_per_partition, r],
+            dtype=self._dtype,
+            is_bias=False,
+            attr=paddle.ParamAttr(
+                initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
+            ),
+        )
+        self.lora_B = self.create_parameter(
+            shape=[r, self.out_features],
+            dtype=self._dtype,
+            is_bias=False,
+            default_initializer=nn.initializer.Constant(value=0.0),
+        )
+        self.lora_A.is_distributed = True
+        self.lora_A.split_axis = 0
+        self.lora_B.is_distributed = False
+        self.scaling = self.lora_alpha / self.r
+
+        # Freezing the pre-trained weight matrix
+        self.weight.stop_gradient = True
+
+    def train(self):
+        super().train()
+        if self.merge_weights and self.merged:
+            # Make sure that the weights are not merged
+            new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
+            self.weight.set_value(new_weight)
+            self.merged = False
+
+    def eval(self):
+        super().eval()
+        if self.merge_weights and not self.merged:
+            # Merge the weights and mark it
+            new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
+            self.weight.set_value(new_weight)
+            self.merged = True
+
+    def forward(self, x: paddle.Tensor):
+        if not self.input_is_parallel:
+            input_mp = mp_ops._c_split(x, group=self.model_parallel_group)
+        else:
+            input_mp = x
+
+        # x @ W : [bz, in_f / ws] ===> [bz, out_f]
+        result_mp = F.linear(x=input_mp, weight=self.weight, name=self.name)
+
+        output = mp_ops._mp_allreduce(
+            result_mp,
+            group=self.model_parallel_group,
+            use_calc_stream=True,
+            use_model_parallel=True,
+        )
+
+        if not self.merged:
+            # x @ A: [bz, in_f/ ws] ===> [bz, r]
+            input_mp = self.lora_dropout(input_mp) @ self.lora_A
+            # all reduce to keep Lora B's gradient on different gpu consistent
+            input_dup = mp_ops._mp_allreduce(
+                input_mp,
+                group=self.model_parallel_group,
+                use_calc_stream=True,
+                use_model_parallel=True,
+            )
+            #  @ B: [bz, r] ===> [bz, out_f]
+            delta_mp = (input_dup @ self.lora_B) * self.scaling
+            output += delta_mp
+        output = output + self.bias if self.bias is not None else output
+        return output
 
     def extra_repr(self):
         name = f", name={self.name}" if self.name else ""
@@ -109,6 +213,8 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         **kwargs
     ):
         ColumnParallelLinear.__init__(self, in_features, out_features, **kwargs)
+        if not isinstance(r, int) or r <= 0:
+            raise ValueError("Lora rank r should be a positive integer")
         self.r = r
         self.lora_alpha = lora_alpha
         # Optional dropout
@@ -124,50 +230,47 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         self.name = self._name
 
         # Actual trainable parameters
-        if r > 0:
-            self.lora_A = self.create_parameter(
-                shape=[in_features, r],
-                dtype=self._dtype,
-                is_bias=False,
-                attr=lora_A_weight_attr,
-            )
-            self.lora_A.is_distributed = False
-            self.lora_B = self.create_parameter(
-                shape=[r, self.output_size_per_partition],
-                dtype=self._dtype,
-                is_bias=False,
-                default_initializer=nn.initializer.Constant(value=0.0),
-            )
-            self.lora_B.is_distributed = True
-            self.lora_B.split_axis = 1
-            self.scaling = self.lora_alpha / self.r
+        self.lora_A = self.create_parameter(
+            shape=[in_features, r],
+            dtype=self._dtype,
+            is_bias=False,
+            attr=lora_A_weight_attr,
+        )
+        self.lora_A.is_distributed = False
+        self.lora_B = self.create_parameter(
+            shape=[r, self.output_size_per_partition],
+            dtype=self._dtype,
+            is_bias=False,
+            default_initializer=nn.initializer.Constant(value=0.0),
+        )
+        self.lora_B.is_distributed = True
+        self.lora_B.split_axis = 1
+        self.scaling = self.lora_alpha / self.r
 
-            # Freezing the pre-trained weight matrix
-            self.weight.stop_gradient = True
+        # Freezing the pre-trained weight matrix
+        self.weight.stop_gradient = True
 
     def train(self):
         super().train()
         if self.merge_weights and self.merged:
             # Make sure that the weights are not merged
-            if self.r > 0:
-                new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
-                self.weight.set_value(new_weight)
+            new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
+            self.weight.set_value(new_weight)
             self.merged = False
 
     def eval(self):
         super().eval()
         if self.merge_weights and not self.merged:
             # Merge the weights and mark it
-            if self.r > 0:
-                new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
-                self.weight.set_value(new_weight)
+            new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
+            self.weight.set_value(new_weight)
             self.merged = True
 
     def forward(self, input: paddle.Tensor):
         input_mp = mp_ops._c_identity(input, group=self.model_parallel_group)
         result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
 
-        if self.r > 0 and not self.merged:
+        if not self.merged:
             input_a = self.lora_dropout(input) @ self.lora_A
             input_a_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
             delta_mp = (input_a_mp @ self.lora_B) * self.scaling
@@ -202,6 +305,8 @@ class LoRAMergedLinear(nn.Linear):
         assert (
             out_features % len(enable_lora) == 0
         ), f"The length of enable_lora must divide out_features: {out_features} % {len(enable_lora)} != 0"
+        if not isinstance(r, int) or r <= 0:
+            raise ValueError("Lora rank r should be a positive integer")
         self.r = r
         self.lora_alpha = lora_alpha
         if isinstance(enable_lora, List) and all(isinstance(item, bool) for item in enable_lora):
@@ -225,7 +330,7 @@ class LoRAMergedLinear(nn.Linear):
         self.merge_weights = merge_weights
 
         # Actual trainable parameters
-        if r > 0 and any(enable_lora):
+        if any(enable_lora):
             self.lora_A = self.create_parameter(
                 shape=[in_features, r * sum(enable_lora)],
                 dtype=self._dtype,
@@ -277,7 +382,7 @@ class LoRAMergedLinear(nn.Linear):
         super().train()
         if self.merge_weights and self.merged:
             # Make sure that the weights are not merged
-            if self.r > 0 and any(self.enable_lora):
+            if any(self.enable_lora):
                 reshape_lora_B = (
                     self.lora_B.reshape([self.r, self.head_num, sum(self.enable_lora), self.head_dim])
                     .transpose([0, 2, 1, 3])
@@ -300,7 +405,7 @@ class LoRAMergedLinear(nn.Linear):
         super().eval()
         if self.merge_weights and not self.merged:
             # Merge the weights and mark it
-            if self.r > 0 and any(self.enable_lora):
+            if any(self.enable_lora):
                 reshape_lora_B = (
                     self.lora_B.reshape([self.r, self.head_num, sum(self.enable_lora), self.head_dim])
                     .transpose([0, 2, 1, 3])
@@ -321,7 +426,7 @@ class LoRAMergedLinear(nn.Linear):
 
     def forward(self, input: paddle.Tensor):
         result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
-        if self.r > 0 and any(self.enable_lora) and not self.merged:
+        if any(self.enable_lora) and not self.merged:
             input_a = self.lora_dropout(input) @ self.lora_A
             if input_a.dim() == 3:
                 reshape_lora_B = (
@@ -366,6 +471,8 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         assert (
             self.output_size_per_partition % len(enable_lora) == 0
         ), f"The length of enable_lora must divide out_features: {self.output_size_per_partition} % {len(enable_lora)} != 0"
+        if not isinstance(r, int) or r <= 0:
+            raise ValueError("Lora rank r should be a positive integer")
         self.r = r
         self.lora_alpha = lora_alpha
         if isinstance(enable_lora, List) and all(isinstance(item, bool) for item in enable_lora):
@@ -392,7 +499,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         self.name = self._name
 
         # Actual trainable parameters
-        if r > 0 and any(enable_lora):
+        if any(enable_lora):
             self.lora_A = self.create_parameter(
                 shape=[in_features, r * sum(enable_lora)],
                 dtype=self._dtype,
@@ -445,7 +552,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         super().train()
         if self.merge_weights and self.merged:
             # Make sure that the weights are not merged
-            if self.r > 0 and any(self.enable_lora):
+            if any(self.enable_lora):
                 reshape_lora_B = (
                     self.lora_B.reshape([self.r, self.head_num, sum(self.enable_lora), self.head_dim])
                     .transpose([0, 2, 1, 3])
@@ -468,7 +575,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         super().eval()
         if self.merge_weights and not self.merged:
             # Merge the weights and mark it
-            if self.r > 0 and any(self.enable_lora):
+            if any(self.enable_lora):
                 reshape_lora_B = (
                     self.lora_B.reshape([self.r, self.head_num, sum(self.enable_lora), self.head_dim])
                     .transpose([0, 2, 1, 3])
@@ -492,7 +599,7 @@ class ColumnParallelLoRAMergedLinear(ColumnParallelLinear):
         input_mp = mp_ops._c_identity(input, group=self.model_parallel_group)
         # [batch_size, *, out_features_per_partition]
         result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
-        if self.r > 0 and any(self.enable_lora) and not self.merged:
+        if any(self.enable_lora) and not self.merged:
             input_a = self.lora_dropout(input) @ self.lora_A
             input_a_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
             if input_a.dim() == 3:

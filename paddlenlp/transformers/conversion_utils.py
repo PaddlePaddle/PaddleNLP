@@ -38,11 +38,7 @@ from paddle import Tensor
 from paddle.nn import Layer
 
 from paddlenlp.utils.distributed import distributed_gather
-from paddlenlp.utils.env import (
-    CONFIG_NAME,
-    PADDLE_WEIGHT_FILE_NAME,
-    PYTORCH_WEIGHT_FILE_NAME,
-)
+from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHTS_NAME, PYTORCH_WEIGHTS_NAME
 from paddlenlp.utils.import_utils import (
     is_package_available,
     is_torch_available,
@@ -303,6 +299,32 @@ def naive_fuse_split_tp(
 
     """
     axis = -1 if is_column else 0
+    if "PySafeSlice" in str(type(weight)):
+        size = weight.get_shape()[axis]
+        block_size = size // (fuse_tensor_parts * tensor_parallel_degree)
+
+        splited = []
+        if tensor_parallel_rank is None:
+            begin, end, step = 0, fuse_tensor_parts * tensor_parallel_degree, 1
+        else:
+            begin, end, step = tensor_parallel_rank, fuse_tensor_parts * tensor_parallel_degree, tensor_parallel_degree
+        for rank in range(begin, end, step):
+            start = rank * block_size
+            stop = (rank + 1) * block_size
+            if axis == 0 or len(weight.get_shape()) == 1:
+                tensor = weight[start:stop]
+            else:
+                tensor = weight[:, start:stop]
+            splited.append(tensor)
+
+        if tensor_parallel_rank is None:
+            ret = []
+            for tensor_parallel_rank in range(tensor_parallel_degree):
+                ret.append(np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis))
+            return ret
+
+        return np.concatenate(splited, axis=axis)
+
     splited = np.split(weight, fuse_tensor_parts * tensor_parallel_degree, axis=axis)
 
     if tensor_parallel_rank is None:
@@ -995,7 +1017,7 @@ class ConversionMixin:
             for layer_name in all_layer_names:
                 logger.warning(f"--- {layer_name}")
 
-        model_weight_file = os.path.join(cache_dir, PADDLE_WEIGHT_FILE_NAME)
+        model_weight_file = os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)
         paddle.save(state_dict, model_weight_file)
         return state_dict
 
@@ -1082,7 +1104,7 @@ class ConversionMixin:
                 action = name_action_mappings.pop(key)
                 tensor = action(ret) if is_dst else None
             else:
-                tensor = tensor.numpy() if is_dst else None
+                tensor = tensor.cpu().numpy() if is_dst else None
 
             # keep state dict use paddle.tensor
             if isinstance(tensor, np.ndarray):
@@ -1177,7 +1199,7 @@ class Converter(ConversionMixin, LogitComparer):
         os.makedirs(input_dir, exist_ok=True)
 
         # 1. get pytorch weight file
-        weight_file = os.path.join(input_dir, PYTORCH_WEIGHT_FILE_NAME)
+        weight_file = os.path.join(input_dir, PYTORCH_WEIGHTS_NAME)
         if not os.path.exists(weight_file):
             raise FileNotFoundError(f"pytorch weight file<{weight_file}> not found")
 
@@ -1210,6 +1232,6 @@ class Converter(ConversionMixin, LogitComparer):
             for layer_name in all_layer_names:
                 logger.warning(f"--- {layer_name}")
 
-        model_weight_file = os.path.join(input_dir, PADDLE_WEIGHT_FILE_NAME)
+        model_weight_file = os.path.join(input_dir, PADDLE_WEIGHTS_NAME)
         paddle.save(state_dict, model_weight_file)
         return state_dict

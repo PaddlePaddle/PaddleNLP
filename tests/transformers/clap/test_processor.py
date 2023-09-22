@@ -46,7 +46,6 @@ class ClapProcessorTest(unittest.TestCase):
         processor = ClapProcessor.from_pretrained(self.tmpdirname)
 
         self.assertEqual(processor.tokenizer.get_vocab(), tokenizer.get_vocab())
-        # self.assertIsInstance(processor.tokenizer, RobertaTokenizerFast)
 
         self.assertEqual(processor.feature_extractor.to_json_string(), feature_extractor.to_json_string())
         self.assertIsInstance(processor.feature_extractor, ClapFeatureExtractor)

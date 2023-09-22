@@ -178,3 +178,21 @@ class DocxToTextConverter(BaseConverter):
             image: Image = related_part.image
             result_list.append(image)
         return result_list
+
+
+class DocxTotxtConverter(BaseConverter):
+    def convert(
+        self,
+        file_path: Path,
+        separator="\n",
+        **kwargs: Any,
+    ) -> List[str]:
+        """
+        Extract text from a .docx file.
+        """
+        # Creating word reader object.
+        file = docx.Document(file_path)
+        txt_documents = ""
+        txt_documents = separator.join([i.text for i in file.paragraphs])
+        document = {"content": txt_documents, "content_type": "text", "meta": {}}
+        return [document]

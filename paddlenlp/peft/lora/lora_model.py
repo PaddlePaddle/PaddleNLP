@@ -21,12 +21,15 @@ from typing import Dict, List, Union
 
 import paddle
 import paddle.nn as nn
-from paddle.distributed.fleet.meta_parallel import ColumnParallelLinear
+from paddle.distributed.fleet.meta_parallel import (
+    ColumnParallelLinear,
+    RowParallelLinear,
+)
 
 from ...transformers.conversion_utils import ConversionMixin
 from ...transformers.model_utils import PretrainedModel, _add_variant, dtype_guard
 from ...utils.distributed import distributed_gather
-from ...utils.env import LORA_WEIGHT_FILE_NAME
+from ...utils.env import LORA_WEIGHTS_NAME
 from ...utils.log import logger
 from .lora_config import LoRAConfig
 from .lora_layers import (
@@ -34,6 +37,7 @@ from .lora_layers import (
     ColumnParallelLoRAMergedLinear,
     LoRALinear,
     LoRAMergedLinear,
+    RowParallelLoRALinear,
 )
 
 
@@ -48,6 +52,7 @@ class LoRAModel(nn.Layer):
     def __init__(self, model, lora_config: LoRAConfig) -> None:
         super().__init__()
         self.lora_config = lora_config
+        self.lora_split_mapping = {}
         if self.lora_config.dtype is None:
             self.lora_config.dtype = paddle.get_default_dtype()
         with dtype_guard(self.lora_config.dtype):
@@ -58,6 +63,31 @@ class LoRAModel(nn.Layer):
                 f"Reset tensor_parallel_degree of lora_config to {self.model.config.tensor_parallel_degree}."
             )
         self.forward = self.model.forward
+
+    def add_lora_split_mapping(self, module_name, is_column=False):
+        self.lora_split_mapping[module_name] = is_column
+
+    def _get_tensor_parallel_mappings(self, config, is_split=True):
+
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+
+        fn = split_or_merge_func(
+            is_split=is_split,
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_rank=config.tensor_parallel_rank,
+            num_attention_heads=config.num_attention_heads,
+        )
+
+        def get_tensor_parallel_split_mappings():
+            final_actions = {}
+            for key, is_col in self.lora_split_mapping.items():
+                final_actions[key] = partial(fn, is_column=is_col)
+
+            return final_actions
+
+        mappings = get_tensor_parallel_split_mappings()
+
+        return mappings
 
     @classmethod
     def from_pretrained(cls, model, lora_path, **kwargs):
@@ -71,9 +101,9 @@ class LoRAModel(nn.Layer):
 
         # define lora weight name
         if lora_config_tensor_parallel_degree > 1:
-            lora_weight_name = _add_variant(LORA_WEIGHT_FILE_NAME, f"tp{model.config.tensor_parallel_rank:0>2d}")
+            lora_weight_name = _add_variant(LORA_WEIGHTS_NAME, f"tp{model.config.tensor_parallel_rank:0>2d}")
         else:
-            lora_weight_name = LORA_WEIGHT_FILE_NAME
+            lora_weight_name = LORA_WEIGHTS_NAME
 
         # load and set lora weight parameter
         lora_weight_path = os.path.join(lora_path, lora_weight_name)
@@ -102,22 +132,17 @@ class LoRAModel(nn.Layer):
         return lora_model
 
     def set_state_dict(self, state_dict):
+        import warnings
+
+        warnings.filterwarnings(
+            action="ignore", message=".*Skip loading for.*", category=Warning, lineno=0, append=False
+        )
         self.model.set_state_dict(state_dict)
         logger.info("Load lora weight successfully")
 
     def _merge_trainable_tensor_parallel(self, trainable_state_dict):
-        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+        trainable_name_action_mappings = self._get_tensor_parallel_mappings(self.model.config, is_split=False)
 
-        fn = split_or_merge_func(
-            is_split=False,
-            tensor_parallel_degree=self.model.config.tensor_parallel_degree,
-            tensor_parallel_rank=self.model.config.tensor_parallel_rank,
-            num_attention_heads=self.model.config.num_attention_heads,
-        )
-        trainable_name_action_mappings = {}
-        for k in trainable_state_dict:
-            if "lora_B" in k:
-                trainable_name_action_mappings[k] = partial(fn, is_column=True)
         name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
         state_keys_map = ConversionMixin._resolve_prefix_keys(
             name_action_mappings.keys(), self.model.state_dict().keys()
@@ -138,24 +163,13 @@ class LoRAModel(nn.Layer):
                 tensor = action(ret) if is_dst else None
                 trainable_state_dict[key] = tensor
             else:
-                trainable_state_dict[key] = tensor.numpy() if is_dst else None
+                trainable_state_dict[key] = tensor.cpu().numpy() if is_dst else None
 
         return trainable_state_dict
 
     def _convert_tensor_parallel(self, lora_state_dict):
-        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+        lora_name_action_mappings = self._get_tensor_parallel_mappings(self.model.config, is_split=False)
 
-        fn = split_or_merge_func(
-            is_split=True,
-            tensor_parallel_degree=self.model.config.tensor_parallel_degree,
-            tensor_parallel_rank=self.model.config.tensor_parallel_rank,
-            num_attention_heads=self.model.config.num_attention_heads,
-        )
-
-        lora_name_action_mappings = {}
-        for k in lora_state_dict.keys():
-            if "lora_B" in k:
-                lora_name_action_mappings[k] = partial(fn, is_column=True)
         name_action_mappings = self.model._get_tensor_parallel_mappings(self.model.config, is_split=False)
         state_keys_map = ConversionMixin._resolve_prefix_keys(
             name_action_mappings.keys(), self.model.state_dict().keys()
@@ -169,7 +183,7 @@ class LoRAModel(nn.Layer):
             lora_state_dict[name] = action(tensor)
         return lora_state_dict
 
-    def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
+    def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = True, **kwargs):
         variant = kwargs.get("variant", None)
         is_main_process = kwargs.get("is_main_process", paddle.distributed.get_rank() == 0)
 
@@ -193,14 +207,14 @@ class LoRAModel(nn.Layer):
                     variant = f"tp{self.model.config.tensor_parallel_rank:0>2d}"
 
         # save lora weight
-        lora_weight_name = _add_variant(LORA_WEIGHT_FILE_NAME, variant)
+        lora_weight_name = _add_variant(LORA_WEIGHTS_NAME, variant)
         weight_filename = os.path.join(save_directory, lora_weight_name)
         paddle.save(trainable_state_dict, weight_filename)
 
         # save lora config
         if is_main_process:
             self.lora_config.save_pretrained(save_directory)
-            self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
+        self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
 
     def _find_and_replace_module(self, model, module_name, lora_config, enable_lora):
         parent_module = model
@@ -208,6 +222,7 @@ class LoRAModel(nn.Layer):
         for name in attribute_chain[:-1]:
             parent_module = getattr(parent_module, name)
         module = getattr(parent_module, attribute_chain[-1])
+        lora_module = None
         if enable_lora is None:
             if isinstance(module, nn.Linear):
                 lora_module = LoRALinear(
@@ -236,6 +251,22 @@ class LoRAModel(nn.Layer):
                         )
                     ),
                 )
+                # Lora column parallel will spilt lora B matrix
+                self.add_lora_split_mapping(module_name + ".lora_B", is_column=True)
+            elif isinstance(module, RowParallelLinear):
+                # recover the original output_features
+                lora_module = RowParallelLoRALinear(
+                    in_features=module.weight.shape[0] * module.world_size,
+                    out_features=module.weight.shape[1],
+                    has_bias=module.bias is not None,
+                    input_is_parallel=module.input_is_parallel,
+                    r=lora_config.r,
+                    lora_alpha=lora_config.lora_alpha,
+                    lora_dropout=lora_config.lora_dropout,
+                    merge_weights=lora_config.merge_weights,
+                )
+                # Lora column parallel will spilt lora A matrix
+                self.add_lora_split_mapping(module_name + ".lora_A", is_column=False)
         else:
             if isinstance(module, nn.Linear):
                 lora_module = LoRAMergedLinear(
@@ -267,6 +298,10 @@ class LoRAModel(nn.Layer):
                         )
                     ),
                 )
+        if lora_module is None:
+            raise ValueError(
+                f"LoRA strategy only supports paddle.nn.Linear or paddle.distributed.fleet.meta_parallel.ColumnParallelLinear. {module}({module_name}) is not supported。"
+            )
 
         lora_module.weight = module.weight
         if module.bias is not None:
@@ -289,7 +324,8 @@ class LoRAModel(nn.Layer):
     def get_trainable_state_dict(self):
         trainable_state_dict = OrderedDict()
         for name, weight in self.model.state_dict().items():
-            if not weight.stop_gradient:
+            # get lora parameter & QAT scale parameter
+            if not weight.stop_gradient or "activation_quanter" in name or "weight_quanter" in name:
                 trainable_state_dict[name] = weight
         return trainable_state_dict
 
@@ -310,6 +346,7 @@ class LoRAModel(nn.Layer):
             if (
                 isinstance(layer, LoRALinear)
                 or isinstance(layer, ColumnParallelLoRALinear)
+                or isinstance(layer, RowParallelLoRALinear)
                 or isinstance(layer, LoRAMergedLinear)
                 or isinstance(layer, ColumnParallelLoRAMergedLinear)
             ):
@@ -401,12 +438,14 @@ class LoRAModel(nn.Layer):
             return getattr(self.model, name)
 
     def train(self):
+        self.training = True
         self.model.training = True
         for layer in self.model.sublayers():
             layer.training = True
             layer.train()
 
     def eval(self):
+        self.training = False
         self.model.training = False
         for layer in self.model.sublayers():
             layer.training = False

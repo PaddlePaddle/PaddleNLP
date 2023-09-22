@@ -34,13 +34,14 @@ from pipelines.nodes.file_converter import (
 from pipelines.nodes.llm import ChatGLMBot
 from pipelines.nodes.llm.ernie_bot import ErnieBot
 from pipelines.nodes.llm.history import TruncatedConversationHistory
-from pipelines.nodes.llm.prompt_template import PromptTemplate
+from pipelines.nodes.llm.prompt_template import LLMPromptTemplate as PromptTemplate
 from pipelines.nodes.other import JoinDocuments
 from pipelines.nodes.preprocessor import (
     BasePreProcessor,
     CharacterTextSplitter,
     PreProcessor,
     RecursiveCharacterTextSplitter,
+    SpacyTextSplitter,
 )
 from pipelines.nodes.prompt import PromptModel, PromptNode, Shaper
 from pipelines.nodes.question_generator import QuestionGenerator
@@ -50,6 +51,7 @@ from pipelines.nodes.retriever import (
     BaseRetriever,
     BM25Retriever,
     DensePassageRetriever,
+    EmbeddingRetriever,
     MultiModalRetriever,
     WebRetriever,
 )

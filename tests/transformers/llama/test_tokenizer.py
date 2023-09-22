@@ -28,11 +28,12 @@ VOCAB_FILES_NAMES = {
 class LlamaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = LlamaTokenizer
+    test_decode_token = True
     # from_pretrained_kwargs = {"add_prefix_space": True}
     # test_seq2seq = False
 
     def get_tokenizer(self, **kwargs) -> PretrainedTokenizer:
-        tokenizer = LlamaTokenizer.from_pretrained("facebook/tiny-random-llama", **kwargs)
+        tokenizer = LlamaTokenizer.from_pretrained("__internal_testing__/tiny-random-llama", **kwargs)
         tokenizer.pad_token = tokenizer.unk_token
         return tokenizer
 

@@ -24,13 +24,9 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
+from paddle.amp.auto_cast import amp_state
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
-
-try:
-    from paddle.amp.auto_cast import amp_state
-except ImportError:
-    from paddle.fluid.dygraph.amp.auto_cast import amp_state
 
 from ...utils.converter import StateDictNameMapping, init_name_mappings
 from ...utils.log import logger
@@ -212,7 +208,10 @@ class T5LayerFF(nn.Layer):
     def forward(self, hidden_states):
         forwarded_states = self.layer_norm(hidden_states)
         forwarded_states = self.DenseReluDense(forwarded_states)
-        hidden_states = hidden_states + self.dropout(forwarded_states)
+        # hidden_states maybe FP16
+        # self.dropout(forwarded_states) maybe FP32
+        # FP32 + FP16 = FP32, FP16 + FP32 = FP16
+        hidden_states = self.dropout(forwarded_states) + hidden_states
         return hidden_states
 
 
@@ -228,6 +227,7 @@ class T5Attention(nn.Layer):
         self.n_heads = config.num_heads
         self.dropout = config.dropout_rate
         self.inner_dim = self.n_heads * self.key_value_proj_dim
+        # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
 
         # Mesh TensorFlow initialization to avoid scaling before softmax
@@ -924,7 +924,8 @@ class T5Stack(T5PretrainedModel):
         )
         self.final_layer_norm = T5LayerNorm(config.d_model, eps=config.layer_norm_epsilon)
         self.dropout = nn.Dropout(config.dropout_rate)
-        self.enable_recompute = config.enable_recompute
+        # Recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1050,10 +1051,7 @@ class T5Stack(T5PretrainedModel):
 
             if self.enable_recompute and self.training:
                 if use_cache:
-                    logger.warning(
-                        "`use_cache=True` is incompatible with `config.enable_recompute=True`. Setting "
-                        "`use_cache=False`..."
-                    )
+                    logger.warning("`use_cache=True` is incompatible with Recompute. Setting " "`use_cache=False`...")
                     use_cache = False
 
                 layer_outputs = self.recompute_training(
@@ -1229,7 +1227,7 @@ class T5Model(T5PretrainedModel):
     Refer to the superclass documentation for the generic methods.
 
     This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
-    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    /docs/zh/api/paddle/nn/Layer_cn.html>`__ subclass. Use it as a regular Paddle Layer
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
@@ -1842,16 +1840,11 @@ class T5EncoderModel(T5PretrainedModel):
 
     def __init__(self, config: T5Config):
         super().__init__(config)
-
         encoder_config = copy.deepcopy(config)
         encoder_config.use_cache = False
         encoder_config.is_encoder_decoder = False
         self.shared = nn.Embedding(encoder_config.vocab_size, encoder_config.d_model)
         self.encoder = T5Stack(encoder_config, embed_tokens=self.shared)
-
-    @property
-    def t5(self):
-        return self
 
     def get_input_embeddings(self) -> nn.Embedding:
         return self.shared

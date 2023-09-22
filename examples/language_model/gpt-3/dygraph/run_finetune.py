@@ -18,15 +18,13 @@ import sys
 import time
 from functools import partial
 
+import build_optimizer
 import numpy as np
 import paddle
 from args import parse_args
 from configuration import GPTConfig
 from modeling import GPTLMHeadModel
 from paddle.distributed import fleet
-from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
-    DygraphShardingOptimizer,
-)
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
@@ -46,7 +44,6 @@ from visualdl import LogWriter
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import load_dataset
 from paddlenlp.trainer import get_last_checkpoint
-from paddlenlp.trainer.trainer import paddlenlp_load
 from paddlenlp.trainer.training_args import default_logdir
 from paddlenlp.transformers import (
     CosineAnnealingWithWarmupDecay,
@@ -55,7 +52,7 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     PretrainedModel,
 )
-from paddlenlp.transformers.model_utils import _add_variant
+from paddlenlp.transformers.model_utils import _add_variant, paddlenlp_load
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 
@@ -243,36 +240,7 @@ def do_train(args):
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
     decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
-
-    if args.sharding_stage == 1 and args.sharding_degree > 1:
-        optimizer = DygraphShardingOptimizer(
-            hcg=fleet.get_hybrid_communicate_group(),
-            user_defined_strategy=strategy,
-            params=model.parameters(),
-            inner_optimizer_class=paddle.optimizer.AdamW,
-            learning_rate=lr_scheduler if lr_scheduler is not None else args.max_lr,
-            beta1=args.adam_beta1,
-            beta2=args.adam_beta2,
-            epsilon=args.adam_epsilon,
-            weight_decay=args.weight_decay,
-            grad_clip=clip,
-            apply_decay_param_fun=lambda x: x in decay_params,
-        )
-    else:
-        optimizer = paddle.optimizer.AdamW(
-            learning_rate=lr_scheduler if lr_scheduler is not None else args.max_lr,
-            beta1=args.adam_beta1,
-            beta2=args.adam_beta2,
-            epsilon=args.adam_epsilon,
-            parameters=model.parameters(),
-            weight_decay=args.weight_decay,
-            grad_clip=clip,
-            apply_decay_param_fun=lambda x: x in decay_params,
-            # TODO: remove 'multi_precision' in definition of optimizer
-            # and add it to 'paddle.amp.decorate'
-            multi_precision=args.use_pure_fp16,
-        )
-
+    optimizer = build_optimizer.apply(model, args, lr_scheduler, clip, decay_params, strategy)
     if args.use_pure_fp16:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
         # level O2 means converting the network to FP16
@@ -358,7 +326,7 @@ def do_train(args):
         optimizer.set_state_dict(
             paddlenlp_load(
                 os.path.join(last_checkpoint, OPTIMIZER_NAME),
-                return_numpy=True,
+                map_location="cpu",
             )
         )
         global_step = int(str(last_checkpoint).split("-")[-1])

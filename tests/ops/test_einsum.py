@@ -45,9 +45,10 @@ class TestEinsum(CommonTest):
         expected_result = np.einsum(self.sample["paradigm"], *operands)
 
         pd_operands = [paddle.to_tensor(operand) for operand in operands]
-        result = ops.einsum(self.sample["paradigm"], *pd_operands)
-
-        self.check_output_equal(result.numpy(), expected_result)
+        result = ops.einsum(self.sample["paradigm"], *pd_operands).numpy()
+        if len(result.shape) == 1:
+            result = list(result)
+        self.check_output_equal(result, expected_result)
 
 
 class TestEinsumVectorDot(TestEinsum):

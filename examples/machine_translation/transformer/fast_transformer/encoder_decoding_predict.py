@@ -20,7 +20,7 @@ from pprint import pprint
 import numpy as np
 import paddle
 import yaml
-from attrdict import AttrDict
+from easydict import EasyDict as AttrDict
 
 from paddlenlp.ops import FasterTransformer
 from paddlenlp.utils.log import logger
@@ -148,7 +148,7 @@ def do_predict(args):
     # NOTE: Data yielded by DataLoader may be on CUDAPinnedPlace,
     # but custom op doesn't support CUDAPinnedPlace. Hence,
     # disable using CUDAPinnedPlace in DataLoader.
-    paddle.fluid.reader.use_pinned_memory(False)
+    paddle.io.reader.use_pinned_memory(False)
     test_loader, to_tokens = reader.create_infer_loader(args)
 
     # Define model
