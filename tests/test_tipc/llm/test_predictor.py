@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -45,6 +46,15 @@ class InfereneTest(unittest.TestCase):
             config = yaml.safe_load(f)
         return config[key]
 
+    def _read_result(self, file):
+        result = []
+        # read output field from json file
+        with open(file, "r", encoding="utf-8") as f:
+            for line in f:
+                data = json.loads(line)
+                result.append(data["output"])
+        return result
+
     def test_predictor(self):
         config = self._load_config(self.config_key)
         config["output_path"] = self.output_path
@@ -52,10 +62,22 @@ class InfereneTest(unittest.TestCase):
 
         # 1.run fused-mt model
         subprocess.run(
-            command_prefix + " bash tests/test_tipc/llm/inference/run_predictor.sh",
+            command_prefix + " inference_model true bash tests/test_tipc/llm/inference/run_predictor.sh",
             stdout=sys.stdout,
             stderr=sys.stderr,
         )
 
-        assert os.path.exists(os.path.join(self.output_path, "dynamic.json"))
-        assert os.path.exists(os.path.join(self.output_path, "static.json"))
+        fused_dynamic = os.path.join(self.output_path, "dynamic.json")
+        fused_static = os.path.join(self.output_path, "static.json")
+        self.assertListEqual(fused_dynamic, fused_static)
+
+        # 2.run fused-mt model
+        subprocess.run(
+            command_prefix + " true bash tests/test_tipc/llm/inference/run_predictor.sh",
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+        )
+
+        dynamic = os.path.join(self.output_path, "dynamic.json")
+        static = os.path.join(self.output_path, "static.json")
+        self.assertListEqual(dynamic, static)
