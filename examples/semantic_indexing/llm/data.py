@@ -89,24 +89,6 @@ class EmbedCollator(DataCollatorWithPadding):
     query_max_len: int = 32
     passage_max_len: int = 128
 
-    def padding_score(self, teacher_score):
-        group_size = None
-        for scores in teacher_score:
-            if scores is not None:
-                group_size = len(scores)
-                break
-        if group_size is None:
-            return None
-
-        padding_scores = [100.0] + [0.0] * (group_size - 1)
-        new_teacher_score = []
-        for scores in teacher_score:
-            if scores is None:
-                new_teacher_score.append(padding_scores)
-            else:
-                new_teacher_score.append(scores)
-        return new_teacher_score
-
     def __call__(self, features):
         query = [f[0] for f in features]
         passage = [f[1] for f in features]

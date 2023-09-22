@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 from dataclasses import dataclass
 from typing import Dict, Optional
 
@@ -23,8 +22,7 @@ import paddle.nn as nn
 from paddlenlp.transformers import AutoModel, BloomConfig
 from paddlenlp.transformers.bloom.modeling import BloomModel, BloomPreTrainedModel
 from paddlenlp.transformers.model_outputs import ModelOutput
-
-logger = logging.getLogger(__name__)
+from paddlenlp.utils.log import logger
 
 
 @dataclass
