@@ -17,21 +17,21 @@ from typing import List, Union
 
 import paddle
 import paddle.nn.functional as F
-from paddlenlp_ops import (
-    get_token_penalty_multi_scores,
-    save_with_output,
-    set_alibi_mask_value,
-    set_mask_value,
-    set_stop_value_multi_ends,
-    set_value_by_flags_and_idx,
-)
+# from paddlenlp_ops import (
+#     get_token_penalty_multi_scores,
+#     save_with_output,
+#     set_alibi_mask_value,
+#     set_mask_value,
+#     set_stop_value_multi_ends,
+#     set_value_by_flags_and_idx,
+# )
 
 from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList
 
-try:
-    from paddle import top_p_sampling
-except:
-    from paddlenlp_ops import top_p_sampling
+# try:
+#     from paddle import top_p_sampling
+# except:
+#     from paddlenlp_ops import top_p_sampling
 
 
 __all__ = ["GenerationInferenceModel"]

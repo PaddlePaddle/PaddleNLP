@@ -18,7 +18,7 @@ import paddle
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
-from paddlenlp_ops import fused_get_rotary_embedding, get_padding_offset
+# from paddlenlp_ops import fused_get_rotary_embedding, get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformer,

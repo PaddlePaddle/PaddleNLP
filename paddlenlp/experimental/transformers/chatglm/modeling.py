@@ -17,7 +17,7 @@ import paddle
 import paddle.nn.functional as F
 from paddle import nn
 from paddle.distributed import fleet
-from paddlenlp_ops import get_padding_offset
+# from paddlenlp_ops import get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformer,

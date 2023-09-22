@@ -44,7 +44,7 @@ from paddlenlp.transformers import (
     PretrainedTokenizer,
 )
 from paddlenlp.utils.import_utils import import_module, is_paddlenlp_ops_available
-
+import paddle_custom_device.npu.passes as passes
 
 @dataclass
 class PredictorArgument:
@@ -515,27 +515,41 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         self.predictor = self._create_predictor(config)
 
     def _create_predictor(self, predictor_args: PredictorArgument):
-        if not is_paddlenlp_ops_available():
-            raise ValueError(
-                "you should install the paddlenlp ops to run inference predictor, "
-                "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
-            )
+        # if not is_paddlenlp_ops_available():
+        #     raise ValueError(
+        #         "you should install the paddlenlp ops to run inference predictor, "
+        #         "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
+        #     )
 
-        # register the custome ops
-        import_module("paddlenlp_ops.encode_rotary_qk")
-        import_module("paddlenlp_ops.get_padding_offset")
-        import_module("paddlenlp_ops.qkv_transpose_split")
-        import_module("paddlenlp_ops.rebuild_padding")
-        import_module("paddlenlp_ops.transpose_remove_padding")
-        import_module("paddlenlp_ops.write_cache_kv")
+        # # register the custome ops
+        # import_module("paddlenlp_ops.encode_rotary_qk")
+        # import_module("paddlenlp_ops.get_padding_offset")
+        # import_module("paddlenlp_ops.qkv_transpose_split")
+        # import_module("paddlenlp_ops.rebuild_padding")
+        # import_module("paddlenlp_ops.transpose_remove_padding")
+        # import_module("paddlenlp_ops.write_cache_kv")
 
         infer_model_path = get_infer_model_path(predictor_args.model_name_or_path, predictor_args.model_prefix)
 
         config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
 
         config.switch_ir_optim(True)
-        device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
-        config.enable_use_gpu(100, device_id)
+        device_id = int(os.environ.get("FLAGS_selected_npus", 0))
+        config.enable_custom_device("npu", device_id)
+
+        config.enable_memory_optim()
+
+        passes.setUp()
+
+        # config.enable_profile()
+        config.enable_save_optim_model(True)
+        config.set_optim_cache_dir("./optim_cache")
+
+        pass_builder = config.pass_builder()
+        passes.addPasses(pass_builder, "llama7B_mp8_dynamic_batch")
+        # passes.addPasses(pass_builder, "llama65B_mp8_dynamic_batch")
+        
+        pass_builder.turn_on_debug()
         # config.disable_glog_info()
         if predictor_args.enable_memory_optim:
             config.enable_memory_optim()
