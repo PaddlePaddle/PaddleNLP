@@ -37,6 +37,7 @@ class ModelArguments:
 
     normalized: bool = field(default=True)
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
+    is_batch_negative: bool = field(default=False, metadata={"help": "Whethe to use in batch negative training"})
 
 
 @dataclass

@@ -27,7 +27,12 @@ from paddlenlp.transformers import PretrainedTokenizer
 
 class TrainDatasetForEmbedding(Dataset):
     def __init__(
-        self, args: DataArguments, tokenizer: PretrainedTokenizer, query_max_len: int = 64, passage_max_len: int = 1048
+        self,
+        args: DataArguments,
+        tokenizer: PretrainedTokenizer,
+        query_max_len: int = 64,
+        passage_max_len: int = 1048,
+        is_batch_negative: bool = False,
     ):
         if os.path.isdir(args.train_data):
             train_datasets = []
@@ -49,6 +54,7 @@ class TrainDatasetForEmbedding(Dataset):
         self.total_len = len(self.dataset)
         self.query_max_len = query_max_len
         self.passage_max_len = passage_max_len
+        self.is_batch_negative = is_batch_negative
 
     def __len__(self):
         return self.total_len
@@ -61,17 +67,21 @@ class TrainDatasetForEmbedding(Dataset):
         passages = []
         pos = random.choice(self.dataset[item]["pos"])
         passages.append(pos)
-        if len(self.dataset[item]["neg"]) < self.args.train_group_size - 1:
-            num = math.ceil((self.args.train_group_size - 1) / len(self.dataset[item]["neg"]))
-            negs = random.sample(self.dataset[item]["neg"] * num, self.args.train_group_size - 1)
-        else:
-            negs = random.sample(self.dataset[item]["neg"], self.args.train_group_size - 1)
-        passages.extend(negs)
+        # Add negative examples
+        if not self.is_batch_negative:
+            if len(self.dataset[item]["neg"]) < self.args.train_group_size - 1:
+                num = math.ceil((self.args.train_group_size - 1) / len(self.dataset[item]["neg"]))
+                negs = random.sample(self.dataset[item]["neg"] * num, self.args.train_group_size - 1)
+            else:
+                negs = random.sample(self.dataset[item]["neg"], self.args.train_group_size - 1)
+            passages.extend(negs)
+
         if self.args.passage_instruction_for_retrieval is not None:
             passages = [self.args.passage_instruction_for_retrieval + p for p in passages]
         passages = self.tokenizer(
             passages, truncation=True, max_length=self.passage_max_len, return_attention_mask=False
         )
+        # Convert passages to input_ids
         passages_tackle = []
         for i in range(len(passages["input_ids"])):
             passages_tackle.append({"input_ids": passages["input_ids"][i]})

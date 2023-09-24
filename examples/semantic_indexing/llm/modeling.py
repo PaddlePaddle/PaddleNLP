@@ -43,6 +43,8 @@ class BiEncoderModel(BloomPreTrainedModel):
         sentence_pooling_method: str = "cls",
         negatives_cross_device: bool = False,
         temperature: float = 1.0,
+        is_batch_negative: bool = False,
+        margin: float = 0.3,
     ):
         super().__init__(config)
         self.bloom = BloomModel(config)
@@ -51,6 +53,8 @@ class BiEncoderModel(BloomPreTrainedModel):
         self.normalized = normalized
         self.sentence_pooling_method = sentence_pooling_method
         self.temperature = temperature
+        self.is_batch_negative = is_batch_negative
+        self.margin = margin
         if not normalized:
             self.temperature = 1.0
             logger.info("reset temperature = 1.0 due to using inner product to compute similarity")
@@ -111,14 +115,26 @@ class BiEncoderModel(BloomPreTrainedModel):
             if self.negatives_cross_device:
                 q_reps = self._dist_gather_tensor(q_reps)
                 p_reps = self._dist_gather_tensor(p_reps)
+            if self.is_batch_negative:
+                # In batch negatives
+                scores = self.compute_similarity(q_reps, p_reps)
+                # Substract margin from all positive samples cosine_sim()
+                margin_diag = paddle.full(
+                    shape=[q_reps.shape[0]], fill_value=self.margin, dtype=paddle.get_default_dtype()
+                )
+                scores = scores - paddle.diag(margin_diag)
+                # Scale cosine to ease training converge
+                scores = scores / self.temperature
+                target = paddle.arange(0, q_reps.shape[0], dtype="int64")
+                loss = self.compute_loss(scores, target)
+            else:
+                scores = self.compute_similarity(q_reps, p_reps)
+                scores = scores / self.temperature
+                scores = scores.reshape([q_reps.shape[0], -1])
 
-            scores = self.compute_similarity(q_reps, p_reps)
-            scores = scores / self.temperature
-            scores = scores.reshape([q_reps.shape[0], -1])
-
-            target = paddle.arange(scores.shape[0], dtype="int64")
-            target = target * (p_reps.shape[0] // q_reps.shape[0])
-            loss = self.compute_loss(scores, target)
+                target = paddle.arange(scores.shape[0], dtype="int64")
+                target = target * (p_reps.shape[0] // q_reps.shape[0])
+                loss = self.compute_loss(scores, target)
 
         else:
             scores = self.compute_similarity(q_reps, p_reps)
