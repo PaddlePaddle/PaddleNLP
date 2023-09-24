@@ -1,4 +1,4 @@
-# 飞桨大语言模型
+# 飞桨大语言模型工具链
 大模型全流程工具基于PaddlePaddle的4D分布式并行能力旨在提供高性能、灵活易用大模型工具，可以根据自己的需求轻易来定制化百亿和千亿大模型训练，同时支持高性能的压缩推理和服务化，最终使用大模型能力提升业务效果。
 
 | Model | Pretrain | SFT | LoRA | PrefixTuning | Generation | Quantization |
@@ -256,10 +256,10 @@ python predictor.py \
     --mode "static"
 ```
 
-### 4.3 InferenceModel 动态图推理
+### 4.3 Inference Model 动态图推理
 
 ```shell
-# InferenceModel 动态图推理
+# Inference Model 动态图推理
 # LoRA需要先合并参数，详见3.7LoRA参数合并
 # Prefix Tuning暂不支持
 python predictor.py \
@@ -270,7 +270,7 @@ python predictor.py \
     --inference_model
 ```
 
-### 4.4 InferenceModel 静态图推理
+### 4.4 Inference Model 静态图推理
 
 ```shell
 # 首先需要运行一下命令将InferenceModel动态图导出为静态图
@@ -282,7 +282,7 @@ python export_model.py \
     --dtype float16 \
     --inference_model
 
-# InferenceModel 静态图推理
+# Inference Model 静态图推理
 python predictor.py \
     --model_name_or_path ./inference \
     --dtype float16 \
@@ -349,8 +349,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" flask_server.py \
 
 ## 6. 量化
 
-**注**：量化后模型暂不支持推理，相关开源工作正在进行中，敬请期待。
-量化算法可以将模型输入和模型权重用更低比特数值表示，能够有效减少内存占用和计算开销。下面我们提供PTQ、GPTQ两种量化算法结合**PaddleSlim自研策略**进行量化，更多技术细节详见[量化策略详细教程](https://github.com/PaddlePaddle/PaddleSlim/blob/develop/docs/zh_cn/tutorials/quant/advanced_quantization.md)
+量化算法可以将模型权重和激活转为更低比特数值类型表示，能够有效减少显存占用和计算开销。下面我们提供GPTQ和PaddleSlim自研的PTQ策略，分别实现WINT4和W8A8量化。更多技术细节详见[量化策略详细教程](https://github.com/PaddlePaddle/PaddleSlim/blob/develop/docs/zh_cn/tutorials/quant/advanced_quantization.md)
 
 ### 6.1 环境安装
 - PaddleSlim develop版本
