@@ -1,20 +1,25 @@
 # 飞桨大语言模型工具链
-大模型全流程工具基于PaddlePaddle的4D分布式并行能力旨在提供高性能、灵活易用大模型工具，可以根据自己的需求轻易来定制化百亿和千亿大模型训练，同时支持高性能的压缩推理和服务化，最终使用大模型能力提升业务效果。
 
-| Model | Pretrain | SFT | LoRA | PrefixTuning | Generation | Quantization |
+飞桨大语言模型工具链基于飞桨4D分布式并行技术开发，旨在提供高性能、灵活易用大语言模型全流程开发能力，覆盖开发、预训练、精调、压缩、推理、部署的全流程。
+
+| Model | Pretrain | SFT | LoRA | Prefix Tuning | Generation | Quantization |
 | --- | --- | --- | --- | --- | --- | --- |
 | [LLaMA v1/v2](./llama) | ✅  | ✅ | ✅ | ✅ | ✅ | ✅  |
-| [ChatGLM-6B](./chatglm) |  N/A |  ✅  |  ✅  |  ✅  |  ✅  |  ✅  |
-| [ChatGLM2-6B](./chatglm2) |  N/A |  ✅  |  ✅  |  ✅  |  ✅  |  ✅  |
-| [Bloom](./bloom) | N/A | ✅ | ✅ | ✅ | ✅ | ✅ |
-| [GPT-3](./gpt-3) |   ✅  |  ✅  |  ✅  |  WIP  | ✅    | WIP |
-| [OPT](./opt) | WIP | ✅ | ✅ | WIP|  ✅ | WIP |
-| [GLM](./glm) |N/A | ✅ | ✅ | WIP|  ✅ | WIP |
-| [Qwen](./qwen) |N/A | ✅ | ✅ | ✅ |  ✅ | WIP |
+| [ChatGLM-6B](./chatglm) |  ❌  |  ✅  |  ✅  |  ✅  |  ✅  |  ✅  |
+| [ChatGLM2-6B](./chatglm2) |  ❌  |  ✅  |  ✅  |  ✅  |  ✅  |  ✅  |
+| [Bloom](./bloom) | ❌  | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [GPT-3](./gpt-3) |   ✅  |  ✅  |  ✅  |  🚧  | ✅   | 🚧 |
+| [OPT](./opt) | 🚧 | ✅ | ✅ | 🚧 |  ✅ | 🚧 |
+| [GLM](./glm) | ❌  | ✅ | ✅ | 🚧 |  ✅ | 🚧 |
+| [Qwen](./qwen) | ❌ | ✅ | ✅ | ✅ |  ✅ | 🚧 |
 
+
+* ✅: Supported
+* 🚧: In Progress
+* ❌: Not Supported
 
 # LLM全流程工具介绍
-我们提供了模型预训练、精调（SFT、LoRA、PrefixTuning）、量化、动态图推理、服务化部署全流程脚本，开发者可以根据自己的需求定制化自己的大语言模型。
+我们提供了模型预训练、精调（SFT、LoRA、Prefix Tuning）、量化、推理、部署全流程脚本，开发者可以根据自己的需求定制化自己的大语言模型。
 
 <div align="center">
     <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/009bbb4e-baee-4c4a-a52e-94ac44c73c90">
@@ -28,8 +33,8 @@
 
 ## 1. 环境准备
 
-- PaddlePaddle >= 2.5.1
-- PaddleNLP >= 2.6.0
+- paddlepaddle-gpu >= 2.5.1
+- paddlenlp >= 2.6.1
 - tiktoken (仅 Qwen 需要)
 
 ## 2. 预训练
@@ -54,9 +59,10 @@
 
 
 ### 3.2 SFT
-SFT(Supervised Fine-Tuning)依托飞桨提出的[4D混合分布式并行](https://ai.baidu.com/forum/topic/show/987996)能力，支持使用Trainer API轻松切换数据并行(DP)、[张量并行（TP, Tensor Parallelism）](https://arxiv.org/abs/1909.08053)、[流水线并行（PP, Pipeline Parallelism）](https://arxiv.org/abs/1811.06965)（目前仅支持Llama）等多种分布式训练策略。
 
-4D 混合并行策略如何组合？如图所示，在单机内使用通信量较大，适合使用机器内的卡间通信的张量并行（张量并行又称模型并行，MP）和分组参数切片（Sharding）的2D组合策略；训练千亿规模模型时，叠加流水线并行策略使用多台机器共同分担；同时叠加数据并行来增加并发数量，提升训练速度。
+SFT（Supervised Fine-Tuning）依托飞桨提出的[4D混合分布式并行](https://ai.baidu.com/forum/topic/show/987996)能力，支持使用Trainer API轻松切换数据并行(DP)、[张量并行（TP, Tensor Parallelism）](https://arxiv.org/abs/1909.08053)、[流水线并行（PP, Pipeline Parallelism）](https://arxiv.org/abs/1811.06965)（目前仅支持Llama）等多种分布式训练策略。
+
+4D 混合并行策略的最佳配置实践如图下所示，在单机内使用通信量较大，适合使用机器内卡间通信的张量并行（张量并行又称模型并行，MP）和分组参数切片（Sharding）的2D组合策略；训练千亿规模模型时，叠加流水线并行策略使用多台机器共同分担；同时叠加数据并行来增加并发数量，提升训练速度。
 <div align="center">
     <img src="https://ai.bdstatic.com/file/63F5EBB1E188457ABAFD311CFC1D8658" width=50% height=50%>
 </div>
@@ -74,7 +80,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py 
 
 ### 3.3 LoRA
 
-Transformer模型中包含许多Linear层需要进行密集的矩阵乘法计算，而这些通常具有全秩(full rank)。[LoRA](https://arxiv.org/abs/2106.09685)提出冻结预训练的权重矩阵, 通过引入两个低 rank 矩阵 $AB$(图中橙色的两个矩阵) 来近似权重的更新过程 $W_0+\Delta W=W_0+B A$ , 其中 $B \in \mathbb{R}^{d \times r}, A \in \mathbb{R}^{r \times k}$，实验表面将输入表达随机投影到较小的子空间模型仍然可以有效地学习下游任务还可以节约大量的计算显存需求。
+Transformer模型中包含许多Linear层需要进行密集的矩阵乘法计算，而这些通常具有全秩(full rank)特性。[LoRA](https://arxiv.org/abs/2106.09685)提出冻结预训练的权重矩阵, 通过引入两个低 rank 矩阵 $AB$(图中橙色的两个矩阵) 来近似权重的更新过程 $W_0+\Delta W=W_0+B A$ , 其中 $B \in \mathbb{R}^{d \times r}, A \in \mathbb{R}^{r \times k}$，实验表明将输入表达随机投影到较小的子空间模型仍然可以有效地学习下游任务，并大幅降低计算的显存需求。
 
 
 <div align="center">
@@ -97,13 +103,13 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 
 ### 3.4 Prefix Tuning
 
-[Prefix Tuning](https://arxiv.org/abs/2101.00190)受提示学习（Prompt learning）的影响，加入的一部分 prefix embedding 作为连续型提示进行训练。prefix embedding是由专门的 prefix encoder 网络生成的数个张量，会以 past_key_value的方式被插入到语言模型每一层的 hidden_state之前。
+[Prefix Tuning](https://arxiv.org/abs/2101.00190)受提示学习（Prompt learning）的影响，加入的一部分 Prefix Embedding 作为连续型提示进行训练。Prefix Embedding是由专门的 Prefix Encoder 网络生成的数个张量，会以 `past_key_value` 的方式被插入到语言模型每一层的 hidden_state 之前。
 
 <div align="center">
 <img src=https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/8baf6943-4540-4c02-8540-35f977acc077 width=40% height=40% />
 </div>
 
-PaddleNLP Prefix Tuning API支持数据并行、张量并行等多种分布式训练策略，可以通过控制`tensor_parallel_degree` 调整并行训练策略。
+PaddleNLP Prefix Tuning API支持数据并行（DP）、张量并行（TP）等多种分布式训练策略，可以通过控制`tensor_parallel_degree` 调整并行训练策略。
 ```
 # 单卡训练
 python  finetune_generation.py ./llama/pt_argument.json
@@ -113,7 +119,7 @@ python  finetune_generation.py ./llama/pt_argument.json
 python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./llama/pt_argument.json
 ```
 ### 3.5 精调参数介绍
-<details><summary>&emsp; 模型参数(ModelArgument) </summary><div>
+<details><summary>&emsp; 模型参数（ModelArgument） </summary><div>
 
 - `model_name_or_path`: 预训练模型名称或者本地的模型路径，用于热启模型和分词器，默认为None。每个模型**支持模型权重**详见各模型目录。
 - `lora`: 是否开启LoRA微调策略，默认为False。
@@ -124,7 +130,7 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 
 </div></details>
 
-<details><summary>&emsp; 数据参数(DataArgument) </summary><div>
+<details><summary>&emsp; 数据参数（DataArgument）</summary><div>
 
 - `dataset_name_or_path`: 本地数据集目录或内置数据集名称，默认为None。脚本已适配单文件和多文件，会自己寻找`dataset_name_or_path/train.json` 或者 `dataset_name_or_path/train/*.json`作为训练集文件, 以及`dataset_name_or_path/dev.json` 或者 `dataset_name_or_path/dev/*.json`作为验证集文件。
 - `task_name`: 用于选择内置数据集中的具体任务，默认为None。
@@ -138,7 +144,7 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 </div></details>
 
 
-<details><summary>&emsp; 生成参数(GenerateArgument) </summary><div>
+<details><summary>&emsp; 生成参数（GenerateArgument）</summary><div>
 
 注：以下参数仅在`eval_with_do_generation`为True，调用model.generate()时生效。
 
@@ -146,7 +152,7 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 - `top_p`:“采样”策略中 top-p 过滤的累积概率。默认为1.0，表示不起作用。
 </div></details>
 
-<details><summary>&emsp; 训练参数(TrainingArguments) </summary><div>
+<details><summary>&emsp; 训练参数（TrainingArguments）</summary><div>
 
 以下仅介绍TrainingArguments部分常用参数，详情请参见[TrainingArguments文档](https://paddlenlp.readthedocs.io/zh/latest/trainer.html)。
 
@@ -178,7 +184,8 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 
 
 ### 3.6 张量并行参数合并
-我们使用张量并行(TP，Tensor Parallelism)训练过程中，为了节省TP参数合并时间往往在中间checkpoint将参数存储为多个TP参数分片，可以使用提供的分片合并参数脚本进行参数合并。
+
+我们使用张量并行（TP，Tensor Parallelism）训练过程中，为了节省TP参数合并时间通常在中间checkpoint将参数存储为多个TP参数分片，可以使用提供的分片合并参数脚本进行参数合并。
 
 ```
 python merge_tp_params.py \
@@ -190,7 +197,8 @@ python merge_tp_params.py \
 - `device`: 运行环境，默认为gpu。
 </div></details>
 
-### 3.7 LoRA参数合并
+### 3.7 LoRA 参数合并
+
 为了后续的**压缩**和**静态图推理**方便，我们提供LoRA参数合并脚本，可以将LoRA参数合并到主干模型并保存相应的权重。
 ```
 python merge_lora_params.py \
@@ -273,7 +281,7 @@ python predictor.py \
 ### 4.4 Inference Model 静态图推理
 
 ```shell
-# 首先需要运行一下命令将InferenceModel动态图导出为静态图
+# 首先需要运行一下命令将Inference Model动态图导出为静态图
 # LoRA需要先合并参数，详见3.7LoRA参数合并
 # Prefix Tuning暂不支持
 python export_model.py \
@@ -312,11 +320,11 @@ python predictor.py \
 - `dtype`: 模型参数dtype，默认为None。如果没有传入`lora_path`、`prefix_path`则必须传入
 - `model_type`: 初始化不同类型模型，gpt-3: GPTForCausalLM; ernie-3.5-se: Ernie35ForCausalLM; 默认为 None。
 - `mode`: 使用动态图或者静态图推理，值为：[dynamic, static]，默认为 dynamic。
-- `inference_model`: 是否使用InferenceModel 推理，默认值为 False。
+- `inference_model`: 是否使用Inference Model 推理，默认值为 False。
 
 </div></details>
 
-## 5. 服务化部署
+## 5. 服务部署
 
 ### 5.1 环境准备
 
@@ -340,7 +348,6 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" flask_server.py \
 
 <details><summary>&emsp; 脚本参数介绍</summary><div>
 
-
 - `port`: Gradio UI 服务端口号，默认8011。
 - `flask_port`: Flask服务端口号，默认8010。
 - 其他参数请参见动态图推理中参数。
@@ -359,13 +366,13 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" flask_server.py \
 
 量化中默认使用训练集作为校正（Calibartion）数据集，开发集作为评估数据集。如果希望使用其他数据作为校正数据集，则在数据目录下新增`quant.json`文件，文件格式请参照精调训练数据格式。
 
-### 6.3 PTQ量化
+### 6.3 PTQ 量化
 
 ```
 python  finetune_generation.py ./llama/ptq_argument.json
 ```
 
-### 6.4 GPTQ量化
+### 6.4 GPTQ 量化
 
 ```
 python  finetune_generation.py ./llama/gptq_argument.json
@@ -373,7 +380,7 @@ python  finetune_generation.py ./llama/gptq_argument.json
 
 ### 6.5 量化参数介绍
 
-<details><summary>&emsp; 量化参数(QuantArgument)</summary><div>
+<details><summary>&emsp; 量化参数（QuantArgument）</summary><div>
 
 - `quant_type`: PTQ,QAT量化类型，默认为A8W8。支持A8W8,WINT4，WINT8：A8W8指对激活（输入）进行INT8量化，对模型权重进行INT8量化；WINT4指仅对模型权重进行INT4量化，后续使用WeightOnly进行推理；WINT8指仅对模型权重进行INT8量化，后续使用WeightOnly进行推理。
 - `do_ptq`: 是否进行PTQ量化，默认为False。
