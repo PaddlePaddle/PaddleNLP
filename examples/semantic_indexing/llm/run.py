@@ -20,7 +20,7 @@ from data import EmbedCollator, TrainDatasetForEmbedding
 from modeling import BiEncoderModel
 from utils import BiTrainer
 
-from paddlenlp.trainer import PdArgumentParser, set_seed
+from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint, set_seed
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.log import logger
 
@@ -48,6 +48,20 @@ def main():
     logger.info(f"Model parameters {model_args}")
     logger.info(f"Data parameters {data_args}")
 
+    # Detecting last checkpoint.
+    last_checkpoint = None
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
+        last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 1:
+            raise ValueError(
+                f"Output directory ({training_args.output_dir}) already exists and is not empty. "
+                "Use --overwrite_output_dir to overcome."
+            )
+        elif last_checkpoint is not None and training_args.resume_from_checkpoint is None:
+            logger.info(
+                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+            )
     # Set seed
     set_seed(training_args.seed)
     tokenizer = AutoTokenizer.from_pretrained(
@@ -95,7 +109,12 @@ def main():
         ),
         tokenizer=tokenizer,
     )
-    trainer.train()
+    if training_args.do_train:
+        train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
+        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
+        trainer.log_metrics("train", train_result.metrics)
+        trainer.save_metrics("train", train_result.metrics)
+        trainer.save_state()
 
 
 if __name__ == "__main__":
