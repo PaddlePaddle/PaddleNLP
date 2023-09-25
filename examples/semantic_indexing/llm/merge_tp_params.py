@@ -15,7 +15,7 @@ import glob
 import os
 
 import paddle
-from modeling import BiEncoderModel
+from modeling import BloomBiEncoderModel
 
 from paddlenlp.transformers import BloomConfig
 from paddlenlp.utils.log import logger
@@ -83,7 +83,7 @@ def main():
     args = parse_arguments()
     paddle.set_device(args.device)
     config = BloomConfig.from_pretrained(args.model_name_or_path)
-    model_class = BiEncoderModel
+    model_class = BloomBiEncoderModel
 
     tp_state_dict_list = load_tp_params(4, args.model_name_or_path)
     state_dict_to_save = merge_tensor_parallel(

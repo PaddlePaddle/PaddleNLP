@@ -17,7 +17,7 @@ import os
 from arguments import DataArguments, ModelArguments
 from arguments import RetrieverTrainingArguments as TrainingArguments
 from data import EmbedCollator, TrainDatasetForEmbedding
-from modeling import BiEncoderModel
+from modeling import BloomBiEncoderModel, LlamaBiEncoderModel
 from utils import BiTrainer
 
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint, set_seed
@@ -69,16 +69,29 @@ def main():
         cache_dir=model_args.cache_dir,
         use_fast=False,
     )
+    if "llama" in model_args.model_name_or_path:
+        tokenizer.pad_token = tokenizer.unk_token
+    if "bloom" in model_args.model_name_or_path:
+        model = BloomBiEncoderModel.from_pretrained(
+            pretrained_model_name_or_path=model_args.model_name_or_path,
+            dtype="bfloat16",
+            normalized=model_args.normalized,
+            sentence_pooling_method=training_args.sentence_pooling_method,
+            negatives_cross_device=training_args.negatives_cross_device,
+            temperature=training_args.temperature,
+            use_flash_attention=model_args.use_flash_attention,
+        )
+    elif "llama" in model_args.model_name_or_path:
+        model = LlamaBiEncoderModel.from_pretrained(
+            pretrained_model_name_or_path=model_args.model_name_or_path,
+            dtype="bfloat16",
+            normalized=model_args.normalized,
+            sentence_pooling_method=training_args.sentence_pooling_method,
+            negatives_cross_device=training_args.negatives_cross_device,
+            temperature=training_args.temperature,
+            use_flash_attention=model_args.use_flash_attention,
+        )
 
-    model = BiEncoderModel.from_pretrained(
-        pretrained_model_name_or_path=model_args.model_name_or_path,
-        dtype="bfloat16",
-        normalized=model_args.normalized,
-        sentence_pooling_method=training_args.sentence_pooling_method,
-        negatives_cross_device=training_args.negatives_cross_device,
-        temperature=training_args.temperature,
-        use_flash_attention=model_args.use_flash_attention,
-    )
     if training_args.fix_position_embedding:
         for k, v in model.named_parameters():
             if "position_embeddings" in k:
