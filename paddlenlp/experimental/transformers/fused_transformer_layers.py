@@ -36,6 +36,7 @@ if is_paddlenlp_ops_available():
         rebuild_padding,
         transpose_remove_padding,
         write_cache_kv,
+        write_int8_cache_kv,
     )
 else:
     logger.warning(
@@ -493,6 +494,10 @@ class FusedMultiTransformer(Layer):
         rotary_emb_dims=0,
         seq_lens=None,
         time_step=None,
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
     ):
         r"""
         Applies multi transformer layers on the input.
@@ -580,7 +585,20 @@ class FusedMultiTransformer(Layer):
                     v_out = paddle.concat([pre_caches[i][1], v_out], axis=2)
 
                 # write cache kv (inplace)
-                write_cache_kv(k_out, v_out, caches[i], seq_lens + pre_caches_length)
+                if k_quant_scales is not None:
+                    assert v_quant_scales is not None and k_dequant_scales is not None and v_dequant_scales is not None
+                    assert caches[i].dtype == paddle.uint8
+                    write_int8_cache_kv(
+                        k_out,
+                        v_out,
+                        caches[i],
+                        k_quant_scales[i],
+                        v_quant_scales[i],
+                        k_dequant_scales[i],
+                        v_dequant_scales[i],
+                    )
+                else:
+                    write_cache_kv(k_out, v_out, caches[i], seq_lens + pre_caches_length)
 
                 # cutlass fmha
                 qktv_out = variable_length_memory_efficient_attention(
@@ -596,6 +614,7 @@ class FusedMultiTransformer(Layer):
                 fmha_out = transpose_remove_padding(qktv_out, seq_lens, padding_offset)
 
             else:
+
                 fmha_out = masked_multihead_attention(
                     x=qkv_out,
                     cache_kv=caches[i],
@@ -604,6 +623,11 @@ class FusedMultiTransformer(Layer):
                     rotary_tensor=rotary_embs,
                     rotary_emb_dims=rotary_emb_dims,
                     use_neox_rotary_style=self.use_neox_rotary_style,
+                    cache_k_quant_scales=k_quant_scales[i] if k_quant_scales is not None else None,
+                    cache_v_quant_scales=v_quant_scales[i] if v_quant_scales is not None else None,
+                    cache_k_dequant_scales=k_dequant_scales[i] if k_dequant_scales is not None else None,
+                    cache_v_dequant_scales=v_dequant_scales[i] if v_dequant_scales is not None else None,
+                    cache_scale_group_num=self.num_heads * input_ids.shape[0],
                 )[0]
 
             # out_linear
@@ -713,4 +737,5 @@ class FusedMultiTransformer(Layer):
             out = rebuild_padding(tmp_out, cum_offsets, seq_lens, input_ids)
         else:
             out = tmp_out
+            # exit(0)
         return out, caches

@@ -128,7 +128,7 @@ __inline__ __device__ T BlockReduceAbsMax(T val, unsigned mask) {
 
     __syncthreads();
 
-    T abs_max_val = threadIdx.x < blockDim.x / WARP_SIZE ? smem[threadIdx.x] : static_cast<T>(0.0f);
+    T abs_max_val = (threadIdx.x < (blockDim.x / WARP_SIZE)) ? smem[threadIdx.x] : static_cast<T>(0.0f);
     abs_max_val = WarpReduceAbsMax(abs_max_val, mask);
     return abs_max_val;
 }
@@ -145,6 +145,10 @@ __global__ void write_cache_k_int8_kernel(const T* k, const int64_t num_head, co
     InVec in_vec;
     OutVec out_vec;
     InVec abs_max_vec;
+#pragma unroll
+    for (int i = 0; i < VecSize; ++i) {
+      abs_max_vec[i] = 0.0f;
+    }
 
     T local_abs_max;
 
@@ -160,7 +164,13 @@ __global__ void write_cache_k_int8_kernel(const T* k, const int64_t num_head, co
     local_abs_max = LocalReduceMax<T, InVec, VecSize>(abs_max_vec);
     T abs_max_val = BlockReduceAbsMax<T>(local_abs_max, 0xffffffff);
 
-    float quant_scale = 127.0f / static_cast<float>(abs_max_val);
+    __shared__ float quant_scale;
+    if (threadIdx.x == 0) {
+      quant_scale = 127.0f / static_cast<float>(abs_max_val);
+    }
+
+    __syncthreads();
+    
     for (int idx = threadIdx.x * VecSize; idx < seq_len * dim_head; idx += blockDim.x * VecSize) {
         int linear_idx = bi * num_head * seq_len * dim_head + hi * seq_len * dim_head + idx;
         // [bsz, num_head, seq_len, dim_head/x, x]
@@ -170,10 +180,10 @@ __global__ void write_cache_k_int8_kernel(const T* k, const int64_t num_head, co
             out_vec[i] = QuantFunc<T>()(in_vec[i], quant_scale);
         }
         int dim_head_div_x = dim_head / VecSize;
-        int seq_id = threadIdx.x / dim_head_div_x;
+        int seq_id = idx / dim_head;
         int vec_id = threadIdx.x % dim_head_div_x;
         //  [bsz, num_head, dim_head/x, max_seq_len, x]
-        Store<uint8_t>(out_vec, cache + bi * num_head * max_seq_len * dim_head + hi * max_seq_len * dim_head + vec_id * max_seq_len + seq_id);
+        Store<uint8_t>(out_vec, cache + bi * num_head * max_seq_len * dim_head + hi * max_seq_len * dim_head + vec_id * max_seq_len * VecSize + seq_id * VecSize);
     }
 
     if (threadIdx.x == 0) {
@@ -193,6 +203,10 @@ __global__ void write_cache_v_int8_kernel(const T* v, const int64_t num_head, co
     InVec in_vec;
     OutVec out_vec;
     InVec abs_max_vec;
+  #pragma unroll
+    for (int i = 0; i < VecSize; ++i) {
+      abs_max_vec[i] = 0.0f;
+    }
 
     T local_abs_max;
 
@@ -208,7 +222,12 @@ __global__ void write_cache_v_int8_kernel(const T* v, const int64_t num_head, co
     local_abs_max = LocalReduceMax<T, InVec, VecSize>(abs_max_vec);
     T abs_max_val = BlockReduceAbsMax<T>(local_abs_max, 0xffffffff);
 
-    float quant_scale = 127.0f / static_cast<float>(abs_max_val);
+    __shared__ float quant_scale;
+    if (threadIdx.x == 0) {
+      quant_scale = 127.0f / static_cast<float>(abs_max_val);
+    }
+
+    __syncthreads();
     for (int idx = threadIdx.x * VecSize; idx < seq_len * dim_head; idx += blockDim.x * VecSize) {
         int linear_idx = bi * num_head * seq_len * dim_head + hi * seq_len * dim_head + idx;
         // [bsz, num_head, seq_len, dim_head/x, x]
@@ -218,10 +237,10 @@ __global__ void write_cache_v_int8_kernel(const T* v, const int64_t num_head, co
             out_vec[i] = QuantFunc<T>()(in_vec[i], quant_scale);
         }
         int dim_head_div_x = dim_head / VecSize;
-        int seq_id = threadIdx.x / dim_head_div_x;
+        int seq_id = idx / dim_head;
         int vec_id = threadIdx.x % dim_head_div_x;
         //  [bsz, num_head, max_seq_len, dim_head/x, x]
-        Store<uint8_t>(out_vec, cache + bi * num_head * max_seq_len * dim_head + hi * max_seq_len * dim_head + seq_id * dim_head + vec_id);
+        Store<uint8_t>(out_vec, cache + bi * num_head * max_seq_len * dim_head + hi * max_seq_len * dim_head + seq_id * dim_head + vec_id * VecSize);
     }
 
     if (threadIdx.x == 0) {
@@ -248,7 +267,6 @@ void LaunchWriteInt8CacheKV(const paddle::Tensor& input_k,
     const int64_t cache_bsz = cache_kv.shape()[1]; 
     const int64_t num_head = cache_kv.shape()[2]; 
     const int64_t dim_head = cache_kv.shape()[4]; 
-    // printf("bsz: %d, cache_bsz: %d, num_head: %d, seq_len: %d, dim_head: %d.\n", bsz, cache_bsz, num_head, seq_len, dim_head);
 
     auto cache_kv_out = paddle::full({1}, -1, paddle::DataType::UINT8, cache_kv.place());
 
@@ -283,10 +301,12 @@ void LaunchWriteInt8CacheKV(const paddle::Tensor& input_k,
     write_cache_k_int8_kernel<DataType_, VecSize><<<grid, block_sz, 0, input_k.stream()>>>(
         k_ptr,  num_head, dim_head, seq_len, max_seq_len, cache_k_ptr, k_quant_scales_data, k_dequant_scales_data);
 
+
     // copy [bsz, num_head, seq_len, dim_head/x, x]->
     // [bsz, num_head, max_seq_len, dim_head/x, x]
     write_cache_v_int8_kernel<DataType_, VecSize><<<grid, block_sz, 0, input_k.stream()>>>(
         v_ptr,  num_head, dim_head, seq_len, max_seq_len, cache_v_ptr, v_quant_scales_data, v_dequant_scales_data);
+
 }
 
 
@@ -297,7 +317,7 @@ void WriteInt8CacheKV(const paddle::Tensor& input_k,
                   const paddle::Tensor& v_quant_scales,
                   const paddle::Tensor& k_dequant_scales,
                   const paddle::Tensor& v_dequant_scales) {
-    switch (cache_kv.type()) {
+    switch (input_k.type()) {
         case paddle::DataType::BFLOAT16: {
             return LaunchWriteInt8CacheKV<paddle::DataType::BFLOAT16>(
                 input_k, input_v, cache_kv, k_quant_scales, v_quant_scales, k_dequant_scales, v_dequant_scales

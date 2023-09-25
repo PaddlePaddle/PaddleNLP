@@ -53,7 +53,7 @@ class PredictorArgument:
     src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
     max_length: int = field(default=2048, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
-    top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
+    top_p: float = field(default=0.0, metadata={"help": "top_p parameter for generation"})
     temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
     repetition_penalty: float = field(default=1.0, metadata={"help": "repetition penalty parameter for generation"})
     device: str = field(default="gpu", metadata={"help": "Device"})
@@ -84,6 +84,10 @@ class PredictorArgument:
         metadata={
             "help": "If benchmark set as `True`, we will force model decode to max_length, which is helpful to compute throughput. "
         },
+    )
+    use_cachekv_int8: bool = field(
+        default=False,
+        metadata={"help": "If use_cachekv_int8 set as `True`, dynamic cache kv quantization will be applied"},
     )
 
 
@@ -278,12 +282,34 @@ class InferencePredictorMixin:
         self.architectures = self.model_config.architectures[0].lower()
 
         self.dtype = config.dtype or self.model_config
-        self.cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.cache_kvs_shape]
+        if config.use_cachekv_int8:
+            self.cache_kvs = [paddle.zeros(shape, dtype="uint8") for shape in self.cache_kvs_shape]
+        else:
+            self.cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.cache_kvs_shape]
         self.num_layers, self.num_attention_heads, self.head_dim = (
             len(self.cache_kvs),
             self.cache_kvs[0].shape[-3],
             self.cache_kvs[0].shape[-1],
         )
+
+        if config.use_cachekv_int8:
+            self.k_quant_scales = [
+                paddle.zeros([self.cache_kvs[0].shape[1], self.num_attention_heads], dtype="float32")
+                for _ in range(self.num_layers)
+            ]
+            self.v_quant_scales = [
+                paddle.zeros([self.cache_kvs[0].shape[1], self.num_attention_heads], dtype="float32")
+                for _ in range(self.num_layers)
+            ]
+            self.k_dequant_scales = [
+                paddle.zeros([self.cache_kvs[0].shape[1], self.num_attention_heads], dtype="float32")
+                for _ in range(self.num_layers)
+            ]
+            self.v_dequant_scales = [
+                paddle.zeros([self.cache_kvs[0].shape[1], self.num_attention_heads], dtype="float32")
+                for _ in range(self.num_layers)
+            ]
+
         self.total_max_length = config.src_length + config.max_length
         self.pre_ids = paddle.full([config.batch_size, self.total_max_length], -1, dtype="int64")
         if "chatglm" in self.architectures:
@@ -587,8 +613,12 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
                 inputs[key] = [paddle.to_tensor(item) for item in inputs[key]]
             else:
                 inputs[key] = paddle.to_tensor(inputs[key])
-
         inputs["cache_kvs"] = self.cache_kvs
+        if self.config.use_cachekv_int8:
+            inputs["k_quant_scales"] = self.k_quant_scales
+            inputs["v_quant_scales"] = self.v_quant_scales
+            inputs["k_dequant_scales"] = self.k_dequant_scales
+            inputs["v_dequant_scales"] = self.v_dequant_scales
         self.model.generate(
             **inputs,
         )
@@ -794,8 +824,10 @@ def predict():
                 source_texts.append(example["src"])
                 target_texts.append(example["tgt"])
     else:
-        source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
-        target_texts = ["", ""]
+        # source_texts = ["hello world, how are you?", "你好，请问你是谁?"]
+        # target_texts = ["", ""]
+        source_texts = ["你好，请问你是谁?"]
+        target_texts = [""]
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
@@ -828,8 +860,8 @@ def benchmark(predictor, predictor_args, model_args):
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
-    warmup_time = 10
-    test_time = 100
+    warmup_time = 2
+    test_time = 10
 
     print("***********Start Warmup**********")
     for _ in range(warmup_time):
@@ -845,11 +877,12 @@ def benchmark(predictor, predictor_args, model_args):
 
     output_tokens = sum([len(output) for output in outputs])
     print(
-        "Input length is: {}, Output length is: {}, bs is: {}, Generate speed is: {:.3f} tokens/s(ips), QPS: {:.3f} requests/s. ".format(
+        "Input length is: {}, Output length is: {}, bs is: {}, Generate speed is: {:.3f} tokens/s(ips), time: {}, QPS: {:.3f} requests/s. ".format(
             predictor_args.src_length,
             predictor_args.max_length,
             predictor_args.batch_size,
             (output_tokens / (end - start) / test_time),
+            (end - start) / test_time,
             (predictor_args.batch_size / (end - start) / test_time),
         )
     )

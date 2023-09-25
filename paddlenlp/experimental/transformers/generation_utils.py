@@ -160,6 +160,10 @@ class GenerationInferenceModel(GenerationMixin):
         inputs_embeds=None,
         logits_processors=None,
         pre_caches=None,
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
         **model_kwargs,
     ):
 
@@ -182,6 +186,10 @@ class GenerationInferenceModel(GenerationMixin):
         model_kwargs["presence_score"] = presence_score
         model_kwargs["logits_processors"] = logits_processors or LogitsProcessorList()
         model_kwargs["pre_caches"] = pre_caches
+        model_kwargs["k_quant_scales"] = k_quant_scales
+        model_kwargs["v_quant_scales"] = v_quant_scales
+        model_kwargs["k_dequant_scales"] = k_dequant_scales
+        model_kwargs["v_dequant_scales"] = v_dequant_scales
 
         ret = self.sample(
             input_ids,

@@ -232,6 +232,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         output_attentions=False,
         output_hidden_states=None,
         return_dict=False,
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
         **kwargs,
     ):
         # kwargs["cache"] is used used to distinguish between encoder and decoder phase.
@@ -303,6 +307,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 rotary_embs=new_rope,
                 rotary_emb_dims=1,
                 time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
+                k_quant_scales=k_quant_scales,
+                v_quant_scales=v_quant_scales,
+                k_dequant_scales=k_dequant_scales,
+                v_dequant_scales=v_dequant_scales,
             )
         hidden_states = self.norm(hidden_states)
 
@@ -478,6 +486,10 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         cache = kwargs.get("cache", None)
         pre_caches = kwargs.get("pre_caches", None)
         inputs_embeds = kwargs.get("inputs_embeds", None)
+        k_quant_scales = kwargs.get("k_quant_scales", None)
+        v_quant_scales = kwargs.get("v_quant_scales", None)
+        k_dequant_scales = kwargs.get("k_dequant_scales", None)
+        v_dequant_scales = kwargs.get("v_dequant_scales", None)
         if cache is not None:
             input_ids = tgt_ids
             position_ids = tgt_pos
@@ -497,6 +509,10 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
             "seq_len_decoder": seq_len_decoder,
             "cache": cache,
             "pre_caches": pre_caches,
+            "k_quant_scales": k_quant_scales,
+            "v_quant_scales": v_quant_scales,
+            "k_dequant_scales": k_dequant_scales,
+            "v_dequant_scales": v_dequant_scales,
         }
         return model_inputs
 
@@ -517,6 +533,10 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -539,6 +559,10 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            k_quant_scales=k_quant_scales,
+            v_quant_scales=v_quant_scales,
+            k_dequant_scales=k_dequant_scales,
+            v_dequant_scales=v_dequant_scales,
         )
 
         hidden_states = outputs[0]
