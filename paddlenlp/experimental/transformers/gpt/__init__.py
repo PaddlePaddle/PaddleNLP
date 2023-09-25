@@ -12,7 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .configuration import *
 from .modeling import *
-from .modeling_pp import *
-from .tokenizer import *

@@ -238,6 +238,7 @@ class TrainingArguments:
             following config is support:
               enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation
               enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed
+              enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap.
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -578,7 +579,8 @@ class TrainingArguments:
                 "Some additional config it highly affect the useage of sharding parallel, we provide some option to config it."
                 "following config is support: \n"
                 "enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation\n"
-                "enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed"
+                "enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed\n"
+                "enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap"
             )
         },
     )
@@ -807,11 +809,11 @@ class TrainingArguments:
             if (
                 self.pipeline_parallel_degree <= 1
                 and self.tensor_parallel_degree <= 1
-                and not (self.sharding and ShardingOption.SHARD_OP in self.sharding)
+                and (not self.sharding or ShardingOption.FULL_SHARD in self.sharding)
             ):
                 raise ValueError(
-                    "Temporarily amp master grad only support for tensor/pipeline/sharding parallel. "
-                    "Please set amp_master_grad to False."
+                    "Temporarily amp master grad only support for tensor/pipeline/sharding"
+                    " (stage 1 and stage 2) parallel. Please set amp_master_grad to False."
                 )
             if not (self.bf16 or self.fp16):
                 logger.warning("set amp_master_grad to false since amp is disabled.")
@@ -985,10 +987,14 @@ class TrainingArguments:
                     sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
                     for x in sharding_parallel_config:
                         if len(x) > 0:
-                            if x not in ["enable_stage1_tensor_fusion", "enable_stage1_overlap"]:
+                            if x not in [
+                                "enable_stage1_tensor_fusion",
+                                "enable_stage1_overlap",
+                                "enable_stage2_overlap",
+                            ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, "
-                                    f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap."
+                                    f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap."
                                 )
                     try:
                         if (
@@ -1011,6 +1017,14 @@ class TrainingArguments:
                         warnings.warn(
                             "The enable_stage1_tensor_fusion or enable_stage1_overlap is not supported "
                             "by current version of Paddle. Please try latest develop Paddle."
+                        )
+                    if "enable_stage2_overlap" in sharding_parallel_config:
+                        assert (
+                            ShardingOption.SHARD_GRAD_OP in self.sharding
+                        ), f"enable_stage2_overlap expects sharding=stage2, but got {self.sharding}."
+                        assert self.logging_steps > 1, (
+                            "The logging_steps should be greater than 1 for stage2 overlap, "
+                            f"but got logging_steps={self.logging_steps}."
                         )
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)

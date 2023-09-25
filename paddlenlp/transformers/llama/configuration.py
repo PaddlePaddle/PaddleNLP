@@ -153,18 +153,19 @@ class LlamaConfig(PretrainedConfig):
         pp_recompute_interval=1,
         no_recompute_layers=None,
         fuse_attention_qkv=False,
-        use_flash_attention=False,
         fuse_attention_ffn=False,
+        use_flash_attention=False,
         use_fused_rms_norm=False,
+        use_fused_rope=False,
         tensor_parallel_output=True,
         sequence_parallel=False,
         fuse_sequence_parallel_allreduce=False,
+        virtual_pp_degree=1,
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
         tie_word_embeddings=False,
         alibi=False,
-        use_fused_rope=False,
         rope_scaling_factor=1.0,
         rope_scaling_type=None,
         **kwargs,
@@ -196,6 +197,7 @@ class LlamaConfig(PretrainedConfig):
         self.tensor_parallel_output = tensor_parallel_output
         self.sequence_parallel = sequence_parallel
         self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
+        self.virtual_pp_degree = virtual_pp_degree
 
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
