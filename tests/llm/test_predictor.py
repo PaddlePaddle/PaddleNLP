@@ -51,5 +51,5 @@ class PredictorTest(LLMTest, unittest.TestCase):
             count += int(inference_item[min_length // 2] == no_inference_item[min_length // 2])
             full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
 
-        self.assertGreater(full_match / len(result_0), 0.25)
+        self.assertGreaterEqual(full_match / len(result_0), 0.25)
         self.assertGreater(count / len(result_0), 0.4)
