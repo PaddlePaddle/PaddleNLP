@@ -50,12 +50,12 @@ pipeline = Pipeline()
 pipeline.add_node(component=dpr_retriever, name="DenseRetriever", inputs=["Query"])
 
 
-def search_multi_paper(query):
+def search_multi_paper(query, top_k=3):
     prediction = pipeline.run(
         query=query,
         params={
             "DenseRetriever": {
-                "top_k": args.retriever_top_k,
+                "top_k": top_k,
                 "index": args.abstract_index_name,
             },
         },
@@ -129,6 +129,7 @@ def prediction(history):
 
     messages = history_transform(history)
     messages.append({"role": "user", "content": query})
+    logs.append(f"Function Call的输入: {messages}")
     # Step 1, decide whether we need function call
     resp_stream = erniebot.ChatCompletion.create(
         model="ernie-bot-3.5", messages=messages, functions=functions, stream=True
