@@ -340,7 +340,6 @@ class MultiHeadAttention(nn.Layer):
     def core_attn(self, q, k, v, attn_mask=None, output_attentions=False):
         bsz, q_len, num_heads, head_dim = q.shape
         _, kv_seq_len, _, _ = v.shape
-        print(q_len, kv_seq_len)
 
         perm = [0, 2, 1, 3]  # bs, nhead, seqlen, headdim
         q = tensor.transpose(x=q, perm=perm)
