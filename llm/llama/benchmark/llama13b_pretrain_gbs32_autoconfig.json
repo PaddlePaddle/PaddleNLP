@@ -1,0 +1,39 @@
+{
+    "dp_degree": "auto",
+    "mp_degree": "auto",
+    "pp_degree": "auto",
+    "micro_batch_size": "auto",
+    "sharding_degree": "auto",
+    "sharding_stage": [1, 2],
+    "use_recompute": "auto",
+    "recompute_granularity": ["full", "full_attn", "core_attn"],
+    "vpp_degree": "auto",
+    "enable_pp_prune": false,
+    "enable_mp_prune": false,
+
+    "task_limit": 2000,
+    "max_time_per_task": 300,
+
+    "model_cfg": {
+        "hidden_size": 5120,
+        "global_batch_size": 32,
+        "num_layers": 40,
+        "num_attention_heads": 40,
+        "vocab_size": 32000
+    },
+    "run_cmd": {
+        "mp_degree": ["--tensor_parallel_degree", ""],
+        "pp_degree": ["--pipeline_parallel_degree", ""],
+        "sharding_degree": ["--sharding_parallel_degree", ""],
+        "sharding_stage": ["--sharding", "stage"],
+        "use_recompute": ["--recompute", ""],
+        "recompute_granularity": ["--recompute_granularity", ""],
+        "gradient_accumulation_steps": ["--gradient_accumulation_steps", ""],
+        "micro_batch_size": ["--per_device_train_batch_size", ""],
+        "vpp_degree:": ["--virtual_pp_degree", ""]
+    },
+    "metric_cfg": {
+        "name": "interval_samples_per_second",
+        "OptimizationDirection": "Maximize"
+    }
+}
