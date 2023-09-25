@@ -117,6 +117,36 @@ def seed_guard_context(name=None):
         return contextlib.nullcontext()
 
 
+def _make_causal_mask(input_ids_shape, past_key_values_length):
+    """
+    Make causal mask used for self-attention
+    """
+    batch_size, target_length = input_ids_shape  # target_length: seq_len
+
+    mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
+
+    if past_key_values_length > 0:
+        # [tgt_len, tgt_len + past_len]
+        mask = paddle.concat([paddle.ones([target_length, past_key_values_length], dtype="bool"), mask], axis=-1)
+
+    # [bs, 1, tgt_len, tgt_len + past_len]
+    return mask[None, None, :, :].expand([batch_size, 1, target_length, target_length + past_key_values_length])
+
+
+def _expand_2d_mask(mask, dtype, tgt_length):
+    """
+    Expands attention_mask from `[batch_size, src_length]` to `[batch_size, 1, tgt_length, src_length]`.
+    """
+    batch_size, src_length = mask.shape[0], mask.shape[-1]
+    tgt_length = tgt_length if tgt_length is not None else src_length
+
+    mask = mask[:, None, None, :].astype("bool")
+    mask.stop_gradient = True
+    expanded_mask = mask.expand([batch_size, 1, tgt_length, src_length])
+
+    return expanded_mask
+
+
 class MultiHeadAttention(nn.Layer):
     """
     Attention mapps queries and a set of key-value pairs to outputs, and
@@ -308,6 +338,10 @@ class MultiHeadAttention(nn.Layer):
         return (out, weights) if output_attentions else out
 
     def core_attn(self, q, k, v, attn_mask=None, output_attentions=False):
+        bsz, q_len, num_heads, head_dim = q.shape
+        _, kv_seq_len, _, _ = v.shape
+        print(q_len, kv_seq_len)
+
         perm = [0, 2, 1, 3]  # bs, nhead, seqlen, headdim
         q = tensor.transpose(x=q, perm=perm)
         k = tensor.transpose(x=k, perm=perm)
@@ -321,6 +355,12 @@ class MultiHeadAttention(nn.Layer):
         # softmax_mask_fuse_upper_triangle is not supported sif paddle is not compiled with cuda/rocm
         if not paddle.is_compiled_with_cuda():
             attn_mask = get_triangle_upper_mask(product, attn_mask)
+
+        attn_mask = attn_mask.reshape([bsz, 1, q_len, kv_seq_len])
+        if attn_mask.shape != [bsz, 1, q_len, kv_seq_len]:
+            raise ValueError(
+                f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attn_mask.shape}"
+            )
 
         if attn_mask is not None:
             product = product + attn_mask
@@ -945,6 +985,30 @@ class GPTModel(GPTPretrainedModel):
     def set_input_embeddings(self, value):
         self.embeddings.word_embeddings = value
 
+    @staticmethod
+    def _prepare_decoder_attention_mask(attention_mask, input_shape, past_key_values_length, dtype):
+        if attention_mask is not None:
+            # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+            if len(attention_mask.shape) == 2:
+                expanded_attn_mask = _expand_2d_mask(attention_mask, dtype, tgt_length=input_shape[-1])
+                # For decoding phase in generation, seq_length = 1, we don't need to add causal mask
+                if input_shape[-1] > 1:
+                    combined_attention_mask = _make_causal_mask(
+                        input_shape, past_key_values_length=past_key_values_length
+                    )
+                    expanded_attn_mask = expanded_attn_mask & combined_attention_mask
+            # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
+            elif len(attention_mask.shape) == 3:
+                expanded_attn_mask = attention_mask.unsqueeze(1).astype("bool")
+            # if attention_mask is already 4-D, do nothing
+            else:
+                expanded_attn_mask = attention_mask
+        else:
+            expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
+        # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
+        expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
+        return expanded_attn_mask
+
     def forward(
         self,
         input_ids=None,
@@ -1053,27 +1117,28 @@ class GPTModel(GPTPretrainedModel):
         )
 
         if not self.config.fused_softmax_with_triangular or not paddle.is_compiled_with_cuda():
-            # TODO, use registered buffer
-            causal_mask = paddle.tensor.tril(
-                paddle.ones((paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1]), dtype="int64"),
+            batch_size, seq_length = input_shape
+            seq_length_with_past = seq_length
+            cache_length = 0
+            if cache is not None:
+                # cache => bs, seqlen, nheads, head_dims
+                cache_length = paddle.shape(cache[0].k)[1]
+                seq_length_with_past += cache_length
+
+            # embed positions
+            if attention_mask is None:
+                # [bs, seq_len]
+                attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
+            attention_mask = self._prepare_decoder_attention_mask(
+                attention_mask, input_shape, cache_length, getattr(paddle, paddle.get_default_dtype(), paddle.float32)
             )
-            if attention_mask is not None:
-                if attention_mask.dtype != paddle.int64:
-                    attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
-                if len(attention_mask.shape) == 2:
-                    attention_mask = attention_mask[:, None, None, :]
-                attention_mask = (1.0 - (attention_mask & causal_mask)) * -1e4
-            else:
-                attention_mask = (1.0 - causal_mask) * -1e4
-            # The tensor returned by triu not in static graph.
-            attention_mask.stop_gradient = True
+        else:
+            attention_mask = None
 
         outputs = self.decoder(
             embedding_output,
             memory=None,
-            tgt_mask=None
-            if (self.config.fused_softmax_with_triangular and self.training)
-            else attention_mask,  # use softmax_mask_fuse_upper_triangle,
+            tgt_mask=attention_mask,
             use_cache=use_cache,
             cache=cache,
             output_hidden_states=output_hidden_states,
@@ -1483,7 +1548,7 @@ class GPTForCausalLM(GPTPretrainedModel):
     def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, inputs_embeds=None, **kwargs):
         batch_size, seq_length = input_ids.shape
         position_ids = kwargs.get("position_ids", paddle.arange(seq_length).expand((batch_size, seq_length)))
-        attention_mask = kwargs.get("attention_mask", None)
+        # attention_mask = kwargs.get("attention_mask", None)
         if cache:
             input_ids = input_ids[:, -1].unsqueeze(axis=-1)
             position_ids = position_ids[:, -1].unsqueeze(-1)
@@ -1499,7 +1564,7 @@ class GPTForCausalLM(GPTPretrainedModel):
                 "position_ids": position_ids,
                 "cache": cache,
                 "use_cache": use_cache,
-                "attention_mask": attention_mask,
+                "attention_mask": None,
             }
         )
         return model_inputs
