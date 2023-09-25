@@ -167,7 +167,7 @@ class DistDataLoader(paddle.io.DataLoader):
         if self._data_keys is None:
             if self.mp_group.rank > -1 and self.pp_rank == 0:
                 paddle.distributed.broadcast_object_list(data_keys, src=self.mp_src_rank, group=self.mp_group)
-            if self._pp_data_group.rank > -1:
+            if self._pp_data_group is not None:
                 paddle.distributed.broadcast_object_list(
                     data_keys, src=self._pp_data_group.ranks[0], group=self._pp_data_group
                 )
@@ -179,7 +179,7 @@ class DistDataLoader(paddle.io.DataLoader):
         if self.mp_group.rank > -1 and self.pp_rank == 0:
             data_list = broadcast_data_list(data_list, paddle.int64, self.mp_rank, self.mp_group, self.mp_src_rank)
 
-        if self._pp_data_group.rank > -1:
+        if self._pp_data_group is not None:
             # Note(daisimng): In last stage of pp, we don't need input_ids.
             # It will be removed in future.
             data_list = broadcast_data_list(
