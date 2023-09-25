@@ -38,6 +38,7 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     LlamaConfig,
     LlamaForCausalLM,
+    LlamaForCausalLMPipe,
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
@@ -50,8 +51,6 @@ MODEL_CLASSES = {
     ),
 }
 
-from fused_layers import mock_layers
-from modeling_pp import LlamaForCausalLMPipe
 
 from paddlenlp.data.causal_dataset import build_train_valid_test_datasets, print_rank_0
 
@@ -371,6 +370,8 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     if training_args.enable_linear_fused_grad_add:
+        from fused_layers import mock_layers
+
         mock_layers()
 
     if model_args.tokenizer_name_or_path is None:
@@ -465,7 +466,6 @@ def main():
             model_args.model_name_or_path,
             config=config,
             dtype=dtype,
-            load_state_as_np=True,
         )
     else:
         model = model_class._from_config(config, dtype=dtype)

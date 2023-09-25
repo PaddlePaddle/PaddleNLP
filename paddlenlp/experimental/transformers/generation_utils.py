@@ -300,7 +300,8 @@ class GenerationInferenceModel(GenerationMixin):
         batch_idx = paddle.full(shape=[1], dtype="int32", fill_value=-1)
 
         # fake temp next_tokens
-        next_tokens = paddle.full(shape=[paddle.shape(input_ids).shape[0], 1], dtype="int32", fill_value=0)
+        batch = input_ids.shape[0] if input_ids is not None else inputs_embeds.shape[0]
+        next_tokens = paddle.full(shape=[batch, 1], dtype="int32", fill_value=0)
 
         # let inputs_embeds enter into model_kwargs.
         # because the code below directly use the model_kwargs as a parameter without using inputs_embeds.
@@ -360,7 +361,11 @@ class GenerationInferenceModel(GenerationMixin):
                 cache, just_decoder, next_tokens, eos_token_id, model_kwargs
             )
             next_tokens = model_kwargs["next_tokens"]
-            model_kwargs["all_input_ids"] = paddle.concat([model_kwargs["all_input_ids"], next_tokens], axis=1)
+
+            if model_kwargs["all_input_ids"] is None:
+                model_kwargs["all_input_ids"] = next_tokens
+            else:
+                model_kwargs["all_input_ids"] = paddle.concat([model_kwargs["all_input_ids"], next_tokens], axis=1)
 
             save_with_output(
                 next_tokens,
