@@ -21,22 +21,15 @@ import tempfile
 import unittest
 
 import yaml
-from parameterized import parameterized_class
 
 
-@parameterized_class(
-    ["config_key"],
-    [
-        ["llama"],
-    ],
-)
 class InfereneTest(unittest.TestCase):
     config_path: str = "./tests/test_tipc/llm/fixtures/predictor.yaml"
-    config_key: str = None
 
     def setUp(self) -> None:
         self.output_path = tempfile.mkdtemp()
         sys.path.insert(0, "./llm")
+        self.model_name = os.getenv("MODEL_NAME")
 
     def tearDown(self) -> None:
         sys.path.remove("./llm")
@@ -56,11 +49,23 @@ class InfereneTest(unittest.TestCase):
         return result
 
     def test_predictor(self):
-        config = self._load_config(self.config_key)
+        config = self._load_config(self.model_name)
         config["output_path"] = self.output_path
+        config["benchmark"] = "1"
         command_prefix = " ".join([f"{key}={value}" for key, value in config.items()])
 
-        # 1.run fused-mt model
+        # 1.run dynamic model
+        subprocess.run(
+            command_prefix + " bash tests/test_tipc/llm/inference/run_predictor.sh",
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+        )
+
+        dynamic = os.path.join(self.output_path, "dynamic.json")
+        static = os.path.join(self.output_path, "static.json")
+        self.assertListEqual(dynamic, static)
+
+        # 2.run fused-mt model
         subprocess.run(
             command_prefix + " inference_model true bash tests/test_tipc/llm/inference/run_predictor.sh",
             stdout=sys.stdout,
@@ -71,13 +76,18 @@ class InfereneTest(unittest.TestCase):
         fused_static = os.path.join(self.output_path, "static.json")
         self.assertListEqual(fused_dynamic, fused_static)
 
-        # 2.run fused-mt model
-        subprocess.run(
-            command_prefix + " true bash tests/test_tipc/llm/inference/run_predictor.sh",
-            stdout=sys.stdout,
-            stderr=sys.stderr,
-        )
+        # 3. compare the generation text of dynamic & inference model
+        assert len(fused_static) == len(static)
+        count, full_match = 0, 0
+        for inference_item, no_inference_item in zip(fused_static, static):
+            min_length = min(len(inference_item), len(no_inference_item))
+            count += int(inference_item[min_length // 2] == no_inference_item[min_length // 2])
+            full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
 
-        dynamic = os.path.join(self.output_path, "dynamic.json")
-        static = os.path.join(self.output_path, "static.json")
-        self.assertListEqual(dynamic, static)
+        print("full_match", full_match)
+        print(full_match / len(static))
+        print("count", count)
+        print(count / len(static))
+
+        self.assertGreater(full_match / len(static), 0.25)
+        self.assertGreater(count / len(static), 0.4)
