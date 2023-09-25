@@ -75,6 +75,7 @@ def main():
         model = BloomBiEncoderModel.from_pretrained(
             pretrained_model_name_or_path=model_args.model_name_or_path,
             dtype="bfloat16",
+            low_cpu_mem_usage=True,
             normalized=model_args.normalized,
             sentence_pooling_method=training_args.sentence_pooling_method,
             negatives_cross_device=training_args.negatives_cross_device,
@@ -85,6 +86,7 @@ def main():
         model = LlamaBiEncoderModel.from_pretrained(
             pretrained_model_name_or_path=model_args.model_name_or_path,
             dtype="bfloat16",
+            low_cpu_mem_usage=True,
             normalized=model_args.normalized,
             sentence_pooling_method=training_args.sentence_pooling_method,
             negatives_cross_device=training_args.negatives_cross_device,
@@ -104,7 +106,7 @@ def main():
             if "bias" in k:
                 v.stop_gradient = False
             else:
-                logger.info(f"Freeze the parameters for {k}")
+                logger.info(f"Freeze the parameters for {k} shape: {v.shape}")
                 v.stop_gradient = True
     train_dataset = TrainDatasetForEmbedding(
         args=data_args,
