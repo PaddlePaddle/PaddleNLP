@@ -30,6 +30,7 @@ class InfereneTest(unittest.TestCase):
         self.output_path = tempfile.mkdtemp()
         sys.path.insert(0, "./llm")
         self.model_name = os.getenv("MODEL_NAME")
+        self.run_predictor_shell_path = os.path.join(os.path.dirname(__file__), "inference/run_predictor.sh")
 
     def tearDown(self) -> None:
         sys.path.remove("./llm")
@@ -51,14 +52,11 @@ class InfereneTest(unittest.TestCase):
     def test_predictor(self):
         config = self._load_config(self.model_name)
         config["output_path"] = self.output_path
-        config["benchmark"] = "1"
         command_prefix = " ".join([f"{key}={value}" for key, value in config.items()])
 
         # 1.run dynamic model
         subprocess.run(
-            command_prefix + " bash tests/test_tipc/llm/inference/run_predictor.sh",
-            stdout=sys.stdout,
-            stderr=sys.stderr,
+            command_prefix + " bash " + self.run_predictor_shell_path, stdout=sys.stdout, stderr=sys.stderr, shell=True
         )
 
         dynamic = os.path.join(self.output_path, "dynamic.json")
@@ -70,6 +68,7 @@ class InfereneTest(unittest.TestCase):
             command_prefix + " inference_model true bash tests/test_tipc/llm/inference/run_predictor.sh",
             stdout=sys.stdout,
             stderr=sys.stderr,
+            shell=True,
         )
 
         fused_dynamic = os.path.join(self.output_path, "dynamic.json")

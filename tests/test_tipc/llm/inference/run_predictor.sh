@@ -20,17 +20,17 @@ inference_model=${inference_model:-"true"}
 decode_strategy=${decode_strategy:-"greedy_search"}
 data_file=${data_file:-"tests/fixtures/llm/zh_query.json"}
 
-common_arguments="--decode_strategy ${decode_strategy} --src_length 512 --max_length 512 --dtype ${dtype} --batch_size 2 --inference_model ${inference_model} "
+common_arguments="--decode_strategy ${decode_strategy} --src_length 300 --max_length 100 --benchmark 1 --dtype ${dtype} --batch_size 2 --inference_model ${inference_model} "
 common_arguments+="--data_file ${data_file}"
 
 echo "==============================run-dynamic-predictor=============================="
-python ./llm/predictor.py --model_name_or_path ${model_name} --mode dynamic --output_file ./${output_path}/dynamic.json ${common_arguments}
+python ./llm/predictor.py --model_name_or_path ${model_name} --mode dynamic --output_file ${output_path}/dynamic.json ${common_arguments}
 
 echo "==============================run-export-predictor=============================="
 python ./llm/export_model.py --model_name_or_path ${model_name} --output_path ${output_path} ${common_arguments}
 
 echo "==============================run-static-predictor=============================="
-python ./llm/predictor.py --model_name_or_path ${output_path} --mode static --output_file ./${output_path}/static.json ${common_arguments}
+python ./llm/predictor.py --model_name_or_path ${output_path} --mode static --output_file ${output_path}/static.json ${common_arguments}
 
 
 echo "==============================dynamic result=============================="
