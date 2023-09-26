@@ -405,11 +405,17 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight_tensor)
 
             self.transformer_block.ln_scales[idx].set_value(
-                paddle.to_tensor(state_dict["llama.layers.{}.input_layernorm.weight".format(idx)])
+                paddle.to_tensor(
+                    state_dict["llama.layers.{}.input_layernorm.weight".format(idx)],
+                    dtype=self.transformer_block.ln_scales[idx].dtype,
+                )
             )
 
             self.transformer_block.ffn_ln_scales[idx].set_value(
-                paddle.to_tensor(state_dict["llama.layers.{}.post_attention_layernorm.weight".format(idx)])
+                paddle.to_tensor(
+                    state_dict["llama.layers.{}.post_attention_layernorm.weight".format(idx)],
+                    dtype=self.transformer_block.ffn_ln_scales[idx].dtype,
+                )
             )
 
 

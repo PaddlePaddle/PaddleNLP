@@ -20,20 +20,22 @@ import sys
 import tempfile
 import unittest
 
+import paddle
 import yaml
 
 
 class InfereneTest(unittest.TestCase):
-    config_path: str = "./tests/test_tipc/llm/fixtures/predictor.yaml"
+    config_path: str = "./test_tipc/llm/fixtures/predictor.yaml"
 
     def setUp(self) -> None:
+        paddle.set_default_dtype("float32")
         self.output_path = tempfile.mkdtemp()
-        sys.path.insert(0, "./llm")
+        sys.path.insert(0, "../llm")
         self.model_name = os.getenv("MODEL_NAME")
         self.run_predictor_shell_path = os.path.join(os.path.dirname(__file__), "inference/run_predictor.sh")
 
     def tearDown(self) -> None:
-        sys.path.remove("./llm")
+        sys.path.remove("../llm")
 
     def _load_config(self, key):
         with open(self.config_path, "r", encoding="utf-8") as f:
@@ -59,8 +61,8 @@ class InfereneTest(unittest.TestCase):
             command_prefix + " bash " + self.run_predictor_shell_path, stdout=sys.stdout, stderr=sys.stderr, shell=True
         )
 
-        dynamic = os.path.join(self.output_path, "dynamic.json")
-        static = os.path.join(self.output_path, "static.json")
+        dynamic = self._read_result(os.path.join(self.output_path, "dynamic.json"))
+        static = self._read_result(os.path.join(self.output_path, "static.json"))
         self.assertListEqual(dynamic, static)
 
         # 2.run fused-mt model
@@ -71,8 +73,8 @@ class InfereneTest(unittest.TestCase):
             shell=True,
         )
 
-        fused_dynamic = os.path.join(self.output_path, "dynamic.json")
-        fused_static = os.path.join(self.output_path, "static.json")
+        fused_dynamic = self._read_result(os.path.join(self.output_path, "dynamic.json"))
+        fused_static = self._read_result(os.path.join(self.output_path, "static.json"))
         self.assertListEqual(fused_dynamic, fused_static)
 
         # 3. compare the generation text of dynamic & inference model
