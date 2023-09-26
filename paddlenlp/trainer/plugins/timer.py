@@ -15,6 +15,7 @@
 
 import time
 
+
 import paddle
 
 from paddlenlp.utils.log import logger
