@@ -98,7 +98,7 @@ class BloomBiEncoderModel(BloomPreTrainedModel):
         p_reps = self.sentence_embedding(psg_out.last_hidden_state, features["attention_mask"])
         if self.normalized:
             p_reps = paddle.nn.functional.normalize(p_reps, axis=-1)
-        return p_reps.contiguous()
+        return p_reps
 
     def compute_similarity(self, q_reps, p_reps):
         # q_reps [batch_size, embedding_dim]
@@ -123,9 +123,7 @@ class BloomBiEncoderModel(BloomPreTrainedModel):
                 # In batch negatives
                 scores = self.compute_similarity(q_reps, p_reps)
                 # Substract margin from all positive samples cosine_sim()
-                margin_diag = paddle.full(
-                    shape=[q_reps.shape[0]], fill_value=self.margin, dtype=paddle.get_default_dtype()
-                )
+                margin_diag = paddle.full(shape=[q_reps.shape[0]], fill_value=self.margin, dtype=q_reps.dtype)
                 scores = scores - paddle.diag(margin_diag)
                 # Scale cosine to ease training converge
                 scores = scores / self.temperature
@@ -217,7 +215,11 @@ class LlamaBiEncoderModel(LlamaPretrainedModel):
             sum_embeddings = paddle.sum(hidden_state * input_mask_expanded * weights, axis=1, dtype="float32")
             sum_mask = paddle.sum(input_mask_expanded * weights, axis=1)
             embedding = sum_embeddings / sum_mask
-            return embedding
+        else:
+            # TODO(wugaosheng): Add lasttoken pooling method
+            raise NotImplementedError
+
+        return embedding
 
     def encode(self, features):
         if features is None:
@@ -226,7 +228,7 @@ class LlamaBiEncoderModel(LlamaPretrainedModel):
         p_reps = self.sentence_embedding(psg_out.last_hidden_state, features["attention_mask"])
         if self.normalized:
             p_reps = paddle.nn.functional.normalize(p_reps, axis=-1)
-        return p_reps.contiguous()
+        return p_reps
 
     def compute_similarity(self, q_reps, p_reps):
         # q_reps [batch_size, embedding_dim]
@@ -251,9 +253,7 @@ class LlamaBiEncoderModel(LlamaPretrainedModel):
                 # In batch negatives
                 scores = self.compute_similarity(q_reps, p_reps)
                 # Substract margin from all positive samples cosine_sim()
-                margin_diag = paddle.full(
-                    shape=[q_reps.shape[0]], fill_value=self.margin, dtype=paddle.get_default_dtype()
-                )
+                margin_diag = paddle.full(shape=[q_reps.shape[0]], fill_value=self.margin, dtype=q_reps.dtype)
                 scores = scores - paddle.diag(margin_diag)
                 # Scale cosine to ease training converge
                 scores = scores / self.temperature
