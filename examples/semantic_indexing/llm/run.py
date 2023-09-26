@@ -39,6 +39,8 @@ def main():
             f"Output directory ({training_args.output_dir}) already exists and is not empty. Use --overwrite_output_dir to overcome."
         )
 
+    if training_args.pipeline_parallel_degree > 1 and training_args.negatives_cross_device:
+        raise ValueError("Pipeline parallelism does not support cross batch negatives.")
     # Setup logging
     logger.warning(
         f"Process rank: {training_args.local_rank}, device: {training_args.device},"

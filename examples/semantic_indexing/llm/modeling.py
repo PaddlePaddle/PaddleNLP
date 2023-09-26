@@ -73,16 +73,15 @@ class BloomBiEncoderModel(BloomPreTrainedModel):
             self.process_rank = dist.get_rank()
             self.world_size = dist.get_world_size()
 
+        self.labels = paddle.arange(0, self.config.seq_length, dtype="int64")
+        self.labels.stop_gradient = True
+
     def sentence_embedding(self, hidden_state, mask):
         if self.sentence_pooling_method == "weighted_mean":
             # Use weighted mean to compute similarity for decoder only LLMs
             # refer to https://github.com/Muennighoff/sgpt/blob/9728de441b1dd2e638a8a64e1c83f77716f47d9a/biencoder/beir/beir_dense_retriever.py#L258
-            weights = (
-                paddle.arange(start=1, end=hidden_state.shape[1] + 1)
-                .unsqueeze(0)
-                .unsqueeze(-1)
-                .expand(hidden_state.shape)
-            )
+            # 1,2,3...seq_len
+            weights = self.labels[1 : hidden_state.shape[1] + 1].unsqueeze(0).unsqueeze(-1).expand(hidden_state.shape)
             # [batch_size, seq_len] -> [batch_size, seq_len, higgen_dim]
             input_mask_expanded = mask.unsqueeze(-1).expand(hidden_state.shape)
             # bs, seq_len, hidden_dim -> bs, hidden_dim
@@ -127,14 +126,15 @@ class BloomBiEncoderModel(BloomPreTrainedModel):
                 scores = scores - paddle.diag(margin_diag)
                 # Scale cosine to ease training converge
                 scores = scores / self.temperature
-                target = paddle.arange(0, q_reps.shape[0], dtype="int64")
+                # 0,1,2,3...batch_size-1
+                target = self.labels[0 : q_reps.shape[0]]
                 loss = self.compute_loss(scores, target)
             else:
                 scores = self.compute_similarity(q_reps, p_reps)
                 scores = scores / self.temperature
                 scores = scores.reshape([q_reps.shape[0], -1])
-
-                target = paddle.arange(scores.shape[0], dtype="int64")
+                # 0,1,2,3...batch_size-1
+                target = self.labels[0 : scores.shape[0]]
                 target = target * (p_reps.shape[0] // q_reps.shape[0])
                 loss = self.compute_loss(scores, target)
 
@@ -193,6 +193,9 @@ class LlamaBiEncoderModel(LlamaPretrainedModel):
         if self.negatives_cross_device:
             if not dist.is_initialized():
                 raise ValueError("Distributed training has not been initialized for representation all gather.")
+            if config.tensor_parallel_degree > 1:
+                raise ValueError("Tensor parallelism does not support cross batch negatives.")
+
             #     logger.info("Run in a single GPU, set negatives_cross_device=False")
             #     self.negatives_cross_device = False
             # else:
