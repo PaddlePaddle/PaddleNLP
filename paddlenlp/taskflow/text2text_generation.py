@@ -117,7 +117,6 @@ class ChatGLMTask(Task):
         """
         model_instance = AutoModelForCausalLM.from_pretrained(
             self.model,
-            load_state_as_np=True,
             dtype=self._dtype,
         )
         # Load the model parameter for the predict

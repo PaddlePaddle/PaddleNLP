@@ -30,7 +30,7 @@ class ModelEvaluator(Evaluator):
         super().__init__(choices, model_name_or_path, k)
         self.model_name_or_path = model_name_or_path
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name_or_path, dtype="float16", low_cpu_mem_usage=True)
+        self.model = AutoModelForCausalLM.from_pretrained(model_name_or_path, dtype="float16")
         self.model.eval()
         self.generation_config = dict(
             temperature=temperature,

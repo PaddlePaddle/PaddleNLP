@@ -1636,7 +1636,12 @@ class Trainer:
         elif isinstance(data, (tuple, list)):
             return type(data)(self._prepare_input(v) for v in data)
         elif isinstance(data, paddle.Tensor):
-            return data._to(self.args.current_device, None, False)
+            # kwargs = dict(device=self.args.current_device)
+            # update data type for pure fp16
+            if data.place.is_cuda_pinned_place():
+                return data.cuda()
+            return data
+            # return data.to(**kwargs)
         return data
 
     def _prepare_inputs(self, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> Dict[str, Union[paddle.Tensor, Any]]:
