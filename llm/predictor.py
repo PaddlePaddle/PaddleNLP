@@ -17,9 +17,9 @@ import json
 import os
 import sys
 import time
-from threading import Thread
 from abc import abstractmethod
 from dataclasses import dataclass, field
+from threading import Thread
 
 import numpy as np
 import paddle
@@ -33,6 +33,7 @@ from utils import (
     load_real_time_tokens,
 )
 
+from paddlenlp.generation import TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.trainer import PdArgumentParser
@@ -45,7 +46,6 @@ from paddlenlp.transformers import (
     PretrainedTokenizer,
 )
 from paddlenlp.utils.import_utils import import_module, is_paddlenlp_ops_available
-from paddlenlp.generation import TextIteratorStreamer
 
 
 @dataclass
@@ -227,7 +227,7 @@ class DygraphPredictor(BasePredictor):
         )
         result = result[0]
         return result
-    
+
     def stream_predict(self, inputs: dict[str, paddle.Tensor]):
         text_streamer = TextIteratorStreamer(self.tokenizer)
         input_features = self._preprocess(inputs)
@@ -238,7 +238,9 @@ class DygraphPredictor(BasePredictor):
             bos_token_id=self.tokenizer.bos_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
             pad_token_id=self.tokenizer.pad_token_id,
-            decode_strategy=self.config.decode_strategy,
+            decode_strategy="greedy_search"
+            if self.config.top_k == 1 and self.config.top_p == 1.0
+            else self.config.decode_strategy,
             temperature=self.config.temperature,
             top_k=self.config.top_k,
             top_p=self.config.top_p,
@@ -248,6 +250,7 @@ class DygraphPredictor(BasePredictor):
         thread.start()
 
         return text_streamer
+
 
 class StaticGraphPredictor(BasePredictor):
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
