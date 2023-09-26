@@ -144,6 +144,13 @@ except:
 async_save_queue = []
 
 
+def _save_signal(saved_signal_path):
+    paddle.clear_async_save_task_queue()
+    # dump savd_siganl
+    with open(saved_signal_path, mode="w+") as f:
+        f.write("1")
+
+
 def _save_func(obj, path, saved_signal_path, protocol):
     paddle.save(obj, path, protocol)
     # dump savd_siganl
@@ -276,7 +283,10 @@ class Trainer:
 
         self.args = args
         # TODO(@tiangexiao): use async save in framework instead when use_async_save==True
-        self.save_func = paddle.save
+        if self.args.use_async_save:
+            self.save_func = paddle.async_save
+        else:
+            self.save_func = paddle.save
         self.is_in_train = False
         # self.do_grad_scaling = args.fp16
 
@@ -1948,15 +1958,11 @@ class Trainer:
         if self.args.use_hybrid_parallel:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
+                self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, optimizer_name))
                 if self.args.use_async_save:
-                    async_save_optimizer(
-                        self.optimizer.state_dict(),
-                        os.path.join(output_dir, optimizer_name),
-                        saved_signal_path=saved_signal_path,
-                        sync_other_task=True,
-                    )
+                    p = multiprocessing.Process(target=_save_signal, args=(saved_signal_path,))
+                    p.start()
                 else:
-                    self.save_func(self.optimizer.state_dict(), os.path.join(output_dir, optimizer_name))
                     with open(saved_signal_path, mode="w+") as f:
                         f.write("1")
 
