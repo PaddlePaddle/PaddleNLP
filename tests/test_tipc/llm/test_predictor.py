@@ -90,5 +90,5 @@ class InfereneTest(unittest.TestCase):
         print("count", count)
         print(count / len(static))
 
-        self.assertGreater(full_match / len(static), 0.25)
-        self.assertGreater(count / len(static), 0.4)
+        self.assertGreater(full_match / len(static), 0.6)
+        self.assertGreater(count / len(static), 0.8)
