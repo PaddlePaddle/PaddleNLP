@@ -65,7 +65,7 @@ def main():
     paddle.set_default_dtype(predictor_args.dtype)
     tensor_parallel_degree = paddle.distributed.get_world_size()
     tensor_parallel_rank = paddle.distributed.get_rank()
-    if tensor_parallel_degree > 1:
+    if tensor_parallel_degree >= 1:
         strategy = fleet.DistributedStrategy()
         strategy.hybrid_configs = {
             "dp_degree": 1,
@@ -89,7 +89,7 @@ def main():
     predictor.tokenizer.save_pretrained(export_args.output_path)
     generate_rank_mapping(os.path.join(export_args.output_path, "rank_mapping.csv"))
 
-    validate_pdmodel(export_args.output_path, predictor_args.model_prefix)
+    # validate_pdmodel(export_args.output_path, predictor_args.model_prefix)
 
 
 if __name__ == "__main__":

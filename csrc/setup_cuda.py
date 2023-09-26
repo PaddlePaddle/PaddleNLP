@@ -32,6 +32,14 @@ setup(
             "./generation/encode_rotary_qk.cu",
             "./generation/top_p_sampling.cu",
             "./generation/set_alibi_mask_value.cu",
+            "./generation/get_padding_offset_v2.cu",
+            "./generation/rebuild_padding_v2.cu",
+            "./generation/set_value_by_flags_v2.cu",
+            "./generation/stop_generation_multi_ends_v2.cu",
+            "./generation/update_inputs.cu",
+            "./generation/get_output.cc",
+            "./generation/reset_need_stop_value.cc",
+            "./generation/save_with_output_msg.cc",
         ]
     ),
 )
