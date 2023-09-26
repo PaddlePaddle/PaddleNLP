@@ -48,7 +48,6 @@ class TrainDatasetForEmbedding(Dataset):
             self.dataset = datasets.concatenate_datasets(train_datasets)
         else:
             self.dataset = datasets.load_dataset("json", data_files=args.train_data, split="train")
-
         self.tokenizer = tokenizer
         self.args = args
         self.total_len = len(self.dataset)
@@ -63,7 +62,9 @@ class TrainDatasetForEmbedding(Dataset):
         query = self.dataset[item]["query"]
         if self.args.query_instruction_for_retrieval is not None:
             query = self.args.query_instruction_for_retrieval + query
-        query = self.tokenizer(query, truncation=True, max_length=self.query_max_len, return_attention_mask=False)
+        query = self.tokenizer(
+            query, truncation=True, max_length=self.query_max_len, return_attention_mask=False, truncation_side="right"
+        )
         passages = []
         pos = random.choice(self.dataset[item]["pos"])
         passages.append(pos)
@@ -79,7 +80,11 @@ class TrainDatasetForEmbedding(Dataset):
         if self.args.passage_instruction_for_retrieval is not None:
             passages = [self.args.passage_instruction_for_retrieval + p for p in passages]
         passages = self.tokenizer(
-            passages, truncation=True, max_length=self.passage_max_len, return_attention_mask=False
+            passages,
+            truncation=True,
+            max_length=self.passage_max_len,
+            return_attention_mask=False,
+            truncation_side="right",
         )
         # Convert passages to input_ids
         passages_tackle = []
