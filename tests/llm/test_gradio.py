@@ -55,7 +55,7 @@ class UITest(unittest.TestCase):
 
     def avaliable_free_port(self, exclude=None):
         exclude = exclude or []
-        for port in range(8000, 8200):
+        for port in range(8000, 9000):
             if port in exclude:
                 continue
             if is_port_in_use(port):
