@@ -69,6 +69,7 @@ def main():
         cache_dir=model_args.cache_dir,
         use_fast=False,
     )
+    tokenizer.padding_side = "right"
     if "llama" in model_args.model_name_or_path:
         tokenizer.pad_token = tokenizer.unk_token
     if "bloom" in model_args.model_name_or_path:
