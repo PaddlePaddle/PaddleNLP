@@ -43,6 +43,7 @@ __all__ = [
     "AutoModelForMultipleChoice",
     "AutoModelForMaskedLM",
     "AutoModelForCausalLM",
+    "AutoModelForCausalLMPipe",
     "AutoEncoder",
     "AutoDecoder",
     "AutoGenerator",
@@ -140,6 +141,7 @@ MAPPING_TASKS = OrderedDict(
         ("ForMultipleChoice", "AutoModelForMultipleChoice"),
         ("ForMaskedLM", "AutoModelForMaskedLM"),
         ("ForCausalLM", "AutoModelForCausalLM"),
+        ("ForCausalLMPipe", "AutoModelForCausalLMPipe"),
         ("Encoder", "AutoEncoder"),
         ("Decoder", "AutoDecoder"),
         ("Generator", "AutoGenerator"),
@@ -243,17 +245,22 @@ class _BaseAutoModelClass:
             model_class = getattr(import_class, init_class)
             return model_class
         except AttributeError as err:
-            logger.error(err)
-            all_model_classes = import_class.__all__
-            all_tasks = {get_task_name(m) for m in all_model_classes if get_task_name(m) is not None}
-            raise AttributeError(
-                f"module '{import_class.__name__}' only supports the following classes: "
-                + ", ".join(m for m in all_model_classes)
-                + "\n"
-                "Hint: you can use interface "
-                + " or ".join(task + ".from_pretrained" for task in all_tasks)
-                + f" to load '{pretrained_model_name_or_path}'\n"
-            )
+            try:
+                new_import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}")
+                model_class = getattr(new_import_class, init_class)
+                return model_class
+            except AttributeError:
+                logger.error(err)
+                all_model_classes = import_class.__all__
+                all_tasks = {get_task_name(m) for m in all_model_classes if get_task_name(m) is not None}
+                raise AttributeError(
+                    f"module '{import_class.__name__}' only supports the following classes: "
+                    + ", ".join(m for m in all_model_classes)
+                    + "\n"
+                    "Hint: you can use interface "
+                    + " or ".join(task + ".from_pretrained" for task in all_tasks)
+                    + f" to load '{pretrained_model_name_or_path}'\n"
+                )
 
     @classmethod
     def _from_pretrained(
@@ -313,17 +320,23 @@ class _BaseAutoModelClass:
                         try:
                             model_class = getattr(import_class, init_class)
                         except AttributeError as err:
-                            logger.error(err)
-                            all_model_classes = import_class.__all__
-                            all_tasks = {get_task_name(m) for m in all_model_classes if get_task_name(m) is not None}
-                            raise AttributeError(
-                                f"module '{import_class.__name__}' only supports the following classes: "
-                                + ", ".join(m for m in all_model_classes)
-                                + "\n"
-                                "Hint: you can use interface "
-                                + " or ".join(task + ".from_pretrained" for task in all_tasks)
-                                + f" to load '{pretrained_model_name_or_path}'\n"
-                            )
+                            try:
+                                import_class2 = importlib.import_module(f"paddlenlp.transformers.{class_name}")
+                                model_class = getattr(import_class2, init_class)
+                            except AttributeError:
+                                logger.error(err)
+                                all_model_classes = import_class.__all__
+                                all_tasks = {
+                                    get_task_name(m) for m in all_model_classes if get_task_name(m) is not None
+                                }
+                                raise AttributeError(
+                                    f"module '{import_class.__name__}' only supports the following classes: "
+                                    + ", ".join(m for m in all_model_classes)
+                                    + "\n"
+                                    "Hint: you can use interface "
+                                    + " or ".join(task + ".from_pretrained" for task in all_tasks)
+                                    + f" to load '{pretrained_model_name_or_path}'\n"
+                                )
                         logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
                         return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         # From local dir path
@@ -816,6 +829,20 @@ class AutoModelForCausalLM(_BaseAutoModelClass):
                 print(type(model))
                 # <class 'paddlenlp.transformers.gpt.modeling.GPTLMHeadModel'>
         """
+        return cls._from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+
+
+class AutoModelForCausalLMPipe(_BaseAutoModelClass):
+    """
+    Pipeline model for AutoModelForCausalLM.
+    """
+
+    CONFIGURATION_MODEL_MAPPING = get_init_configurations()
+    _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
+    _name_mapping = get_name_mapping("ForCausalLMPipe")
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
 
