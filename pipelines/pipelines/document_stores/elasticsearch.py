@@ -2220,6 +2220,10 @@ class OpenDistroElasticsearchDocumentStore(OpenSearchDocumentStore):
 
 
 class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
+    ef_construction = 200
+    m = 32
+    space_type = "l2"
+
     def similarity_check(self, similarity):
         if similarity in ["cosine", "dot_prod", "l2", "l1"]:
             self.similarity = similarity
@@ -2273,6 +2277,116 @@ class BaiduElasticsearchDocumentStore(ElasticsearchDocumentStore):
                 }
             }
         }
+        try:
+            self.client.indices.create(index=index_name, body=mapping, headers=headers)
+        except RequestError as e:
+            # With multiple workers we need to avoid race conditions, where:
+            # - there's no index in the beginning
+            # - both want to create one
+            # - one fails as the other one already created it
+            if not self.client.indices.exists(index=index_name, headers=headers):
+                raise e
+
+    def _create_document_index(self, index_name: str, headers: Optional[Dict[str, str]] = None):
+        """
+        Create a new index for storing documents. In case if an index with the name already exists, it ensures that
+        the embedding_field is present.
+        """
+        # check if the existing index has the embedding field; if not create it
+        if self.client.indices.exists(index=index_name, headers=headers):
+            mapping = self.client.indices.get(index_name, headers=headers)[index_name]["mappings"]
+            if self.search_fields:
+                for search_field in self.search_fields:
+                    if search_field in mapping["properties"] and mapping["properties"][search_field]["type"] != "text":
+                        raise Exception(
+                            f"The search_field '{search_field}' of index '{index_name}' with type '{mapping['properties'][search_field]['type']}' "
+                            f"does not have the right type 'text' to be queried in fulltext search. Please use only 'text' type properties as search_fields. "
+                            f"This error might occur if you are trying to use pipelines 1.0 and above with an existing elasticsearch index created with a previous version of pipelines."
+                            f"In this case deleting the index with `curl -X DELETE \"{self.pipeline_config['params']['host']}:{self.pipeline_config['params']['port']}/{index_name}\"` will fix your environment. "
+                            f"Note, that all data stored in the index will be lost!"
+                        )
+            if self.embedding_field:
+                if (
+                    self.embedding_field in mapping["properties"]
+                    and mapping["properties"][self.embedding_field]["type"] != self.vector_type
+                ):
+                    raise Exception(
+                        f"The '{index_name}' index in Elasticsearch already has a field called '{self.embedding_field}'"
+                        f" with the type '{mapping['properties'][self.embedding_field]['type']}'. Please update the "
+                        f"document_store to use a different name for the embedding_field parameter."
+                    )
+                if self.index_type != "hnsw":
+                    mapping["properties"][self.embedding_field] = {
+                        "type": self.vector_type,
+                        "dims": self.embedding_dim,
+                    }
+                self.client.indices.put_mapping(index=index_name, body=mapping, headers=headers)
+            return
+
+        if self.custom_mapping:
+            mapping = self.custom_mapping
+        else:
+            mapping = {
+                "mappings": {
+                    "properties": {self.name_field: {"type": "keyword"}, self.content_field: {"type": "text"}},
+                    "dynamic_templates": [
+                        {
+                            "strings": {
+                                "path_match": "*",
+                                "match_mapping_type": "string",
+                                "mapping": {"type": "keyword"},
+                            }
+                        }
+                    ],
+                },
+                "settings": {
+                    "analysis": {
+                        "analyzer": {
+                            "default": {
+                                "type": self.analyzer,
+                            }
+                        }
+                    }
+                },
+            }
+
+            if self.synonyms:
+                for field in self.search_fields:
+                    mapping["mappings"]["properties"].update({field: {"type": "text", "analyzer": "synonym"}})
+                mapping["mappings"]["properties"][self.content_field] = {"type": "text", "analyzer": "synonym"}
+
+                mapping["settings"]["analysis"]["analyzer"]["synonym"] = {
+                    "tokenizer": "whitespace",
+                    "filter": ["lowercase", "synonym"],
+                }
+                mapping["settings"]["analysis"]["filter"] = {
+                    "synonym": {"type": self.synonym_type, "synonyms": self.synonyms}
+                }
+
+            else:
+                for field in self.search_fields:
+                    mapping["mappings"]["properties"].update({field: {"type": "text"}})
+
+            if self.embedding_field:
+                mapping["settings"]["number_of_shards"] = 1
+                mapping["settings"]["number_of_replicas"] = 2
+                if self.index_type == "hnsw":
+                    mapping["mappings"]["properties"][self.embedding_field] = {
+                        "type": self.vector_type,
+                        "dims": self.embedding_dim,
+                        "index_type": "hnsw",
+                        "space_type": self.space_type,
+                        "parameters": {"ef_construction": self.ef_construction, "m": self.m},
+                    }
+
+            else:
+                mapping["mappings"]["properties"][self.embedding_field] = {
+                    "type": self.vector_type,
+                    "dims": self.embedding_dim,
+                }
+
+            if self.index_type == "hnsw":
+                mapping["settings"]["index"] = {"knn": True}
         try:
             self.client.indices.create(index=index_name, body=mapping, headers=headers)
         except RequestError as e:

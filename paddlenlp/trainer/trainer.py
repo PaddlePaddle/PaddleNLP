@@ -46,6 +46,9 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.dygraph_sharding
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
     HybridParallelOptimizer,
 )
+from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_optimizer_stage2 import (
+    GroupShardedOptimizerStage2,
+)
 
 try:
     from paddle.distributed.fleet.utils.hybrid_parallel_util import (
@@ -362,6 +365,12 @@ class Trainer:
                         from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
                             GroupShardedScaler,
                         )
+
+                        if self.args.amp_master_grad:
+                            assert (
+                                ShardingOption.SHARD_GRAD_OP in self.args.sharding
+                            ), "Main grad doesn't support sharding stage 3 for now."
+                            mix_precision_utils.MixPrecisionScaler(self.scaler)  # return value has no use
 
                         self.scaler = GroupShardedScaler(self.scaler)
                 else:
@@ -1051,6 +1060,9 @@ class Trainer:
 
         metrics = None
         if self.control.should_evaluate:
+            if isinstance(self.optimizer, GroupShardedOptimizerStage2) and self.optimizer._broadcast_overlap:
+                paddle.device.cuda.synchronize()
+
             if isinstance(self.eval_dataset, dict):
                 for eval_dataset_name, eval_dataset in self.eval_dataset.items():
                     metrics = self.evaluate(
@@ -1062,6 +1074,9 @@ class Trainer:
                 metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
 
         if self.control.should_save:
+            if isinstance(self.optimizer, GroupShardedOptimizerStage2) and self.optimizer._broadcast_overlap:
+                paddle.device.cuda.synchronize()
+
             self._save_checkpoint(model, metrics=metrics)
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
 
@@ -1567,6 +1582,14 @@ class Trainer:
                     extra_kwargs["dp_group"] = self.dp_group
                     extra_kwargs["exclude_layer"] = ["GroupNorm"]
 
+                if self.args.amp_master_grad:
+                    assert level == "os_g", "Main grad doesn't support sharding stage 3 for now."
+                    assert (
+                        self.args.data_parallel_degree == 1
+                    ), "Sharding stage 2 main grad is not compatible with dp for now."
+                    mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
+                    self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
+
                 model, optimizer, _ = group_sharded_parallel(
                     model,
                     self.optimizer,
@@ -1576,6 +1599,17 @@ class Trainer:
                     offload=cpu_offload,
                     **extra_kwargs,
                 )
+                if self.args.amp_master_grad:
+                    assert hasattr(optimizer, "use_main_grad"), (
+                        "Current installed paddle doesn't support sharding stage 2 with main grad, "
+                        "please upgrade your paddle (using nightly version)."
+                    )
+
+                sharding_parallel_config = set(self.args.sharding_parallel_config.split(" "))
+                if level == "os_g" and "enable_stage2_overlap" in sharding_parallel_config:
+                    model._set_reduce_overlap(True)
+                    optimizer._set_broadcast_overlap(True, model)
+
                 self.optimizer = optimizer
 
         # pure tesnor parallel mode, no pipeline_parallel, no sharding.
