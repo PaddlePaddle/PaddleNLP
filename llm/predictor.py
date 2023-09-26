@@ -838,14 +838,7 @@ class StaticBlockInferencePredictor(BasePredictor):
         seq_lens_this_time = copy.deepcopy(self.inputs['seq_lens_this_time'][:real_bsz])
         self.seq_lens_handle.share_external_data(seq_lens_this_time)
         while self.inputs["not_need_stop"]:
-            print("not_need_stop: ", self.inputs["not_need_stop"])
-            print("step_idx: ", self.inputs["step_idx"])
-            print("seq_lens_this_time: ", seq_lens_this_time)
-            print("seq_lens_encoder: ", self.inputs["seq_lens_encoder"])
-            print("seq_lens_decoder: ", self.inputs["seq_lens_decoder"])
-            print("stop_flags: ", self.inputs["stop_flags"])
             self.predictor.run()
-            # paddle.distributed.barrier()
         print("predict done")
         # reset free_list
         for i in range(self.config.batch_size):
