@@ -109,7 +109,6 @@ def main():
         model_args.model_name_or_path,
         output_predict=True,
         parallel_output=True,
-        load_state_as_np=True,
         dtype=dtype,  # todo enable set dtype to avoid additional mem usage
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
