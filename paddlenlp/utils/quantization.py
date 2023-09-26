@@ -47,19 +47,19 @@ class QuantizationLinear(nn.Layer):
             self.llm_int8_threshold = kwargs.pop("llm_int8_threshold", 6.0)
 
         # PaddlePaddle dosen't support Int4 data type, one Int8 data represents two Int4 data.
+        # paddle.nn.quant.weight_quantize will transpose in_features and out_features.
         self.quant_weight = self.create_parameter(
-            shape=[in_features // 2, out_features] if self.quant_dtype == "int4" else [in_features, out_features],
+            shape=[out_features // 2, in_features] if self.quant_dtype == "int4" else [out_features, in_features],
             attr=weight_attr if weight_attr else paddle.nn.initializer.Constant(value=0),
             dtype="int8",
             is_bias=False,
         )
         self.quant_scale = self.create_parameter(
-            shape=[in_features],
+            shape=[out_features],
             attr=scale_attr,
             dtype="float32",
             is_bias=False,
         )
-
         if bias_attr is False:
             self.bias = None
         else:
@@ -117,36 +117,40 @@ class ColumnParallelQuantizationLinear(nn.Layer):
         self.output_size_per_partition = out_features // self.world_size
 
         # PaddlePaddle dosen't support Int4 data type, one Int8 data represents two Int4 data.
+        # paddle.nn.quant.weight_quantize will transpose in_features and out_features.
         if self.is_mp and paddle.in_dynamic_mode():
             with get_rng_state_tracker().rng_state():
-                self.weight = self.create_parameter(
-                    shape=[in_features // 2, self.output_size_per_partition]
+                self.quant_weight = self.create_parameter(
+                    shape=[self.output_size_per_partition // 2, in_features]
                     if self.quant_dtype == "int4"
-                    else [in_features, self.output_size_per_partition],
+                    else [self.output_size_per_partition, in_features],
                     attr=weight_attr if weight_attr else paddle.nn.initializer.Constant(value=0),
                     dtype="int8",
                     is_bias=False,
                 )
         else:
-            self.weight = self.create_parameter(
-                shape=[in_features // 2, self.output_size_per_partition]
+            self.quant_weight = self.create_parameter(
+                shape=[self.output_size_per_partition // 2, in_features]
                 if self.quant_dtype == "int4"
-                else [in_features, self.output_size_per_partition],
+                else [self.output_size_per_partition, in_features],
                 attr=weight_attr if weight_attr else paddle.nn.initializer.Constant(value=0),
                 dtype="int8",
                 is_bias=False,
             )
 
-        self.weight.is_distributed = True if self.is_mp else False
-        if self.weight.is_distributed:
-            self.weight.split_axis = 1
+        self.quant_weight.is_distributed = True if self.is_mp else False
+        if self.quant_weight.is_distributed:
+            self.quant_weight.split_axis = 0
 
         self.quant_scale = self.create_parameter(
-            shape=[in_features],
+            shape=[self.output_size_per_partition],
             attr=scale_attr,
             dtype="float32",
             is_bias=False,
         )
+        self.quant_scale.is_distributed = True if self.is_mp else False
+        if self.quant_scale.is_distributed:
+            self.quant_scale.split_axis = 0
 
         if bias_attr is False:
             self.bias = None
@@ -224,36 +228,40 @@ class RowParallelQuantizationLinear(nn.Layer):
         self.input_size_per_partition = in_features // self.world_size
 
         # PaddlePaddle dosen't support Int4 data type, one Int8 data represents two Int4 data.
+        # paddle.nn.quant.weight_quantize will transpose in_features and out_features.
         if self.is_mp and paddle.in_dynamic_mode():
             with get_rng_state_tracker().rng_state():
-                self.weight = self.create_parameter(
-                    shape=[self.input_size_per_partition // 2, out_features]
+                self.quant_weight = self.create_parameter(
+                    shape=[out_features // 2, self.input_size_per_partition]
                     if self.quant_dtype == "int4"
-                    else [self.input_size_per_partition, out_features],
+                    else [out_features, self.input_size_per_partition],
                     attr=weight_attr if weight_attr else paddle.nn.initializer.Constant(value=0),
                     dtype="int8",
                     is_bias=False,
                 )
         else:
-            self.weight = self.create_parameter(
-                shape=[self.input_size_per_partition // 2, out_features]
+            self.quant_weight = self.create_parameter(
+                shape=[out_features // 2, self.input_size_per_partition]
                 if self.quant_dtype == "int4"
-                else [self.input_size_per_partition, out_features],
+                else [out_features, self.input_size_per_partition],
                 attr=weight_attr if weight_attr else paddle.nn.initializer.Constant(value=0),
                 dtype="int8",
                 is_bias=False,
             )
 
-        self.weight.is_distributed = True if self.is_mp else False
-        if self.weight.is_distributed:
-            self.weight.split_axis = 0
+        self.quant_weight.is_distributed = True if self.is_mp else False
+        if self.quant_weight.is_distributed:
+            self.quant_weight.split_axis = 1
 
         self.quant_scale = self.create_parameter(
-            shape=[self.input_size_per_partition],
+            shape=[out_features],
             attr=scale_attr,
             dtype="float32",
             is_bias=False,
         )
+        self.quant_scale.is_distributed = True if self.is_mp else False
+        if self.quant_scale.is_distributed:
+            self.quant_scale.split_axis = 0
 
         if bias_attr is False:
             self.bias = None
@@ -359,25 +367,20 @@ def replace_with_quantization_linear(model, quant_algo, name_prefix="", **kwargs
     return quantization_linear_list
 
 
-def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quant_algo, dtype, is_mp=False):
+def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quant_algo, dtype):
     for name in quantization_linear_list:
         weight_name = name + ".weight"
         quant_weight_name = name + ".quant_weight"
         quant_scale_name = name + ".quant_scale"
-        if is_mp:
-            if quant_weight_name not in state_dict or quant_scale_name not in state_dict:
-                raise ValueError(
-                    "Quantization feature only supports quantized params. Please quantize weight before loading model."
-                )
 
         if quant_weight_name in state_dict and quant_scale_name in state_dict:
             if state_dict[quant_weight_name].dtype != paddle.int8:
                 raise ValueError(
-                    f"{quant_weight_name} should be {paddle.int8} in state_dict but received dtype {state_dict[quant_weight_name].dtype}"
+                    f"{quant_weight_name} should be {paddle.int8} in state_dict but received dtype {state_dict[quant_weight_name].dtype}."
                 )
             if state_dict[quant_scale_name].dtype != paddle.float32:
                 raise ValueError(
-                    f"{quant_scale_name} should be {paddle.float32} in state_dict but received dtype {state_dict[quant_scale_name].dtype}"
+                    f"{quant_scale_name} should be {paddle.float32} in state_dict but received dtype {state_dict[quant_scale_name].dtype}."
                 )
         elif weight_name in state_dict:
             target_weight = state_dict.pop(weight_name).cast(dtype)

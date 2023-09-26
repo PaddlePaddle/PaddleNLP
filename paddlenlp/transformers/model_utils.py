@@ -1629,7 +1629,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     quantization_linear_list,
                     config.quantization_config["quant_algo"],
                     dtype,
-                    config.tensor_parallel_degree > 1,
                 )
                 loaded_keys = [k for k in state_dict.keys()]
             else:
@@ -1766,7 +1765,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         quantization_linear_list,
                         quantization_config["quant_algo"],
                         dtype,
-                        config.tensor_parallel_degree > 1,
                     )
 
                 # Mistmatched keys contains tuples key/shape1/shape2 of weights in the checkpoint that have a shape not
@@ -2035,6 +2033,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                             loaded_keys = f.keys()
                         tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
                         state_dict = load_state_dict(resolved_archive_file, tp_actions)
+                    else:
+                        state_dict = load_state_dict(resolved_archive_file)
                 else:
                     state_dict = load_state_dict(resolved_archive_file)
 
@@ -2181,6 +2181,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if state_dict is None:
             state_dict = model_to_save.state_dict()
             if config_to_save.tensor_parallel_degree > 1:
+                if config_to_save.quantization_config is not None and merge_tensor_parallel:
+                    logger.warning(
+                        "Quantization strategy does not support merge tensor parallel, thus we set merge_tensor_parallel to False."
+                    )
+                    merge_tensor_parallel = False
                 if merge_tensor_parallel:
                     state_dict = model_to_save.merge_tensor_parallel(state_dict, config_to_save)
                     config_to_save.tensor_parallel_degree = 1
