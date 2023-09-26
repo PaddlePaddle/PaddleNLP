@@ -559,7 +559,7 @@ def create_predictor(
     tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path)
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if isinstance(tokenizer, LlamaTokenizer):
-        tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.pad_token_id = tokenizer.eos_token_id
 
     # update config parameter for inference predictor
     if predictor_args.decode_strategy == "greedy_search" and predictor_args.inference_model:
