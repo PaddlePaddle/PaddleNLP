@@ -99,7 +99,6 @@ class Predictor(object):
                 args.model_name_or_path,
                 tensor_parallel_degree=tensor_parallel_degree,
                 tensor_parallel_rank=tensor_parallel_rank,
-                load_state_as_np=True,
                 dtype=dtype,
                 use_flash_attention=use_flash_attn,
             )

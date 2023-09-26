@@ -20,7 +20,7 @@ paddle.set_default_dtype("float16")
 model_name = "EleutherAI/gpt-j-6B"
 
 tokenizer = GPTJTokenizer.from_pretrained(model_name)
-model = GPTJForCausalLM.from_pretrained(model_name, load_state_as_np=True)
+model = GPTJForCausalLM.from_pretrained(model_name)
 model.eval()
 
 inputs = "What is PaddleNLP?"
