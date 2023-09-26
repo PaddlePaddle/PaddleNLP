@@ -107,6 +107,7 @@ class UITest(unittest.TestCase):
             "max_length": 20,
             "min_length": 1,
         }
+        # Case 1: greedy search
         result_0 = get_response(data)
         result_1 = get_response(data)
 
