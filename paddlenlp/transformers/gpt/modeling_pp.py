@@ -114,7 +114,7 @@ class LayerNormPipe(nn.LayerNorm):
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
         hidden_states = super().forward(hidden_states)
-        return return_args(hidden_states, attention_mask, position_ids)
+        return hidden_states
 
 
 class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
