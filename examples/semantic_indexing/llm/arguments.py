@@ -83,4 +83,4 @@ class RetrieverTrainingArguments(TrainingArguments):
     sentence_pooling_method: str = field(
         default="weighted_mean", metadata={"help": "the pooling method, should be weighted_mean"}
     )
-    fine_tune_type: str = field(default="sft", metadata={"help": "fine-tune type for retrieval,eg: sft, bitfit"})
+    fine_tune_type: str = field(default="sft", metadata={"help": "fine-tune type for retrieval,eg: sft, bitfit, lora"})

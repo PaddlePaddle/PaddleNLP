@@ -20,6 +20,7 @@ from data import EmbedCollator, TrainDatasetForEmbedding
 from modeling import BloomBiEncoderModel, LlamaBiEncoderModel
 from utils import BiTrainer
 
+from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint, set_seed
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.log import logger
@@ -28,6 +29,16 @@ from paddlenlp.utils.log import logger
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    # Set the dtype for loading model
+    dtype = None
+    if training_args.fp16_opt_level == "O2":
+        if training_args.fp16:
+            dtype = "float16"
+        if training_args.bf16:
+            dtype = "bfloat16"
+    else:
+        dtype = "float32"
 
     if (
         os.path.exists(training_args.output_dir)
@@ -77,7 +88,7 @@ def main():
     if "bloom" in model_args.model_name_or_path:
         model = BloomBiEncoderModel.from_pretrained(
             pretrained_model_name_or_path=model_args.model_name_or_path,
-            dtype="bfloat16",
+            dtype=dtype,
             low_cpu_mem_usage=True,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             tensor_parallel_rank=training_args.tensor_parallel_rank,
@@ -90,7 +101,7 @@ def main():
     elif "llama" in model_args.model_name_or_path:
         model = LlamaBiEncoderModel.from_pretrained(
             pretrained_model_name_or_path=model_args.model_name_or_path,
-            dtype="bfloat16",
+            dtype=dtype,
             low_cpu_mem_usage=True,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             tensor_parallel_rank=training_args.tensor_parallel_rank,
@@ -115,6 +126,23 @@ def main():
             else:
                 logger.info(f"Freeze the parameters for {k} shape: {v.shape}")
                 v.stop_gradient = True
+
+    if training_args.fine_tune_type == "lora":
+        if "llama" in model_args.model_name_or_path:
+            target_modules = [".*q_proj.*", ".*k_proj.*", ".*v_proj.*"]
+        else:
+            target_modules = [".*query_key_value.*"]
+
+        lora_config = LoRAConfig(
+            target_modules=target_modules,
+            r=8,
+            lora_alpha=32,
+            dtype=dtype,
+        )
+        model = LoRAModel(model, lora_config)
+        model.mark_only_lora_as_trainable()
+        model.print_trainable_parameters()
+
     train_dataset = TrainDatasetForEmbedding(
         args=data_args,
         tokenizer=tokenizer,
