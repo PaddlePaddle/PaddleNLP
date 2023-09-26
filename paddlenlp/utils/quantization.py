@@ -200,7 +200,7 @@ class RowParallelQuantizationLinear(nn.Layer):
     """Quantization Linear layer with mp parallelized(row).
     The code implementation refers to paddle.distributed.fleet.meta_parallel.RowParallelLinear.
     https://github.com/PaddlePaddle/Paddle/blob/develop/python/paddle/distributed/fleet/layers/mpu/mp_layers.py#L517
-    Different from RowParallelQuantizationLinear, this class keeps weight in INT8/INT4 with quant scale, and supports matrix
+    Different from RowParallelLinear, this class keeps weight in INT8/INT4 with quant scale, and supports matrix
     multiplication(weight_only_linear/llm_int8_linear) for input tensor(fp16/bf16) and quantized weight(INT8/INT4)
     and bias addition if provided.
     Notice: quantized weight shape is transposed.
