@@ -80,6 +80,15 @@ class QuantizationLinear(nn.Layer):
 
 
 class ColumnParallelQuantizationLinear(nn.Layer):
+    """Quantization Linear layer with mp parallelized(column).
+    The code implementation refers to paddle.distributed.fleet.meta_parallel.ColumnParallelLinear.
+    https://github.com/PaddlePaddle/Paddle/blob/develop/python/paddle/distributed/fleet/layers/mpu/mp_layers.py#L310
+    Different from ColumnParallelLinear, this class keeps weight in INT8/INT4 with quant scale, and supports matrix
+    multiplication(weight_only_linear/llm_int8_linear) for input tensor(fp16/bf16) and quantized weight(INT8/INT4)
+    and bias addition if provided.
+    Notice: quantized weight shape is transposed.
+    """
+
     def __init__(
         self,
         in_features,
@@ -117,7 +126,6 @@ class ColumnParallelQuantizationLinear(nn.Layer):
         self.output_size_per_partition = out_features // self.world_size
 
         # PaddlePaddle dosen't support Int4 data type, one Int8 data represents two Int4 data.
-        # paddle.nn.quant.weight_quantize will transpose in_features and out_features.
         if self.is_mp and paddle.in_dynamic_mode():
             with get_rng_state_tracker().rng_state():
                 self.quant_weight = self.create_parameter(
@@ -189,6 +197,15 @@ class ColumnParallelQuantizationLinear(nn.Layer):
 
 
 class RowParallelQuantizationLinear(nn.Layer):
+    """Quantization Linear layer with mp parallelized(row).
+    The code implementation refers to paddle.distributed.fleet.meta_parallel.RowParallelLinear.
+    https://github.com/PaddlePaddle/Paddle/blob/develop/python/paddle/distributed/fleet/layers/mpu/mp_layers.py#L517
+    Different from RowParallelQuantizationLinear, this class keeps weight in INT8/INT4 with quant scale, and supports matrix
+    multiplication(weight_only_linear/llm_int8_linear) for input tensor(fp16/bf16) and quantized weight(INT8/INT4)
+    and bias addition if provided.
+    Notice: quantized weight shape is transposed.
+    """
+
     def __init__(
         self,
         in_features,

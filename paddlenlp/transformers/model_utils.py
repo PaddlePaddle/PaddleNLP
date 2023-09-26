@@ -2170,7 +2170,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         os.makedirs(save_directory, exist_ok=True)
         # Save model config
 
-        # Only save the model itself if we are us ing distributed training
+        # Only save the model in distributed training setup
         model_to_save = unwrap_model(self)
 
         # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
