@@ -28,9 +28,9 @@ from paddlenlp.transformers import LlamaTokenizer
 
 def is_port_in_use(port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(0.25)
+        s.settimeout(0.01)
         try:
-            s.bind(("0.0.0.0", port))
+            s.bind(("localhost", port))
             return False
         except socket.error:
             return True
@@ -55,7 +55,7 @@ class UITest(unittest.TestCase):
 
     def avaliable_free_port(self, exclude=None):
         exclude = exclude or []
-        for port in range(8000, 9000):
+        for port in range(8000, 10000):
             if port in exclude:
                 continue
             if is_port_in_use(port):
@@ -79,12 +79,12 @@ class UITest(unittest.TestCase):
             content = json.load(f)
         return content[-1]["utterance"]
 
-    @pytest.mark.timeout(60 * 4)
+    @pytest.mark.timeout(4 * 60)
     def test_argument(self):
         self.wait_until_server_is_ready()
 
         def get_response(data):
-            res = requests.post(f"http://0.0.0.0:{self.flask_port}/api/chat", json=data, stream=True)
+            res = requests.post(f"http://localhost:{self.flask_port}/api/chat", json=data, stream=True)
             result_ = ""
             for line in res.iter_lines():
                 print(line)
