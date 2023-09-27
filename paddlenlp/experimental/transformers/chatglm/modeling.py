@@ -180,16 +180,13 @@ class ChatGLMStackDyBatch(nn.Layer):
             )
             for i in range(config.num_layers)
         ]
-
         qkv_bias_attrs = [paddle.ParamAttr(name="fusemt.{}.qkv_bias".format(i)) for i in range(config.num_layers)]
-
         linear_weight_attrs = [
             paddle.ParamAttr(
                 name="fusemt.{}.linear_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
             )
             for i in range(config.num_layers)
         ]
-
         linear_bias_attrs = [
             paddle.ParamAttr(name="fusemt.{}.linear_bias".format(i)) for i in range(config.num_layers)
         ]
