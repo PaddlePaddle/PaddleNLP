@@ -44,6 +44,7 @@ class Eval_modle:
             low_cpu_mem_usage=True,
             use_flash_attention=True,
             sentence_pooling_method="weighted_mean",
+            normalized=True,
         )
         self._model.eval()
 
