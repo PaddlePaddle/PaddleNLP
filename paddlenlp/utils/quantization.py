@@ -104,7 +104,8 @@ class ColumnParallelQuantizationLinear(nn.Layer):
         **kwargs
     ):
         super().__init__()
-
+        self.in_features = in_features
+        self.out_features = out_features
         self.quant_algo = quant_algo
         self.quant_dtype = QuantDtypeMapping[self.quant_algo]
         self._dtype = dtype
@@ -216,7 +217,8 @@ class RowParallelQuantizationLinear(nn.Layer):
         **kwargs
     ):
         super().__init__()
-
+        self.in_features = in_features
+        self.out_features = out_features
         self.quant_algo = quant_algo
         self.quant_dtype = QuantDtypeMapping[self.quant_algo]
         self._dtype = dtype
