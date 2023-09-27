@@ -394,7 +394,6 @@ def main():
             model_args.model_name_or_path,
             config=config,
             dtype=dtype,
-            load_state_as_np=True,
             use_progressive_seq_len=True,
         )
     else:
