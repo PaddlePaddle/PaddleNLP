@@ -420,11 +420,16 @@ def _build_index_mappings(
     data_cache_dir = os.path.dirname(idx_path["desc"])
     # data_cache_success = True
     # Build the indexed mapping if not exist.
-    if data_cache_path is not None and share_folder:
+    check_rank_flag = build_indices and local_rank == 0
+    if share_folder:
         check_rank_flag = build_indices and paddle.distributed.get_rank() == 0
-    else:
-        check_rank_flag = build_indices and local_rank == 0
+
     # if build_indices and paddle.distributed.get_rank() == 0:
+
+    print(
+        f"searching for causual dataset, build_indices={build_indices}, share_folder {share_folder}, check_rank_flag {check_rank_flag}",
+        flush=True,
+    )
     if check_rank_flag:
         print_rank_0(" > WARNING: could not find index map files, building " "the indices on rank 0 ...")
 
@@ -523,10 +528,12 @@ def _build_index_mappings(
                 or (not os.path.isfile(idx_path["sample"]))
                 or (not os.path.isfile(idx_path["shuffle"]))
             ):
+                print("building indices on rank 0 ...", flush=True)
                 time.sleep(3)
             else:
                 try:
                     np.load(idx_path["shuffle"], allow_pickle=True, mmap_mode="r")
+                    print("build success", flush=True)
                     break
                 except Exception:
                     print("%s file is still writing or damaged, please wait for a moment." % idx_path["shuffle"])

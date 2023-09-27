@@ -53,6 +53,8 @@ Llama2 模型的权重的使用则需要遵循[License](../../paddlenlp/transfor
 
 预训练数据制作参考[此处](../../model_zoo/ernie-1.0/preprocess/docs/OpenWebText2.md)
 
+OpenWebText2预训练数据制作参考[此处](../../model_zoo/ernie-1.0/preprocess/docs/OpenWebText2.md)，详细制作流程可参考[此处](../../model_zoo/ernie-1.0/preprocess/README.md)。
+
 为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
 ```shell
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
@@ -114,6 +116,8 @@ python -u  -m paddle.distributed.launch \
 3. `continue_training` 表示从现有的预训练模型加载训练。7b模型初始loss大概为1.99x, 随机初始化模型loss从11.x左右下降。
 4. `use_fused_rms_norm` 需要安装[此目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt-3/external_ops)下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置PYTHONPATH
 5. 当前脚本为sharding版本，需要4D并行训练（数据、sharding、张量、流水线并行）的用户，请参考 `run_trainer_tp4pp2.sh`脚本。
+6. 多机训练时，若各机器使用的文件夹来自同一个共享的硬盘位置，请指定`--share_folder true`。否则默认各台机器的0号卡独立制作缓存数据，
+7. 若数据集文件夹中默认的缓存文件夹`index-cache/`存在，则额外指定的`--data_cache`不生效，训练时优先加载默认缓存文件夹中的内容。
 
 ## 4. 模型精调
 请参考[LLM全流程工具介绍](../README.md)

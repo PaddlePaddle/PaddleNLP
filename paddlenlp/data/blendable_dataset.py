@@ -86,6 +86,10 @@ class BlendableDataset(paddle.io.Dataset):
             if share_folder:
                 check_rank_flag = not cache_hit and paddle.distributed.get_rank() == 0
 
+            print(
+                f"searching for blendable dataset, cache_hit={cache_hit}, share_folder {share_folder}, check_rank_flag {check_rank_flag}",
+                flush=True,
+            )
             if check_rank_flag:
                 print(
                     " > WARNING: could not find index map files for blendable"
@@ -121,10 +125,12 @@ class BlendableDataset(paddle.io.Dataset):
             else:
                 while True:
                     if (not os.path.isfile(index_path)) or (not os.path.isfile(sample_index_path)):
+                        print("building indices on rank 0 ...", flush=True)
                         time.sleep(3)
                     else:
                         try:
                             np.load(index_path, allow_pickle=True, mmap_mode="r")
+                            print("build success", flush=True)
                             break
                         except Exception:
                             print("%s file is still writing or damaged, please wait for a moment." % index_path)
@@ -140,6 +146,10 @@ class BlendableDataset(paddle.io.Dataset):
             self.dataset_sample_index = np.load(sample_index_path, allow_pickle=True, mmap_mode="r")
             assert self.dataset_sample_index.size == self.size
         else:
+            print_rank_0(
+                "building indices for the blendable dataset, Since --data_cache is not specified, the index file will not be stored.",
+                flush=True,
+            )
             self.dataset_index, self.dataset_sample_index = _build_indices()
 
         # Check size
