@@ -1630,7 +1630,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 raise ImportError("Quantization features require `paddlepaddle >= 2.5.2`")
             if state_dict is not None:
                 state_dict = convert_to_quantize_state_dict(
-                    state_dict, quantization_linear_list, config.quantization_config["quant_algo"], dtype
+                    state_dict,
+                    quantization_linear_list,
+                    config.quantization_config["quant_algo"],
+                    dtype,
                 )
                 loaded_keys = [k for k in state_dict.keys()]
             else:
@@ -1765,7 +1768,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
                 if quantization_config is not None:
                     state_dict = convert_to_quantize_state_dict(
-                        state_dict, quantization_linear_list, quantization_config["quant_algo"], dtype
+                        state_dict,
+                        quantization_linear_list,
+                        quantization_config["quant_algo"],
+                        dtype,
                     )
 
                 # Mistmatched keys contains tuples key/shape1/shape2 of weights in the checkpoint that have a shape not
@@ -1967,8 +1973,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 from ..utils.quantization import replace_with_quantization_linear
             except ImportError:
                 raise ImportError("You need to install paddlepaddle >= 2.5.2")
-            if config.tensor_parallel_degree > 1:
-                raise NotImplementedError("Quantization method dosen't support tensor parallelism.")
+
             if dtype != "float16" and dtype != "bfloat16":
                 dtype = "float16"
                 logger.warning(
@@ -2165,7 +2170,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         os.makedirs(save_directory, exist_ok=True)
         # Save model config
 
-        # Only save the model itself if we are using distributed training
+        # Only save the model in distributed training setup
         model_to_save = unwrap_model(self)
 
         # save the string version of dtype to the config, e.g. convert paddle.float32 => "float32"
@@ -2180,6 +2185,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if state_dict is None:
             state_dict = model_to_save.state_dict()
             if config_to_save.tensor_parallel_degree > 1:
+                if config_to_save.quantization_config is not None and merge_tensor_parallel:
+                    logger.warning(
+                        "Quantization strategy does not support merge tensor parallel, thus we set merge_tensor_parallel to False."
+                    )
+                    merge_tensor_parallel = False
                 if merge_tensor_parallel:
                     state_dict = model_to_save.merge_tensor_parallel(state_dict, config_to_save)
                     config_to_save.tensor_parallel_degree = 1
