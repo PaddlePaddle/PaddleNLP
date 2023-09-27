@@ -64,7 +64,7 @@ class PredictorTest(LLMTest, unittest.TestCase):
         print(count / len(result_0))
 
         self.assertGreaterEqual(full_match / len(result_0), 0.25)
-        self.assertGreater(count / len(result_0), 0.4)
+        self.assertGreaterEqual(count / len(result_0), 0.4)
 
 
 @parameterized_class(
@@ -117,5 +117,5 @@ class PredictorPrecacheTest(LLMTest, unittest.TestCase):
         print("count", count)
         print(count / len(result_0))
 
-        self.assertGreaterEqual(full_match / len(result_0), 0.25)
-        self.assertGreater(count / len(result_0), 0.4)
+        self.assertGreaterEqual(full_match / len(result_0), 0.6)
+        self.assertGreaterEqual(count / len(result_0), 0.8)

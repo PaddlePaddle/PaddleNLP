@@ -321,7 +321,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
-
         unfused_state_dict = {}
         head_size = self.hidden_size // self.num_attention_heads
 
