@@ -14,7 +14,7 @@
 
 
 param="model_name_or_path=llama "
-param="model_item=llama-7b "
+param="model_item=CE_llama-7b "
 param+="run_mode=MP1-mbs2 "
 param+="batch_size=2 "
 param+="device_num=N1C1 "
