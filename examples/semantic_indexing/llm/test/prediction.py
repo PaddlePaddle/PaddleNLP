@@ -14,9 +14,10 @@
 
 import numpy as np
 import paddle
+from modeling import BloomBiEncoderModel
 
 from paddlenlp.data import DataCollatorWithPadding
-from paddlenlp.transformers import AutoModel, AutoTokenizer
+from paddlenlp.transformers import AutoTokenizer
 
 
 class Eval_modle:
@@ -37,7 +38,13 @@ class Eval_modle:
         """
         Construct the inference model for the predictor.
         """
-        self._model = AutoModel.from_pretrained(self.model, dtype="bfloat16")
+        self._model = BloomBiEncoderModel.from_pretrained(
+            pretrained_model_name_or_path=self.model,
+            dtype="bfloat16",
+            low_cpu_mem_usage=True,
+            use_flash_attention=True,
+            sentence_pooling_method="weighted_mean",
+        )
         self._model.eval()
 
     def _construct_tokenizer(self):
@@ -118,21 +125,8 @@ class Eval_modle:
         with paddle.no_grad():
             for batch_inputs in inputs["batches"]:
                 batch_inputs = self._collator(batch_inputs)
-                token_embeddings = self._model(input_ids=batch_inputs["input_ids"])[0]
-                weights = (
-                    paddle.arange(start=1, end=token_embeddings.shape[1] + 1)
-                    .unsqueeze(0)
-                    .unsqueeze(-1)
-                    .expand(token_embeddings.shape)
-                )
-                input_mask_expanded = batch_inputs["attention_mask"].unsqueeze(-1).expand(token_embeddings.shape)
-                sum_embeddings = paddle.sum(token_embeddings * input_mask_expanded * weights, axis=1, dtype="float32")
-                sum_mask = paddle.sum(input_mask_expanded * weights, axis=1)
-                embedding = sum_embeddings / sum_mask
-                all_feats.append(embedding.detach().cpu().numpy())
-            # del inputs
-            # import gc
-            # gc.collection()
+                token_embeddings = self._model.encode(batch_inputs)
+                all_feats.append(token_embeddings.detach().cpu().numpy())
             return all_feats
 
     def _postprocess(self, inputs):
