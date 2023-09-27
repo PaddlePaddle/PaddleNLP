@@ -56,7 +56,10 @@ def convert_file_size_to_int(size: Union[int, str]):
 
 
 def reduce_tensor(tensor, buffer_size="32MiB"):
-    numel = int(paddle.numel(tensor).item())
+    if tensor.dtype == paddle.int8:
+        numel = np.prod(tensor.shape)
+    else:
+        numel = int(paddle.numel(tensor).item())
     # dtype = str(tensor.dtype)
     # numel_bits = numel * dtype_byte_size(tensor.dtype)
     buffer_size = convert_file_size_to_int(buffer_size)

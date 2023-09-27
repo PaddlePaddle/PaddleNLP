@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import argparse
 import logging
-import time
+import os
 from typing import Optional
 
 import fitz
@@ -23,6 +24,10 @@ from pipelines.nodes import EmbeddingRetriever, ErnieRanker
 from pipelines.pipelines import Pipeline
 
 logging.getLogger().setLevel(logging.INFO)
+import time
+from functools import partial
+from multiprocessing import Pool
+
 from pipelines.nodes import ErnieBot
 from pipelines.nodes.combine_documents import (
     MapReduceDocuments,
@@ -44,19 +49,43 @@ def load_all_json_path(path):
     return json_path
 
 
-def pdf2image(pdfPath, imgPath, zoom_x=10, zoom_y=10, rotation_angle=0):
+def pdf2image_index(start, end, pdfPath, imgPath, zoom_x=10, zoom_y=10, rotation_angle=0):
+    pdf = fitz.open(pdfPath)
+    image_path = []
+    for index in range(start, end):
+        page = pdf[index]
+        trans = fitz.Matrix(zoom_x, zoom_y).prerotate(rotation_angle)
+        pm = page.get_pixmap(matrix=trans, alpha=False)
+        pm._writeIMG(imgPath + "/" + str(index) + ".png", format=1)
+        image_path.append((imgPath + "/" + str(index) + ".png", "page:" + str(index)))
+    return image_path
+
+
+def pdf2image(pdfPath, imgPath, zoom_x=10, zoom_y=10, rotation_angle=0, number_process_page=5):
     """
     Convert PDF to Image
     """
     pdf = fitz.open(pdfPath)
     image_path = []
-    for pg in range(0, pdf.page_count):
-        page = pdf[pg]
-        trans = fitz.Matrix(zoom_x, zoom_y).prerotate(rotation_angle)
-        pm = page.get_pixmap(matrix=trans, alpha=False)
-        pm._writeIMG(imgPath + "/" + str(pg) + ".png", format=1)
-        image_path.append((imgPath + "/" + str(pg) + ".png", "page:" + str(pg)))
+    if pdf.page_count % number_process_page == 0:
+        number_process = pdf.page_count // number_process_page
+    else:
+        number_process = pdf.page_count // number_process_page + 1
+    number_process = min(number_process, os.cpu_count())
+    pool = Pool(processes=number_process)
+    index_list = [i for i in range(0, pdf.page_count, number_process_page)]
+    if index_list[-1] < pdf.page_count:
+        index_list.append(pdf.page_count)
+    print(number_process)
+    func = partial(
+        pdf2image_index, pdfPath=pdfPath, imgPath=imgPath, zoom_x=zoom_x, zoom_y=zoom_y, rotation_angle=rotation_angle
+    )
+    result = pool.starmap(func, [(start, end) for start, end in zip(index_list, index_list[1:])])
+    pool.close()
+    pool.join()
     pdf.close()
+    for item in result:
+        image_path.extend(item)
     return image_path
 
 
@@ -308,3 +337,59 @@ def translate_part(text, api_key, secret_key, task="翻译", max_length=10000, l
         if not txt:
             txt = text
     return txt
+
+
+def get_parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--api_type", type=str, default="qianfan")
+    parser.add_argument("--api_key", type=str, default="", help="The API Key.")
+    parser.add_argument("--secret_key", type=str, default="", help="The secret key.")
+    parser.add_argument("--bos_ak", type=str, default="", help="The Access Token for uploading files to bos")
+    parser.add_argument("--bos_sk", type=str, default="", help="The Secret Token for uploading files to bos")
+    parser.add_argument(
+        "--top_p",
+        type=float,
+        default=0.7,
+        help="The range is between 0 and 1.The smaller the parameter, the more stable the generated result. When it is 0, randomness is minimized",
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.95,
+        help="The smaller the parameter, the more stable the generated result",
+    )
+    parser.add_argument("--max_length", type=int, default=1024, help="Maximum number of generated tokens")
+    parser.add_argument("--ernie_model", type=str, default="ernie-bot-3.5", help="Model type")
+    parser.add_argument("--system_prompt", type=str, default="你是我的AI助理。", help="System settings for dialogue models")
+    parser.add_argument("--es_host", type=str, default="", help="the host of es")
+    parser.add_argument("--es_port", type=int, default=8309, help="the port of es")
+    parser.add_argument("--es_username", type=str, default="", help="the username of es")
+    parser.add_argument("--es_password", type=str, default="", help="the password of es")
+    parser.add_argument("--es_index_abstract", type=str, default="", help="the index of abstracts")
+    parser.add_argument("--es_index_full_text", type=str, default="", help="the index of all papers")
+    parser.add_argument("--es_chunk_size", type=int, default=500, help="the size of chunk in es")
+    parser.add_argument("--es_thread_count", type=int, default=30, help="the thread count in es")
+    parser.add_argument("--es_queue_size", type=int, default=30, help="the size of queue in es")
+    parser.add_argument("--retriever_batch_size", type=int, default=16, help="the batch size of retriever ")
+    parser.add_argument("--retriever_api_key", type=str, default="", help="the api key of retriever")
+    parser.add_argument("--retriever_secret_key", type=str, default="", help="the secret key of retriever")
+    parser.add_argument(
+        "--retriever_embed_title", type=bool, default=False, help="whether use embedding title in retriever"
+    )
+    parser.add_argument("--retriever_threshold", type=float, default=0.95, help="the threshold of retriever")
+    parser.add_argument(
+        "--txt_file", type=str, default="", help="the path of a txt file which includes all papers path"
+    )
+    parser.add_argument("--max_token", type=int, default=11200, help=" the max number of tokens of LLM")
+    parser.add_argument("--translation_chunk_size", type=int, default=300, help="the chunk size of translation")
+    parser.add_argument("--translation_cycle_num", type=int, default=3, help="fault tolerance times")
+    parser.add_argument(
+        "--translation_max_token", type=int, default=500, help="the max number of tokens of translation segment"
+    )
+    parser.add_argument("--serving_name", default="0.0.0.0", help="Serving ip.")
+    parser.add_argument("--serving_port", default=8099, type=int, help="Serving port.")
+    parser.add_argument(
+        "--number_process_page", default=5, type=int, help="the number of PDF pages processed per process"
+    )
+    args = parser.parse_args()
+    return args

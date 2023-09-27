@@ -6,7 +6,9 @@ ChatTable 是一个表格问答助手，他可以根据您给出的查询问题�
 
 ## 2. 安装依赖
 
+
 ```
+pip install gradio
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
 cd PaddleNLP/pipelines/examples/chat_table
 ```

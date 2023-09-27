@@ -40,6 +40,7 @@ from ..model_outputs import (
     SequenceClassifierOutputWithPast,
     TokenClassifierOutput,
 )
+from ..model_utils import dy2st_nocheck_guard_context
 from .configuration import (
     GPT_PRETRAINED_INIT_CONFIGURATION,
     GPT_PRETRAINED_RESOURCE_FILES_MAP,
@@ -1239,8 +1240,12 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
         """
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
-            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
-            loss = paddle.mean(masked_lm_loss)
+            # skip ignore_index which loss == 0
+            if loss_mask is None:
+                loss_mask = (masked_lm_loss > 0).astype("float32")
+                loss_mask = loss_mask.reshape([-1])
+            masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
+            loss = masked_lm_loss / loss_mask.sum()
         return loss
 
 
@@ -1318,7 +1323,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
         src_ids = paddle.concat([src_ids, nid], axis=1)
         cur_len = 0
-        with paddle.fluid.framework._stride_in_no_check_dy2st_diff():
+        with dy2st_nocheck_guard_context():
             while cur_len < self.max_predict_len:
                 output, cached_kvs = self.model(nid, use_cache=True, cache=cached_kvs)
                 nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])

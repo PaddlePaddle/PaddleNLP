@@ -30,6 +30,7 @@ Engine:
 Model:
   module: "GPTModuleAuto"
   name: "GPT"
+  vocab_size_divisible_unit: 128
   fuse_attn_qkv: True
   scale_qk_by_layer_num: True
   fused_softmax_with_triangular: True
@@ -71,3 +72,8 @@ Optimizer:
   grad_clip:
     name: "ClipGradByGlobalNorm"
     clip_norm: 1.0
+
+
+FusedPasses:
+  fused_linear: False
+  fused_adamw: False

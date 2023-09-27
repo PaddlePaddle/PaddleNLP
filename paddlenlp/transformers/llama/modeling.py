@@ -570,14 +570,14 @@ class LlamaAttention(nn.Layer):
                     ]
                 )
 
-        self.rope_fusion_level = config.rope_fusion_level
-        if self.rope_fusion_level is not None:
+        self.use_fused_rope = config.use_fused_rope
+        if self.use_fused_rope:
             if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
                     "Will disable fuse rope. Try using latest gpu version of Paddle."
                 )
-                self.rope_fusion_level = None
+                self.use_fused_rope = False
 
         if config.sequence_parallel:
             ColumnParallelLinear = ColumnSequenceParallelLinear
@@ -664,7 +664,7 @@ class LlamaAttention(nn.Layer):
                 bias_attr=False,
             )
 
-        if config.rope and self.rope_fusion_level != "full":
+        if config.rope:
             self._init_rope()
 
         self.config = config
@@ -736,15 +736,17 @@ class LlamaAttention(nn.Layer):
             kv_seq_len += past_key_value[0].shape[-3]
 
         if self.config.rope:
-            if self.rope_fusion_level is not None:
+            if self.use_fused_rope:
                 assert past_key_value is None, "fuse rotary not support cache kv for now"
-
-            if self.rope_fusion_level == "full":
-                query_states, key_states, _ = fused_rotary_position_embedding(query_states, key_states, v=None)
-            elif self.rope_fusion_level == "core":
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
                 query_states, key_states, _ = fused_rotary_position_embedding(
-                    query_states, key_states, v=None, sin=sin, cos=cos
+                    query_states,
+                    key_states,
+                    v=None,
+                    sin=sin,
+                    cos=cos,
+                    position_ids=position_ids,
+                    use_neox_rotary_style=False,
                 )
             else:
                 cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
@@ -1430,6 +1432,13 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             }
         )
         return model_inputs
+
+    def _get_model_inputs_spec(self, dtype: str):
+        return {
+            "input_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            "attention_mask": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            "position_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+        }
 
     @staticmethod
     def update_model_kwargs_for_generation(outputs, model_kwargs, is_encoder_decoder=False):

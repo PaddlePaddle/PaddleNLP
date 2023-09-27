@@ -21,6 +21,7 @@ import paddle.distributed.fleet as fleet
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.distributed.fleet.utils import recompute
+from paddle.utils import map_structure
 
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -251,6 +252,10 @@ class SelfAttention(nn.Layer):
         self.num_multi_query_groups_per_partition = config.multi_query_group_num
 
         if config.tensor_parallel_degree > 1:
+            if config.tensor_parallel_degree > 2:
+                raise ValueError(
+                    "ChatGLM2 does not support `tensor_parallel_degree` > 2. Consider using Sharding stage 3"
+                )
             self.query = fleet.meta_parallel.ColumnParallelLinear(
                 config.hidden_size,
                 config.hidden_size,
@@ -358,6 +363,10 @@ class MLP(nn.Layer):
         self.add_bias = config.add_bias_linear
 
         if config.tensor_parallel_degree > 1:
+            if config.tensor_parallel_degree > 2:
+                raise ValueError(
+                    "ChatGLM2 does not support `tensor_parallel_degree` > 2. Consider using Sharding stage 3"
+                )
             self.dense_h_to_4h = fleet.meta_parallel.ColumnParallelLinear(
                 config.hidden_size, config.ffn_hidden_size * 2, has_bias=self.add_bias, gather_output=False
             )
@@ -690,6 +699,10 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         self.rotary_pos_emb = RotaryEmbedding(rotary_dim // 2)
         self.encoder = GLMTransformer(config)
         if config.tensor_parallel_degree > 1:
+            if config.tensor_parallel_degree > 2:
+                raise ValueError(
+                    "ChatGLM2 does not support `tensor_parallel_degree` > 2. Consider using Sharding stage 3"
+                )
             self.output_layer = fleet.meta_parallel.ColumnParallelLinear(
                 config.hidden_size,
                 config.padded_vocab_size,
@@ -765,6 +778,10 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
         self.max_sequence_length = config.max_sequence_length
         self.chatglm_v2 = ChatGLMv2Model(config)
 
+    def reorder_cache(self, cache: paddle.Tensor, beam_idx):
+        cache = map_structure(lambda x: paddle.index_select(x, beam_idx, axis=1), cache)
+        return cache
+
     def update_model_kwargs_for_generation(
         self,
         outputs: ModelOutput,
@@ -782,7 +799,7 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
             model_kwargs["attention_mask"] = paddle.concat([attention_mask, new_attention_mask], axis=-1)
 
         # update position ids
-        if "position_ids" in model_kwargs:
+        if model_kwargs.get("position_ids", None) is not None:
             position_ids = model_kwargs["position_ids"]
             new_position_id = position_ids[..., -1:].clone()
             new_position_id += 1
@@ -813,6 +830,13 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
             "attention_mask": attention_mask,
             "return_last_logit": True,
             "use_cache": True,
+        }
+
+    def _get_model_inputs_spec(self, dtype: str):
+        return {
+            "input_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            "attention_mask": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            "position_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
         }
 
     def forward(

@@ -299,6 +299,32 @@ def naive_fuse_split_tp(
 
     """
     axis = -1 if is_column else 0
+    if "PySafeSlice" in str(type(weight)):
+        size = weight.get_shape()[axis]
+        block_size = size // (fuse_tensor_parts * tensor_parallel_degree)
+
+        splited = []
+        if tensor_parallel_rank is None:
+            begin, end, step = 0, fuse_tensor_parts * tensor_parallel_degree, 1
+        else:
+            begin, end, step = tensor_parallel_rank, fuse_tensor_parts * tensor_parallel_degree, tensor_parallel_degree
+        for rank in range(begin, end, step):
+            start = rank * block_size
+            stop = (rank + 1) * block_size
+            if axis == 0 or len(weight.get_shape()) == 1:
+                tensor = weight[start:stop]
+            else:
+                tensor = weight[:, start:stop]
+            splited.append(tensor)
+
+        if tensor_parallel_rank is None:
+            ret = []
+            for tensor_parallel_rank in range(tensor_parallel_degree):
+                ret.append(np.concatenate(splited[tensor_parallel_rank::tensor_parallel_degree], axis=axis))
+            return ret
+
+        return np.concatenate(splited, axis=axis)
+
     splited = np.split(weight, fuse_tensor_parts * tensor_parallel_degree, axis=axis)
 
     if tensor_parallel_rank is None:
