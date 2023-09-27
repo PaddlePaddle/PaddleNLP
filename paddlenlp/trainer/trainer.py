@@ -442,6 +442,9 @@ class Trainer:
         """
         resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
 
+        if resume_from_checkpoint is not None and not self.args.old_save_load:
+            self.sharded_ckpt_io.load_sharded_checkpoint(resume_from_checkpoint)
+
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
             resume_from_checkpoint = get_last_checkpoint(self.args.output_dir)

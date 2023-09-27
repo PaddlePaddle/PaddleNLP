@@ -21,14 +21,17 @@ import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
 
+from paddlenlp.trainer.trainer_utils import get_last_checkpoint
 from paddlenlp.transformers.model_utils import _add_variant, get_parameter_dtype
-from paddlenlp.transformers.utils import dtype_byte_size  # , paddlenlp_load
-from paddlenlp.utils.env import PADDLE_WEIGHTS_NAME, SAFE_WEIGHTS_NAME
+from paddlenlp.transformers.utils import dtype_byte_size, get_checkpoint_shard_files
+from paddlenlp.utils.env import (
+    PADDLE_WEIGHTS_INDEX_NAME,
+    PADDLE_WEIGHTS_NAME,
+    SAFE_WEIGHTS_NAME,
+)
 from paddlenlp.utils.log import logger
 
 local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
-
-MODEL_PDPARAMS_INDEX_NAME = "model.pdparams.index.json"
 
 
 class ShardedCkptIO:
@@ -54,20 +57,27 @@ class ShardedCkptIO:
                 state_dict = model_to_save.merge_tensor_parallel_with_shard(
                     state_dict, config_to_save, all_filter_keys
                 )
+                # do we need to change?
                 config_to_save.tensor_parallel_degree = 1
 
             # build index json file
             self.index_file_list = []
+            self.total_size_list = []
             index_weight_file = {}
+            total_size = 0
             weights_name = SAFE_WEIGHTS_NAME if safe_serialization else PADDLE_WEIGHTS_NAME
             weights_name = _add_variant(weights_name, weight_name_suffix)
-            for key in state_dict.keys():
+            for key, weight in state_dict.items():
                 index_weight_file[key] = weights_name
+                total_size += weight.numel() * dtype_byte_size(weight.dtype)
+            total_size = paddle.to_tensor(total_size)
             data_group = self.hcg.get_data_parallel_group()
             if data_group.rank == -1:
                 dist.all_gather_object(self.index_file_list, index_weight_file)
+                dist.all_gather(self.total_size_list, total_size)
             else:
                 dist.all_gather_object(self.index_file_list, index_weight_file, group=data_group)
+                dist.all_gather(self.total_size_list, total_size, group=data_group)
 
         return state_dict, config_to_save
 
@@ -82,7 +92,10 @@ class ShardedCkptIO:
                 final_dict.update(self.index_file_list[i])
             sharded_index_json["weight_map"] = final_dict
 
-            path = os.path.join(output_dir, MODEL_PDPARAMS_INDEX_NAME)
+            self.total_size_list = [i.item() for i in self.total_size_list]
+            sharded_index_json["metadata"] = {"total_size": sum(self.total_size_list)}
+
+            path = os.path.join(output_dir, PADDLE_WEIGHTS_INDEX_NAME)
             with open(path, "w") as f:
                 json.dump(sharded_index_json, f, indent=4)
 
@@ -122,3 +135,26 @@ class ShardedCkptIO:
             filter_tensor_list, src=self.hcg.get_model_parallel_group_src_rank(), group=self.tp_group
         )
         return filter_tensor_list
+
+    def load_sharded_checkpoint(self, resume_from_checkpoint=None):
+        # Load potential model checkpoint
+        if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
+            resume_from_checkpoint = get_last_checkpoint(self.args.output_dir)
+            if resume_from_checkpoint is None:
+                raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
+
+        resolved_archive_file, sharded_metadata = get_checkpoint_shard_files(
+            pretrained_model_name_or_path=resume_from_checkpoint,
+            index_filename=os.path.join(resume_from_checkpoint, PADDLE_WEIGHTS_INDEX_NAME),
+        )
+
+        loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
+
+        print(loaded_state_dict_keys)
+
+        model_state_dict = self.model.state_dict()
+        expected_keys = list(model_state_dict.keys())
+        prefix = self.model.base_model_prefix
+
+        print(expected_keys)
+        print(prefix)
