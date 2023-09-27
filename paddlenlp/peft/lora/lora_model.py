@@ -42,14 +42,26 @@ from .lora_layers import (
 )
 
 try:
-    from ...utils.quantization import QuantizationLinear
-    from .lora_quant_layers import QuantizationLoRALinear
+    from ...utils.quantization import (
+        ColumnParallelQuantizationLinear,
+        QuantizationLinear,
+        RowParallelQuantizationLinear,
+    )
+    from .lora_quantization_layers import (
+        ColumnParallelQuantizationLoRALinear,
+        QuantizationLoRALinear,
+        RowParallelQuantizationLoRALinear,
+    )
 except:
     logger.warning(
         "Quantization strategy is available for PaddlePaddle >= 2.5.2. Please update your PaddlePaddle version for applying quantization strategy. "
     )
     QuantizationLinear = None
+    ColumnParallelQuantizationLinear = None
+    RowParallelQuantizationLinear = None
     QuantizationLoRALinear = None
+    ColumnParallelQuantizationLoRALinear = None
+    RowParallelQuantizationLoRALinear = None
 
 
 class LoRAModel(nn.Layer):
@@ -77,6 +89,7 @@ class LoRAModel(nn.Layer):
                 f"Reset tensor_parallel_degree of lora_config to {self.model.config.tensor_parallel_degree}."
             )
         self.forward = self.model.forward
+        self.quantized = False
 
     def add_lora_split_mapping(self, module_name, is_column=False):
         self.lora_split_mapping[module_name] = is_column
@@ -198,6 +211,12 @@ class LoRAModel(nn.Layer):
         return lora_state_dict
 
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = True, **kwargs):
+        if self.quantized:
+            merge_tensor_parallel = False
+            logger.warning(
+                "Quantized strategy does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
+            )
+
         variant = kwargs.get("variant", None)
         is_main_process = kwargs.get("is_main_process", paddle.distributed.get_rank() == 0)
 
@@ -293,6 +312,40 @@ class LoRAModel(nn.Layer):
                     lora_alpha=lora_config.lora_alpha,
                     lora_dropout=lora_config.lora_dropout,
                 )
+                self.quantized = True
+            elif ColumnParallelQuantizationLinear is not None and isinstance(module, ColumnParallelQuantizationLinear):
+                # recover the original output_features
+                lora_module = ColumnParallelQuantizationLoRALinear(
+                    in_features=module.in_features,
+                    out_features=module.out_features,
+                    quant_algo=module.quant_algo,
+                    dtype=module._dtype,
+                    bias_attr=False if module.bias is None else None,
+                    gather_output=module.gather_output,
+                    r=lora_config.r,
+                    lora_alpha=lora_config.lora_alpha,
+                    lora_dropout=lora_config.lora_dropout,
+                    lora_A_weight_attr=paddle.ParamAttr(
+                        initializer=nn.initializer.KaimingUniform(
+                            negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
+                        )
+                    ),
+                )
+                self.quantized = True
+            elif RowParallelQuantizationLinear is not None and isinstance(module, RowParallelQuantizationLinear):
+                # recover the original output_features
+                lora_module = RowParallelQuantizationLoRALinear(
+                    in_features=module.in_features,
+                    out_features=module.out_features,
+                    quant_algo=module.quant_algo,
+                    dtype=module._dtype,
+                    bias_attr=False if module.bias is None else None,
+                    input_is_parallel=module.input_is_parallel,
+                    r=lora_config.r,
+                    lora_alpha=lora_config.lora_alpha,
+                    lora_dropout=lora_config.lora_dropout,
+                )
+                self.quantized = True
         else:
             if isinstance(module, nn.Linear):
                 lora_module = LoRAMergedLinear(
@@ -379,7 +432,15 @@ class LoRAModel(nn.Layer):
                 or isinstance(layer, RowParallelLoRALinear)
                 or isinstance(layer, LoRAMergedLinear)
                 or isinstance(layer, ColumnParallelLoRAMergedLinear)
-                or (QuantizationLinear is not None and isinstance(layer, QuantizationLinear))
+                or (QuantizationLoRALinear is not None and isinstance(layer, QuantizationLoRALinear))
+                or (
+                    ColumnParallelQuantizationLoRALinear is not None
+                    and isinstance(layer, ColumnParallelQuantizationLoRALinear)
+                )
+                or (
+                    RowParallelQuantizationLoRALinear is not None
+                    and isinstance(layer, RowParallelQuantizationLoRALinear)
+                )
             ):
                 for name, weight in layer.state_dict().items():
                     if self.lora_config.trainable_bias in ["lora", "all"] and "bias" in name:
@@ -459,6 +520,14 @@ class LoRAModel(nn.Layer):
                 or isinstance(layer, ColumnParallelLoRAMergedLinear)
                 or isinstance(layer, RowParallelLoRALinear)
                 or (QuantizationLoRALinear is not None and isinstance(layer, QuantizationLoRALinear))
+                or (
+                    ColumnParallelQuantizationLoRALinear is not None
+                    and isinstance(layer, ColumnParallelQuantizationLoRALinear)
+                )
+                or (
+                    RowParallelQuantizationLoRALinear is not None
+                    and isinstance(layer, RowParallelQuantizationLoRALinear)
+                )
             ):
                 raise NotImplementedError(f"{layer} restoration is not supported yet.")
         return self.model
