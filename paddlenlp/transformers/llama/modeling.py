@@ -1343,6 +1343,9 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
             # skip ignore_index which loss == 0
             masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
+            if masked_lm_loss.numel() == 0
+                return prediction_scores.sum() * 0
+            
             loss = paddle.mean(masked_lm_loss)
 
         return loss
