@@ -98,11 +98,10 @@ class GPTEmbeddingPipe(GPTEmbeddings):
 class GPTDecoderLayerPipe(GPTDecoderLayer):
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
-        # hidden_states = super().forward(hidden_states, tgt_mask=attention_mask)
         if self.enable_recompute and self.config.recompute_granularity == "full":
             hidden_states = recompute(super().forward, hidden_states, attention_mask)
         else:
-            hidden_states = super().forward(hidden_states, tgt_mask=attention_mask)
+            hidden_states = super().forward(hidden_states, attention_mask)
 
         return return_args(hidden_states, attention_mask, position_ids)
 
@@ -114,7 +113,7 @@ class LayerNormPipe(nn.LayerNorm):
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
         hidden_states = super().forward(hidden_states)
-        return return_args(hidden_states, attention_mask, position_ids)
+        return hidden_states
 
 
 class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
