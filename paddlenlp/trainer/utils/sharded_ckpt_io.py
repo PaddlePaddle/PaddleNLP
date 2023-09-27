@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import copy
+import gc
 import json
 import os
 
@@ -20,9 +21,15 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
+from tqdm.auto import tqdm
 
 from paddlenlp.trainer.trainer_utils import get_last_checkpoint
-from paddlenlp.transformers.model_utils import _add_variant, get_parameter_dtype
+from paddlenlp.transformers.model_utils import (
+    _add_variant,
+    _load_state_dict_into_model,
+    get_parameter_dtype,
+    load_state_dict,
+)
 from paddlenlp.transformers.utils import dtype_byte_size, get_checkpoint_shard_files
 from paddlenlp.utils.env import (
     PADDLE_WEIGHTS_INDEX_NAME,
@@ -148,13 +155,56 @@ class ShardedCkptIO:
             index_filename=os.path.join(resume_from_checkpoint, PADDLE_WEIGHTS_INDEX_NAME),
         )
 
-        loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
-
-        print(loaded_state_dict_keys)
-
+        loaded_keys = sharded_metadata["all_checkpoint_keys"]
         model_state_dict = self.model.state_dict()
         expected_keys = list(model_state_dict.keys())
-        prefix = self.model.base_model_prefix
 
-        print(expected_keys)
-        print(prefix)
+        def _remove_unused_keys(
+            state_dict,
+            model_state_dict,
+        ):
+            unused_keys = set(state_dict.keys()) - set(model_state_dict.keys())
+            for unused_key in unused_keys:
+                del state_dict[unused_key]
+            return unused_keys
+
+        # This should always be a list but, just to be sure.
+        if not isinstance(resolved_archive_file, list):
+            resolved_archive_file = [resolved_archive_file]
+
+        error_msgs = []
+
+        if len(resolved_archive_file) > 1:
+            resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
+
+        for shard_file in resolved_archive_file:
+            pre_tensor_parallel_split = False
+            if shard_file.endswith(".safetensors") and self.model.config.tensor_parallel_degree > 1:
+                pre_tensor_parallel_split = True
+                assert loaded_keys is not None, "loaded_keys is not None."
+                tp_actions = self.model.get_tensor_parallel_convert_actions(self.model.config, loaded_keys)
+            # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
+            state_dict = load_state_dict(
+                shard_file, tp_actions if pre_tensor_parallel_split else None, set(expected_keys)
+            )
+
+            _ = _remove_unused_keys(state_dict, model_state_dict)
+            if self.model.config.tensor_parallel_degree > 1 and not pre_tensor_parallel_split:
+                logger.info("Converting state_dict to Tensor Parallel Format")
+                # ignore error for multi shard, since only parts of data
+                state_dict = self.model.convert_tensor_parallel(
+                    None, self.model.config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
+                )
+            error_msgs += _load_state_dict_into_model(self.model, state_dict, "")
+
+            # force memory release
+            del state_dict
+            gc.collect()
+
+        if len(error_msgs) > 0:
+            error_msg = "\n\t".join(error_msgs)
+            if " but the expected shape is" in error_msg:
+                error_msg += (
+                    "\n\tYou may consider adding `ignore_mismatched_sizes=True` in the model `from_pretrained` method."
+                )
+            raise RuntimeError(f"Error(s) in loading state_dict for {self.model.__class__.__name__}:\n\t{error_msg}")
