@@ -14,10 +14,13 @@
 
 
 param="model_name_or_path=llama "
+param="model_item=llama-7b "
 param+="run_mode=MP1-mbs2 "
 param+="batch_size=2 "
 param+="device_num=N1C1 "
+param+="dtype=fp16 "
 
+bash ./test_tipc/llm/prepare.sh
 
 bash -c "${param} bash ./test_tipc/llm/run_ce.sh"
 

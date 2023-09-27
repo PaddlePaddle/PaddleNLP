@@ -12,14 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+sed -i -e "s/paddlepaddle/#paddlepaddle/g" ../requirements-dev.txt
+make install
 
-param="model_name_or_path=llama "
-param="model_item=llama-7b "
-param+="run_mode=MP1-mbs2 "
-param+="batch_size=2 "
-param+="device_num=N1C1 "
-param+="dtype=fp16 "
-
-
-bash -c "${param} bash ./test_tipc/llm/run_ce.sh"
-
+cd ../csrc
+pip install -r requirements.txt
+python setup_cuda.py install

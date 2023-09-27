@@ -22,7 +22,7 @@ function _set_params(){
     device_num=${device_num:-"N1C1"}
     batch_size=${batch_size:-2}
     model_item=${model_item:-"llama-7b"}
-    base_batch_size=${global_batch_size}
+    base_batch_size=${batch_size}
     dtype=${dtype:-"fp16"}
 
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递
@@ -33,9 +33,9 @@ function _set_params(){
 
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
 
-    fp_item=dtype
+    fp_item=${dtype}
     # 以下为通用执行命令，无特殊可不用修改
-    model_name=CE_${model_item}_bs${batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
+    model_name=${model_item}_bs${batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
     arr=(${device})
     num_gpu_devices=${#arr[*]}
@@ -68,10 +68,11 @@ function _train(){
     echo "current CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}, model_name=${model_name}, device_num=${device_num}, is profiling=${profiling}"
 
     use_pure_fp16=False
+    export MODEL_NAME=${model_name_or_path}
     # 以下为通用执行命令，无特殊可不用修改
     case ${device_num} in
     N1C1) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
-        train_cmd="MODEL_NAME=${model_name_or_path} python -m pytest -s -v test_tipc/llm/test_predictor.py"
+        train_cmd="python -m pytest -s -v test_tipc/llm/test_predictor.py"
         workerlog_id=0
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
