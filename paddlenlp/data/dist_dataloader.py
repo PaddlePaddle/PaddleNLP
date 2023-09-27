@@ -152,7 +152,7 @@ class DistDataLoader(paddle.io.DataLoader):
         # broadcast data keys size
         data_keys_size = paddle.to_tensor(data_keys_size)
         if self._data_keys_size is None:
-            if self.mp_group is not None and self.pp_rank == 0:
+            if self.mp_group.rank > -1 and self.pp_rank == 0:
                 paddle.distributed.broadcast(data_keys_size, src=self.mp_src_rank, group=self.mp_group)
             if self._pp_data_group is not None:
                 paddle.distributed.broadcast(
