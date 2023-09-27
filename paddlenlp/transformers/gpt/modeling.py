@@ -59,7 +59,6 @@ except:
 __all__ = [
     "GPTModel",
     "GPTPretrainedModel",
-    "GPTForPretraining",
     "GPTPretrainingCriterion",
     "GPTForGreedyGeneration",
     "GPTLMHeadModel",
@@ -69,10 +68,6 @@ __all__ = [
     "GPTEmbeddings",
     "GPTDecoderLayer",
 ]
-
-
-def print(*args, **kwargs):
-    pass
 
 
 def get_triangle_upper_mask(x, mask=None):
@@ -272,15 +267,12 @@ class MultiHeadAttention(nn.Layer):
         q = tensor.transpose(x=q, perm=perm)
         k = tensor.transpose(x=k, perm=perm)
         v = tensor.transpose(x=v, perm=perm)
-        print("core attn", q.shape, k.shape, v.shape)
         # scale dot product attention
         scale_qk_coeff = self.config.scale_qk_coeff * self.head_dim**0.5
         product = paddle.matmul(x=q.scale(1.0 / scale_qk_coeff), y=k, transpose_y=True)
 
         if self.config.scale_qk_coeff != 1.0:
             product = product.scale(self.config.scale_qk_coeff)
-
-        print("product", product.shape, product.astype("float32").abs().sum().item())
 
         # softmax_mask_fuse_upper_triangle is not supported sif paddle is not compiled with cuda/rocm
         if not paddle.is_compiled_with_cuda():
@@ -322,8 +314,6 @@ class MultiHeadAttention(nn.Layer):
             # [bs, seq_len, num_head, head_dim]
             q, k, v, past_key_value = self._prepare_qkv(query, key, value, use_cache, past_key_value)
 
-        print("query", q.shape, q.astype("float32").abs().sum().item())
-
         if self.config.use_flash_attention:
             # Flash Attention now ignore attention mask
             # Current Flash Attention doesn't support attn maskt
@@ -342,11 +332,9 @@ class MultiHeadAttention(nn.Layer):
         else:
             out = outputs
 
-        print("before out_j", out.shape, out.astype("float32").abs().sum().item())
         # project to output
         out = self.out_proj(out)
 
-        print("after out_j", out.shape, out.astype("float32").abs().sum().item())
         outs = [out]
         if output_attentions:
             outs.append(weights)
@@ -429,7 +417,6 @@ class TransformerDecoder(nn.Layer):
                     output_attentions,
                 )
             else:
-                print(mod)
                 outputs = mod(
                     output,
                     attention_mask=attention_mask,
@@ -528,7 +515,6 @@ class GPTDecoderLayer(nn.Layer):
 
         if self.config.normalize_before:
             hidden_states = self.norm1(hidden_states)
-        print("hidden_states", hidden_states.shape, hidden_states.astype("float32").abs().sum().item())
         # self.self_attn(...) --> hidden_states, weights, (past_key_value)
         if use_cache is False:
             has_gradient = not hidden_states.stop_gradient
@@ -1032,7 +1018,6 @@ class GPTModel(GPTPretrainedModel):
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 
-        print("embedding_output", embedding_output.shape, embedding_output.astype("float32").abs().sum().item())
         outputs = self.decoder(
             embedding_output,
             attention_mask=attention_mask,
@@ -1052,98 +1037,6 @@ class GPTModel(GPTPretrainedModel):
                 outputs = outputs[:idx] + (all_hidden_states) + outputs[idx + 1 :]
 
         return outputs
-
-
-class GPTForPretraining(GPTPretrainedModel):
-    """
-    GPT Model with pretraining tasks on top.
-
-    Args:
-        gpt (:class:`GPTModel`):
-            An instance of :class:`GPTModel`.
-
-    """
-
-    def __init__(self, config: GPTConfig):
-        super(GPTForPretraining, self).__init__(config)
-        self.gpt = GPTModel(config)
-        self.lm_head = GPTLMHead(config)
-        self.tie_weights()
-
-    def get_output_embeddings(self):
-        return self.lm_head
-
-    def forward(
-        self,
-        input_ids,
-        position_ids=None,
-        attention_mask=None,
-        masked_positions=None,
-        use_cache=False,
-        cache=None,
-        labels=None,
-        loss_mask=None,
-    ):
-        r"""
-
-        Args:
-            input_ids (Tensor, optional):
-                See :class:`GPTModel`.
-            position_ids (Tensor, optional):
-                See :class:`GPTModel`.
-            attention_mask (Tensor, optional):
-                See :class:`GPTModel`.
-            use_cache (bool, optional):
-                See :class:`GPTModel`.
-            cache (Tensor, optional):
-                See :class:`GPTModel`.
-
-        Returns:
-            Tensor or tuple: Returns tensor `logits` or tuple `(logits, cached_kvs)`. If `use_cache` is True,
-            tuple (`logits, cached_kvs`) will be returned. Otherwise, tensor `logits` will be returned.
-            `logits` is the output of the gpt model.
-            `cache_kvs` is the cache output of gpt model if `use_cache` is True.
-
-        Example:
-            .. code-block::
-
-                import paddle
-                from paddlenlp.transformers import GPTForPretraining, GPTTokenizer
-
-                tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
-                model = GPTForPretraining.from_pretrained('gpt2-medium-en')
-
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                output = model(**inputs,use_cache=True)
-
-                logits = output[0]
-                cached_kvs = output[1]
-
-        """
-
-        outputs = self.gpt(
-            input_ids, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
-        )
-        if use_cache:
-            encoder_outputs, cached_kvs = outputs[:2]
-        else:
-            encoder_outputs = outputs
-        logits = self.lm_head(encoder_outputs)
-
-        if labels is None:
-            if use_cache:
-                return logits, cached_kvs
-            else:
-                return logits
-        else:
-            loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
-            masked_lm_loss = loss_func(logits, labels.unsqueeze(2))
-
-            loss_mask = loss_mask.reshape([-1])
-            masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
-            loss = masked_lm_loss / loss_mask.sum()
-            return loss, logits
 
 
 class GPTPretrainingCriterion(paddle.nn.Layer):
@@ -1288,7 +1181,7 @@ class GPTLMHead(nn.Layer):
     def __init__(self, config: GPTConfig, embedding_weights=None):
         super(GPTLMHead, self).__init__()
         self.config = config
-        self.transpose_y = False
+        self.transpose_y = True
 
         if embedding_weights is not None:
             self.transpose_y = True
@@ -1300,13 +1193,13 @@ class GPTLMHead(nn.Layer):
                 vocab_size = config.vocab_size
 
             self.weight = self.create_parameter(
-                shape=[config.hidden_size, vocab_size],
+                shape=[vocab_size, config.hidden_size],
                 dtype=paddle.get_default_dtype(),
             )
             # Must set distributed attr for Tensor Parallel !
             self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
             if self.weight.is_distributed:
-                self.weight.split_axis = 1
+                self.weight.split_axis = 0
 
     def forward(self, hidden_states, tensor_parallel_output=None):
         if tensor_parallel_output is None:
@@ -1408,7 +1301,6 @@ class GPTForCausalLM(GPTPretrainedModel):
             hidden_states = outputs[0]
 
         logits = self.lm_head(hidden_states)
-        print("logits", logits.shape, logits.astype("float32").abs().sum().item())
 
         loss = None
         if labels is not None:
@@ -1427,7 +1319,6 @@ class GPTForCausalLM(GPTPretrainedModel):
 
             outputs = (logits,) + outputs[1:]
             return ((loss,) + outputs) if loss is not None else outputs
-        print("logits", logits.shape, logits.astype("float32").abs().sum().item())
         return CausalLMOutputWithCrossAttentions(
             loss=loss,
             logits=logits,
