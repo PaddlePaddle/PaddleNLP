@@ -31,7 +31,7 @@ function _set_params(){
     skip_steps=0                  # (必选)解析日志，跳过模型前几个性能不稳定的step
     keyword="IPS:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
 
-    convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
+    convergence_key="precision:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
 
     fp_item=${dtype}
     # 以下为通用执行命令，无特殊可不用修改

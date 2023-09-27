@@ -87,7 +87,7 @@ class InfereneTest(unittest.TestCase):
 
         print("full_match", full_match)
         print(full_match / len(static))
-        print("count", count)
+        print("precision:", count)
         print(count / len(static))
 
         self.assertGreater(full_match / len(static), 0.6)
