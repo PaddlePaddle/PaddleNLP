@@ -39,12 +39,12 @@ class Eval_modle:
         Construct the inference model for the predictor.
         """
         self._model = BloomBiEncoderModel.from_pretrained(
+            normalized=True,
             pretrained_model_name_or_path=self.model,
             dtype="bfloat16",
             low_cpu_mem_usage=True,
             use_flash_attention=True,
             sentence_pooling_method="weighted_mean",
-            normalized=True,
         )
         self._model.eval()
 
