@@ -32,7 +32,8 @@ class QuantizationLinear(nn.Layer):
         self, in_features, out_features, quant_algo, dtype, weight_attr=None, scale_attr=None, bias_attr=None, **kwargs
     ):
         super().__init__()
-
+        self.in_features = in_features
+        self.out_features = out_features
         self.quant_algo = quant_algo
         self.quant_dtype = QuantDtypeMapping[self.quant_algo]
         self._dtype = dtype

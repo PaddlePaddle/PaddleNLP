@@ -11,11 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import math
 
 import paddle
 from paddle import nn
 from paddle.nn import functional as F
 from paddle.nn.quant.format import ConvertibleQuantedLayer
+
+from ...utils.quantization import QuantizationLinear
 
 
 class QuantedLoRALinear(ConvertibleQuantedLayer):
@@ -91,3 +94,53 @@ class QuantedLoRALinear(ConvertibleQuantedLayer):
 
     def activation_quanters(self):
         return ["activation_quanter"]
+
+
+class QuantizationLoRALinear(QuantizationLinear):
+    def __init__(
+        self,
+        in_features,
+        out_features,
+        quant_algo,
+        dtype,
+        weight_attr=None,
+        scale_attr=None,
+        bias_attr=None,
+        r: int = 0,
+        lora_alpha: int = 1,
+        lora_dropout: float = 0.0,
+    ):
+        QuantizationLinear.__init__(
+            self, in_features, out_features, quant_algo, dtype, weight_attr, scale_attr, bias_attr
+        )
+        if not isinstance(r, int) or r <= 0:
+            raise ValueError("Lora rank r should be a positive integer")
+        if self.quant_algo == "llm.int8":
+            raise NotImplementedError("llm.int8 not yet support lora strategy.")
+        self.r = r
+        self.lora_alpha = lora_alpha
+        # Optional dropout
+        if lora_dropout > 0.0:
+            self.lora_dropout = nn.Dropout(p=lora_dropout)
+        else:
+            self.lora_dropout = lambda x: x
+
+        # Actual trainable parameters
+        self.lora_A = self.create_parameter(
+            shape=[in_features, r],
+            dtype=self._dtype,
+            is_bias=False,
+            default_initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu"),
+        )
+        self.lora_B = self.create_parameter(
+            shape=[r, out_features],
+            dtype=self._dtype,
+            is_bias=False,
+            default_initializer=nn.initializer.Constant(value=0.0),
+        )
+        self.scaling = self.lora_alpha / self.r
+
+    def forward(self, x: paddle.Tensor):
+        result = super().forward(x)
+        result += (self.lora_dropout(x) @ self.lora_A @ self.lora_B) * self.scaling
+        return result
