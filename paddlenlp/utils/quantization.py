@@ -118,21 +118,24 @@ class ColumnParallelQuantizationLinear(nn.Layer):
         )
         self.is_mp = self.world_size > 1
         self.gather_output = gather_output
+        self.output_size_per_partition = out_features // self.world_size
 
         # PaddlePaddle dosen't support Int4 data type, one Int8 data represents two Int4 data.
         if self.is_mp and paddle.in_dynamic_mode():
             with get_rng_state_tracker().rng_state():
                 self.quant_weight = self.create_parameter(
-                    shape=[out_features // 2, in_features]
+                    shape=[self.output_size_per_partition // 2, in_features]
                     if self.quant_dtype == "int4"
-                    else [out_features, in_features],
+                    else [self.output_size_per_partition, in_features],
                     attr=weight_attr if weight_attr else paddle.nn.initializer.Constant(value=0),
                     dtype="int8",
                     is_bias=False,
                 )
         else:
             self.quant_weight = self.create_parameter(
-                shape=[out_features // 2, in_features] if self.quant_dtype == "int4" else [out_features, in_features],
+                shape=[self.output_size_per_partition // 2, in_features]
+                if self.quant_dtype == "int4"
+                else [self.output_size_per_partition, in_features],
                 attr=weight_attr if weight_attr else paddle.nn.initializer.Constant(value=0),
                 dtype="int8",
                 is_bias=False,
@@ -143,7 +146,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
             self.quant_weight.split_axis = 0
 
         self.quant_scale = self.create_parameter(
-            shape=[out_features],
+            shape=[self.output_size_per_partition],
             attr=scale_attr,
             dtype="float32",
             is_bias=False,
@@ -156,7 +159,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
             self.bias = None
         else:
             self.bias = self.create_parameter(
-                shape=[out_features],
+                shape=[self.output_size_per_partition],
                 attr=bias_attr if bias_attr else paddle.nn.initializer.Constant(value=0.0),
                 dtype=self._dtype,
                 is_bias=True,
@@ -228,22 +231,25 @@ class RowParallelQuantizationLinear(nn.Layer):
         self.rank = tp._HYBRID_PARALLEL_GROUP.get_model_parallel_rank() if mp_group is None else mp_group.rank
         self.is_mp = self.world_size > 1
         self.input_is_parallel = input_is_parallel
+        self.input_size_per_partition = in_features // self.world_size
 
         # PaddlePaddle dosen't support Int4 data type, one Int8 data represents two Int4 data.
         # paddle.nn.quant.weight_quantize will transpose in_features and out_features.
         if self.is_mp and paddle.in_dynamic_mode():
             with get_rng_state_tracker().rng_state():
                 self.quant_weight = self.create_parameter(
-                    shape=[out_features // 2, in_features]
+                    shape=[out_features // 2, self.input_size_per_partition]
                     if self.quant_dtype == "int4"
-                    else [out_features, in_features],
+                    else [out_features, self.input_size_per_partition],
                     attr=weight_attr if weight_attr else paddle.nn.initializer.Constant(value=0),
                     dtype="int8",
                     is_bias=False,
                 )
         else:
             self.quant_weight = self.create_parameter(
-                shape=[out_features // 2, in_features] if self.quant_dtype == "int4" else [out_features, in_features],
+                shape=[out_features // 2, self.input_size_per_partition]
+                if self.quant_dtype == "int4"
+                else [out_features, self.input_size_per_partition],
                 attr=weight_attr if weight_attr else paddle.nn.initializer.Constant(value=0),
                 dtype="int8",
                 is_bias=False,
@@ -333,7 +339,7 @@ def replace_with_quantization_linear(model, quant_algo, name_prefix="", **kwargs
                 bias_attr = None
             model._sub_layers[name] = ColumnParallelQuantizationLinear(
                 child.weight.shape[0],
-                child.weight.shape[1],
+                child.weight.shape[1] * child.world_size,
                 quant_algo,
                 child._dtype,
                 bias_attr=bias_attr,
@@ -348,7 +354,7 @@ def replace_with_quantization_linear(model, quant_algo, name_prefix="", **kwargs
             else:
                 bias_attr = None
             model._sub_layers[name] = RowParallelQuantizationLinear(
-                child.weight.shape[0],
+                child.weight.shape[0] * child.world_size,
                 child.weight.shape[1],
                 quant_algo,
                 child._dtype,
