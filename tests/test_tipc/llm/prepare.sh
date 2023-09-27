@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-sed -i -e "s/paddlepaddle/#paddlepaddle/g" ../requirements-dev.txt
+cd ..
+sed -i -e "s/paddlepaddle/#paddlepaddle/g" requirements-dev.txt
+
 make install
 
-cd ../csrc
+cd ./csrc
 pip install -r requirements.txt
 python setup_cuda.py install
