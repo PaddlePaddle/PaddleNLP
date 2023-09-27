@@ -32,7 +32,6 @@ from ...transformers.model_utils import PretrainedModel, _add_variant, dtype_gua
 from ...utils.distributed import distributed_gather
 from ...utils.env import LORA_WEIGHTS_NAME
 from ...utils.log import logger
-from ...utils.quantization import QuantizationLinear
 from .lora_config import LoRAConfig
 from .lora_layers import (
     ColumnParallelLoRALinear,
@@ -41,17 +40,26 @@ from .lora_layers import (
     LoRAMergedLinear,
     RowParallelLoRALinear,
 )
-from .lora_quant_layers import QuantizationLoRALinear
+
+try:
+    from ...utils.quantization import QuantizationLinear
+    from .lora_quant_layers import QuantizationLoRALinear
+except:
+    logger.warning(
+        "Quantization strategy is available for PaddlePaddle >= 2.5.2. Please update your PaddlePaddle version for applying quantization strategy. "
+    )
+    QuantizationLinear = None
+    QuantizationLoRALinear = None
 
 
 class LoRAModel(nn.Layer):
     restore_layer_map: Dict[nn.Layer, nn.Layer] = {
         LoRALinear: nn.Linear,
         LoRAMergedLinear: nn.Linear,
-        ColumnParallelLoRALinear: ColumnParallelLinear,
-        ColumnParallelLoRAMergedLinear: ColumnParallelLinear,
-        RowParallelLoRALinear: RowParallelLinear,
-        QuantizationLoRALinear: QuantizationLinear,
+        # ColumnParallelLoRALinear: ColumnParallelLinear,
+        # ColumnParallelLoRAMergedLinear: ColumnParallelLinear,
+        # RowParallelLoRALinear: RowParallelLinear,
+        # QuantizationLoRALinear: QuantizationLinear,
     }
 
     def __init__(self, model, lora_config: LoRAConfig) -> None:
@@ -272,7 +280,7 @@ class LoRAModel(nn.Layer):
                 )
                 # Lora column parallel will spilt lora A matrix
                 self.add_lora_split_mapping(module_name + ".lora_A", is_column=False)
-            elif isinstance(module, QuantizationLinear):
+            elif QuantizationLinear is not None and isinstance(module, QuantizationLinear):
                 # recover the original output_features
                 lora_module = QuantizationLoRALinear(
                     in_features=module.in_features,
@@ -370,7 +378,7 @@ class LoRAModel(nn.Layer):
                 or isinstance(layer, RowParallelLoRALinear)
                 or isinstance(layer, LoRAMergedLinear)
                 or isinstance(layer, ColumnParallelLoRAMergedLinear)
-                or isinstance(layer, QuantizationLinear)
+                or (QuantizationLinear is not None and isinstance(layer, QuantizationLinear))
             ):
                 for name, weight in layer.state_dict().items():
                     if self.lora_config.trainable_bias in ["lora", "all"] and "bias" in name:
@@ -449,7 +457,7 @@ class LoRAModel(nn.Layer):
                 isinstance(layer, ColumnParallelLoRALinear)
                 or isinstance(layer, ColumnParallelLoRAMergedLinear)
                 or isinstance(layer, RowParallelLoRALinear)
-                or isinstance(layer, QuantizationLoRALinear)
+                or (QuantizationLoRALinear is not None and isinstance(layer, QuantizationLoRALinear))
             ):
                 raise NotImplementedError(f"{layer} restoration is not supported yet.")
         return self.model
