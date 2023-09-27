@@ -369,7 +369,7 @@ class FusedMultiTransformer(Layer):
                     ffn1_weight_shape[0] //= 2
 
                 ffn1_weight_scale = self.create_parameter(
-                    shape=[dim_feedforward * 2],
+                    shape=[dim_feedforward * 2] if activation.endswith("glu") else [dim_feedforward],
                     attr=ffn1_weight_scale_attr,
                     dtype=paddle.float32,
                     is_bias=False,
