@@ -28,7 +28,7 @@ from paddlenlp.transformers import LlamaTokenizer
 
 def is_port_in_use(port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(1)
+        s.settimeout(0.25)
         try:
             s.bind(("0.0.0.0", port))
             return False
