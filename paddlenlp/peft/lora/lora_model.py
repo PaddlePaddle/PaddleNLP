@@ -53,6 +53,7 @@ except:
 
 
 class LoRAModel(nn.Layer):
+    # TODO:lugimzzz support restore in following PR
     restore_layer_map: Dict[nn.Layer, nn.Layer] = {
         LoRALinear: nn.Linear,
         LoRAMergedLinear: nn.Linear,
