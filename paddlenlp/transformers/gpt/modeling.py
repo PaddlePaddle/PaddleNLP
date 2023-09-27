@@ -906,7 +906,6 @@ class GPTModel(GPTPretrainedModel):
         output_attentions=False,
         output_hidden_states=False,
         return_dict=False,
-        **kwargs,
     ):
         r"""
         The GPTModel forward method, overrides the `__call__()` special method.
