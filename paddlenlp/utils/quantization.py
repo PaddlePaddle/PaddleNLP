@@ -86,7 +86,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
     Different from ColumnParallelLinear, this class keeps weight in INT8/INT4 with quant scale, and supports matrix
     multiplication(weight_only_linear/llm_int8_linear) for input tensor(fp16/bf16) and quantized weight(INT8/INT4)
     and bias addition if provided.
-    Notice: quantized weight shape is transposed.
+    Notice: quantized weight shape is transposed of weight shape in ColumnParallelLinear.
     """
 
     def __init__(
@@ -118,29 +118,21 @@ class ColumnParallelQuantizationLinear(nn.Layer):
         )
         self.is_mp = self.world_size > 1
         self.gather_output = gather_output
-        assert (
-            out_features % self.world_size == 0
-        ), "Number of column of the weight for linear ({}) must be" " divisible by model parallel size ({})".format(
-            out_features, self.world_size
-        )
-        self.output_size_per_partition = out_features // self.world_size
 
         # PaddlePaddle dosen't support Int4 data type, one Int8 data represents two Int4 data.
         if self.is_mp and paddle.in_dynamic_mode():
             with get_rng_state_tracker().rng_state():
                 self.quant_weight = self.create_parameter(
-                    shape=[self.output_size_per_partition // 2, in_features]
+                    shape=[out_features // 2, in_features]
                     if self.quant_dtype == "int4"
-                    else [self.output_size_per_partition, in_features],
+                    else [out_features, in_features],
                     attr=weight_attr if weight_attr else paddle.nn.initializer.Constant(value=0),
                     dtype="int8",
                     is_bias=False,
                 )
         else:
             self.quant_weight = self.create_parameter(
-                shape=[self.output_size_per_partition // 2, in_features]
-                if self.quant_dtype == "int4"
-                else [self.output_size_per_partition, in_features],
+                shape=[out_features // 2, in_features] if self.quant_dtype == "int4" else [out_features, in_features],
                 attr=weight_attr if weight_attr else paddle.nn.initializer.Constant(value=0),
                 dtype="int8",
                 is_bias=False,
@@ -151,7 +143,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
             self.quant_weight.split_axis = 0
 
         self.quant_scale = self.create_parameter(
-            shape=[self.output_size_per_partition],
+            shape=[out_features],
             attr=scale_attr,
             dtype="float32",
             is_bias=False,
@@ -164,7 +156,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
             self.bias = None
         else:
             self.bias = self.create_parameter(
-                shape=[self.output_size_per_partition],
+                shape=[out_features],
                 attr=bias_attr if bias_attr else paddle.nn.initializer.Constant(value=0.0),
                 dtype=self._dtype,
                 is_bias=True,
@@ -203,7 +195,7 @@ class RowParallelQuantizationLinear(nn.Layer):
     Different from RowParallelLinear, this class keeps weight in INT8/INT4 with quant scale, and supports matrix
     multiplication(weight_only_linear/llm_int8_linear) for input tensor(fp16/bf16) and quantized weight(INT8/INT4)
     and bias addition if provided.
-    Notice: quantized weight shape is transposed.
+    Notice: quantized weight shape is transposed of weight shape in RowParallelLinear.
     """
 
     def __init__(
@@ -237,30 +229,21 @@ class RowParallelQuantizationLinear(nn.Layer):
         self.is_mp = self.world_size > 1
         self.input_is_parallel = input_is_parallel
 
-        assert (
-            in_features % self.world_size == 0
-        ), "Number of row of the weight for linear ({}) must be" " divisible by model parallel size ({})".format(
-            in_features, self.world_size
-        )
-        self.input_size_per_partition = in_features // self.world_size
-
         # PaddlePaddle dosen't support Int4 data type, one Int8 data represents two Int4 data.
         # paddle.nn.quant.weight_quantize will transpose in_features and out_features.
         if self.is_mp and paddle.in_dynamic_mode():
             with get_rng_state_tracker().rng_state():
                 self.quant_weight = self.create_parameter(
-                    shape=[out_features // 2, self.input_size_per_partition]
+                    shape=[out_features // 2, in_features]
                     if self.quant_dtype == "int4"
-                    else [out_features, self.input_size_per_partition],
+                    else [out_features, in_features],
                     attr=weight_attr if weight_attr else paddle.nn.initializer.Constant(value=0),
                     dtype="int8",
                     is_bias=False,
                 )
         else:
             self.quant_weight = self.create_parameter(
-                shape=[out_features // 2, self.input_size_per_partition]
-                if self.quant_dtype == "int4"
-                else [out_features, self.input_size_per_partition],
+                shape=[out_features // 2, in_features] if self.quant_dtype == "int4" else [out_features, in_features],
                 attr=weight_attr if weight_attr else paddle.nn.initializer.Constant(value=0),
                 dtype="int8",
                 is_bias=False,
