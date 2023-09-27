@@ -104,7 +104,7 @@ class GenerationTesterMixin:
         plus_length=0,
     ):
         process_kwargs = {
-            "min_new_tokens": 1 if max_length is None else max_length - 1,
+            "min_length": 1 if max_length is None else max_length - 1,
             "repetition_penalty": 1.2,
         }
 
@@ -120,7 +120,7 @@ class GenerationTesterMixin:
             )
             + (
                 [
-                    MinLengthLogitsProcessor(process_kwargs["min_new_tokens"] + plus_length, eos_token_id),
+                    MinLengthLogitsProcessor(process_kwargs["min_length"] + plus_length, eos_token_id),
                 ]
                 if eos_token_id is not None
                 else []
@@ -1001,7 +1001,7 @@ class GenerationIntegrationTests:
         bart_model.generate(
             input_ids,
             generation_config=GenerationConfig(
-                decode_strategy="sampling", top_k=1, max_new_tokens=30, max_in_tokens=25
+                decode_strategy="sampling", top_k=1, max_new_tokens=30, min_new_tokens=25
             ),
         )
 
