@@ -452,7 +452,9 @@ class Trainer:
         resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
 
         if resume_from_checkpoint is not None and not self.args.old_save_load:
-            self.sharded_ckpt_io.load_sharded_checkpoint(resume_from_checkpoint)
+            self.sharded_ckpt_io.load_sharded_checkpoint(
+                resume_from_checkpoint, safe_serialization=self.args.safe_ckpt
+            )
             return
 
         # Load potential model checkpoint
@@ -633,7 +635,7 @@ class Trainer:
                 self.model_wrapped = model
             if delay_optimizer_creation:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-            self._load_optimizer_and_scheduler(resume_from_checkpoint)  # 加载优化器逻辑,这部分可以暂时不改动
+            self._load_optimizer_and_scheduler(resume_from_checkpoint)
 
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples:,}")
@@ -1855,7 +1857,6 @@ class Trainer:
 
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
-        # 优化器保存
         if self.args.use_hybrid_parallel:
             if self.dp_group.rank <= 0:
                 os.makedirs(output_dir, exist_ok=True)
@@ -1990,7 +1991,6 @@ class Trainer:
             shutil.rmtree(checkpoint)
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
-        # If we are executing this function, we are the process zero, so we don't check for that. 该注释后续需要改掉
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
         logger.info(f"Saving model checkpoint to {output_dir}")
@@ -2015,7 +2015,9 @@ class Trainer:
                         )
                     else:
                         state_dict, config_to_save = self.sharded_ckpt_io.manipulate_state_dict_and_config(
-                            unwrap_model(self.model), self.args.weight_name_suffix
+                            unwrap_model(self.model),
+                            self.args.weight_name_suffix,
+                            safe_serialization=self.args.safe_ckpt,
                         )
                         weight_name_suffix = self.args.weight_name_suffix
                     unwrap_model(self.model).save_pretrained(
@@ -2023,7 +2025,10 @@ class Trainer:
                         state_dict=state_dict,
                         config_to_save=config_to_save,
                         variant=weight_name_suffix,
-                        is_main_process=self.args.should_save,  # 这块地方应该要修改,should_save
+                        is_main_process=self.args.should_save,
+                        safe_serialization=self.args.safe_ckpt
+                        if not self.args.should_save_sharding_stage1_model
+                        else False,
                     )
                 else:
                     logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
@@ -2046,7 +2051,9 @@ class Trainer:
                         )
                     else:
                         state_dict, config_to_save = self.sharded_ckpt_io.manipulate_state_dict_and_config(
-                            unwrap_model(self.model), self.args.weight_name_suffix
+                            unwrap_model(self.model),
+                            self.args.weight_name_suffix,
+                            safe_serialization=self.args.safe_ckpt,
                         )
                         weight_name_suffix = self.args.weight_name_suffix
                     self.model.save_pretrained(
@@ -2056,6 +2063,9 @@ class Trainer:
                         merge_tensor_parallel=merge_tensor_parallel,
                         variant=weight_name_suffix,
                         is_main_process=self.args.should_save,
+                        safe_serialization=self.args.safe_ckpt
+                        if not self.args.should_save_sharding_stage1_model
+                        else False,
                     )
 
         else:
@@ -2130,7 +2140,7 @@ class Trainer:
             self.sharding_io.save_distributed_model_meta(output_dir)
 
         if not self.args.old_save_load and not self.args.should_save_sharding_stage1_model:
-            self.sharded_ckpt_io.save_sharded_index(output_dir)
+            self.sharded_ckpt_io.save_sharded_index(output_dir, safe_serialization=self.args.safe_ckpt)
 
         if self.args.should_save:
             if self.tokenizer is not None:

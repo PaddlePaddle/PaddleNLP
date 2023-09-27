@@ -697,7 +697,11 @@ class TrainingArguments:
     )
     old_save_load: Optional[bool] = field(
         default=True,
-        metadata={"help": "whether use old save load method or new sharded ckpt method."},
+        metadata={"help": "Whether use old save load method or new sharded ckpt method."},
+    )
+    safe_ckpt: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Whether use safetensors when saving and loading checkpoint."},
     )
 
     def __post_init__(self):

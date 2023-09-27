@@ -34,6 +34,7 @@ from paddlenlp.transformers.utils import dtype_byte_size, get_checkpoint_shard_f
 from paddlenlp.utils.env import (
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
+    SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
 )
 from paddlenlp.utils.log import logger
@@ -42,10 +43,9 @@ local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 
 
 class ShardedCkptIO:
-    def __init__(self, args, model, optimizer=None, hcg=None):
+    def __init__(self, args, model, hcg=None):
         self.args = args
         self.model = model
-        self.optimizer = optimizer
         self.tp_group = None
         self.hcg = hcg
         if self.hcg is None and paddle.distributed.get_world_size() > 1 and self.args.use_hybrid_parallel:
@@ -88,7 +88,7 @@ class ShardedCkptIO:
 
         return state_dict, config_to_save
 
-    def save_sharded_index(self, output_dir):
+    def save_sharded_index(self, output_dir, safe_serialization=False):
         # save index json file
         if local_rank == 0:
             sharded_index_json = {}
@@ -102,7 +102,10 @@ class ShardedCkptIO:
             self.total_size_list = [i.item() for i in self.total_size_list]
             sharded_index_json["metadata"] = {"total_size": sum(self.total_size_list)}
 
-            path = os.path.join(output_dir, PADDLE_WEIGHTS_INDEX_NAME)
+            if not safe_serialization:
+                path = os.path.join(output_dir, PADDLE_WEIGHTS_INDEX_NAME)
+            else:
+                path = os.path.join(output_dir, SAFE_WEIGHTS_INDEX_NAME)
             with open(path, "w") as f:
                 json.dump(sharded_index_json, f, indent=4)
 
@@ -143,16 +146,17 @@ class ShardedCkptIO:
         )
         return filter_tensor_list
 
-    def load_sharded_checkpoint(self, resume_from_checkpoint=None):
+    def load_sharded_checkpoint(self, resume_from_checkpoint=None, safe_serialization=False):
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
             resume_from_checkpoint = get_last_checkpoint(self.args.output_dir)
             if resume_from_checkpoint is None:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
+        index_filename = PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
         resolved_archive_file, sharded_metadata = get_checkpoint_shard_files(
             pretrained_model_name_or_path=resume_from_checkpoint,
-            index_filename=os.path.join(resume_from_checkpoint, PADDLE_WEIGHTS_INDEX_NAME),
+            index_filename=os.path.join(resume_from_checkpoint, index_filename),
         )
 
         loaded_keys = sharded_metadata["all_checkpoint_keys"]
