@@ -52,16 +52,9 @@ class PredictorTest(LLMTest, unittest.TestCase):
         assert len(result_0) == len(result_1)
         count, full_match = 0, 0
         for inference_item, no_inference_item in zip(result_0, result_1):
-            print("inference_item =>", inference_item)
-            print("no_inference_item =>", no_inference_item)
             min_length = min(len(inference_item), len(no_inference_item))
             count += int(inference_item[: min_length // 2] == no_inference_item[: min_length // 2])
             full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
-
-        print("full_match", full_match)
-        print(full_match / len(result_0))
-        print("count", count)
-        print(count / len(result_0))
 
         self.assertGreaterEqual(full_match / len(result_0), 0.25)
         self.assertGreaterEqual(count / len(result_0), 0.4)
@@ -105,17 +98,10 @@ class PredictorPrecacheTest(LLMTest, unittest.TestCase):
         assert len(result_0) == len(result_1)
         count, full_match = 0, 0
         for inference_item, no_inference_item in zip(result_0, result_1):
-            print("inference_item =>", inference_item)
-            print("no_inference_item =>", no_inference_item)
 
             min_length = min(len(inference_item), len(no_inference_item))
             count += int(inference_item[: min_length // 2] == no_inference_item[: min_length // 2])
             full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
-
-        print("full_match", full_match)
-        print(full_match / len(result_0))
-        print("count", count)
-        print(count / len(result_0))
 
         self.assertGreaterEqual(full_match / len(result_0), 0.6)
         self.assertGreaterEqual(count / len(result_0), 0.8)
