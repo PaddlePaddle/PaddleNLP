@@ -438,6 +438,46 @@ class Trainer:
         """
         self.callback_handler.remove_callback(callback)
 
+    def _load_from_peft_checkpoint(self, resume_from_checkpoint=None):
+        """load state_dict from checkpoint, Only for PEFT Model.
+
+        Args:
+            resume_from_checkpoint (`str` or `bool`, *optional*):
+                If a `str`, local path to a saved checkpoint as saved by a previous instance of [`Trainer`]. If a
+                `bool` and equals `True`, load the last checkpoint in *args.output_dir* as saved by a previous instance
+                of [`Trainer`]. Only load model state dict.
+        """
+        tp_merge = True
+        if isinstance(self.model, LoRAModel):
+            weight_name = LORA_WEIGHTS_NAME
+            if self.model.quantized:
+                tp_merge = False
+        elif isinstance(self.model, PrefixModelForCausalLM):
+            weight_name = PREFIX_WEIGHTS_NAME
+
+        if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
+            if tp_merge:
+                weights_file = os.path.join(resume_from_checkpoint, weight_name)
+            else:
+                weights_file = os.path.join(
+                    resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
+                )
+
+            logger.info(f"Loading model from {resume_from_checkpoint} .")
+
+            if os.path.isfile(weights_file):
+                # We load the model state dict on the CPU to avoid an OOM error.
+                state_dict = paddle.load(weights_file, return_numpy=True)
+                if tp_merge:
+                    state_dict = self.model._convert_tensor_parallel(state_dict)
+
+                # If the model is on the GPU, it still works!
+                self._set_state_dict_in_model(state_dict)
+                # release memory
+                del state_dict
+        elif resume_from_checkpoint is not None:
+            logger.info(f"not loading ckpt :{self.args.dataset_rank}")
+
     def _load_from_checkpoint(self, resume_from_checkpoint=None):
         """load state_dict from_checkpoint, Only load model state dict.
 
@@ -455,13 +495,11 @@ class Trainer:
             if resume_from_checkpoint is None:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
-        if isinstance(self.model, LoRAModel):
-            weight_name = LORA_WEIGHTS_NAME
-        elif isinstance(self.model, PrefixModelForCausalLM):
-            weight_name = PREFIX_WEIGHTS_NAME
-        else:
-            weight_name = PADDLE_WEIGHTS_NAME
+        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+            self._load_from_peft_checkpoint(resume_from_checkpoint)
+            return
 
+        weight_name = PADDLE_WEIGHTS_NAME
         weight_index_name = PADDLE_WEIGHTS_INDEX_NAME  # currently set paddle as default, do not support safetensors.
 
         if self.args.should_load_sharding_stage1_model:
@@ -493,11 +531,6 @@ class Trainer:
                 if os.path.isfile(weights_file):
                     # We load the model state dict on the CPU to avoid an OOM error.
                     state_dict = paddle.load(weights_file, return_numpy=True)
-                    if (isinstance(self.model, LoRAModel) and self.model.lora_config.tensor_parallel_degree > 1) or (
-                        isinstance(self.model, PrefixModelForCausalLM)
-                        and self.model.prefix_config.tensor_parallel_degree > 1
-                    ):
-                        state_dict = self.model._convert_tensor_parallel(state_dict)
 
                     # If the model is on the GPU, it still works!
                     self._set_state_dict_in_model(state_dict)
@@ -931,30 +964,23 @@ class Trainer:
             logger.info(
                 f"Loading best model from {self.state.best_model_checkpoint} (score: {self.state.best_metric})."
             )
-            if isinstance(self.model, LoRAModel):
-                best_model_path = os.path.join(self.state.best_model_checkpoint, LORA_WEIGHTS_NAME)
-            elif isinstance(self.model, PrefixModelForCausalLM):
-                best_model_path = os.path.join(self.state.best_model_checkpoint, PREFIX_WEIGHTS_NAME)
+            if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+                self._load_best_model_from_peft_checkpoint()
             else:
                 weight_name = PADDLE_WEIGHTS_NAME
                 best_model_path = os.path.join(
                     self.state.best_model_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
                 )
-            if os.path.exists(best_model_path):
-                # We load the model state dict on the CPU to avoid an OOM error.
-                state_dict = paddle.load(best_model_path, return_numpy=True)
-                if (isinstance(self.model, LoRAModel) and self.model.lora_config.tensor_parallel_degree > 1) or (
-                    isinstance(self.model, PrefixModelForCausalLM)
-                    and self.model.prefix_config.tensor_parallel_degree > 1
-                ):
-                    state_dict = self.model._convert_tensor_parallel(state_dict)
-                # If the model is on the GPU, it still works!
-                self._set_state_dict_in_model(state_dict)
-            else:
-                logger.warning(
-                    f"Could not locate the best model at {best_model_path}, if you are running a distributed training "
-                    "on multiple nodes, you should activate `--save_on_each_node`."
-                )
+                if os.path.exists(best_model_path):
+                    # We load the model state dict on the CPU to avoid an OOM error.
+                    state_dict = paddle.load(best_model_path, return_numpy=True)
+                    # If the model is on the GPU, it still works!
+                    self._set_state_dict_in_model(state_dict)
+                else:
+                    logger.warning(
+                        f"Could not locate the best model at {best_model_path}, if you are running a distributed training "
+                        "on multiple nodes, you should activate `--save_on_each_node`."
+                    )
 
         self._total_loss_scalar += tr_loss.item()
         train_loss = self._total_loss_scalar / self.state.global_step
@@ -972,6 +998,32 @@ class Trainer:
         self.control = self.callback_handler.on_train_end(args, self.state, self.control)
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
+
+    def _load_best_model_from_peft_checkpoint(self):
+        tp_merge = True
+
+        if isinstance(self.model, LoRAModel) and self.model.quantized:
+            best_model_path = os.path.join(
+                self.state.best_model_checkpoint, _add_variant(LORA_WEIGHTS_NAME, self.args.weight_name_suffix)
+            )
+            tp_merge = False
+        elif isinstance(self.model, LoRAModel) and not self.model.quantized:
+            best_model_path = os.path.join(self.state.best_model_checkpoint, LORA_WEIGHTS_NAME)
+        elif isinstance(self.model, PrefixModelForCausalLM):
+            best_model_path = os.path.join(self.state.best_model_checkpoint, PREFIX_WEIGHTS_NAME)
+
+        if os.path.exists(best_model_path):
+            # We load the model state dict on the CPU to avoid an OOM error.
+            state_dict = paddle.load(best_model_path, return_numpy=True)
+            if tp_merge:
+                state_dict = self.model._convert_tensor_parallel(state_dict)
+            # If the model is on the GPU, it still works!
+            self._set_state_dict_in_model(state_dict)
+        else:
+            logger.warning(
+                f"Could not locate the best model at {best_model_path}, if you are running a distributed training "
+                "on multiple nodes, you should activate `--save_on_each_node`."
+            )
 
     def _get_train_sampler(self) -> Optional[paddle.io.Sampler]:
         if self.train_dataset is None or not has_length(self.train_dataset):
@@ -1845,7 +1897,12 @@ class Trainer:
 
         output_dir = os.path.join(run_dir, checkpoint_folder)
 
-        self.save_model(output_dir)
+        if isinstance(self.model, LoRAModel) and self.model.quantized:
+            self.save_model(output_dir)
+        elif isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+            self.save_model(output_dir, True)
+        else:
+            self.save_model(output_dir)
 
         optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
@@ -1997,7 +2054,7 @@ class Trainer:
             self.model.save_pretrained(
                 output_dir,
                 variant=self.args.weight_name_suffix,
-                merge_tensor_parallel=True,
+                merge_tensor_parallel=merge_tensor_parallel,
                 is_main_process=self.args.should_save,
             )
         elif not isinstance(self.model, PretrainedModel):

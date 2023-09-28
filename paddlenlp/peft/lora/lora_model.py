@@ -54,7 +54,7 @@ try:
     )
 except:
     logger.warning(
-        "Quantization strategy is available for PaddlePaddle >= 2.5.2. Please update your PaddlePaddle version for applying quantization strategy. "
+        "Quantization strategy is only available for PaddlePaddle >= 2.5.2. Please update your PaddlePaddle version to apply quantization strategy to LoRA."
     )
     QuantizationLinear = None
     ColumnParallelQuantizationLinear = None
@@ -210,7 +210,7 @@ class LoRAModel(nn.Layer):
             lora_state_dict[name] = action(tensor)
         return lora_state_dict
 
-    def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = True, **kwargs):
+    def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
         if self.quantized and merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
             merge_tensor_parallel = False
             logger.warning(
@@ -301,7 +301,6 @@ class LoRAModel(nn.Layer):
                 # Lora column parallel will spilt lora A matrix
                 self.add_lora_split_mapping(module_name + ".lora_A", is_column=False)
             elif QuantizationLinear is not None and isinstance(module, QuantizationLinear):
-                # recover the original output_features
                 lora_module = QuantizationLoRALinear(
                     in_features=module.in_features,
                     out_features=module.out_features,
@@ -314,7 +313,6 @@ class LoRAModel(nn.Layer):
                 )
                 self.quantized = True
             elif ColumnParallelQuantizationLinear is not None and isinstance(module, ColumnParallelQuantizationLinear):
-                # recover the original output_features
                 lora_module = ColumnParallelQuantizationLoRALinear(
                     in_features=module.in_features,
                     out_features=module.out_features,
@@ -333,7 +331,6 @@ class LoRAModel(nn.Layer):
                 )
                 self.quantized = True
             elif RowParallelQuantizationLinear is not None and isinstance(module, RowParallelQuantizationLinear):
-                # recover the original output_features
                 lora_module = RowParallelQuantizationLoRALinear(
                     in_features=module.in_features,
                     out_features=module.out_features,
@@ -415,11 +412,10 @@ class LoRAModel(nn.Layer):
         freeze_numel = 0
         trainable_numel = 0
         for _, weight in self.model.state_dict().items():
-            weight_size = np.prod(weight.shape) if weight.dtype == paddle.int8 else weight.numel().item()
             if weight.stop_gradient:
-                freeze_numel += weight_size
+                freeze_numel += np.prod(weight.shape)
             else:
-                trainable_numel += weight_size
+                trainable_numel += np.prod(weight.shape)
         logger.info(
             f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel+trainable_numel:.2e}|| Trainable:{trainable_numel / (freeze_numel+trainable_numel):.2%}"
         )
