@@ -445,10 +445,10 @@ class TransformerDecoder(nn.Layer):
                 outputs = self.recompute_training(
                     layer_module=mod,
                     hidden_states=output,
-                    attention_mask = attention_mask,
-                    use_cache = use_cache,
-                    past_key_values = past_key_values[i] if past_key_values is not None else None,
-                    output_attentions = output_attentions,
+                    attention_mask=attention_mask,
+                    use_cache=use_cache,
+                    past_key_values=past_key_values[i] if past_key_values is not None else None,
+                    output_attentions=output_attentions,
                 )
             else:
                 outputs = mod(
@@ -568,7 +568,7 @@ class GPTDecoderLayer(nn.Layer):
             hidden_states = self.self_attn(
                 hidden_states, None, None, attention_mask, use_cache, past_key_value, output_attentions
             )
-        incremental_cache =  hidden_states[-1] if use_cache else None
+        incremental_cache = hidden_states[-1] if use_cache else None
         attention_weights = hidden_states[1] if output_attentions else None
         hidden_states = hidden_states[0] if (use_cache or output_attentions) else hidden_states
 
