@@ -72,14 +72,21 @@ __global__ void RotaryKernel(const T *input,
   int si = blockIdx.z;
   if (sequence_lengths && si >= sequence_lengths[bi] * rotary_emb_dims) return;
   int half_lastdim = last_dim / 2;
+  int rotary_last_dim = last_dim / 4;
+
   // Note(ZhenyuLi): Calculate the relevant data at one time, so that no
   // additional space is required.
   for (int ti = threadIdx.x; ti < half_lastdim; ti += blockDim.x) {
+    
+    if (ti >= half_lastdim / 2) break;
+    
     int base_idx = bi * head_num * seq_len * last_dim +
                    hi * seq_len * last_dim + si * last_dim;
     int left_idx = base_idx + 2 * ti;
     const int right_idx = base_idx + 2 * ti + 1;
-    int emb_idx = bi * seq_len * last_dim + si * last_dim + 2 * ti;
+    
+    int emb_idx = bi * seq_len * rotary_last_dim + si * rotary_last_dim + ti;
+    
     float input_left = static_cast<float>(input[left_idx]);
     float input_right = static_cast<float>(input[right_idx]);
     float cos_tmp = cos_emb[emb_idx];
@@ -109,6 +116,7 @@ void LaunchRotaryQK(const paddle::Tensor& q,
     const int32_t dim_head = q.shape()[3];
 
     auto cu_stream = q.stream();
+    // 卧槽，每个block计算 last_dim 这么多个数字！
     dim3 grid(batch_size, head_num, seq_len * rotary_emb_dims);
     const int last_dim = dim_head / rotary_emb_dims;
     auto getBlockSize = [](int dim) {
@@ -124,9 +132,13 @@ void LaunchRotaryQK(const paddle::Tensor& q,
         return 32;
         }
     };
+    // last_dim / 2 因为要算两个数字啊！
     int BlockSize = getBlockSize(last_dim / 2);
     const float *cos_emb = rotary_emb.data<float>();
-    const float *sin_emb = rotary_emb.data<float>() + batch_size * seq_len * dim_head;
+    // batch_size are always 1!
+    const float *sin_emb = rotary_emb.data<float>() + 1 * seq_len * dim_head / 4;
+
+    // std::cout << "batch_size * seq_len * dim_head" << batch_size * seq_len * dim_head << std::endl;
     
     const DataType_* q_data = reinterpret_cast<const DataType_*>(q.data<data_t>()); 
     const DataType_* k_data = reinterpret_cast<const DataType_*>(kv.data<data_t>()); 
