@@ -208,6 +208,7 @@ def scaled_dot_product_attention(
             attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
         return (attn_output, attn_weights) if output_attentions else attn_output
     else:
+        #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
         query_states = paddle.transpose(query_states, [0, 2, 1, 3])
         # merge with the next tranpose
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
