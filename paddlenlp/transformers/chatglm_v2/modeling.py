@@ -146,119 +146,39 @@ class RMSNorm(nn.Layer):
         # if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
         #     hidden_states = paddle.cast(hidden_states, self.weight.dtype)
         return output
-def generate_qkv(q, k, v, query_padding_mask=None, key_padding_mask=None,kvpacked=False, qkvpacked=False):
-    """
-    Arguments:
-        qkv: (batch_size, seqlen_q, 3, num_heads, head_size)
-        k: (batch_size, seqlen_k, nheads_k, d)
-        v: (batch_size, seqlen_k, nheads_k, d)
-        query_padding_mask: (batch_size, seqlen), bool/int
-        key_padding_mask: (batch_size, seqlen), bool/int
-    """
-    # print("q:", q.shape)
-    # print("k:", k.shape)
-    assert not (kvpacked and qkvpacked)
-    batch_size, seqlen_q, num_heads, head_size = q.shape
-    _, seqlen_k, nheads_k, _ = k.shape
-    assert k.shape == [batch_size, seqlen_k, nheads_k, head_size]
-    assert v.shape == [batch_size, seqlen_k, nheads_k, head_size]
-    if query_padding_mask is not None:
-        q_unpad, indices_q, cu_seqlens_q, max_seqlen_q = unpad_input(q, query_padding_mask)
-        output_pad_fn = lambda output_unpad: pad_input(output_unpad, indices_q, batch_size, seqlen_q, num_heads, head_size)
-    else:
-        q_unpad=q.reshape([q.shape[0]*q.shape[1],q.shape[2],q.shape[3]])
-        cu_seqlens_q=paddle.arange(0,(batch_size+1)*seqlen_q,step=seqlen_q,dtype=paddle.int32)
-        max_seqlen_q=paddle.to_tensor([seqlen_q])
-        output_pad_fn = lambda output_unpad:  output_unpad.reshape([batch_size,-1,output_unpad.shape[1],output_unpad.shape[2]])
-        
-    if key_padding_mask is not None:
-        k_unpad, indices_k, cu_seqlens_k, max_seqlen_k = unpad_input(k, key_padding_mask)
-        v_unpad, _, _, _ = unpad_input(v, key_padding_mask)
-    else:
-        k_unpad = k.reshape([k.shape[0]*k.shape[1],k.shape[2],k.shape[3]])
-        v_unpad = v.reshape([v.shape[0]*v.shape[1],v.shape[2],v.shape[3]])
-        cu_seqlens_k = paddle.arange(0, (batch_size + 1) * seqlen_k, step=seqlen_k, dtype=paddle.int32)
-        max_seqlen_k = paddle.to_tensor([seqlen_k])
 
-    if (not qkvpacked) and (not kvpacked):
-        dq_pad_fn = output_pad_fn
-        if key_padding_mask is not None:
-            dk_pad_fn = lambda dk_unpad: pad_input(dk_unpad, indices_k, batch_size, seqlen_k, num_heads, head_size)
-        return (q_unpad, k_unpad, v_unpad, cu_seqlens_q, cu_seqlens_k, max_seqlen_q, max_seqlen_k, q, k, v, output_pad_fn, None, None)
-
-def unpad_input(hidden_states, attention_mask):
-    """
-    Arguments:
-        hidden_states: (batch, seqlen, ...)
-        attention_mask: (batch, seqlen), bool / int, 1 means valid and 0 means not valid.
-    Return:
-        hidden_states: (total_nnz, ...), where total_nnz = number of tokens in selected in attention_mask.
-        cu_seqlens: (batch + 1), the cumulative sequence lengths, used to index into hidden_states.
-        max_seqlen_in_batch: int
-    """
-    seqlens_in_batch = paddle.sum(attention_mask, axis=-1, dtype="int32")
-    indices = paddle.flatten(paddle.nonzero(paddle.flatten(attention_mask.cast(paddle.int32)), as_tuple=False))
-    max_seqlen_in_batch = seqlens_in_batch.max()
-    cu_seqlens = F.pad(
-        paddle.cumsum(seqlens_in_batch, axis=0, dtype="int32"),
-        (1, 0))
-    
-    hidden_states = paddle.flatten(hidden_states, start_axis = 0, stop_axis = 1)
-    hidden_states_new = []
-    for i in indices:
-        hidden_states_new.append(hidden_states[i:i+1])
-    return (
-            paddle.concat(hidden_states_new), 
-            indices, cu_seqlens, max_seqlen_in_batch
-        )
-
-def pad_input(hidden_states, indices, batch, seqlen, num_heads, head_size):
-    """
-    Arguments:
-        hidden_states: (total_nnz, ...), where total_nnz = number of tokens in selected in attention_mask.
-        indices: (total_nnz)
-    Return:
-        hidden_states: (batch, seqlen, ...)
-    """
-    output = paddle.zeros([batch * seqlen, num_heads, head_size], dtype=hidden_states.dtype)
-    # output[indices] = hidden_states
-    for i in range(indices.size):
-        output[indices[i]] = hidden_states[i]
-    return output.reshape([batch, seqlen, num_heads, head_size])
 def kernel_encoder(query_layer,key_layer,value_layer,num_head,num_head_kv,dim_head,seq_lens,attention_mask):
         #仅定长
 
-        # bs = query_layer.shape[1]
-        # qs = query_layer.shape[0]
-        # kvs = key_layer.shape[0]
-        # cu_q = paddle.arange(0, (bs + 1) * qs, qs, dtype='int32')
-        # cu_kv = paddle.arange(0, (bs + 1) * kvs, kvs, dtype='int32')
+        bs = query_layer.shape[1]
+        qs = query_layer.shape[0]
+        kvs = key_layer.shape[0]
+        cu_q = paddle.arange(0, (bs + 1) * qs, qs, dtype='int32')
+        cu_kv = paddle.arange(0, (bs + 1) * kvs, kvs, dtype='int32')
         query_layer = query_layer.transpose([1, 0, 2, 3])
         key_layer = key_layer.transpose([1, 0, 2, 3])
         value_layer = value_layer.transpose([1, 0, 2, 3])
-        # qq = paddle.reshape(query_layer, [bs * qs, num_head, dim_head])
-        # kk = paddle.reshape(key_layer, [bs * kvs, num_head_kv, dim_head])
-        # vv = paddle.reshape(value_layer, [bs * kvs, num_head_kv, dim_head])
-        (q_unpad, k_unpad, v_unpad, cu_seqlens_q, cu_seqlens_k, max_seqlen_q, max_seqlen_k, q, k, v,
-            output_pad_fn, _, _) = generate_qkv(query_layer,key_layer,value_layer,attention_mask,attention_mask)
+        qq = paddle.reshape(query_layer, [bs * qs, num_head, dim_head])
+        kk = paddle.reshape(key_layer, [bs * kvs, num_head_kv, dim_head])
+        vv = paddle.reshape(value_layer, [bs * kvs, num_head_kv, dim_head])
+        
         
         scale = float(dim_head ** -0.5)
         zero_tensors = False
-        is_causal = False
+        is_causal = True
         #import pdb;pdb.set_trace()
         fmha_out = flash_attn_varlen_fwd(
-            q_unpad,
-            k_unpad, 
-            v_unpad, 
-            cu_seqlens_q,
-            cu_seqlens_k, 
-            max_seqlen_q,
-            max_seqlen_k, 
+            qq,
+            kk, 
+            vv, 
+            cu_q,
+            cu_kv, 
+            paddle.to_tensor([seq_lens]),
+            paddle.to_tensor([seq_lens]), 
             scale, 
             zero_tensors, 
             is_causal)
-        fmha_out = output_pad_fn(fmha_out)
-        #fmha_out = fmha_out.reshape([bs,-1,num_head,dim_head])
+        fmha_out = fmha_out.reshape([bs,-1,num_head,dim_head])
         fmha_out = fmha_out.transpose([1,0,2,3])
         fmha_out =fmha_out.reshape([fmha_out.shape[0],fmha_out.shape[1],fmha_out.shape[2]*fmha_out.shape[3]])
         return fmha_out
@@ -749,7 +669,6 @@ class GLMTransformer(nn.Layer):
         zero = paddle.zeros(attention_mask.shape, dtype=hidden_states.dtype)
         neg_inf = paddle.full_like(attention_mask, paddle.finfo(hidden_states.dtype).min, dtype=hidden_states.dtype)
         attention_mask = paddle.where(attention_mask, zero, neg_inf)
-        import pdb;pdb.set_trace()
         for index in range(self.num_hidden_layers):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
@@ -774,8 +693,7 @@ class GLMTransformer(nn.Layer):
                     use_cache=use_cache,
                     cache_kvs=self.caches[index],
                     cur_seq_len=self.cur_seq_len,
-                    is_first_forward=True,
-                    attention_mask=attention_mask
+                    is_first_forward=True
                 )
 
             if use_cache:
