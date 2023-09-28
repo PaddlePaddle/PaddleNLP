@@ -264,7 +264,7 @@ class AutoTokenizer:
         # Default not to use fast tokenizer
         use_fast = kwargs.pop("use_fast", False)
         cache_dir = kwargs.get("cache_dir", None)
-        subfolder = kwargs.get("subfolder", None)
+        subfolder = kwargs.get("subfolder", "")
         from_aistudio = kwargs.get("from_aistudio", False)
         from_hf_hub = kwargs.get("from_hf_hub", False)
         cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)

@@ -523,8 +523,6 @@ def cached_file(
         cache_dir = str(cache_dir)
 
     if from_aistudio:
-        print(path_or_repo_id, filename)
-        # TODO: support cache_dir for AI Studio download
         try:
             resolved_file = aistudio_download(repo_id=path_or_repo_id, filename=filename)
         except:
