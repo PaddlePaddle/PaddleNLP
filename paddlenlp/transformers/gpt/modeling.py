@@ -350,12 +350,18 @@ class MultiHeadAttention(nn.Layer):
             # Paddle Flash Attention input [batch_size, seq_len, num_heads, head_dim]
             # Torch Flash Attention input (batch_size, seqlen, nheads, headdim)
             bsz, q_len, num_heads, head_dim = q.shape
-            # TODO: Suppot attention mask for flash attention
-            outputs = self._flash_attention(q, k, v, attention_mask=None, output_attentions=output_attentions)
+            # TODO: Support attention mask for flash attention
+            attention_func = self._flash_attention
         else:
             # scale dot product attention
             # [bs, seq_len, num_head,]
-            outputs = self._core_attention(q, k, v, attention_mask=attention_mask, output_attentions=output_attentions)
+            attention_func = self._core_attention
+
+        has_gradient = (not q.stop_gradient) or (not k.stop_gradient) or (not v.stop_gradient)
+        if self.enable_recompute and self.config.recompute_granularity == "core_attn" and has_gradient:
+            outputs = recompute(attention_func, q, k, v, attention_mask, output_attentions, use_reentrant=False)
+        else:
+            outputs = attention_func(q, k, v, attention_mask=attention_mask, output_attentions=output_attentions)
 
         if output_attentions:
             out, weights = outputs
@@ -434,7 +440,6 @@ class TransformerDecoder(nn.Layer):
         layer.
         """
         output = hidden_states
-        new_caches = [] if use_cache else None
         all_self_attentions = () if output_attentions else None
         all_hidden_states = () if output_hidden_states else None
 
@@ -447,7 +452,7 @@ class TransformerDecoder(nn.Layer):
                     hidden_states=output,
                     attention_mask=attention_mask,
                     use_cache=use_cache,
-                    past_key_values=past_key_values[i] if past_key_values is not None else None,
+                    past_key_values=None,
                     output_attentions=output_attentions,
                 )
             else:
@@ -462,7 +467,7 @@ class TransformerDecoder(nn.Layer):
             # outputs = hidden_states if both use_cache and output_attentions are False
             # Otherwise, outputs = (hidden_states, attention if output_attentions, cache if use_cache)
             output = outputs[0] if (use_cache or output_attentions) else outputs
-            new_caches = new_caches + (outputs[-1],) if use_cache else None
+            past_key_values = outputs[-1] if use_cache else None
             all_self_attentions = all_self_attentions + (outputs[1],) if output_attentions else None
             all_hidden_states = all_hidden_states + (output,) if output_hidden_states else None
 
@@ -470,7 +475,7 @@ class TransformerDecoder(nn.Layer):
             output = self.norm(output)
 
         if not return_dict:
-            temp_list = [output, new_caches, all_hidden_states, all_self_attentions]
+            temp_list = [output, past_key_values, all_hidden_states, all_self_attentions]
 
             if not (use_cache or output_attentions or output_hidden_states):
                 return output
@@ -479,7 +484,7 @@ class TransformerDecoder(nn.Layer):
 
         return BaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=output,
-            past_key_values=new_caches,
+            past_key_values=past_key_values,
             hidden_states=all_hidden_states,
             attentions=all_self_attentions,
             cross_attentions=None,
