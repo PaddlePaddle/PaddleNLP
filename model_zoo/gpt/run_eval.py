@@ -14,7 +14,6 @@
 import argparse
 import json
 import math
-import os
 import re
 import time
 
@@ -23,16 +22,16 @@ import paddle
 from paddle.io import DataLoader
 
 from paddlenlp.data import Stack, Tuple
-from paddlenlp.transformers import GPTForPretraining, GPTModel, GPTTokenizer
+from paddlenlp.transformers import GPTForCausalLM, GPTTokenizer
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "gpt": (GPTForPretraining, GPTTokenizer),
+    "gpt": (GPTForCausalLM, GPTTokenizer),
 }
 
 # yapf: disable
 parser = argparse.ArgumentParser()
-parser.add_argument("--model_name", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])), )
+parser.add_argument("--model_name_or_path", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])), )
 parser.add_argument("--eval_path", default=None, type=str, required=True, help="The eval file path.", )
 parser.add_argument('--cloze_eval', action='store_true', help='Evaluation dataset from `--eval_path` is a cloze task.')
 parser.add_argument('--overlapping_eval', type=int, default=32, help='Sliding window for overlapping eval.')
@@ -187,7 +186,7 @@ def create_eval_dataset(args):
     eval_batch_size = args.batch_size
     seq_len = args.seq_length
 
-    tokenizer = GPTTokenizer.from_pretrained(args.model_name)
+    tokenizer = GPTTokenizer.from_pretrained(args.model_name_or_path)
     if not args.cloze_eval:
         with open(args.eval_path, "rb") as reader:
             entire_data = reader.read().decode("utf-8")
@@ -226,15 +225,7 @@ def create_eval_dataset(args):
 def do_eval(args):
     paddle.set_device(args.device)
     model_class, tokenizer_class = MODEL_CLASSES["gpt"]
-
-    if args.init_checkpoint_path is not None:
-        model = GPTForPretraining(GPTModel(**model_class.pretrained_init_configuration[args.model_name]))
-
-        logger.info("Load model checkpoint from %s" % args.init_checkpoint_path)
-        model_dict = paddle.load(os.path.join(args.init_checkpoint_path))
-        model.set_dict(model_dict)
-    else:
-        model = model_class.from_pretrained(args.model_name)
+    model = model_class.from_pretrained(args.model_name_or_path)
 
     tic_eval = time.time()
     eval_data_loader = create_eval_dataset(args)

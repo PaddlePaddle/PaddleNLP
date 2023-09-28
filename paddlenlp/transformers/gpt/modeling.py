@@ -59,7 +59,6 @@ except:
 __all__ = [
     "GPTModel",
     "GPTPretrainedModel",
-    "GPTForPretraining",
     "GPTPretrainingCriterion",
     "GPTForGreedyGeneration",
     "GPTLMHeadModel",
@@ -85,7 +84,7 @@ def get_triangle_upper_mask(x, mask=None):
     return mask
 
 
-def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, tensor_parallel_output=True):
+def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, transpose_y=True, tensor_parallel_output=True):
     is_fleet_init = True
     tensor_parallel_degree = 1
     try:
@@ -98,7 +97,7 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, tensor_parallel_output=T
     if is_fleet_init and tensor_parallel_degree > 1 and y.is_distributed:
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
         input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
-        logits = paddle.matmul(input_parallel, y, transpose_y=True)
+        logits = paddle.matmul(input_parallel, y, transpose_y=transpose_y)
 
         if tensor_parallel_output:
             return logits
@@ -106,7 +105,7 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, tensor_parallel_output=T
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
 
     else:
-        logits = paddle.matmul(x, y, transpose_y=True)
+        logits = paddle.matmul(x, y, transpose_y=transpose_y)
         return logits
 
 
@@ -126,7 +125,6 @@ class MultiHeadAttention(nn.Layer):
     """
 
     Cache = collections.namedtuple("Cache", ["k", "v"])
-    StaticCache = collections.namedtuple("StaticCache", ["k", "v"])
 
     def __init__(
         self,
@@ -148,6 +146,7 @@ class MultiHeadAttention(nn.Layer):
         ), "hidden_size must be divisible by num_attention_heads"
 
         self.num_attention_heads = config.num_attention_heads  # default, without tensor parallel
+
         if config.tensor_parallel_degree > 1:
             assert config.num_attention_heads % config.tensor_parallel_degree == 0
             self.num_attention_heads = config.num_attention_heads // config.tensor_parallel_degree
@@ -202,98 +201,54 @@ class MultiHeadAttention(nn.Layer):
 
             self.out_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
 
-    def _fuse_prepare_qkv(self, query, use_cache=False, cache=None):
+    def _fuse_prepare_qkv(self, query, use_cache=False, past_key_value=None):
         mix_layer = self.qkv_proj(query)
         # bs, seqlen, nhead, headdim
         mix_layer = paddle.reshape_(mix_layer, [0, 0, self.num_attention_heads, 3 * self.head_dim])
         # bs, nhead, seqlen, headdim
-        if not self.config.use_flash_attention:
-            # falsh attn need: [ bz, seqlen, nhead, head_dim]
-            mix_layer = paddle.transpose(mix_layer, [0, 2, 1, 3])
 
-        q, k, v = paddle.split(mix_layer, num_or_sections=3, axis=-1)
+        query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
 
-        assert not isinstance(cache, self.StaticCache), "cache currently does not support the StaticCache type"
+        # [bsz, nh, t, hd]
+        if past_key_value is not None:
+            # reuse k, v, self_attention
+            key_states = paddle.concat([past_key_value[0], key_states], axis=1)
+            value_states = paddle.concat([past_key_value[1], value_states], axis=1)
 
-        if isinstance(cache, self.Cache):
-            # for decoder self-attention in inference
-            k = tensor.concat([cache.k, k], axis=2)
-            v = tensor.concat([cache.v, v], axis=2)
-        if use_cache is True:
-            cache = self.Cache(k, v)
+        past_key_value = (key_states, value_states) if use_cache else None
 
-        return (q, k, v, cache) if use_cache else (q, k, v, None)
+        return query_states, key_states, value_states, past_key_value
 
-    def _prepare_qkv(self, query, key, value, use_cache=False, cache=None):
+    def _prepare_qkv(self, query, key, value, use_cache=False, past_key_value=None):
         r"""
         Prapares linear projected queries, keys and values for usage of subsequnt
         multiple parallel attention. If `cache` is not None, using cached results
         to reduce redundant calculations.
 
         """
-        q = self.q_proj(query)
-        q = tensor.reshape(x=q, shape=[0, 0, self.num_attention_heads, self.head_dim])
-        if not self.config.use_flash_attention:
-            # falsh attn need: [ bz, seqlen, nhead, head_dim]
-            q = tensor.transpose(x=q, perm=[0, 2, 1, 3])
+        query_states = self.q_proj(query)
+        # [bs, seq_len, num_head, head_dim]
+        query_states = tensor.reshape(x=query_states, shape=[0, 0, self.num_attention_heads, self.head_dim])
 
-        if isinstance(cache, self.StaticCache):
-            # for encoder-decoder attention in inference and has cached
-            k, v = cache.k, cache.v
-        else:
-            k, v = self.compute_kv(key, value)
+        key_states = self.k_proj(key)
+        # [bs, seq_len, num_head, head_dim]
+        key_states = tensor.reshape(x=key_states, shape=[0, 0, self.num_attention_heads, self.head_dim])
 
-        if isinstance(cache, self.Cache):
-            # for decoder self-attention in inference
-            k = tensor.concat([cache.k, k], axis=2)
-            v = tensor.concat([cache.v, v], axis=2)
-        if use_cache is True:
-            cache = self.Cache(k, v)
+        value_states = self.v_proj(value)
+        # [bs, seq_len, num_head, head_dim]
+        value_states = tensor.reshape(x=value_states, shape=[0, 0, self.num_attention_heads, self.head_dim])
 
-        return (q, k, v, cache) if use_cache else (q, k, v, None)
+        # [bsz, nh, t, hd]
+        if past_key_value is not None:
+            # reuse k, v, self_attention
+            key_states = paddle.concat([past_key_value[0], key_states], axis=1)
+            value_states = paddle.concat([past_key_value[1], value_states], axis=1)
 
-    def compute_kv(self, key, value):
-        r"""
-        Applies linear projection on input keys and values, then splits heads
-        (reshape and transpose) to get keys and values from different representation
-        subspaces. The results are used as key-values pairs for subsequent multiple
-        parallel attention.
+        past_key_value = (key_states, value_states) if use_cache else None
 
-        It is part of calculations in multi-head attention, and is provided as
-        a method to pre-compute and prefetch these results, thus we can use them
-        to construct cache for inference.
+        return query_states, key_states, value_states, past_key_value
 
-        """
-        k = self.k_proj(key)
-        v = self.v_proj(value)
-        k = tensor.reshape(x=k, shape=[0, 0, self.num_attention_heads, self.head_dim])
-        k = tensor.transpose(x=k, perm=[0, 2, 1, 3])
-        v = tensor.reshape(x=v, shape=[0, 0, self.num_attention_heads, self.head_dim])
-        v = tensor.transpose(x=v, perm=[0, 2, 1, 3])
-        return k, v
-
-    def gen_cache(self, key, value=None, type=Cache):
-        """
-        Generates cache for `forward` usage in inference accroding to arguments.
-        The generated cache is an instance of `MultiHeadAttention.Cache` or an
-        instance of `MultiHeadAttention.StaticCache`.
-        """
-        if type == MultiHeadAttention.StaticCache:  # static_kv
-            k, v = self.compute_kv(key, value)
-            return self.StaticCache(k, v)
-        elif value is None:  # incremental_state
-            k = paddle.full(
-                shape=[key.shape[0], self.num_attention_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0
-            )
-            v = paddle.full(
-                shape=[key.shape[0], self.num_attention_heads, 0, self.head_dim], dtype=key.dtype, fill_value=0
-            )
-            return self.Cache(k, v)
-        else:
-            # incremental_state with initial value, mainly for usage like UniLM
-            return self.Cache(key, value)
-
-    def _flash_attention(self, q, k, v, attn_mask=None, output_attentions=False):
+    def _flash_attention(self, q, k, v, attention_mask=None, output_attentions=False):
         out, weights = flash_attention(
             q,
             k,
@@ -306,12 +261,12 @@ class MultiHeadAttention(nn.Layer):
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
         return (out, weights) if output_attentions else out
 
-    def core_attn(self, q, k, v, attn_mask=None, output_attentions=False):
+    def _core_attention(self, q, k, v, attention_mask=None, output_attentions=False):
+        # [bs, seq_len, num_head, head_dim] -> [bs, num_head, seq_len, head_dim]
         perm = [0, 2, 1, 3]
         q = tensor.transpose(x=q, perm=perm)
         k = tensor.transpose(x=k, perm=perm)
         v = tensor.transpose(x=v, perm=perm)
-
         # scale dot product attention
         scale_qk_coeff = self.config.scale_qk_coeff * self.head_dim**0.5
         product = paddle.matmul(x=q.scale(1.0 / scale_qk_coeff), y=k, transpose_y=True)
@@ -321,10 +276,10 @@ class MultiHeadAttention(nn.Layer):
 
         # softmax_mask_fuse_upper_triangle is not supported sif paddle is not compiled with cuda/rocm
         if not paddle.is_compiled_with_cuda():
-            attn_mask = get_triangle_upper_mask(product, attn_mask)
+            attention_mask = get_triangle_upper_mask(product, attention_mask)
 
-        if attn_mask is not None:
-            product = product + attn_mask
+        if attention_mask is not None:
+            product = product + attention_mask
             weights = F.softmax(product)
         else:
             weights = incubate.softmax_mask_fuse_upper_triangle(product)
@@ -343,7 +298,9 @@ class MultiHeadAttention(nn.Layer):
 
         return (out, weights) if output_attentions else out
 
-    def forward(self, query, key, value, attn_mask=None, use_cache=False, cache=None, output_attentions=False):
+    def forward(
+        self, query, key, value, attention_mask=None, use_cache=False, past_key_value=None, output_attentions=False
+    ):
         r"""
         Applies multi-head attention to map queries and a set of key-value pairs
         to outputs.
@@ -352,9 +309,10 @@ class MultiHeadAttention(nn.Layer):
         value = query if value is None else value
         # compute q ,k ,v
         if self.config.fuse_attention_qkv:
-            q, k, v, cache = self._fuse_prepare_qkv(query, use_cache, cache)
+            q, k, v, past_key_value = self._fuse_prepare_qkv(query, use_cache, past_key_value)
         else:
-            q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
+            # [bs, seq_len, num_head, head_dim]
+            q, k, v, past_key_value = self._prepare_qkv(query, key, value, use_cache, past_key_value)
 
         if self.config.use_flash_attention:
             # Flash Attention now ignore attention mask
@@ -362,32 +320,17 @@ class MultiHeadAttention(nn.Layer):
             # Paddle Flash Attention input [batch_size, seq_len, num_heads, head_dim]
             # Torch Flash Attention input (batch_size, seqlen, nheads, headdim)
             bsz, q_len, num_heads, head_dim = q.shape
-            # Q Shape:  [1, 16, 2048, 64]
-            # bs, nhead, seqlen, head_dim
-            attn_output, weights = flash_attention(
-                q,
-                k,
-                v,
-                causal=q.shape[1] != 1,
-                return_softmax=self.need_weights,
-            )
-            out = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+            # TODO: Suppoty attention mask for flash attention
+            outputs = self._flash_attention(q, k, v, attention_mask=None, output_attentions=output_attentions)
         else:
             # scale dot product attention
-            product = paddle.matmul(x=q * (self.head_dim**-0.5), y=k, transpose_y=True)
+            # [bs, seq_len, num_head,]
+            outputs = self._core_attention(q, k, v, attention_mask=attention_mask, output_attentions=output_attentions)
 
-            if attn_mask is not None:
-                product = product + attn_mask
-
-            weights = F.softmax(product)
-            if self.dropout:
-                weights = F.dropout(weights, self.dropout, training=self.training, mode="upscale_in_train")
-
-            out = tensor.matmul(weights, v)
-
-            # combine heads
-            out = tensor.transpose(out, perm=[0, 2, 1, 3])
-            out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
+        if output_attentions:
+            out, weights = outputs
+        else:
+            out = outputs
 
         # project to output
         out = self.out_proj(out)
@@ -396,7 +339,7 @@ class MultiHeadAttention(nn.Layer):
         if output_attentions:
             outs.append(weights)
         if use_cache:
-            outs.append(cache)
+            outs.append(past_key_value)
         return out if len(outs) == 1 else tuple(outs)
 
 
@@ -415,8 +358,6 @@ class TransformerDecoder(nn.Layer):
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
 
-        self.checkpoints = []
-
     @paddle.jit.not_to_static
     def recompute_training(
         self,
@@ -425,7 +366,6 @@ class TransformerDecoder(nn.Layer):
         past_key_value: paddle.Tensor,
         attention_mask: paddle.Tensor,
         use_cache: bool,
-        cache: paddle.Tensor,
         output_attentions: paddle.Tensor,
     ):
         def create_custom_forward(module):
@@ -437,22 +377,19 @@ class TransformerDecoder(nn.Layer):
         hidden_states = recompute(
             create_custom_forward(layer_module),
             hidden_states,
-            past_key_value,
             attention_mask,
             use_cache,
-            cache,
+            past_key_value,
             use_reentrant=self.config.recompute_use_reentrant,
         )
         return hidden_states
 
     def forward(
         self,
-        tgt,
-        memory,
-        tgt_mask=None,
-        memory_mask=None,
+        hidden_states,
+        attention_mask=None,
         use_cache=False,
-        cache=None,
+        past_key_values=None,
         output_attentions=False,
         output_hidden_states=False,
         return_dict=False,
@@ -462,21 +399,19 @@ class TransformerDecoder(nn.Layer):
         provided, also applies layer normalization on the output of last decoder
         layer.
         """
-        output = tgt
+        output = hidden_states
         new_caches = [] if use_cache else None
-        self.checkpoints = []
         all_self_attentions = () if output_attentions else None
         all_hidden_states = () if output_hidden_states else None
 
         for i, mod in enumerate(self.layers):
             has_gradient = not output.stop_gradient
-            # def forward(self, tgt, memory, tgt_mask=None, use_cache=False, cache=None, output_attentions=False):
+            # def forward(self, hidden_states, attention_mask=None, use_cache=False, past_key_value=None, output_attentions=False):
             if self.enable_recompute and has_gradient:
                 outputs = self.recompute_training(
                     mod,
                     output,
-                    memory,
-                    tgt_mask,
+                    attention_mask,
                     use_cache,
                     None,
                     output_attentions,
@@ -484,10 +419,9 @@ class TransformerDecoder(nn.Layer):
             else:
                 outputs = mod(
                     output,
-                    memory,
-                    tgt_mask=tgt_mask,
+                    attention_mask=attention_mask,
                     use_cache=use_cache,
-                    cache=cache[i] if cache is not None else cache,
+                    past_key_value=past_key_values[i] if past_key_values is not None else None,
                     output_attentions=output_attentions,
                 )
 
@@ -500,7 +434,6 @@ class TransformerDecoder(nn.Layer):
                 new_caches.append(outputs[-1])
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (output,)
-            self.checkpoints.append(output.name)
 
         if self.norm is not None:
             output = self.norm(output)
@@ -521,19 +454,6 @@ class TransformerDecoder(nn.Layer):
             cross_attentions=None,
         )
 
-    def gen_cache(self, memory, do_zip=False):
-        r"""
-        Generates cache for `forward` usage. The generated cache is a list, and
-        each element in it is a tuple( :code:`(incremental_cache, static_cache)` )
-        produced by `GPTDecoderLayer.gen_cache`. See `GPTDecoderLayer.gen_cache`
-        for more details. If `do_zip` is True, apply `zip` on these tuples to get
-        a list with two elements.
-        """
-        cache = [layer.gen_cache(memory) for layer in self.layers]
-        if do_zip:
-            cache = list(zip(*cache))
-        return cache
-
 
 class GPTDecoderLayer(nn.Layer):
     """
@@ -551,10 +471,6 @@ class GPTDecoderLayer(nn.Layer):
 
         if not FusedDropoutAdd:
             config.use_fused_dropout_add = False
-
-        self._config = locals()
-        self._config.pop("self")
-        self._config.pop("__class__", None)  # py3
 
         self.self_attn = MultiHeadAttention(config=config)
 
@@ -592,59 +508,75 @@ class GPTDecoderLayer(nn.Layer):
         else:
             self.activation = getattr(F, config.hidden_activation)
 
-    def forward(self, tgt, memory, tgt_mask=None, use_cache=False, cache=None, output_attentions=False):
-        residual = tgt
+    def forward(
+        self, hidden_states, attention_mask=None, use_cache=False, past_key_value=None, output_attentions=False
+    ):
+        residual = hidden_states
 
         if self.config.normalize_before:
-            tgt = self.norm1(tgt)
-
-        # self.self_attn(...) --> hidden_states, weights, (cache)
+            hidden_states = self.norm1(hidden_states)
+        # self.self_attn(...) --> hidden_states, weights, (past_key_value)
         if use_cache is False:
-            has_gradient = not tgt.stop_gradient
+            has_gradient = not hidden_states.stop_gradient
             if self.enable_recompute and has_gradient and self.config.recompute_granularity == "full_attn":
-                tgt = recompute(
-                    self.self_attn, tgt, None, None, tgt_mask, use_cache, cache, output_attentions, use_reentrant=False
+                hidden_states = recompute(
+                    self.self_attn,
+                    hidden_states,
+                    None,
+                    None,
+                    attention_mask,
+                    use_cache,
+                    past_key_value,
+                    output_attentions,
+                    use_reentrant=False,
                 )
             else:
-                tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache, output_attentions)
+                hidden_states = self.self_attn(
+                    hidden_states, None, None, attention_mask, use_cache, past_key_value, output_attentions
+                )
         else:
-            tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache, output_attentions)
+            hidden_states, incremental_cache = self.self_attn(
+                hidden_states, None, None, attention_mask, use_cache, past_key_value, output_attentions
+            )
+
         if output_attentions:
-            tgt, attention_weights = tgt
+            hidden_states, attention_weights = hidden_states
 
         with seed_guard_context("global_seed"):
             if self.config.use_fused_dropout_add:
-                tgt = self.fused_dropout_add1(tgt, residual)
+                hidden_states = self.fused_dropout_add1(hidden_states, residual)
             else:
-                tgt = residual + self.dropout1(tgt)
+                hidden_states = residual + self.dropout1(hidden_states)
 
         if not self.config.normalize_before:
-            tgt = self.norm1(tgt)
+            hidden_states = self.norm1(hidden_states)
 
-        residual = tgt
+        residual = hidden_states
         if self.config.normalize_before:
-            tgt = self.norm2(tgt)
+            hidden_states = self.norm2(hidden_states)
 
         with seed_guard_context("global_seed"):
             if not self.config.use_fused_dropout_add:
-                tgt = residual + self.dropout2(self.linear2(self.activation(self.linear1(tgt), approximate=True)))
+                hidden_states = residual + self.dropout2(
+                    self.linear2(self.activation(self.linear1(hidden_states), approximate=True))
+                )
             else:
-                tgt = self.fused_dropout_add2(
-                    self.linear2(self.activation(self.linear1(tgt), approximate=True)), residual
+                hidden_states = self.fused_dropout_add2(
+                    self.linear2(self.activation(self.linear1(hidden_states), approximate=True)), residual
                 )
         if not self.config.normalize_before:
-            tgt = self.norm2(tgt)
+            hidden_states = self.norm2(hidden_states)
 
         if not (output_attentions or use_cache):
-            return tgt
+            return hidden_states
 
-        temp_list = [tgt, attention_weights if output_attentions else None, incremental_cache if use_cache else None]
+        temp_list = [
+            hidden_states,
+            attention_weights if output_attentions else None,
+            incremental_cache if use_cache else None,
+        ]
 
         return tuple(v for v in temp_list if v is not None)
-
-    def gen_cache(self, memory):
-        incremental_cache = self.self_attn.gen_cache(memory, type=self.self_attn.Cache)
-        return incremental_cache
 
 
 class GPTEmbeddings(nn.Layer):
@@ -957,8 +889,6 @@ class GPTModel(GPTPretrainedModel):
             decoder_layers,
         )
 
-        self.checkpoints = []
-
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
 
@@ -972,7 +902,7 @@ class GPTModel(GPTPretrainedModel):
         attention_mask=None,
         inputs_embeds=None,
         use_cache=False,
-        cache=None,
+        past_key_values=None,
         output_attentions=False,
         output_hidden_states=False,
         return_dict=False,
@@ -1008,9 +938,7 @@ class GPTModel(GPTPretrainedModel):
             use_cache (bool, optional):
                 Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
                 can be used to speed up decoding.
-            cache (list, optional):
-                It is a list, and each element in the list is a tuple `(incremental_cache, static_cache)`.
-                See `TransformerDecoder.gen_cache <https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__ for more details.
+            past_key_values (list, optional):
                 It is only used for inference and should be None for training.
                 Default to `None`.
             output_attentions (bool, optional):
@@ -1047,7 +975,6 @@ class GPTModel(GPTPretrainedModel):
                 output = model(**inputs)
         """
 
-        self.checkpoints = []
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
@@ -1060,8 +987,8 @@ class GPTModel(GPTPretrainedModel):
 
         if position_ids is None:
             past_length = 0
-            if cache is not None:
-                past_length = paddle.shape(cache[0].k)[-2]
+            if past_key_values is not None:
+                past_length = paddle.shape(past_key_values[0][0])[1]
             position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype="int64")
             position_ids = position_ids.unsqueeze(0)
             position_ids = paddle.expand(position_ids, input_shape)
@@ -1071,8 +998,8 @@ class GPTModel(GPTPretrainedModel):
 
         # TODO, use registered buffer
         length = input_shape[-1]
-        if cache is not None:
-            cache_length = paddle.shape(cache[0].k)[2]
+        if past_key_values is not None:
+            cache_length = paddle.shape(past_key_values[0][0])[1]
             length = length + cache_length
         else:
             cache_length = 0
@@ -1092,10 +1019,9 @@ class GPTModel(GPTPretrainedModel):
 
         outputs = self.decoder(
             embedding_output,
-            memory=None,
-            tgt_mask=attention_mask,
+            attention_mask=attention_mask,
             use_cache=use_cache,
-            cache=cache,
+            past_key_values=past_key_values,
             output_hidden_states=output_hidden_states,
             output_attentions=output_attentions,
             return_dict=return_dict,
@@ -1109,101 +1035,7 @@ class GPTModel(GPTPretrainedModel):
                 all_hidden_states = (embedding_output,) + outputs[idx]
                 outputs = outputs[:idx] + (all_hidden_states) + outputs[idx + 1 :]
 
-        self.checkpoints.extend(self.decoder.checkpoints)
-
         return outputs
-
-
-class GPTForPretraining(GPTPretrainedModel):
-    """
-    GPT Model with pretraining tasks on top.
-
-    Args:
-        gpt (:class:`GPTModel`):
-            An instance of :class:`GPTModel`.
-
-    """
-
-    def __init__(self, config: GPTConfig):
-        super(GPTForPretraining, self).__init__(config)
-        self.gpt = GPTModel(config)
-        self.lm_head = GPTLMHead(config)
-        self.tie_weights()
-
-    def get_output_embeddings(self):
-        return self.lm_head
-
-    def forward(
-        self,
-        input_ids,
-        position_ids=None,
-        attention_mask=None,
-        masked_positions=None,
-        use_cache=False,
-        cache=None,
-        labels=None,
-        loss_mask=None,
-    ):
-        r"""
-
-        Args:
-            input_ids (Tensor, optional):
-                See :class:`GPTModel`.
-            position_ids (Tensor, optional):
-                See :class:`GPTModel`.
-            attention_mask (Tensor, optional):
-                See :class:`GPTModel`.
-            use_cache (bool, optional):
-                See :class:`GPTModel`.
-            cache (Tensor, optional):
-                See :class:`GPTModel`.
-
-        Returns:
-            Tensor or tuple: Returns tensor `logits` or tuple `(logits, cached_kvs)`. If `use_cache` is True,
-            tuple (`logits, cached_kvs`) will be returned. Otherwise, tensor `logits` will be returned.
-            `logits` is the output of the gpt model.
-            `cache_kvs` is the cache output of gpt model if `use_cache` is True.
-
-        Example:
-            .. code-block::
-
-                import paddle
-                from paddlenlp.transformers import GPTForPretraining, GPTTokenizer
-
-                tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
-                model = GPTForPretraining.from_pretrained('gpt2-medium-en')
-
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                output = model(**inputs,use_cache=True)
-
-                logits = output[0]
-                cached_kvs = output[1]
-
-        """
-
-        outputs = self.gpt(
-            input_ids, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
-        )
-        if use_cache:
-            encoder_outputs, cached_kvs = outputs[:2]
-        else:
-            encoder_outputs = outputs
-        logits = self.lm_head(encoder_outputs)
-
-        if labels is None:
-            if use_cache:
-                return logits, cached_kvs
-            else:
-                return logits
-        else:
-            loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
-            masked_lm_loss = loss_func(logits, labels.unsqueeze(2))
-
-            loss_mask = loss_mask.reshape([-1])
-            masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
-            loss = masked_lm_loss / loss_mask.sum()
-            return loss, logits
 
 
 class GPTPretrainingCriterion(paddle.nn.Layer):
@@ -1269,7 +1101,13 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         self.eol_token_id = config.eol_token_id
 
     def model(
-        self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
+        self,
+        input_ids,
+        position_ids=None,
+        attention_mask=None,
+        masked_positions=None,
+        use_cache=False,
+        past_key_values=None,
     ):
         r"""
 
@@ -1294,7 +1132,11 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         """
 
         outputs = self.gpt(
-            input_ids, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
+            input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            use_cache=use_cache,
+            past_key_values=past_key_values,
         )
         if use_cache:
             encoder_outputs, cached_kvs = outputs[:2]
@@ -1318,14 +1160,14 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
             Tensor: Returns tensor `src_ids`, which means the indices of output sequence tokens in the vocabulary.
             They are numerical representations of tokens that build the output sequence.
         """
-        output, cached_kvs = self.model(input_ids, use_cache=True, cache=None)
+        output, cached_kvs = self.model(input_ids, use_cache=True, past_key_values=None)
         src_ids = input_ids
         nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
         src_ids = paddle.concat([src_ids, nid], axis=1)
         cur_len = 0
         with dy2st_nocheck_guard_context():
             while cur_len < self.max_predict_len:
-                output, cached_kvs = self.model(nid, use_cache=True, cache=cached_kvs)
+                output, cached_kvs = self.model(nid, use_cache=True, past_key_values=cached_kvs)
                 nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
                 src_ids = paddle.concat([src_ids, nid], axis=1)
                 cur_len += 1
@@ -1337,27 +1179,34 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
 class GPTLMHead(nn.Layer):
     def __init__(self, config: GPTConfig, embedding_weights=None):
         super(GPTLMHead, self).__init__()
-        self.weight = (
-            self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype())
-            if embedding_weights is None
-            else embedding_weights
-        )
         self.config = config
+        self.transpose_y = True
 
-        if self.config.tensor_parallel_degree > 1:
-
-            def decoder(hidden_states):
-                return parallel_matmul(hidden_states, self.weight, self.config.tensor_parallel_output)
-
+        if embedding_weights is not None:
+            self.transpose_y = True
+            self.weight = embedding_weights
         else:
+            if config.tensor_parallel_degree > 1:
+                vocab_size = config.vocab_size // config.tensor_parallel_degree
+            else:
+                vocab_size = config.vocab_size
 
-            def decoder(hidden_states):
-                return F.linear(hidden_states, self.weight.T)
+            self.weight = self.create_parameter(
+                shape=[vocab_size, config.hidden_size],
+                dtype=paddle.get_default_dtype(),
+            )
+            # Must set distributed attr for Tensor Parallel !
+            self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
+            if self.weight.is_distributed:
+                self.weight.split_axis = 0
 
-        self.decoder = decoder
+    def forward(self, hidden_states, tensor_parallel_output=None):
+        if tensor_parallel_output is None:
+            tensor_parallel_output = self.config.tensor_parallel_output
 
-    def forward(self, hidden_states):
-        logits = self.decoder(hidden_states)
+        logits = parallel_matmul(
+            hidden_states, self.weight, transpose_y=self.transpose_y, tensor_parallel_output=tensor_parallel_output
+        )
         return logits
 
 
@@ -1374,7 +1223,8 @@ class GPTForCausalLM(GPTPretrainedModel):
     def __init__(self, config: GPTConfig):
         super(GPTForCausalLM, self).__init__(config)
         self.gpt = GPTModel(config)
-        self.lm_head = GPTLMHead(config)
+        self.lm_head = GPTLMHead(config, embedding_weights=self.gpt.embeddings.word_embeddings.weight)
+
         self.tie_weights()
         self.criterion = GPTPretrainingCriterion(config)
 
@@ -1388,7 +1238,7 @@ class GPTForCausalLM(GPTPretrainedModel):
         attention_mask=None,
         inputs_embeds=None,
         use_cache=False,
-        cache=None,
+        past_key_values=None,
         labels=None,
         output_attentions=False,
         output_hidden_states=False,
@@ -1407,7 +1257,7 @@ class GPTForCausalLM(GPTPretrainedModel):
                 See :class:`GPTModel`.
             use_cache (bool, optional):
                 See :class:`GPTModel`.
-            cache (Tensor, optional):
+            past_key_values (Tensor, optional):
                 See :class:`GPTModel`.
             labels (paddle.Tensor, optional):
                 A Tensor of shape `(batch_size, sequence_length)`.
@@ -1439,7 +1289,7 @@ class GPTForCausalLM(GPTPretrainedModel):
             attention_mask=attention_mask,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
-            cache=cache,
+            past_key_values=past_key_values,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -1468,7 +1318,6 @@ class GPTForCausalLM(GPTPretrainedModel):
 
             outputs = (logits,) + outputs[1:]
             return ((loss,) + outputs) if loss is not None else outputs
-
         return CausalLMOutputWithCrossAttentions(
             loss=loss,
             logits=logits,
@@ -1500,13 +1349,13 @@ class GPTForCausalLM(GPTPretrainedModel):
         self._fast_entry = FasterGPT(self, use_fp16_decoding=use_fp16_decoding).forward
         return self._fast_entry
 
-    def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, **kwargs):
+    def prepare_inputs_for_generation(self, input_ids, use_cache=False, past_key_values=None, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
         position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
         if attention_mask is not None and attention_mask.ndim == 4:
             attention_mask = attention_mask[:, -1:, -1:, :]
-        if cache is not None:
+        if past_key_values is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
             if position_ids is not None:
                 position_ids = position_ids[:, -1].unsqueeze(-1)
@@ -1515,7 +1364,7 @@ class GPTForCausalLM(GPTPretrainedModel):
             "position_ids": position_ids,
             "attention_mask": attention_mask,
             "use_cache": use_cache,
-            "cache": cache,
+            "past_key_values": past_key_values,
         }
 
     @staticmethod
@@ -1529,12 +1378,6 @@ class GPTForCausalLM(GPTPretrainedModel):
         else:
             attention_mask = paddle.ones_like(input_ids, dtype="int64")
         return paddle.unsqueeze(attention_mask, axis=[1, 2])
-
-    def __getattr__(self, name):
-        try:
-            return super().__getattr__(name)
-        except AttributeError:
-            return getattr(getattr(self, self.base_model_prefix), name)
 
 
 class GPTForTokenClassification(GPTPretrainedModel):
