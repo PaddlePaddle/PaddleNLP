@@ -209,9 +209,6 @@ class RowParallelQuantizationLoRALinear(RowParallelQuantizationLinear):
         self.lora_B.is_distributed = False
         self.scaling = self.lora_alpha / self.r
 
-        # Freezing the pre-trained weight matrix
-        self.weight.stop_gradient = True
-
     def forward(self, x: paddle.Tensor):
         if not self.input_is_parallel:
             input_mp = mp_ops._c_split(x, group=self.model_parallel_group)
@@ -219,7 +216,8 @@ class RowParallelQuantizationLoRALinear(RowParallelQuantizationLinear):
             input_mp = x
 
         # x @ W : [bz, in_f / ws] ===> [bz, out_f]
-        result_mp = weight_only_linear(input_mp, self.quant_weight, None, self.quant_scale, self.quant_dtype)
+        with paddle.amp.auto_cast(enable=False):
+            result_mp = weight_only_linear(input_mp, self.quant_weight, None, self.quant_scale, self.quant_dtype)
 
         output = mp_ops._mp_allreduce(
             result_mp,

@@ -77,6 +77,7 @@ class LoRAModel(nn.Layer):
 
     def __init__(self, model, lora_config: LoRAConfig) -> None:
         super().__init__()
+        self.quantized = False
         self.lora_config = lora_config
         self.lora_split_mapping = {}
         if self.lora_config.dtype is None:
@@ -89,7 +90,6 @@ class LoRAModel(nn.Layer):
                 f"Reset tensor_parallel_degree of lora_config to {self.model.config.tensor_parallel_degree}."
             )
         self.forward = self.model.forward
-        self.quantized = False
 
     def add_lora_split_mapping(self, module_name, is_column=False):
         self.lora_split_mapping[module_name] = is_column
@@ -211,7 +211,7 @@ class LoRAModel(nn.Layer):
         return lora_state_dict
 
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = True, **kwargs):
-        if self.quantized:
+        if self.quantized and merge_tensor_parallel and self.model.config.tensor_parallel_degree > 1:
             merge_tensor_parallel = False
             logger.warning(
                 "Quantized strategy does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
