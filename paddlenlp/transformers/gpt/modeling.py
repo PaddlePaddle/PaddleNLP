@@ -460,20 +460,20 @@ class TransformerDecoder(nn.Layer):
                     output,
                     attention_mask=attention_mask,
                     use_cache=use_cache,
-                    past_key_value=past_key_values[i] if past_key_values is not None else None,
+                    past_key_value=past_key_values if past_key_values is not None else None,
                     output_attentions=output_attentions,
                 )
 
             # outputs = hidden_states if both use_cache and output_attentions are False
             # Otherwise, outputs = (hidden_states, attention if output_attentions, cache if use_cache)
             output = outputs[0] if (use_cache or output_attentions) else outputs
-            past_key_values = outputs[-1] if use_cache else None
             all_self_attentions = all_self_attentions + (outputs[1],) if output_attentions else None
             all_hidden_states = all_hidden_states + (output,) if output_hidden_states else None
 
         if self.norm is not None:
             output = self.norm(output)
 
+        past_key_values = outputs[-1] if use_cache else None
         if not return_dict:
             temp_list = [output, past_key_values, all_hidden_states, all_self_attentions]
 
@@ -1064,24 +1064,14 @@ class GPTModel(GPTPretrainedModel):
             length = length + cache_length
         else:
             cache_length = 0
-        causal_mask = self.bias[:, :, cache_length:length, :length]
 
-        # # embed positions
-        # if attention_mask is None:
-        #     # [bs, seq_len]
-        #     attention_mask = paddle.ones((1, length), dtype=paddle.bool)
-        # attention_mask = self._prepare_decoder_attention_mask(
-        #     attention_mask, input_shape, cache_length, getattr(paddle, paddle.get_default_dtype(), paddle.float32)
-        # )
-
-        if attention_mask is not None:
-            if attention_mask.dtype != paddle.int64:
-                attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
-            if len(attention_mask.shape) == 2:
-                attention_mask = attention_mask[:, None, None, :]
-            attention_mask = (1.0 - (attention_mask & causal_mask)) * -1e4
-        else:
-            attention_mask = (1.0 - causal_mask) * -1e4
+        # embed positions
+        if attention_mask is None:
+            # [bs, seq_len]
+            attention_mask = paddle.ones((1, length), dtype=paddle.bool)
+        attention_mask = self._prepare_decoder_attention_mask(
+            attention_mask, input_shape, cache_length, getattr(paddle, paddle.get_default_dtype(), paddle.float32)
+        )
 
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
