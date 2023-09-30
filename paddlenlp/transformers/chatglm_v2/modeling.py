@@ -799,7 +799,7 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
             model_kwargs["attention_mask"] = paddle.concat([attention_mask, new_attention_mask], axis=-1)
 
         # update position ids
-        if "position_ids" in model_kwargs:
+        if model_kwargs.get("position_ids", None) is not None:
             position_ids = model_kwargs["position_ids"]
             new_position_id = position_ids[..., -1:].clone()
             new_position_id += 1
@@ -830,6 +830,13 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
             "attention_mask": attention_mask,
             "return_last_logit": True,
             "use_cache": True,
+        }
+
+    def _get_model_inputs_spec(self, dtype: str):
+        return {
+            "input_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            "attention_mask": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            "position_ids": paddle.static.InputSpec(shape=[None, None], dtype="int64"),
         }
 
     def forward(

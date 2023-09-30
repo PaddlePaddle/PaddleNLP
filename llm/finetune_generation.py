@@ -109,9 +109,9 @@ def main():
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
             raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
-        from llama.modeling_pp import LlamaForCausalLMPipe
+        from paddlenlp.transformers import AutoModelForCausalLMPipe
 
-        model = LlamaForCausalLMPipe.from_pretrained(
+        model = AutoModelForCausalLMPipe.from_pretrained(
             model_args.model_name_or_path,
             tensor_parallel_output=False,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
