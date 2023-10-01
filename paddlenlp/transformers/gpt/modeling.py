@@ -442,6 +442,7 @@ class TransformerDecoder(nn.Layer):
         output = hidden_states
         all_self_attentions = () if output_attentions else None
         all_hidden_states = () if output_hidden_states else None
+        next_decoder_cache = () if use_cache else None
 
         for i, mod in enumerate(self.layers):
             has_gradient = not output.stop_gradient
@@ -460,7 +461,7 @@ class TransformerDecoder(nn.Layer):
                     output,
                     attention_mask=attention_mask,
                     use_cache=use_cache,
-                    past_key_value=past_key_values if past_key_values is not None else None,
+                    past_key_value=past_key_values[i] if past_key_values is not None else None,
                     output_attentions=output_attentions,
                 )
 
@@ -469,13 +470,14 @@ class TransformerDecoder(nn.Layer):
             output = outputs[0] if (use_cache or output_attentions) else outputs
             all_self_attentions = all_self_attentions + (outputs[1],) if output_attentions else None
             all_hidden_states = all_hidden_states + (output,) if output_hidden_states else None
+            next_decoder_cache = next_decoder_cache + (outputs[-1],) if use_cache else None
 
         if self.norm is not None:
             output = self.norm(output)
 
-        past_key_values = outputs[-1] if use_cache else None
+        next_cache = next_decoder_cache if use_cache else None
         if not return_dict:
-            temp_list = [output, past_key_values, all_hidden_states, all_self_attentions]
+            temp_list = [output, next_cache, all_hidden_states, all_self_attentions]
 
             if not (use_cache or output_attentions or output_hidden_states):
                 return output
@@ -484,7 +486,7 @@ class TransformerDecoder(nn.Layer):
 
         return BaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=output,
-            past_key_values=past_key_values,
+            past_key_values=next_cache,
             hidden_states=all_hidden_states,
             attentions=all_self_attentions,
             cross_attentions=None,
@@ -1045,9 +1047,12 @@ class GPTModel(GPTPretrainedModel):
             raise ValueError("You have to specify either input_ids or inputs_embeds")
         # input_shape => bs, seq_len
 
+        if past_key_values is None:
+            past_key_values = tuple([None] * len(self.decoder.layers))
+
         if position_ids is None:
             past_length = 0
-            if past_key_values is not None:
+            if past_key_values[0] is not None:
                 # bs, seq_len, num_head, head_dim
                 past_length = paddle.shape(past_key_values[0][0])[1]
             position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype="int64")
@@ -1059,19 +1064,21 @@ class GPTModel(GPTPretrainedModel):
 
         # TODO, use registered buffer
         length = input_shape[-1]
-        if past_key_values is not None:
+        if past_key_values[0] is not None:
             cache_length = paddle.shape(past_key_values[0][0])[1]
             length = length + cache_length
         else:
             cache_length = 0
 
-        # embed positions
-        if attention_mask is None:
-            # [bs, seq_len]
-            attention_mask = paddle.ones((1, length), dtype=paddle.bool)
-        attention_mask = self._prepare_decoder_attention_mask(
-            attention_mask, input_shape, cache_length, getattr(paddle, paddle.get_default_dtype(), paddle.float32)
-        )
+        causal_mask = self.bias[:, :, cache_length:length, :length]
+        if attention_mask is not None:
+            if attention_mask.dtype != paddle.int64:
+                attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
+            if len(attention_mask.shape) == 2:
+                attention_mask = attention_mask[:, None, None, :]
+            attention_mask = (1.0 - (attention_mask & causal_mask)) * -1e4
+        else:
+            attention_mask = (1.0 - causal_mask) * -1e4
 
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
@@ -1411,9 +1418,7 @@ class GPTForCausalLM(GPTPretrainedModel):
     def prepare_inputs_for_generation(self, input_ids, use_cache=False, past_key_values=None, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
         position_ids = kwargs.get("position_ids", None)
-        attention_mask = kwargs.get("attention_mask", None)
-        if attention_mask is not None and attention_mask.ndim == 4:
-            attention_mask = attention_mask[:, -1:, -1:, :]
+        # attention_mask = kwargs.get("attention_mask", None)
         if past_key_values is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
             if position_ids is not None:
@@ -1421,7 +1426,7 @@ class GPTForCausalLM(GPTPretrainedModel):
         return {
             "input_ids": input_ids,
             "position_ids": position_ids,
-            "attention_mask": attention_mask,
+            "attention_mask": None,
             "use_cache": use_cache,
             "past_key_values": past_key_values,
         }

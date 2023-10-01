@@ -209,11 +209,10 @@ def create_pretrained_dataset(
         tokens = tokens_[:, :-1]
 
         # Attention mask.
-        attention_mask = paddle.ones(tokens.shape, dtype=paddle.int64)
+        # attention_mask = paddle.ones(tokens.shape, dtype=paddle.int64)
 
         return {
             "input_ids": tokens,
-            "attention_mask": attention_mask,
             "labels": labels,
         }
 
