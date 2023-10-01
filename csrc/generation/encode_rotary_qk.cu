@@ -86,6 +86,7 @@ __global__ void RotaryKernel(const T *input,
     const int right_idx = base_idx + 2 * ti + 1;
     
     int emb_idx = bi * seq_len * rotary_last_dim + si * rotary_last_dim + ti;
+    // int emb_idx = 0 * seq_len * rotary_last_dim + si * rotary_last_dim + ti;
     
     float input_left = static_cast<float>(input[left_idx]);
     float input_right = static_cast<float>(input[right_idx]);
@@ -136,7 +137,7 @@ void LaunchRotaryQK(const paddle::Tensor& q,
     int BlockSize = getBlockSize(last_dim / 2);
     const float *cos_emb = rotary_emb.data<float>();
     // batch_size are always 1!
-    const float *sin_emb = rotary_emb.data<float>() + 1 * seq_len * dim_head / 4;
+    const float *sin_emb = rotary_emb.data<float>() + batch_size * seq_len * dim_head / 4;
 
     // std::cout << "batch_size * seq_len * dim_head" << batch_size * seq_len * dim_head << std::endl;
     
