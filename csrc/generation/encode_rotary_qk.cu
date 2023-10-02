@@ -136,10 +136,7 @@ void LaunchRotaryQK(const paddle::Tensor& q,
     // last_dim / 2 因为要算两个数字啊！
     int BlockSize = getBlockSize(last_dim / 2);
     const float *cos_emb = rotary_emb.data<float>();
-    // batch_size are always 1!
     const float *sin_emb = rotary_emb.data<float>() + batch_size * seq_len * dim_head / 4;
-
-    // std::cout << "batch_size * seq_len * dim_head" << batch_size * seq_len * dim_head << std::endl;
     
     const DataType_* q_data = reinterpret_cast<const DataType_*>(q.data<data_t>()); 
     const DataType_* k_data = reinterpret_cast<const DataType_*>(kv.data<data_t>()); 
