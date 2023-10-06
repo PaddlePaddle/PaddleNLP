@@ -14,6 +14,7 @@
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import Pool
 
 import pandas as pd
 
@@ -126,7 +127,7 @@ def offline_ann(index_name, docs):
             embed_title=args.embed_title,
         )
 
-    log_file = open("log.txt", "a")
+    log_file = open("log.txt", "w")
     try:
         # Manually indexing
         res = retriever.run_indexing(docs)
@@ -226,9 +227,6 @@ def run_multi_process_splitter(document):
         datasets.append({"content": txt, "meta": meta_data})
     file_log.write(document["id"] + "\tsuccess" + "\n")
     return {"index_name": document["id"], "content": datasets}
-
-
-from multiprocessing import Pool
 
 
 def indexing_main_body(csv_name):
