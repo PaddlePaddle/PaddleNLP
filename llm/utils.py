@@ -395,9 +395,12 @@ def dybatch_preprocess(
 ):
     """Pre-process generation inputs."""
     inputs = {}
-    if "chatglm" in architectures:
+    if "chatglmforcausallm" == architectures.lower():
         input_ids = []
         position_ids = []
+
+        # if isinstance(texts, str):
+        #     texts = [texts]
 
         for text in texts:
             tokens = tokenizer(text, return_tensors="np", padding=True, max_length=src_length)
@@ -413,6 +416,14 @@ def dybatch_preprocess(
         for i in range(len(position_ids)):
             inst_data_pos.append(np.array([list(inst) + [0] * (max_len - len(inst)) for inst in position_ids[i]]))
         inputs["position_ids"] = paddle.to_tensor(np.array(inst_data_pos))
+
+
+        # position_ids = paddle.zeros(shape=[bs, max_length + src_length], dtype="int64")
+
+        # for i in range(bs):
+        #     position_ids[i, pre_caches_length : pre_caches_length + seq_len[i]] = paddle.arange(seq_len[i])
+
+        # inputs["position_ids"] = position_ids
     elif "gpt" in architectures:
         input_ids = []
         if isinstance(texts, str):
@@ -489,7 +500,7 @@ def dybatch_preprocess(
     inputs["top_p"] = (
         np.array(
             [
-                top_p,
+                0.0,
             ]
             * bs
         )

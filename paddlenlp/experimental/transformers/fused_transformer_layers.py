@@ -551,8 +551,9 @@ class FusedMultiTransformer(Layer):
                     weight_dtype=self.weight_dtype,
                 )
             else:
-                qkv_out = self.linear(ln_out, self.qkv_weights[i], self.qkv_biases[i], transpose_weight=True)
-
+                #qkv_out = self.linear(ln_out, self.qkv_weights[i], self.qkv_biases[i], transpose_weight=True)
+                qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
+                qkv_out = paddle.add(qkv_out, self.qkv_biases[i])
             # fmha compute
             if time_step is None:  # context
                 """
@@ -574,6 +575,24 @@ class FusedMultiTransformer(Layer):
                         rotary_emb_dims=rotary_emb_dims,
                         use_neox=self.use_neox_rotary_style,
                     )
+                    # q_out : [batch, head_num, seq_len, head_dim]
+                    # batch, head_num, seq_len, head_dim = q_out.shape
+                    # # 只旋转前面一半的维度呀！
+                    # rotay_dims = head_dim // 2
+                    # q_out0, q_out1 = q_out[...,0:rotay_dims], q_out[...,rotay_dims:]
+                    # k_out0, k_out1 = k_out[...,0:rotay_dims], k_out[...,rotay_dims:]
+                    # q_out0 = q_out0.reshape([batch, head_num, seq_len, rotay_dims // 2, 2])
+                    # k_out0 = k_out0.reshape([batch, head_num , seq_len, rotay_dims // 2, 2])
+                    # rotary_embs = rotary_embs.reshape([2, 1, 1, seq_len, rotay_dims // 2])
+                    # q_out0 = paddle.stack(
+                    #     [
+                    #         q_out0[..., 0] * rotary_embs[0, ...] - q_out0[..., 1] * rotary_embs[1,...],
+                    #         q_out0[..., 1] * rotary_embs[0, ...] + q_out0[..., 0] * rotary_embs[1,...],
+                    #     ],
+                    #     -1,
+                    # )
+                    # q_out0 = q_out0.reshape(q_out1.shape)
+                    # q_out = paddle.concat([q_out0, q_out1], axis=-1)
 
                 if pre_caches is not None:
                     k_out = paddle.concat([pre_caches[i][0], k_out], axis=2)
@@ -656,6 +675,10 @@ class FusedMultiTransformer(Layer):
             else:
                 ffn1_out = paddle.matmul(tmp_out, self.ffn1_weights[i])
             ffn1_out = fused_act_bias_wrapper(ffn1_out, self.ffn1_biases[i], act_method=self.activation)
+            # import paddle.nn.functional as F
+            # ffn_fc = ffn1_out[..., 0::2]
+            # gate = ffn1_out[..., 1::2]
+            # ffn1_out = F.silu(ffn_fc) * gate
 
             # ffn2 matmul
             if self.use_weight_only:

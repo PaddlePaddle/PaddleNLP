@@ -12,26 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+os.environ["CUDA_VISIBLE_DEVICES"]="5"
 
 import paddle
 from paddle.distributed import fleet
 
 from paddlenlp.transformers import (
     ChatGLMv2Config,
-    ChatGLMv2ForConditionalGeneration,
     ChatGLMv2Tokenizer,
 )
 
+from paddlenlp.transformers import ChatGLMv2ForCausalLM
 
 def parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name_or_path", default="THUDM/chatglm2-6b", help="The directory of model.")
-    parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
-    parser.add_argument("--src_length", type=int, default=128, help="The batch size of data.")
-    parser.add_argument("--tgt_length", type=int, default=128, help="The batch size of data.")
+    parser.add_argument("--batch_size", type=int, default=2, help="The batch size of data.")
+    parser.add_argument("--src_length", type=int, default=1280, help="The batch size of data.")
+    parser.add_argument("--tgt_length", type=int, default=1280, help="The batch size of data.")
     return parser.parse_args()
 
 
@@ -75,7 +75,7 @@ class Predictor(object):
             config = ChatGLMv2Config.from_pretrained(args.model_name_or_path)
             dtype = config.dtype if config.dtype is not None else config.paddle_dtype
 
-            self.model = ChatGLMv2ForConditionalGeneration.from_pretrained(
+            self.model = ChatGLMv2ForCausalLM.from_pretrained(
                 args.model_name_or_path,
                 tensor_parallel_degree=tensor_parallel_degree,
                 tensor_parallel_rank=tensor_parallel_rank,
@@ -156,14 +156,25 @@ if __name__ == "__main__":
     args = parse_arguments()
     predictor = Predictor(args)
     all_texts = [
-        "你好",
+        #"[Round 0]\n问：你好\n答：你好👋!我是人工智能助手 ChatGLM-6B,很高兴见到你,欢迎问我任何问题。\n[Round 1]\n问：晚上睡不着应该怎么办\n答：",
+    "<0>山东师范大学博士学位论文##129,16,199,21</0><1>构“大变”的成语。异体成语的运用体现出这一时期很多成语的构成要素并不十分固定，##36,30,287,35</1><2>成语结构也并不十分稳固，呈现出成语在结构上不断发生演变的过渡性特征，以及近代汉##36,39,291,44</2><3>语词汇向现代汉语词汇发展过程中的过渡性特征。##36,49,177,54</3><4>本章小结##146,62,180,69</4><5>本章我们在借鉴前人对成语的研究成果与界定的基础上，提出了对成语的界定：成语##48,77,291,83</5><6>是人们长期以来相沿习用的，意义相对完整、结构相对稳定的固定词组。成语的典型表现##36,87,291,92</6><7>形式为四字结构，多具有书面语色彩。进而提出了异体成语的定义：异体成语是整体意义##36,96,290,102</7><8>基本相同，形式上至少有一个相同的构成要素并且其他相异要素存在着互相替换的意义关##36,106,291,111</8><9>系，具有相同语法性质，结构稳定的一组词汇类聚。清末民初时期出现在白话报刊中的异##36,115,291,121</9><10>体成语，便是清末民初异体成语。清末民初异体成语中在当时使用频率最高的变体我们称##36,125,291,130</10><11>为清末民初异体成语的通体，其他称为清末民初异体成语的变体。##36,135,223,140</11><12>清末民初异体成语可以从形式、语义、结构等方面分类分析，总结分布特征。清末民##48,144,291,149</12><13>初异体成语在数量与分布上具有繁复性，在类型上具有多样化特征，在风格色彩上具有白##35,153,290,159</13><14>话化特征，在整体运用上具有过渡性特征等。##36,163,164,168</14><15>43##36,296,44,300</15><16>万方数据##26,310,48,315</16>",
         "[Round 0]\n问：你好\n答：你好👋!我是人工智能助手 ChatGLM-6B,很高兴见到你,欢迎问我任何问题。\n[Round 1]\n问：晚上睡不着应该怎么办\n答：",
+     #"<0>山东师范大学博士学位论文##129,16,199,21</0><1>构“大变”的成语。异体成语的运用体现出这一时期很多成语的构成要素并不十分固定，##36,30,287,35</1><2>成语结构也并不十分稳固，呈现出成语在结构上不断发生演变的过渡性特征，以及近代汉##36,39,291,44</2><3>语词汇向现代汉语词汇发展过程中的过渡性特征。##36,49,177,54</3><4>本章小结##146,62,180,69</4><5>本章我们在借鉴前人对成语的研究成果与界定的基础上，提出了对成语的界定：成语##48,77,291,83</5><6>是人们长期以来相沿习用的，意义相对完整、结构相对稳定的固定词组。成语的典型表现##36,87,291,92</6><7>形式为四字结构，多具有书面语色彩。进而提出了异体成语的定义：异体成语是整体意义##36,96,290,102</7><8>基本相同，形式上至少有一个相同的构成要素并且其他相异要素存在着互相替换的意义关##36,106,291,111</8><9>系，具有相同语法性质，结构稳定的一组词汇类聚。清末民初时期出现在白话报刊中的异##36,115,291,121</9><10>体成语，便是清末民初异体成语。清末民初异体成语中在当时使用频率最高的变体我们称##36,125,291,130</10><11>为清末民初异体成语的通体，其他称为清末民初异体成语的变体。##36,135,223,140</11><12>清末民初异体成语可以从形式、语义、结构等方面分类分析，总结分布特征。清末民##48,144,291,149</12><13>初异体成语在数量与分布上具有繁复性，在类型上具有多样化特征，在风格色彩上具有白##35,153,290,159</13><14>话化特征，在整体运用上具有过渡性特征等。##36,163,164,168</14><15>43##36,296,44,300</15><16>万方数据##26,310,48,315</16>",
     ]
-    
-    for i in range (10):
+
+    for i in range (1):
         batch_texts = batchfy_text(all_texts, args.batch_size)
         for bs, texts in enumerate(batch_texts):
-            outputs = predictor.predict(texts)
+            for i in range(10):
+                import datetime
+                starttime = datetime.datetime.now()
+                
+                outputs = predictor.predict(texts)
+
+                endtime = datetime.datetime.now()
+                duringtime = endtime - starttime
+                print ("耗时:",duringtime.seconds * 1000 + duringtime.microseconds / 1000.0)
+            
             for text, result in zip(texts, outputs["result"]):
                 print("{}\n{}".format(text, result))
 
@@ -171,7 +182,7 @@ if __name__ == "__main__":
     import time
     starttime = datetime.datetime.now()
 
-    for i in range (10):
+    for i in range (1):
         batch_texts = batchfy_text(all_texts, args.batch_size)
         for bs, texts in enumerate(batch_texts):
             outputs = predictor.predict(texts)

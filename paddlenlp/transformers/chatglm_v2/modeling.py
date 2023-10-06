@@ -92,7 +92,8 @@ class RotaryEmbedding(nn.Layer):
 
         # Calculate the product of position index and $\theta_i$
         idx_theta = paddle.outer(seq_idx, theta).astype(self.default_dtype)
-
+        
+        # stack will add a dimension.
         cache = paddle.stack([paddle.cos(idx_theta), paddle.sin(idx_theta)], axis=-1)
 
         # this is to mimic the behaviour of complex32, else we will get different results
@@ -303,8 +304,7 @@ class CoreAttention(nn.Layer):
             )
 
         attention_probs = F.softmax(attention_scores.astype("float32"), axis=-1, name = "哈哈哈")
-        attention_probs = attention_probs.astype(self.dtype)
-        #print("attention_probs", attention_probs)
+        attention_probs = attention_probs.astype(self.default_dtype)
 
         # attention_probs = self.attention_dropout(attention_probs)
 
@@ -384,6 +384,20 @@ class SelfAttention(nn.Layer):
         key_layer = self.key(hidden_states)
         value_layer = self.value(hidden_states)
 
+
+        # q_weight = self.query.weight
+        # q_bias = self.query.bias
+        # k_weight = self.key.weight
+        # k_bias = self.key.bias
+        # v_weight = self.value.weight
+        # v_bias = self.value.bias
+        # self.qkv_weight = paddle.concat([q_weight, k_weight, v_weight], axis=-1)
+        # self.qkv_bias = paddle.concat([q_bias, k_bias, v_bias], axis=-1)
+
+        # qkv = paddle.matmul(hidden_states, self.qkv_weight)
+        # qkv += self.qkv_bias
+        # query_layer, key_layer, value_layer = paddle.split(qkv, [4096, 256, 256], axis=-1)
+
         query_layer = query_layer.reshape(
             [seq_length, batch_size, self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
         )
@@ -411,6 +425,7 @@ class SelfAttention(nn.Layer):
             multiplier = self.num_attention_heads_per_partition // self.kv_indices.shape[0]
         else:
             multiplier = self.num_attention_heads_per_partition // self.num_multi_query_groups_per_partition
+            # 32 // 2
 
         key_layer = key_layer.unsqueeze(-2).tile([1, 1, 1, multiplier, 1])
         key_layer = key_layer.reshape(
@@ -991,6 +1006,14 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
             hidden_states = hidden_states[-1:]
         lm_logits = self.chatglm_v2.output_layer(hidden_states)
         lm_logits = lm_logits.transpose([1, 0, 2])
+
+
+        # import numpy as np
+        # static_dict = {
+        # "your" : lm_logits[:,-1,:].numpy(),
+        # }
+        # np.savez('/zhoukangkang/your.npz', **static_dict)
+        # exit(0)
 
         loss = None
         if labels is not None:
