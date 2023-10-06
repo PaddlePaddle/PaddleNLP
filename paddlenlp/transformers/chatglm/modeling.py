@@ -98,10 +98,8 @@ class RotaryEmbeddings(nn.Layer):
     def __init__(self, hidden_size, base=10000.0, position_encoding_2d=True):
         super().__init__()
         self.default_dtype = paddle.get_default_dtype()
-        inv_freq = 1.0 / (base ** (paddle.arange(0, hidden_size, 2).astype("float32") / hidden_size))
-        inv_freq = inv_freq.astype(self.default_dtype)
+        self.inv_freq = 1.0 / (base ** (paddle.arange(0, hidden_size, 2).astype("float32") / hidden_size))
         self.position_encoding_2d = position_encoding_2d
-        self.register_buffer("inv_freq", inv_freq)
         self.max_seq_len_cached = -1
         self.cos_cached = None
         self.sin_cached = None
@@ -123,30 +121,14 @@ class RotaryEmbeddings(nn.Layer):
             # x.shape = [b, s, n, h/n/2]
             # TODO(duanyanhui): npu arange kernel don't support fp16, and
             # it can't be fallbacked to cpu. It will be fixed in future.
-            if paddle.get_device().split(":")[0] == "npu":
-                t = paddle.arange(start=0, end=seq_len, dtype="float32")
-                t = t.cast(self.inv_freq.dtype)
-            else:
-                t = paddle.arange(start=0, end=seq_len, dtype=self.inv_freq.dtype)
+            t = paddle.arange(start=0, end=seq_len, dtype="float32")
             # [s, h/n/2]
-            if not paddle.in_dynamic_mode():
-                inv_freq = paddle.cast(self.inv_freq, "float32")
-                t = paddle.cast(t, "float32")
-                freqs = paddle.einsum("i,j->ij", t, inv_freq)
-            else:
-                freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
-            freqs = freqs.cast(self.default_dtype)
+            freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
             # [s, h/n]
             emb = paddle.concat([freqs, freqs], axis=-1)
-            if self.default_dtype == paddle.bfloat16:
-                emb = emb.cast("float32")
             # [s, 1, h/n]
-            cos_cached = emb.cos().unsqueeze(1)
-            sin_cached = emb.sin().unsqueeze(1)
-
-            if self.default_dtype == paddle.bfloat16:
-                cos_cached = cos_cached.astype(self.default_dtype)
-                sin_cached = sin_cached.astype(self.default_dtype)
+            cos_cached = emb.cos().unsqueeze(1).cast(self.default_dtype)
+            sin_cached = emb.sin().unsqueeze(1).cast(self.default_dtype)
 
             if hasattr(paddle.framework, "_no_check_dy2st_diff"):
                 # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
