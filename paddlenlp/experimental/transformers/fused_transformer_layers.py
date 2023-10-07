@@ -37,6 +37,7 @@ if is_paddlenlp_ops_available():
         rebuild_padding_v2,
         transpose_remove_padding,
         write_cache_kv,
+        write_int8_cache_kv,
     )
 else:
     logger.warning(
@@ -187,8 +188,10 @@ class FusedMultiTransformer(Layer):
         self.norm_type = norm_type
         if norm_type == "layernorm":
             self.norm_func = fused_layer_norm
-        else:
+        elif norm_type == "rmsnorm":
             self.norm_func = fused_rms_norm
+        else:
+            raise NotImplementedError("Only support norm type of [layernorm, rmsnorm]")
         self.use_neox_rotary_style = use_neox_rotary_style
         self._norm_weight_dtype = "float32" if self.norm_type == "layernorm" else self._dtype
 
@@ -492,6 +495,10 @@ class FusedMultiTransformer(Layer):
         rotary_emb_dims=0,
         seq_lens=None,
         time_step=None,
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
     ):
         r"""
         Applies multi transformer layers on the input.
@@ -579,7 +586,20 @@ class FusedMultiTransformer(Layer):
                     v_out = paddle.concat([pre_caches[i][1], v_out], axis=2)
 
                 # write cache kv (inplace)
-                write_cache_kv(k_out, v_out, caches[i], seq_lens + pre_caches_length)
+                if k_quant_scales is not None:
+                    assert v_quant_scales is not None and k_dequant_scales is not None and v_dequant_scales is not None
+                    assert caches[i].dtype == paddle.uint8
+                    write_int8_cache_kv(
+                        k_out,
+                        v_out,
+                        caches[i],
+                        k_quant_scales[i],
+                        v_quant_scales[i],
+                        k_dequant_scales[i],
+                        v_dequant_scales[i],
+                    )
+                else:
+                    write_cache_kv(k_out, v_out, caches[i], seq_lens + pre_caches_length)
 
                 # cutlass fmha
                 qktv_out = variable_length_memory_efficient_attention(
@@ -595,6 +615,7 @@ class FusedMultiTransformer(Layer):
                 fmha_out = transpose_remove_padding(qktv_out, seq_lens, padding_offset)
 
             else:
+
                 fmha_out = masked_multihead_attention(
                     x=qkv_out,
                     cache_kv=caches[i],
@@ -603,6 +624,10 @@ class FusedMultiTransformer(Layer):
                     rotary_tensor=rotary_embs,
                     rotary_emb_dims=rotary_emb_dims,
                     use_neox_rotary_style=self.use_neox_rotary_style,
+                    cache_k_quant_scales=k_quant_scales[i] if k_quant_scales is not None else None,
+                    cache_v_quant_scales=v_quant_scales[i] if v_quant_scales is not None else None,
+                    cache_k_dequant_scales=k_dequant_scales[i] if k_dequant_scales is not None else None,
+                    cache_v_dequant_scales=v_dequant_scales[i] if v_dequant_scales is not None else None,
                 )[0]
 
             # out_linear
@@ -712,7 +737,9 @@ class FusedMultiTransformer(Layer):
             out = rebuild_padding(tmp_out, cum_offsets, seq_lens, input_ids)
         else:
             out = tmp_out
+            # exit(0)
         return out, caches
+
 
 class FusedBlockMultiTransformer(Layer):
     def __init__(
@@ -1078,7 +1105,7 @@ class FusedBlockMultiTransformer(Layer):
         block_tables=None,
         max_input_length=-1,
         block_size=64,
-        use_neox_rotary_style=False
+        use_neox_rotary_style=False,
     ):
         r"""
         Applies multi transformer layers on the input.
@@ -1140,7 +1167,7 @@ class FusedBlockMultiTransformer(Layer):
                 )
             else:
                 qkv_out = self.linear(ln_out, self.qkv_weights[i], self.qkv_biases[i], transpose_weight=True)
-            
+
             # fmha
             fmha_out = paddle.incubate.nn.functional.block_multihead_attention(
                 qkv_out,
@@ -1158,7 +1185,7 @@ class FusedBlockMultiTransformer(Layer):
                 attn_mask,
                 max_input_length,
                 block_size,
-                use_neox_rotary_style
+                use_neox_rotary_style,
             )[0]
 
             # out_linear
@@ -1264,10 +1291,5 @@ class FusedBlockMultiTransformer(Layer):
 
             ln_out = tmp_out
 
-        out = rebuild_padding_v2(
-            tmp_out, 
-            cum_offsets, 
-            seq_lens_decoder, 
-            seq_lens_encoder,
-            max_input_length)
+        out = rebuild_padding_v2(tmp_out, cum_offsets, seq_lens_decoder, seq_lens_encoder, max_input_length)
         return out, caches

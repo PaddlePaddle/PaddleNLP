@@ -18,15 +18,19 @@ import paddle
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
-from paddlenlp_ops import fused_get_rotary_embedding, get_padding_offset, get_padding_offset_v2
+from paddlenlp_ops import (
+    fused_get_rotary_embedding,
+    get_padding_offset,
+    get_padding_offset_v2,
+)
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
-    FusedMultiTransformer,
     FusedBlockMultiTransformer,
+    FusedMultiTransformer,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
+    GenerationBlockInferenceModel,
     GenerationInferenceModel,
-    GenerationBlockInferenceModel
 )
 from paddlenlp.transformers import LlamaConfig, LlamaPretrainedModel
 from paddlenlp.transformers.llama.modeling import LlamaLMHead
@@ -39,11 +43,13 @@ from paddlenlp.transformers.model_utils import (
     register_base_model,
 )
 
-__all__ = ["LlamaInferenceModel", 
-           "LlamaBlockInferenceModel",
-           "LlamaForCausalLMInferenceModel", 
-           "LlamaForCausalLMBlockInferenceModel",
-           "LlamaForMiniGPT4InferenceModel"]
+__all__ = [
+    "LlamaInferenceModel",
+    "LlamaBlockInferenceModel",
+    "LlamaForCausalLMInferenceModel",
+    "LlamaForCausalLMBlockInferenceModel",
+    "LlamaForMiniGPT4InferenceModel",
+]
 
 
 class FusedLlamaRMSNorm(nn.Layer):
@@ -238,6 +244,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         output_attentions=False,
         output_hidden_states=None,
         return_dict=False,
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
         **kwargs,
     ):
         # kwargs["cache"] is used used to distinguish between encoder and decoder phase.
@@ -309,6 +319,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 rotary_embs=new_rope,
                 rotary_emb_dims=1,
                 time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
+                k_quant_scales=k_quant_scales,
+                v_quant_scales=v_quant_scales,
+                k_dequant_scales=k_dequant_scales,
+                v_dequant_scales=v_dequant_scales,
             )
         hidden_states = self.norm(hidden_states)
 
@@ -437,7 +451,7 @@ class LlamaBlockInferenceModel(LlamaPretrainedModel):
         self.epsilon = config.rms_norm_eps
         self.max_position_embeddings = config.max_position_embeddings
         self.use_weight_only = False
-        
+
         self.max_input_length = config.max_input_length
         self.block_size = config.block_size
         self.use_neox_rotary_style = True
@@ -565,10 +579,8 @@ class LlamaBlockInferenceModel(LlamaPretrainedModel):
         cum_offsets_now = paddle.cumsum(self.max_input_length - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
         ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = get_padding_offset_v2(
-            input_ids, 
-            cum_offsets_now, 
-            token_num, 
-            seq_lens_this_time)
+            input_ids, cum_offsets_now, token_num, seq_lens_this_time
+        )
         return ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k
 
     # This function is a little different from prepare_input_ids_for_generation in paddlenlp/transformers/generation/utils.py
@@ -595,7 +607,9 @@ class LlamaBlockInferenceModel(LlamaPretrainedModel):
         seq_lens_decoder=None,
         seq_lens_this_time=None,
     ):
-        ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(input_ids, seq_lens_this_time)
+        ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
+            input_ids, seq_lens_this_time
+        )
 
         inputs_embeds = self.embed_tokens(ids_remove_padding)
 
@@ -617,7 +631,7 @@ class LlamaBlockInferenceModel(LlamaPretrainedModel):
                 block_tables=block_tables,
                 max_input_length=self.max_input_length,
                 block_size=self.block_size,
-                use_neox_rotary_style=self.use_neox_rotary_style
+                use_neox_rotary_style=self.use_neox_rotary_style,
             )
         hidden_states = self.norm(hidden_states)
 
@@ -787,6 +801,10 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         cache = kwargs.get("cache", None)
         pre_caches = kwargs.get("pre_caches", None)
         inputs_embeds = kwargs.get("inputs_embeds", None)
+        k_quant_scales = kwargs.get("k_quant_scales", None)
+        v_quant_scales = kwargs.get("v_quant_scales", None)
+        k_dequant_scales = kwargs.get("k_dequant_scales", None)
+        v_dequant_scales = kwargs.get("v_dequant_scales", None)
         if cache is not None:
             input_ids = tgt_ids
             position_ids = tgt_pos
@@ -806,6 +824,10 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
             "seq_len_decoder": seq_len_decoder,
             "cache": cache,
             "pre_caches": pre_caches,
+            "k_quant_scales": k_quant_scales,
+            "v_quant_scales": v_quant_scales,
+            "k_dequant_scales": k_dequant_scales,
+            "v_dequant_scales": v_dequant_scales,
         }
         return model_inputs
 
@@ -826,6 +848,10 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -848,6 +874,10 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            k_quant_scales=k_quant_scales,
+            v_quant_scales=v_quant_scales,
+            k_dequant_scales=k_dequant_scales,
+            v_dequant_scales=v_dequant_scales,
         )
 
         hidden_states = outputs[0]
@@ -916,7 +946,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         Returns:
             list[paddle.Tensor]: the list tensor shape for cache
         """
-        max_block_per_seq = (config.max_seq_len + config.block_size - 1) // config.block_size 
+        max_block_per_seq = (config.max_seq_len + config.block_size - 1) // config.block_size
         if max_batch_size == -1:
             max_block_nums = None
         else:
@@ -933,9 +963,8 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             cache_kvs.append(cache_kv_shape)
             cache_kvs.append(cache_kv_shape)
         return cache_kvs
-    
-    def prepare_inputs_for_generation(self,
-                                      **kwargs):
+
+    def prepare_inputs_for_generation(self, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
         input_ids = kwargs["input_ids"]
         src_mask = kwargs.get("src_mask", None)
@@ -943,9 +972,9 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         caches = kwargs.get("caches", None)
 
         rope_emb = kwargs["rope_emb"]
-        seq_lens_this_time = kwargs['seq_lens_this_time']
-        seq_lens_encoder = kwargs['seq_lens_encoder']
-        seq_lens_decoder = kwargs['seq_lens_decoder']
+        seq_lens_this_time = kwargs["seq_lens_this_time"]
+        seq_lens_encoder = kwargs["seq_lens_encoder"]
+        seq_lens_decoder = kwargs["seq_lens_decoder"]
         model_inputs = {
             "input_ids": input_ids,
             "src_mask": src_mask,
@@ -954,7 +983,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             "seq_lens_this_time": seq_lens_this_time,
             "seq_lens_encoder": seq_lens_encoder,
             "seq_lens_decoder": seq_lens_decoder,
-            "block_tables": block_tables
+            "block_tables": block_tables,
         }
         return model_inputs
 
@@ -968,7 +997,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         seq_lens_encoder=None,
         seq_lens_decoder=None,
         rope_emb=None,
-        block_tables=None
+        block_tables=None,
     ):
         outputs = self.llama(
             input_ids,
