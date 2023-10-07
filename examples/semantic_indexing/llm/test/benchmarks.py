@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import argparse
+import csv
 import math
 import time
 from collections import defaultdict
@@ -19,6 +21,18 @@ from typing import Dict, List, cast
 from datasets import load_dataset
 from mteb.abstasks import AbsTaskRetrieval
 from prediction import Eval_modle
+
+csv.field_size_limit(500 * 1024 * 1024)
+
+# yapf: disable
+parser = argparse.ArgumentParser()
+parser.add_argument("--query_model", default="bigscience/bloomz-7b1-mt", type=str, help="The ann index name")
+parser.add_argument("--passage_model", default="bigscience/bloomz-7b1-mt", type=str, help="The ann index name")
+parser.add_argument("--query_max_length", default=64, type=int, help="Number of element to retrieve from embedding search")
+parser.add_argument("--passage_max_length", default=512, type=int, help="The embedding_dim of index")
+
+args = parser.parse_args()
+# yapf: enable
 
 
 class PaddleModel:
@@ -33,7 +47,7 @@ class PaddleModel:
         self.sep = sep
 
     def encode_queries(self, queries: List[str], batch_size: int, **kwargs):
-        return self.query_model.run(queries, batch_size=batch_size, max_seq_len=64, **kwargs)
+        return self.query_model.run(queries, batch_size=batch_size, max_seq_len=args.query_max_length, **kwargs)
 
     def encode_corpus(self, corpus: List[Dict[str, str]], batch_size: int, **kwargs):
         if type(corpus) is dict:
@@ -48,7 +62,7 @@ class PaddleModel:
                 (doc["title"] + self.sep + doc["text"]).strip() if "title" in doc else doc["text"].strip()
                 for doc in corpus
             ]
-        return self.query_model.run(sentences, batch_size=batch_size, max_seq_len=788, **kwargs)
+        return self.query_model.run(sentences, batch_size=batch_size, max_seq_len=args.passage_max_length, **kwargs)
 
 
 class T2RRetrieval(AbsTaskRetrieval):
@@ -124,15 +138,12 @@ class T2RRetrieval(AbsTaskRetrieval):
 
 
 def load_t2ranking_for_retraviel(num_max_passages: float):
-    import pandas
-
-    collection_dataset = pandas.read_csv("./collection.tsv", sep="\t")
-    # collection_dataset = load_dataset("THUIR/T2Ranking", "collection")["train"]  # type: ignore
+    collection_dataset = load_dataset("THUIR/T2Ranking", "collection")["train"]  # type: ignore
     dev_queries_dataset = load_dataset("THUIR/T2Ranking", "queries.dev")["train"]  # type: ignore
     dev_rels_dataset = load_dataset("THUIR/T2Ranking", "qrels.dev")["train"]  # type: ignore
     corpus = {}
     for index in range(min(len(collection_dataset), num_max_passages)):
-        record = collection_dataset.iloc[index, :]
+        record = collection_dataset[index]
         record = cast(dict, record)
         pid: int = record["pid"]
         corpus[str(pid)] = {"text": record["text"]}
@@ -161,4 +172,4 @@ def load_t2ranking_for_retraviel(num_max_passages: float):
 
 
 tasks = T2RRetrieval(num_max_passages=10000)
-tasks.evaluate(model_query="bigscience/bloomz-7b1-mt", model_corpus="bigscience/bloomz-7b1-mt", split="dev")
+tasks.evaluate(model_query=args.query_model, model_corpus=args.passage_model, split="dev")
