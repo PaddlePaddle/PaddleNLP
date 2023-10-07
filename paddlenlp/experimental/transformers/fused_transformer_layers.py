@@ -627,7 +627,6 @@ class FusedMultiTransformer(Layer):
                     cache_v_quant_scales=v_quant_scales[i] if v_quant_scales is not None else None,
                     cache_k_dequant_scales=k_dequant_scales[i] if k_dequant_scales is not None else None,
                     cache_v_dequant_scales=v_dequant_scales[i] if v_dequant_scales is not None else None,
-                    cache_scale_group_num=self.num_heads * input_ids.shape[0],
                 )[0]
 
             # out_linear

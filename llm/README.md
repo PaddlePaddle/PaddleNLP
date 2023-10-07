@@ -263,7 +263,7 @@ python predictor.py \
 # LoRA需要先合并参数，详见3.7LoRA参数合并
 # Prefix Tuning暂不支持
 python predictor.py \
-    --model_name_or_path meta-llama/Llama-2-7b-chat \
+    --model_name_or_path checkpoints/llama_sft_ckpts/checkpoint-10 \
     --dtype float16 \
     --max_length 1024 \
     --mode "dynamic" \
@@ -277,10 +277,19 @@ python predictor.py \
 # LoRA需要先合并参数，详见3.7LoRA参数合并
 # Prefix Tuning暂不支持
 python export_model.py \
-    --model_name_or_path meta-llama/Llama-2-7b-chat \
+    --model_name_or_path checkpoints/llama_sft_ckpts/checkpoint-10 \
     --output_path ./inference \
     --dtype float16 \
-    --inference_model
+    --inference_model \
+    --use_cachekv_int8
+
+python export_model.py \
+    --model_name_or_path checkpoints/llama_sft_ckpts/checkpoint-10 \
+    --output_path ./inference \
+    --dtype float16 \
+    --inference_model \
+    --quant_type weight_only_int8 \
+    --use_cachekv_int8
 
 # InferenceModel 静态图推理
 python predictor.py \
@@ -290,6 +299,15 @@ python predictor.py \
     --output_file "infer.json" \
     --mode "static" \
     --inference_model
+
+python predictor.py \
+    --model_name_or_path ./inference \
+    --dtype float16 \
+    --max_length 1024 \
+    --output_file "infer.json" \
+    --mode "static" \
+    --inference_model \
+    --use_cachekv_int8
 ```
 
 

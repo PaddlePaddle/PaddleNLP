@@ -584,6 +584,19 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
             input_tensor = self.predictor.get_input_handle("cache_kvs_" + str(i))
             input_tensor.share_external_data(self.cache_kvs[i])
 
+            if self.config.use_cachekv_int8:
+                input_tensor = self.predictor.get_input_handle("k_quant_scales_" + str(i))
+                input_tensor.share_external_data(self.k_quant_scales[i])
+
+                input_tensor = self.predictor.get_input_handle("v_quant_scales_" + str(i))
+                input_tensor.share_external_data(self.v_quant_scales[i])
+
+                input_tensor = self.predictor.get_input_handle("k_dequant_scales_" + str(i))
+                input_tensor.share_external_data(self.k_dequant_scales[i])
+
+                input_tensor = self.predictor.get_input_handle("v_dequant_scales_" + str(i))
+                input_tensor.share_external_data(self.v_dequant_scales[i])
+
         input_tensor = self.predictor.get_input_handle("pre_ids")
         input_tensor.share_external_data(self.pre_ids)
 

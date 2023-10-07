@@ -64,6 +64,7 @@ class GenerationInferenceModel(GenerationMixin):
 
     def to_static(self, output_path: str, config: dict):
         dtype = config.get("dtype", paddle.get_default_dtype())
+        cachekv_dtype = dtype
 
         cache_kvs_shapes = self.get_cache_kvs_shape(self.config, max_length=config.get("max_length", None))
         export_precache = config.get("export_precache", False)
@@ -74,6 +75,50 @@ class GenerationInferenceModel(GenerationMixin):
             ]
         else:
             precache_input_spec = None
+
+        use_cachekv_int8 = config.get("use_cachekv_int8", False)
+
+        if use_cachekv_int8:
+            cachekv_dtype = "uint8"
+            cache_k_quant_scales = [
+                paddle.static.InputSpec(
+                    shape=[shape[1], self.config.num_attention_heads],
+                    dtype="float32",
+                    name="k_quant_scales_{}".format(i),
+                )
+                for i, shape in enumerate(cache_kvs_shapes)
+            ]
+
+            cache_v_quant_scales = [
+                paddle.static.InputSpec(
+                    shape=[shape[1], self.config.num_attention_heads],
+                    dtype="float32",
+                    name="v_quant_scales_{}".format(i),
+                )
+                for i, shape in enumerate(cache_kvs_shapes)
+            ]
+
+            cache_k_dequant_scales = [
+                paddle.static.InputSpec(
+                    shape=[shape[1], self.config.num_attention_heads],
+                    dtype="float32",
+                    name="k_dequant_scales_{}".format(i),
+                )
+                for i, shape in enumerate(cache_kvs_shapes)
+            ]
+            cache_v_dequant_scales = [
+                paddle.static.InputSpec(
+                    shape=[shape[1], self.config.num_attention_heads],
+                    dtype="float32",
+                    name="v_dequant_scales_{}".format(i),
+                )
+                for i, shape in enumerate(cache_kvs_shapes)
+            ]
+        else:
+            cache_k_quant_scales = None
+            cache_v_quant_scales = None
+            cache_k_dequant_scales = None
+            cache_v_dequant_scales = None
 
         input_spec = [
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),  # input_ids
@@ -101,14 +146,18 @@ class GenerationInferenceModel(GenerationMixin):
             [
                 paddle.static.InputSpec(
                     shape=shape,
-                    dtype=dtype,
+                    dtype=cachekv_dtype,
                     name="cache_kvs_{}".format(i),
                 )
                 for i, shape in enumerate(cache_kvs_shapes)
             ],  # cache_kvs
             None,  # inputs_embeds
             config.get("logits_processors", None),
-            precache_input_spec,
+            precache_input_spec,  # pre_caches
+            cache_k_quant_scales,
+            cache_v_quant_scales,
+            cache_k_dequant_scales,
+            cache_v_dequant_scales,
         ]
         if self.config["model_type"] and "chatglm" in self.config.model_type:
             input_spec[2] = paddle.static.InputSpec(
@@ -117,6 +166,7 @@ class GenerationInferenceModel(GenerationMixin):
             input_spec[16] = paddle.static.InputSpec(shape=[None, 2, 1], dtype="int64", name="tgt_pos")  # tgt_pos
         elif self.config["model_type"] and "gpt" in self.config.model_type:
             input_spec[2] = paddle.static.InputSpec(shape=[None], dtype="int64", name="position_ids")  # position_ids
+
         model = paddle.jit.to_static(self.generate, input_spec=input_spec)
         paddle.jit.save(
             model, output_path, skip_prune_program=True

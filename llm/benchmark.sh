@@ -19,13 +19,38 @@ export FLAGS_new_executor_serial_run=1
 export FLAGS_allocator_strategy=naive_best_fit
 export FLAGS_fraction_of_gpu_memory_to_use=0.92
 
+# python predictor.py \
+#     --model_name_or_path ./llama7b-inference_model_fp16 \
+#     --dtype float16 \
+#     --src_length 300 \
+#     --max_length 100 \
+#     --output_file "infer.json" \
+#     --mode "static" \
+#     --batch_size 1 \
+#     --benchmark \
+#     --inference_model
+
+for bsz in 60;do
 python predictor.py \
-    --model_name_or_path ./llama7b-inference_model_fp16 \
+    --model_name_or_path "checkpoints/llama_sft_ckpts/checkpoint-10" \
     --dtype float16 \
     --src_length 300 \
     --max_length 100 \
-    --output_file "infer.json" \
-    --mode "static" \
-    --batch_size 1 \
-    --benchmark \
-    --inference_model
+    --mode "dynamic" \
+    --inference_model \
+    --batch_size ${bsz} \
+    --use_cachekv_int8 \
+    --benchmark 
+done
+
+# for bsz in 34;do
+# python predictor.py \
+#     --model_name_or_path "checkpoints/llama_sft_ckpts/checkpoint-10" \
+#     --dtype float16 \
+#     --src_length 300 \
+#     --max_length 100 \
+#     --mode "dynamic" \
+#     --inference_model \
+#     --batch_size ${bsz} \
+#     --benchmark 
+# done
