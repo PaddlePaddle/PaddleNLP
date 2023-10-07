@@ -349,7 +349,7 @@ class MultiHeadAttention(nn.Layer):
             # Current Flash Attention doesn't support attn maskt
             # Paddle Flash Attention input [batch_size, seq_len, num_heads, head_dim]
             # Torch Flash Attention input (batch_size, seqlen, nheads, headdim)
-            bsz, q_len, num_heads, head_dim = q.shape
+            # bsz, q_len, num_heads, head_dim = q.shape
             # TODO: Support attention mask for flash attention
             attention_func = self._flash_attention
         else:
