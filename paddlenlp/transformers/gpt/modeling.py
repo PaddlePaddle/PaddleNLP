@@ -453,7 +453,7 @@ class TransformerDecoder(nn.Layer):
                     hidden_states=output,
                     attention_mask=attention_mask,
                     use_cache=use_cache,
-                    past_key_values=None,
+                    past_key_value=None,
                     output_attentions=output_attentions,
                 )
             else:
