@@ -126,7 +126,7 @@ def embedding_extraction(file_path):
 
 if __name__ == "__main__":
 
-    file_paths = glob.glob("*.jsonl")
+    file_paths = glob.glob(os.path.join(args.file_paths, "*.jsonl"))
     file_paths.sort()
     root_path = os.path.join("data", "full_text_embeddings")
     os.makedirs(root_path, exist_ok=True)
