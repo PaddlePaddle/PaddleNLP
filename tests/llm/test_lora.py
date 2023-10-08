@@ -26,12 +26,11 @@ from .testing_utils import LLMTest
 
 
 @parameterized_class(
-    ["model_dir", "enable_compare"],
+    ["model_dir"],
     [
-        ["llama", False],
-        # TODO(wj-Mcat): to enable chatglm/chatglm2 unit test
-        # ["chatglm"],
-        # ["chatglm2"],
+        ["llama"],
+        ["chatglm"],
+        ["chatglm2"],
         ["bloom"],
     ],
 )
