@@ -347,9 +347,9 @@ class Trainer:
                 self.args.tensor_parallel_degree > 1 and self.sharding is None
             ):
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
+                self.scaler = fleet.distributed_scaler(self.scaler)
                 if self.args.amp_master_grad:
                     mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
-                self.scaler = fleet.distributed_scaler(self.scaler)
             elif self.sharding is not None:
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
                 if self.amp_dtype == "float16" or self.amp_dtype == "bfloat16":
