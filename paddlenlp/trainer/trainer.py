@@ -94,6 +94,7 @@ from ..utils.env import (
 from ..utils.import_utils import is_datasets_available
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
+from .plugins.sharded_ckpt_io import ShardedCkptIO
 from .plugins.timer import get_timers, set_timers
 from .trainer_callback import (
     CallbackHandler,
@@ -130,7 +131,6 @@ from .utils.helper import (  # nested_truncate,
     nested_numpify,
     nested_truncate,
 )
-from .utils.sharded_ckpt_io import ShardedCkptIO
 from .utils.sharding_io import ShardingIO
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
