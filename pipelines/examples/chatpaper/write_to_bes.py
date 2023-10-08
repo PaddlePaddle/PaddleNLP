@@ -84,18 +84,20 @@ def get_doc_store():
             thread_count=args.es_thread_count,
             queue_size=args.es_queue_size,
             index_type="hnsw",
+            duplicate_documents=args.duplicate_documents,
         )
 
         return document_store
 
 
 if __name__ == "__main__":
-    file_paths = glob.glob(os.path.join(args.file_paths, "/*.jsonl"))
+    file_paths = glob.glob(os.path.join(args.file_paths, "*.jsonl"))
     file_paths.sort()
     file_paths = file_paths[args.start_idx : args.end_idx]
     document_store = get_doc_store()
     log_file = open("log_writer.txt", "w")
     for file_path in tqdm(file_paths):
+        print(f"Processing file: {file_path}")
         docs = read_data(file_path)
         try:
             # Manually write
