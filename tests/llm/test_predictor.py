@@ -18,16 +18,23 @@ import unittest
 
 from parameterized import parameterized_class
 
-from paddlenlp.transformers import AutoTokenizer, LlamaForCausalLM, BloomForCausalLM, ChatGLMForCausalLM, ChatGLMv2ForCausalLM
+from paddlenlp.transformers import (
+    AutoTokenizer,
+    BloomForCausalLM,
+    ChatGLMForCausalLM,
+    LlamaForCausalLM,
+)
 
 from .testing_utils import LLMTest
 
 
 @parameterized_class(
     ["model_name_or_path", "model_class"],
-    [["__internal_testing__/tiny-random-llama", LlamaForCausalLM],
-     ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
-     ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM]],
+    [
+        ["__internal_testing__/tiny-random-llama", LlamaForCausalLM],
+        ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
+        ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
+    ],
 )
 class PredictorTest(LLMTest, unittest.TestCase):
     config_path: str = "./tests/fixtures/llm/predictor.yaml"
@@ -47,7 +54,7 @@ class PredictorTest(LLMTest, unittest.TestCase):
 
         # compare the generation result of inference & dygraph model
         assert len(result_0) == len(result_1)
-        
+
         count, full_match = 0, 0
         for inference_item, no_inference_item in zip(result_0, result_1):
             # random model may return all special tokens prediction,
