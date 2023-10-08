@@ -24,12 +24,12 @@ from .testing_utils import LLMTest
 
 
 @parameterized_class(
-    ["model_dir", "enable_compare"],
+    ["model_dir"],
     [
-        ["llama", False],
-        # ["chatglm"],
-        # ["chatglm2"],
-        # ["bloom"],
+        ["llama"],
+        ["chatglm"],
+        ["bloom"],
+        ["chatglm2"]
     ],
 )
 class FinetuneTest(LLMTest, unittest.TestCase):
@@ -50,12 +50,13 @@ class FinetuneTest(LLMTest, unittest.TestCase):
         finetune_config["dataset_name_or_path"] = self.data_dir
         finetune_config["output_dir"] = self.output_dir
 
+        print(finetune_config)
         with argv_context_guard(finetune_config):
             from finetune_generation import main
 
             main()
 
-        if self.model_dir != "opt":
+        if self.model_dir != "opt" and self.model_dir!= "chatglm2":
             self.run_predictor({"inference_model": True})
 
         self.run_predictor({"inference_model": False})
