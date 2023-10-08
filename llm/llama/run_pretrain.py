@@ -453,9 +453,12 @@ def main():
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
     config.sep_parallel_degree = training_args.sep_parallel_degree
+    assert config.num_attention_heads % config.sep_parallel_degree == 0
 
     # hack to change model size
-    config.num_hidden_layers = 8
+    config.num_hidden_layers = 4
+    config.num_attention_heads = 64
+    config.num_key_value_heads = 64
     # config.intermediate_size = config.hidden_size
     #
 

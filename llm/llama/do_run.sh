@@ -23,24 +23,47 @@ export FLAGS_cudnn_deterministic=1
 export FLAGS_flash_attn_version=v1
 export USE_FAST_LN=0
 
-mode="tp"
-# mode="sep"
+export FLAGS_shard_norm_align_dp=1
+export FLAGS_shard_use_reduce=0
+export FLAGS_enable_sep_shard=0
 
-max_seq_length=2048
+mode="tp"
+mode="sep"
 if [[ $# > 0 ]]; then
-  max_seq_length=$1
+  mode=$1
 fi
-echo "max_seq_length:$max_seq_length"
+
+# max_seq_length=16384
+max_seq_length=65536
+if [[ $# > 1 ]]; then
+  max_seq_length=$2
+fi
+
+gpus="0,1,2,3,4,5,6,7"
+if [[ $# > 2 ]]; then
+  gpus=$3
+fi
+
+gpu_num=8
+if [[ $# > 3 ]]; then
+  gpu_num=$4
+fi
+
+echo "mode:$mode, max_seq_length:$max_seq_length, gpus:$gpus, gpu_num:$gpu_num"
+
 max_steps=10
-tp_log_dir=tp_log_$max_seq_length
-sep_log_dir=sep_log_$max_seq_length
+log_dir=${mode}_log_seq_${max_seq_length}_gpus_${gpu_num}
+echo "log_dir:${log_dir}"
+# log_dir=tp_log_tmp
 
 export PYTHONPATH=../../:$PYTHONPATH
 if [[ $mode == "tp" ]]; then
 rm -rf dp_input_data/*
+# rm -rf tp_log
+# nsys profile --stats true -w true -t cuda,nvtx,osrt,cudnn,cublas --capture-range=cudaProfilerApi -x true --force-overwrite true -o test_paddle \
 python -u  -m paddle.distributed.launch \
-    --gpus "0,1,2,3,4,5,6,7" \
-    --log_dir "./$tp_log_dir" \
+    --gpus $gpus \
+    --log_dir "./$log_dir" \
     run_pretrain.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
@@ -81,16 +104,19 @@ python -u  -m paddle.distributed.launch \
     --data_cache "./data_cache" \
     --pipeline_parallel_degree 1 \
     --sep_parallel_degree 1 \
-    --tensor_parallel_degree 8 \
-    --sequence_parallel false \
+    --tensor_parallel_degree $gpu_num \
+    --sequence_parallel true \
+    --skip_profile_timer true \
     --amp_master_grad \
     # --sharding "stage1" \
+    # --sharding_parallel_degree 8 \
 
 elif [[ $mode == "sep" ]]; then
-rm -rf sep_input_data/*
+# rm -rf sep_log
+# nsys profile --stats true -w true -t cuda,nvtx,osrt,cudnn,cublas --capture-range=cudaProfilerApi -x true --force-overwrite true -o test_paddle \
 python -u  -m paddle.distributed.launch \
-    --gpus "0,1,2,3,4,5,6,7" \
-    --log_dir "./$sep_log_dir" \
+    --gpus $gpus \
+    --log_dir "./$log_dir" \
     run_pretrain.py \
     --model_type "llama" \
     --model_name_or_path "facebook/llama-7b" \
@@ -130,11 +156,13 @@ python -u  -m paddle.distributed.launch \
     --recompute_use_reentrant true \
     --data_cache "./data_cache" \
     --pipeline_parallel_degree 1 \
-    --sep_parallel_degree 8 \
+    --sep_parallel_degree $gpu_num \
     --tensor_parallel_degree 1 \
     --sequence_parallel false \
+    --skip_profile_timer true \
     --amp_master_grad \
     # --sharding "stage1" \
+    # --sharding_parallel_degree 8 \
 
 fi
 
