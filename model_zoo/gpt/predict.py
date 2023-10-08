@@ -22,37 +22,35 @@ import sys
 import numpy as np
 import paddle
 
-from paddlenlp.transformers import (
-    GPTChineseTokenizer,
-    GPTForGreedyGeneration,
-    GPTTokenizer,
-)
+from paddlenlp.transformers import GPTChineseTokenizer, GPTForCausalLM, GPTTokenizer
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "gpt-cn": (GPTForGreedyGeneration, GPTChineseTokenizer),
-    "gpt": (GPTForGreedyGeneration, GPTTokenizer),
+    "gpt-cn": (GPTForCausalLM, GPTChineseTokenizer),
+    "gpt": (GPTForCausalLM, GPTTokenizer),
 }
 
 
 class Demo:
-    def __init__(self, model_type="gpt-cn", model_name_or_path="gpt-cpm-large-cn", max_predict_len=32):
+    def __init__(self, model_type="gpt-cn", model_name_or_path="gpt-cpm-large-cn", max_new_tokens=10):
         model_class, tokenizer_class = MODEL_CLASSES[model_type]
         self.tokenizer = tokenizer_class.from_pretrained(model_name_or_path)
         logger.info("Loading the model parameters, please wait...")
-        self.model = model_class.from_pretrained(
-            model_name_or_path, max_predict_len=max_predict_len, eol_token_id=self.tokenizer.eol_token_id
-        )
+        self.model = model_class.from_pretrained(model_name_or_path)
         self.model.eval()
+        self.max_new_tokens = max_new_tokens
         logger.info("Model loaded.")
 
     # prediction function
     def predict(self, text):
         ids = self.tokenizer(text)["input_ids"]
         input_ids = paddle.to_tensor(np.array(ids).reshape(1, -1).astype("int64"))
-        out = self.model(input_ids)
-        out = [int(x) for x in out.numpy().reshape([-1])]
-        logger.info(self.tokenizer.convert_ids_to_string(out))
+        out = self.model.generate(
+            input_ids=input_ids, max_new_tokens=self.max_new_tokens, eos_token_id=self.tokenizer.eol_token_id
+        )
+        # print(out)
+        out = [int(x) for x in out[0].numpy().reshape([-1])]
+        logger.info("\n" + text + self.tokenizer.convert_ids_to_string(out))
 
     # One shot example
     def ask_question_cn(self, question):
