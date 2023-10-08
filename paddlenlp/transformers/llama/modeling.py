@@ -72,6 +72,12 @@ __all__ = [
     "LlamaPretrainingCriterion",
 ]
 
+def check_memory_usage(msg=""):
+    max_memory_allocated_size = paddle.device.cuda.max_memory_allocated()/(1024*1024*1024)
+    max_memory_reserved_size = paddle.device.cuda.max_memory_reserved()/(1024*1024*1024)
+    memory_allocated_size = paddle.device.cuda.memory_allocated()/(1024*1024*1024)
+    memory_reserved_size = paddle.device.cuda.memory_reserved()/(1024*1024*1024)
+    logger.warning(f"checking gpu memory usage {msg}:\nmax_memory_allocated_size: {max_memory_allocated_size}GB\nmax_memory_reserved_size: {max_memory_reserved_size}GB\nmemory_allocated_size: {memory_allocated_size}GB\nmemory_reserved_size: {memory_reserved_size}GB")
 
 def _get_interleave(n):
     def _get_interleave_power_of_2(n):
@@ -174,6 +180,7 @@ def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
         return logits
 
 
+
 def scaled_dot_product_attention(
     query_states,
     config,
@@ -194,8 +201,12 @@ def scaled_dot_product_attention(
         # Current Flash Attention doesn't support attn maskt
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
+        assert attention_mask is None, "Do not build attention mask for Flash Attention"
         if alibi is not None:
             raise ValueError("Flash Attention does not support ALiBi yet")
+        # from paddlenlp.trainer.plugins.timer import get_timers
+        # timers = get_timers()
+        # timers and timers("flash_attention").start()
         attn_output, attn_weights = flash_attention(
             query_states,
             key_states,
@@ -203,7 +214,12 @@ def scaled_dot_product_attention(
             causal=is_causal and query_states.shape[1] != 1,
             return_softmax=output_attentions,
         )
+        # timers and timers("flash_attention").stop()
+        #
+        # attn_output = query_states
+        #
         if reshard_layer is not None:
+            # timers and timers("reshard_attn_output").start()
             # input attn_output shape: [bs, seqlen, num_head/sep, head_dim]
             attn_output = reshard_layer(attn_output, split_axis=1, concat_axis=2,)
             # output attn_output shape: [bs, seqlen/sep, num_head, head_dim]
@@ -211,6 +227,7 @@ def scaled_dot_product_attention(
             assert q_len % config.sep_parallel_degree == 0, f"q_len:{q_len}, config.sep_parallel_degree:{config.sep_parallel_degree}"
             q_len = q_len // config.sep_parallel_degree
             num_heads = num_heads * config.sep_parallel_degree
+            # timers and timers("reshard_attn_output").stop()
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
         else:
@@ -686,9 +703,17 @@ class LlamaAttention(nn.Layer):
         
         self.reshard_layer = None
         if config.sep_parallel_degree > 1:
+            assert self.num_key_value_heads % config.sep_parallel_degree == 0
+            assert self.num_heads % config.sep_parallel_degree == 0
             self.reshard_layer = ReshardLayer()
 
         self.config = config
+
+        # from paddlenlp.trainer.plugins.timer import get_timers, set_timers
+        # set_timers()
+        # self.timers = get_timers()
+        # logger.info(f"self.timers: {self.timers}")
+
 
     def _init_rope(self):
         if self.config.rope_scaling_type is None:
@@ -732,19 +757,23 @@ class LlamaAttention(nn.Layer):
 
         if self.fuse_attention_qkv:
             mix_layer = self.qkv_proj(hidden_states)
+            # check_memory_usage("before qkv")
             if self.reshard_layer is not None:
+                # self.timers and self.timers("reshard_qkv").start()
                 if self.sequence_parallel:
                     assert self.seq_length % self.config.sep_parallel_degree == 0
                     mix_layer = paddle.reshape_(mix_layer, [-1, self.seq_length // self.config.sep_parallel_degree, 3 * self.num_heads * self.head_dim])
                 # [bs, seq_len / sep, num_head, head_dim] -> [bs, seq_len, num_head / sep, head_dim]
                 mix_layer = self.reshard_layer(mix_layer, split_axis=2, concat_axis=1,)
                 mix_layer = paddle.reshape_(mix_layer, [0, self.seq_length, -1, 3 * self.head_dim])  # [bs, seq_len, num_head/k, 3*head_dim], k is sep degree
+                # self.timers and self.timers("reshard_qkv").stop()
             else:
                 if self.sequence_parallel:
                     target_shape = [-1, self.seq_length, self.num_heads, 3 * self.head_dim]
                 else:
                     target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
                 mix_layer = paddle.reshape_(mix_layer, target_shape)
+            # check_memory_usage("after qkv")
             query_states, key_states, value_states = paddle.split(mix_layer, num_or_sections=3, axis=-1)
         else:
             query_states = self.q_proj(hidden_states)
@@ -825,6 +854,7 @@ class LlamaAttention(nn.Layer):
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
+            # check_memory_usage("before scaled_dot_product_attention")
             outputs = scaled_dot_product_attention(
                 query_states,
                 self.config,
@@ -836,6 +866,7 @@ class LlamaAttention(nn.Layer):
                 self.sequence_parallel,
                 reshard_layer = self.reshard_layer,
             )
+            # check_memory_usage("after scaled_dot_product_attention")
         if output_attentions:
             attn_output, attn_weights = outputs
         else:
@@ -1139,6 +1170,10 @@ class LlamaModel(LlamaPretrainedModel):
 
         self.gradient_checkpointing = False
 
+        # from paddlenlp.trainer.plugins.timer import get_timers, set_timers
+        # set_timers()
+        # self.timers = get_timers()
+
     def get_input_embeddings(self):
         return self.embed_tokens
 
@@ -1147,6 +1182,10 @@ class LlamaModel(LlamaPretrainedModel):
 
     @staticmethod
     def _prepare_decoder_attention_mask(attention_mask, input_shape, past_key_values_length, dtype):
+        logger.info(f"input_shape:{input_shape}, attention_mask shape:{attention_mask.shape}")
+        # from paddlenlp.trainer.plugins.timer import get_timers
+        # timers = get_timers()
+        # timers("expanded_attn_mask").start()
         if attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
             if len(attention_mask.shape) == 2:
@@ -1165,8 +1204,11 @@ class LlamaModel(LlamaPretrainedModel):
                 expanded_attn_mask = attention_mask
         else:
             expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
+        # timers("expanded_attn_mask").stop()
+        # timers("expanded_attn_mask_where").start()
         # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
         expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
+        # timers("expanded_attn_mask_where").stop()
         return expanded_attn_mask
 
     @paddle.jit.not_to_static
@@ -1246,6 +1288,8 @@ class LlamaModel(LlamaPretrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
+        # self.timers("between_emd_attn").start()
+
         if self.sequence_parallel:
             # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
             bs, seq_len, hidden_size = inputs_embeds.shape
@@ -1254,38 +1298,51 @@ class LlamaModel(LlamaPretrainedModel):
             inputs_embeds = ScatterOp.apply(inputs_embeds)
 
         # embed positions
-        if attention_mask is None:
-            # [bs, seq_len]
-            attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
-
-        if self.config.alibi:
-            alibi = build_alibi_tensor(attention_mask, self.config.num_attention_heads, dtype=inputs_embeds.dtype)
-            if self.config.tensor_parallel_degree > 1:
-                block_size = self.config.num_attention_heads // self.config.tensor_parallel_degree
-                alibi = alibi[
-                    :,
-                    self.config.tensor_parallel_rank
-                    * block_size : (self.config.tensor_parallel_rank + 1)
-                    * block_size,
-                ]
-                alibi = alibi.reshape([batch_size * block_size, 1, seq_length_with_past])
+        alibi = None
+        if not (self.config.use_flash_attention and flash_attention):
+            # self.timers("build_attention_mask").start()
+            if attention_mask is None:
+                # [bs, seq_len]
+                attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
+            # self.timers("build_attention_mask").stop()
+            # self.timers("build_alibi").start()
+            if self.config.alibi:
+                alibi = build_alibi_tensor(attention_mask, self.config.num_attention_heads, dtype=inputs_embeds.dtype)
+                if self.config.tensor_parallel_degree > 1:
+                    block_size = self.config.num_attention_heads // self.config.tensor_parallel_degree
+                    alibi = alibi[
+                        :,
+                        self.config.tensor_parallel_rank
+                        * block_size : (self.config.tensor_parallel_rank + 1)
+                        * block_size,
+                    ]
+                    alibi = alibi.reshape([batch_size * block_size, 1, seq_length_with_past])
+                else:
+                    alibi = alibi.reshape([batch_size * self.config.num_attention_heads, 1, seq_length_with_past])
             else:
-                alibi = alibi.reshape([batch_size * self.config.num_attention_heads, 1, seq_length_with_past])
-        else:
-            alibi = None
+                alibi = None
+            # self.timers("build_alibi").stop()
 
+            # self.timers("build_prepare_attn_mask").start()
+            attention_mask = self._prepare_decoder_attention_mask(
+                attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
+            )  # [bs, 1, seq_len, seq_len]
+            # self.timers("build_prepare_attn_mask").stop()
+
+        # self.timers("build_position_ids").start()
         if position_ids is None:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
+        # self.timers("build_position_ids").stop()
 
-        attention_mask = self._prepare_decoder_attention_mask(
-            attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
-        )  # [bs, 1, seq_len, seq_len]
+
         hidden_states = inputs_embeds
 
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
+
+        # self.timers("between_emd_attn").stop()
 
         for idx, (decoder_layer) in enumerate(self.layers):
             if output_hidden_states:
@@ -1540,7 +1597,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
+        # check_memory_usage("start run llama lm")
         outputs = self.llama(
             input_ids,  # [bs, seq_len]
             position_ids=position_ids,
@@ -1552,6 +1609,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
+        # check_memory_usage("llama out")
 
         hidden_states = outputs[0]  # [bs, seq_len, dim]
 
@@ -1562,10 +1620,12 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         )
 
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+        # check_memory_usage("lm_head out")
 
         loss = None
         if labels is not None:
             loss = self.criterion(logits, labels)
+        # check_memory_usage("criterion out")
 
         if not return_dict:
             output = (logits,) + outputs[1:]
