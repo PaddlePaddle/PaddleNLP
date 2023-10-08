@@ -292,6 +292,7 @@ class TransformerDecoder(nn.Layer):
         for i, mod in enumerate(self.layers):
             ipp = mod.ipp
             mod = auto.shard_op(mod, auto_env.get_mesh()[ipp])
+            auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().dp_dim, None, None])
 
             if cache is None:
                 if use_cache:
@@ -305,8 +306,6 @@ class TransformerDecoder(nn.Layer):
             else:
                 output, new_cache = mod(output, memory, tgt_mask=tgt_mask, use_cache=use_cache, cache=cache[i])
                 new_caches.append(new_cache)
-
-            auto.shard_tensor(output, auto_env.get_mesh()[ipp], [auto_env.get_mesh().dp_dim, None, None])
 
         if self.norm is not None:
             output = self.norm(output)
