@@ -695,9 +695,9 @@ class TrainingArguments:
     distributed_dataloader: Optional[bool] = field(
         default=False, metadata={"help": "Whether to use distributed dataloader."}
     )
-    old_save_load: Optional[bool] = field(
-        default=True,
-        metadata={"help": "Whether use old save load method or new sharded ckpt method."},
+    unify_hybrid_parallel_checkpoint: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether to unify hybrid parallel checkpoint."},
     )
     safe_ckpt: Optional[bool] = field(
         default=True,
@@ -1181,7 +1181,7 @@ class TrainingArguments:
     def weight_name_suffix(self):
         if self.use_hybrid_parallel:
             name = []
-            if self.old_save_load:
+            if not self.unify_hybrid_parallel_checkpoint:
                 if self.tensor_parallel_degree > 1:
                     name.append(f"tp{self.tensor_parallel_rank:0>2d}")
                 if self.pipeline_parallel_degree > 1:

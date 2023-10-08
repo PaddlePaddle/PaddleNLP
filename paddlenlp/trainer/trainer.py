@@ -451,7 +451,7 @@ class Trainer:
         """
         resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
 
-        if resume_from_checkpoint is not None and not self.args.old_save_load:
+        if resume_from_checkpoint is not None and self.args.unify_hybrid_parallel_checkpoint:
             self.sharded_ckpt_io.load_sharded_checkpoint(
                 resume_from_checkpoint, safe_serialization=self.args.safe_ckpt
             )
@@ -1997,11 +1997,11 @@ class Trainer:
         # Save a trained model and configuration using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
 
-        if self.args.old_save_load:
+        if not self.args.unify_hybrid_parallel_checkpoint:
             merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
 
         # New sharded ckpt method
-        if not self.args.old_save_load:
+        if self.args.unify_hybrid_parallel_checkpoint:
             if not isinstance(self.model, PretrainedModel):
                 if isinstance(unwrap_model(self.model), PretrainedModel):
                     config_to_save = None
@@ -2139,7 +2139,7 @@ class Trainer:
         if self.args.should_save_sharding_stage1_model:
             self.sharding_io.save_distributed_model_meta(output_dir)
 
-        if not self.args.old_save_load and not self.args.should_save_sharding_stage1_model:
+        if self.args.unify_hybrid_parallel_checkpoint and not self.args.should_save_sharding_stage1_model:
             self.sharded_ckpt_io.save_sharded_index(output_dir, safe_serialization=self.args.safe_ckpt)
 
         if self.args.should_save:
