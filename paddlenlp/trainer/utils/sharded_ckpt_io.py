@@ -25,12 +25,19 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer.trainer_utils import get_last_checkpoint
 from paddlenlp.transformers.model_utils import (
+    PretrainedModel,
     _add_variant,
     _load_state_dict_into_model,
     get_parameter_dtype,
     load_state_dict,
+    unwrap_model,
 )
-from paddlenlp.transformers.utils import dtype_byte_size, get_checkpoint_shard_files
+from paddlenlp.transformers.utils import (
+    device_guard,
+    dtype_byte_size,
+    get_checkpoint_shard_files,
+)
+from paddlenlp.utils.distributed import distributed_gather
 from paddlenlp.utils.env import (
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
@@ -43,9 +50,8 @@ local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 
 
 class ShardedCkptIO:
-    def __init__(self, args, model, hcg=None):
+    def __init__(self, args, hcg=None):
         self.args = args
-        self.model = model
         self.tp_group = None
         self.hcg = hcg
         if self.hcg is None and paddle.distributed.get_world_size() > 1 and self.args.use_hybrid_parallel:
@@ -55,14 +61,14 @@ class ShardedCkptIO:
     def manipulate_state_dict_and_config(self, model_to_save, weight_name_suffix, safe_serialization=False):
         state_dict = model_to_save.state_dict()
         if self.args.use_hybrid_parallel:
-            all_filter_keys = self.filter_params(model_to_save, state_dict, self.optimizer, self.tp_group.rank)
+            all_filter_keys = self.filter_params(model_to_save, state_dict, self.tp_group.rank)
             dtype = get_parameter_dtype(model_to_save)
             assert hasattr(model_to_save, "config")
             model_to_save.config.dtype = str(dtype).split(".")[1]
             config_to_save = copy.deepcopy(model_to_save.config)
             if config_to_save.tensor_parallel_degree > 1:
-                state_dict = model_to_save.merge_tensor_parallel_with_shard(
-                    state_dict, config_to_save, all_filter_keys
+                state_dict = self.merge_tensor_parallel_with_shard(
+                    model_to_save, state_dict, config_to_save, all_filter_keys
                 )
                 # do we need to change?
                 config_to_save.tensor_parallel_degree = 1
@@ -109,22 +115,22 @@ class ShardedCkptIO:
             with open(path, "w") as f:
                 json.dump(sharded_index_json, f, indent=4)
 
-    def filter_params(self, model_to_save, state_dict, optimizer=None, tp_rank=0):
+    def filter_params(self, model_to_save, state_dict, tp_rank=0):
         logger.info("filter params for different workers to save.")
 
         tp_size = self.tp_group.nranks
         filter_tensor_list = [[] for i in range(tp_size)]
         if tp_rank == 0:
-            name_action_mappings = model_to_save._get_tensor_parallel_mappings(model_to_save.config, is_split=False)
+            tp_actions = model_to_save._get_tensor_parallel_mappings(model_to_save.config, is_split=False)
             state_keys_map = model_to_save._resolve_prefix_keys(
-                name_action_mappings.keys(), state_dict.keys(), ignore_error=True
+                tp_actions.keys(), state_dict.keys(), ignore_error=True
             )
             for k, v in state_keys_map.items():
-                name_action_mappings[v] = name_action_mappings.pop(k)
+                tp_actions[v] = tp_actions.pop(k)
 
             tensor_bytes_dict = {}
             for (k, v) in state_dict.items():
-                if k in name_action_mappings:
+                if k in tp_actions:
                     tensor_bytes_dict[k] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
                 else:
                     tensor_bytes_dict[k] = v.numel().item() * dtype_byte_size(v.dtype)
@@ -146,7 +152,84 @@ class ShardedCkptIO:
         )
         return filter_tensor_list
 
-    def load_sharded_checkpoint(self, resume_from_checkpoint=None, safe_serialization=False):
+    def merge_tensor_parallel_with_shard(self, model_to_save, state_dict, config, all_filter_keys):
+        tp_actions = model_to_save._get_tensor_parallel_mappings(config, is_split=False)
+        state_keys_map = model_to_save._resolve_prefix_keys(tp_actions.keys(), state_dict.keys(), ignore_error=True)
+
+        for k, v in state_keys_map.items():
+            tp_actions[v] = tp_actions.pop(k)
+
+        state_dict_to_save = {}
+
+        for i, filter_keys in enumerate(all_filter_keys):
+            is_dst = paddle.distributed.get_rank(self.tp_group) == i
+            for key in filter_keys:
+                tensor = state_dict[key]
+                if key in tp_actions:
+                    ret = distributed_gather(tensor, dst=i, group=self.tp_group, offload=True)
+                    action = tp_actions.pop(key)
+                    tensor = action(ret) if is_dst else None
+                else:
+                    tensor = tensor.cpu().numpy() if is_dst else None
+
+                # keep state dict use paddle.tensor
+                if isinstance(tensor, np.ndarray):
+                    with device_guard("cpu"):
+                        tensor = paddle.Tensor(tensor, zero_copy=True)
+
+                if is_dst:
+                    state_dict_to_save[key] = tensor
+
+        if len(tp_actions) > 0:
+            for x in tp_actions.keys():
+                logger.warning(f"key <{x}> need to merge tensor parallel but we can't find in model state.")
+
+        return state_dict_to_save
+
+    def save_sharded_checkpoint(self, model, output_dir, state_dict=None):
+        if not isinstance(model, PretrainedModel):
+            if isinstance(unwrap_model(model), PretrainedModel):
+                config_to_save = None
+                state_dict, config_to_save = self.manipulate_state_dict_and_config(
+                    unwrap_model(model),
+                    self.args.weight_name_suffix,
+                    safe_serialization=self.args.safe_ckpt,
+                )
+                unwrap_model(model).save_pretrained(
+                    output_dir,
+                    state_dict=state_dict,
+                    config_to_save=config_to_save,
+                    variant=self.args.weight_name_suffix,
+                    is_main_process=self.args.should_save,
+                    safe_serialization=self.args.safe_ckpt,
+                )
+            else:
+                logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
+                if state_dict is None:
+                    state_dict = model.state_dict()
+                paddle.save(
+                    state_dict,
+                    os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix)),
+                )
+        else:
+            if isinstance(model, PretrainedModel):
+                config_to_save = None
+                state_dict, config_to_save = self.manipulate_state_dict_and_config(
+                    model,
+                    self.args.weight_name_suffix,
+                    safe_serialization=self.args.safe_ckpt,
+                )
+                model.save_pretrained(
+                    output_dir,
+                    state_dict=state_dict,
+                    config_to_save=config_to_save,
+                    variant=self.args.weight_name_suffix,
+                    is_main_process=self.args.should_save,
+                    safe_serialization=self.args.safe_ckpt,
+                )
+        self.save_sharded_index(output_dir, safe_serialization=self.args.safe_ckpt)
+
+    def load_sharded_checkpoint(self, model, resume_from_checkpoint=None, safe_serialization=False):
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
             resume_from_checkpoint = get_last_checkpoint(self.args.output_dir)
@@ -160,7 +243,7 @@ class ShardedCkptIO:
         )
 
         loaded_keys = sharded_metadata["all_checkpoint_keys"]
-        model_state_dict = self.model.state_dict()
+        model_state_dict = model.state_dict()
         expected_keys = list(model_state_dict.keys())
 
         def _remove_unused_keys(
@@ -183,23 +266,23 @@ class ShardedCkptIO:
 
         for shard_file in resolved_archive_file:
             pre_tensor_parallel_split = False
-            if shard_file.endswith(".safetensors") and self.model.config.tensor_parallel_degree > 1:
+            if shard_file.endswith(".safetensors") and model.config.tensor_parallel_degree > 1:
                 pre_tensor_parallel_split = True
                 assert loaded_keys is not None, "loaded_keys is not None."
-                tp_actions = self.model.get_tensor_parallel_convert_actions(self.model.config, loaded_keys)
+                tp_actions = model.get_tensor_parallel_convert_actions(model.config, loaded_keys)
             # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
             state_dict = load_state_dict(
                 shard_file, tp_actions if pre_tensor_parallel_split else None, set(expected_keys)
             )
 
             _ = _remove_unused_keys(state_dict, model_state_dict)
-            if self.model.config.tensor_parallel_degree > 1 and not pre_tensor_parallel_split:
+            if model.config.tensor_parallel_degree > 1 and not pre_tensor_parallel_split:
                 logger.info("Converting state_dict to Tensor Parallel Format")
                 # ignore error for multi shard, since only parts of data
-                state_dict = self.model.convert_tensor_parallel(
-                    None, self.model.config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
+                state_dict = model.convert_tensor_parallel(
+                    None, model.config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
                 )
-            error_msgs += _load_state_dict_into_model(self.model, state_dict, "")
+            error_msgs += _load_state_dict_into_model(model, state_dict, "")
 
             # force memory release
             del state_dict
@@ -211,4 +294,4 @@ class ShardedCkptIO:
                 error_msg += (
                     "\n\tYou may consider adding `ignore_mismatched_sizes=True` in the model `from_pretrained` method."
                 )
-            raise RuntimeError(f"Error(s) in loading state_dict for {self.model.__class__.__name__}:\n\t{error_msg}")
+            raise RuntimeError(f"Error(s) in loading state_dict for {model.__class__.__name__}:\n\t{error_msg}")
