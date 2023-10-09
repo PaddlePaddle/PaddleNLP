@@ -9,6 +9,7 @@ jinja2
 sphinx
 sphinx_book_theme
 readthedocs-sphinx-search
+sphinx-rtd-theme
 
 Markdown
 sphinx-copybutton
