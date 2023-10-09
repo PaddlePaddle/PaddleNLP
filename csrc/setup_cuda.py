@@ -12,11 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import paddle
 from paddle.utils.cpp_extension import CUDAExtension, setup
+
+cuda_version = int(paddle.version.cuda_version.split(".")[0])
+disable_bfloat16 = cuda_version < 11
 
 setup(
     name="paddlenlp_ops",
     ext_modules=CUDAExtension(
+        include_dirs=[
+            "/root/paddlejob/workspace/env_run/fhq/cub"
+        ],
         sources=[
             "./generation/save_with_output.cc",
             "./generation/set_mask_value.cu",
@@ -32,6 +39,9 @@ setup(
             "./generation/encode_rotary_qk.cu",
             "./generation/top_p_sampling.cu",
             "./generation/set_alibi_mask_value.cu",
+        ],
+        extra_compile_args=[
+            "-DDISABLE_BF16=1" if disable_bfloat16 else ""
         ]
     ),
 )
